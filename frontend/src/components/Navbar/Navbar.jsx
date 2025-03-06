@@ -58,7 +58,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             <a href="/" className={`font-medium transition-colors ${textColor}`}>Home</a>
             <a href="/courses" className={`font-medium transition-colors ${textColor}`}>Courses</a>
             <a href="/chat" className={`font-medium transition-colors ${textColor}`}>AI Chatbot</a>
-            <a href="#learning-hub" className={`font-medium transition-colors ${textColor}`}>Learning Hub</a>
+            <a href="learning-hub" className={`font-medium transition-colors ${textColor}`}>Learning Hub</a>
             <div className="relative group">
               <a href="#more" className={`font-medium transition-colors flex items-center ${textColor}`}>
                 More
@@ -102,7 +102,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             <a href="#home" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Home</a>
             <a href="courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Courses</a>
             <a href="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">AI Chatbot</a>
-            <a href="#learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Learning Hub</a>
+            <a href="learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Learning Hub</a>
             <a href="#search" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Search</a>
             <div className="mt-4 flex flex-col space-y-2 px-4">
               <button className="px-4 py-2 rounded-full text-blue-600 border border-blue-600 font-medium">Log In</button>

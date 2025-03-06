@@ -14,7 +14,7 @@ const Hero = () => {
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20 mb-8">
             <span className="animate-pulse mr-2 h-3 w-3 rounded-full bg-green-400"></span>
-            <span className="text-white text-sm font-medium">1,000+ Free Courses Available</span>
+            <span className="text-black text-sm font-medium">1,000+ Free Courses Available</span>
           </div>
           
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6 leading-tight">

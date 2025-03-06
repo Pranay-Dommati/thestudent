@@ -5,7 +5,7 @@ import RatingStars from './RatingStars';
 
 const HeroSection = ({ course, progressPercentage, completedLessons, totalLessons }) => {
   return (
-    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-12 relative overflow-hidden">
+    <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-24 pb-12 relative overflow-hidden">
       {/* Background decorative elements */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full blur-xl -translate-y-1/2 translate-x-1/4"></div>
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-white opacity-10 rounded-full blur-xl translate-y-1/2 -translate-x-1/4"></div>
