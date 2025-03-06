@@ -6,7 +6,7 @@ import CourseLearning from './CourseLearning';
 
 const CourseLearningPage = () => {
   const { courseId } = useParams();
-  
+
   return (
     <>
       <Navbar />
