@@ -1,36 +1,66 @@
 import React, { useState, useEffect } from 'react';
 
-const Navbar = () => {
+const Navbar = ({ initialStyle = "transparent" }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Add this effect to reset scroll position when component mounts
+  useEffect(() => {
+    // Force scroll to top on initial load
+    window.scrollTo(0, 0);
+    
+    // Force update isScrolled state 
+    setIsScrolled(window.scrollY > 10);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
     };
+    
+    // Call once immediately to set initial state
+    handleScroll();
+    
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Generate the background class based on scroll state and initialStyle
+  let backgroundClass = '';
+  if (isScrolled) {
+    backgroundClass = 'bg-white shadow-md';
+  } else if (initialStyle === 'gradient') {
+    backgroundClass = 'bg-gradient-to-r from-indigo-600 to-purple-700';
+  } else if (initialStyle === 'light') {
+    backgroundClass = 'bg-white shadow-sm';
+  } else {
+    backgroundClass = 'bg-transparent';
+  }
+
+  // Text color based on background
+  const textColor = (isScrolled || initialStyle === 'light') 
+    ? 'text-gray-700 hover:text-blue-600' 
+    : 'text-white hover:text-blue-200';
+
   return (
-    <nav className={`fixed w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-md py-2' : 'bg-transparent py-4'}`}>
+    <nav className={`fixed w-full z-50 transition-all duration-300 ${backgroundClass} ${isScrolled ? 'py-2' : 'py-4'}`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center">
-            <a href="#home" className="flex items-center space-x-2">
+            <a href="/" className="flex items-center space-x-2">
               <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">S</div>
-              <span className={`font-bold text-xl ${isScrolled ? 'text-gray-800' : 'text-white'}`}>Students Hub</span>
+              <span className={`font-bold text-xl ${isScrolled || initialStyle === 'light' ? 'text-gray-800' : 'text-white'}`}>Students Hub</span>
             </a>
           </div>
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
-            <a href="#home" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>Home</a>
-            <a href="courses" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>Courses</a>
-            <a href="chat" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>AI Chatbot</a>
-            <a href="#learning-hub" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>Learning Hub</a>
+            <a href="/" className={`font-medium transition-colors ${textColor}`}>Home</a>
+            <a href="/courses" className={`font-medium transition-colors ${textColor}`}>Courses</a>
+            <a href="/chat" className={`font-medium transition-colors ${textColor}`}>AI Chatbot</a>
+            <a href="#learning-hub" className={`font-medium transition-colors ${textColor}`}>Learning Hub</a>
             <div className="relative group">
-              <a href="#more" className={`font-medium transition-colors flex items-center ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>
+              <a href="#more" className={`font-medium transition-colors flex items-center ${textColor}`}>
                 More
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -47,7 +77,7 @@ const Navbar = () => {
           </div>
           
           <div className="flex items-center space-x-4">
-            <button className={`hidden md:block px-4 py-2 rounded-full font-medium transition-colors ${isScrolled ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' : 'text-white border border-white hover:bg-white hover:bg-opacity-10'}`}>Log In</button>
+            <button className={`hidden md:block px-4 py-2 rounded-full font-medium transition-colors ${isScrolled || initialStyle === 'light' ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' : 'text-white border border-white hover:bg-white hover:bg-opacity-10'}`}>Log In</button>
             <button className="hidden md:block px-4 py-2 rounded-full font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-shadow">Sign Up</button>
             
             {/* Mobile menu button */}
@@ -55,7 +85,7 @@ const Navbar = () => {
               className="md:hidden"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${isScrolled ? 'text-gray-800' : 'text-white'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${isScrolled || initialStyle === 'light' ? 'text-gray-800' : 'text-white'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {isMobileMenuOpen ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 ) : (
