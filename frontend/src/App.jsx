@@ -1,10 +1,10 @@
 import './App.css';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar/Navbar';
-import Footer from './components/Footer/Footer';
 import HomePage from './components/HomePage/HomePage';
 import Courses from './components/Courses/Courses';
-import CourseDetailsPage from './components/Courses/CourseDetailsPage/CourseDetailsPage';
+import Navbar from './components/Navbar/Navbar';
+import Footer from './components/Footer/Footer';
+import ChatBotPage from './components/Chatbot/ChatbotPage';
 
 function App() {
   return (
@@ -13,7 +13,16 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/courses" element={<Courses />} />
-        <Route path="/courses/:courseId" element={<CourseDetailsPage />} />
+        <Route path="/chat" element={<ChatBotPage />} />
+        <Route 
+          path="/courses/:courseId" 
+          element={
+            <div className="pt-16">
+             
+              <Courses.CourseDetailsPage />
+            </div>
+          } 
+        />
       </Routes>
       <Footer />
     </BrowserRouter>
