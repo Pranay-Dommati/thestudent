@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import CourseDetails from '../../CourseDetails/CourseDetails';
+import CourseDetails from '../CourseDetails';
 import Navbar from '../../Navbar/Navbar';
 import Footer from '../../Footer/Footer';
 
