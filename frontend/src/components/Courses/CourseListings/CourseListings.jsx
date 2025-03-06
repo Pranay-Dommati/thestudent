@@ -11,14 +11,14 @@ const CourseListings = ({ category, filters }) => {
     const sampleCourses = [
         {
             id: 1,
-            thumbnail: "https://via.placeholder.com/300x200?text=Next.js",
-            title: "Master Next.js: From Zero to Production",
-            instructor: "John Doe",
+            thumbnail: "https://images.unsplash.com/photo-1457305237443-44c3d5a30b89?q=80&w=2074&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+            title: "Web Development: From Zero to Mastery",
+            instructor: "YT",
             duration: "56 hours",
             level: "Beginner",
             tags: ["Free", "Video", "Project-Based"],
-            rating: 4.8,
-            reviewCount: 1245,
+            rating: "",
+            reviewCount: 0,
             platform: "YouTube"
         },
         {

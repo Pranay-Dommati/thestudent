@@ -22,9 +22,9 @@ const CourseLearning = ({ courseId }) => {
     setTimeout(() => {
       setCourse({
         id: courseId,
-        title: "Master Next.js: From Zero to Production",
+        title: "Web Development: From Zero to Hero",
         instructor: {
-          name: "John Doe",
+          name: "YT",
           avatar: "https://via.placeholder.com/150",
         },
         description: "This comprehensive course takes you from the basics of Next.js to deploying production-ready applications.",
