@@ -27,7 +27,7 @@ const Navbar = () => {
           <div className="hidden md:flex items-center space-x-6">
             <a href="#home" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>Home</a>
             <a href="#courses" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>Courses</a>
-            <a href="#ai-chatbot" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>AI Chatbot</a>
+            <a href="chat" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>AI Chatbot</a>
             <a href="#learning-hub" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>Learning Hub</a>
             <div className="relative group">
               <a href="#more" className={`font-medium transition-colors flex items-center ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>
