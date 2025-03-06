@@ -1,37 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-const LessonNotes = ({ lessonId }) => {
-  const [notes, setNotes] = useState('');
-  
-  // Load notes from localStorage on component mount
-  useEffect(() => {
-    const savedNotes = localStorage.getItem(`course-notes-${lessonId}`);
-    if (savedNotes) {
-      setNotes(savedNotes);
-    }
-  }, [lessonId]);
-  
-  // Save notes to localStorage when they change
-  const handleNotesChange = (e) => {
-    const newNotes = e.target.value;
-    setNotes(newNotes);
-    localStorage.setItem(`course-notes-${lessonId}`, newNotes);
-  };
+const CourseProgress = ({ completedLessons, totalLessons }) => {
+  const progressPercentage = Math.round((completedLessons / totalLessons) * 100) || 0;
   
   return (
     <div>
-      <h3 className="text-xl font-bold mb-4">Your Notes</h3>
-      <p className="text-gray-600 mb-2">
-        Take notes for this lesson. Your notes are saved automatically and are only visible to you.
-      </p>
-      <textarea
-        className="w-full h-64 p-4 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-        placeholder="Start typing your notes here..."
-        value={notes}
-        onChange={handleNotesChange}
-      ></textarea>
+      <div className="flex justify-between text-sm mb-1">
+        <span className="font-medium">Your progress</span>
+        <span>{progressPercentage}%</span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-2">
+        <div 
+          className="bg-indigo-600 h-2 rounded-full transition-all duration-300" 
+          style={{ width: `${progressPercentage}%` }} 
+        ></div>
+      </div>
+      <div className="flex justify-between text-xs text-gray-500 mt-1">
+        <span>{completedLessons}/{totalLessons} lessons completed</span>
+      </div>
     </div>
   );
 };
 
-export default LessonNotes;
+export default CourseProgress;
