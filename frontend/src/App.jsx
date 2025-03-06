@@ -12,7 +12,8 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/courses" element={<Courses />} />
         <Route path="/chat" element={<ChatBotPage />} />
-        <Route path="/courses/:courseId" element={<CourseDetailsPage />} />      </Routes>
+        <Route path="/courses/:courseId" element={<CourseDetailsPage />} />
+      </Routes>
     </BrowserRouter>
   );
 }
