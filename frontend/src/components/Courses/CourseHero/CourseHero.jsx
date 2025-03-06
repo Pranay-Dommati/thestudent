@@ -10,7 +10,7 @@ const CourseHero = () => {
     };
 
     return (
-        <section className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white py-16">
+        <section className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-28 pb-18">
             <div className="container mx-auto px-4 text-center">
                 <h1 className="text-4xl md:text-5xl font-bold mb-4">Find the Perfect Course for You</h1>
                 <p className="text-xl mb-8 max-w-3xl mx-auto">

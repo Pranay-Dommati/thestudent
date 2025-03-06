@@ -11,15 +11,12 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/courses" element={<Courses />} />
         <Route path="/chat" element={<ChatBotPage />} />
-        <Route 
-          path="/courses/:courseId" 
-          element={
+        <Route path="/courses/:courseId" element={
             <div className="pt-16">
-
               <Courses.CourseDetailsPage />
             </div>
-          } 
-        />
+          }
+          />
       </Routes>
     </BrowserRouter>
   );
