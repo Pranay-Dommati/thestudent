@@ -26,7 +26,7 @@ const Navbar = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
             <a href="#home" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>Home</a>
-            <a href="#courses" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>Courses</a>
+            <a href="courses" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>Courses</a>
             <a href="chat" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>AI Chatbot</a>
             <a href="#learning-hub" className={`font-medium transition-colors ${isScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-blue-200'}`}>Learning Hub</a>
             <div className="relative group">
@@ -70,8 +70,8 @@ const Navbar = () => {
         {isMobileMenuOpen && (
           <div className="md:hidden mt-4 py-4 bg-white rounded-lg shadow-xl">
             <a href="#home" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Home</a>
-            <a href="#courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Courses</a>
-            <a href="#ai-chatbot" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">AI Chatbot</a>
+            <a href="courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Courses</a>
+            <a href="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">AI Chatbot</a>
             <a href="#learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Learning Hub</a>
             <a href="#search" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Search</a>
             <div className="mt-4 flex flex-col space-y-2 px-4">
