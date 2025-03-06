@@ -139,9 +139,10 @@ const CourseDetails = ({ courseId }) => {
 
         {/* Start Learning Button */}
         <div className="mt-8 flex justify-center">
-          <button className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-8 rounded-lg shadow-md transition">
+        <Link to={`/courses/${course.id}/learning`} className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-8 rounded-lg shadow-md transition">
+
             Start Learning
-          </button>
+        </Link>
         </div>
 
         {/* Related Courses */}
