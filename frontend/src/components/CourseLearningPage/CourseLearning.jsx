@@ -217,11 +217,11 @@ const CourseLearning = ({ courseId }) => {
   
   // Update the main layout wrapper
   return (
-    <div className="max-w-[1920px] mx-auto">
-      <div className="flex flex-col lg:flex-row">
-        {/* Main Content Area - On the left */}
-        <div className="flex-1 lg:mr-80 xl:mr-96 p-4 sm:p-6">
-          {/* Course Header with Breadcrumbs */}
+    <div className="min-h-screen flex">
+      {/* Main Content Area - Left side, takes remaining width */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-4 sm:p-6">
+          {/* Breadcrumbs */}
           <div className="mb-4">
             <div className="flex items-center text-sm text-gray-500 mb-2">
               <button 
@@ -250,8 +250,8 @@ const CourseLearning = ({ courseId }) => {
             />
           </div>
 
-          {/* Content Area */}
-          <div className="max-w-full">
+          {/* Content Area - Takes remaining space */}
+          <div className="max-w-none">
             {/* Content Tabs */}
             <div className="mb-6 border-b border-gray-200">
               <div className="flex space-x-6">
@@ -405,139 +405,139 @@ const CourseLearning = ({ courseId }) => {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Course Content Sidebar - On the right */}
-        <div className={`lg:w-80 xl:w-96 border-l border-gray-200 bg-white h-[calc(100vh-64px)] fixed lg:sticky top-16 right-0 z-30 transition-all duration-300 transform ${sidebarVisible ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0`}>
-          <div className="h-full flex flex-col">
-            {/* Sidebar Header */}
-            <div className="p-4 border-b border-gray-200 bg-white flex-shrink-0">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-lg">Course content</h2>
-                <button 
-                  className="lg:hidden text-gray-500 hover:text-gray-700"
-                  onClick={() => setSidebarVisible(false)}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              {/* Search bar */}
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search lessons..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-3 top-2.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      {/* Course Content Sidebar - Fixed width on right */}
+      <div className="w-[400px] border-l border-gray-200 bg-white h-screen sticky top-0 overflow-hidden flex flex-col">
+        <div className="h-full flex flex-col">
+          {/* Sidebar Header */}
+          <div className="p-4 border-b border-gray-200 bg-white flex-shrink-0">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg">Course content</h2>
+              <button 
+                className="lg:hidden text-gray-500 hover:text-gray-700"
+                onClick={() => setSidebarVisible(false)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </div>
-              
-              {/* Progress bar */}
-              <div className="mt-4">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="font-medium">Your progress</span>
-                  <span>{Math.round((completedLessons / totalLessons) * 100)}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-indigo-600 h-2 rounded-full"
-                    style={{ width: `${(completedLessons / totalLessons) * 100}%` }}
-                  ></div>
-                </div>
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>{completedLessons}/{totalLessons} lessons completed</span>
-                </div>
-              </div>
+              </button>
             </div>
             
-            {/* Course chapters list with scroll */}
-            <div className="flex-grow overflow-y-auto custom-scrollbar">
-              {filteredChapters()?.map((chapter, chapterIndex) => (
-                <div key={chapterIndex} className="border-b border-gray-200 last:border-b-0">
-                  <button 
-                    className={`w-full p-4 flex justify-between items-center hover:bg-gray-50 transition-colors duration-150 ${activeChapter === chapterIndex ? 'bg-gray-50' : ''}`}
-                    onClick={() => toggleChapter(chapterIndex)}
-                  >
-                    <div className="flex items-center text-left">
-                      <span className="w-6 h-6 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs mr-3">
-                        {chapterIndex + 1}
-                      </span>
-                      <span className="font-medium line-clamp-1">{chapter.title}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-xs text-gray-500 mr-2 whitespace-nowrap">
-                        {chapter.lessons.filter(l => l.completed).length}/{chapter.lessons.length}
-                      </span>
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        className={`h-4 w-4 text-gray-500 transform transition-transform ${expandedChapters[chapterIndex] ? 'rotate-180' : ''}`}
-                        fill="none" 
-                        viewBox="0 0 24 24" 
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </button>
-                  
-                  {expandedChapters[chapterIndex] && (
-                    <div>
-                      {chapter.lessons.map((lesson, lessonIndex) => (
-                        <button
-                          key={lessonIndex}
-                          className={`w-full p-3 pl-12 flex items-center text-left hover:bg-gray-50 transition-colors duration-150 ${
-                            activeChapter === chapterIndex && activeLesson === lessonIndex 
-                              ? 'bg-indigo-50 border-l-4 border-indigo-600 pl-11' 
-                              : ''
-                          }`}
-                          onClick={() => selectLesson(chapterIndex, lessonIndex)}
-                        >
-                          <div className={`w-5 h-5 flex-shrink-0 rounded-full border flex items-center justify-center mr-3 ${
-                            lesson.completed ? 'bg-green-100 border-green-400' : 'border-gray-300'
-                          }`}>
-                            {lesson.completed ? (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            ) : (
-                              <span className="h-3 w-3"></span>
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <span className="block text-sm font-medium line-clamp-2">{lesson.title}</span>
-                            <div className="flex items-center mt-1 text-xs text-gray-500">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              {lesson.duration}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+            {/* Search bar */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search lessons..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-3 top-2.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            
+            {/* Progress bar */}
+            <div className="mt-4">
+              <div className="flex justify-between text-sm mb-1">
+                <span className="font-medium">Your progress</span>
+                <span>{Math.round((completedLessons / totalLessons) * 100)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-indigo-600 h-2 rounded-full"
+                  style={{ width: `${(completedLessons / totalLessons) * 100}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>{completedLessons}/{totalLessons} lessons completed</span>
+              </div>
             </div>
           </div>
+          
+          {/* Course chapters list with scroll */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {filteredChapters()?.map((chapter, chapterIndex) => (
+              <div key={chapterIndex} className="border-b border-gray-200 last:border-b-0">
+                <button 
+                  className={`w-full p-4 flex justify-between items-center hover:bg-gray-50 transition-colors duration-150 ${activeChapter === chapterIndex ? 'bg-gray-50' : ''}`}
+                  onClick={() => toggleChapter(chapterIndex)}
+                >
+                  <div className="flex items-center text-left">
+                    <span className="w-6 h-6 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs mr-3">
+                      {chapterIndex + 1}
+                    </span>
+                    <span className="font-medium line-clamp-1">{chapter.title}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-xs text-gray-500 mr-2 whitespace-nowrap">
+                      {chapter.lessons.filter(l => l.completed).length}/{chapter.lessons.length}
+                    </span>
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className={`h-4 w-4 text-gray-500 transform transition-transform ${expandedChapters[chapterIndex] ? 'rotate-180' : ''}`}
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+                
+                {expandedChapters[chapterIndex] && (
+                  <div>
+                    {chapter.lessons.map((lesson, lessonIndex) => (
+                      <button
+                        key={lessonIndex}
+                        className={`w-full p-3 pl-12 flex items-center text-left hover:bg-gray-50 transition-colors duration-150 ${
+                          activeChapter === chapterIndex && activeLesson === lessonIndex 
+                            ? 'bg-indigo-50 border-l-4 border-indigo-600 pl-11' 
+                            : ''
+                        }`}
+                        onClick={() => selectLesson(chapterIndex, lessonIndex)}
+                      >
+                        <div className={`w-5 h-5 flex-shrink-0 rounded-full border flex items-center justify-center mr-3 ${
+                          lesson.completed ? 'bg-green-100 border-green-400' : 'border-gray-300'
+                        }`}>
+                          {lesson.completed ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          ) : (
+                            <span className="h-3 w-3"></span>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <span className="block text-sm font-medium line-clamp-2">{lesson.title}</span>
+                          <div className="flex items-center mt-1 text-xs text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {lesson.duration}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-
-        {/* Mobile Toggle Button - For right sidebar */}
-        <button 
-          className="lg:hidden fixed bottom-5 right-5 z-10 bg-indigo-600 text-white p-3 rounded-full shadow-lg"
-          onClick={() => setSidebarVisible(!sidebarVisible)}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-          </svg>
-        </button>
       </div>
+
+      {/* Mobile Toggle Button */}
+      <button 
+        className="lg:hidden fixed bottom-5 right-5 z-10 bg-indigo-600 text-white p-3 rounded-full shadow-lg"
+        onClick={() => setSidebarVisible(!sidebarVisible)}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+        </svg>
+      </button>
     </div>
   );
 };
