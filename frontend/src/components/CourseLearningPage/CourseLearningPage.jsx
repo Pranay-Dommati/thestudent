@@ -9,7 +9,7 @@ const CourseLearningPage = () => {
   
   return (
     <>
-      <Navbar />
+      <Navbar  initialStyle="light" />
       <div className="pt-16 min-h-screen bg-gray-50">
         <CourseLearning courseId={courseId} />
       </div>

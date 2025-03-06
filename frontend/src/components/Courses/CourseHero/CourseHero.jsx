@@ -10,7 +10,7 @@ const CourseHero = () => {
     };
 
     return (
-        <section className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-28 pb-18">
+        <section className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-24 pb-16">
             <div className="container mx-auto px-4 text-center">
                 <h1 className="text-4xl md:text-5xl font-bold mb-4">Find the Perfect Course for You</h1>
                 <p className="text-xl mb-8 max-w-3xl mx-auto">
@@ -22,7 +22,7 @@ const CourseHero = () => {
                         <input
                             type="text"
                             placeholder="Search by topic, instructor, or platform..."
-                            className="w-full py-4 px-6 rounded-full text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-lg"
+                            className="w-full py-4 px-6 rounded-full text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-lg border border-gray-300"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
