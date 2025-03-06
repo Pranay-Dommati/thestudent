@@ -1,6 +1,7 @@
 // CourseOverview.js
 import React from 'react';
-
+import LearningPoint from './LearningPoint';
+import InstructorCard from './InstructorCard';
 const CourseOverview = ({ course }) => {
   return (
     <div>
