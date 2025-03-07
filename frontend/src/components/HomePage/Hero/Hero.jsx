@@ -27,12 +27,33 @@ const Hero = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <a href="courses" className="px-8 py-4 rounded-lg bg-white text-indigo-600 font-bold text-lg hover:shadow-lg hover:shadow-indigo-500/30 transition-all transform hover:-translate-y-1">
+            <a 
+              href="courses" 
+              className="px-8 py-4 rounded-lg bg-white text-indigo-600 font-bold text-lg
+                       transition-all duration-300 ease-out transform
+                       hover:shadow-lg hover:shadow-white/30 hover:-translate-y-1
+                       hover:bg-opacity-95 hover:text-indigo-700
+                       active:translate-y-0"
+            >
               Start Learning
             </a>
-            <a href="chat" className="px-8 py-4 rounded-lg bg-indigo-800 bg-opacity-50 text-white border border-indigo-400 border-opacity-30 backdrop-blur-sm font-bold text-lg hover:bg-opacity-70 transition-all">
+            <a 
+              href="chat" 
+              className="group px-8 py-4 rounded-lg bg-indigo-800 bg-opacity-50 text-white 
+                       border border-indigo-400 border-opacity-30 backdrop-blur-sm font-bold text-lg 
+                       transition-all duration-300 ease-out transform
+                       hover:shadow-lg hover:shadow-indigo-600/20 hover:-translate-y-1
+                       hover:bg-opacity-60 hover:border-opacity-50
+                       active:translate-y-0"
+            >
               <span className="flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 Generate with AI
