@@ -1,64 +1,101 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { FaPlay, FaBookReader } from 'react-icons/fa';  // Changed icon import
+import { Link } from 'react-router-dom';
 
 const TenthStandard = ({ board }) => {
   const subjects = [
-    { id: 'math', name: 'Mathematics', icon: '📐', topics: ['Algebra', 'Geometry', 'Trigonometry'] },
-    { id: 'science', name: 'Science', icon: '🔬', topics: ['Physics', 'Chemistry', 'Biology'] },
-    { id: 'english', name: 'English', icon: '📚', topics: ['Literature', 'Grammar', 'Writing'] },
-    { id: 'social', name: 'Social Studies', icon: '🌍', topics: ['History', 'Geography', 'Civics'] },
+    {
+      id: 'english',
+      name: 'English',
+      icon: '📚',
+      courseId: '1',
+      description: 'Master language & literature with comprehensive coverage of CBSE syllabus',
+      duration: '40+ hours of content'
+    },
+    {
+      id: 'hindi',
+      name: 'Hindi',
+      icon: '📖',
+      courseId: '1',
+      description: 'Strengthen your Hindi language skills with expert guidance',
+      duration: '35+ hours of content'
+    },
+    {
+      id: 'mathematics',
+      name: 'Mathematics',
+      icon: '📐',
+      courseId: '1',
+      description: 'Build strong foundations in algebra, geometry, and trigonometry',
+      duration: '45+ hours of content'
+    },
+    {
+      id: 'science',
+      name: 'Science',
+      icon: '🔬',
+      courseId: '1',
+      description: 'Comprehensive coverage of Physics, Chemistry, and Biology',
+      duration: '50+ hours of content'
+    },
+    {
+      id: 'social',
+      name: 'Social Science',
+      icon: '🌍',
+      courseId: '1',
+      description: 'In-depth exploration of History, Geography, and Civics',
+      duration: '40+ hours of content'
+    }
   ];
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">10th Standard - {board.toUpperCase()}</h1>
-        <p className="text-gray-600">Comprehensive study materials and courses for 10th grade students</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Class 10 - CBSE</h1>
+        <p className="text-gray-600">Complete syllabus coverage with curated video lectures</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {subjects.map((subject) => (
-          <motion.div
-            key={subject.id}
-            whileHover={{ y: -5 }}
-            className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all p-6 border border-gray-100"
-          >
-            <div className="text-4xl mb-4">{subject.icon}</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-3">{subject.name}</h3>
-            <ul className="space-y-2">
-              {subject.topics.map((topic, idx) => (
-                <li key={idx} className="text-gray-600 flex items-center">
-                  <span className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></span>
-                  {topic}
-                </li>
-              ))}
-            </ul>
-            <button className="mt-4 w-full bg-indigo-50 text-indigo-600 py-2 rounded-lg font-medium hover:bg-indigo-100 transition-colors">
-              Explore {subject.name}
-            </button>
-          </motion.div>
+          <Link to={`/courses/${subject.courseId}`} key={subject.id}>
+            <motion.div
+              whileHover={{ y: -5 }}
+              className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
+            >
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl"></div>
+                <div className="relative p-6">
+                  <div className="flex items-center justify-between">
+                    <span className="text-white text-2xl">{subject.icon}</span>
+                    <FaPlay className="text-white opacity-75" />
+                  </div>
+                  <h3 className="text-white text-xl font-bold mt-2">{subject.name}</h3>
+                  <p className="text-white/80 text-sm mt-1">{subject.duration}</p>
+                </div>
+              </div>
+              <div className="p-6">
+                <p className="text-gray-600 text-sm mb-4">{subject.description}</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <FaBookReader className="text-indigo-600" />
+                    <span className="text-sm text-gray-600">Structured Learning</span>
+                  </div>
+                  <span className="text-indigo-600 text-sm font-medium">
+                    Preview Course →
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          </Link>
         ))}
       </div>
 
-      {/* Study Resources Section */}
-      <div className="mt-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Study Resources</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6">
-            <h3 className="text-lg font-semibold mb-3">Practice Tests</h3>
-            <p className="text-gray-600 mb-4">Access board-specific practice tests and sample papers</p>
-            <button className="text-indigo-600 font-medium hover:text-indigo-800">Start Practice →</button>
-          </div>
-          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-6">
-            <h3 className="text-lg font-semibold mb-3">Video Lectures</h3>
-            <p className="text-gray-600 mb-4">Watch expert explanations of complex topics</p>
-            <button className="text-indigo-600 font-medium hover:text-indigo-800">Watch Now →</button>
-          </div>
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6">
-            <h3 className="text-lg font-semibold mb-3">Study Notes</h3>
-            <p className="text-gray-600 mb-4">Download comprehensive study materials and notes</p>
-            <button className="text-indigo-600 font-medium hover:text-indigo-800">Download →</button>
-          </div>
+      {/* Sample Papers Section */}
+      <div className="mt-12 bg-gray-50 rounded-2xl p-8">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Additional Resources</h2>
+        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6">
+          <h3 className="text-lg font-semibold mb-3">Sample Papers</h3>
+          <p className="text-gray-600 mb-4">CBSE sample papers and previous year questions</p>
+          <button className="text-indigo-600 font-medium hover:text-indigo-800">Access Now →</button>
         </div>
       </div>
     </div>
