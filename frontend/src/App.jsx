@@ -8,6 +8,7 @@ import CourseLearningPage from './components/CourseLearningPage/CourseLearningPa
 import LearningHubPage from './components/LearningHub/LearningHubPage';
 import FloatingChatButton from './components/Chatbot/FloatingChatButton';
 import AuthForm from './components/Auth/AuthForm';
+import ProfilePage from './components/Profile/ProfilePage'; 
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
         <Route path="/learning-hub" element={<LearningHubPage />} /> 
         <Route path="/auth" element={<AuthForm />} />
+        <Route path="/profile" element={<ProfilePage />} />
       </Routes>
 
       {/* Floating chat button - appears on all pages except /chat */}
