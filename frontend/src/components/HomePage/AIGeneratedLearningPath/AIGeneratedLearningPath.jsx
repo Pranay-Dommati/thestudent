@@ -36,44 +36,42 @@ const AIGeneratedLearningPath = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  // Handle keyboard navigation
+  // Modify the handleKeyDown function
   const handleKeyDown = (e) => {
-    if (!showExamples) return;
-    
-    // Arrow Down
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const newIndex = selectedIndex < examples.length - 1 ? selectedIndex + 1 : 0;
-      setSelectedIndex(newIndex);
-      
-      // Scroll into view if needed
-      if (optionRefs.current[newIndex]) {
-        optionRefs.current[newIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (showExamples && inputValue.length === 0) {
+      // Dropdown navigation logic
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const newIndex = selectedIndex < examples.length - 1 ? selectedIndex + 1 : 0;
+        setSelectedIndex(newIndex);
+        if (optionRefs.current[newIndex]) {
+          optionRefs.current[newIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
       }
-    }
-    
-    // Arrow Up
-    else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      const newIndex = selectedIndex > 0 ? selectedIndex - 1 : examples.length - 1;
-      setSelectedIndex(newIndex);
-      
-      // Scroll into view if needed
-      if (optionRefs.current[newIndex]) {
-        optionRefs.current[newIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const newIndex = selectedIndex > 0 ? selectedIndex - 1 : examples.length - 1;
+        setSelectedIndex(newIndex);
+        if (optionRefs.current[newIndex]) {
+          optionRefs.current[newIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
       }
-    }
-    
-    // Enter
-    else if (e.key === 'Enter' && selectedIndex >= 0) {
+      else if (e.key === 'Enter' && selectedIndex >= 0) {
+        e.preventDefault();
+        handleExampleClick(examples[selectedIndex]);
+      }
+      else if (e.key === 'Escape') {
+        setShowExamples(false);
+        inputRef.current.blur();
+      }
+    } 
+    // Handle Enter key submission
+    else if (e.key === 'Enter') {
       e.preventDefault();
-      handleExampleClick(examples[selectedIndex]);
-    }
-    
-    // Escape
-    else if (e.key === 'Escape') {
-      setShowExamples(false);
-      inputRef.current.blur();
+      if (inputValue.trim()) {
+        handleGenerate();
+        setShowExamples(false);
+      }
     }
   };
 
