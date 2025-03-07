@@ -193,9 +193,10 @@ const ChatbotPage = () => {
   };
 
   return (
-    <div className="h-screen flex bg-gray-50">
-      {/* Collapsible Chat History Sidebar */}
-      <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}>
+    <div className="h-screen flex overflow-hidden">
+      {/* Sidebar - keep existing styles but add h-screen */}
+      <div className={`h-screen flex-shrink-0 ${isSidebarOpen ? 'w-80' : 'w-0'} 
+        transition-all duration-300 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}>
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="font-semibold text-gray-800 flex items-center">
             <FaHistory className="mr-2" />
@@ -222,9 +223,9 @@ const ChatbotPage = () => {
         </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Modified Top Navbar */}
+      {/* Main chat container - remove bg-gray-50 from this level */}
+      <div className="flex-1 flex flex-col h-screen">
+        {/* Navbar remains unchanged */}
         <nav className="bg-white shadow-sm p-4 flex justify-between items-center">
           <div className="flex items-center">
             {!isSidebarOpen && (
@@ -263,10 +264,10 @@ const ChatbotPage = () => {
           </div>
         )}
         
-        {/* Chat Container */}
-        <div className="flex-1 flex flex-col p-4 overflow-hidden bg-gray-50">
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto mb-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+        {/* Chat messages container - keep the gray background here */}
+        <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+          {/* Messages area - keep existing padding and spacing */}
+          <div className="flex-1 p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {chatHistory.map((chat) => (
               <div 
                 key={chat.id} 
