@@ -5,6 +5,27 @@ import { FaGraduationCap, FaRegLightbulb, FaRobot, FaHistory } from "react-icons
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from 'react-markdown';
 
+const useWindowSize = () => {
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return windowSize;
+};
+
 const ChatbotPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -23,7 +44,8 @@ const ChatbotPage = () => {
   const [apiError, setApiError] = useState(null);
   const messagesEndRef = useRef(null);
   const initialQueryProcessed = useRef(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { width } = useWindowSize();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(width >= 1024); // 1024px is typical laptop breakpoint
   const [chatSessions, setChatSessions] = useState([
     {
       id: 1,
@@ -61,6 +83,10 @@ const ChatbotPage = () => {
       navigate('/chat', { replace: true });
     }
   }, [initialQuery, navigate]);
+
+  useEffect(() => {
+    setIsSidebarOpen(width >= 1024);
+  }, [width]);
 
   const callGeminiAPI = async (userMessage) => {
     try {
@@ -384,7 +410,7 @@ const ChatbotPage = () => {
               </div>
               
               <div className="flex flex-wrap gap-2 mt-3">
-                {["Course recommendations", "Study tips", "Career advice"].map((suggestion, index) => (
+                {["Study tips", "Career advice"].map((suggestion, index) => (
                   <button
                     key={index}
                     onClick={() => handleSuggestion(suggestion)}
