@@ -7,6 +7,10 @@ import CourseHero from "./CourseHero/CourseHero";
 import CourseCategories from "./CourseCategories/CourseCategories";
 import CourseFilters from "./CourseFilters/CourseFilters";
 import CourseListings from "./CourseListings/CourseListings";
+import TenthStandard from './categories/10th/TenthStandard';
+import EleventhStandard from './categories/11th/EleventhStandard';
+import TwelfthStandard from './categories/12th/TwelveStandard';
+import Undergraduate from './categories/undergraduate/Undergraduate';
 
 const Courses = () => {
     const [selectedLevel, setSelectedLevel] = useState(null);
@@ -185,40 +189,26 @@ const Courses = () => {
                             </div>
                         </motion.div>
                     ) : (
-                        <div className="flex flex-col md:flex-row gap-8">
-                            <div className="md:w-1/4">
-                                {(selectedLevel === 'undergraduate' || selectedBoard) && (
-                                    <div className="mb-6">
-                                        <button 
-                                            onClick={handleBackToLevels}
-                                            className="flex items-center text-indigo-600 hover:text-indigo-800 transition-colors"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                            </svg>
-                                            Back to Levels
-                                        </button>
-                                    </div>
-                                )}
-                                <CourseCategories 
-                                    selectedCategory={selectedCategory} 
+                        <div className="flex flex-col">
+                            {/* For 10th, 11th, and 12th standard */}
+                            {selectedLevel !== 'undergraduate' && (
+                                <>
+                                    {selectedLevel === '10th' && <TenthStandard board={selectedBoard} />}
+                                    {selectedLevel === '11th' && <EleventhStandard board={selectedBoard} />}
+                                    {selectedLevel === '12th' && <TwelfthStandard board={selectedBoard} />}
+                                </>
+                            )}
+
+                            {/* For undergraduate - keeping the filters */}
+                            {selectedLevel === 'undergraduate' && (
+                                <Undergraduate 
+                                    selectedCategory={selectedCategory}
                                     onCategoryChange={setSelectedCategory}
-                                    educationLevel={selectedLevel}
-                                    board={selectedBoard}
-                                />
-                                <CourseFilters 
-                                    filters={filters} 
-                                    onFilterChange={setFilters}
-                                />
-                            </div>
-                            <div className="md:w-3/4">
-                                <CourseListings 
-                                    category={selectedCategory}
                                     filters={filters}
-                                    educationLevel={selectedLevel}
-                                    board={selectedBoard}
+                                    onFilterChange={setFilters}
+                                    onBackClick={handleBackToLevels}
                                 />
-                            </div>
+                            )}
                         </div>
                     )}
                 </div>
