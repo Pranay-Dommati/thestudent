@@ -72,11 +72,10 @@ const AIGeneratedLearningPath = () => {
           </div>
           
           <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
-            Create Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-300">Personalized</span> Learning Path
+            Create Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-300">Personalized Course</span> with Our AI
           </h2>
           <p className="text-xl text-indigo-100 mb-10 max-w-2xl mx-auto">
-            Tell our AI what you want to learn, and we'll generate a customized curriculum from the best free resources on the web.
-          </p>
+          Give our AI a prompt, get structured playlists, and save them to your learning hub—all in one place          </p>
           
           <div className="bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 transform hover:scale-[1.01]">
             <div className="p-8">
