@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 const testimonials = [
   {
@@ -36,29 +36,43 @@ export default function Testimonials() {
 
       <div className="relative max-w-4xl w-full flex items-center justify-between px-8">
         {/* Left Arrow */}
-        <button onClick={prevTestimonial} className="text-4xl text-white/70 hover:text-white transition">
+        <button
+          onClick={prevTestimonial}
+          className="text-4xl text-white/70 hover:text-white transition"
+        >
           <FaChevronLeft />
         </button>
 
-        {/* Testimonial Content */}
-        <motion.div
-          key={index}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.5 }}
-          className="flex flex-col items-center text-center max-w-xl"
-        >
-          <p className="text-xl italic text-white/90 mb-4">
-            "{testimonials[index].text}"
-          </p>
-          <img src={testimonials[index].image} alt={testimonials[index].name} className="w-20 h-20 rounded-full border-4 border-white mb-3" />
-          <h3 className="text-lg font-semibold">{testimonials[index].name}</h3>
-          <p className="text-sm text-white/80">{testimonials[index].title}</p>
-        </motion.div>
+        {/* Testimonial Content with Fixed Height */}
+        <div className="flex flex-col items-center text-center max-w-xl min-h-[250px] justify-center">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="flex flex-col items-center"
+            >
+              <p className="text-xl italic text-white/90 mb-4">
+                "{testimonials[index].text}"
+              </p>
+              <img
+                src={testimonials[index].image}
+                alt={testimonials[index].name}
+                className="w-20 h-20 rounded-full border-4 border-white mb-3"
+              />
+              <h3 className="text-lg font-semibold">{testimonials[index].name}</h3>
+              <p className="text-sm text-white/80">{testimonials[index].title}</p>
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
         {/* Right Arrow */}
-        <button onClick={nextTestimonial} className="text-4xl text-white/70 hover:text-white transition">
+        <button
+          onClick={nextTestimonial}
+          className="text-4xl text-white/70 hover:text-white transition"
+        >
           <FaChevronRight />
         </button>
       </div>
