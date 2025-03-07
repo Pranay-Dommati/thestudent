@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const AIGeneratedLearningPath = () => {
   const [inputValue, setInputValue] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
-  const navigate = useNavigate(); // Add this for navigation
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const navigate = useNavigate();
+  
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const optionRefs = useRef([]);
   
   const examples = [
     "Full Stack Web Development with React and Node.js",
@@ -14,18 +19,71 @@ const AIGeneratedLearningPath = () => {
     "UI/UX Design Fundamentals"
   ];
   
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        dropdownRef.current && 
+        !dropdownRef.current.contains(event.target) && 
+        inputRef.current && 
+        !inputRef.current.contains(event.target)
+      ) {
+        setShowExamples(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
+  // Handle keyboard navigation
+  const handleKeyDown = (e) => {
+    if (!showExamples) return;
+    
+    // Arrow Down
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const newIndex = selectedIndex < examples.length - 1 ? selectedIndex + 1 : 0;
+      setSelectedIndex(newIndex);
+      
+      // Scroll into view if needed
+      if (optionRefs.current[newIndex]) {
+        optionRefs.current[newIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+    
+    // Arrow Up
+    else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const newIndex = selectedIndex > 0 ? selectedIndex - 1 : examples.length - 1;
+      setSelectedIndex(newIndex);
+      
+      // Scroll into view if needed
+      if (optionRefs.current[newIndex]) {
+        optionRefs.current[newIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+    
+    // Enter
+    else if (e.key === 'Enter' && selectedIndex >= 0) {
+      e.preventDefault();
+      handleExampleClick(examples[selectedIndex]);
+    }
+    
+    // Escape
+    else if (e.key === 'Escape') {
+      setShowExamples(false);
+      inputRef.current.blur();
+    }
+  };
+
   const handleGenerate = () => {
     if (inputValue.trim() === '') return;
     setIsGenerating(true);
     
-    // Simulate a brief loading state before redirecting
     setTimeout(() => {
       setIsGenerating(false);
-      
-      // Create a specific prompt for learning paths
       const formattedQuery = `Create a detailed learning path for: ${inputValue}`;
-      
-      // Redirect to chat with the query
       navigate(`/chat?q=${encodeURIComponent(formattedQuery)}`);
     }, 1000);
   };
@@ -33,7 +91,14 @@ const AIGeneratedLearningPath = () => {
   const handleExampleClick = (example) => {
     setInputValue(example);
     setShowExamples(false);
+    setSelectedIndex(-1);
+    inputRef.current.focus();
   };
+
+  // Initialize or reset option refs when examples change
+  useEffect(() => {
+    optionRefs.current = optionRefs.current.slice(0, examples.length);
+  }, [examples]);
 
   return (
     <section className="py-24 px-6 bg-gradient-to-br from-indigo-700 via-indigo-800 to-purple-900 text-white relative overflow-hidden">
@@ -86,34 +151,51 @@ const AIGeneratedLearningPath = () => {
             <div className="p-8">
               <div className="relative mb-6">
                 <input
+                  ref={inputRef}
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onFocus={() => setShowExamples(true)}
+                  onKeyDown={handleKeyDown}
                   placeholder="What do you want to learn today?"
                   className="w-full p-5 border-2 border-gray-200 rounded-xl text-gray-800 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+                  aria-expanded={showExamples}
+                  aria-controls="search-examples"
+                  role="combobox"
+                  aria-autocomplete="list"
                 />
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 absolute right-4 top-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 
-                {/* Dropdown examples */}
+                {/* Enhanced dropdown with keyboard navigation and scrolling */}
                 {showExamples && inputValue.length === 0 && (
-                  <div className="absolute z-10 mt-2 w-full bg-white rounded-xl shadow-lg border border-gray-100 py-2 animate-fadeIn">
-                    <p className="px-4 py-2 text-sm font-medium text-gray-500">POPULAR SEARCHES</p>
+                  <div 
+                    ref={dropdownRef}
+                    id="search-examples"
+                    className="absolute z-10 mt-2 w-full bg-white rounded-xl shadow-lg border border-gray-100 py-2 animate-fadeIn max-h-60 overflow-y-auto"
+                    role="listbox"
+                  >
+                    <p className="px-4 py-2 text-sm font-medium text-gray-500 sticky top-0 bg-white">POPULAR SEARCHES</p>
                     {examples.map((example, idx) => (
                       <button
                         key={idx}
-                        className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-indigo-50 transition-colors duration-150"
+                        ref={el => optionRefs.current[idx] = el}
+                        className={`block w-full text-left px-4 py-3 text-gray-700 transition-colors duration-150 ${
+                          selectedIndex === idx ? 'bg-indigo-50' : 'hover:bg-indigo-50'
+                        }`}
                         onClick={() => handleExampleClick(example)}
+                        role="option"
+                        aria-selected={selectedIndex === idx}
+                        onMouseEnter={() => setSelectedIndex(idx)}
                       >
                         <div className="flex items-center">
-                          <span className="bg-indigo-100 text-indigo-600 p-2 rounded-full mr-3">
+                          <span className="bg-indigo-100 text-indigo-600 p-2 rounded-full mr-3 flex-shrink-0">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                           </span>
-                          {example}
+                          <span className="truncate">{example}</span>
                         </div>
                       </button>
                     ))}
