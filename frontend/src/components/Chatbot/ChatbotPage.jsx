@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom"; // Add these imports
-import { IoSend, IoHome, IoBookmark, IoMenu } from "react-icons/io5";
-import { FaGraduationCap, FaRegLightbulb, FaRobot } from "react-icons/fa";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { IoSend, IoHome, IoBookmark, IoMenu, IoChevronBack } from "react-icons/io5";
+import { FaGraduationCap, FaRegLightbulb, FaRobot, FaHistory } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from 'react-markdown';
 
@@ -23,6 +23,21 @@ const ChatbotPage = () => {
   const [apiError, setApiError] = useState(null);
   const messagesEndRef = useRef(null);
   const initialQueryProcessed = useRef(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [chatSessions, setChatSessions] = useState([
+    {
+      id: 1,
+      title: "Course Recommendations",
+      timestamp: "2 hours ago",
+      preview: "Looking for web development courses..."
+    },
+    {
+      id: 2,
+      title: "Learning Path",
+      timestamp: "Yesterday",
+      preview: "Create a learning path for machine learning..."
+    }
+  ]);
   
   // WARNING: This is not secure for production. API keys should be handled by a backend.
   const GEMINI_API_KEY = "AIzaSyCeEzuEj-HkFd5UcabGy28bULZjnsYy9Ek";
@@ -179,54 +194,54 @@ const ChatbotPage = () => {
 
   return (
     <div className="h-screen flex bg-gray-50">
-      {/* Sidebar */}
-      <div className="hidden md:flex w-64 flex-col bg-white shadow-md">
-        <div className="p-4 border-b">
-          <Link to="/" className="text-2xl font-bold text-blue-600 flex items-center">
-            <FaGraduationCap className="mr-2" />
-            Students Hub
-          </Link>
+      {/* Collapsible Chat History Sidebar */}
+      <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}>
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="font-semibold text-gray-800 flex items-center">
+            <FaHistory className="mr-2" />
+            Chat History
+          </h2>
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <IoChevronBack size={20} />
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Resources</h3>
-          <ul>
-            {suggestionTopics.map((topic, index) => (
-              <li key={index} className="mb-2">
-                <button 
-                  onClick={() => handleSuggestion(topic)}
-                  className="w-full text-left p-2 hover:bg-blue-50 rounded-md text-gray-700 flex items-center"
-                >
-                  <FaRegLightbulb className="mr-2 text-blue-500" />
-                  {topic}
-                </button>
-              </li>
-            ))}
-          </ul>
+        <div className="flex-1 overflow-y-auto">
+          {chatSessions.map((session) => (
+            <button
+              key={session.id}
+              className="w-full text-left p-4 hover:bg-gray-50 border-b border-gray-100 transition-colors"
+            >
+              <div className="text-sm font-medium text-gray-800">{session.title}</div>
+              <div className="text-xs text-gray-500 mt-1">{session.timestamp}</div>
+              <div className="text-xs text-gray-600 mt-1 truncate">{session.preview}</div>
+            </button>
+          ))}
         </div>
-        {/* GitHub repository link removed as requested */}
       </div>
-      
-      {/* Main Content */}
+
+      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
-        {/* Top Navbar */}
+        {/* Modified Top Navbar */}
         <nav className="bg-white shadow-sm p-4 flex justify-between items-center">
           <div className="flex items-center">
-            <button className="md:hidden mr-4 text-gray-600">
-              <IoMenu size={24} />
-            </button>
-            <Link to="/" className="md:hidden text-xl font-bold text-blue-600 flex items-center">
-              <FaGraduationCap className="mr-2" />
-              Students Hub
-            </Link>
-            <div className="hidden md:flex items-center">
+            {!isSidebarOpen && (
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="mr-4 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                <IoMenu size={24} />
+              </button>
+            )}
+            <div className="flex items-center">
               <FaRobot className="text-blue-500 mr-2" />
-              <h2 className="text-xl font-semibold text-gray-800">
-                Learning Assistant
-              </h2>
+              <h2 className="text-xl font-semibold text-gray-800">Learning Assistant</h2>
             </div>
           </div>
-          <div>
-            <Link to="/" className="mr-2 text-gray-600 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50">
+          <div className="flex items-center gap-2">
+            <Link to="/" className="text-gray-600 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50">
               <IoHome size={20} />
             </Link>
             <button className="text-gray-600 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50">
@@ -234,7 +249,7 @@ const ChatbotPage = () => {
             </button>
           </div>
         </nav>
-        
+
         {/* API Error Banner */}
         {apiError && (
           <div className="bg-amber-50 border-l-4 border-amber-500 p-4">
@@ -302,38 +317,47 @@ const ChatbotPage = () => {
             <div ref={messagesEndRef} />
           </div>
           
-          {/* Message Input */}
-          <div className="mt-auto">
-            <div className="bg-white border border-gray-300 rounded-lg flex items-center p-1 shadow-sm">
-              <input
-                type="text"
-                placeholder="Type your question here..."
-                className="flex-1 p-2 bg-transparent outline-none text-gray-800"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                disabled={isLoading}
-              />
-              <button 
-                onClick={handleSendMessage}
-                disabled={!message.trim() || isLoading}
-                className={`p-2 rounded-lg ${
-                  message.trim() && !isLoading ? "text-blue-600 hover:bg-blue-50" : "text-gray-400"
-                }`}
-              >
-                <IoSend size={20} />
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {["Course recommendations", "Study tips", "Career advice"].map((suggestion, index) => (
-                <button 
-                  key={index}
-                  onClick={() => handleSuggestion(suggestion)}
-                  className="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors"
+          {/* Redesigned Message Input */}
+          <div className="p-4 bg-white border-t border-gray-200">
+            <div className="max-w-4xl mx-auto">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Type your message here..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
+                  disabled={isLoading}
+                  className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-lg 
+                          focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500
+                          text-gray-800 placeholder-gray-500"
+                />
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={!message.trim() || isLoading}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md
+                          transition-colors ${
+                            message.trim() && !isLoading
+                              ? 'text-blue-600 hover:bg-blue-50'
+                              : 'text-gray-400'
+                          }`}
                 >
-                  {suggestion}
+                  <IoSend size={20} />
                 </button>
-              ))}
+              </div>
+              
+              <div className="flex flex-wrap gap-2 mt-3">
+                {["Course recommendations", "Study tips", "Career advice"].map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSuggestion(suggestion)}
+                    className="text-sm bg-gray-100 text-gray-700 px-4 py-1.5 rounded-full
+                            hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
