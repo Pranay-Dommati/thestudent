@@ -204,7 +204,8 @@ const ChatbotPage = () => {
           </h2>
           <button
             onClick={() => setIsSidebarOpen(false)}
-            className="text-gray-500 hover:text-gray-700"
+            className="p-2 hover:bg-blue-50 rounded-full text-gray-500 hover:text-blue-600 transition-all duration-200"
+            aria-label="Close sidebar"
           >
             <IoChevronBack size={20} />
           </button>
@@ -242,10 +243,17 @@ const ChatbotPage = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/" className="text-gray-600 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50">
+            <Link 
+              to="/" 
+              className="p-2 rounded-full text-blue-600 hover:bg-blue-50 hover:scale-110 transition-all duration-200"
+              aria-label="Go to home"
+            >
               <IoHome size={20} />
             </Link>
-            <button className="text-gray-600 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50">
+            <button 
+              className="p-2 rounded-full text-blue-600 hover:bg-blue-50 hover:scale-110 transition-all duration-200"
+              aria-label="Save chat"
+            >
               <IoBookmark size={20} />
             </button>
           </div>
