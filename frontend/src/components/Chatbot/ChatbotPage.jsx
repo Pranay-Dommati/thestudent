@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom"; // Add these imports
 import { IoSend, IoHome, IoBookmark, IoMenu } from "react-icons/io5";
 import { FaGraduationCap, FaRegLightbulb, FaRobot } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from 'react-markdown';
 
 const ChatbotPage = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const initialQuery = searchParams.get('q');
+  
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState([
     {
@@ -18,6 +22,7 @@ const ChatbotPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState(null);
   const messagesEndRef = useRef(null);
+  const initialQueryProcessed = useRef(false);
   
   // WARNING: This is not secure for production. API keys should be handled by a backend.
   const GEMINI_API_KEY = "AIzaSyCeEzuEj-HkFd5UcabGy28bULZjnsYy9Ek";
@@ -26,6 +31,21 @@ const ChatbotPage = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  // Handle initial query from URL parameter
+  useEffect(() => {
+    if (initialQuery && !initialQueryProcessed.current) {
+      initialQueryProcessed.current = true;
+      setMessage(initialQuery);
+      // Use setTimeout to ensure the UI renders before processing
+      setTimeout(() => {
+        handleSendMessage(initialQuery);
+      }, 100);
+      
+      // Remove the query parameter from URL for cleaner navigation
+      navigate('/chat', { replace: true });
+    }
+  }, [initialQuery, navigate]);
 
   const callGeminiAPI = async (userMessage) => {
     try {
@@ -80,26 +100,27 @@ const ChatbotPage = () => {
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!message.trim() || isLoading) return;
+  // Update handleSendMessage to accept a parameter
+  const handleSendMessage = async (customMessage = null) => {
+    const messageToSend = customMessage || message;
+    if (!messageToSend.trim() || isLoading) return;
     
     // Add user message
     const userMessageObj = {
       id: chatHistory.length + 1,
       type: "user",
-      content: message,
+      content: messageToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     
-    const currentMessage = message;
     setChatHistory(prev => [...prev, userMessageObj]);
-    setMessage("");
+    if (!customMessage) setMessage(""); // Only clear the input if it's not a programmatic message
     setIsLoading(true);
     setApiError(null); // Reset any previous API errors
     
     try {
       // Call Gemini API
-      const botResponseContent = await callGeminiAPI(currentMessage);
+      const botResponseContent = await callGeminiAPI(messageToSend);
       
       // Add bot response
       const botResponse = {

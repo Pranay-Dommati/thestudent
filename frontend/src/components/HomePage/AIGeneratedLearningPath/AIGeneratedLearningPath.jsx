@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const AIGeneratedLearningPath = () => {
   const [inputValue, setInputValue] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
+  const navigate = useNavigate(); // Add this for navigation
   
   const examples = [
     "Full Stack Web Development with React and Node.js",
@@ -16,10 +18,16 @@ const AIGeneratedLearningPath = () => {
     if (inputValue.trim() === '') return;
     setIsGenerating(true);
     
-    // Simulate AI generation
+    // Simulate a brief loading state before redirecting
     setTimeout(() => {
       setIsGenerating(false);
-    }, 2000);
+      
+      // Create a specific prompt for learning paths
+      const formattedQuery = `Create a detailed learning path for: ${inputValue}`;
+      
+      // Redirect to chat with the query
+      navigate(`/chat?q=${encodeURIComponent(formattedQuery)}`);
+    }, 1000);
   };
 
   const handleExampleClick = (example) => {

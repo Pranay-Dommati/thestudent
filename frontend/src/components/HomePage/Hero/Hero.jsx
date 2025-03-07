@@ -14,7 +14,7 @@ const Hero = () => {
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20 mb-8">
             <span className="animate-pulse mr-2 h-3 w-3 rounded-full bg-green-400"></span>
-            <span className="text-black text-sm font-medium">1,000+ Free Courses Available</span>
+            <span className="text-black text-sm font-medium">10+ Free Courses Available</span>
           </div>
           
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6 leading-tight">
@@ -27,10 +27,10 @@ const Hero = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <a href="#courses" className="px-8 py-4 rounded-lg bg-white text-indigo-600 font-bold text-lg hover:shadow-lg hover:shadow-indigo-500/30 transition-all transform hover:-translate-y-1">
+            <a href="courses" className="px-8 py-4 rounded-lg bg-white text-indigo-600 font-bold text-lg hover:shadow-lg hover:shadow-indigo-500/30 transition-all transform hover:-translate-y-1">
               Start Learning
             </a>
-            <a href="#ai-chatbot" className="px-8 py-4 rounded-lg bg-indigo-800 bg-opacity-50 text-white border border-indigo-400 border-opacity-30 backdrop-blur-sm font-bold text-lg hover:bg-opacity-70 transition-all">
+            <a href="chat" className="px-8 py-4 rounded-lg bg-indigo-800 bg-opacity-50 text-white border border-indigo-400 border-opacity-30 backdrop-blur-sm font-bold text-lg hover:bg-opacity-70 transition-all">
               <span className="flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
