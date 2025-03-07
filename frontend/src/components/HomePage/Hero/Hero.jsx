@@ -2,7 +2,7 @@ import React from 'react';
 
 const Hero = () => {
   return (
-    <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-700 overflow-hidden">
+    <section className="relative pt-24 pb-24 md:pt-32 md:pb-32 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-700 overflow-hidden">
       {/* Decorative elements */}
       <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-96 h-96 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 opacity-20 blur-3xl"></div>
       <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-96 h-96 rounded-full bg-gradient-to-br from-blue-400 to-cyan-300 opacity-20 blur-3xl"></div>
@@ -10,7 +10,7 @@ const Hero = () => {
       {/* Grid background */}
       <div className="absolute inset-0 bg-grid-white/[0.05] bg-[length:30px_30px]"></div>
       
-      <div className="container mx-auto px-4 relative z-10">
+      <div className="container mx-auto px-4 relative z-20">
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20 mb-8">
             <span className="animate-pulse mr-2 h-3 w-3 rounded-full bg-green-400"></span>
@@ -26,7 +26,7 @@ const Hero = () => {
             organized to maximize your learning efficiency.
           </p>
           
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-4 mb-20">
             <a 
               href="courses" 
               className="px-8 py-4 rounded-lg bg-white text-indigo-600 font-bold text-lg
@@ -71,7 +71,7 @@ const Hero = () => {
       </div>
       
       {/* Wave pattern at bottom */}
-      <div className="absolute bottom-0 left-0 right-0">
+      <div className="absolute bottom-0 left-0 right-0 z-10">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320" className="w-full h-auto">
           <path fill="#ffffff" fillOpacity="1" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,138.7C672,149,768,203,864,202.7C960,203,1056,149,1152,138.7C1248,128,1344,160,1392,176L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
         </svg>
