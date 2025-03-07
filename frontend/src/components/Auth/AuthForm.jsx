@@ -58,12 +58,12 @@ export default function AuthForm() {
       <div className="relative w-full max-w-4xl bg-white shadow-2xl rounded-2xl overflow-hidden">
         <div className="flex flex-col md:flex-row">
           <AnimatePresence initial={false} mode="wait">
-            {/* Welcome Panel */}
+            {/* Welcome Panel - Always on top for mobile */}
             <motion.div
               key={isSignUp ? "welcome-signup" : "welcome-login"}
               className={`flex flex-col items-center justify-center p-6 sm:p-10 text-white 
                 bg-gradient-to-br ${isSignUp ? 'from-blue-600 to-indigo-700' : 'from-indigo-600 to-blue-700'}
-                w-full md:w-5/12 ${isSignUp ? 'order-2 md:order-2' : 'order-1 md:order-1'}`}
+                w-full md:w-5/12 order-1 ${isSignUp ? 'md:order-2' : 'md:order-1'}`}
               initial={{ 
                 x: isSignUp ? '100%' : '-100%',
                 opacity: 0
@@ -106,11 +106,11 @@ export default function AuthForm() {
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
             </motion.div>
             
-            {/* Form Panel */}
+            {/* Form Panel - Always on bottom for mobile */}
             <motion.div 
               key={isSignUp ? "form-signup" : "form-login"}
               className={`flex w-full md:w-7/12 flex-col items-center justify-center px-6 sm:px-10 py-8 sm:py-12
-                ${isSignUp ? 'order-1 md:order-1' : 'order-2 md:order-2'}`}
+                order-2 ${isSignUp ? 'md:order-1' : 'md:order-2'}`}
               initial={{ 
                 x: isSignUp ? '-100%' : '100%',
                 opacity: 0
