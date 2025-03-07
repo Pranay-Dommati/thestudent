@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
 const Navbar = ({ initialStyle = "transparent" }) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -77,13 +78,18 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           </div>
           
           <div className="flex items-center space-x-4">
-          <button className={`hidden md:block px-4 cursor-pointer py-2 rounded-full font-medium transition-all duration-300 
-  ${isScrolled || initialStyle === 'light' 
-    ? 'text-blue-600 border border-blue-600 hover:bg-blue-200 hover:text-blue-800' 
-    : 'text-white border border-white hover:bg-white hover:bg-opacity-20 hover:text-blue-300'}`}>
-  Log In
-</button>
-            <button className="hidden md:block px-4 py-2 rounded-full font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg cursor-pointer transition-shadow">Sign Up</button>
+            <a href="/auth?mode=login" className={`hidden md:block px-4 cursor-pointer py-2 rounded-full font-medium transition-all duration-300 
+              ${isScrolled || initialStyle === 'light' 
+                ? 'text-blue-600 border border-blue-600 hover:bg-blue-200 hover:text-blue-800' 
+                : 'text-white border border-white hover:bg-white hover:bg-opacity-20 hover:text-blue-300'}`}>
+              Log In
+            </a>
+            <Link 
+              to="/auth?mode=signup" 
+              className="hidden md:block px-4 py-2 rounded-full font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg cursor-pointer transition-shadow"
+            >
+              Sign Up
+            </Link>
             
             {/* Mobile menu button */}
             <button 
@@ -110,8 +116,13 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             <a href="learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Learning Hub</a>
             <a href="#search" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Search</a>
             <div className="mt-4 flex flex-col space-y-2 px-4">
-              <button className="px-4 py-2 rounded-full text-blue-600 border border-blue-600 font-medium">Log In</button>
-              <button className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium">Sign Up</button>
+              <a href="/auth?mode=login" className="px-4 py-2 rounded-full text-blue-600 border border-blue-600 font-medium text-center">Log In</a>
+              <Link 
+                to="/auth?mode=signup" 
+                className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium text-center"
+              >
+                Sign Up
+              </Link>
             </div>
           </div>
         )}
