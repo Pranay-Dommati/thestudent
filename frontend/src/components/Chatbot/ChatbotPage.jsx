@@ -222,6 +222,34 @@ const ChatbotPage = () => {
             </button>
           ))}
         </div>
+
+        {/* New Footer Navigation */}
+        <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <Link 
+            to="/" 
+            className="flex items-center justify-between p-3 rounded-lg hover:bg-white 
+                      group transition-all duration-200 border border-transparent 
+                      hover:border-gray-200 hover:shadow-sm"
+          >
+            <div className="flex items-center">
+              <div className="p-2 rounded-full bg-blue-100 text-blue-600 group-hover:bg-blue-600 
+                            group-hover:text-white transition-colors">
+                <IoHome size={18} />
+              </div>
+              <span className="ml-3 font-medium text-gray-700 group-hover:text-blue-600">
+                Back to Home
+              </span>
+            </div>
+            <svg 
+              className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </div>
       </div>
 
       {/* Main chat container - remove bg-gray-50 from this level */}
