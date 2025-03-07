@@ -85,7 +85,7 @@ const FeaturedPlaylists = () => {
     : playlists.filter(playlist => playlist.category === activeCategory);
 
   return (
-    <section className="py-16 px-4 bg-gray-50">
+    <section className="pt-0 pb-16 px-4 bg-[#F9FAFB]">
       <div className="container mx-auto">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-10">
           <div>
