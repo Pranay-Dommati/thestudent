@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, Outlet } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaGraduationCap, FaBook, FaUniversity, FaLaptopCode } from 'react-icons/fa';
 import Navbar from "../Navbar/Navbar";
@@ -8,6 +8,7 @@ import CourseHero from "./CourseHero/CourseHero";
 
 const Courses = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [selectedLevel, setSelectedLevel] = useState(null);
 
     const educationLevels = [
@@ -41,6 +42,12 @@ const Courses = () => {
         setSelectedLevel(level);
         navigate(`/courses/${level}`);
     };
+
+    useEffect(() => {
+        if (location.pathname === '/courses') {
+            setSelectedLevel(null);
+        }
+    }, [location.pathname]);
 
     const containerVariants = {
         hidden: { opacity: 0, y: 20 },
