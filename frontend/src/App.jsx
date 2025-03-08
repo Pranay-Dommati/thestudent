@@ -12,7 +12,7 @@ import TenthStandard from './components/Courses/categories/10th/TenthStandard';
 import EleventhStandard from './components/Courses/categories/11th/EleventhStandard';
 import TwelfthStandard from './components/Courses/categories/12th/TwelfthStandard';
 import Undergraduate from './components/Courses/categories/undergraduate/Undergraduate';
-
+import ProfileLayout from './components/Profile/ProfilePage';
 function App() {
   return (
     <BrowserRouter>
@@ -25,6 +25,7 @@ function App() {
           <Route path="12th" element={<TwelfthStandard />} />
           <Route path="undergraduate" element={<Undergraduate />} />
         </Route>
+        <Route path="/profile" element={<ProfileLayout />} />
         <Route path="/chat" element={<ChatBotPage />} />
         <Route path="/courses/:courseId" element={<CourseDetailsPage />} />
         <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
