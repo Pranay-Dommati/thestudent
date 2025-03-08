@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import BackButton from '../../components/BackButton';
 import CourseCategories from './CourseCategories/CourseCategories';
 import CourseFilters from './CourseFilters/CourseFilters';
 import CourseListings from './CourseListings/CourseListings';
@@ -17,6 +18,11 @@ const Undergraduate = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <BackButton 
+        title="Undergraduate Courses" 
+        subtitle="Explore professional development courses" 
+      />
+      
       <div className="flex flex-col md:flex-row gap-8">
         {/* Sidebar with filters */}
         <div className="md:w-1/4">

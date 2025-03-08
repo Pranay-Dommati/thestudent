@@ -10,7 +10,7 @@ import FloatingChatButton from './components/Chatbot/FloatingChatButton';
 import AuthForm from './components/Auth/AuthForm';
 import TenthStandard from './components/Courses/categories/10th/TenthStandard';
 import EleventhStandard from './components/Courses/categories/11th/EleventhStandard';
-import TwelfthStandard from './components/Courses/categories/12th/TwelveStandard';
+import TwelfthStandard from './components/Courses/categories/12th/TwelfthStandard';
 import Undergraduate from './components/Courses/categories/undergraduate/Undergraduate';
 
 function App() {

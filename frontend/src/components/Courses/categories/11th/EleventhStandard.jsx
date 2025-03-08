@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
+import BackButton from '../../components/BackButton';
 
 const EleventhStandard = () => {
   const navigate = useNavigate();
@@ -89,20 +90,10 @@ const EleventhStandard = () => {
     <div className="container mx-auto px-4 py-8">
       {!selectedBoard ? (
         <>
-          <div className="flex items-center mb-8">
-            <button 
-              onClick={handleBack}
-              className="mr-4 p-2 hover:bg-white rounded-full transition-all hover:shadow-md text-gray-600 hover:text-indigo-600"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900">Select Your Board</h2>
-              <p className="text-gray-600 mt-1">Choose your education board to view relevant courses</p>
-            </div>
-          </div>
+          <BackButton 
+            title="Select Your Board" 
+            subtitle="Choose your education board to view relevant courses" 
+          />
 
           <div className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -128,10 +119,10 @@ const EleventhStandard = () => {
         </>
       ) : (
         <>
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Class 11 - {selectedBoard.toUpperCase()}</h1>
-            <p className="text-gray-600">Complete syllabus coverage with curated video lectures</p>
-          </div>
+          <BackButton 
+            title={`Class 11 - ${selectedBoard.toUpperCase()}`}
+            subtitle="Complete syllabus coverage with curated video lectures" 
+          />
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {subjects.map((subject) => (
