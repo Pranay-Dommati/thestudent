@@ -13,6 +13,25 @@ import AISettings from './tabs/AISettings';
 const ProfilePage = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: 'John Doe',
+    username: 'johndoe',
+    bio: 'Passionate learner | Full Stack Developer | AI Enthusiast',
+    avatar: 'https://avatars.githubusercontent.com/u/12345678',
+    badges: [
+      { id: 1, text: '🎓 Advanced Learner', color: 'blue' },
+      { id: 2, text: '👨‍🏫 Mentor', color: 'green' },
+      { id: 3, text: '🏆 Top Contributor', color: 'purple' }
+    ]
+  });
+
+  const handleProfileUpdate = (updatedData) => {
+    // Update the profile data in the parent component
+    setProfileData(prev => ({
+      ...prev,
+      ...updatedData
+    }));
+  };
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: FaUser },
@@ -25,7 +44,7 @@ const ProfilePage = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'profile':
-        return <BasicProfile isDarkMode={isDarkMode} />;
+        return <BasicProfile isDarkMode={isDarkMode} onUpdateProfile={handleProfileUpdate} />;
       case 'security':
         return <SecuritySettings isDarkMode={isDarkMode} />;
       case 'learning':
@@ -51,7 +70,7 @@ const ProfilePage = () => {
             <div className="relative group">
               <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-blue-500">
                 <img 
-                  src="https://avatars.githubusercontent.com/u/12345678" 
+                  src={profileData.avatar} 
                   alt="Profile"
                   className="w-full h-full object-cover"
                 />
@@ -66,28 +85,24 @@ const ProfilePage = () => {
               <h1 className={`text-3xl font-bold mb-2 ${
                 isDarkMode ? 'text-white' : 'text-gray-800'
               }`}>
-                John Doe
+                {profileData.name}
               </h1>
               <p className={`text-lg mb-2 ${
                 isDarkMode ? 'text-gray-300' : 'text-gray-600'
               }`}>
-                @johndoe
+                @{profileData.username}
               </p>
               <p className={`text-sm mb-4 max-w-2xl ${
                 isDarkMode ? 'text-gray-400' : 'text-gray-500'
               }`}>
-                Passionate learner | Full Stack Developer | AI Enthusiast
+                {profileData.bio}
               </p>
               <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-sm">
-                  🎓 Advanced Learner
-                </span>
-                <span className="px-3 py-1 bg-green-100 text-green-600 rounded-full text-sm">
-                  👨‍🏫 Mentor
-                </span>
-                <span className="px-3 py-1 bg-purple-100 text-purple-600 rounded-full text-sm">
-                  🏆 Top Contributor
-                </span>
+                {profileData.badges.map(badge => (
+                  <span key={badge.id} className={`px-3 py-1 bg-${badge.color}-100 text-${badge.color}-600 rounded-full text-sm`}>
+                    {badge.text}
+                  </span>
+                ))}
               </div>
             </div>
 
@@ -114,40 +129,54 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex overflow-x-auto space-x-2 mb-8 pb-2">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
-                activeTab === tab.id
-                  ? `${isDarkMode ? 'bg-blue-600' : 'bg-blue-500'} text-white`
-                  : `${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:bg-gray-50'} 
-                     ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Content Section */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.2 }}
-            className={`rounded-xl p-6 ${
+        {/* New Layout Structure */}
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Vertical Navigation Sidebar */}
+          <motion.div 
+            className={`w-full md:w-64 flex-shrink-0 ${
               isDarkMode ? 'bg-gray-800' : 'bg-white'
-            } shadow-lg`}
+            } rounded-xl shadow-lg p-4`}
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.3 }}
           >
-            {renderTabContent()}
+            {tabs.map(tab => (
+              <motion.button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center w-full px-4 py-3 rounded-lg mb-2 transition-all ${
+                  activeTab === tab.id
+                    ? `${isDarkMode ? 'bg-blue-600' : 'bg-blue-500'} text-white`
+                    : `${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'} 
+                       ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`
+                }`}
+                whileHover={{ x: 4 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <tab.icon className="w-5 h-5" />
+                <span className="ml-3 font-medium">{tab.label}</span>
+              </motion.button>
+            ))}
           </motion.div>
-        </AnimatePresence>
+
+          {/* Content Section */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              className="flex-1"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className={`rounded-xl p-6 ${
+                isDarkMode ? 'bg-gray-800' : 'bg-white'
+              } shadow-lg`}>
+                {renderTabContent()}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );
