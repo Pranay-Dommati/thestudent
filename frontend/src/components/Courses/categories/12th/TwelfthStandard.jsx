@@ -5,79 +5,24 @@ import { Link, useNavigate } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
 import { stateBoards } from '../../data/states';
 
-const EleventhStandard = () => {
+const TwelfthStandard = () => {
   const navigate = useNavigate();
   const [selectedBoard, setSelectedBoard] = useState(null);
   const [showStateBoards, setShowStateBoards] = useState(false);
 
   const boards = [
-    { 
-      id: 'cbse', 
-      name: 'CBSE',
-      fullName: 'Central Board of Secondary Education',
-      available: true
-    },
-    { 
-      id: 'state', 
-      name: 'State Board',
-      fullName: 'State Board of Secondary and Higher Secondary Education',
-      available: true
-    },
-    { 
-      id: 'icse', 
-      name: 'CISCE',
-      fullName: 'Council for the Indian School Certificate Examinations',
-      available: false
-    },
-    { 
-      id: 'nios', 
-      name: 'NIOS',
-      fullName: 'National Institute of Open Schooling',
-      available: false
-    }
+    { id: 'cbse', name: 'CBSE', fullName: 'Central Board of Secondary Education', available: true },
+    { id: 'state', name: 'State Board', fullName: 'State Board of Secondary and Higher Secondary Education', available: true },
+    { id: 'icse', name: 'CISCE', fullName: 'Council for the Indian School Certificate Examinations', available: false },
+    { id: 'nios', name: 'NIOS', fullName: 'National Institute of Open Schooling', available: false }
   ];
 
   const subjects = [
-    {
-      id: 'physics',
-      name: 'Physics',
-      icon: '🔬',
-      courseId: '1',
-      description: 'Comprehensive coverage of Physics for 11th grade',
-      duration: '50+ hours of content'
-    },
-    {
-      id: 'chemistry',
-      name: 'Chemistry',
-      icon: '⚗️',
-      courseId: '1',
-      description: 'In-depth exploration of Chemistry concepts',
-      duration: '45+ hours of content'
-    },
-    {
-      id: 'mathematics',
-      name: 'Mathematics',
-      icon: '📐',
-      courseId: '1',
-      description: 'Advanced Mathematics for 11th grade',
-      duration: '60+ hours of content'
-    },
-    {
-      id: 'biology',
-      name: 'Biology',
-      icon: '🧬',
-      courseId: '1',
-      description: 'Detailed study of Biology topics',
-      duration: '55+ hours of content'
-    },
-    {
-      id: 'english',
-      name: 'English',
-      icon: '📚',
-      courseId: '1',
-      description: 'Master English language and literature',
-      duration: '40+ hours of content'
-    }
+    { id: 'physics', name: 'Physics', icon: '🔬', courseId: '1', description: 'Comprehensive coverage of Physics for 12th grade', duration: '50+ hours of content' },
+    { id: 'chemistry', name: 'Chemistry', icon: '⚗️', courseId: '1', description: 'In-depth exploration of Chemistry concepts', duration: '45+ hours of content' },
+    { id: 'mathematics', name: 'Mathematics', icon: '📐', courseId: '1', description: 'Advanced Mathematics for 12th grade', duration: '60+ hours of content' },
+    { id: 'biology', name: 'Biology', icon: '🧬', courseId: '1', description: 'Detailed study of Biology topics', duration: '55+ hours of content' },
+    { id: 'english', name: 'English', icon: '📚', courseId: '1', description: 'Master English language and literature', duration: '40+ hours of content' }
   ];
 
   const handleBoardSelect = (board) => {
@@ -112,7 +57,6 @@ const EleventhStandard = () => {
             title="Select Your Board" 
             subtitle="Choose your education board to view relevant courses" 
           />
-
           <div className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {boards.filter(board => board.available).map((board) => (
@@ -127,11 +71,6 @@ const EleventhStandard = () => {
                   <p className="text-gray-500 text-sm">{board.fullName}</p>
                 </motion.button>
               ))}
-            </div>
-
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
-              <h3 className="text-lg font-semibold text-indigo-900 mb-2">More Boards Coming Soon!</h3>
-              <p className="text-indigo-700">We're working hard to bring you content for ICSE, NIOS, and other boards. Stay tuned for updates!</p>
             </div>
           </div>
         </>
@@ -162,29 +101,22 @@ const EleventhStandard = () => {
       ) : (
         <>
           <BackButton 
-            title={`Class 11 - ${selectedBoard.includes('state') ? 
+            title={`Class 12 - ${selectedBoard.includes('state') ? 
               stateBoards.find(s => selectedBoard.includes(s.id))?.name : 
               boards.find(b => b.id === selectedBoard)?.name}`}
             subtitle="Complete syllabus coverage with curated video lectures" 
           />
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {subjects.map((subject) => (
               <Link to={`/courses/${subject.courseId}`} key={subject.id}>
-                <motion.div
-                  whileHover={{ y: -5 }}
-                  className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
-                >
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl"></div>
-                    <div className="relative p-6">
-                      <div className="flex items-center justify-between">
-                        <span className="text-white text-2xl">{subject.icon}</span>
-                        <FaPlay className="text-white opacity-75" />
-                      </div>
-                      <h3 className="text-white text-xl font-bold mt-2">{subject.name}</h3>
-                      <p className="text-white/80 text-sm mt-1">{subject.duration}</p>
+                <motion.div whileHover={{ y: -5 }} className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full">
+                  <div className="relative p-6 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl text-white">
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl">{subject.icon}</span>
+                      <FaPlay className="opacity-75" />
                     </div>
+                    <h3 className="text-xl font-bold mt-2">{subject.name}</h3>
+                    <p className="text-white/80 text-sm mt-1">{subject.duration}</p>
                   </div>
                   <div className="p-6">
                     <p className="text-gray-600 text-sm mb-4">{subject.description}</p>
@@ -200,19 +132,10 @@ const EleventhStandard = () => {
               </Link>
             ))}
           </div>
-
-          <div className="mt-12 bg-gray-50 rounded-2xl p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Additional Resources</h2>
-            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6">
-              <h3 className="text-lg font-semibold mb-3">Sample Papers</h3>
-              <p className="text-gray-600 mb-4">CBSE sample papers and previous year questions</p>
-              <button className="text-indigo-600 font-medium hover:text-indigo-800">Access Now →</button>
-            </div>
-          </div>
         </>
       )}
     </div>
   );
 };
 
-export default EleventhStandard;
+export default TwelfthStandard;

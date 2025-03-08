@@ -1,28 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaGraduationCap, FaBook, FaUniversity, FaLaptopCode } from 'react-icons/fa';
 import Navbar from "../Navbar/Navbar";
 import Footer from "../Footer/Footer";
 import CourseHero from "./CourseHero/CourseHero";
-import CourseCategories from "./CourseCategories/CourseCategories";
-import CourseFilters from "./CourseFilters/CourseFilters";
-import CourseListings from "./CourseListings/CourseListings";
-import TenthStandard from './categories/10th/TenthStandard';
-import EleventhStandard from './categories/11th/EleventhStandard';
-import TwelfthStandard from './categories/12th/TwelveStandard';
-import Undergraduate from './categories/undergraduate/Undergraduate';
 
 const Courses = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
     const [selectedLevel, setSelectedLevel] = useState(null);
-    const [selectedBoard, setSelectedBoard] = useState(null);
-    const [selectedCategory, setSelectedCategory] = useState('all');
-    const [filters, setFilters] = useState({
-        skillLevel: 'all',
-        duration: 'all',
-        sortBy: 'popular'
-    });
 
-    // Education levels and boards configuration
     const educationLevels = [
         { 
             id: '10th', 
@@ -50,54 +38,16 @@ const Courses = () => {
         },
     ];
 
-    // Update the boards configuration
-    const getAvailableBoards = (level) => {
-        const availableBoards = [
-            { 
-                id: 'cbse', 
-                name: 'CBSE',
-                fullName: 'Central Board of Secondary Education',
-                available: true
-            },
-            { 
-                id: 'state', 
-                name: 'State Board',
-                fullName: 'State Board of Secondary and Higher Secondary Education',
-                available: true
-            },
-            { 
-                id: 'icse', 
-                name: 'CISCE',
-                fullName: 'Council for the Indian School Certificate Examinations',
-                available: false
-            },
-            { 
-                id: 'nios', 
-                name: 'NIOS',
-                fullName: 'National Institute of Open Schooling',
-                available: false
-            }
-        ];
-
-        // Filter boards based on level if needed
-        return availableBoards;
-    };
-
     const handleLevelSelect = (level) => {
         setSelectedLevel(level);
-        if (level === 'undergraduate') {
-            setSelectedBoard(null);
+        navigate(`/courses/${level}`);
+    };
+
+    useEffect(() => {
+        if (location.pathname === '/courses') {
+            setSelectedLevel(null);
         }
-    };
-
-    const handleBoardSelect = (board) => {
-        setSelectedBoard(board);
-    };
-
-    const handleBackToLevels = () => {
-        setSelectedLevel(null);
-        setSelectedBoard(null);
-    };
+    }, [location.pathname]);
 
     const containerVariants = {
         hidden: { opacity: 0, y: 20 },
@@ -165,92 +115,8 @@ const Courses = () => {
                                 ))}
                             </div>
                         </motion.div>
-                    ) : selectedLevel !== 'undergraduate' && !selectedBoard ? (
-                        <motion.div
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                            exit="exit"
-                            className="max-w-4xl mx-auto"
-                        >
-                            <div className="flex items-center mb-8">
-                                <motion.button 
-                                    onClick={handleBackToLevels}
-                                    className="mr-4 p-2 hover:bg-white rounded-full transition-all
-                                             hover:shadow-md text-gray-600 hover:text-indigo-600"
-                                    whileHover={{ scale: 1.1 }}
-                                    whileTap={{ scale: 0.95 }}
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" 
-                                         viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                                              d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                </motion.button>
-                                <div>
-                                    <h2 className="text-3xl font-bold text-gray-900">
-                                        Select Your Board
-                                    </h2>
-                                    <p className="text-gray-600 mt-1">
-                                        Choose your education board to view relevant courses
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-8">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                    {getAvailableBoards(selectedLevel)
-                                        .filter(board => board.available)
-                                        .map((board) => (
-                                            <motion.button
-                                                key={board.id}
-                                                onClick={() => handleBoardSelect(board.id)}
-                                                className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl 
-                                                         transition-all duration-300 border border-gray-100"
-                                                whileHover={{ y: -5 }}
-                                                whileTap={{ scale: 0.98 }}
-                                            >
-                                                <h3 className="text-xl font-bold text-gray-900 mb-2">{board.name}</h3>
-                                                <p className="text-gray-500 text-sm">
-                                                    {board.fullName}
-                                                </p>
-                                            </motion.button>
-                                        ))}
-                                </div>
-
-                                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
-                                    <h3 className="text-lg font-semibold text-indigo-900 mb-2">
-                                        More Boards Coming Soon!
-                                    </h3>
-                                    <p className="text-indigo-700">
-                                        We're working hard to bring you content for ICSE, NIOS, and other boards. 
-                                        Stay tuned for updates!
-                                    </p>
-                                </div>
-                            </div>
-                        </motion.div>
                     ) : (
-                        <div className="flex flex-col">
-                            {/* For 10th, 11th, and 12th standard */}
-                            {selectedLevel !== 'undergraduate' && (
-                                <>
-                                    {selectedLevel === '10th' && <TenthStandard board={selectedBoard} />}
-                                    {selectedLevel === '11th' && <EleventhStandard board={selectedBoard} />}
-                                    {selectedLevel === '12th' && <TwelfthStandard board={selectedBoard} />}
-                                </>
-                            )}
-
-                            {/* For undergraduate - keeping the filters */}
-                            {selectedLevel === 'undergraduate' && (
-                                <Undergraduate 
-                                    selectedCategory={selectedCategory}
-                                    onCategoryChange={setSelectedCategory}
-                                    filters={filters}
-                                    onFilterChange={setFilters}
-                                    onBackClick={handleBackToLevels}
-                                />
-                            )}
-                        </div>
+                        <Outlet />
                     )}
                 </div>
             </div>

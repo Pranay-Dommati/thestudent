@@ -8,7 +8,10 @@ import CourseLearningPage from './components/CourseLearningPage/CourseLearningPa
 import LearningHubPage from './components/LearningHub/LearningHubPage';
 import FloatingChatButton from './components/Chatbot/FloatingChatButton';
 import AuthForm from './components/Auth/AuthForm';
-import ProfilePage from './components/Profile/ProfilePage'; 
+import TenthStandard from './components/Courses/categories/10th/TenthStandard';
+import EleventhStandard from './components/Courses/categories/11th/EleventhStandard';
+import TwelfthStandard from './components/Courses/categories/12th/TwelfthStandard';
+import Undergraduate from './components/Courses/categories/undergraduate/Undergraduate';
 
 function App() {
   return (
@@ -16,13 +19,17 @@ function App() {
       {/* Routes for page navigation */}
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/courses" element={<Courses />} />
+        <Route path="/courses" element={<Courses />}>
+          <Route path="10th" element={<TenthStandard />} />
+          <Route path="11th" element={<EleventhStandard />} />
+          <Route path="12th" element={<TwelfthStandard />} />
+          <Route path="undergraduate" element={<Undergraduate />} />
+        </Route>
         <Route path="/chat" element={<ChatBotPage />} />
         <Route path="/courses/:courseId" element={<CourseDetailsPage />} />
         <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
         <Route path="/learning-hub" element={<LearningHubPage />} /> 
         <Route path="/auth" element={<AuthForm />} />
-        <Route path="/profile" element={<ProfilePage />} />
       </Routes>
 
       {/* Floating chat button - appears on all pages except /chat */}
