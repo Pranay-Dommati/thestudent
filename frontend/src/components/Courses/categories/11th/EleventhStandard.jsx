@@ -3,10 +3,12 @@ import { motion } from 'framer-motion';
 import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
+import { stateBoards } from '../../data/states';
 
 const EleventhStandard = () => {
   const navigate = useNavigate();
   const [selectedBoard, setSelectedBoard] = useState(null);
+  const [showStateBoards, setShowStateBoards] = useState(false);
 
   const boards = [
     { 
@@ -79,16 +81,32 @@ const EleventhStandard = () => {
   ];
 
   const handleBoardSelect = (board) => {
-    setSelectedBoard(board);
+    if (board === 'state') {
+      setShowStateBoards(true);
+    } else {
+      setSelectedBoard(board);
+      setShowStateBoards(false);
+    }
+  };
+
+  const handleStateSelect = (stateId) => {
+    setSelectedBoard(`state-${stateId}`);
+    setShowStateBoards(false);
   };
 
   const handleBack = () => {
-    navigate('/courses');
+    if (showStateBoards) {
+      setShowStateBoards(false);
+    } else if (selectedBoard) {
+      setSelectedBoard(null);
+    } else {
+      navigate('/courses');
+    }
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {!selectedBoard ? (
+      {!selectedBoard && !showStateBoards ? (
         <>
           <BackButton 
             title="Select Your Board" 
@@ -117,10 +135,36 @@ const EleventhStandard = () => {
             </div>
           </div>
         </>
+      ) : showStateBoards ? (
+        <>
+          <BackButton 
+            title="Select Your State" 
+            subtitle="Choose your state board" 
+          />
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {stateBoards.map((state) => (
+                <motion.button
+                  key={state.id}
+                  onClick={() => handleStateSelect(state.id)}
+                  className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl 
+                           transition-all duration-300 border border-gray-100"
+                  whileHover={{ y: -5 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{state.name}</h3>
+                  <p className="text-gray-500 text-sm">{state.fullName}</p>
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        </>
       ) : (
         <>
           <BackButton 
-            title={`Class 11 - ${selectedBoard.toUpperCase()}`}
+            title={`Class 11 - ${selectedBoard.includes('state') ? 
+              stateBoards.find(s => selectedBoard.includes(s.id))?.name : 
+              boards.find(b => b.id === selectedBoard)?.name}`}
             subtitle="Complete syllabus coverage with curated video lectures" 
           />
 
