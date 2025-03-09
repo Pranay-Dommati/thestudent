@@ -304,12 +304,6 @@ const ChatbotPage = () => {
             >
               <IoHome size={20} />
             </Link>
-            <button 
-              className="p-2 rounded-full text-blue-600 hover:bg-blue-50 hover:scale-110 transition-all duration-200"
-              aria-label="Save chat"
-            >
-              <IoBookmark size={20} />
-            </button>
           </div>
         </nav>
 
