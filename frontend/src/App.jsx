@@ -16,15 +16,14 @@ import ProfileLayout from './components/Profile/ProfilePage';
 function App() {
   return (
     <BrowserRouter>
-      {/* Routes for page navigation */}
+     
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/courses" element={<Courses />}>
-          <Route path="10th" element={<TenthStandard />} />
-          <Route path="11th" element={<EleventhStandard />} />
-          <Route path="12th" element={<TwelfthStandard />} />
-          <Route path="undergraduate" element={<Undergraduate />} />
-        </Route>
+        <Route path="10th" element={<TenthStandard />} />
+        <Route path="11th" element={<EleventhStandard />} />
+        <Route path="12th" element={<TwelfthStandard />} />
+        <Route path="undergraduate" element={<Undergraduate />} /></Route>
         <Route path="/profile" element={<ProfileLayout />} />
         <Route path="/chat" element={<ChatBotPage />} />
         <Route path="/courses/:courseId" element={<CourseDetailsPage />} />
@@ -33,7 +32,6 @@ function App() {
         <Route path="/auth" element={<AuthForm />} />
       </Routes>
 
-      {/* Floating chat button - appears on all pages except /chat */}
       <FloatingChatButton />
     </BrowserRouter>
   );

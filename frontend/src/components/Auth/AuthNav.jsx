@@ -36,10 +36,8 @@ const AuthNav = () => {
               </svg>
               Back to Home
             </Link>
-            <a 
-              href="https://docs.studentshub.com" 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            <Link 
+              to="/help-center"
               className="text-gray-600 hover:text-blue-600 transition-colors hidden sm:flex items-center"
             >
               <svg 
@@ -55,7 +53,7 @@ const AuthNav = () => {
                 />
               </svg>
               Help Center
-            </a>
+            </Link>
           </div>
         </div>
       </div>
