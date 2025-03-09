@@ -1,88 +1,66 @@
 import React, { useState } from 'react';
 
+const categories = [
+  { id: 'all', name: 'All Playlists' },
+  { id: 'tenth', name: 'Class 10' },
+  { id: 'eleventh', name: 'Class 11' },
+  { id: 'twelfth', name: 'Class 12' },
+  { id: 'engineering', name: 'Engineering' }
+];
+
+const playlists = [
+  // 10th Standard Courses
+  { 
+    id: 1, 
+    title: 'CBSE Class 10 Mathematics', 
+    duration: '45 hours', 
+    lessons: 90,
+    category: 'tenth',
+    author: 'Master Mathematics',
+    rating: 4.8,
+    students: '25.4K',
+    image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3'
+  },
+  // 11th Standard Courses
+  { 
+    id: 2, 
+    title: 'Class 11 Physics Complete Course', 
+    duration: '50 hours',
+    lessons: 95, 
+    category: 'eleventh',
+    author: 'Physics Academy',
+    rating: 4.9,
+    students: '20K',
+    image: 'https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?ixlib=rb-4.0.3'
+  },
+  // 12th Standard Courses
+  { 
+    id: 3, 
+    title: 'Chemistry for Class 12', 
+    duration: '48 hours',
+    lessons: 85,
+    category: 'twelfth',
+    author: 'Chemistry Masters',
+    rating: 4.7,
+    students: '18.9K',
+    image: 'https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?ixlib=rb-4.0.3'
+  },
+  // Engineering Courses
+  { 
+    id: 4, 
+    title: 'Web Development Bootcamp', 
+    duration: '56 hours',
+    lessons: 120,
+    category: 'engineering',
+    author: 'Tech Academy',
+    rating: 4.8,
+    students: '15.4K',
+    image: 'https://images.unsplash.com/photo-1547658719-da2b51169166?ixlib=rb-4.0.3'
+  }
+];
+
 const FeaturedPlaylists = () => {
   const [activeCategory, setActiveCategory] = useState('all');
-  
-  const categories = [
-    { id: 'all', name: 'All Playlists' },
-    { id: 'tenth', name: 'Class 10' },
-    { id: 'eleventh', name: 'Class 11' },
-    { id: 'twelfth', name: 'Class 12' },
-    { id: 'undergraduate', name: 'Undergraduate' }
-  ];
-  
-  const playlists = [
-    // 10th Standard Courses
-    { 
-      id: 1, 
-      title: 'CBSE Class 10 Mathematics', 
-      duration: '45 hours', 
-      lessons: 90,
-      category: 'tenth',
-      author: 'Master Mathematics',
-      rating: 4.8,
-      students: '25.4K',
-      image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3'
-    },
-    // 11th Standard Courses
-    { 
-      id: 2, 
-      title: 'Class 11 Physics Complete Course', 
-      duration: '50 hours',
-      lessons: 95, 
-      category: 'eleventh',
-      author: 'Physics Academy',
-      rating: 4.9,
-      students: '20K',
-      image: 'https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?ixlib=rb-4.0.3'
-    },
-    // 12th Standard Courses
-    { 
-      id: 3, 
-      title: 'Chemistry for Class 12 Board Prep', 
-      duration: '48 hours',
-      lessons: 85,
-      category: 'twelfth',
-      author: 'Chemistry Masters',
-      rating: 4.7,
-      students: '18.9K',
-      image: 'https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?ixlib=rb-4.0.3'
-    },
-    // Undergraduate Courses
-    { 
-      id: 4, 
-      title: 'Web Development Bootcamp', 
-      duration: '56 hours',
-      lessons: 120,
-      category: 'undergraduate',
-      author: 'Tech Academy',
-      rating: 4.8,
-      students: '15.4K',
-      image: 'https://images.unsplash.com/photo-1547658719-da2b51169166?ixlib=rb-4.0.3'
-    },
-    { 
-      id: 5, 
-      title: 'Class 10 Science Masterclass', 
-      duration: '42 hours',
-      lessons: 80,
-      category: 'tenth',
-      author: 'Science Experts',
-      rating: 4.9,
-      students: '22.8K',
-      image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?ixlib=rb-4.0.3'
-    },
-    { 
-      id: 6, 
-      title: 'Class 11 Advanced Mathematics', 
-      duration: '52 hours',
-      lessons: 100,
-      category: 'eleventh',
-      author: 'Math Academy',
-      rating: 4.8,
-      students: '16.5K',
-      image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3'
-    }
-  ];
   
   const filteredPlaylists = activeCategory === 'all' 
     ? playlists 

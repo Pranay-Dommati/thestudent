@@ -11,7 +11,7 @@ import AuthForm from './components/Auth/AuthForm';
 import TenthStandard from './components/Courses/categories/10th/TenthStandard';
 import EleventhStandard from './components/Courses/categories/11th/EleventhStandard';
 import TwelfthStandard from './components/Courses/categories/12th/TwelfthStandard';
-import Undergraduate from './components/Courses/categories/undergraduate/Undergraduate';
+import Undergraduate from './components/Courses/categories/undergraduate/Engineering';
 import ProfileLayout from './components/Profile/ProfilePage';
 function App() {
   return (
@@ -23,7 +23,7 @@ function App() {
           <Route path="10th" element={<TenthStandard />} />
           <Route path="11th" element={<EleventhStandard />} />
           <Route path="12th" element={<TwelfthStandard />} />
-          <Route path="undergraduate" element={<Undergraduate />} />
+          <Route path="engineering" element={<Undergraduate />} />
         </Route>
         <Route path="/profile" element={<ProfileLayout />} />
         <Route path="/chat" element={<ChatBotPage />} />
