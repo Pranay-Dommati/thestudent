@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 const Hero = () => {
   return (
@@ -32,8 +33,8 @@ const Hero = () => {
           
           {/* Adjusted button sizes */}
           <div className="flex flex-col sm:flex-row justify-center gap-4 mb-20 px-4">
-            <a 
-              href="courses" 
+            <Link 
+              to="/courses" 
               className="px-6 md:px-8 py-3 md:py-4 rounded-lg bg-white text-indigo-600 font-bold text-base md:text-lg
                        transition-all duration-300 ease-out transform
                        hover:shadow-lg hover:shadow-white/30 hover:-translate-y-1
@@ -41,9 +42,9 @@ const Hero = () => {
                        active:translate-y-0"
             >
               Start Learning
-            </a>
-            <a 
-              href="chat" 
+            </Link>
+            <Link 
+              to="/chat" 
               className="group px-6 md:px-8 py-3 md:py-4 rounded-lg bg-indigo-800 bg-opacity-50 text-white 
                        border border-indigo-400 border-opacity-30 backdrop-blur-sm font-bold text-base md:text-lg
                        transition-all duration-300 ease-out transform
@@ -63,7 +64,7 @@ const Hero = () => {
                 </svg>
                 AI Study Assistant
               </span>
-            </a>
+            </Link>
           </div>
         </div>
       </div>
