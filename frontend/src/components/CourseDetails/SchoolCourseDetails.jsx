@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FaPlay, FaBookReader, FaClock, FaChalkboardTeacher } from 'react-icons/fa';
+import { FaPlay, FaBookReader, FaClock, FaChalkboardTeacher, FaGlobe } from 'react-icons/fa';
 import LoadingSpinner from './LoadingSpinner';
 import Navbar from '../Navbar/Navbar';
 import Footer from '../Footer/Footer';
@@ -67,8 +67,8 @@ const SchoolCourseDetails = ({ courseId }) => {
               </div>
               <div className="bg-white/10 rounded-lg p-4 mb-6">
                 <div className="flex items-center space-x-2">
-                  <FaChalkboardTeacher />
-                  <span>Instructor: {course.instructor}</span>
+                  <FaGlobe className="text-lg" />
+                  <span>Sources : YouTube</span>
                 </div>
                 <div className="flex items-center space-x-2 mt-2">
                   <FaClock />
