@@ -17,9 +17,13 @@ const Hero = () => {
             <span className="text-indigo-600 text-sm font-medium">10+ Free Courses Available</span>
           </div>
           
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6 leading-tight">
+          {/* <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6 leading-tight">
             Find the Best <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-400">Free Courses</span>, Curated & AI-Generated for You!
+          </h1> */}
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6 leading-tight">
+          Discover the  <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-400">Free Courses </span>Organized from Top Online Sources!
           </h1>
+          
           
           <p className="text-xl text-white mb-10 max-w-2xl mx-auto">
             Learn at your own pace with structured playlists from YouTube and beyond, 
@@ -56,7 +60,8 @@ const Hero = () => {
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                Generate with AI
+                {/* Generate with AI */}
+                AI Study Assistant
               </span>
             </a>
           </div>
