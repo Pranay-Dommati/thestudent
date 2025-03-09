@@ -158,16 +158,16 @@ const TrustSection = () => {
         <div className="mt-20 bg-indigo-600 text-white rounded-2xl overflow-hidden shadow-xl">
           <div className="grid grid-cols-1 md:grid-cols-3">
             <div className="p-8 text-center border-b md:border-b-0 md:border-r border-indigo-500">
-              <div className="text-4xl font-bold mb-2">10,000+</div>
-              <div className="text-indigo-200">Active Students</div>
+              <div className="text-4xl font-bold mb-2">Join Us</div>
+              <div className="text-indigo-200">Growing Community</div>
             </div>
             <div className="p-8 text-center border-b md:border-b-0 md:border-r border-indigo-500">
-              <div className="text-4xl font-bold mb-2">500+</div>
-              <div className="text-indigo-200">Curated Playlists</div>
+              <div className="text-4xl font-bold mb-2">Discover</div>
+              <div className="text-indigo-200">Expanding Playlists</div>
             </div>
             <div className="p-8 text-center">
-              <div className="text-4xl font-bold mb-2">4.9/5</div>
-              <div className="text-indigo-200">Student Satisfaction</div>
+              <div className="text-4xl font-bold mb-2">Excellence</div>
+              <div className="text-indigo-200">Focused on Quality</div>
             </div>
           </div>
         </div>
