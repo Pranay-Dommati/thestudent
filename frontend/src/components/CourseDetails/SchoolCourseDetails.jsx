@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FaPlay, FaBookReader, FaClock, FaChalkboardTeacher } from 'react-icons/fa';
 import LoadingSpinner from './LoadingSpinner';
-
+import Navbar from '../Navbar/Navbar';
+import Footer from '../Footer/Footer';
 const SchoolCourseDetails = ({ courseId }) => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -47,10 +48,13 @@ const SchoolCourseDetails = ({ courseId }) => {
   if (!course) return <div className="p-8 text-center">Course not found</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
+    <Navbar />
+    
+    <div className="min-h-screen bg-gray-50"> {/* Removed pt-6 from here */}
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-        <div className="container mx-auto px-4 py-12">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white pt-8"> {/* Added pt-8 here */}
+        <div className="container mx-auto px-4 py-12"> {/* Changed pt-6 pb-12 to py-12 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div>
               <h1 className="text-4xl font-bold mb-4">{course.title}</h1>
@@ -78,11 +82,12 @@ const SchoolCourseDetails = ({ courseId }) => {
                 <FaPlay className="mr-2" /> Start Learning
               </Link>
             </div>
-            <div className="relative">
+            {/* Update the image container div and img classes */}
+            <div className="relative py-10 lg:py-6 max-w-xl mx-auto lg:mx-0">
               <img 
                 src={course.thumbnail} 
                 alt={course.title}
-                className="rounded-lg shadow-xl w-full"
+                className="rounded-lg shadow-xl w-full h-[250px] object-cover"
               />
             </div>
           </div>
@@ -129,6 +134,8 @@ const SchoolCourseDetails = ({ courseId }) => {
         </div>
       </div>
     </div>
+    <Footer />
+    </>
   );
 };
 
