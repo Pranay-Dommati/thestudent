@@ -136,11 +136,17 @@ const AIGeneratedLearningPath = () => {
           
           {/* Remove text-center from parent div and adjust heading alignment */}
           <div className="flex flex-col items-start">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
+            {/* <h2 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
               Create Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-300">Personalized Course</span> with Our AI
+            </h2> */}
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
+            Get Personalized  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-300">Learning</span>  Recommendations
             </h2>
-            <p className="text-xl text-indigo-100 mb-10">
+            {/* <p className="text-xl text-indigo-100 mb-10">
               Give our AI a prompt, get structured playlists, and save them to your learning hub—all in one place
+            </p> */}
+            <p className="text-xl text-indigo-100 mb-10">
+            Chat with our AI assistant to find the best free courses, structured playlists, and learning paths tailored to your goals.
             </p>
           </div>
 
