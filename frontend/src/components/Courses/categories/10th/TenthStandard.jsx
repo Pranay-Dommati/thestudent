@@ -42,7 +42,7 @@ const TenthStandard = () => {
       id: 'english',
       name: 'English',
       icon: '📚',
-      courseId: '1',
+      courseId: '10th-english', // Updated courseId
       description: 'Master language & literature with comprehensive coverage of CBSE syllabus',
       duration: '40+ hours of content'
     },
@@ -50,7 +50,7 @@ const TenthStandard = () => {
       id: 'hindi',
       name: 'Hindi',
       icon: '📖',
-      courseId: '1',
+      courseId: '10th-hindi', // Updated courseId
       description: 'Strengthen your Hindi language skills with expert guidance',
       duration: '35+ hours of content'
     },
@@ -58,7 +58,7 @@ const TenthStandard = () => {
       id: 'mathematics',
       name: 'Mathematics',
       icon: '📐',
-      courseId: '1',
+      courseId: '10th-mathematics', // Updated courseId
       description: 'Build strong foundations in algebra, geometry, and trigonometry',
       duration: '45+ hours of content'
     },
@@ -66,7 +66,7 @@ const TenthStandard = () => {
       id: 'science',
       name: 'Science',
       icon: '🔬',
-      courseId: '1',
+      courseId: '10th-science', // Updated courseId
       description: 'Comprehensive coverage of Physics, Chemistry, and Biology',
       duration: '50+ hours of content'
     },
@@ -74,7 +74,7 @@ const TenthStandard = () => {
       id: 'social',
       name: 'Social Science',
       icon: '🌍',
-      courseId: '1',
+      courseId: '10th-social', // Updated courseId
       description: 'In-depth exploration of History, Geography, and Civics',
       duration: '40+ hours of content'
     }

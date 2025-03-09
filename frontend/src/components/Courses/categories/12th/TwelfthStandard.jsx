@@ -18,11 +18,46 @@ const TwelfthStandard = () => {
   ];
 
   const subjects = [
-    { id: 'physics', name: 'Physics', icon: '🔬', courseId: '1', description: 'Comprehensive coverage of Physics for 12th grade', duration: '50+ hours of content' },
-    { id: 'chemistry', name: 'Chemistry', icon: '⚗️', courseId: '1', description: 'In-depth exploration of Chemistry concepts', duration: '45+ hours of content' },
-    { id: 'mathematics', name: 'Mathematics', icon: '📐', courseId: '1', description: 'Advanced Mathematics for 12th grade', duration: '60+ hours of content' },
-    { id: 'biology', name: 'Biology', icon: '🧬', courseId: '1', description: 'Detailed study of Biology topics', duration: '55+ hours of content' },
-    { id: 'english', name: 'English', icon: '📚', courseId: '1', description: 'Master English language and literature', duration: '40+ hours of content' }
+    {
+      id: 'physics',
+      name: 'Physics',
+      icon: '🔬',
+      courseId: '12th-physics',
+      description: 'Comprehensive coverage of Physics for 12th grade',
+      duration: '50+ hours of content'
+    },
+    {
+      id: 'chemistry',
+      name: 'Chemistry',
+      icon: '⚗️',
+      courseId: '12th-chemistry',
+      description: 'In-depth exploration of Chemistry concepts',
+      duration: '45+ hours of content'
+    },
+    {
+      id: 'mathematics',
+      name: 'Mathematics',
+      icon: '📐',
+      courseId: '12th-mathematics',
+      description: 'Advanced Mathematics for 12th grade',
+      duration: '60+ hours of content'
+    },
+    {
+      id: 'biology',
+      name: 'Biology',
+      icon: '🧬',
+      courseId: '12th-biology',
+      description: 'Detailed study of Biology topics',
+      duration: '55+ hours of content'
+    },
+    {
+      id: 'english',
+      name: 'English',
+      icon: '📚',
+      courseId: '12th-english',
+      description: 'Master English language and literature',
+      duration: '40+ hours of content'
+    }
   ];
 
   const handleBoardSelect = (board) => {

@@ -1,5 +1,5 @@
 import './App.css';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useParams, useLocation } from 'react-router-dom';
 import HomePage from './components/HomePage/HomePage';
 import Courses from './components/Courses/Courses';
 import ChatBotPage from './components/Chatbot/ChatbotPage';
@@ -13,10 +13,29 @@ import EleventhStandard from './components/Courses/categories/11th/EleventhStand
 import TwelfthStandard from './components/Courses/categories/12th/TwelfthStandard';
 import Undergraduate from './components/Courses/categories/undergraduate/Engineering';
 import ProfileLayout from './components/Profile/ProfilePage';
+import CourseDetails from './components/CourseDetails/CourseDetails';
+import SchoolCourseDetails from './components/CourseDetails/SchoolCourseDetails';
+
+const CourseDetailsWrapper = () => {
+  const { courseId } = useParams();
+  
+  const determineCourseType = (id) => {
+    // Check if courseId starts with 10th, 11th, or 12th
+    return ['10th', '11th', '12th'].some(grade => id.startsWith(grade)) ? 'school' : 'engineering';
+  };
+
+  const courseType = determineCourseType(courseId);
+  
+  return courseType === 'school' ? (
+    <SchoolCourseDetails courseId={courseId} />
+  ) : (
+    <CourseDetails courseId={courseId} />
+  );
+};
+
 function App() {
   return (
     <BrowserRouter>
-      {/* Routes for page navigation */}
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/courses" element={<Courses />}>
@@ -27,13 +46,12 @@ function App() {
         </Route>
         <Route path="/profile" element={<ProfileLayout />} />
         <Route path="/chat" element={<ChatBotPage />} />
-        <Route path="/courses/:courseId" element={<CourseDetailsPage />} />
+        <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
         <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
         <Route path="/learning-hub" element={<LearningHubPage />} /> 
         <Route path="/auth" element={<AuthForm />} />
       </Routes>
 
-      {/* Floating chat button - appears on all pages except /chat */}
       <FloatingChatButton />
     </BrowserRouter>
   );
