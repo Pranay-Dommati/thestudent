@@ -75,7 +75,7 @@ const TrustSection = () => {
               <svg className="w-5 h-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              TRUSTED BY THOUSANDS
+              Quality Learning, Guaranteed
             </div>
           </div>
           <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
@@ -124,13 +124,10 @@ const TrustSection = () => {
         
         {/* Social proof section */}
         <div className="mt-20 text-center">
-          <p className="text-sm uppercase font-medium text-gray-500 tracking-wider mb-6">TRUSTED BY UNIVERSITIES AND ORGANIZATIONS</p>
+          <p className="text-sm uppercase font-medium text-gray-500 tracking-wider mb-6">Sourced from Top Learning Platforms</p>
           <div className="flex flex-wrap justify-center items-center gap-x-12 gap-y-6 opacity-70">
             <img className="h-8" src="https://via.placeholder.com/120x30" alt="University logo" />
-            <img className="h-8" src="https://via.placeholder.com/120x30" alt="University logo" />
-            <img className="h-8" src="https://via.placeholder.com/120x30" alt="University logo" />
-            <img className="h-8" src="https://via.placeholder.com/120x30" alt="University logo" />
-            <img className="h-8" src="https://via.placeholder.com/120x30" alt="University logo" />
+
           </div>
         </div>
         
