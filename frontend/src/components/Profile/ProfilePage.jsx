@@ -10,7 +10,7 @@ import LearningProgress from './tabs/LearningProgress';
 import CommunitySection from './tabs/CommunitySection';
 import AISettings from './tabs/AISettings';
 import ProfileNavbar from './layout/ProfileNavbar';
-import ProfileFooter from './layout/ProfileFooter';
+import Footer from '../Footer/Footer';
 
 const ProfilePage = () => {
   const [activeTab, setActiveTab] = useState('profile');
@@ -183,7 +183,7 @@ const ProfilePage = () => {
           </div>
         </div>
       </div>
-      <ProfileFooter isDarkMode={isDarkMode} />
+      <Footer  />
     </>
   );
 };

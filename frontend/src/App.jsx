@@ -16,7 +16,8 @@ import ProfileLayout from './components/Profile/ProfilePage';
 import CourseDetails from './components/CourseDetails/CourseDetails';
 import SchoolCourseDetails from './components/CourseDetails/SchoolCourseDetails';
 import Navbar from './components/Navbar/Navbar';
-import Footer from './components/Footer/Footer';
+import AdminDashboard from './components/Admin/Dashboard/AdminDashboard';
+import { Toaster } from 'react-hot-toast';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -50,48 +51,85 @@ const Layout = ({ children }) => {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Layout>  {/* Layout component wraps all routes and includes Navbar and Footer */}
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/courses" element={<Courses />}>
-            <Route path="10th" element={<TenthStandard />} />
-            <Route path="10th/cbse" element={<TenthStandard />} />
-            <Route path="10th/state/:stateId" element={<TenthStandard />} />
-            <Route path="11th" element={<EleventhStandard />} />
-            <Route path="11th/cbse" element={<EleventhStandard />} />
-            <Route path="11th/state/:stateId" element={<EleventhStandard />} />
-            <Route path="12th" element={<TwelfthStandard />} />
-            <Route path="12th/cbse" element={<TwelfthStandard />} />
-            <Route path="12th/state/:stateId" element={<TwelfthStandard />} />
-            <Route path="engineering" element={<Undergraduate />} />
-            <Route path="engineering/cbse" element={<Undergraduate />} />
-            <Route path="engineering/state/:stateId" element={<Undergraduate />} />
-          </Route>
-          <Route path="/profile" element={<ProfileLayout />} />
-          <Route path="/chat" element={<ChatBotPage />} />
-          <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
-          <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
-          <Route path="/learning-hub" element={<LearningHubPage />} /> 
-          <Route path="/auth" element={<AuthForm />} />
-          <Route path="/courses/10th/cbse/:subjectId" element={<SchoolCourseDetails />} />
-          <Route path="/courses/10th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
-          <Route path="/courses/11th/cbse/:subjectId" element={<SchoolCourseDetails />} />
-          <Route path="/courses/11th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
-          <Route path="/courses/12th/cbse/:subjectId" element={<SchoolCourseDetails />} />
-          <Route path="/courses/12th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
-          <Route path="/courses/engineering/:courseId" element={<CourseDetails />} />
-          <Route path="/courses/engineering/:courseId/learning" element={<CourseLearningPage />} />
-          <Route path="/courses/10th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
-          <Route path="/courses/10th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
-          <Route path="/courses/11th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
-          <Route path="/courses/11th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
-          <Route path="/courses/12th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
-          <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
-        </Routes>
-      </Layout>
-      <FloatingChatButton />
-    </BrowserRouter>
+    <>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            style: {
+              background: '#22c55e',
+              color: '#fff',
+            },
+          },
+          error: {
+            duration: 4000,
+            style: {
+              background: '#ef4444',
+              color: '#fff',
+            },
+          },
+        }} 
+      />
+      <BrowserRouter>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin/*" element={<AdminDashboard />} />
+            
+            {/* Course Routes */}
+            <Route path="/courses" element={<Courses />}>
+              <Route path="10th" element={<TenthStandard />} />
+              <Route path="10th/cbse" element={<TenthStandard />} />
+              <Route path="10th/state/:stateId" element={<TenthStandard />} />
+              <Route path="11th" element={<EleventhStandard />} />
+              <Route path="11th/cbse" element={<EleventhStandard />} />
+              <Route path="11th/state/:stateId" element={<EleventhStandard />} />
+              <Route path="12th" element={<TwelfthStandard />} />
+              <Route path="12th/cbse" element={<TwelfthStandard />} />
+              <Route path="12th/state/:stateId" element={<TwelfthStandard />} />
+              <Route path="engineering" element={<Undergraduate />} />
+              <Route path="engineering/cbse" element={<Undergraduate />} />
+              <Route path="engineering/state/:stateId" element={<Undergraduate />} />
+            </Route>
+
+            {/* Other Routes */}
+            <Route path="/profile" element={<ProfileLayout />} />
+            <Route path="/chat" element={<ChatBotPage />} />
+            <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
+            <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
+            <Route path="/learning-hub" element={<LearningHubPage />} />
+            <Route path="/auth" element={<AuthForm />} />
+
+            {/* Course Detail Routes */}
+            <Route path="/courses/10th/cbse/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/10th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/11th/cbse/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/11th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/12th/cbse/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/12th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/engineering/:courseId" element={<CourseDetails />} />
+
+            {/* Learning Routes */}
+            <Route path="/courses/engineering/:courseId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/10th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/10th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/11th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/11th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/12th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+          </Routes>
+        </Layout>
+        <FloatingChatButton />
+      </BrowserRouter>
+    </>
   );
 }
 
