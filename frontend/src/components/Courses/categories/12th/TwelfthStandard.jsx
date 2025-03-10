@@ -1,20 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FaPlay, FaBookReader } from 'react-icons/fa';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
 import { stateBoards } from '../../data/states';
 
 const TwelfthStandard = () => {
   const navigate = useNavigate();
+  const { stateId } = useParams();
+  const location = useLocation();
   const [selectedBoard, setSelectedBoard] = useState(null);
   const [showStateBoards, setShowStateBoards] = useState(false);
 
+  useEffect(() => {
+    if (location.pathname.includes('/state/')) {
+      setSelectedBoard(`state-${stateId}`);
+    } else if (location.pathname.includes('/cbse')) {
+      setSelectedBoard('cbse');
+    }
+  }, [location, stateId]);
+
   const boards = [
-    { id: 'cbse', name: 'CBSE', fullName: 'Central Board of Secondary Education', available: true },
-    { id: 'state', name: 'State Board', fullName: 'State Board of Secondary and Higher Secondary Education', available: true },
-    { id: 'icse', name: 'CISCE', fullName: 'Council for the Indian School Certificate Examinations', available: false },
-    { id: 'nios', name: 'NIOS', fullName: 'National Institute of Open Schooling', available: false }
+    { 
+      id: 'cbse', 
+      name: 'CBSE',
+      fullName: 'Central Board of Secondary Education',
+      available: true
+    },
+    { 
+      id: 'state', 
+      name: 'State Board',
+      fullName: 'State Board of Secondary and Higher Secondary Education',
+      available: true
+    }
   ];
 
   const subjects = [
@@ -49,14 +67,6 @@ const TwelfthStandard = () => {
       courseId: '12th-biology',
       description: 'Detailed study of Biology topics',
       duration: '55+ hours of content'
-    },
-    {
-      id: 'english',
-      name: 'English',
-      icon: '📚',
-      courseId: '12th-english',
-      description: 'Master English language and literature',
-      duration: '40+ hours of content'
     }
   ];
 
@@ -64,13 +74,12 @@ const TwelfthStandard = () => {
     if (board === 'state') {
       setShowStateBoards(true);
     } else {
-      setSelectedBoard(board);
-      setShowStateBoards(false);
+      navigate(`/courses/12th/${board}`);
     }
   };
 
   const handleStateSelect = (stateId) => {
-    setSelectedBoard(`state-${stateId}`);
+    navigate(`/courses/12th/state/${stateId}`);
     setShowStateBoards(false);
   };
 
@@ -85,7 +94,7 @@ const TwelfthStandard = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 pt-20">
       {!selectedBoard && !showStateBoards ? (
         <>
           <BackButton 
@@ -121,8 +130,7 @@ const TwelfthStandard = () => {
                 <motion.button
                   key={state.id}
                   onClick={() => handleStateSelect(state.id)}
-                  className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl 
-                           transition-all duration-300 border border-gray-100"
+                  className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
                   whileHover={{ y: -5 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -143,7 +151,12 @@ const TwelfthStandard = () => {
           />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {subjects.map((subject) => (
-              <Link to={`/courses/${subject.courseId}`} key={subject.id}>
+              <Link 
+                to={selectedBoard.includes('state') 
+                  ? `/courses/12th/state/${selectedBoard.replace('state-', '')}/${subject.id}` 
+                  : `/courses/12th/${selectedBoard}/${subject.id}`} 
+                key={subject.id}
+              >
                 <motion.div whileHover={{ y: -5 }} className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full">
                   <div className="relative p-6 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl text-white">
                     <div className="flex items-center justify-between">
