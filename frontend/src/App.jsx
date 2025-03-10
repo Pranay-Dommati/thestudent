@@ -15,12 +15,13 @@ import Undergraduate from './components/Courses/categories/engineering/Engineeri
 import ProfileLayout from './components/Profile/ProfilePage';
 import CourseDetails from './components/CourseDetails/CourseDetails';
 import SchoolCourseDetails from './components/CourseDetails/SchoolCourseDetails';
+import Navbar from './components/Navbar/Navbar';
+import Footer from './components/Footer/Footer';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
   
   const determineCourseType = (id) => {
-    // Check if courseId starts with 10th, 11th, or 12th
     return ['10th', '11th', '12th'].some(grade => id.startsWith(grade)) ? 'school' : 'engineering';
   };
 
@@ -33,25 +34,54 @@ const CourseDetailsWrapper = () => {
   );
 };
 
+const Layout = ({ children }) => {
+  const location = useLocation();
+  const isChat = location.pathname === '/chat';
+
+  return (
+    <>
+      {!isChat && <Navbar />}
+      <div className="min-h-screen">
+        {children}
+      </div>
+    </>
+  );
+};
+
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/courses" element={<Courses />}>
-          <Route path="10th" element={<TenthStandard />} />
-          <Route path="11th" element={<EleventhStandard />} />
-          <Route path="12th" element={<TwelfthStandard />} />
-          <Route path="engineering" element={<Undergraduate />} />
-        </Route>
-        <Route path="/profile" element={<ProfileLayout />} />
-        <Route path="/chat" element={<ChatBotPage />} />
-        <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
-        <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
-        <Route path="/learning-hub" element={<LearningHubPage />} /> 
-        <Route path="/auth" element={<AuthForm />} />
-      </Routes>
-
+      <Layout>  {/* Layout component wraps all routes and includes Navbar and Footer */}
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/courses" element={<Courses />}>
+            <Route path="10th" element={<TenthStandard />} />
+            <Route path="10th/cbse" element={<TenthStandard />} />
+            <Route path="10th/state/:stateId" element={<TenthStandard />} />
+            <Route path="11th" element={<EleventhStandard />} />
+            <Route path="11th/cbse" element={<EleventhStandard />} />
+            <Route path="11th/state/:stateId" element={<EleventhStandard />} />
+            <Route path="12th" element={<TwelfthStandard />} />
+            <Route path="12th/cbse" element={<TwelfthStandard />} />
+            <Route path="12th/state/:stateId" element={<TwelfthStandard />} />
+            <Route path="engineering" element={<Undergraduate />} />
+            <Route path="engineering/cbse" element={<Undergraduate />} />
+            <Route path="engineering/state/:stateId" element={<Undergraduate />} />
+          </Route>
+          <Route path="/profile" element={<ProfileLayout />} />
+          <Route path="/chat" element={<ChatBotPage />} />
+          <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
+          <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
+          <Route path="/learning-hub" element={<LearningHubPage />} /> 
+          <Route path="/auth" element={<AuthForm />} />
+          <Route path="/courses/10th/cbse/:subjectId" element={<SchoolCourseDetails />} />
+          <Route path="/courses/10th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
+          <Route path="/courses/11th/cbse/:subjectId" element={<SchoolCourseDetails />} />
+          <Route path="/courses/11th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
+          <Route path="/courses/12th/cbse/:subjectId" element={<SchoolCourseDetails />} />
+          <Route path="/courses/12th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
+        </Routes>
+      </Layout>
       <FloatingChatButton />
     </BrowserRouter>
   );
