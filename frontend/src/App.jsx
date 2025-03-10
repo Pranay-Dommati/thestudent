@@ -11,7 +11,7 @@ import AuthForm from './components/Auth/AuthForm';
 import TenthStandard from './components/Courses/categories/10th/TenthStandard';
 import EleventhStandard from './components/Courses/categories/11th/EleventhStandard';
 import TwelfthStandard from './components/Courses/categories/12th/TwelfthStandard';
-import Undergraduate from './components/Courses/categories/undergraduate/Engineering';
+import Undergraduate from './components/Courses/categories/engineering/Engineering';
 import ProfileLayout from './components/Profile/ProfilePage';
 import CourseDetails from './components/CourseDetails/CourseDetails';
 import SchoolCourseDetails from './components/CourseDetails/SchoolCourseDetails';
