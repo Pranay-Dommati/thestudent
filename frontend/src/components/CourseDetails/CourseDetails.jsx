@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaPlay, FaClock, FaUserGraduate, FaChartLine, FaAward, FaCode } from 'react-icons/fa';
+import { FaPlay, FaClock, FaUserGraduate, FaChartLine, FaCode } from 'react-icons/fa';
 import LoadingSpinner from './LoadingSpinner';
 import Footer from '../Footer/Footer';
 
@@ -34,7 +34,7 @@ const CourseDetails = ({ courseId }) => {
           { icon: <FaUserGraduate />, title: "Beginner to Advanced", text: "No prior experience needed" },
           { icon: <FaClock />, title: "56 Hours", text: "Self-paced learning" },
           { icon: <FaChartLine />, title: "Real Projects", text: "Build 5 production apps" },
-          { icon: <FaAward />, title: "Certificate", text: "Upon completion" }
+          { icon: <FaCode />, title: "Hands-on Practice", text: "Code along with guided exercises" }
         ],
         thumbnail: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800",
         previewImage: "https://images.unsplash.com/photo-1587620962725-abab7fe55159?w=800",
@@ -190,8 +190,9 @@ const CourseDetails = ({ courseId }) => {
             {/* Sidebar */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-xl shadow-lg p-6 sticky top-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-6">
+                  {/* Rating Section */}
+                  <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                     <div className="flex items-center space-x-2">
                       <span className="text-2xl font-bold text-indigo-600">{course.stats.rating}</span>
                       <div className="flex text-yellow-400">
@@ -201,10 +202,23 @@ const CourseDetails = ({ courseId }) => {
                     </div>
                     <span className="text-gray-500">({course.stats.reviews} reviews)</span>
                   </div>
-                  
+
+                  {/* Features List */}
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3 text-gray-700">
+                      <FaClock className="text-indigo-600 text-lg" />
+                      <span className="font-medium">Self-Paced Learning</span>
+                    </div>
+                    <div className="flex items-start space-x-3 text-gray-700">
+                      <FaUserGraduate className="text-indigo-600 text-lg mt-1" />
+                      <span className="font-medium">Taught by Top YouTube Educational Creators</span>
+                    </div>
+                  </div>
+
+                  {/* Enrollment Button */}
                   <button 
                     onClick={handleStartLearning}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02]"
                   >
                     Enroll Now - Free
                   </button>
