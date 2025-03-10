@@ -42,7 +42,7 @@ const EleventhStandard = () => {
       id: 'physics',
       name: 'Physics',
       icon: '🔬',
-      courseId: '1',
+      courseId: '11th-physics', // Updated courseId
       description: 'Comprehensive coverage of Physics for 11th grade',
       duration: '50+ hours of content'
     },
@@ -50,7 +50,7 @@ const EleventhStandard = () => {
       id: 'chemistry',
       name: 'Chemistry',
       icon: '⚗️',
-      courseId: '1',
+      courseId: '11th-chemistry', // Updated courseId
       description: 'In-depth exploration of Chemistry concepts',
       duration: '45+ hours of content'
     },
@@ -58,7 +58,7 @@ const EleventhStandard = () => {
       id: 'mathematics',
       name: 'Mathematics',
       icon: '📐',
-      courseId: '1',
+      courseId: '11th-mathematics', // Updated courseId
       description: 'Advanced Mathematics for 11th grade',
       duration: '60+ hours of content'
     },
@@ -66,7 +66,7 @@ const EleventhStandard = () => {
       id: 'biology',
       name: 'Biology',
       icon: '🧬',
-      courseId: '1',
+      courseId: '11th-biology', // Updated courseId
       description: 'Detailed study of Biology topics',
       duration: '55+ hours of content'
     },
@@ -74,7 +74,7 @@ const EleventhStandard = () => {
       id: 'english',
       name: 'English',
       icon: '📚',
-      courseId: '1',
+      courseId: '11th-english', // Updated courseId
       description: 'Master English language and literature',
       duration: '40+ hours of content'
     }

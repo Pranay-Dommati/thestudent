@@ -1,84 +1,66 @@
 import React, { useState } from 'react';
 
+const categories = [
+  { id: 'all', name: 'All Playlists' },
+  { id: 'tenth', name: 'Class 10' },
+  { id: 'eleventh', name: 'Class 11' },
+  { id: 'twelfth', name: 'Class 12' },
+  { id: 'engineering', name: 'Engineering' }
+];
+
+const playlists = [
+  // 10th Standard Courses
+  { 
+    id: 1, 
+    title: 'CBSE Class 10 Mathematics', 
+    duration: '45 hours', 
+    lessons: 90,
+    category: 'tenth',
+    author: 'Master Mathematics',
+    rating: 4.8,
+    students: '25.4K',
+    image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3'
+  },
+  // 11th Standard Courses
+  { 
+    id: 2, 
+    title: 'Class 11 Physics Complete Course', 
+    duration: '50 hours',
+    lessons: 95, 
+    category: 'eleventh',
+    author: 'Physics Academy',
+    rating: 4.9,
+    students: '20K',
+    image: 'https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?ixlib=rb-4.0.3'
+  },
+  // 12th Standard Courses
+  { 
+    id: 3, 
+    title: 'Chemistry for Class 12', 
+    duration: '48 hours',
+    lessons: 85,
+    category: 'twelfth',
+    author: 'Chemistry Masters',
+    rating: 4.7,
+    students: '18.9K',
+    image: 'https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?ixlib=rb-4.0.3'
+  },
+  // Engineering Courses
+  { 
+    id: 4, 
+    title: 'Web Development Bootcamp', 
+    duration: '56 hours',
+    lessons: 120,
+    category: 'engineering',
+    author: 'Tech Academy',
+    rating: 4.8,
+    students: '15.4K',
+    image: 'https://images.unsplash.com/photo-1547658719-da2b51169166?ixlib=rb-4.0.3'
+  }
+];
+
 const FeaturedPlaylists = () => {
   const [activeCategory, setActiveCategory] = useState('all');
-  
-  const categories = [
-    { id: 'all', name: 'All Playlists' },
-    { id: 'web', name: 'Web Dev' },
-    { id: 'python', name: 'Python' },
-    { id: 'design', name: 'UI/UX' },
-    { id: 'data', name: 'Data Science' }
-  ];
-  
-  const playlists = [
-    { 
-      id: 1, 
-      title: 'Top 10 Web Dev Courses', 
-      duration: '56 hours', 
-      lessons: 120,
-      category: 'web',
-      author: 'Tech Academy',
-      rating: 4.8,
-      students: '15.4K',
-      image: 'https://images.unsplash.com/photo-1547658719-da2b51169166?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-    },
-    { 
-      id: 2, 
-      title: 'Python for Beginners to Advanced', 
-      duration: '40 hours',
-      lessons: 85, 
-      category: 'python',
-      author: 'Code Masters',
-      rating: 4.9,
-      students: '23K',
-      image: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-    },
-    { 
-      id: 3, 
-      title: 'UI/UX Design with Figma', 
-      duration: '30 hours',
-      lessons: 64,
-      category: 'design',
-      author: 'Design School',
-      rating: 4.7,
-      students: '8.9K',
-      image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-    },
-    { 
-      id: 4, 
-      title: 'Data Science Fundamentals', 
-      duration: '48 hours',
-      lessons: 92,
-      category: 'data',
-      author: 'Data Experts',
-      rating: 4.6,
-      students: '12.2K',
-      image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-    },
-    { 
-      id: 5, 
-      title: 'Full Stack JavaScript Bootcamp', 
-      duration: '62 hours',
-      lessons: 135,
-      category: 'web',
-      author: 'JS Masters',
-      rating: 4.9,
-      students: '19.8K',
-      image: 'https://images.unsplash.com/photo-1593720213428-28a5b9e94613?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-    },
-    { 
-      id: 6, 
-      title: 'Machine Learning with Python', 
-      duration: '52 hours',
-      lessons: 110,
-      category: 'python',
-      author: 'AI Academy',
-      rating: 4.8,
-      students: '16.5K',
-      image: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-    }
-  ];
   
   const filteredPlaylists = activeCategory === 'all' 
     ? playlists 

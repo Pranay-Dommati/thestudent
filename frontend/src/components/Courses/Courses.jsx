@@ -31,8 +31,8 @@ const Courses = () => {
             description: 'Preparation for higher education'
         },
         { 
-            id: 'undergraduate', 
-            name: 'Undergraduate', 
+            id: 'engineering', 
+            name: 'Engineering', 
             icon: FaLaptopCode,
             description: 'Professional skill development'
         },
