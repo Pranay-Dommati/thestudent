@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaPlay, FaClock, FaUserGraduate, FaChartLine, FaCode } from 'react-icons/fa';
+import { FaPlay, FaClock, FaUserGraduate, FaChartLine, FaCode, FaChevronDown, FaChevronUp, FaGlobe } from 'react-icons/fa';
 import LoadingSpinner from './LoadingSpinner';
 import Footer from '../Footer/Footer';
 
@@ -8,6 +8,7 @@ const CourseDetails = ({ courseId }) => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [openSections, setOpenSections] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,11 +19,10 @@ const CourseDetails = ({ courseId }) => {
         title: "Master Next.js: From Zero to Production",
         subtitle: "Build modern, production-ready web applications with Next.js and React",
         instructor: {
-          name: "John Doe",
-          role: "Senior Software Engineer",
-          company: "Tech Solutions Inc.",
-          avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300",
-          bio: "10+ years of experience in web development and teaching"
+          name: "Sources:",
+          role: "YouTube",
+          company: "",
+          avatar: "", // We'll use an icon instead of an image
         },
         stats: {
           students: "12,345",
@@ -50,13 +50,25 @@ const CourseDetails = ({ courseId }) => {
         curriculum: [
           {
             title: "Getting Started",
-            lessons: [
+            lectures: [
               { title: "Introduction to Next.js", duration: "15:00" },
               { title: "Setting Up Your Environment", duration: "20:00" },
               { title: "Your First Next.js App", duration: "30:00" }
             ]
           },
-          // ...more sections
+          {
+            title: "Advanced Topics",
+            lectures: [
+              { title: "Server-side Rendering", duration: "25:00" },
+              { title: "Static Site Generation", duration: "18:00" },
+              { title: "API Routes", duration: "22:00" }
+            ]
+          }
+        ],
+        requirements: [
+          "Basic HTML, CSS, and JavaScript knowledge",
+          "Familiarity with React is recommended",
+          "No prior experience with Next.js required"
         ]
       });
       setLoading(false);
@@ -65,6 +77,13 @@ const CourseDetails = ({ courseId }) => {
 
   const handleStartLearning = () => {
     navigate(`/courses/engineering/${course.id}/learning`);
+  };
+
+  const toggleSection = (index) => {
+    setOpenSections((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
   };
 
   if (loading) return <LoadingSpinner />;
@@ -98,14 +117,13 @@ const CourseDetails = ({ courseId }) => {
                 </div>
 
                 <div className="flex items-center space-x-4">
-                  <img 
-                    src={course.instructor.avatar} 
-                    alt={course.instructor.name}
-                    className="w-12 h-12 rounded-full"
-                  />
+                  <div className="text-2xl text-white">
+                    <FaGlobe />
+                  </div>
                   <div>
-                    <p className="font-medium">{course.instructor.name}</p>
-                    <p className="text-sm text-gray-300">{course.instructor.role} at {course.instructor.company}</p>
+                    <p className="font-medium text-white flex items-center gap-2">
+                      Sources: <span className="text-gray-200">YouTube</span>
+                    </p>
                   </div>
                 </div>
 
@@ -163,26 +181,69 @@ const CourseDetails = ({ courseId }) => {
               </div>
 
               <div>
-                <h2 className="text-2xl font-bold mb-4">Course Curriculum</h2>
-                <div className="space-y-4">
+                <h2 className="text-2xl font-bold mb-6">Course Curriculum</h2>
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden">
                   {course.curriculum.map((section, index) => (
-                    <div key={index} className="bg-white rounded-lg shadow-sm">
-                      <div className="p-4 border-b">
-                        <h3 className="font-bold">{section.title}</h3>
-                      </div>
-                      <div className="p-4">
-                        {section.lessons.map((lesson, idx) => (
-                          <div key={idx} className="flex items-center justify-between py-2">
-                            <div className="flex items-center space-x-3">
-                              <FaPlay className="text-indigo-600 text-sm" />
-                              <span>{lesson.title}</span>
-                            </div>
-                            <span className="text-sm text-gray-500">{lesson.duration}</span>
+                    <div key={index} className="border-b border-gray-100 last:border-b-0">
+                      <button
+                        onClick={() => toggleSection(index)}
+                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-all duration-200"
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="flex-shrink-0 w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center">
+                            <span className={`text-indigo-600 transform transition-transform duration-200 ${
+                              openSections[index] ? 'rotate-180' : ''
+                            }`}>
+                              <FaChevronDown className="w-4 h-4" />
+                            </span>
                           </div>
-                        ))}
-                      </div>
+                          <div className="text-left">
+                            <h3 className="font-semibold text-lg text-gray-800">{section.title}</h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                              {section.lectures.length} lectures • {section.lectures.reduce((acc, curr) => {
+                                const [mins] = curr.duration.split(':');
+                                return acc + parseInt(mins);
+                              }, 0)} min
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                      
+                      {openSections[index] && (
+                        <div className="bg-gray-50 border-t border-gray-100">
+                          {section.lectures.map((lecture, idx) => (
+                            <div
+                              key={idx}
+                              className="px-6 py-3 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <span className="text-indigo-600 p-1.5 bg-indigo-50 rounded-full">
+                                  <FaPlay className="w-3 h-3" />
+                                </span>
+                                <span className="text-gray-700">{lecture.title}</span>
+                              </div>
+                              <span className="text-sm text-gray-500">{lecture.duration}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
+                </div>
+
+                {/* Requirements Section */}
+                <div className="mt-8">
+                  <h2 className="text-2xl font-bold mb-4">Requirements</h2>
+                  <div className="bg-white rounded-lg shadow-lg p-6">
+                    <ul className="space-y-3">
+                      {course.requirements.map((req, index) => (
+                        <li key={index} className="flex items-start space-x-3">
+                          <span className="text-indigo-600 mt-1">•</span>
+                          <span className="text-gray-700">{req}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
