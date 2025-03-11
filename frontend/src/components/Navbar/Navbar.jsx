@@ -71,14 +71,16 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           <div className="flex items-center justify-end w-[200px]">
             {isLoggedIn ? (
               <div className="relative">
-                <button 
-                  onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                  className="flex items-center space-x-2 focus:outline-none"
-                >
-                  <div className={`w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:opacity-90 transition-opacity flex items-center justify-center text-white`}>
-                    <FaUserCircle className="w-5 h-5" />
-                  </div>
-                </button>
+
+          <button 
+            onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+            className="flex items-center space-x-2 focus:outline-none"
+          >
+          <div className="w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+            <FaUserCircle className="w-6 h-6" />
+          </div>
+          </button>
+
 
                 {isProfileDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 py-2 bg-white rounded-lg shadow-xl border border-gray-100">
