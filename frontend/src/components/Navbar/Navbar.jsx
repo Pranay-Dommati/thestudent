@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaCog, FaGraduationCap } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
@@ -9,6 +9,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -22,6 +23,28 @@ const Navbar = ({ initialStyle = "transparent" }) => {
     handleScroll();
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+
+    const handleEscapeKey = (event) => {
+      if (event.key === 'Escape') {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscapeKey);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
   }, []);
 
   let backgroundClass = '';
@@ -70,17 +93,15 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           {/* Profile section */}
           <div className="flex items-center justify-end w-[200px]">
             {isLoggedIn ? (
-              <div className="relative">
-
-          <button 
-            onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-            className="flex items-center space-x-2 focus:outline-none"
-          >
-          <div className="w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-            <FaUserCircle className="w-6 h-6" />
-          </div>
-          </button>
-
+              <div className="relative" ref={dropdownRef}>
+                <button 
+                  onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                  className="flex items-center space-x-2 focus:outline-none"
+                >
+                  <div className="w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white cursor-pointer hover:opacity-90 transition-opacity">
+                    <FaUserCircle className="w-6 h-6" />
+                  </div>
+                </button>
 
                 {isProfileDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 py-2 bg-white rounded-lg shadow-xl border border-gray-100">
