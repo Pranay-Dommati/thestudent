@@ -58,47 +58,61 @@ const SchoolCourseDetails = ({ courseId }) => {
     <>
     <Navbar />
     
-    <div className="min-h-screen bg-gray-50"> {/* Removed pt-6 from here */}
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white pt-8"> {/* Added pt-8 here */}
-        <div className="container mx-auto px-4 py-12"> {/* Changed pt-6 pb-12 to py-12 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-            <div>
-              <h1 className="text-4xl font-bold mb-4">{course.title}</h1>
-              <div className="flex items-center space-x-4 mb-6">
-                <span>{course.board}</span>
-                <span>•</span>
-                <span>{course.class} Standard</span>
-                <span>•</span>
-                <span>{course.subject}</span>
+    <div className="min-h-screen bg-gray-50">
+      {/* Hero Section - Updated spacing and layout */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white">
+        <div className="container mx-auto px-4 py-16">
+          <div className="grid pt-8 grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-4xl font-bold mb-4">{course.title}</h1>
+                <div className="flex items-center space-x-4 text-gray-200 mb-6">
+                  <span>{course.board}</span>
+                  <span>•</span>
+                  <span>{course.class} Standard</span>
+                  <span>•</span>
+                  <span>{course.subject}</span>
+                </div>
               </div>
-              <div className="bg-white/10 rounded-lg p-4 mb-6">
+
+              <div className="flex items-center space-x-4 text-sm">
+                <span className="flex items-center">
+                  <FaChalkboardTeacher className="mr-2" />
+                  Expert Teachers
+                </span>
+                <span>•</span>
+                <span className="flex items-center">
+                  <FaClock className="mr-2" />
+                  {course.duration}
+                </span>
+                <span>•</span>
+                <span>{course.chapters} chapters</span>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 mb-6">
                 <div className="flex items-center space-x-2">
                   <FaGlobe className="text-lg" />
                   <span>Sources : YouTube</span>
                 </div>
-                <div className="flex items-center space-x-2 mt-2">
-                  <FaClock />
-                  <span>{course.duration} • {course.chapters} chapters</span>
-                </div>
               </div>
+
               <button 
                 onClick={handleStartLearning}
-                className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-all transform hover:scale-105 hover:shadow-lg flex items-center justify-center"
+                className="bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-4 rounded-lg font-medium flex items-center space-x-2 transform transition hover:scale-105"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                </svg>
-                Start Learning
+                <FaPlay className="mr-2" />
+                <span>Start Learning Now</span>
               </button>
             </div>
-            {/* Update the image container div and img classes */}
-            <div className="relative py-10 lg:py-6 max-w-xl mx-auto lg:mx-0">
+
+            {/* Image section with overlay */}
+            <div className="relative">
               <img 
                 src={course.thumbnail} 
                 alt={course.title}
-                className="rounded-lg shadow-xl w-full h-[250px] object-cover"
+                className="rounded-lg shadow-2xl w-full h-[350px] object-cover"
               />
+              <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/50 to-transparent rounded-lg"></div>
             </div>
           </div>
         </div>
@@ -109,7 +123,7 @@ const SchoolCourseDetails = ({ courseId }) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {course.features.map((feature, index) => (
             <div key={index} className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-              <div className="text-blue-600 text-2xl mb-4">{feature.icon}</div>
+              <div className="text-indigo-600 text-2xl mb-4">{feature.icon}</div>
               <h3 className="font-bold text-xl mb-2">{feature.title}</h3>
               <p className="text-gray-600">{feature.desc}</p>
             </div>
