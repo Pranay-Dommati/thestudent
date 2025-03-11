@@ -1,53 +1,76 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FaCheck } from 'react-icons/fa';
 
 const SavedPlaylists = () => {
-  const [activeTab, setActiveTab] = useState('playlists');
-  // Mock data - would come from API in real app
-  const playlists = [
+  const [activeTab, setActiveTab] = useState('courses');
+  
+  // Updated courses data with progress percentage
+  const courses = [
     {
-      id: 'playlist-1',
-      name: 'Web Development Track',
-      courses: [
-        {
-          id: 'course-101',
-          title: 'HTML & CSS Fundamentals',
-          completed: true,
-          thumbnail: 'https://images.unsplash.com/photo-1621839673705-6617adf9e890?w=800&auto=format&fit=crop'
-        },
-        {
-          id: 'course-102',
-          title: 'JavaScript Basics',
-          completed: true,
-          thumbnail: 'https://images.unsplash.com/photo-1579468118864-1b9ea3c0db4a?w=800&auto=format&fit=crop'
-        },
-        {
-          id: 'course-103',
-          title: 'React Fundamentals',
-          completed: false,
-          thumbnail: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&auto=format&fit=crop'
-        }
-      ]
+      id: 'course-101',
+      title: 'HTML & CSS Fundamentals',
+      instructor: 'Sarah Johnson',
+      progress: 100,
+      thumbnail: 'https://images.unsplash.com/photo-1621839673705-6617adf9e890?w=800&auto=format&fit=crop'
     },
     {
-      id: 'playlist-2',
-      name: 'Machine Learning Path',
-      courses: [
-        {
-          id: 'course-201',
-          title: 'Python for Data Science',
-          completed: true,
-          thumbnail: 'https://images.unsplash.com/photo-1526379879527-8559ecfcb970?w=800&auto=format&fit=crop'
-        },
-        {
-          id: 'course-202',
-          title: 'Intro to Machine Learning',
-          completed: false,
-          thumbnail: 'https://images.unsplash.com/photo-1535551951406-a19828b0a76b?w=800&auto=format&fit=crop'
-        }
-      ]
+      id: 'course-102',
+      title: 'JavaScript Basics',
+      instructor: 'John Doe',
+      progress: 100,
+      thumbnail: 'https://images.unsplash.com/photo-1579468118864-1b9ea3c0db4a?w=800&auto=format&fit=crop'
+    },
+    {
+      id: 'course-103',
+      title: 'React Fundamentals',
+      instructor: 'Mike Wilson',
+      progress: 45,
+      thumbnail: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&auto=format&fit=crop'
     }
+    // ... keep other courses
   ];
+
+  // Progress Circle Component
+  const ProgressCircle = ({ progress }) => {
+    const circumference = 2 * Math.PI * 16; // radius = 16
+    const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+    return (
+      <div className="relative w-10 h-10">
+        <svg className="transform -rotate-90 w-10 h-10">
+          <circle
+            className="text-gray-200"
+            strokeWidth="2"
+            stroke="currentColor"
+            fill="transparent"
+            r="16"
+            cx="20"
+            cy="20"
+          />
+          <circle
+            className="text-blue-600"
+            strokeWidth="2"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            stroke="currentColor"
+            fill="transparent"
+            r="16"
+            cx="20"
+            cy="20"
+          />
+        </svg>
+        {progress === 100 ? (
+          <FaCheck className="w-4 h-4 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+        ) : (
+          <span className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xs font-medium text-blue-600">
+            {progress}%
+          </span>
+        )}
+      </div>
+    );
+  };
 
   const favorites = [
     {
@@ -73,20 +96,20 @@ const SavedPlaylists = () => {
       <div className="border-b border-gray-200">
         <div className="flex">
           <button
-            onClick={() => setActiveTab('playlists')}
+            onClick={() => setActiveTab('courses')}
             className={`px-6 py-3 font-medium text-sm focus:outline-none ${
-              activeTab === 'playlists'
-                ? 'border-b-2 border-indigo-600 text-indigo-600'
+              activeTab === 'courses'
+                ? 'border-b-2 border-blue-600 text-blue-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            Learning Playlists
+            My Courses
           </button>
           <button
             onClick={() => setActiveTab('favorites')}
             className={`px-6 py-3 font-medium text-sm focus:outline-none ${
               activeTab === 'favorites'
-                ? 'border-b-2 border-indigo-600 text-indigo-600'
+                ? 'border-b-2 border-blue-600 text-blue-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -96,65 +119,45 @@ const SavedPlaylists = () => {
       </div>
 
       <div className="p-6">
-        {activeTab === 'playlists' ? (
+        {activeTab === 'courses' ? (
           <>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-800">Your Learning Playlists</h2>
-              <button className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
-                + Create New Playlist
-              </button>
+              <h2 className="text-xl font-bold text-gray-800">My Courses</h2>
+              <Link 
+                to="/courses" 
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                Start New Course
+              </Link>
             </div>
 
-            <div className="space-y-6">
-              {playlists.map((playlist) => (
-                <div key={playlist.id} className="border border-gray-100 rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 px-4 py-3 flex justify-between items-center">
-                    <h3 className="font-semibold">{playlist.name}</h3>
-                    <div className="flex items-center gap-2">
-                      <button className="text-sm text-gray-500 hover:text-gray-700">Edit</button>
-                      <span className="text-gray-300">|</span>
-                      <button className="text-sm text-gray-500 hover:text-gray-700">
-                        {playlist.courses.length} courses
-                      </button>
-                    </div>
+            <div className="space-y-3">
+              {courses.map((course) => (
+                <div 
+                  key={course.id} 
+                  className="flex bg-white rounded-lg border border-gray-100 overflow-hidden hover:shadow-md transition-shadow h-20"
+                >
+                  <div className="w-32">
+                    <img 
+                      src={course.thumbnail} 
+                      alt={course.title}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-
-                  <div className="divide-y divide-gray-100">
-                    {playlist.courses.map((course) => (
-                      <div key={course.id} className="flex items-center gap-3 p-3 hover:bg-gray-50">
-                        <div className="flex-shrink-0">
-                          <img
-                            src={course.thumbnail}
-                            alt={course.title}
-                            className="w-16 h-12 object-cover rounded"
-                          />
-                        </div>
-                        <div className="flex-grow">
-                          <Link to={`/courses/${course.id}`} className="font-medium hover:text-indigo-600">
-                            {course.title}
-                          </Link>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {course.completed ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Completed
-                            </span>
-                          ) : (
-                            <Link
-                              to={`/courses/${course.id}/learning`}
-                              className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-                            >
-                              Continue
-                            </Link>
-                          )}
-                          <button className="text-gray-400 hover:text-gray-600">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex-1 px-4 py-2 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-semibold text-gray-800 text-base mb-0.5">{course.title}</h3>
+                      <p className="text-sm text-gray-500">{course.instructor}</p>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <ProgressCircle progress={course.progress} />
+                      <Link 
+                        to={`/courses/${course.id}`}
+                        className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-sm font-medium hover:bg-blue-100 transition-colors"
+                      >
+                        {course.progress === 100 ? 'Review' : 'Continue'}
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}
