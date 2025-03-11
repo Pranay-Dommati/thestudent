@@ -50,7 +50,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center">
           {/* Logo section */}
-          <div className="flex items-center">
+          <div className="flex items-center w-[200px]">
             <a href="/" className="flex items-center space-x-2">
               <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">S</div>
               <span className={`font-bold text-xl ${isScrolled || initialStyle === 'light' ? 'text-gray-800' : 'text-white'}`}>Students Hub</span>
@@ -58,7 +58,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           </div>
           
           {/* Center the navigation items */}
-          <div className="hidden md:flex items-center justify-center flex-1">
+          <div className="hidden md:flex items-center justify-center flex-1 max-w-[600px]">
             <div className="flex items-center space-x-8">
               <a href="/" className={`font-medium transition-colors ${textColor}`}>Home</a>
               <a href="/courses" className={`font-medium transition-colors ${textColor}`}>Courses</a>
@@ -68,17 +68,15 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           </div>
           
           {/* Profile section */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center justify-end w-[200px]">
             {isLoggedIn ? (
               <div className="relative">
                 <button 
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                   className="flex items-center space-x-2 focus:outline-none"
                 >
-                  <div className={`w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center ${
-                    isScrolled || initialStyle === 'light' ? 'text-gray-700' : 'text-white bg-white/20 hover:bg-white/30'
-                  }`}>
-                    <FaUserCircle className="w-6 h-6" />
+                  <div className={`w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:opacity-90 transition-opacity flex items-center justify-center text-white`}>
+                    <FaUserCircle className="w-5 h-5" />
                   </div>
                 </button>
 
@@ -108,20 +106,22 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 )}
               </div>
             ) : (
-              <>
-                <a href="/auth?mode=login" className={`hidden md:block px-4 py-2 rounded-full font-medium transition-all duration-300 
-                  ${isScrolled || initialStyle === 'light' 
-                    ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' 
-                    : 'text-white border border-white hover:bg-white/20'}`}>
+              <div className="hidden md:flex items-center space-x-4"> {/* Added space-x-4 here */}
+                <a href="/auth?mode=login" 
+                  className={`px-4 py-2 rounded-full font-medium transition-all duration-300 
+                    ${isScrolled || initialStyle === 'light' 
+                      ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' 
+                      : 'text-white border border-white hover:bg-white/20'}`}
+                >
                   Log In
                 </a>
                 <Link 
                   to="/auth?mode=signup" 
-                  className="hidden md:block px-4 py-2 rounded-full font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-shadow"
+                  className="px-4 py-2 rounded-full font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-shadow"
                 >
                   Sign Up
                 </Link>
-              </>
+              </div>
             )}
 
             {/* Mobile menu button */}
