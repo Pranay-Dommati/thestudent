@@ -154,7 +154,7 @@ const CourseDetails = ({ courseId }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {course.keyFeatures.map((feature, index) => (
               <div key={index} className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                <div className="text-indigo-600 text-2xl mb-4">{feature.icon}</div>
+                <div className="text-blue-600 text-2xl mb-4">{feature.icon}</div>
                 <h3 className="font-bold text-lg mb-2">{feature.title}</h3>
                 <p className="text-gray-600">{feature.text}</p>
               </div>
@@ -174,7 +174,7 @@ const CourseDetails = ({ courseId }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {course.highlights.map((highlight, index) => (
                     <div key={index} className="flex items-start space-x-3">
-                      <FaCode className="text-indigo-600 mt-1" />
+                      <FaCode className="text-blue-600 mt-1" />
                       <span className="text-gray-700">{highlight}</span>
                     </div>
                   ))}
@@ -192,7 +192,7 @@ const CourseDetails = ({ courseId }) => {
                       >
                         <div className="flex items-center space-x-4">
                           <div className="flex-shrink-0 w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center">
-                            <span className={`text-indigo-600 transform transition-transform duration-200 ${
+                            <span className={`text-blue-600 transform transition-transform duration-200 ${
                               openSections[index] ? 'rotate-180' : ''
                             }`}>
                               <FaChevronDown className="w-4 h-4" />
@@ -218,7 +218,7 @@ const CourseDetails = ({ courseId }) => {
                               className="px-6 py-3 flex items-center justify-between hover:bg-gray-100 transition-colors"
                             >
                               <div className="flex items-center space-x-3">
-                                <span className="text-indigo-600 p-1.5 bg-indigo-50 rounded-full">
+                                <span className="text-blue-600 p-1.5 bg-blue-50 rounded-full">
                                   <FaPlay className="w-3 h-3" />
                                 </span>
                                 <span className="text-gray-700">{lecture.title}</span>
@@ -239,7 +239,7 @@ const CourseDetails = ({ courseId }) => {
                     <ul className="space-y-3">
                       {course.requirements.map((req, index) => (
                         <li key={index} className="flex items-start space-x-3">
-                          <span className="text-indigo-600 mt-1">•</span>
+                          <span className="text-blue-600 mt-1">•</span>
                           <span className="text-gray-700">{req}</span>
                         </li>
                       ))}
@@ -256,7 +256,7 @@ const CourseDetails = ({ courseId }) => {
                   {/* Rating Section */}
                   <div className="flex items-center justify-between pb-4 border-b border-gray-100">
                     <div className="flex items-center space-x-2">
-                      <span className="text-2xl font-bold text-indigo-600">{course.stats.rating}</span>
+                      <span className="text-2xl font-bold text-blue-600">{course.stats.rating}</span>
                       <div className="flex text-yellow-400">
                         {'★'.repeat(Math.floor(course.stats.rating))}
                         {'☆'.repeat(5 - Math.floor(course.stats.rating))}
@@ -268,22 +268,22 @@ const CourseDetails = ({ courseId }) => {
                   {/* Features List */}
                   <div className="space-y-4">
                     <div className="flex items-center space-x-3 text-gray-700">
-                      <FaClock className="text-indigo-600 text-lg" />
+                      <FaClock className="text-blue-600 text-lg" />
                       <span className="font-medium">Self-Paced Learning</span>
                     </div>
                     <div className="flex items-start space-x-3 text-gray-700">
-                      <FaUserGraduate className="text-indigo-600 text-lg mt-1" />
+                      <FaUserGraduate className="text-blue-600 text-lg mt-1" />
                       <span className="font-medium">Taught by Top YouTube Educational Creators</span>
                     </div>
                   </div>
 
                   {/* Enrollment Button */}
                   <button 
-                    onClick={handleStartLearning}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02]"
-                  >
-                    Enroll Now - Free
-                  </button>
+  onClick={handleStartLearning}
+  className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02]"
+>
+  Enroll Now - Free
+</button>
                 </div>
               </div>
             </div>
