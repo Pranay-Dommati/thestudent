@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 const HeroSection = ({ user }) => {
   return (
-    <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-24 pb-16 relative overflow-hidden">
+    <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-16 pb-16 relative overflow-hidden">
       {/* Decorative elements */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full blur-xl -translate-y-1/2 translate-x-1/4"></div>
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-white opacity-10 rounded-full blur-xl translate-y-1/2 -translate-x-1/4"></div>
@@ -45,15 +45,19 @@ const HeroSection = ({ user }) => {
           <div className="flex flex-wrap gap-4">
             <Link 
               to={`/courses/${user.lastCourse?.id || ''}/learning`}
-              className="px-6 py-3 bg-white text-indigo-700 font-medium rounded-lg hover:bg-opacity-90 transition shadow-lg"
+              className="group relative px-6 py-3 bg-white text-indigo-700 font-medium rounded-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:bg-opacity-95 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600"
             >
-              Resume Last Course
+              <span className="relative z-10">
+                Resume Last Course
+              </span>
             </Link>
             <Link 
               to="/courses"
-              className="px-6 py-3 bg-indigo-500 bg-opacity-30 text-white font-medium rounded-lg border border-white/30 hover:bg-opacity-40 transition"
+              className="group relative px-6 py-3 bg-indigo-500 bg-opacity-30 text-white font-medium rounded-lg border border-white/30 transition-all duration-300 hover:bg-opacity-40 hover:border-white/50 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white/50"
             >
-              Explore New Courses
+              <span className="relative z-10">
+                Explore New Courses
+              </span>
             </Link>
           </div>
         </div>
