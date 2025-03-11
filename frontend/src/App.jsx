@@ -18,6 +18,7 @@ import SchoolCourseDetails from './components/CourseDetails/SchoolCourseDetails'
 import Navbar from './components/Navbar/Navbar';
 import AdminDashboard from './components/Admin/Dashboard/AdminDashboard';
 import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from './context/AuthContext';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -51,7 +52,7 @@ const Layout = ({ children }) => {
 
 function App() {
   return (
-    <>
+    <AuthProvider>
       <Toaster 
         position="top-right"
         toastOptions={{
@@ -129,7 +130,7 @@ function App() {
         </Layout>
         <FloatingChatButton />
       </BrowserRouter>
-    </>
+    </AuthProvider>
   );
 }
 

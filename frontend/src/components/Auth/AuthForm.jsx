@@ -4,6 +4,7 @@ import { FaGoogle, FaFacebook, FaGraduationCap, FaRegUser, FaRegEnvelope, FaLock
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthNav from './AuthNav';
 import AuthFooter from './AuthFooter';
+import { useAuth } from '../../context/AuthContext';
 
 export default function AuthForm() {
   const location = useLocation();
@@ -48,20 +49,21 @@ export default function AuthForm() {
     });
   };
 
+  const { login } = useAuth();
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Simple validation
     const errors = {};
-    if (isSignUp && !formData.name) errors.name = "Name is required";
+    
     if (!formData.email) errors.email = "Email is required";
     if (!formData.password) errors.password = "Password is required";
     
     setFormErrors(errors);
     
     if (Object.keys(errors).length === 0) {
-      // Submit form data
-      console.log("Form submitted:", formData);
-      // Redirect or show success message
+      // Simple login - just check if fields are filled
+      login();
+      navigate('/');
     }
   };
 
