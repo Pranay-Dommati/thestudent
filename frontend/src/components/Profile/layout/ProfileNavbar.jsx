@@ -6,9 +6,8 @@ import {
   FaUserCircle, FaShieldAlt, FaHistory, FaDownload 
 } from 'react-icons/fa';
 
-const ProfileNavbar = ({ isDarkMode, profileData }) => {
+const ProfileNavbar = ({ isDarkMode, profileData, setActiveTab }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const profileActions = [
     { icon: FaUserCircle, label: 'View Profile', action: () => {} },
@@ -34,11 +33,10 @@ const ProfileNavbar = ({ isDarkMode, profileData }) => {
             >
               ← Back
             </Link>
-            <span className={`text-lg font-semibold ${
-              isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>
-              Profile Settings
-            </span>
+            <Link to="/" className="flex items-center space-x-2">
+              <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">S</div>
+              <span className={`font-bold text-xl ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Students Hub</span>
+            </Link>
           </div>
 
           {/* Right Side */}
@@ -46,7 +44,7 @@ const ProfileNavbar = ({ isDarkMode, profileData }) => {
             {/* Notifications */}
             <div className="relative">
               <button
-                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                onClick={() => setActiveTab('notifications')}
                 className={`p-2 rounded-full ${
                   isDarkMode 
                     ? 'hover:bg-gray-800 text-gray-300' 

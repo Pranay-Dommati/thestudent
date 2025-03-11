@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  FaUser, FaLock, FaBookOpen, FaUsers, FaBrain, 
-  FaGoogle, FaGithub, FaMoon, FaSun, FaBell
+  FaUser, FaLock, FaBookOpen, FaUsers, FaBrain, FaBell, 
+  FaGoogle, FaGithub, FaMoon, FaSun
 } from 'react-icons/fa';
 import BasicProfile from './tabs/BasicProfile';
 import SecuritySettings from './tabs/SecuritySettings';
 import LearningProgress from './tabs/LearningProgress';
 import CommunitySection from './tabs/CommunitySection';
 import AISettings from './tabs/AISettings';
+import Notifications from './tabs/Notifications';
 import ProfileNavbar from './layout/ProfileNavbar';
 import Footer from '../Footer/Footer';
 
@@ -40,7 +41,8 @@ const ProfilePage = () => {
     { id: 'security', label: 'Security', icon: FaLock },
     { id: 'learning', label: 'My Learning', icon: FaBookOpen },
     { id: 'community', label: 'Community', icon: FaUsers },
-    { id: 'ai', label: 'AI & Settings', icon: FaBrain },
+    { id: 'ai', label: "AI'Settings", icon: FaBrain },
+    { id: 'notifications', label: 'Notifications', icon: FaBell }
   ];
 
   const renderTabContent = () => {
@@ -55,6 +57,8 @@ const ProfilePage = () => {
         return <CommunitySection isDarkMode={isDarkMode} />;
       case 'ai':
         return <AISettings isDarkMode={isDarkMode} />;
+      case 'notifications':
+        return <Notifications isDarkMode={isDarkMode} />;
       default:
         return null;
     }
@@ -62,7 +66,7 @@ const ProfilePage = () => {
 
   return (
     <>
-      <ProfileNavbar isDarkMode={isDarkMode} profileData={profileData} />
+      <ProfileNavbar isDarkMode={isDarkMode} profileData={profileData} setActiveTab={setActiveTab} />
       <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} pt-16`}>
         <div className="container mx-auto px-4 py-8">
           {/* Profile Header */}

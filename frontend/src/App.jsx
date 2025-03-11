@@ -19,6 +19,7 @@ import Navbar from './components/Navbar/Navbar';
 import AdminDashboard from './components/Admin/Dashboard/AdminDashboard';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
+import HelpCenter from './components/HelpCenter/HelpCenter';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -103,6 +104,7 @@ function App() {
 
             {/* Other Routes */}
             <Route path="/profile" element={<ProfileLayout />} />
+            <Route path="/help-center" element={<HelpCenter />} />
             <Route path="/chat" element={<ChatBotPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
