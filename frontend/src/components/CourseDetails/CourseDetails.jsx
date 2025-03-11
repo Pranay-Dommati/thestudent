@@ -93,7 +93,8 @@ const CourseDetails = ({ courseId }) => {
     <>
       <div className="min-h-screen bg-gray-50">
         {/* Hero Section */}
-        <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-indigo-900 text-white">
+        {/* <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-indigo-900 text-white"> */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white">
           <div className="container mx-auto px-4 py-16">
             <div className="grid pt-8 grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div className="space-y-6">

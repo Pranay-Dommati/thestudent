@@ -60,7 +60,7 @@ const SchoolCourseDetails = ({ courseId }) => {
     
     <div className="min-h-screen bg-gray-50"> {/* Removed pt-6 from here */}
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white pt-8"> {/* Added pt-8 here */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-8"> {/* Added pt-8 here */}
         <div className="container mx-auto px-4 py-12"> {/* Changed pt-6 pb-12 to py-12 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             <div>
@@ -84,7 +84,7 @@ const SchoolCourseDetails = ({ courseId }) => {
               </div>
               <button 
                 onClick={handleStartLearning}
-                className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-all transform hover:scale-105 hover:shadow-lg flex items-center justify-center"
+                className="w-full md:w-auto bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-all transform hover:scale-105 hover:shadow-lg flex items-center justify-center"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
@@ -109,7 +109,7 @@ const SchoolCourseDetails = ({ courseId }) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {course.features.map((feature, index) => (
             <div key={index} className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-              <div className="text-blue-600 text-2xl mb-4">{feature.icon}</div>
+              <div className="text-indigo-600 text-2xl mb-4">{feature.icon}</div>
               <h3 className="font-bold text-xl mb-2">{feature.title}</h3>
               <p className="text-gray-600">{feature.desc}</p>
             </div>
