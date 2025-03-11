@@ -20,7 +20,7 @@ const AdminDashboard = () => {
 
   const menuItems = [
     { 
-      id: 'dashboard', 
+      id: '/', 
       label: 'Dashboard', 
       icon: FaHome, 
       path: '/admin' 
