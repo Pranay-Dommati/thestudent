@@ -90,10 +90,10 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             </div>
           </div>
           
-          {/* Profile section */}
+          {/* Profile section - Add md:block to hide on mobile */}
           <div className="flex items-center justify-end w-[200px]">
             {isLoggedIn ? (
-              <div className="relative" ref={dropdownRef}>
+              <div className="relative hidden md:block" ref={dropdownRef}>
                 <button 
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                   className="flex items-center space-x-2 focus:outline-none"
@@ -147,9 +147,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               </div>
             )}
 
-            {/* Mobile menu button */}
+            {/* Mobile menu button - Move to the right edge */}
             <button 
-              className="md:hidden"
+              className="md:hidden ml-4"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${isScrolled || initialStyle === 'light' ? 'text-gray-800' : 'text-white'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -163,26 +163,48 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           </div>
         </div>
         
-        {/* Mobile menu */}
+        {/* Mobile menu - Update with profile section at the top when logged in */}
         {isMobileMenuOpen && (
           <div className="md:hidden mt-4 py-4 bg-white rounded-lg shadow-xl">
+            {isLoggedIn && (
+              <>
+                <div className="flex items-center px-4 py-2 border-b border-gray-100">
+                  <div className="w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+                    <FaUserCircle className="w-6 h-6" />
+                  </div>
+                  <span className="ml-3 font-medium text-gray-800">Your Profile</span>
+                </div>
+                <div className="py-2">
+                  <Link to="/profile" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
+                    <FaUserCircle className="w-4 h-4 mr-2" />
+                    <span>Profile</span>
+                  </Link>
+                  <Link to="/learning-hub" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
+                    <FaGraduationCap className="w-4 h-4 mr-2" />
+                    <span>My Learning</span>
+                  </Link>
+                  <Link to="/settings" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
+                    <FaCog className="w-4 h-4 mr-2" />
+                    <span>Settings</span>
+                  </Link>
+                </div>
+                <hr className="my-2" />
+              </>
+            )}
+            
             <a href="/" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Home</a>
             <a href="/courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Courses</a>
             <a href="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">AI Chatbot</a>
             <a href="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Learning Hub</a>
+            
             {isLoggedIn ? (
-              <>
-                <hr className="my-2" />
-                <Link to="/profile" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Profile</Link>
-                <Link to="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">My Learning</Link>
-                <Link to="/settings" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Settings</Link>
-                <button 
-                  onClick={handleLogout}
-                  className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100"
-                >
-                  Sign Out
-                </button>
-              </>
+              <button 
+                onClick={handleLogout}
+                className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 mt-2 border-t border-gray-100"
+              >
+                <FaSignOutAlt className="w-4 h-4 mr-2 inline" />
+                <span>Sign Out</span>
+              </button>
             ) : (
               <div className="mt-4 flex flex-col space-y-2 px-4">
                 <a href="/auth?mode=login" className="px-4 py-2 rounded-full text-blue-600 border border-blue-600 font-medium text-center">
