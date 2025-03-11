@@ -116,7 +116,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                     <hr className="my-2" />
                     <button 
                       onClick={handleLogout}
-                      className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-gray-100"
+                      className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-gray-100 cursor-pointer"
                     >
                       <FaSignOutAlt className="w-4 h-4 mr-2" />
                       <span>Sign Out</span>
