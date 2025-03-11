@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaUserCircle, FaSignOutAlt, FaCog, FaGraduationCap } from 'react-icons/fa';
+import { FaUserCircle, FaSignOutAlt, FaCog } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 
 const Navbar = ({ initialStyle = "transparent" }) => {
@@ -109,10 +109,6 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                       <FaUserCircle className="w-4 h-4 mr-2" />
                       <span>Profile</span>
                     </Link>
-                    <Link to="/learning-hub" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
-                      <FaGraduationCap className="w-4 h-4 mr-2" />
-                      <span>My Learning</span>
-                    </Link>
                     <Link to="/settings" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
                       <FaCog className="w-4 h-4 mr-2" />
                       <span>Settings</span>
@@ -129,7 +125,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 )}
               </div>
             ) : (
-              <div className="hidden md:flex items-center space-x-4"> {/* Added space-x-4 here */}
+              <div className="hidden md:flex items-center space-x-4">
                 <a href="/auth?mode=login" 
                   className={`px-4 py-2 rounded-full font-medium transition-all duration-300 
                     ${isScrolled || initialStyle === 'light' 
@@ -178,10 +174,6 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                   <Link to="/profile" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
                     <FaUserCircle className="w-4 h-4 mr-2" />
                     <span>Profile</span>
-                  </Link>
-                  <Link to="/learning-hub" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
-                    <FaGraduationCap className="w-4 h-4 mr-2" />
-                    <span>My Learning</span>
                   </Link>
                   <Link to="/settings" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
                     <FaCog className="w-4 h-4 mr-2" />
