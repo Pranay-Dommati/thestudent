@@ -35,9 +35,11 @@ const HeroSection = ({ user }) => {
               </div>
               <Link 
                 to={`/courses/${user.lastCourse.id}/learning`}
-                className="mt-4 md:mt-0 md:ml-4 px-6 py-2.5 bg-white text-indigo-700 font-medium rounded-lg hover:bg-opacity-90 transition shadow-lg"
+                className="mt-4 md:mt-0 md:ml-4 px-6 py-2.5 bg-white text-indigo-700 font-medium rounded-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:bg-opacity-95 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600"
               >
-                Resume Course
+                <span className="relative z-10">
+                  Resume Course
+                </span>
               </Link>
             </div>
           )}
