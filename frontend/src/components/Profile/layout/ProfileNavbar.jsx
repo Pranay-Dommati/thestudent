@@ -23,21 +23,16 @@ const ProfileNavbar = ({ isDarkMode, profileData, setActiveTab }) => {
     } border-b shadow-sm`}>
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Left: Logo with Back Button */}
-          <div className="flex items-center space-x-4">
-            <Link 
-              to="/"
-              className={`p-2 rounded-lg transition-colors ${
-                isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
-              }`}
-            >
-              ← Back
-            </Link>
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">S</div>
-              <span className={`font-bold text-xl ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Students Hub</span>
-            </Link>
-          </div>
+          {/* Logo - Now acts as home button */}
+          <Link 
+            to="/" 
+            className="flex items-center space-x-2 transition-transform hover:scale-[1.02]"
+          >
+            <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">S</div>
+            <span className={`font-bold text-xl ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+              Students Hub
+            </span>
+          </Link>
 
           {/* Right Side */}
           <div className="flex items-center space-x-4">
