@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FaUser, FaLock, FaBookOpen, FaUsers, FaBrain, FaBell, 
-  FaGoogle, FaGithub, FaMoon, FaSun
+  FaGoogle, FaGithub
 } from 'react-icons/fa';
 import BasicProfile from './tabs/BasicProfile';
 import SecuritySettings from './tabs/SecuritySettings';
@@ -21,11 +21,7 @@ const ProfilePage = () => {
     username: 'johndoe',
     bio: 'Passionate learner | Full Stack Developer | AI Enthusiast',
     avatar: 'https://avatars.githubusercontent.com/u/12345678',
-    badges: [
-      { id: 1, text: '🎓 Advanced Learner', color: 'blue' },
-      { id: 2, text: '👨‍🏫 Mentor', color: 'green' },
-      { id: 3, text: '🏆 Top Contributor', color: 'purple' }
-    ]
+    badges: [] // Removed badges array
   });
 
   const handleProfileUpdate = (updatedData) => {
@@ -74,7 +70,7 @@ const ProfilePage = () => {
             isDarkMode ? 'bg-gray-800' : 'bg-white'
           } shadow-lg`}>
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-              {/* Profile Image */}
+              {/* Profile Image - Removed the user icon button */}
               <div className="relative group">
                 <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-blue-500">
                   <img 
@@ -83,13 +79,10 @@ const ProfilePage = () => {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <button className="absolute bottom-0 right-0 bg-blue-500 p-2 rounded-full text-white hover:bg-blue-600 transition-colors">
-                  <FaUser className="w-4 h-4" />
-                </button>
               </div>
 
               {/* Profile Info */}
-              <div className="flex-1 text-center md:text-left">
+              <div className="flex-1 text-center md:text-left pt-2">
                 <h1 className={`text-3xl font-bold mb-2 ${
                   isDarkMode ? 'text-white' : 'text-gray-800'
                 }`}>
@@ -105,32 +98,12 @@ const ProfilePage = () => {
                 }`}>
                   {profileData.bio}
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {profileData.badges.map(badge => (
-                    <span key={badge.id} className={`px-3 py-1 bg-${badge.color}-100 text-${badge.color}-600 rounded-full text-sm`}>
-                      {badge.text}
-                    </span>
-                  ))}
-                </div>
+                {/* Removed badges section */}
               </div>
 
-              {/* Quick Actions */}
-              <div className="flex items-center gap-4">
-                <button 
-                  onClick={() => setIsDarkMode(!isDarkMode)}
-                  className={`p-2 rounded-lg ${
-                    isDarkMode 
-                      ? 'bg-gray-700 text-yellow-400 hover:bg-gray-600' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {isDarkMode ? <FaSun className="w-5 h-5" /> : <FaMoon className="w-5 h-5" />}
-                </button>
-                <button className={`p-2 rounded-lg ${
-                  isDarkMode 
-                    ? 'bg-gray-700 text-blue-400 hover:bg-gray-600' 
-                    : 'bg-gray-100 text-blue-600 hover:bg-gray-200'
-                }`}>
+              {/* Quick Actions - Remove dark mode toggle, keep only notifications */}
+              <div className="flex items-center">
+                <button className="p-2 rounded-lg bg-gray-100 text-blue-600 hover:bg-gray-200">
                   <FaBell className="w-5 h-5" />
                 </button>
               </div>
