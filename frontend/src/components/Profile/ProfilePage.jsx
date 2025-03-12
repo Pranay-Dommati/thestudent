@@ -101,9 +101,12 @@ const ProfilePage = () => {
                 {/* Removed badges section */}
               </div>
 
-              {/* Quick Actions - Remove dark mode toggle, keep only notifications */}
+              {/* Quick Actions - Notifications with onClick handler */}
               <div className="flex items-center">
-                <button className="p-2 rounded-lg bg-gray-100 text-blue-600 hover:bg-gray-200">
+                <button 
+                  onClick={() => setActiveTab('notifications')}
+                  className="p-2 rounded-lg bg-gray-100 text-blue-600 hover:bg-gray-200 cursor-pointer transition-colors"
+                >
                   <FaBell className="w-5 h-5" />
                 </button>
               </div>

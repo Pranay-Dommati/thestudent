@@ -135,7 +135,6 @@ const BasicProfile = ({ isDarkMode, onUpdateProfile }) => {
     username: 'johndoe',
     email: 'john.doe@example.com',
     bio: 'Passionate learner | Full Stack Developer | AI Enthusiast',
-    location: 'San Francisco, CA',
     interests: ['Web Development', 'Machine Learning', 'AI', 'Cloud Computing', 'DevOps', 'Mobile Development'],
     socialLinks: {
       website: 'portfolio.johndoe.dev',
@@ -200,7 +199,7 @@ const BasicProfile = ({ isDarkMode, onUpdateProfile }) => {
             }
           }}
           disabled={isSaving}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer ${
             isEditing 
               ? `bg-blue-500 text-white ${isSaving ? 'opacity-75 cursor-not-allowed' : 'hover:bg-blue-600'}`
               : 'text-blue-500 hover:text-blue-600'
@@ -258,12 +257,6 @@ const BasicProfile = ({ isDarkMode, onUpdateProfile }) => {
               onChange={(value) => setLocalProfileData({...localProfileData, email: value})}
               isDarkMode={isDarkMode}
             />
-            <EditableField
-              label="Location"
-              value={localProfileData.location}
-              onChange={(value) => setLocalProfileData({...localProfileData, location: value})}
-              isDarkMode={isDarkMode}
-            />
           </motion.div>
         ) : (
           <motion.div
@@ -289,15 +282,6 @@ const BasicProfile = ({ isDarkMode, onUpdateProfile }) => {
                 Email
               </label>
               <p className={`${isDarkMode ? 'text-white' : 'text-gray-800'}`}>john.doe@example.com</p>
-            </div>
-            <div>
-              <label className={`block text-sm font-medium mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                Location
-              </label>
-              <p className={`flex items-center ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                <FaMapMarkerAlt className="w-4 h-4 mr-1 text-gray-400" />
-                San Francisco, CA
-              </p>
             </div>
           </motion.div>
         )}
