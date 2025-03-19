@@ -24,10 +24,10 @@ const SecuritySettings = ({ isDarkMode }) => {
         </h3>
         <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
           <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setIsPasswordModalOpen(true)}
-            className="w-full flex items-center justify-between px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-300 shadow-md hover:shadow-lg cursor-pointer"
           >
             <span className="flex items-center">
               <FaLock className="w-5 h-5 mr-2" />
@@ -39,57 +39,59 @@ const SecuritySettings = ({ isDarkMode }) => {
       </div>
 
       {/* Linked Accounts */}
-      <div>
-        <h3 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-          Linked Accounts
-        </h3>
-        <div className="space-y-3">
-          <div className={`p-4 rounded-lg flex items-center justify-between ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-            <div className="flex items-center">
-              <FaGoogle className="w-5 h-5 text-red-500 mr-3" />
-              <div>
-                <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Google</p>
-                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>john.doe@gmail.com</p>
-              </div>
+      <div className="space-y-3">
+        {/* Google Account */}
+        <div className={`p-4 rounded-lg flex items-center justify-between ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+          <div className="flex items-center">
+            <FaGoogle className="w-5 h-5 text-red-500 mr-3" />
+            <div>
+              <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Google</p>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>john.doe@gmail.com</p>
             </div>
-            <button className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
-              Disconnect
-            </button>
           </div>
-          
-          <div className={`p-4 rounded-lg flex items-center justify-between ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-            <div className="flex items-center">
-              <FaGithub className="w-5 h-5 mr-3" />
-              <div>
-                <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>GitHub</p>
-                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Not connected</p>
-              </div>
-            </div>
-            <button className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors">
-              Connect
-            </button>
-          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer"
+          >
+            Disconnect
+          </motion.button>
         </div>
-      </div>
 
-      {/* Two-Factor Authentication */}
-      <div>
-        <h3 className={`text-xl font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-          Two-Factor Authentication
-        </h3>
-        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <FaShieldAlt className="w-5 h-5 text-green-500" />
-              <div>
-                <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>2FA is enabled</p>
-                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Using Authenticator app</p>
-              </div>
+        {/* GitHub Account */}
+        <div className={`p-4 rounded-lg flex items-center justify-between ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+          <div className="flex items-center">
+            <FaGithub className="w-5 h-5 mr-3" />
+            <div>
+              <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>GitHub</p>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Not connected</p>
             </div>
-            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
-              Manage 2FA
-            </button>
           </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer"
+          >
+            Connect
+          </motion.button>
+        </div>
+
+        {/* 2FA Section */}
+        <div className={`p-4 rounded-lg flex items-center justify-between ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+          <div className="flex items-center space-x-3">
+            <FaShieldAlt className="w-5 h-5 text-green-500" />
+            <div>
+              <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>2FA is enabled</p>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Using Authenticator app</p>
+            </div>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer"
+          >
+            Manage 2FA
+          </motion.button>
         </div>
       </div>
 
