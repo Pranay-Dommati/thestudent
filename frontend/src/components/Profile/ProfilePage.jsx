@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  FaUser, FaLock, FaBookOpen, FaUsers, FaBrain, FaBell, 
+  FaUser, FaLock, FaUsers, FaBrain, FaBell, 
   FaGoogle, FaGithub
 } from 'react-icons/fa';
 import BasicProfile from './tabs/BasicProfile';
 import SecuritySettings from './tabs/SecuritySettings';
-import LearningProgress from './tabs/LearningProgress';
 import CommunitySection from './tabs/CommunitySection';
 import AISettings from './tabs/AISettings';
 import Notifications from './tabs/Notifications';
@@ -35,7 +34,6 @@ const ProfilePage = () => {
   const tabs = [
     { id: 'profile', label: 'Profile', icon: FaUser },
     { id: 'security', label: 'Security', icon: FaLock },
-    { id: 'learning', label: 'My Learning', icon: FaBookOpen },
     { id: 'community', label: 'Community', icon: FaUsers },
     { id: 'ai', label: "AI'Settings", icon: FaBrain },
     { id: 'notifications', label: 'Notifications', icon: FaBell }
@@ -47,8 +45,6 @@ const ProfilePage = () => {
         return <BasicProfile isDarkMode={isDarkMode} onUpdateProfile={handleProfileUpdate} />;
       case 'security':
         return <SecuritySettings isDarkMode={isDarkMode} />;
-      case 'learning':
-        return <LearningProgress isDarkMode={isDarkMode} />;
       case 'community':
         return <CommunitySection isDarkMode={isDarkMode} />;
       case 'ai':
