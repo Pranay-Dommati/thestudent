@@ -102,7 +102,7 @@ const CourseLearning = ({ courseId }) => {
                 videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" 
               },
               {
-                title: "Additional Resources",
+                title: "Resources",
                 duration: "Reading",
                 completed: false,
                 type: 'resources'
@@ -318,7 +318,7 @@ const CourseLearning = ({ courseId }) => {
               
               {activeTab === 'resources' && (
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Lesson Resources</h3>
+
                   <div className="space-y-4">
                     <div className="border border-gray-200 rounded-lg p-4 flex items-start hover:bg-gray-50 transition-colors">
                       <div className="bg-blue-100 rounded p-2 mr-3">
