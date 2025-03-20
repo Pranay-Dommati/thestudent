@@ -33,8 +33,8 @@ const CourseDetails = ({ courseId }) => {
         keyFeatures: [
           { icon: <FaUserGraduate />, title: "Beginner to Advanced", text: "No prior experience needed" },
           { icon: <FaClock />, title: "56 Hours", text: "Self-paced learning" },
-          { icon: <FaChartLine />, title: "Real Projects", text: "Build 5 production apps" },
-          { icon: <FaCode />, title: "Hands-on Practice", text: "Code along with guided exercises" }
+          { icon: <FaChartLine />, title: "Real Projects", text: "Hands-on Projects" },
+          { icon: <FaCode />, title: "Coding Drills", text: "Code along with guided exercises" }
         ],
         thumbnail: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800",
         previewImage: "https://images.unsplash.com/photo-1587620962725-abab7fe55159?w=800",
