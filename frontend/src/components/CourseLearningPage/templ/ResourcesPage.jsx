@@ -2,14 +2,12 @@ import React from 'react';
 import { FaFileAlt, FaExternalLinkAlt, FaDownload, FaFilePdf, FaFileWord, FaFileCode } from 'react-icons/fa';
 
 const ResourcesPage = () => {
-  // Sample resources data - would come from API in real implementation
   const resources = [
     {
       id: 1,
       title: "Course Syllabus",
       description: "Complete overview of the curriculum and learning objectives",
       type: "pdf",
-      size: "1.2 MB",
       downloadUrl: "#",
     },
     {
@@ -17,7 +15,6 @@ const ResourcesPage = () => {
       title: "Practice Exercises",
       description: "Additional exercises to reinforce concepts from the lesson",
       type: "zip",
-      size: "3.5 MB",
       downloadUrl: "#",
     },
     {
@@ -25,7 +22,6 @@ const ResourcesPage = () => {
       title: "Code Examples",
       description: "Sample code demonstrating key concepts",
       type: "code",
-      size: "850 KB",
       downloadUrl: "#",
     },
     {
@@ -33,7 +29,6 @@ const ResourcesPage = () => {
       title: "Reference Guide",
       description: "Quick reference for important commands and syntax",
       type: "doc",
-      size: "750 KB",
       downloadUrl: "#",
     },
     {
@@ -45,7 +40,6 @@ const ResourcesPage = () => {
     }
   ];
 
-  // Helper function to render appropriate icon
   const getResourceIcon = (type) => {
     switch(type) {
       case 'pdf': return <FaFilePdf className="text-red-500" />;
@@ -60,49 +54,45 @@ const ResourcesPage = () => {
   return (
     <div className="p-6">
       <header className="mb-8">
-
         <p className="text-gray-600">
-        Additional resources to deepen your learning
+          Supplementary materials to enhance your learning experience
         </p>
       </header>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {resources.map(resource => (
           <div 
             key={resource.id} 
-            className="bg-white p-5 rounded-lg border border-gray-200 hover:shadow-md transition-shadow duration-300"
+            className="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-md transition-shadow duration-300"
           >
-            <div className="flex items-start">
-              <div className="p-3 bg-gray-100 rounded-lg mr-4">
-                {getResourceIcon(resource.type)}
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-lg text-gray-800">{resource.title}</h3>
-                <p className="text-gray-600 text-sm mb-3">{resource.description}</p>
-                
-                <div className="flex justify-between items-center">
-                  {resource.size && (
-                    <span className="text-xs text-gray-500">{resource.size}</span>
-                  )}
-                  {resource.type === 'link' ? (
-                    <a 
-                      href={resource.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center"
-                    >
-                      <FaExternalLinkAlt className="mr-2" /> Visit Resource
-                    </a>
-                  ) : (
-                    <a 
-                      href={resource.downloadUrl} 
-                      className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center"
-                    >
-                      <FaDownload className="mr-2" /> Download
-                    </a>
-                  )}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-2.5 bg-gray-100 rounded-lg mr-4">
+                  {getResourceIcon(resource.type)}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">{resource.title}</h3>
+                  <p className="text-gray-600 text-sm">{resource.description}</p>
                 </div>
               </div>
+              
+              {resource.type === 'link' ? (
+                <a 
+                  href={resource.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="ml-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center whitespace-nowrap"
+                >
+                  <FaExternalLinkAlt className="mr-2" /> Visit Resource
+                </a>
+              ) : (
+                <a 
+                  href={resource.downloadUrl} 
+                  className="ml-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center whitespace-nowrap"
+                >
+                  <FaDownload className="mr-2" /> Download
+                </a>
+              )}
             </div>
           </div>
         ))}
