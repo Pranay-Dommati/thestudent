@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LessonVideo from './LessonVideo';
 import CourseProgress from './CourseProgress';
+import ResourcesPage from './templ/ResourcesPage';
+import QuizzesPage from './templ/QuizzesPage';
+import InstructionsPage from './templ/InstructionsPage';
 
 const CourseLearning = ({ courseId }) => {
   const [course, setCourse] = useState(null);
@@ -12,6 +15,7 @@ const CourseLearning = ({ courseId }) => {
   const [activeTab, setActiveTab] = useState('content');
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [contentType, setContentType] = useState('video'); // 'video', 'resources', 'quiz', 'instructions'
   const videoRef = useRef(null);
   const navigate = useNavigate();
 
@@ -215,43 +219,27 @@ const CourseLearning = ({ courseId }) => {
     (acc, chapter) => acc + chapter.lessons.length, 0
   );
   
-  // Update the main layout wrapper
-  return (
-    <div className="min-h-screen flex">
-      {/* Main Content Area - Left side, takes remaining width */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-4 sm:p-6">
-          {/* Breadcrumbs */}
-          <div className="mb-4">
-            <div className="flex items-center text-sm text-gray-500 mb-2">
-              <button 
-                onClick={() => navigate(`/courses/${courseId}`)}
-                className="hover:text-indigo-600 transition-colors"
-              >
-                Course
-              </button>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mx-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-              <span className="text-gray-700">{course.chapters[activeChapter].title}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mx-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-              <span className="text-gray-900 font-medium">{currentLesson.title}</span>
+  // Modified content area rendering
+  const renderContent = () => {
+    switch(contentType) {
+      case 'resources':
+        return <ResourcesPage />;
+      case 'quiz':
+        return <QuizzesPage />;
+      case 'instructions':
+        return <InstructionsPage />;
+      case 'video':
+      default:
+        return (
+          <>
+            {/* Video Player */}
+            <div ref={videoRef} className="bg-black rounded-lg overflow-hidden shadow-lg mb-6">
+              <LessonVideo 
+                videoUrl={currentLesson.videoUrl} 
+                title={currentLesson.title}
+              />
             </div>
-            <h1 className="text-2xl font-bold">{currentLesson.title}</h1>
-          </div>
-          
-          {/* Video Player */}
-          <div ref={videoRef} className="bg-black rounded-lg overflow-hidden shadow-lg mb-6">
-            <LessonVideo 
-              videoUrl={currentLesson.videoUrl} 
-              title={currentLesson.title}
-            />
-          </div>
 
-          {/* Content Area - Takes remaining space */}
-          <div className="max-w-none">
             {/* Content Tabs */}
             <div className="mb-6 border-b border-gray-200">
               <div className="flex space-x-6">
@@ -403,6 +391,74 @@ const CourseLearning = ({ courseId }) => {
                 </svg>
               </button>
             </div>
+          </>
+        );
+    }
+  };
+
+  // Add additional navigation buttons in the sidebar
+  const renderAdditionalNavigation = () => {
+    return (
+      <div className="border-t border-gray-200 pt-4 mt-4">
+        <h3 className="text-sm font-medium text-gray-500 mb-3 px-4">Additional Resources</h3>
+        <button
+          onClick={() => setContentType('resources')}
+          className={`w-full text-left px-4 py-2 text-sm ${contentType === 'resources' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700 hover:bg-gray-50'}`}
+        >
+          Lesson Resources
+        </button>
+        <button
+          onClick={() => setContentType('quiz')}
+          className={`w-full text-left px-4 py-2 text-sm ${contentType === 'quiz' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700 hover:bg-gray-50'}`}
+        >
+          Practice Quiz
+        </button>
+        <button
+          onClick={() => setContentType('instructions')}
+          className={`w-full text-left px-4 py-2 text-sm ${contentType === 'instructions' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700 hover:bg-gray-50'}`}
+        >
+          Project Instructions
+        </button>
+        <button
+          onClick={() => setContentType('video')}
+          className={`w-full text-left px-4 py-2 text-sm ${contentType === 'video' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700 hover:bg-gray-50'}`}
+        >
+          Back to Video
+        </button>
+      </div>
+    );
+  };
+
+  // Update the main layout wrapper
+  return (
+    <div className="min-h-screen flex">
+      {/* Main Content Area - Left side, takes remaining width */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-4 sm:p-6">
+          {/* Breadcrumbs */}
+          <div className="mb-4">
+            <div className="flex items-center text-sm text-gray-500 mb-2">
+              <button 
+                onClick={() => navigate(`/courses/${courseId}`)}
+                className="hover:text-indigo-600 transition-colors"
+              >
+                Course
+              </button>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mx-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-gray-700">{course.chapters[activeChapter].title}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mx-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-gray-900 font-medium">{currentLesson.title}</span>
+            </div>
+            <h1 className="text-2xl font-bold">{currentLesson.title}</h1>
+          </div>
+          
+          {/* Content Area - Takes remaining space */}
+          <div className="max-w-none">
+            {renderContent()}
           </div>
         </div>
       </div>
@@ -526,6 +582,9 @@ const CourseLearning = ({ courseId }) => {
               </div>
             ))}
           </div>
+          
+          {/* Add the new navigation options */}
+          {renderAdditionalNavigation()}
         </div>
       </div>
 
