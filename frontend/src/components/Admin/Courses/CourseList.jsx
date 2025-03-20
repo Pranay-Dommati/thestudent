@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaSearch, FaFilter, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaPlus, FaSearch, FaFilter } from 'react-icons/fa';
 
 const CourseList = ({ onAddNew, isDarkMode }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -9,18 +9,19 @@ const CourseList = ({ onAddNew, isDarkMode }) => {
     subject: '',
     status: 'all'
   });
+  const [filterOpen, setFilterOpen] = useState(false);
 
   return (
     <div className={`bg-white rounded-xl shadow-lg p-6 ${
       isDarkMode ? 'bg-gray-800 text-white' : ''
     }`}>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Courses</h2>
+        <h1 className="text-2xl font-bold">Courses</h1>
         <button
           onClick={onAddNew}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          className="flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
         >
-          Add New Course
+          <FaPlus className="mr-2" /> Add New Course
         </button>
       </div>
 
@@ -38,6 +39,7 @@ const CourseList = ({ onAddNew, isDarkMode }) => {
           />
         </div>
         <button
+          onClick={() => setFilterOpen(!filterOpen)}
           className={`flex items-center px-4 py-2 border rounded-lg ${
             isDarkMode 
               ? 'border-gray-600 hover:bg-gray-700' 
