@@ -108,7 +108,7 @@ const CourseLearning = ({ courseId }) => {
                 type: 'resources'
               },
               {
-                title: "Chapter Quiz",
+                title: "Quiz",
                 duration: "Quiz",
                 completed: false,
                 type: 'quiz'
