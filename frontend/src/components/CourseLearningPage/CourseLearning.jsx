@@ -84,22 +84,43 @@ const CourseLearning = ({ courseId }) => {
                 title: "getStaticProps", 
                 duration: "18:45", 
                 completed: false,
+                type: 'video',
                 videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" 
               },
               { 
                 title: "getServerSideProps", 
                 duration: "20:30", 
                 completed: false,
+                type: 'video',
                 videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" 
               },
               { 
                 title: "API Routes", 
                 duration: "16:15", 
                 completed: false,
+                type: 'video',
                 videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" 
+              },
+              {
+                title: "Additional Resources",
+                duration: "Reading",
+                completed: false,
+                type: 'resources'
+              },
+              {
+                title: "Chapter Quiz",
+                duration: "Quiz",
+                completed: false,
+                type: 'quiz'
+              },
+              {
+                title: "Practice Project",
+                duration: "Project",
+                completed: false,
+                type: 'instructions'
               }
             ]
-          },
+          }
         ]
       });
       
@@ -196,6 +217,15 @@ const CourseLearning = ({ courseId }) => {
       
       return filteredLessons.length > 0 ? { ...chapter, lessons: filteredLessons } : null;
     }).filter(Boolean);
+  };
+
+  // Handle lesson click
+  const handleLessonClick = (chapterIndex, lessonIndex) => {
+    const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
+    setActiveChapter(chapterIndex);
+    setActiveLesson(lessonIndex);
+    setContentType(lesson.type); // Will be 'video', 'resources', 'quiz', or 'instructions'
+    videoRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   // Loading state
@@ -552,7 +582,7 @@ const CourseLearning = ({ courseId }) => {
                             ? 'bg-indigo-50 border-l-4 border-indigo-600 pl-11' 
                             : ''
                         }`}
-                        onClick={() => selectLesson(chapterIndex, lessonIndex)}
+                        onClick={() => handleLessonClick(chapterIndex, lessonIndex)}
                       >
                         <div className={`w-5 h-5 flex-shrink-0 rounded-full border flex items-center justify-center mr-3 ${
                           lesson.completed ? 'bg-green-100 border-green-400' : 'border-gray-300'
