@@ -17,19 +17,19 @@ const AdminDashboard = () => {
       id: 'courses',
       label: 'Courses', 
       icon: FaBook, 
-      path: '/admin/courses' 
+      path: '/admin-p/courses' 
     },
     { 
       id: 'users', 
       label: 'Users', 
       icon: FaUsers, 
-      path: '/admin/users' 
+      path: '/admin-p/users' 
     },
     { 
       id: 'settings', 
       label: 'Settings', 
       icon: FaCog, 
-      path: '/admin/settings' 
+      path: '/admin-p/settings' 
     }
   ];
 

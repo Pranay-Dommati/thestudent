@@ -83,8 +83,8 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             
-            {/* Admin Routes */}
-            <Route path="/admin/*" element={<AdminDashboard />} />
+            {/* Admin Routes - Updated path */}
+            <Route path="/admin-p/*" element={<AdminDashboard />} />
             
             {/* Course Routes */}
             <Route path="/courses" element={<Courses />}>

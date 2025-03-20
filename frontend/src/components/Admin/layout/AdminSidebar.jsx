@@ -12,12 +12,12 @@ const AdminSidebar = ({ menuItems, isDarkMode }) => {
         <ul className="space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname.includes(`/admin/${item.id}`);
+            const isActive = location.pathname === item.path;
             
             return (
               <li key={item.id}>
                 <Link
-                  to={`/admin/${item.id}`}
+                  to={item.path}
                   className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                     isActive
                       ? 'bg-blue-600 text-white'
