@@ -14,7 +14,7 @@ const AdminDashboard = () => {
 
   const menuItems = [
     { 
-      id: 'courses', 
+      id: 'courses',
       label: 'Courses', 
       icon: FaBook, 
       path: '/admin/courses' 
