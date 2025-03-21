@@ -8,7 +8,8 @@ import QuizIntro from './templ/QuizIntro'; // Make sure to import QuizIntro inst
 import InstructionsPage from './templ/InstructionsPage';
 import Sidebar from './Sidebar';
 
-const CourseLearning = ({ courseId }) => {
+// Update the function signature to accept onSidebarToggle prop
+const CourseLearning = ({ courseId, onSidebarToggle }) => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeChapter, setActiveChapter] = useState(0);
@@ -245,6 +246,13 @@ const CourseLearning = ({ courseId }) => {
       videoRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  // Add effect to notify parent when sidebar visibility changes
+  useEffect(() => {
+    if (onSidebarToggle) {
+      onSidebarToggle(sidebarVisible);
+    }
+  }, [sidebarVisible, onSidebarToggle]);
 
   // Loading state
   if (loading) {
