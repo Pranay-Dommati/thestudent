@@ -273,40 +273,30 @@ const CourseLearning = ({ courseId }) => {
     
     switch(contentType) {
       case 'resources':
-        return (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <ResourcesPage />
-          </div>
-        );
+        return <ResourcesPage />; // Removed the white container div
         
       case 'quiz':
         return (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <QuizIntro 
-              quizData={{
-                title: currentLesson.title,
-                description: "Test your understanding of the concepts covered in this lesson",
-                timeLimit: "15 minutes",
-                totalQuestions: 5,
-                passingScore: 80,
-                attempts: "Unlimited",
-                instructions: [
-                  "Read each question carefully",
-                  "You can review your answers before submission",
-                  "You need to score 80% or higher to pass",
-                  "You can retake the quiz if needed"
-                ]
-              }}
-            />
-          </div>
+          <QuizIntro 
+            quizData={{
+              title: currentLesson.title,
+              description: "Test your understanding of the concepts covered in this lesson",
+              timeLimit: "15 minutes",
+              totalQuestions: 5,
+              passingScore: 80,
+              attempts: "Unlimited",
+              instructions: [
+                "Read each question carefully",
+                "You can review your answers before submission",
+                "You need to score 80% or higher to pass",
+                "You can retake the quiz if needed"
+              ]
+            }}
+          /> // Removed the white container div
         );
         
       case 'instructions':
-        return (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <InstructionsPage />
-          </div>
-        );
+        return <InstructionsPage />; // Removed the white container div
         
       case 'video':
       default:
