@@ -160,14 +160,6 @@ const InstructionsPage = () => {
           ))}
         </ul>
       </div>
-
-      {/* Submit button */}
-      <div className="flex justify-center">
-        <button className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center">
-          <FaLaptopCode className="mr-2" />
-          Submit Project
-        </button>
-      </div>
     </div>
   );
 };
