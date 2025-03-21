@@ -54,6 +54,7 @@ const ResourcesPage = () => {
   return (
     <div className="p-6">
       <header className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">Resources</h1>
         <p className="text-gray-600">
           Supplementary materials to enhance your learning experience
         </p>
