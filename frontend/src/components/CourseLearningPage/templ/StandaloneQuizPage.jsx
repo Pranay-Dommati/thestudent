@@ -155,9 +155,47 @@ const StandaloneQuizPage = () => {
         <div className="container mx-auto px-4">
           {showResults ? (
             <div className="max-w-4xl mx-auto p-8 bg-white rounded-lg shadow-sm my-8 border border-gray-200">
-              <h2 className="text-2xl font-bold text-center mb-6">Quiz Results</h2>
-              <p className="text-center text-lg mb-8">Thank you for completing the quiz!</p>
-              <div className="text-center">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
+                  <span className="text-2xl text-green-600">✓</span>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Quiz Completed!</h2>
+                <p className="text-gray-600">Great job completing the quiz</p>
+              </div>
+
+              {/* Score Summary */}
+              <div className="max-w-md mx-auto bg-gray-50 rounded-lg p-6 mb-8">
+                <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
+                  <span className="text-gray-600 font-medium">Your Score</span>
+                  <span className="text-2xl font-bold text-indigo-600">80%</span>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Questions Attempted</span>
+                    <span className="font-medium">{Object.keys(selectedAnswers).length} of {quizData.questions.length}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Correct Answers</span>
+                    <span className="font-medium text-green-600">4</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Incorrect Answers</span>
+                    <span className="font-medium text-red-600">1</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-center space-x-4">
+                <button 
+                  onClick={() => {
+                    setShowResults(false);
+                    setSelectedAnswers({});
+                  }}
+                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200"
+                >
+                  Try Again
+                </button>
                 <button 
                   onClick={handleBack}
                   className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700"
