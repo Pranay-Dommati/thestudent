@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import QuizQuestion from './QuizQuestion';
-import Navbar from '../../Navbar/Navbar';
+import { FaChevronLeft } from 'react-icons/fa';
 
 const StandaloneQuizPage = () => {
   const { courseId } = useParams();
@@ -103,10 +103,32 @@ const StandaloneQuizPage = () => {
     // Navigate to results page or show results component
   };
 
+  const handleBack = () => {
+    navigate(`/courses/engineering/${courseId}/learning`);
+  };
+
   return (
-    <>
-      <Navbar initialStyle="light" />
-      <div className="min-h-screen bg-gray-50 pt-24"> {/* Added pt-24 for proper spacing after navbar */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Simple Quiz Navbar */}
+      <div className="bg-white shadow-sm fixed top-0 left-0 right-0 z-50">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center h-16">
+            <button 
+              onClick={handleBack}
+              className="flex items-center text-gray-700 hover:text-blue-600 transition-colors mr-4"
+            >
+              <FaChevronLeft className="mr-1" />
+              <span>Back</span>
+            </button>
+            <h1 className="text-lg font-medium text-gray-800">
+              Knowledge Check - Getting started with HTML
+            </h1>
+          </div>
+        </div>
+      </div>
+
+      {/* Main content with proper spacing */}
+      <div className="pt-16 pb-8">
         <div className="container mx-auto px-4">
           {showResults ? (
             <div className="max-w-4xl mx-auto p-8 bg-white rounded-lg shadow-sm my-8">
@@ -114,7 +136,7 @@ const StandaloneQuizPage = () => {
               <p className="text-center text-lg mb-8">Thank you for completing the quiz!</p>
               <div className="text-center">
                 <button 
-                  onClick={() => navigate(`/courses/engineering/${courseId}/learning`)}
+                  onClick={handleBack}
                   className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700"
                 >
                   Return to Course
@@ -136,7 +158,7 @@ const StandaloneQuizPage = () => {
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
