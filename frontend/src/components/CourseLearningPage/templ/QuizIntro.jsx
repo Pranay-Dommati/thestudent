@@ -1,7 +1,16 @@
 import React from 'react';
 import { FaClock, FaListAlt, FaRedo, FaCheck } from 'react-icons/fa';
+import { useNavigate, useParams } from 'react-router-dom';
 
 const QuizIntro = ({ quizData, onStart }) => {
+  const navigate = useNavigate();
+  const { courseId } = useParams();
+  
+  const handleStartQuiz = () => {
+    // Navigate to the standalone quiz page instead of showing the quiz in the current page
+    navigate(`/courses/engineering/${courseId}/learning/quiz`);
+  };
+
   return (
     <div className="max-w-3xl mx-auto">
       <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
@@ -58,7 +67,7 @@ const QuizIntro = ({ quizData, onStart }) => {
         {/* Start Button Section */}
         <div className="p-8 bg-white border-t border-gray-200">
           <button
-            onClick={onStart}
+            onClick={handleStartQuiz}
             className="w-full px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all duration-200 flex items-center justify-center"
           >
             <span className="mr-2">Start Quiz</span>

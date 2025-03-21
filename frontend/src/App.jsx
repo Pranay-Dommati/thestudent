@@ -20,6 +20,7 @@ import AdminDashboard from './components/Admin/Dashboard/AdminDashboard';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import HelpCenter from './components/HelpCenter/HelpCenter';
+import StandaloneQuizPage from './components/CourseLearningPage/templ/StandaloneQuizPage';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -122,6 +123,9 @@ function App() {
 
             {/* Learning Routes */}
             <Route path="/courses/engineering/:courseId/learning" element={<CourseLearningPage />} />
+            {/* Add this new route for quizzes */}
+            <Route path="/courses/engineering/:courseId/learning/quiz" element={<StandaloneQuizPage />} />
+            
             <Route path="/courses/10th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/10th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/11th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
