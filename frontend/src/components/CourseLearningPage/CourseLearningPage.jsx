@@ -9,11 +9,14 @@ const CourseLearningPage = () => {
 
   return (
     <>
-      <Navbar  initialStyle="light" />
+      <Navbar initialStyle="light" />
       <div className="pt-16 min-h-screen bg-gray-50">
         <CourseLearning courseId={courseId} />
       </div>
-      <Footer />
+      {/* Adjust footer width to match content area */}
+      <div className="transition-all duration-300 mr-[400px]">
+        <Footer />
+      </div>
     </>
   );
 };

@@ -466,39 +466,43 @@ const CourseLearning = ({ courseId }) => {
     }
   };
 
-  // In the return statement, replace the content rendering with:
+  // In the return statement, remove the footer and adjust the layout:
   return (
     <div className="min-h-screen flex">
-      {/* Main Content Area - Remove the margin-right spacing and make it take full width */}
-      <div className={`flex-1 transition-all duration-300`}>
-        <div className="p-6">
-          {/* Navigation/Breadcrumb */}
-          <div className="mb-6">
-            <div className="flex items-center text-sm text-gray-600 mb-2">
-              <span>Course</span>
-              <span className="mx-2">•</span>
-              <span>{course.chapters[activeChapter].title}</span>
-              <span className="mx-2">•</span>
-              <span>{currentLesson.title}</span>
-            </div>
-            <h1 className="text-2xl font-bold">{currentLesson.title}</h1>
-          </div>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Content Container with proper margin for sidebar */}
+        <div className={`transition-all duration-300 ${sidebarVisible ? 'mr-[400px]' : ''}`}>
+          <div className="p-6 max-w-4xl">
+            {/* Video content navigation */}
+            {contentType === 'video' && (
+              <div className="mb-6">
+                <nav className="flex items-center text-sm text-gray-600">
+                  <span>Course</span>
+                  <span className="mx-2">•</span>
+                  <span>{course.chapters[activeChapter].title}</span>
+                  <span className="mx-2">•</span>
+                  <span>{currentLesson.title}</span>
+                </nav>
+              </div>
+            )}
 
-          {/* Render content based on content type */}
-          {renderContent()}
+            {/* Dynamic Content */}
+            {renderContent()}
+          </div>
         </div>
       </div>
 
-      {/* Sidebar - Position it absolutely instead of fixed */}
+      {/* Sidebar */}
       <div 
-        className={`w-[400px] border-l border-gray-200 bg-white h-screen sticky top-0 overflow-hidden flex flex-col transform transition-transform duration-300 ${
+        className={`fixed top-0 right-0 h-screen w-[400px] bg-white shadow-lg border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 ${
           sidebarVisible ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <Sidebar
           isSidebarOpen={sidebarVisible}
           course={course}
-          searchQuery={searchQuery}
+          searchQuery={searchQuery || ''}
           setSearchQuery={setSearchQuery}
           expandedChapters={expandedChapters}
           activeChapter={activeChapter}
