@@ -1,18 +1,19 @@
 import React from 'react';
-import { FaSearch } from 'react-icons/fa';
+import { FaSearch, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
 
 const Sidebar = ({ 
   isSidebarOpen, 
   course, 
-  searchQuery = '', // Add default value here
-  setSearchQuery = () => {}, // Add default value here
+  searchQuery = '', 
+  setSearchQuery = () => {}, 
   expandedChapters,
   activeChapter,
   activeLesson,
   handleLessonClick,
-  completedLessons = 0, // Add default value here
-  totalLessons = 0, // Add default value here
-  toggleChapter
+  completedLessons = 0, 
+  totalLessons = 0, 
+  toggleChapter,
+  toggleSidebar  // Add this prop to receive the toggle function
 }) => {
   // Filter lessons based on search
   const filteredChapters = () => {
@@ -38,6 +39,14 @@ const Sidebar = ({
         <div className="pt-8 px-4 pb-3 border-b border-gray-200 bg-white flex-shrink-0">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-lg">Course content</h2>
+            {/* Add the toggle button here */}
+            <button
+              onClick={toggleSidebar}
+              className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+              aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+            >
+              <FaChevronRight className="w-4 h-4 text-gray-600" />
+            </button>
           </div>
           
           {/* Search bar */}

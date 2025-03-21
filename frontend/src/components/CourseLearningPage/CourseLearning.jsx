@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import LessonVideo from './LessonVideo';
 import CourseProgress from './CourseProgress';
 import ResourcesPage from './templ/ResourcesPage';
@@ -493,6 +494,20 @@ const CourseLearning = ({ courseId }) => {
         </div>
       </div>
 
+      {/* Always visible sidebar toggle button positioned at the top of sidebar */}
+      <button
+        onClick={() => setSidebarVisible(!sidebarVisible)}
+        className={`fixed top-17 transition-all duration-300 ${
+          sidebarVisible ? 'right-[400px]' : 'right-0'
+        } transform bg-white p-3 shadow-md rounded-l-lg z-40 hover:bg-gray-50`}
+        aria-label={sidebarVisible ? "Close sidebar" : "Open sidebar"}
+      >
+        {sidebarVisible ? 
+          <FaChevronRight className="w-5 h-5 text-gray-600" /> : 
+          <FaChevronLeft className="w-5 h-5 text-gray-600" />
+        }
+      </button>
+
       {/* Sidebar - Keep fixed width */}
       <div 
         className={`fixed top-0 right-0 h-screen w-[400px] bg-white shadow-lg border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 ${
@@ -511,6 +526,7 @@ const CourseLearning = ({ courseId }) => {
           completedLessons={completedLessons}
           totalLessons={totalLessons}
           toggleChapter={toggleChapter}
+          toggleSidebar={() => setSidebarVisible(!sidebarVisible)}
         />
       </div>
     </div>
