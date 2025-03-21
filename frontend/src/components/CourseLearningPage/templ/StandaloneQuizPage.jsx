@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FaChevronLeft, FaRegCircle, FaRegDotCircle } from 'react-icons/fa';
+import { FaChevronLeft, FaRegCircle, FaRegDotCircle, FaExclamationCircle } from 'react-icons/fa';
 
 const StandaloneQuizPage = () => {
   const { courseId } = useParams();
@@ -9,6 +9,7 @@ const StandaloneQuizPage = () => {
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [showResults, setShowResults] = useState(false);
   const [returnPath, setReturnPath] = useState('');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   // Capture the return path when component mounts
   useEffect(() => {
@@ -100,6 +101,35 @@ const StandaloneQuizPage = () => {
     navigate(returnPath);
   };
 
+  // Add this function to check if all questions have been answered
+  const allQuestionsAnswered = () => {
+    // Check if we have an answer for each question
+    return quizData.questions.every(question => 
+      selectedAnswers[question.id] !== undefined
+    );
+  };
+
+  // Handle clicks on the disabled submit button
+  const handleSubmitClick = () => {
+    if (!allQuestionsAnswered()) {
+      setSubmitAttempted(true);
+      
+      // Auto-hide the message after 5 seconds
+      setTimeout(() => {
+        setSubmitAttempted(false);
+      }, 5000);
+    } else {
+      handleSubmit();
+    }
+  };
+  
+  // Find unanswered questions to show in the message
+  const getUnansweredQuestions = () => {
+    return quizData.questions
+      .filter(question => selectedAnswers[question.id] === undefined)
+      .map(q => quizData.questions.findIndex(question => question.id === q.id) + 1);
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {/* Simple Quiz Navbar */}
@@ -187,11 +217,31 @@ const StandaloneQuizPage = () => {
                 ))}
               </div>
 
-              {/* Submit Button */}
-              <div className="flex justify-center mt-10">
+              {/* Submit Button and Warning Message */}
+              <div className="flex flex-col items-center space-y-4 mt-10">
+                {/* Warning Message */}
+                {submitAttempted && !allQuestionsAnswered() && (
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 w-full max-w-md mb-4 animate-fadeIn">
+                    <div className="flex items-center">
+                      <FaExclamationCircle className="text-red-500 mr-2" />
+                      <div>
+                        <p className="text-red-700 font-medium">Please answer all questions</p>
+                        <p className="text-red-600 text-sm">
+                          Missing answers for question{getUnansweredQuestions().length > 1 ? 's' : ''}: {getUnansweredQuestions().join(', ')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Submit Button */}
                 <button
-                  onClick={handleSubmit}
-                  className="px-8 py-3 bg-indigo-600 text-white rounded-lg text-lg font-medium hover:bg-indigo-700 transition-colors"
+                  onClick={handleSubmitClick}
+                  className={`px-8 py-3 rounded-lg text-lg font-medium transition-colors w-full max-w-md
+                    ${allQuestionsAnswered() 
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer' 
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-75'
+                    }`}
                 >
                   Submit Quiz
                 </button>
