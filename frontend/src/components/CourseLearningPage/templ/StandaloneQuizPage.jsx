@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaRegCircle, FaRegDotCircle } from 'react-icons/fa';
 
 const StandaloneQuizPage = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [showResults, setShowResults] = useState(false);
+  const [returnPath, setReturnPath] = useState('');
+
+  // Capture the return path when component mounts
+  useEffect(() => {
+    // Get the previous path from location state, or default to the standard path
+    const previousPath = location.state?.from || `/courses/engineering/${courseId}/learning`;
+    setReturnPath(previousPath);
+  }, [courseId, location]);
 
   // Mock quiz data - in a real app, you would fetch this based on courseId
   const quizData = {
@@ -88,7 +97,7 @@ const StandaloneQuizPage = () => {
   };
 
   const handleBack = () => {
-    navigate(`/courses/engineering/${courseId}/learning`);
+    navigate(returnPath);
   };
 
   return (
@@ -99,12 +108,12 @@ const StandaloneQuizPage = () => {
           <div className="flex items-center h-16">
             <button 
               onClick={handleBack}
-              className="flex items-center text-gray-700 hover:text-blue-600 transition-colors mr-4"
+              className="flex items-center text-blue-600 hover:text-blue-800 transition-colors mr-4 cursor-pointer"
             >
-              <FaChevronLeft className="mr-1" />
-              <span>Back</span>
+              <FaChevronLeft className="mr-2" />
+              <span className="font-medium">Back</span>
             </button>
-            <h1 className="text-lg font-medium text-gray-800">
+            <h1 className="text-sm font-medium text-gray-800">
               {quizData.title}
             </h1>
           </div>
