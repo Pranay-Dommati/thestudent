@@ -7,6 +7,7 @@ import CourseContentTab from './tabs/CourseContentTab';
 import RequirementsTab from './tabs/RequirementsTab';
 import PreviewTab from './tabs/PreviewTab';
 import EngineeringCourseForm from './EngineeringCourseForm/index';
+import SchoolCourseForm from './SchoolCourseForm/index'; // Add this import
 
 const courseCategories = [
   { level: '10th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
@@ -134,8 +135,7 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
       case '10th':
       case '11th':
       case '12th':
-        // School course form - you could create separate components for these too
-        return <SchoolCourseForm onSubmit={onSubmit} onCancel={onCancel} level={selectedLevel.id} />;
+        return <SchoolCourseForm onSubmit={onSubmit} onCancel={onCancel} classLevel={selectedLevel.id} />;
       default:
         return null;
     }
