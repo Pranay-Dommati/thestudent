@@ -334,12 +334,7 @@ const CourseLearning = ({ courseId, onSidebarToggle }) => {
                 >
                   Resources
                 </button>
-                <button 
-                  className={`py-4 px-1 font-medium ${activeTab === 'transcript' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}
-                  onClick={() => setActiveTab('transcript')}
-                >
-                  Transcript
-                </button>
+                {/* Remove the Transcript tab button */}
               </div>
             </div>
 
@@ -411,28 +406,7 @@ const CourseLearning = ({ courseId, onSidebarToggle }) => {
                 </div>
               )}
               
-              {activeTab === 'transcript' && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Lesson Transcript</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg text-gray-700 prose max-w-none">
-                    <p className="mb-4">
-                      <strong>0:00</strong> - Hello and welcome to this lesson on {currentLesson.title}. Today we're going to explore how this feature works in Next.js.
-                    </p>
-                    <p className="mb-4">
-                      <strong>0:12</strong> - Let's start by understanding what {currentLesson.title.toLowerCase()} actually is and why it's an important part of the Next.js framework.
-                    </p>
-                    <p className="mb-4">
-                      <strong>0:35</strong> - The main benefit of using this approach is that it allows for better performance and user experience.
-                    </p>
-                    <p className="mb-4">
-                      <strong>1:15</strong> - Now let's look at some code examples to see how this works in practice. First, we'll create a basic setup...
-                    </p>
-                    <p className="text-center text-gray-500 mt-4 border-t pt-4">
-                      Full transcript available for download in the resources section.
-                    </p>
-                  </div>
-                </div>
-              )}
+              {/* Remove the transcript tab content section */}
             </div>
 
             {/* Navigation Controls */}
