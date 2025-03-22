@@ -10,9 +10,10 @@ const AdminSettings = () => {
   const [verificationStep, setVerificationStep] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
+  const [wantToChangePassword, setWantToChangePassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   
   const handleVerifyCode = (type) => {
     // Validate verification code (simple frontend validation)
@@ -54,7 +55,7 @@ const AdminSettings = () => {
     }
   };
   
-  const handleEmailChange = async (e) => {
+  const handleEmailAndPasswordChange = async (e) => {
     e.preventDefault();
     
     // Basic validation
@@ -63,16 +64,36 @@ const AdminSettings = () => {
       return;
     }
 
+    if (wantToChangePassword) {
+      if (!newPassword || !confirmPassword) {
+        toast.error('All password fields are required');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        toast.error('New passwords do not match');
+        return;
+      }
+    }
+
     try {
-      // Here you would make an API call to update the email
-      toast.success('Email updated successfully');
+      // Here you would make an API call to update the email and password
+      if (wantToChangePassword) {
+        toast.success('Email and password updated successfully');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        toast.success('Email updated successfully');
+      }
+      
       setCurrentEmail(newEmail);
       setNewEmail('');
       setShowEmailModal(false);
       setVerificationStep(false);
       setVerificationCode('');
+      setWantToChangePassword(false);
     } catch (error) {
-      toast.error('Failed to update email');
+      toast.error('Failed to update settings');
     }
   };
 
@@ -155,6 +176,9 @@ const AdminSettings = () => {
                     setVerificationStep(false);
                     setVerificationCode('');
                     setNewEmail('');
+                    setWantToChangePassword(false);
+                    setNewPassword('');
+                    setConfirmPassword('');
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
@@ -165,7 +189,7 @@ const AdminSettings = () => {
               {!verificationStep ? (
                 <div className="space-y-4">
                   <p className="text-gray-600">
-                    For security purposes, we need to verify your identity. Please enter the 6-digit code sent to your email.
+                    For security purposes, we need to verify your identity. Please enter the 6-digit code sent to your email address ({currentEmail}).
                   </p>
                   
                   <div>
@@ -192,7 +216,19 @@ const AdminSettings = () => {
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleEmailChange} className="space-y-4">
+                <form onSubmit={handleEmailAndPasswordChange} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Current Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={currentEmail}
+                      disabled
+                      className="w-full p-2 border border-gray-300 bg-gray-100 rounded-lg"
+                    />
+                  </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       New Email Address
@@ -206,12 +242,57 @@ const AdminSettings = () => {
                     />
                   </div>
                   
+                  <div className="mt-6 pt-4 border-t border-gray-200">
+                    <div className="flex items-center mb-4">
+                      <input
+                        type="checkbox"
+                        id="change-password"
+                        checked={wantToChangePassword}
+                        onChange={() => setWantToChangePassword(!wantToChangePassword)}
+                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      />
+                      <label htmlFor="change-password" className="ml-2 block text-sm text-gray-700">
+                        I also want to change my password
+                      </label>
+                    </div>
+                    
+                    {wantToChangePassword && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            New Password
+                          </label>
+                          <input
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter new password"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Confirm New Password
+                          </label>
+                          <input
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Confirm new password"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
                   <div className="flex justify-end">
                     <button
                       type="submit"
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
-                      Update Email
+                      {wantToChangePassword ? "Update Email & Password" : "Update Email"}
                     </button>
                   </div>
                 </form>
@@ -258,7 +339,7 @@ const AdminSettings = () => {
               {!verificationStep ? (
                 <div className="space-y-4">
                   <p className="text-gray-600">
-                    For security purposes, we need to verify your identity. Please enter the 6-digit code sent to your email.
+                    For security purposes, we need to verify your identity. Please enter the 6-digit code sent to your email address ({currentEmail}).
                   </p>
                   
                   <div>
