@@ -4,12 +4,19 @@ import { Link, useLocation } from 'react-router-dom';
 const AdminSidebar = ({ menuItems, currentView, setCurrentView, isDarkMode }) => {
   const location = useLocation();
 
-  // Handle initial active state and path matching
+  // Update isActiveItem logic to handle paths more precisely
   const isActiveItem = (item) => {
-    if (location.pathname === '/admin-p' && item.id === 'courses') {
+    // Check for exact path match
+    if (location.pathname === item.path) {
       return true;
     }
-    return location.pathname.includes(item.path) || currentView === item.id;
+    
+    // Special case for courses section
+    if (item.id === 'courses') {
+      return location.pathname === '/admin-p' || location.pathname === '/admin-p/courses';
+    }
+    
+    return currentView === item.id;
   };
 
   return (

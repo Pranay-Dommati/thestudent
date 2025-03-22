@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import { FaBook, FaUsers, FaCog } from 'react-icons/fa';
+import { FaBook, FaUsers, FaCog, FaPlus } from 'react-icons/fa';
 import AdminNav from '../layout/AdminNav';
 import AdminSidebar from '../layout/AdminSidebar';
 import AdminCourses from '../Courses/AdminCourses';
 import AdminUsers from '../Users/AdminUsers';
 import AdminSettings from '../Settings/AdminSettings';
 import CourseManagement from '../Courses/CourseManagement';
+import CourseForm from '../Courses/CourseForm';
 
 const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState('courses');
@@ -18,6 +19,12 @@ const AdminDashboard = () => {
       label: 'Courses', 
       icon: FaBook, 
       path: '/admin-p/courses' 
+    },
+    { 
+      id: 'addCourse',
+      label: 'Add Course', 
+      icon: FaPlus, 
+      path: '/admin-p/add-course' 
     },
     { 
       id: 'users', 
@@ -49,6 +56,7 @@ const AdminDashboard = () => {
           <Routes>
             <Route index element={<CourseManagement />} />
             <Route path="courses/*" element={<CourseManagement />} />
+            <Route path="add-course" element={<CourseForm onCancel={() => navigate('/admin-p/courses')} />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="settings" element={<AdminSettings />} />
           </Routes>

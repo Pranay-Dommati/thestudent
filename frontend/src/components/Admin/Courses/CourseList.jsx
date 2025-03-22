@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FaPlus, FaSearch, FaFilter } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 
 const CourseList = ({ onAddNew, isDarkMode }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -10,6 +11,7 @@ const CourseList = ({ onAddNew, isDarkMode }) => {
     status: 'all'
   });
   const [filterOpen, setFilterOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className={`bg-white rounded-xl shadow-lg p-6 ${
@@ -18,7 +20,7 @@ const CourseList = ({ onAddNew, isDarkMode }) => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Courses</h1>
         <button
-          onClick={onAddNew}
+          onClick={() => navigate('/admin-p/add-course')}
           className="flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
         >
           <FaPlus className="mr-2" /> Add New Course
