@@ -167,22 +167,6 @@ const BasicInfoStep = ({
         {errors.subject && <p className="text-red-500 text-sm">{errors.subject}</p>}
       </div>
       
-      {/* Short Description */}
-      <div className="space-y-2">
-        <label className="block text-gray-700 font-medium">
-          One-line Description <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          name="shortDescription"
-          value={courseInfo.shortDescription}
-          onChange={handleCourseInfoChange}
-          className={`w-full p-2 border ${errors.shortDescription ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
-          placeholder={`e.g., Master ${classLevel} ${courseInfo.subject || 'Subject'} with comprehensive coverage of CBSE syllabus`}
-        />
-        {errors.shortDescription && <p className="text-red-500 text-sm">{errors.shortDescription}</p>}
-      </div>
-      
       {/* Sources */}
       <div className="space-y-2">
         <label className="block text-gray-700 font-medium">
@@ -225,22 +209,6 @@ const BasicInfoStep = ({
           onChange={handleCourseInfoChange}
           className="w-full p-2 border border-gray-300 rounded-lg"
         />
-      </div>
-      
-      {/* Description */}
-      <div className="space-y-2">
-        <label className="block text-gray-700 font-medium">
-          About This Course <span className="text-red-500">*</span>
-        </label>
-        <textarea
-          name="description"
-          value={courseInfo.description}
-          onChange={handleCourseInfoChange}
-          rows={5}
-          className={`w-full p-2 border ${errors.description ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
-          placeholder="Provide a detailed description of your course"
-        ></textarea>
-        {errors.description && <p className="text-red-500 text-sm">{errors.description}</p>}
       </div>
       
       {/* Key Topics */}
