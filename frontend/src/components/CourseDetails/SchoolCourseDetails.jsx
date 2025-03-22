@@ -20,6 +20,7 @@ const SchoolCourseDetails = ({ courseId }) => {
         subject: "Mathematics",
         board: "CBSE",
         class: "10th",
+        lastUpdated: "December 2024", // Add this line
         features: [
           { icon: <FaChalkboardTeacher />, title: "Expert Teachers", desc: "Learn from experienced educators" },
           { icon: <FaBookReader />, title: "Structured Learning", desc: "Well-organized chapter-wise content" },
@@ -87,6 +88,8 @@ const SchoolCourseDetails = ({ courseId }) => {
                 </span>
                 <span>•</span>
                 <span>{course.chapters} chapters</span>
+                <span>•</span>
+                <span>Updated {course.lastUpdated}</span>
               </div>
 
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 mb-6">
