@@ -19,6 +19,13 @@ const subjects = {
   'undergraduate': ['Engineering Mathematics', 'Data Structures', 'Computer Networks', 'Database Management']
 };
 
+const EDUCATION_LEVELS = [
+  { id: 'engineering', label: 'Engineering' },
+  { id: '10th', label: 'Class 10' },
+  { id: '11th', label: 'Class 11' },
+  { id: '12th', label: 'Class 12' }
+];
+
 const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
   const [activeTab, setActiveTab] = useState('basic');
   const [form, setForm] = useState({
@@ -40,6 +47,8 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [selectedLevel, setSelectedLevel] = useState(null);
+  const [showLevelSelection, setShowLevelSelection] = useState(true);
 
   const validateForm = useCallback(() => {
     const newErrors = {};
@@ -112,6 +121,11 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
     setForm({ ...form, [field]: items });
   };
 
+  const handleLevelSelect = (level) => {
+    setSelectedLevel(level);
+    setShowLevelSelection(false);
+  };
+
   const tabs = [
     { id: 'basic', label: 'Basic Info' },
     { id: 'content', label: 'Course Content' },
@@ -152,80 +166,72 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
         <h2 className="text-2xl font-bold">
           {initialData ? 'Edit Course' : 'Create New Course'}
         </h2>
-        <div className="flex items-center space-x-4">
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={form.isPublished}
-              onChange={(e) => setForm({ ...form, isPublished: e.target.checked })}
-              className="form-checkbox h-5 w-5 text-blue-600"
-            />
-            <span>Publish course</span>
-          </label>
+        {!showLevelSelection && (
           <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800"
+            onClick={() => setShowLevelSelection(true)}
+            className="text-blue-600 hover:text-blue-700"
           >
-            Cancel
+            Change Education Level
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center ${
-              isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-          >
-            {isSubmitting ? (
-              <>
-                <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Saving...
-              </>
-            ) : (
-              'Save Course'
-            )}
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* Form Content */}
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Navigation Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {tabs.map(tab => (
+      {showLevelSelection ? (
+        <div className="space-y-6">
+          <p className="text-gray-600">Select the education level for your new course:</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {EDUCATION_LEVELS.map((level) => (
               <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                key={level.id}
+                onClick={() => handleLevelSelect(level)}
+                className="p-6 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 flex flex-col items-center justify-center gap-2"
               >
-                {tab.label}
+                <span className="text-lg font-medium text-gray-800">{level.label}</span>
+                <p className="text-sm text-gray-500 text-center">
+                  {level.id === 'engineering' 
+                    ? 'Professional skill development'
+                    : `${level.label} standard courses`}
+                </p>
               </button>
             ))}
-          </nav>
+          </div>
         </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Navigation Tabs */}
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
 
-        {/* Tab Content */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.2 }}
-          >
-            {renderTabContent()}
-          </motion.div>
-        </AnimatePresence>
-      </form>
+          {/* Tab Content */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {renderTabContent()}
+            </motion.div>
+          </AnimatePresence>
+        </form>
+      )}
     </div>
   );
 };
