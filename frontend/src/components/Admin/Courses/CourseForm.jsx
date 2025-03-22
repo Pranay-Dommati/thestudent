@@ -6,7 +6,7 @@ import BasicInfoTab from './tabs/BasicInfoTab';
 import CourseContentTab from './tabs/CourseContentTab';
 import RequirementsTab from './tabs/RequirementsTab';
 import PreviewTab from './tabs/PreviewTab';
-import EngineeringCourseForm from './EngineeringCourseForm';
+import EngineeringCourseForm from './EngineeringCourseForm/index';
 
 const courseCategories = [
   { level: '10th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
