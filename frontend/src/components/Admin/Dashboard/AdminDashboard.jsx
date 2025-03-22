@@ -76,12 +76,17 @@ const AdminDashboard = () => {
   ];
 
   if (!isAuthenticated) {
-    return <AdminLogin onLoginSuccess={() => setIsAuthenticated(true)} />;
+    return (
+      <>
+        <AdminNav isLoginPage={true} />
+        <AdminLogin onLoginSuccess={() => setIsAuthenticated(true)} />
+      </>
+    );
   }
 
   return (
     <div className="min-h-screen">
-      <AdminNav onLogout={handleLogout} />
+      <AdminNav onLogout={handleLogout} isLoginPage={false} />
       
       <div className="flex pt-16">
         <AdminSidebar 

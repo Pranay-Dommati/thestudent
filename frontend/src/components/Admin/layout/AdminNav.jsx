@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaSignOutAlt } from 'react-icons/fa';
+import { FaSignOutAlt, FaLock } from 'react-icons/fa';
 
-const AdminNav = ({ onLogout }) => {
+const AdminNav = ({ onLogout, isLoginPage }) => {
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-lg">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Left side - Logo and brand name */}
@@ -19,13 +19,16 @@ const AdminNav = ({ onLogout }) => {
 
           {/* Right side - Admin text and logout */}
           <div className="flex items-center space-x-4">
-            <span className="font-medium text-gray-700">
-              Admin Panel
-            </span>
+            <div className="flex items-center text-gray-700">
+              <FaLock className="mr-2 text-gray-700" />
+              <span className="font-medium">
+                Admin Portal
+              </span>
+            </div>
             {onLogout && (
               <button
                 onClick={onLogout}
-                className="flex items-center text-gray-600 hover:text-red-600 transition-colors"
+                className="flex items-center text-gray-700 hover:text-red-600 transition-colors"
                 title="Logout"
               >
                 <FaSignOutAlt className="mr-1" />
