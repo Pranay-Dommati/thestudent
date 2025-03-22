@@ -6,6 +6,7 @@ import BasicInfoTab from './tabs/BasicInfoTab';
 import CourseContentTab from './tabs/CourseContentTab';
 import RequirementsTab from './tabs/RequirementsTab';
 import PreviewTab from './tabs/PreviewTab';
+import EngineeringCourseForm from './EngineeringCourseForm';
 
 const courseCategories = [
   { level: '10th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
@@ -126,6 +127,20 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
     setShowLevelSelection(false);
   };
 
+  const renderFormBasedOnLevel = () => {
+    switch(selectedLevel?.id) {
+      case 'engineering':
+        return <EngineeringCourseForm onSubmit={onSubmit} onCancel={onCancel} />;
+      case '10th':
+      case '11th':
+      case '12th':
+        // School course form - you could create separate components for these too
+        return <SchoolCourseForm onSubmit={onSubmit} onCancel={onCancel} level={selectedLevel.id} />;
+      default:
+        return null;
+    }
+  };
+
   const tabs = [
     { id: 'basic', label: 'Basic Info' },
     { id: 'content', label: 'Course Content' },
@@ -197,40 +212,7 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Navigation Tabs */}
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              {tabs.map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-
-          {/* Tab Content */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              {renderTabContent()}
-            </motion.div>
-          </AnimatePresence>
-        </form>
+        renderFormBasedOnLevel()
       )}
     </div>
   );
