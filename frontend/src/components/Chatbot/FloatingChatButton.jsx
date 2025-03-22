@@ -6,10 +6,11 @@ const FloatingChatButton = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Don't show the button on the chat page or quiz pages
+  // Don't show the button on the chat page, quiz pages, or admin pages
   if (
     location.pathname === '/chat' || 
-    location.pathname.includes('/learning/quiz')
+    location.pathname.includes('/learning/quiz') ||
+    location.pathname.startsWith('/admin-p') // Add this condition
   ) {
     return null;
   }
