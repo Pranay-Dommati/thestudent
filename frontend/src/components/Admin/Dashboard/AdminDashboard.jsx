@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import { FaBook, FaUsers, FaCog, FaPlus } from 'react-icons/fa';
+import { FaBook, FaUsers, FaLock, FaPlus } from 'react-icons/fa';
 import AdminNav from '../layout/AdminNav';
 import AdminSidebar from '../layout/AdminSidebar';
 import AdminCourses from '../Courses/AdminCourses';
@@ -33,10 +33,10 @@ const AdminDashboard = () => {
       path: '/admin-p/users' 
     },
     { 
-      id: 'settings', 
-      label: 'Settings', 
-      icon: FaCog, 
-      path: '/admin-p/settings' 
+      id: 'security', // Changed from 'settings' to 'security'
+      label: 'Security', // Changed from 'Settings' to 'Security'
+      icon: FaLock, // Changed from FaCog to FaLock to match security theme
+      path: '/admin-p/settings' // Path stays the same for backward compatibility
     }
   ];
 

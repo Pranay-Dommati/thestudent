@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { FaPlus, FaSearch, FaFilter } from 'react-icons/fa';
+import { FaPlus, FaSearch, FaFilter, FaEdit, FaTrash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
-const CourseList = ({ onAddNew, isDarkMode }) => {
+const CourseList = ({ courses = [], onAddNew, isDarkMode, onEdit, onDelete }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     category: '',
@@ -12,6 +12,16 @@ const CourseList = ({ onAddNew, isDarkMode }) => {
   });
   const [filterOpen, setFilterOpen] = useState(false);
   const navigate = useNavigate();
+
+  const handleEdit = (courseId) => {
+    if (onEdit) onEdit(courseId);
+    // Alternatively navigate to edit page
+    // navigate(`/admin-p/edit-course/${courseId}`);
+  };
+
+  const handleDelete = (courseId) => {
+    if (onDelete) onDelete(courseId);
+  };
 
   return (
     <div className={`bg-white rounded-xl shadow-lg p-6 ${
@@ -59,15 +69,67 @@ const CourseList = ({ onAddNew, isDarkMode }) => {
             isDarkMode ? 'text-gray-300' : 'text-gray-600'
           }`}>
             <tr>
-              <th className="pb-3">Title</th>
-              <th className="pb-3">Category</th>
-              <th className="pb-3">Subject</th>
-              <th className="pb-3">Status</th>
-              <th className="pb-3">Actions</th>
+              <th className="pb-3 px-4 w-1/4">Title</th>
+              <th className="pb-3 px-4 w-1/4 text-center">Class</th>
+              <th className="pb-3 px-4 w-1/4 text-center">Last Updated</th>
+              <th className="pb-3 px-4 w-1/4 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
-            {/* Add table rows here */}
+          <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+            {courses.length > 0 ? (
+              courses.map((course) => (
+                <tr key={course.id} className="hover:bg-gray-50">
+                  <td className="py-3 px-4">
+                    <div className="flex items-center">
+                      {course.thumbnail && (
+                        <img 
+                          src={course.thumbnail} 
+                          alt={course.title}
+                          className="w-10 h-10 mr-3 rounded-md object-cover"
+                        />
+                      )}
+                      <span className="font-medium">{course.title}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                    {course.classLevel || "N/A"}
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                    {course.lastUpdated ? new Date(course.lastUpdated).toLocaleDateString() : "Not specified"}
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                    <button
+                      onClick={() => handleEdit(course.id)}
+                      className={`p-1.5 rounded-md mr-2 ${
+                        isDarkMode 
+                          ? 'text-blue-400 hover:bg-gray-700' 
+                          : 'text-blue-600 hover:bg-blue-50'
+                      }`}
+                      title="Edit course"
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(course.id)}
+                      className={`p-1.5 rounded-md ${
+                        isDarkMode 
+                          ? 'text-red-400 hover:bg-gray-700' 
+                          : 'text-red-600 hover:bg-red-50'
+                      }`}
+                      title="Delete course"
+                    >
+                      <FaTrash />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="4" className="py-6 text-center text-gray-500">
+                  No courses found. Create your first course by clicking "Add New Course".
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
