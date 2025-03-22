@@ -13,7 +13,6 @@ const AdminSettings = () => {
   const [wantToChangePassword, setWantToChangePassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
   
   const handleVerifyCode = (type) => {
     // Validate verification code (simple frontend validation)
@@ -31,7 +30,7 @@ const AdminSettings = () => {
     e.preventDefault();
     
     // Basic validation
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    if (!newPassword || !confirmPassword) {
       toast.error('All fields are required');
       return;
     }
@@ -44,7 +43,6 @@ const AdminSettings = () => {
     try {
       // Here you would make an API call to update the password
       toast.success('Password updated successfully');
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setShowPasswordModal(false);
@@ -326,7 +324,6 @@ const AdminSettings = () => {
                     setShowPasswordModal(false);
                     setVerificationStep(false);
                     setVerificationCode('');
-                    setCurrentPassword('');
                     setNewPassword('');
                     setConfirmPassword('');
                   }}
@@ -369,18 +366,6 @@ const AdminSettings = () => {
                 <form onSubmit={handlePasswordChange} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Current Password
-                    </label>
-                    <input
-                      type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       New Password
                     </label>
                     <input
@@ -388,6 +373,7 @@ const AdminSettings = () => {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter new password"
                     />
                   </div>
                   
@@ -400,6 +386,7 @@ const AdminSettings = () => {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Confirm new password"
                     />
                   </div>
                   
