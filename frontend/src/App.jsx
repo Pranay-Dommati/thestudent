@@ -21,6 +21,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import HelpCenter from './components/HelpCenter/HelpCenter';
 import StandaloneQuizPage from './components/CourseLearningPage/templ/StandaloneQuizPage';
+import AdminForgotPassword from './components/Admin/AdminForgotPassword';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -85,6 +86,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             
             {/* Admin Routes - Updated path */}
+            <Route path="/admin-p/forgot-password" element={<AdminForgotPassword />} />
             <Route path="/admin-p/*" element={<AdminDashboard />} />
             
             {/* Course Routes */}

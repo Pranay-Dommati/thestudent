@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FaEnvelope, FaLock, FaArrowRight } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const AdminLogin = ({ onLoginSuccess }) => {
   const [credentials, setCredentials] = useState({
@@ -56,10 +56,6 @@ const AdminLogin = ({ onLoginSuccess }) => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleForgotPassword = () => {
-    toast.info("Enter any email and password to login");
   };
 
   return (
@@ -129,13 +125,12 @@ const AdminLogin = ({ onLoginSuccess }) => {
           
           <div className="flex items-center justify-between">
             <div className="text-sm">
-              <button 
-                type="button"
-                onClick={handleForgotPassword}
-                className="font-medium text-blue-600 hover:text-blue-500 bg-transparent border-none cursor-pointer"
+              <Link 
+                to="/admin-p/forgot-password"
+                className="font-medium text-blue-600 hover:text-blue-500"
               >
                 Forgot your password?
-              </button>
+              </Link>
             </div>
           </div>
           
