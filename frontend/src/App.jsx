@@ -22,6 +22,7 @@ import { AuthProvider } from './context/AuthContext';
 import HelpCenter from './components/HelpCenter/HelpCenter';
 import StandaloneQuizPage from './components/CourseLearningPage/templ/StandaloneQuizPage';
 import NotFound from './components/NotFound/NotFound';
+import AdminForgotPassword from './components/Admin/AdminForgotPassword';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -42,10 +43,11 @@ const CourseDetailsWrapper = () => {
 const Layout = ({ children }) => {
   const location = useLocation();
   const isChat = location.pathname === '/chat';
+  const isNotFound = location.pathname === '*'; // Add condition for NotFound route
 
   return (
     <>
-      {!isChat && <Navbar />}
+      {!isChat && !isNotFound && <Navbar />}
       <div className="min-h-screen">
         {children}
       </div>
@@ -86,6 +88,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             
             {/* Admin Routes - Updated path */}
+            <Route path="/admin-p/forgot-password" element={<AdminForgotPassword />} />
             <Route path="/admin-p/*" element={<AdminDashboard />} />
             
             {/* Course Routes */}
