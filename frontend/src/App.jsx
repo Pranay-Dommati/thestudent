@@ -85,9 +85,9 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             
-            {/* Admin Routes - Updated path */}
-            <Route path="/admin-p/forgot-password" element={<AdminForgotPassword />} />
+            {/* Admin Routes */}
             <Route path="/admin-p/*" element={<AdminDashboard />} />
+            <Route path="/admin-p/forgot-password" element={<AdminForgotPassword />} />
             
             {/* Course Routes */}
             <Route path="/courses" element={<Courses />}>

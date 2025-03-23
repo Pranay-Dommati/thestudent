@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import BasicInfoStep from './BasicInfoStep';
 import CourseStructureStep from './CourseStructureStep';
+import { createCourse } from '../../../../services/courseApi';
 
 const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   const navigate = useNavigate();
@@ -414,28 +415,51 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       const formData = new FormData();
       
       // Add basic course info
-      formData.append('thumbnail', courseInfo.thumbnail);
+      if (courseInfo.thumbnail) {
+        formData.append('thumbnail', courseInfo.thumbnail);
+      }
       formData.append('title', courseInfo.title);
       formData.append('shortDescription', courseInfo.shortDescription);
-      formData.append('sources', courseInfo.sources);
+      formData.append('description', courseInfo.description);
       formData.append('duration', courseInfo.duration);
       formData.append('proficiency', courseInfo.proficiency);
-      formData.append('certificateGiven', courseInfo.certificateGiven);
-      formData.append('projectBased', courseInfo.projectBased);
-      formData.append('lastUpdated', courseInfo.lastUpdated);
-      formData.append('description', courseInfo.description);
+      formData.append('certificateGiven', courseInfo.certificateGiven ? 'true' : 'false');
+      formData.append('projectBased', courseInfo.projectBased ? 'true' : 'false');
+      formData.append('sources', courseInfo.sources);
       formData.append('learningPoints', JSON.stringify(courseInfo.learningPoints));
       formData.append('requirements', JSON.stringify(courseInfo.requirements));
       
-      // Add sections data
-      formData.append('sections', JSON.stringify(sections));
+      // Make sure sections data is properly formatted
+      const sectionsData = sections.map(section => ({
+        name: section.name,
+        lessons: section.lessons.map(lesson => ({
+          title: lesson.title,
+          type: lesson.type,
+          videoUrl: lesson.videoUrl,
+          description: lesson.description,
+          aboutLesson: lesson.aboutLesson,
+          resources: lesson.hasResources ? lesson.resources : { downloadable: [], internet: [] },
+          quizQuestions: lesson.quizQuestions || []
+        }))
+      }));
       
-      await onSubmit(formData);
-      toast.success('Course created successfully');
+      // Add sections data
+      formData.append('sections', JSON.stringify(sectionsData));
+      
+      console.log('Sending formData:', Object.fromEntries(formData));
+      
+      // Call createCourse API
+      await createCourse(formData);
+      toast.success('Course created successfully!');
       navigate('/admin-p/courses');
     } catch (error) {
       console.error('Error creating course:', error);
-      toast.error('Failed to create course. Please try again.');
+      if (error.response?.data) {
+        console.error('Error response:', error.response.data);
+        toast.error(`Failed to create course: ${JSON.stringify(error.response.data)}`);
+      } else {
+        toast.error('Failed to create course. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
