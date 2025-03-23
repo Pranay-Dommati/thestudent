@@ -21,6 +21,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import HelpCenter from './components/HelpCenter/HelpCenter';
 import StandaloneQuizPage from './components/CourseLearningPage/templ/StandaloneQuizPage';
+import NotFound from './components/NotFound/NotFound';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -132,6 +133,9 @@ function App() {
             <Route path="/courses/11th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/12th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+
+            {/* Add this at the very bottom of your Routes */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
         <FloatingChatButton />
