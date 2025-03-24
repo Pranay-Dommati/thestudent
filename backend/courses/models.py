@@ -52,6 +52,7 @@ class EngineeringCourse(BaseCourse):
     project_based = models.BooleanField(default=False)
     learning_points = models.JSONField(default=list, blank=True)
     requirements = models.JSONField(default=list, blank=True)
+    category = models.CharField(max_length=100, blank=True)
     
     def __str__(self):
         return f"Engineering - {self.title} ({self.proficiency})"

@@ -20,6 +20,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     sources: '',
     duration: '',
     proficiency: 'beginner',
+    category: '', // Add this line
     certificateGiven: false,
     projectBased: false,
     lastUpdated: new Date().toISOString().split('T')[0],
@@ -331,6 +332,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     if (!courseInfo.sources.trim()) newErrors.sources = 'Course sources are required';
     if (!courseInfo.duration.trim()) newErrors.duration = 'Course duration is required';
     if (!courseInfo.description.trim()) newErrors.description = 'Course description is required';
+    if (!courseInfo.category.trim()) newErrors.category = 'Course category is required';
     
     // Validate learning points (at least 2)
     if (courseInfo.learningPoints.length < 2) {
@@ -426,8 +428,10 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       formData.append('certificateGiven', courseInfo.certificateGiven ? 'true' : 'false');
       formData.append('projectBased', courseInfo.projectBased ? 'true' : 'false');
       formData.append('sources', courseInfo.sources);
+      formData.append('category', courseInfo.category);
       formData.append('learningPoints', JSON.stringify(courseInfo.learningPoints));
       formData.append('requirements', JSON.stringify(courseInfo.requirements));
+      
       
       // Make sure sections data is properly formatted
       const sectionsData = sections.map(section => ({
