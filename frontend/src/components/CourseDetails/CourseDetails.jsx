@@ -1,82 +1,121 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { FaPlay, FaClock, FaUserGraduate, FaChartLine, FaCode, FaChevronDown, FaChevronUp, FaGlobe } from 'react-icons/fa';
 import LoadingSpinner from './LoadingSpinner';
 import Footer from '../Footer/Footer';
+import { getEngineeringCourseById } from '../../services/courseApi';
+import { toast } from 'react-hot-toast';
 
-const CourseDetails = ({ courseId }) => {
+// Add this helper function at the top of your file
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  return `Updated ${date.toLocaleString('en-US', { month: 'long', year: 'numeric' })}`;
+};
+
+const CourseDetails = () => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [openSections, setOpenSections] = useState({});
+  const { courseId } = useParams();
   const navigate = useNavigate();
 
   useEffect(() => {
-    setLoading(true);
-    setTimeout(() => {
-      setCourse({
-        id: 1,
-        title: "Master Next.js: From Zero to Production",
-        subtitle: "Build modern, production-ready web applications with Next.js and React",
-        instructor: {
-          name: "Sources:",
-          role: "YouTube",
-          company: "",
-          avatar: "", // We'll use an icon instead of an image
-        },
-        stats: {
-          students: "12,345",
-          rating: 4.8,
-          reviews: 2156,
-          lastUpdated: "December 2024"
-        },
-        keyFeatures: [
-          { icon: <FaUserGraduate />, title: "Beginner to Advanced", text: "No prior experience needed" },
-          { icon: <FaClock />, title: "56 Hours", text: "Self-paced learning" },
-          { icon: <FaChartLine />, title: "Real Projects", text: "Hands-on Projects" },
-          { icon: <FaCode />, title: "Coding Drills", text: "Code along with guided exercises" }
-        ],
-        thumbnail: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800",
-        previewImage: "https://images.unsplash.com/photo-1587620962725-abab7fe55159?w=800",
-        description: "This comprehensive course takes you from the basics of Next.js to deploying production-ready applications. Learn through practical examples and real-world projects.",
-        highlights: [
-          "Master Next.js fundamentals and advanced concepts",
-          "Build scalable and performant applications",
-          "Learn best practices and design patterns",
-          "Deploy applications to production",
-          "Implement authentication and authorization",
-          "Handle API routes and server-side rendering"
-        ],
-        curriculum: [
-          {
-            title: "Getting Started",
-            lectures: [
-              { title: "Introduction to Next.js", duration: "15:00" },
-              { title: "Setting Up Your Environment", duration: "20:00" },
-              { title: "Your First Next.js App", duration: "30:00" }
-            ]
+    const fetchCourseDetails = async () => {
+      setLoading(true);
+      try {
+        const courseData = await getEngineeringCourseById(courseId);
+        
+        // Format the duration to append "hours" if it's not already there
+        const formattedDuration = courseData.duration.toLowerCase().includes('hours') 
+          ? courseData.duration 
+          : `${courseData.duration} hours`;
+
+        setCourse({
+          id: courseData.id,
+          title: courseData.title,
+          subtitle: courseData.short_description || courseData.title,
+          instructor: {
+            name: "Sources:",
+            role: courseData.sources || "YouTube",
+            company: "",
+            avatar: "",
           },
-          {
-            title: "Advanced Topics",
-            lectures: [
-              { title: "Server-side Rendering", duration: "25:00" },
-              { title: "Static Site Generation", duration: "18:00" },
-              { title: "API Routes", duration: "22:00" }
-            ]
-          }
-        ],
-        requirements: [
-          "Basic HTML, CSS, and JavaScript knowledge",
-          "Familiarity with React is recommended",
-          "No prior experience with Next.js required"
-        ]
-      });
-      setLoading(false);
-    }, 800);
+          stats: {
+            students: "0", // Removed as requested
+            rating: 4.8,
+            reviews: 0,
+            lastUpdated: formatDate(courseData.last_updated)
+          },
+          keyFeatures: [
+            { 
+              icon: <FaUserGraduate />, 
+              title: courseData.proficiency || "Beginner to Advanced", 
+              text: "No prior experience needed" 
+            },
+            { 
+              icon: <FaClock />, 
+              title: formattedDuration, 
+              text: "Self-paced learning" 
+            },
+            { 
+              icon: <FaChartLine />, 
+              title: courseData.project_based ? "Project-Based Learning" : "Practical Learning", 
+              text: courseData.project_based ? "Build Real Projects" : "Hands-on Practice"
+            },
+            { 
+              icon: <FaCode />, 
+              title: "Coding Drills", 
+              text: "Code along with guided exercises" 
+            }
+          ],
+          thumbnail: courseData.thumbnail,
+          previewImage: courseData.thumbnail,
+          description: courseData.description,
+          highlights: [
+            "Master fundamental concepts",
+            "Build scalable and performant applications",
+            "Learn best practices",
+            "Apply skills in real-world scenarios"
+          ],
+          // Keep the static curriculum structure for now
+          curriculum: [
+            {
+              title: "Getting Started",
+              lectures: [
+                { title: "Introduction", duration: "15:00" },
+                { title: "Setting Up Your Environment", duration: "20:00" },
+                { title: "First Steps", duration: "30:00" }
+              ]
+            },
+            {
+              title: "Core Concepts",
+              lectures: [
+                { title: "Basic Principles", duration: "25:00" },
+                { title: "Advanced Techniques", duration: "18:00" },
+                { title: "Practical Applications", duration: "22:00" }
+              ]
+            }
+          ],
+          requirements: [
+            "Basic knowledge of the subject",
+            "Willingness to learn",
+            "No prior advanced knowledge required"
+          ]
+        });
+      } catch (error) {
+        console.error('Error fetching course details:', error);
+        toast.error('Failed to load course details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourseDetails();
   }, [courseId]);
 
   const handleStartLearning = () => {
-    navigate(`/courses/engineering/${course.id}/learning`);
+    navigate(`/courses/engineering/${courseId}/learning`);
   };
 
   const toggleSection = (index) => {
@@ -93,7 +132,6 @@ const CourseDetails = ({ courseId }) => {
     <>
       <div className="min-h-screen bg-gray-50">
         {/* Hero Section */}
-        {/* <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-indigo-900 text-white"> */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white">
           <div className="container mx-auto px-4 py-16">
             <div className="grid pt-8 grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -105,26 +143,19 @@ const CourseDetails = ({ courseId }) => {
                 
                 <div className="flex items-center space-x-4 text-sm">
                   <span className="flex items-center">
-                    <FaUserGraduate className="mr-2" />
-                    {course.stats.students} students
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center">
                     <FaClock className="mr-2" />
                     {course.keyFeatures[1].title}
                   </span>
                   <span>•</span>
-                  <span>Updated {course.stats.lastUpdated}</span>
+                  <span>{course.stats.lastUpdated}</span>
                 </div>
 
                 <div className="flex items-center space-x-4">
-                  <div className="text-2xl text-white">
-                    <FaGlobe />
-                  </div>
-                  <div>
-                    <p className="font-medium text-white flex items-center gap-2">
-                      Sources: <span className="text-gray-200">YouTube</span>
-                    </p>
+                  <div className="inline-block bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
+                    <div className="flex items-center space-x-2">
+                      <FaGlobe className="text-lg" />
+                      <span>Sources: {course.instructor.role}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -137,11 +168,15 @@ const CourseDetails = ({ courseId }) => {
                 </button>
               </div>
 
-              <div className="relative">
+              <div className="relative w-full h-[400px]"> {/* Fixed height container */}
                 <img 
                   src={course.previewImage}
-                  alt="Course Preview"
-                  className="rounded-lg shadow-2xl"
+                  alt={course.title}
+                  className="w-full h-full object-cover rounded-lg shadow-2xl"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = '/default-course-thumbnail.jpg'; // Add a default image path
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/50 to-transparent rounded-lg"></div>
               </div>
