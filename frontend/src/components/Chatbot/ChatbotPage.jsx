@@ -63,7 +63,29 @@ const ChatbotPage = () => {
   
   // WARNING: This is not secure for production. API keys should be handled by a backend.
   const GEMINI_API_KEY = "AIzaSyCeEzuEj-HkFd5UcabGy28bULZjnsYy9Ek";
-  
+  const YOUTUBE_API_KEY = "AIzaSyCqhODgwcRcBxQfcCyyno2X4uyhbOaAerk"; // Your YouTube API key
+  const YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search";
+
+  // Category mapping to improve search relevance
+  const CATEGORY_MAP = {
+    "html": "html tutorial beginner",
+    "css": "css tutorial for beginners",
+    "javascript": "javascript fundamentals tutorial",
+    "react": "react js tutorial for beginners",
+    "python": "python programming tutorial",
+    "java": "java programming tutorial",
+    "machine learning": "machine learning tutorial for beginners",
+    "data science": "data science tutorial",
+    "web development": "web development tutorial full stack",
+    "mobile development": "mobile app development tutorial",
+    "database": "database management tutorial",
+    "sql": "sql tutorial for beginners",
+    "git": "git and github tutorial",
+    "devops": "devops tutorial for beginners",
+    "cloud computing": "cloud computing basics tutorial",
+    "cybersecurity": "cybersecurity fundamentals"
+  };
+
   // Scroll to bottom of messages when chat history updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -88,105 +110,305 @@ const ChatbotPage = () => {
     setIsSidebarOpen(width >= 1024);
   }, [width]);
 
-  const callGeminiAPI = async (userMessage) => {
+  // Enhanced YouTube search with category mapping and result quality filtering
+  const getYoutubeResources = async (query, maxResults = 3) => {
     try {
-      // Corrected Gemini API endpoint
-      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      // Check if we have a specific category mapping for this topic
+      let searchQuery = query;
+      const lowerQuery = query.toLowerCase();
       
-      // Format request for Gemini API
-      const requestBody = {
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { 
-                  text: "You are an AI-powered course assistant for The Students Hub. Your goal is to help users find the best free courses, generate structured learning paths, and recommend curated content from YouTube and other free resources. Ensure responses are clear, structured, and focus on guiding learners to relevant topics. Format your responses using markdown with proper headings (# for main headings, ## for subheadings), bullet points (* or -), and other formatting as appropriate. Here's the user's request: " + userMessage
-                }
-              ]
-            }
-          ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1000,
-          topP: 0.8,
-          topK: 40
+      // Use the category map or add "tutorial" to improve search relevance
+      Object.keys(CATEGORY_MAP).forEach(key => {
+        if (lowerQuery.includes(key)) {
+          searchQuery = CATEGORY_MAP[key];
+          return;
         }
-      };
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'API request failed');
+      if (!searchQuery.includes("tutorial") && !searchQuery.includes("course")) {
+        searchQuery += " tutorial";
       }
+      
+      const params = new URLSearchParams({
+        part: "snippet,statistics",
+        q: searchQuery,
+        key: YOUTUBE_API_KEY,
+        maxResults: maxResults * 2, // Fetch more to filter for quality
+        type: "video",
+        videoDefinition: "high",
+        relevanceLanguage: "en",
+        order: "relevance" // Options: relevance, viewCount, rating
+      });
+      
+      const response = await fetch(`${YOUTUBE_SEARCH_URL}?${params}`);
+      if (!response.ok) throw new Error('YouTube API request failed');
       
       const data = await response.json();
       
-      // Extract text from Gemini response
-      if (data.candidates && data.candidates[0]?.content?.parts?.length > 0) {
-        return data.candidates[0].content.parts[0].text;
-      } else {
-        throw new Error('Unexpected response format from Gemini API');
+      if (data.items && data.items.length > 0) {
+        // Sort by relevance (already done by API) and take top results
+        const filteredResults = data.items
+          .filter(video => {
+            // Filter out short videos (less than 5 minutes) and non-educational channels
+            const title = video.snippet.title.toLowerCase();
+            return !title.includes("shorts") && 
+                   !title.includes("tiktok") && 
+                   !title.includes("trailer");
+          })
+          .slice(0, maxResults);
+        
+        return filteredResults.map(video => ({
+          title: video.snippet.title,
+          url: `https://www.youtube.com/watch?v=${video.id.videoId}`,
+          thumbnail: video.snippet.thumbnails.default.url,
+          channelTitle: video.snippet.channelTitle
+        }));
       }
+      return [];
     } catch (error) {
-      console.error('Error calling Gemini API:', error);
-      setApiError(error.message);
-      return "Sorry, I encountered an error while processing your request. Please try again later.";
+      console.error('Error fetching YouTube resources:', error);
+      return [];
     }
   };
 
-  // Update handleSendMessage to accept a parameter
+  // Get official documentation links based on topic
+  const getOfficialDocs = (topic) => {
+    const docsMap = {
+      "html": "https://developer.mozilla.org/en-US/docs/Web/HTML",
+      "css": "https://developer.mozilla.org/en-US/docs/Web/CSS",
+      "javascript": "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
+      "react": "https://react.dev/learn",
+      "python": "https://docs.python.org/3/tutorial/",
+      "java": "https://docs.oracle.com/javase/tutorial/",
+      "machine learning": "https://scikit-learn.org/stable/tutorial/",
+      "data science": "https://pandas.pydata.org/docs/user_guide/index.html",
+      "node.js": "https://nodejs.org/en/docs/",
+      "sql": "https://www.w3schools.com/sql/",
+      "git": "https://git-scm.com/doc",
+    };
+
+    const lowerTopic = topic.toLowerCase();
+    for (const [key, url] of Object.entries(docsMap)) {
+      if (lowerTopic.includes(key)) {
+        return { name: `${key.charAt(0).toUpperCase() + key.slice(1)} Documentation`, url };
+      }
+    }
+    return null;
+  };
+
+  // Replace the existing getYouTubeResources function with this optimized version
+const getYouTubeResources = async (topic, maxResults = 1) => {
+  // Use a cache to avoid repeated API calls for the same topics
+  if (!window.youtubeCache) window.youtubeCache = {};
+  if (window.youtubeCache[topic]) return window.youtubeCache[topic];
+
+  const category = CATEGORY_MAP[topic.toLowerCase()] || topic;
+  const params = new URLSearchParams({
+    part: "snippet", // Remove statistics as it's not returned in search results
+    q: category,
+    key: YOUTUBE_API_KEY,
+    maxResults: maxResults * 2,
+    type: "video",
+    videoDefinition: "high",
+    relevanceLanguage: "en",
+    order: "viewCount",
+  });
+
+  try {
+    const response = await fetch(`${YOUTUBE_SEARCH_URL}?${params}`);
+    const data = await response.json();
+    
+    if (data.items && data.items.length > 0) {
+      // Filter videos
+      const filteredVideos = data.items.filter((video) => {
+        const title = video.snippet.title.toLowerCase();
+        return (
+          !title.includes("shorts") &&
+          !title.includes("tiktok") &&
+          !title.includes("trailer")
+        );
+      });
+
+      // Format as markdown link string for direct use in prompts
+      if (filteredVideos.length > 0) {
+        const result = filteredVideos.slice(0, maxResults).map(video => 
+          `[${video.snippet.title}](https://www.youtube.com/watch?v=${video.id.videoId})`
+        ).join(", ");
+        
+        // Cache the result
+        window.youtubeCache[topic] = result;
+        return result;
+      }
+    }
+    return "No relevant videos found";
+  } catch (error) {
+    console.error("YouTube API Error:", error);
+    return "Error fetching videos";
+  }
+};
+
+  const getOpenSourceCourses = async (topic) => {
+    const coursesMap = {
+      "machine learning": [
+        { name: "MIT OpenCourseWare - Machine Learning", url: "https://ocw.mit.edu/courses/machine-learning/" },
+        { name: "Fast.ai - Practical Deep Learning", url: "https://course.fast.ai/" },
+      ],
+      "data science": [
+        { name: "Kaggle - Data Science Courses", url: "https://www.kaggle.com/learn" },
+        { name: "Harvard - Data Science Online", url: "https://cs50.harvard.edu/x/" },
+      ],
+      "web development": [
+        { name: "freeCodeCamp - Full Stack Development", url: "https://www.freecodecamp.org/" },
+        { name: "The Odin Project", url: "https://www.theodinproject.com/" },
+      ],
+    };
+
+    return coursesMap[topic.toLowerCase()] || [];
+  };
+
+  const callGeminiAPI = async (userMessage) => {
+    try {
+      const prompt = `
+      You are an AI-powered learning assistant.
+      Your job is to provide **structured** learning paths for students.
+  
+      When asked about a topic (e.g., '${userMessage}'), format the response with **clear step-by-step sections**:
+      - Use **Markdown** for structuring responses (# for headings, bullet points for lists).
+      - Break topics into **progressive steps** (Beginner → Intermediate → Advanced).
+      - Select one **most viewed or highly rated** video per step from different top channels.
+      - Provide **official documentation links** alongside videos.
+      - Ensure responses remain **concise, structured, and easy to follow**.
+  
+      Example:
+      **# ${userMessage}**
+      **## Step 1: HTML Basics**
+      - Introduction to HTML
+      - Structure of an HTML document
+      🔗 ${await getYouTubeResources("HTML")}
+      📖 [MDN HTML Docs](https://developer.mozilla.org/en-US/docs/Web/HTML)
+  
+      **## Step 2: CSS Fundamentals**
+      - Styling basics, selectors, and layouts
+      🔗 ${await getYouTubeResources("CSS")}
+      📖 [MDN CSS Docs](https://developer.mozilla.org/en-US/docs/Web/CSS)
+  
+      **## Step 3: JavaScript Essentials**
+      - Variables, functions, and DOM manipulation
+      🔗 ${await getYouTubeResources("JavaScript")}
+      📖 [MDN JavaScript Docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+  
+      **## Step 4: Advanced Web Development**
+      - React and Node.js introduction
+      🔗 ${await getYouTubeResources("React")}, ${await getYouTubeResources("Node.js")}
+      📖 [React Docs](https://react.dev/), [Node.js Docs](https://nodejs.org/en/docs/)
+      `;
+  
+      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const requestBody = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1200,
+          topP: 0.8,
+          topK: 40,
+        },
+      };
+  
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || "API request failed");
+      }
+  
+      const data = await response.json();
+      if (data.candidates && data.candidates[0]?.content?.parts?.length > 0) {
+        return data.candidates[0].content.parts[0].text;
+      } else {
+        throw new Error("Unexpected response format from Gemini API");
+      }
+    } catch (error) {
+      console.error("Error generating learning path:", error);
+      return "Sorry, I couldn't generate the learning path at this moment.";
+    }
+  };
+
+  // Enhanced message handler with better resource integration
   const handleSendMessage = async (customMessage = null) => {
     const messageToSend = customMessage || message;
     if (!messageToSend.trim() || isLoading) return;
-    
-    // Add user message
+
     const userMessageObj = {
       id: chatHistory.length + 1,
       type: "user",
       content: messageToSend,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
-    
-    setChatHistory(prev => [...prev, userMessageObj]);
-    if (!customMessage) setMessage(""); // Only clear the input if it's not a programmatic message
+
+    setChatHistory((prev) => [...prev, userMessageObj]);
+    if (!customMessage) setMessage("");
     setIsLoading(true);
-    setApiError(null); // Reset any previous API errors
-    
+
     try {
-      // Call Gemini API
-      const botResponseContent = await callGeminiAPI(messageToSend);
-      
-      // Add bot response
+      const response = await callGeminiAPI(messageToSend);
+
       const botResponse = {
         id: chatHistory.length + 2,
         type: "bot",
-        content: botResponseContent,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        content: response,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      
-      setChatHistory(prev => [...prev, botResponse]);
+
+      setChatHistory((prev) => [...prev, botResponse]);
     } catch (error) {
       console.error("Error in chat:", error);
-      // Add error message
       const errorResponse = {
         id: chatHistory.length + 2,
         type: "bot",
         content: "Sorry, I encountered an error. Please try again.",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isError: true
+        isError: true,
       };
-      setChatHistory(prev => [...prev, errorResponse]);
+      setChatHistory((prev) => [...prev, errorResponse]);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Scroll to bottom of messages when chat history updates
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory]);
+
+  // Handle initial query from URL parameter
+  useEffect(() => {
+    if (initialQuery && !initialQueryProcessed.current) {
+      initialQueryProcessed.current = true;
+      setMessage(initialQuery);
+      // Use setTimeout to ensure the UI renders before processing
+      setTimeout(() => {
+        handleSendMessage(initialQuery);
+      }, 100);
+      
+      // Remove the query parameter from URL for cleaner navigation
+      navigate('/chat', { replace: true });
+    }
+  }, [initialQuery, navigate]);
+
+  useEffect(() => {
+    setIsSidebarOpen(width >= 1024);
+  }, [width]);
 
   const suggestionTopics = [
     "Course recommendations",
@@ -221,8 +443,13 @@ const ChatbotPage = () => {
   return (
     <div className="h-screen flex overflow-hidden">
       {/* Sidebar - keep existing styles but add h-screen */}
-      <div className={`h-screen flex-shrink-0 ${isSidebarOpen ? 'w-80' : 'w-0'} 
-        transition-all duration-300 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}>
+      <div
+
+  className={`h-screen flex-shrink-0 ${
+    isSidebarOpen ? 'w-80' : 'w-0'
+  } transition-all duration-300 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}
+>
+
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="font-semibold text-gray-800 flex items-center">
             <FaHistory className="mr-2" />
