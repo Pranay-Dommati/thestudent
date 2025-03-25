@@ -49,3 +49,21 @@ export const getCourses = async () => {
     throw error;
   }
 };
+
+export const getEngineeringCourses = async (category = 'all') => {
+  try {
+    console.log('Fetching courses for category:', category);
+    const response = await axios.get(`${API_URL}/api/courses/engineering/?category=${category}`);
+    console.log('Course data received:', response.data);
+    
+    // Log thumbnail URLs for debugging
+    response.data.forEach(course => {
+      console.log('Course thumbnail URL:', course.thumbnail);
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching courses:', error);
+    throw error;
+  }
+};

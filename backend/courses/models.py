@@ -45,14 +45,14 @@ class EngineeringCourse(BaseCourse):
         ('advanced', 'Advanced'),
     )
     
-    subject = models.CharField(max_length=100, blank=True)  # Make blank=True
-    sources = models.CharField(max_length=255, blank=True)  # Already set
+    subject = models.CharField(max_length=100, blank=True, null=True)
+    sources = models.CharField(max_length=255, blank=True, null=True)
     proficiency = models.CharField(max_length=20, choices=PROFICIENCY_CHOICES, default='beginner')
     certificate_given = models.BooleanField(default=False)
     project_based = models.BooleanField(default=False)
-    learning_points = models.JSONField(default=list, blank=True)
-    requirements = models.JSONField(default=list, blank=True)
-    category = models.CharField(max_length=100, blank=True)
+    learning_points = models.JSONField(default=list, blank=True, null=True)
+    requirements = models.JSONField(default=list, blank=True, null=True)
+    category = models.CharField(max_length=100, blank=True, null=True)
     
     def __str__(self):
         return f"Engineering - {self.title} ({self.proficiency})"

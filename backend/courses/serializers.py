@@ -60,5 +60,5 @@ class EngineeringCourseWithSectionsSerializer(serializers.ModelSerializer):
             'id', 'title', 'subject', 'short_description', 'description',
             'thumbnail', 'duration', 'sources', 'proficiency', 'certificate_given',
             'project_based', 'last_updated', 'learning_points', 'requirements',
-            'is_published', 'sections'
+            'is_published', 'sections', 'category'  # Added category field
         ]

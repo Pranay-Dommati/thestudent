@@ -7,6 +7,8 @@ from rest_framework.permissions import AllowAny
 from .models import SchoolCourse, EngineeringCourse
 from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer
 import json
+from django.conf import settings
+import os
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
@@ -205,4 +207,49 @@ def create_course(request):
         return Response(
             {'error': str(e)}, 
             status=status.HTTP_400_BAD_REQUEST
+        )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_engineering_courses(request):
+    try:
+        category = request.query_params.get('category', 'all')
+        print(f"Requested category: {category}")
+        
+        queryset = EngineeringCourse.objects.all()
+        print(f"Total courses before filtering: {queryset.count()}")
+        
+        if category != 'all' and category != '':
+            queryset = queryset.filter(category=category)
+            print(f"Courses after category filter: {queryset.count()}")
+
+        # Process course data
+        courses_data = []
+        for course in queryset:
+            course_data = {
+                'id': str(course.id),
+                'title': course.title,
+                'thumbnail': request.build_absolute_uri(course.thumbnail.url) if course.thumbnail else None,
+                'short_description': course.short_description,
+                'description': course.description,
+                'duration': course.duration,
+                'sources': course.sources,
+                'proficiency': course.proficiency,
+                'certificate_given': course.certificate_given,
+                'project_based': course.project_based,
+                'category': course.category,
+                'last_updated': course.last_updated,
+            }
+            courses_data.append(course_data)
+
+        print(f"Successfully processed {len(courses_data)} courses")
+        return Response(courses_data)
+        
+    except Exception as e:
+        print(f"Error in list_engineering_courses: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": "Internal server error", "details": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
