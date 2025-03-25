@@ -31,6 +31,23 @@ const CourseDetails = () => {
           ? courseData.duration 
           : `${courseData.duration} hours`;
 
+        // Fix the image URL construction
+        let imageUrl;
+        if (courseData.thumbnail?.startsWith('http')) {
+          // If it's already a full URL, use it as is
+          imageUrl = courseData.thumbnail;
+        } else if (courseData.thumbnail) {
+          // If it's a relative path, construct the full URL
+          // Make sure we don't have double slashes between API_URL and the path
+          const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+          imageUrl = baseUrl + (courseData.thumbnail.startsWith('/') ? courseData.thumbnail : `/${courseData.thumbnail}`);
+        } else {
+          // Fallback if no thumbnail is provided
+          imageUrl = '/default-course-thumbnail.jpg';
+        }
+
+        console.log("Using image URL:", imageUrl); // Debug the final URL
+
         setCourse({
           id: courseData.id,
           title: courseData.title,
@@ -69,12 +86,8 @@ const CourseDetails = () => {
               text: "Code along with guided exercises" 
             }
           ],
-          thumbnail: courseData.thumbnail.startsWith('http') 
-            ? courseData.thumbnail 
-            : `${import.meta.env.VITE_API_URL}${courseData.thumbnail}`,
-          previewImage: courseData.thumbnail.startsWith('http') 
-            ? courseData.thumbnail 
-            : `${import.meta.env.VITE_API_URL}${courseData.thumbnail}`,
+          thumbnail: imageUrl,
+          previewImage: imageUrl,
           description: courseData.description,
           highlights: courseData.learning_points || [],
           curriculum: courseData.sections.map(section => ({
