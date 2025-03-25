@@ -23,6 +23,7 @@ import HelpCenter from './components/HelpCenter/HelpCenter';
 import StandaloneQuizPage from './components/CourseLearningPage/templ/StandaloneQuizPage';
 import NotFound from './components/NotFound/NotFound';
 import AdminForgotPassword from './components/Admin/AdminForgotPassword';
+import Mentoring from './pages/Mentoring/Mentoring';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -137,7 +138,10 @@ function App() {
             <Route path="/courses/12th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
 
-            {/* Add this at the very bottom of your Routes */}
+            {/* Mentoring Route - Move this before the catch-all route */}
+            <Route path="/mentoring" element={<Mentoring />} />
+            
+            {/* Catch-all route should always be last */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>

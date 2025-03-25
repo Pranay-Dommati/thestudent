@@ -9,7 +9,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const moreDropdownRef = useRef(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -30,11 +32,15 @@ const Navbar = ({ initialStyle = "transparent" }) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsProfileDropdownOpen(false);
       }
+      if (moreDropdownRef.current && !moreDropdownRef.current.contains(event.target)) {
+        setIsMoreDropdownOpen(false);
+      }
     };
 
     const handleEscapeKey = (event) => {
       if (event.key === 'Escape') {
         setIsProfileDropdownOpen(false);
+        setIsMoreDropdownOpen(false);
       }
     };
 
@@ -87,6 +93,44 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <a href="/courses" className={`font-medium transition-colors ${textColor}`}>Courses</a>
               <a href="/chat" className={`font-medium transition-colors ${textColor}`}>AI Chatbot</a>
               <a href="/learning-hub" className={`font-medium transition-colors ${textColor}`}>Learning Hub</a>
+              
+              {/* More dropdown */}
+              <div className="relative" ref={moreDropdownRef}>
+                <button 
+                  onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
+                  className={`font-medium transition-colors ${textColor} flex items-center`}
+                >
+                  More
+                  <svg 
+                    className={`ml-1 w-4 h-4 transition-transform ${isMoreDropdownOpen ? 'rotate-180' : ''}`}
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown menu */}
+                {isMoreDropdownOpen && (
+                  <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 py-2 z-50">
+                    <a 
+                      href="/mentoring" 
+                      className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100"
+                    >
+                      <svg 
+                        className="w-4 h-4 mr-2" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      Mentoring
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
@@ -179,6 +223,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 <a href="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                   Learning Hub
                 </a>
+                <a href="/mentoring" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                  Mentoring
+                </a>
                 <Link to="/settings" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                   Settings
                 </Link>
@@ -196,6 +243,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 <a href="/courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Courses</a>
                 <a href="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">AI Chatbot</a>
                 <a href="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Learning Hub</a>
+                <a href="/mentoring" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                  Mentoring
+                </a>
                 <div className="mt-4 flex flex-col space-y-2 px-4">
                   <a href="/auth?mode=login" className="px-4 py-2 rounded-full text-blue-600 border border-blue-600 font-medium text-center">
                     Log In
