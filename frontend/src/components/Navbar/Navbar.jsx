@@ -87,6 +87,19 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <a href="/courses" className={`font-medium transition-colors ${textColor}`}>Courses</a>
               <a href="/chat" className={`font-medium transition-colors ${textColor}`}>AI Chatbot</a>
               <a href="/learning-hub" className={`font-medium transition-colors ${textColor}`}>Learning Hub</a>
+              <div className="relative group">
+                <button className={`font-medium transition-colors ${textColor} focus:outline-none flex items-center`}>
+                  More
+                  <svg className="ml-1 w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <div className="absolute hidden group-hover:block mt-2 bg-white shadow-lg rounded-lg py-2 w-40">
+                  <Link to="/mentoring" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                    Mentoring
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
           
