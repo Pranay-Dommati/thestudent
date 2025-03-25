@@ -23,6 +23,7 @@ import HelpCenter from './components/HelpCenter/HelpCenter';
 import StandaloneQuizPage from './components/CourseLearningPage/templ/StandaloneQuizPage';
 import NotFound from './components/NotFound/NotFound';
 import AdminForgotPassword from './components/Admin/AdminForgotPassword';
+import MentoringPage from './components/Mentoring/MentoringPage';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -43,11 +44,12 @@ const CourseDetailsWrapper = () => {
 const Layout = ({ children }) => {
   const location = useLocation();
   const isChat = location.pathname === '/chat';
-  const isNotFound = location.pathname === '*'; // Add condition for NotFound route
+  const isNotFound = location.pathname === '*';
+  const isMentoring = location.pathname === '/mentoring';
 
   return (
     <>
-      {!isChat && !isNotFound && <Navbar />}
+      {!isChat && !isNotFound && !isMentoring && <Navbar />}
       <div className="min-h-screen">
         {children}
       </div>
@@ -139,6 +141,7 @@ function App() {
 
             {/* Add this at the very bottom of your Routes */}
             <Route path="*" element={<NotFound />} />
+            <Route path="/mentoring" element={<MentoringPage />} />
           </Routes>
         </Layout>
         <FloatingChatButton />
