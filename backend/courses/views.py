@@ -259,24 +259,8 @@ def list_engineering_courses(request):
 def get_engineering_course_by_id(request, course_id):
     try:
         course = EngineeringCourse.objects.get(id=course_id)
-        
-        # Process course data
-        course_data = {
-            'id': str(course.id),
-            'title': course.title,
-            'thumbnail': request.build_absolute_uri(course.thumbnail.url) if course.thumbnail else None,
-            'short_description': course.short_description,
-            'description': course.description,
-            'duration': course.duration,
-            'sources': course.sources,
-            'proficiency': course.proficiency,
-            'certificate_given': course.certificate_given,
-            'project_based': course.project_based,
-            'category': course.category,
-            'last_updated': course.last_updated,
-        }
-        
-        return Response(course_data)
+        serializer = EngineeringCourseWithSectionsSerializer(course)
+        return Response(serializer.data)
     except EngineeringCourse.DoesNotExist:
         return Response(
             {"error": "Course not found"}, 

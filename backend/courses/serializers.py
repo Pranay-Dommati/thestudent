@@ -57,8 +57,9 @@ class EngineeringCourseWithSectionsSerializer(serializers.ModelSerializer):
     class Meta:
         model = EngineeringCourse
         fields = [
-            'id', 'title', 'subject', 'short_description', 'description',
-            'thumbnail', 'duration', 'sources', 'proficiency', 'certificate_given',
-            'project_based', 'last_updated', 'learning_points', 'requirements',
-            'is_published', 'sections', 'category'  # Added category field
+            'id', 'title', 'short_description', 'description',
+            'thumbnail', 'duration', 'sources', 'proficiency', 
+            'certificate_given', 'project_based', 'learning_points', 
+            'requirements', 'category', 'last_updated', 'is_published', 
+            'sections'
         ]

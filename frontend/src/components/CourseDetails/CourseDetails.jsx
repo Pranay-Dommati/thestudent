@@ -69,39 +69,22 @@ const CourseDetails = () => {
               text: "Code along with guided exercises" 
             }
           ],
-          thumbnail: courseData.thumbnail,
-          previewImage: courseData.thumbnail,
+          thumbnail: courseData.thumbnail.startsWith('http') 
+            ? courseData.thumbnail 
+            : `${import.meta.env.VITE_API_URL}${courseData.thumbnail}`,
+          previewImage: courseData.thumbnail.startsWith('http') 
+            ? courseData.thumbnail 
+            : `${import.meta.env.VITE_API_URL}${courseData.thumbnail}`,
           description: courseData.description,
-          highlights: [
-            "Master fundamental concepts",
-            "Build scalable and performant applications",
-            "Learn best practices",
-            "Apply skills in real-world scenarios"
-          ],
-          // Keep the static curriculum structure for now
-          curriculum: [
-            {
-              title: "Getting Started",
-              lectures: [
-                { title: "Introduction", duration: "15:00" },
-                { title: "Setting Up Your Environment", duration: "20:00" },
-                { title: "First Steps", duration: "30:00" }
-              ]
-            },
-            {
-              title: "Core Concepts",
-              lectures: [
-                { title: "Basic Principles", duration: "25:00" },
-                { title: "Advanced Techniques", duration: "18:00" },
-                { title: "Practical Applications", duration: "22:00" }
-              ]
-            }
-          ],
-          requirements: [
-            "Basic knowledge of the subject",
-            "Willingness to learn",
-            "No prior advanced knowledge required"
-          ]
+          highlights: courseData.learning_points || [],
+          curriculum: courseData.sections.map(section => ({
+            title: section.name,
+            lectures: section.lessons.map(lesson => ({
+              title: lesson.title,
+              duration: "" // Empty string since we're not showing duration
+            }))
+          })),
+          requirements: courseData.requirements || []
         });
       } catch (error) {
         console.error('Error fetching course details:', error);
@@ -218,6 +201,7 @@ const CourseDetails = () => {
 
               <div>
                 <h2 className="text-2xl font-bold mb-6">Course Curriculum</h2>
+                {/* Course Curriculum */}
                 <div className="bg-white rounded-lg shadow-lg overflow-hidden">
                   {course.curriculum.map((section, index) => (
                     <div key={index} className="border-b border-gray-100 last:border-b-0">
@@ -236,10 +220,7 @@ const CourseDetails = () => {
                           <div className="text-left">
                             <h3 className="font-semibold text-lg text-gray-800">{section.title}</h3>
                             <p className="text-sm text-gray-500 mt-1">
-                              {section.lectures.length} lectures • {section.lectures.reduce((acc, curr) => {
-                                const [mins] = curr.duration.split(':');
-                                return acc + parseInt(mins);
-                              }, 0)} min
+                              {section.lectures.length} lectures
                             </p>
                           </div>
                         </div>
@@ -258,7 +239,6 @@ const CourseDetails = () => {
                                 </span>
                                 <span className="text-gray-700">{lecture.title}</span>
                               </div>
-                              <span className="text-sm text-gray-500">{lecture.duration}</span>
                             </div>
                           ))}
                         </div>
