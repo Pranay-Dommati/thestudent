@@ -268,18 +268,6 @@ const CourseDetails = () => {
             <div className="lg:col-span-1">
               <div className="bg-white rounded-xl shadow-lg p-6 sticky top-6">
                 <div className="space-y-6">
-                  {/* Rating Section */}
-                  <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-2xl font-bold text-blue-600">{course.stats.rating}</span>
-                      <div className="flex text-yellow-400">
-                        {'★'.repeat(Math.floor(course.stats.rating))}
-                        {'☆'.repeat(5 - Math.floor(course.stats.rating))}
-                      </div>
-                    </div>
-                    <span className="text-gray-500">({course.stats.reviews} reviews)</span>
-                  </div>
-
                   {/* Features List */}
                   <div className="space-y-4">
                     <div className="flex items-center space-x-3 text-gray-700">
@@ -294,11 +282,11 @@ const CourseDetails = () => {
 
                   {/* Enrollment Button */}
                   <button 
-  onClick={handleStartLearning}
-  className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02]"
->
-  Enroll Now - Free
-</button>
+                    onClick={handleStartLearning}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02]"
+                  >
+                    Enroll Now - Free
+                  </button>
                 </div>
               </div>
             </div>
