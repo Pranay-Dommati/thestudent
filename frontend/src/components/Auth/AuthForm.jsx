@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaGoogle, FaFacebook, FaGraduationCap, FaRegUser, FaRegEnvelope, FaLock } from "react-icons/fa";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { toast } from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 import AuthNav from './AuthNav';
 import AuthFooter from './AuthFooter';
-import { useAuth } from '../../context/AuthContext';
 
 export default function AuthForm() {
   const location = useLocation();
@@ -32,6 +33,7 @@ export default function AuthForm() {
     password: '',
   });
   const [formErrors, setFormErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const toggleForm = () => {
     const newMode = !isSignUp;
@@ -49,21 +51,47 @@ export default function AuthForm() {
     });
   };
 
-  const { login } = useAuth();
+  const { register, login } = useAuth();
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const validateForm = () => {
     const errors = {};
     
     if (!formData.email) errors.email = "Email is required";
     if (!formData.password) errors.password = "Password is required";
+    if (isSignUp && !formData.name) errors.name = "Name is required";
+    if (formData.password && formData.password.length < 6) {
+      errors.password = "Password must be at least 6 characters";
+    }
     
-    setFormErrors(errors);
-    
-    if (Object.keys(errors).length === 0) {
-      // Simple login - just check if fields are filled
-      login();
-      navigate('/');
+    return errors;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const errors = validateForm();
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      let success;
+      if (isSignUp) {
+        success = await register(formData.name, formData.email, formData.password);
+      } else {
+        success = await login(formData.email, formData.password);
+      }
+
+      if (success) {
+        navigate('/');
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -238,11 +266,22 @@ export default function AuthForm() {
                   
                   <motion.button 
                     type="submit"
+                    disabled={isLoading}
                     className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-800"
                     whileHover={{ boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" }}
                     whileTap={{ y: 2 }}
                   >
-                    {isSignUp ? 'Create Account' : 'Login'}
+                    {isLoading ? (
+                      <span className="flex items-center justify-center">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Processing...
+                      </span>
+                    ) : (
+                      isSignUp ? "Create Account" : "Login"
+                    )}
                   </motion.button>
                 </form>
 

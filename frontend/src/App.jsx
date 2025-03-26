@@ -27,7 +27,7 @@ import MentoringPage from './components/Mentoring/MentoringPage';
 import ConnectMentors from './components/Mentoring/ConnectMentors';
 import SeniorsAlumniPage from './components/Mentoring/SeniorsAlumniPage';
 import MentorInsights from './components/Mentoring/MentorInsights';
-
+import './utils/axios';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
