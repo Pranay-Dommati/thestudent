@@ -111,36 +111,45 @@ export const callGeminiAPI = async (userMessage) => {
     const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
     const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-    const prompt = `
-You are an AI that creates **structured learning paths** for students.  
-**Rules:**  
-- Divide topics into **Beginner → Intermediate → Advanced** sections.  
-- Each section must include:  
-  1. 📌 *Goal*  
-  2. 🎥 **YouTube Video**  
-  3. 📖 **Documentation**  
-  4. 🔹 *Mini-task*  
-- End with a **real-world project**.  
+    const prompt = `Create a structured learning path based on the input: ${userMessage}
 
-**Example Output:**
-
-# 🚀 *Structured Web Development Learning Path*  
-✅ *Goal*: Learn step by step with curated resources, mini-projects, and real-world applications.  
-
-## *1️⃣ HTML & CSS - Foundations*  
-📌 *Goal*: Learn HTML structure, semantic elements, and CSS styling.  
-
-### *1.1 HTML Basics*  
-- 📖 [MDN HTML Docs](https://developer.mozilla.org/en-US/docs/Web/HTML)  
-- 🎥 [Traversy Media - HTML Crash Course](https://www.youtube.com/watch?v=UB1O30fR-EE)  
-🔹 *Mini-task*: Create a simple webpage with headings, paragraphs, and lists.  
-
-### *1.2 CSS Fundamentals*  
-- 📖 [MDN CSS Docs](https://developer.mozilla.org/en-US/docs/Web/CSS)  
-- 🎥 [CSS Crash Course](https://www.youtube.com/watch?v=yfoY53QXEnI)  
-🔹 *Mini-task*: Style an HTML page using colors, fonts, and margins.  
-
-## Now, generate a structured learning path for: **${userMessage}**`;
+    Rules:
+    - Organize content into main sections based on the input (e.g., 1. HTML and CSS, 2. JavaScript, etc.)
+    - Each section should be a numbered title (e.g., 1. HTML and CSS, 2. JavaScript, 3. Frameworks)
+    - Each subsection must be numbered as well (e.g., 1.1, 1.2, 1.3, etc.)
+    - Each subsection must include one YouTube video link only, no description
+    - Format the response in Markdown with clear headers and bullet points.
+    
+    Example Output:
+    # 1. HTML and CSS
+    
+    ## 1.1 Basic HTML
+    - [HTML Basics](https://www.youtube.com/watch?v=UB1O30fR-EE)
+    
+    ## 1.2 Forms and Inputs
+    - [HTML Forms Tutorial](https://www.youtube.com/watch?v=9YffrCViTVk)
+    
+    ## 1.3 CSS Fundamentals
+    - [CSS Basics](https://www.youtube.com/watch?v=yfoY53QXEnI)
+    
+    # 2. JavaScript
+    
+    ## 2.1 JavaScript Fundamentals
+    - [JavaScript Basics](https://www.youtube.com/watch?v=W6NZfCO5SIk)
+    
+    ## 2.2 DOM Manipulation
+    - [Understanding DOM](https://www.youtube.com/watch?v=0ik6X4DJKCc)
+    
+    ## 2.3 Asynchronous JavaScript
+    - [Understanding Async JS](https://www.youtube.com/watch?v=Y8xWpAX7dGk)
+    
+    # 3. Frameworks
+    
+    ## 3.1 Introduction to React
+    - [React Basics](https://www.youtube.com/watch?v=Ke90Tje7VS0)
+    
+    ## 3.2 State Management
+    - [React State & Props](https://www.youtube.com/watch?v=Oioo0IdoEls)`;
 
     const requestBody = {
       contents: [{ parts: [{ text: prompt }] }],
@@ -165,12 +174,9 @@ You are an AI that creates **structured learning paths** for students.
     if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
 
     const data = await response.json();
-
-    // Log the raw AI response to the terminal
     const responseText = data.candidates[0]?.content?.parts?.[0]?.text;
-    console.log("Raw AI Response:", responseText);
 
-    // Return the raw response for now
+    console.log("Raw AI Response:", responseText);
     return responseText;
   } catch (error) {
     console.error("Error generating learning path with Gemini:", error);
