@@ -27,6 +27,7 @@ import MentoringHome from './components/Mentoring/HomePage/MentoringHome';
 import IndustryExperts from './components/Mentoring/IndustryExperts/IndustryExperts';
 import AlumniMentorship from './components/Mentoring/AlumniMentorship/AlumniMentorship';
 import CollegeSeniors from './components/Mentoring/CollegeSeniors/CollegeSeniors';
+import MentoringNavbar from './components/Mentoring/MentoringNavbar';
 import './utils/axios';
 
 const CourseDetailsWrapper = () => {
@@ -47,13 +48,14 @@ const CourseDetailsWrapper = () => {
 
 const Layout = ({ children }) => {
   const location = useLocation();
-  const isChat = location.pathname === '/chat';
-  const isNotFound = location.pathname === '*';
-  const isMentoring = ['/mentoring'].includes(location.pathname);
+
+  // Check if the current route is related to mentoring
+  const isMentoring = location.pathname.startsWith('/mentoring');
 
   return (
     <>
-      {!isChat && !isNotFound && !isMentoring && <Navbar />}
+      {/* Render MentoringNavbar for mentoring pages, otherwise render Navbar */}
+      {isMentoring ? <MentoringNavbar /> : <Navbar />}
       <div className="min-h-screen">
         {children}
       </div>

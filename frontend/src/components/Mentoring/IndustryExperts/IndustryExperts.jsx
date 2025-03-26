@@ -1,7 +1,7 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import MentoringNavbar from "../MentoringNavbar";
 import Footer from "../../Footer/Footer";
-import { FaStar, FaSearch, FaFilter, FaBriefcase, FaGraduationCap, FaLinkedin } from "react-icons/fa";
+import { FaStar, FaSearch, FaBriefcase, FaLinkedin } from "react-icons/fa";
 
 const industryExperts = [
   {
@@ -13,10 +13,10 @@ const industryExperts = [
     expertise: ["Web Development", "System Design", "Cloud Architecture"],
     rating: 4.9,
     totalReviews: 124,
-    price: 20,
+    price: 50,
     availability: "Available this week",
-    image: "/john.jpg",
-    linkedIn: "https://linkedin.com/in/johndoe"
+    image: "https://randomuser.me/api/portraits/men/1.jpg",
+    linkedIn: "https://linkedin.com/in/johndoe",
   },
   {
     id: 2,
@@ -27,10 +27,10 @@ const industryExperts = [
     expertise: ["Machine Learning", "Data Analytics", "Python"],
     rating: 4.8,
     totalReviews: 98,
-    price: 18,
-    availability: "Next week availability",
-    image: "/emma.jpg",
-    linkedIn: "https://linkedin.com/in/emmawatson"
+    price: 40,
+    availability: "Available next week",
+    image: "https://randomuser.me/api/portraits/women/2.jpg",
+    linkedIn: "https://linkedin.com/in/emmawatson",
   },
   // Add more mentors here
 ];
@@ -39,9 +39,10 @@ const IndustryExperts = () => {
   const [search, setSearch] = useState("");
   const [selectedExpertise, setSelectedExpertise] = useState("All");
 
-  const filteredMentors = industryExperts.filter((mentor) =>
-    mentor.name.toLowerCase().includes(search.toLowerCase()) &&
-    (selectedExpertise === "All" || mentor.expertise.includes(selectedExpertise))
+  const filteredMentors = industryExperts.filter(
+    (mentor) =>
+      mentor.name.toLowerCase().includes(search.toLowerCase()) &&
+      (selectedExpertise === "All" || mentor.expertise.includes(selectedExpertise))
   );
 
   return (
@@ -51,9 +52,9 @@ const IndustryExperts = () => {
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 pt-24 pb-12 px-4">
         <div className="max-w-7xl mx-auto text-center text-white">
-          <h1 className="text-4xl font-bold mb-4">Connect with Industry Experts</h1>
+          <h1 className="text-5xl font-bold mb-4">Find Your Industry Expert</h1>
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-            Get personalized guidance from professionals at top companies
+            Connect with experienced professionals from top companies for personalized career guidance.
           </p>
           <div className="flex justify-center gap-8 mb-8">
             <div className="text-center">
@@ -102,13 +103,16 @@ const IndustryExperts = () => {
         {/* Mentors Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredMentors.map((mentor) => (
-            <div key={mentor.id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300">
+            <div
+              key={mentor.id}
+              className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300"
+            >
               <div className="p-6">
                 <div className="flex items-start gap-4">
-                  <img 
-                    src={mentor.image} 
-                    alt={mentor.name} 
-                    className="w-20 h-20 rounded-full object-cover border-2 border-blue-100" 
+                  <img
+                    src={mentor.image}
+                    alt={mentor.name}
+                    className="w-20 h-20 rounded-full object-cover border-2 border-blue-100"
                   />
                   <div>
                     <h3 className="text-lg font-semibold">{mentor.name}</h3>
@@ -131,7 +135,7 @@ const IndustryExperts = () => {
                   </div>
                   <div className="flex flex-wrap gap-2 mb-4">
                     {mentor.expertise.map((skill, index) => (
-                      <span 
+                      <span
                         key={index}
                         className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-sm"
                       >
@@ -145,7 +149,7 @@ const IndustryExperts = () => {
                   <div className="text-gray-600">
                     <span className="font-semibold text-xl text-gray-800">${mentor.price}</span>/hour
                   </div>
-                  <a 
+                  <a
                     href={mentor.linkedIn}
                     target="_blank"
                     rel="noopener noreferrer"
