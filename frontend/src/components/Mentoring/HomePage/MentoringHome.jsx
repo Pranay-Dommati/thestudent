@@ -5,15 +5,8 @@ import HowItWorks from "./HowItWorks";
 import CollegeMentorship from "./CollegeMentorship";
 import CTASection from "./CTASection";
 import CategoryCard from "./CategoryCard";
-import MentorCard from "./MentorCard";
 import Footer from "../../Footer/Footer";
 import { FaUserGraduate, FaChalkboardTeacher, FaUsers } from "react-icons/fa";
-
-const mentors = [
-  { name: "John Doe", role: "Software Engineer at Google", rating: "⭐⭐⭐⭐⭐", price: "$20/hr" },
-  { name: "Sarah Lee", role: "Product Manager at Amazon", rating: "⭐⭐⭐⭐", price: "$15/hr" },
-  { name: "Mike Smith", role: "Alumni | Career Mentor", rating: "⭐⭐⭐⭐⭐", price: "Free" }
-];
 
 export default function MentoringHome() {
   return (
@@ -47,7 +40,7 @@ export default function MentoringHome() {
                 icon={<FaUserGraduate className="text-4xl text-green-600" />}
                 title="Alumni Mentorship"
                 description="Get career advice and placement guidance from experienced alumni."
-                path="/mentoring/alumni"
+                path="/mentoring/alumni-mentorship"
                 stats={[
                   { value: "200+", label: "Alumni" },
                   { value: "98%", label: "Success" }
@@ -57,7 +50,7 @@ export default function MentoringHome() {
                 icon={<FaUsers className="text-4xl text-purple-600" />}
                 title="College Seniors"
                 description="Seniors guide you in exams, placements, and study plans."
-                path="/mentoring/seniors"
+                path="/mentoring/college-seniors"
                 stats={[
                   { value: "300+", label: "Seniors" },
                   { value: "Free", label: "Sessions" }
@@ -68,16 +61,6 @@ export default function MentoringHome() {
         </section>
 
         <HowItWorks />
-
-        {/* Featured Mentors */}
-        <section className="py-16 px-8">
-          <h2 className="text-3xl font-semibold text-center mb-8">Top Mentors</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            {mentors.map((mentor, index) => (
-              <MentorCard key={index} mentor={mentor} />
-            ))}
-          </div>
-        </section>
 
         <CollegeMentorship />
         <CTASection />

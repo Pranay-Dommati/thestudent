@@ -24,6 +24,9 @@ import StandaloneQuizPage from './components/CourseLearningPage/templ/Standalone
 import NotFound from './components/NotFound/NotFound';
 import AdminForgotPassword from './components/Admin/AdminForgotPassword';
 import MentoringHome from './components/Mentoring/HomePage/MentoringHome';
+import IndustryExperts from './components/Mentoring/IndustryExperts/IndustryExperts';
+import AlumniMentorship from './components/Mentoring/AlumniMentorship/AlumniMentorship';
+import CollegeSeniors from './components/Mentoring/CollegeSeniors/CollegeSeniors';
 import './utils/axios';
 
 const CourseDetailsWrapper = () => {
@@ -141,6 +144,9 @@ function App() {
 
             <Route path="*" element={<NotFound />} />
             <Route path="/mentoring" element={<MentoringHome />} />
+            <Route path="/mentoring/industry-experts" element={<IndustryExperts />} />
+            <Route path="/mentoring/alumni-mentorship" element={<AlumniMentorship />} />
+            <Route path="/mentoring/college-seniors" element={<CollegeSeniors />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
