@@ -111,31 +111,36 @@ export const callGeminiAPI = async (userMessage) => {
     const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
     const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-    const prompt = `You are an AI that creates **structured learning paths**.  
-    **Rules:**  
-    - Follow the **Web Development Example** format.  
-    - Divide topics into **Beginner → Intermediate → Advanced** sections.  
-    - Each section must include:  
-      1. 📌 *Goal*  
-      2. 📖 **Documentation**  
-      3. 🎥 **YouTube Video**  
-      4. 🔹 *Mini-task*  
-    - End with a **real-world project**.  
+    const prompt = `
+You are an AI that creates **structured learning paths** for students.  
+**Rules:**  
+- Divide topics into **Beginner → Intermediate → Advanced** sections.  
+- Each section must include:  
+  1. 📌 *Goal*  
+  2. 🎥 **YouTube Video**  
+  3. 📖 **Documentation**  
+  4. 🔹 *Mini-task*  
+- End with a **real-world project**.  
 
-    ## 🔥 **Example: Web Development Learning Path**  
-    ## 1️⃣ HTML & CSS - Foundations  
-    📌 *Goal*: Learn the basics of HTML structure and CSS styling.  
-    ### 1.1 HTML Basics  
-    - 📖 [MDN HTML Docs](https://developer.mozilla.org/en-US/docs/Web/HTML)  
-    - 🎥 [HTML Crash Course by Traversy Media](https://www.youtube.com/watch?v=UB1O30fR-EE)  
-    🔹 *Mini-task*: Create a simple webpage with headings, paragraphs, and lists.  
+**Example Output:**
 
-    ### 1.2 CSS Basics  
-    - 📖 [MDN CSS Docs](https://developer.mozilla.org/en-US/docs/Web/CSS)  
-    - 🎥 [CSS Crash Course](https://www.youtube.com/watch?v=yfoY53QXEnI)  
-    🔹 *Mini-task*: Style your webpage with colors and fonts.  
+# 🚀 *Structured Web Development Learning Path*  
+✅ *Goal*: Learn step by step with curated resources, mini-projects, and real-world applications.  
 
-    ## Now, generate a structured learning path for: **${userMessage}**`;
+## *1️⃣ HTML & CSS - Foundations*  
+📌 *Goal*: Learn HTML structure, semantic elements, and CSS styling.  
+
+### *1.1 HTML Basics*  
+- 📖 [MDN HTML Docs](https://developer.mozilla.org/en-US/docs/Web/HTML)  
+- 🎥 [Traversy Media - HTML Crash Course](https://www.youtube.com/watch?v=UB1O30fR-EE)  
+🔹 *Mini-task*: Create a simple webpage with headings, paragraphs, and lists.  
+
+### *1.2 CSS Fundamentals*  
+- 📖 [MDN CSS Docs](https://developer.mozilla.org/en-US/docs/Web/CSS)  
+- 🎥 [CSS Crash Course](https://www.youtube.com/watch?v=yfoY53QXEnI)  
+🔹 *Mini-task*: Style an HTML page using colors, fonts, and margins.  
+
+## Now, generate a structured learning path for: **${userMessage}**`;
 
     const requestBody = {
       contents: [{ parts: [{ text: prompt }] }],
@@ -160,15 +165,16 @@ export const callGeminiAPI = async (userMessage) => {
     if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
 
     const data = await response.json();
-    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-      throw new Error("Invalid response format from Gemini API");
-    }
 
-    const responseText = data.candidates[0].content.parts[0].text;
-    return parseLearningPath(responseText);
+    // Log the raw AI response to the terminal
+    const responseText = data.candidates[0]?.content?.parts?.[0]?.text;
+    console.log("Raw AI Response:", responseText);
+
+    // Return the raw response for now
+    return responseText;
   } catch (error) {
     console.error("Error generating learning path with Gemini:", error);
-    return null;
+    return "Sorry, I couldn't generate the learning path at this moment.";
   }
 };
 
