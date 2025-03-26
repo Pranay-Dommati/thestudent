@@ -55,21 +55,29 @@ export default function AuthForm() {
 
   const validateForm = () => {
     const errors = {};
-    
-    if (!formData.email) errors.email = "Email is required";
-    if (!formData.password) errors.password = "Password is required";
-    if (isSignUp && !formData.name) errors.name = "Name is required";
-    if (formData.password && formData.password.length < 6) {
+
+    // Validate email
+    if (!formData.email) {
+      errors.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = "Invalid email format";
+    }
+
+    // Validate password
+    if (!formData.password) {
+      errors.password = "Password is required";
+    } else if (formData.password.length < 6) {
       errors.password = "Password must be at least 6 characters";
     }
-    
+
     return errors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const errors = validateForm();
 
+    // Client-side validation
+    const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
@@ -78,18 +86,22 @@ export default function AuthForm() {
     setIsLoading(true);
 
     try {
-      let success;
-      if (isSignUp) {
-        success = await register(formData.name, formData.email, formData.password);
+      if (!isSignUp) {
+        // Login request
+        const response = await login(formData.email, formData.password);
+        if (response) {
+          navigate('/'); // Redirect to the homepage on successful login
+        }
       } else {
-        success = await login(formData.email, formData.password);
-      }
-
-      if (success) {
-        navigate('/');
+        // Registration logic (already implemented)
+        const success = await register(formData.name, formData.email, formData.password);
+        if (success) {
+          navigate('/');
+        }
       }
     } catch (error) {
-      console.error('Auth error:', error);
+      console.error("Error during login:", error);
+      toast.error("Invalid email or password");
     } finally {
       setIsLoading(false);
     }
@@ -246,24 +258,6 @@ export default function AuthForm() {
                     {formErrors.password && <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>}
                   </div>
                   
-                  <AnimatePresence>
-                    {!isSignUp && (
-                      <motion.div 
-                        className="flex justify-between items-center text-sm"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <label className="flex items-center cursor-pointer">
-                          <input type="checkbox" className="rounded text-blue-600 focus:ring-blue-500 mr-1.5" />
-                          <span>Remember me</span>
-                        </label>
-                        <a href="#" className="text-blue-600 hover:text-blue-800 hover:underline">Forgot password?</a>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  
                   <motion.button 
                     type="submit"
                     disabled={isLoading}
@@ -271,17 +265,7 @@ export default function AuthForm() {
                     whileHover={{ boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" }}
                     whileTap={{ y: 2 }}
                   >
-                    {isLoading ? (
-                      <span className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Processing...
-                      </span>
-                    ) : (
-                      isSignUp ? "Create Account" : "Login"
-                    )}
+                    {isLoading ? "Processing..." : "Login"}
                   </motion.button>
                 </form>
 
