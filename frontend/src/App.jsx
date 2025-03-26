@@ -23,10 +23,7 @@ import HelpCenter from './components/HelpCenter/HelpCenter';
 import StandaloneQuizPage from './components/CourseLearningPage/templ/StandaloneQuizPage';
 import NotFound from './components/NotFound/NotFound';
 import AdminForgotPassword from './components/Admin/AdminForgotPassword';
-import MentoringPage from './components/Mentoring/MentoringPage';
-import ConnectMentors from './components/Mentoring/ConnectMentors';
-import SeniorsAlumniPage from './components/Mentoring/SeniorsAlumniPage';
-import MentorInsights from './components/Mentoring/MentorInsights';
+import MentoringHome from './components/Mentoring/HomePage/MentoringHome';
 import './utils/axios';
 
 const CourseDetailsWrapper = () => {
@@ -49,7 +46,7 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const isChat = location.pathname === '/chat';
   const isNotFound = location.pathname === '*';
-  const isMentoring = ['/mentoring', '/connect-mentors', '/seniors-alumni', '/mentor-insights'].includes(location.pathname);
+  const isMentoring = ['/mentoring'].includes(location.pathname);
 
   return (
     <>
@@ -143,11 +140,7 @@ function App() {
             <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
 
             <Route path="*" element={<NotFound />} />
-            <Route path="/mentoring" element={<MentoringPage />} />
-            <Route path="/connect-mentors" element={<ConnectMentors />} />
-            <Route path="/seniors-alumni" element={<SeniorsAlumniPage />} />
-            <Route path="/mentor-insights" element={<MentorInsights />} />
-            
+            <Route path="/mentoring" element={<MentoringHome />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
