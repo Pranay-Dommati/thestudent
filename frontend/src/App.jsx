@@ -24,6 +24,9 @@ import StandaloneQuizPage from './components/CourseLearningPage/templ/Standalone
 import NotFound from './components/NotFound/NotFound';
 import AdminForgotPassword from './components/Admin/AdminForgotPassword';
 import MentoringPage from './components/Mentoring/MentoringPage';
+import ConnectMentors from './components/Mentoring/ConnectMentors';
+import SeniorsAlumniPage from './components/Mentoring/SeniorsAlumniPage';
+import MentorInsights from './components/Mentoring/MentorInsights';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -45,7 +48,7 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const isChat = location.pathname === '/chat';
   const isNotFound = location.pathname === '*';
-  const isMentoring = location.pathname === '/mentoring';
+  const isMentoring = ['/mentoring', '/connect-mentors', '/seniors-alumni', '/mentor-insights'].includes(location.pathname);
 
   return (
     <>
@@ -129,7 +132,6 @@ function App() {
 
             {/* Learning Routes */}
             <Route path="/courses/engineering/:courseId/learning" element={<CourseLearningPage />} />
-            {/* Add this new route for quizzes */}
             <Route path="/courses/engineering/:courseId/learning/quiz" element={<StandaloneQuizPage />} />
             
             <Route path="/courses/10th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
@@ -139,9 +141,12 @@ function App() {
             <Route path="/courses/12th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
 
-            {/* Add this at the very bottom of your Routes */}
             <Route path="*" element={<NotFound />} />
             <Route path="/mentoring" element={<MentoringPage />} />
+            <Route path="/connect-mentors" element={<ConnectMentors />} />
+            <Route path="/seniors-alumni" element={<SeniorsAlumniPage />} />
+            <Route path="/mentor-insights" element={<MentorInsights />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
         <FloatingChatButton />

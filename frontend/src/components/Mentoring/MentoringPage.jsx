@@ -117,36 +117,46 @@ const MentoringPage = () => {
 
               {/* Section Navigation */}
               <div className="hidden md:flex items-center space-x-6">
-                <button
-                  onClick={() => setActiveSection('mentors')}
+                <Link
+                  to="/mentoring"
                   className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     activeSection === 'mentors'
                       ? 'bg-white text-blue-600'
                       : 'text-white hover:bg-white/10'
                   }`}
                 >
-                  Connect with Mentors
-                </button>
-                <button
-                  onClick={() => setActiveSection('seniors')}
+                  Home
+                </Link>
+                <Link
+                  to="/connect-mentors"
                   className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     activeSection === 'seniors'
                       ? 'bg-white text-blue-600'
                       : 'text-white hover:bg-white/10'
                   }`}
                 >
-                  Seniors & Alumni
-                </button>
-                <button
-                  onClick={() => setActiveSection('insights')}
+                  Connect with Mentors
+                </Link>
+                <Link
+                  to="/seniors-alumni"
                   className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     activeSection === 'insights'
                       ? 'bg-white text-blue-600'
                       : 'text-white hover:bg-white/10'
                   }`}
                 >
+                  Seniors & Alumni
+                </Link>
+                <Link
+                  to="/mentor-insights"
+                  className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    activeSection === 'connect'
+                      ? 'bg-white text-blue-600'
+                      : 'text-white hover:bg-white/10'
+                  }`}
+                >
                   Mentor Insights
-                </button>
+                </Link>
               </div>
             </div>
           </div>

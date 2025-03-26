@@ -9,7 +9,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const moreDropdownRef = useRef(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -27,6 +29,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
+      if (moreDropdownRef.current && !moreDropdownRef.current.contains(event.target)) {
+        setIsMoreDropdownOpen(false);
+      }
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsProfileDropdownOpen(false);
       }
@@ -87,18 +92,34 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <a href="/courses" className={`font-medium transition-colors ${textColor}`}>Courses</a>
               <a href="/chat" className={`font-medium transition-colors ${textColor}`}>AI Chatbot</a>
               <a href="/learning-hub" className={`font-medium transition-colors ${textColor}`}>Learning Hub</a>
-              <div className="relative group">
-                <button className={`font-medium transition-colors ${textColor} focus:outline-none flex items-center`}>
-                  More
-                  <svg className="ml-1 w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="relative group" ref={moreDropdownRef}>
+                <button 
+                  onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
+                  className={`flex items-center space-x-1 font-medium transition-colors ${textColor}`}
+                >
+                  <span>More</span>
+                  <svg 
+                    className={`w-4 h-4 transition-transform duration-200 ${isMoreDropdownOpen ? 'rotate-180' : ''}`}
+                    xmlns="http://www.w3.org/2000/svg" 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <div className="absolute hidden group-hover:block mt-2 bg-white shadow-lg rounded-lg py-2 w-40">
-                  <Link to="/mentoring" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
-                    Mentoring
-                  </Link>
-                </div>
+                {isMoreDropdownOpen && (
+                  <div className="absolute mt-2 bg-white shadow-lg rounded-lg py-2 w-40">
+                    <Link 
+                      to="/mentoring" 
+                      className="block px-4 py-2 text-gray-800 hover:bg-gray-100 transition-colors"
+                      onClick={() => setIsMoreDropdownOpen(false)}
+                    >
+                      Mentoring
+                    </Link>
+                    {/* Add more dropdown items here */}
+                  </div>
+                )}
               </div>
             </div>
           </div>
