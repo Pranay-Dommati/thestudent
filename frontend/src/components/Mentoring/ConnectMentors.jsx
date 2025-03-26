@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 const ConnectMentors = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedField, setSelectedField] = useState('all');
+  const [selectedType, setSelectedType] = useState('all');
   const [activeSection, setActiveSection] = useState('seniors');
 
   const mentors = [
@@ -16,7 +17,9 @@ const ConnectMentors = () => {
       expertise: ["Web Development", "System Design"],
       rating: 4.9,
       availability: "Mon, Wed, Fri",
-      image: "https://randomuser.me/api/portraits/women/1.jpg"
+      image: "https://randomuser.me/api/portraits/women/1.jpg",
+      type: "paid",
+      rate: "$50/hour"
     },
     {
       id: 2,
@@ -26,7 +29,8 @@ const ConnectMentors = () => {
       expertise: ["Machine Learning", "Python", "Data Analysis"],
       rating: 4.8,
       availability: "Tue, Thu, Sat",
-      image: "https://randomuser.me/api/portraits/men/2.jpg"
+      image: "https://randomuser.me/api/portraits/men/2.jpg",
+      type: "free"
     },
     {
       id: 3,
@@ -36,7 +40,9 @@ const ConnectMentors = () => {
       expertise: ["UI/UX Design", "Product Design", "Figma"],
       rating: 4.9,
       availability: "Mon, Thu, Fri",
-      image: "https://randomuser.me/api/portraits/women/3.jpg"
+      image: "https://randomuser.me/api/portraits/women/3.jpg",
+      type: "paid",
+      rate: "$60/hour"
     },
     {
       id: 4,
@@ -46,7 +52,77 @@ const ConnectMentors = () => {
       expertise: ["Product Strategy", "Agile", "Leadership"],
       rating: 4.7,
       availability: "Wed, Fri",
-      image: "https://randomuser.me/api/portraits/men/4.jpg"
+      image: "https://randomuser.me/api/portraits/men/4.jpg",
+      type: "free"
+    },
+    {
+      id: 5,
+      name: "Alex Thompson",
+      role: "AI Research Scientist",
+      company: "OpenAI",
+      expertise: ["AI/ML", "Deep Learning", "Neural Networks"],
+      rating: 4.9,
+      availability: "Mon, Wed",
+      image: "https://randomuser.me/api/portraits/men/5.jpg",
+      type: "paid",
+      rate: "$80/hour"
+    },
+    {
+      id: 6,
+      name: "Priya Patel",
+      role: "ML Engineer",
+      company: "Tesla",
+      expertise: ["AI/ML", "Computer Vision", "Python"],
+      rating: 4.7,
+      availability: "Tue, Thu, Sat",
+      image: "https://randomuser.me/api/portraits/women/6.jpg",
+      type: "free"
+    },
+    {
+      id: 7,
+      name: "John Martinez",
+      role: "Senior Product Manager",
+      company: "Meta",
+      expertise: ["Product Management", "Product Strategy", "User Research"],
+      rating: 4.8,
+      availability: "Mon, Fri",
+      image: "https://randomuser.me/api/portraits/men/7.jpg",
+      type: "paid",
+      rate: "$70/hour"
+    },
+    {
+      id: 8,
+      name: "Lisa Wang",
+      role: "Product Lead",
+      company: "Airbnb",
+      expertise: ["Product Management", "Agile", "Product Analytics"],
+      rating: 4.9,
+      availability: "Wed, Thu",
+      image: "https://randomuser.me/api/portraits/women/8.jpg",
+      type: "free"
+    },
+    {
+      id: 9,
+      name: "Rajesh Kumar",
+      role: "Startup Advisor",
+      company: "Startup Inc.",
+      expertise: ["Entrepreneurship", "Business Strategy", "Fundraising"],
+      rating: 4.8,
+      availability: "Mon, Tue, Fri",
+      image: "https://randomuser.me/api/portraits/men/9.jpg",
+      type: "paid",
+      rate: "$100/hour"
+    },
+    {
+      id: 10,
+      name: "Sophia Lee",
+      role: "Business Consultant",
+      company: "Consulting Co.",
+      expertise: ["Entrepreneurship", "Growth Marketing", "Business Development"],
+      rating: 4.7,
+      availability: "Wed, Sat",
+      image: "https://randomuser.me/api/portraits/women/10.jpg",
+      type: "free"
     }
   ];
 
@@ -54,7 +130,8 @@ const ConnectMentors = () => {
     const matchesSearch = mentor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       mentor.expertise.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesField = selectedField === 'all' || mentor.expertise.includes(selectedField);
-    return matchesSearch && matchesField;
+    const matchesType = selectedType === 'all' || mentor.type === selectedType;
+    return matchesSearch && matchesField && matchesType;
   });
 
   return (
@@ -145,6 +222,15 @@ const ConnectMentors = () => {
               <option value="Product Management">Product Management</option>
               <option value="Entrepreneurship">Entrepreneurship</option>
             </select>
+            <select
+              className="px-4 py-2 border rounded-lg bg-white"
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+            >
+              <option value="all">All Types</option>
+              <option value="free">Free Mentoring</option>
+              <option value="paid">Paid Mentoring</option>
+            </select>
           </div>
 
           {/* Mentors Grid */}
@@ -170,6 +256,15 @@ const ConnectMentors = () => {
                       {skill}
                     </span>
                   ))}
+                </div>
+                <div className="mb-4">
+                  <span className={`px-3 py-1 rounded-full text-sm ${
+                    mentor.type === 'free' 
+                      ? 'bg-green-100 text-green-600' 
+                      : 'bg-purple-100 text-purple-600'
+                  }`}>
+                    {mentor.type === 'free' ? 'Free Mentoring' : mentor.rate}
+                  </span>
                 </div>
                 <button className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">
                   Schedule Session

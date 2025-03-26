@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import BackButton from '../../components/BackButton';
 import CourseCategories from './CourseCategories/CourseCategories';
@@ -12,6 +12,30 @@ const Engineering = () => {
     duration: 'all',
     sortBy: 'popular'
   });
+
+  const [allCategories, setAllCategories] = useState([
+    { id: 'all', name: 'All Categories' },
+    { id: 'webdev', name: 'Web Development', icon: '💻' },
+    { id: 'datascience', name: 'Data Science & AI', icon: '🤖' },
+    { id: 'uiux', name: 'UI/UX & Graphic Design', icon: '🎨' },
+    { id: 'marketing', name: 'Marketing & Business', icon: '📊' },
+    { id: 'personal', name: 'Personal Development', icon: '🚀' }
+  ]);
+
+  useEffect(() => {
+    // Load custom categories from localStorage
+    const storedCategories = JSON.parse(localStorage.getItem('courseCategories') || '[]');
+    if (storedCategories.length > 0) {
+      // Add any new categories not already in allCategories
+      const newCategories = storedCategories.filter(
+        newCat => !allCategories.some(existingCat => existingCat.id === newCat.id)
+      );
+      
+      if (newCategories.length > 0) {
+        setAllCategories([...allCategories, ...newCategories]);
+      }
+    }
+  }, []);
 
   const handleCategoryChange = (category) => setSelectedCategory(category);
   const handleFilterChange = (newFilters) => setFilters({ ...filters, ...newFilters });
@@ -30,6 +54,7 @@ const Engineering = () => {
             <CourseCategories 
               selectedCategory={selectedCategory} 
               onCategoryChange={handleCategoryChange}
+              categories={allCategories}
             />
             <CourseFilters 
               filters={filters} 

@@ -1,10 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaPlus, FaTrash, FaUpload } from 'react-icons/fa';
 
 const PROFICIENCY_LEVELS = [
   { id: 'beginner', label: 'Beginner (No prior experience needed)' },
   { id: 'intermediate', label: 'Intermediate (Basic knowledge required)' },
   { id: 'advanced', label: 'Advanced (Expert-Level)' }
+];
+
+const DEFAULT_CATEGORIES = [
+  { id: 'webdev', name: 'Web Development', icon: '💻' },
+  { id: 'datascience', name: 'Data Science & AI', icon: '🤖' },
+  { id: 'uiux', name: 'UI/UX & Graphic Design', icon: '🎨' },
+  { id: 'marketing', name: 'Marketing & Business', icon: '📊' },
+  { id: 'personal', name: 'Personal Development', icon: '🚀' }
 ];
 
 const BasicInfoStep = ({ 
@@ -19,6 +27,44 @@ const BasicInfoStep = ({
   removeArrayField,
   handleSectionCountChange
 }) => {
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [newCategory, setNewCategory] = useState('');
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+
+  const handleAddCategory = () => {
+    if (newCategory.trim()) {
+      const newCategoryObj = {
+        id: newCategory.toLowerCase().replace(/\s+/g, '-'),
+        name: newCategory,
+        icon: '🔖' // Default icon for new categories
+      };
+      
+      // Add to categories list
+      setCategories([...categories, newCategoryObj]);
+      
+      // Set as selected category
+      setCourseInfo({...courseInfo, category: newCategoryObj.id});
+      
+      // Reset and hide the input
+      setNewCategory('');
+      setShowNewCategoryInput(false);
+      
+      // Save to localStorage to persist across sessions
+      const storedCategories = JSON.parse(localStorage.getItem('courseCategories') || '[]');
+      localStorage.setItem('courseCategories', JSON.stringify([...storedCategories, newCategoryObj]));
+      
+      toast.success('New category added!');
+    }
+  };
+
+  useEffect(() => {
+    // Load any custom categories from localStorage
+    const storedCategories = JSON.parse(localStorage.getItem('courseCategories') || '[]');
+    if (storedCategories.length > 0) {
+      setCategories([...DEFAULT_CATEGORIES, ...storedCategories]);
+    }
+  }, []);
+
   return (
     <div className="space-y-8">
       <h2 className="text-xl font-semibold text-gray-800 border-b pb-2">Basic Course Information</h2>
@@ -169,6 +215,50 @@ const BasicInfoStep = ({
             <span className="ml-2">Includes hands-on projects</span>
           </label>
         </div>
+      </div>
+      
+      {/* Category */}
+      <div className="space-y-2">
+        <label className="block text-gray-700 font-medium">
+          Category <span className="text-red-500">*</span>
+        </label>
+        <div className="relative">
+          <select
+            name="category"
+            value={courseInfo.category}
+            onChange={handleCourseInfoChange}
+            className={`w-full p-2 border ${errors.category ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+          >
+            <option value="">Select a category</option>
+            {categories.map(category => (
+              <option key={category.id} value={category.id}>
+                {category.icon} {category.name}
+              </option>
+            ))}
+            <option value="add-new">+ Add New Category</option>
+          </select>
+          {errors.category && <p className="text-red-500 text-sm">{errors.category}</p>}
+        </div>
+        
+        {/* Add new category input */}
+        {(courseInfo.category === 'add-new' || showNewCategoryInput) && (
+          <div className="mt-2 flex space-x-2">
+            <input
+              type="text"
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              placeholder="Enter new category name"
+              className="flex-1 p-2 border border-gray-300 rounded-lg"
+            />
+            <button
+              type="button"
+              onClick={handleAddCategory}
+              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              Add
+            </button>
+          </div>
+        )}
       </div>
       
       {/* Last Updated */}

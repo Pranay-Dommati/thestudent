@@ -131,11 +131,11 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
   const renderFormBasedOnLevel = () => {
     switch(selectedLevel?.id) {
       case 'engineering':
-        return <EngineeringCourseForm onSubmit={onSubmit} onCancel={onCancel} />;
+        return <EngineeringCourseForm onCancel={onCancel} />;
       case '10th':
       case '11th':
       case '12th':
-        return <SchoolCourseForm onSubmit={onSubmit} onCancel={onCancel} classLevel={selectedLevel.id} />;
+        return <SchoolCourseForm onCancel={onCancel} classLevel={selectedLevel.id} />;
       default:
         return null;
     }

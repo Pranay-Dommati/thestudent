@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import BasicInfoStep from './BasicInfoStep';
 import CourseStructureStep from './CourseStructureStep';
+import { createCourse } from '../../../../services/courseApi';
 
 const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   const navigate = useNavigate();
@@ -18,11 +19,9 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     board: '',
     state: '',
     subject: '',
-    shortDescription: '',
     sources: '',
     duration: '',
     lastUpdated: new Date().toISOString().split('T')[0],
-    description: '',
     keyTopics: [''],
     learningPoints: ['', ''],
     chapterCount: 1
@@ -324,20 +323,20 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     ));
   };
   
-  // Validate form data
-  const validateForm = () => {
-    const newErrors = {};
-    
-    // Validate course info
+  // REPLACE the existing validateForm function with this:
+const validateForm = () => {
+  const newErrors = {};
+  
+  // Only validate first step fields when on first step
+  if (activeStep === 1) {
+    // Basic info validation
     if (!courseInfo.thumbnail) newErrors.thumbnail = 'Course thumbnail is required';
     if (!courseInfo.title.trim()) newErrors.title = 'Course title is required';
     if (!courseInfo.board) newErrors.board = 'Board selection is required';
     if (courseInfo.board === 'state' && !courseInfo.state) newErrors.state = 'State selection is required';
     if (!courseInfo.subject) newErrors.subject = 'Subject selection is required';
-    if (!courseInfo.shortDescription.trim()) newErrors.shortDescription = 'Course short description is required';
     if (!courseInfo.sources.trim()) newErrors.sources = 'Course sources are required';
     if (!courseInfo.duration.trim()) newErrors.duration = 'Course duration is required';
-    if (!courseInfo.description.trim()) newErrors.description = 'Course description is required';
     
     // Validate key topics
     if (courseInfo.keyTopics.length === 0) {
@@ -352,107 +351,116 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     } else if (courseInfo.learningPoints.some(point => !point.trim())) {
       newErrors.learningPoints = 'All learning points must be filled';
     }
-    
-    // Validate chapters if on step 2
-    if (activeStep === 2) {
-      // Validate chapter names
-      if (chapters.some(chapter => !chapter.name.trim())) {
-        newErrors.chapterNames = 'All chapter names must be filled';
+  }
+  
+  // Only validate second step fields when on second step
+  if (activeStep === 2) {
+    // Validate chapters
+    chapters.forEach((chapter, chapterIndex) => {
+      if (!chapter.name.trim()) {
+        newErrors[`chapter${chapterIndex}name`] = 'Chapter name is required';
       }
       
-      // Validate lessons
-      chapters.forEach((chapter, chapterIndex) => {
-        chapter.lessons.forEach((lesson, lessonIndex) => {
-          if (!lesson.title.trim()) {
-            newErrors[`chapter${chapterIndex}lesson${lessonIndex}`] = 'Lesson title is required';
-          }
-          
-          if (lesson.type === 'video' && !lesson.videoUrl.trim()) {
-            newErrors[`chapter${chapterIndex}lesson${lessonIndex}video`] = 'Video URL is required';
-          }
-          
-          if (lesson.type === 'quiz' && lesson.quizQuestions.length < 1) {
-            newErrors[`chapter${chapterIndex}lesson${lessonIndex}quiz`] = 'At least 1 quiz question is required';
-          }
-          
-          if (lesson.hasResources) {
-            // Validate resources
-            const hasDownloadable = lesson.resources.downloadable.length > 0;
-            const hasInternet = lesson.resources.internet.length > 0;
-            
-            if (!hasDownloadable && !hasInternet) {
-              newErrors[`chapter${chapterIndex}lesson${lessonIndex}resources`] = 'At least one resource is required';
-            }
-            
-            if (hasDownloadable && lesson.resources.downloadable.some(r => !r.name.trim() || !r.description.trim() || !r.link.trim())) {
-              newErrors[`chapter${chapterIndex}lesson${lessonIndex}downloadable`] = 'All downloadable resource fields must be filled';
-            }
-            
-            if (hasInternet && lesson.resources.internet.some(r => !r.name.trim() || !r.description.trim() || !r.link.trim())) {
-              newErrors[`chapter${chapterIndex}lesson${lessonIndex}internet`] = 'All internet resource fields must be filled';
-            }
-          }
-        });
+      chapter.lessons.forEach((lesson, lessonIndex) => {
+        if (!lesson.title.trim()) {
+          newErrors[`chapter${chapterIndex}lesson${lessonIndex}`] = 'Lesson title is required';
+        }
+        
+        if (lesson.type === 'video' && !lesson.videoUrl.trim()) {
+          newErrors[`chapter${chapterIndex}lesson${lessonIndex}video`] = 'Video URL is required';
+        }
       });
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    });
+  }
   
-  // Handle step navigation
-  const handleNext = () => {
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+  
+  // Update the handleNext function
+  const handleNext = (e) => {
+    // Prevent form submission when clicking "Next"
+    e.preventDefault();
+    
+    console.log("Next button clicked");
+    console.log("Current errors:", errors);
+    
+    // Validate the form before proceeding
     if (validateForm()) {
       setActiveStep(activeStep + 1);
       window.scrollTo(0, 0);
+    } else {
+      console.log("Form validation failed", errors);
+      toast.error("Please fill in all required fields correctly");
     }
   };
-  
+
   const handleBack = () => {
     setActiveStep(activeStep - 1);
     window.scrollTo(0, 0);
   };
   
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+  // Update handleSubmit to only include fields you want
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  if (!validateForm()) {
+    return;
+  }
+  
+  setIsSubmitting(true);
+  try {
+    // Prepare form data
+    const formData = new FormData();
     
-    setIsSubmitting(true);
-    try {
-      // Prepare form data
-      const formData = new FormData();
-      
-      // Add basic course info
+    // Add basic course info
+    if (courseInfo.thumbnail) {
       formData.append('thumbnail', courseInfo.thumbnail);
-      formData.append('title', courseInfo.title);
-      formData.append('classLevel', classLevel);
-      formData.append('board', courseInfo.board);
-      if (courseInfo.board === 'state') {
-        formData.append('state', courseInfo.state);
-      }
-      formData.append('subject', courseInfo.subject);
-      formData.append('shortDescription', courseInfo.shortDescription);
-      formData.append('sources', courseInfo.sources);
-      formData.append('duration', courseInfo.duration);
-      formData.append('lastUpdated', courseInfo.lastUpdated);
-      formData.append('description', courseInfo.description);
-      formData.append('keyTopics', JSON.stringify(courseInfo.keyTopics));
-      formData.append('learningPoints', JSON.stringify(courseInfo.learningPoints));
-      
-      // Add chapters data
-      formData.append('chapters', JSON.stringify(chapters));
-      
-      await onSubmit(formData);
-      toast.success('Course created successfully');
-      navigate('/admin-p/courses');
-    } catch (error) {
-      console.error('Error creating course:', error);
-      toast.error('Failed to create course. Please try again.');
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+    formData.append('title', courseInfo.title);
+    formData.append('class_level', classLevel);
+    formData.append('board', courseInfo.board);
+    if (courseInfo.board === 'state') {
+      formData.append('state', courseInfo.state);
+    }
+    formData.append('subject', courseInfo.subject);
+    formData.append('sources', courseInfo.sources);
+    formData.append('duration', courseInfo.duration);
+    
+    // Add the missing fields to make the backend happy
+    formData.append('shortDescription', courseInfo.title); // Use title as shortDescription
+    formData.append('description', `${courseInfo.title} - ${classLevel} - ${courseInfo.subject}`); // Generate a description
+    
+    formData.append('keyTopics', JSON.stringify(courseInfo.keyTopics));
+    formData.append('learningPoints', JSON.stringify(courseInfo.learningPoints));
+    
+    // Process chapters data for API
+    const chaptersData = chapters.map(chapter => ({
+      name: chapter.name,
+      lessons: chapter.lessons.map(lesson => ({
+        title: lesson.title,
+        type: lesson.type,
+        videoUrl: lesson.videoUrl,
+        aboutLesson: lesson.aboutLesson,
+        resources: lesson.hasResources ? lesson.resources : { downloadable: [], internet: [] },
+        quizQuestions: lesson.quizQuestions || []
+      }))
+    }));
+    
+    // Add chapters data
+    formData.append('chapters', JSON.stringify(chaptersData));
+    
+    // Submit the form
+    await createCourse(formData);
+    toast.success('Course created successfully');
+    navigate('/admin-p/courses');
+  } catch (error) {
+    console.error('Error creating course:', error);
+    toast.error('Failed to create course. Please try again.');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 max-w-7xl mx-auto">
@@ -533,7 +541,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
           
           {activeStep < 2 ? (
             <button
-              type="button"
+              type="button" // Make sure this is type="button"
               onClick={handleNext}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
             >
@@ -541,7 +549,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
             </button>
           ) : (
             <button
-              type="submit"
+              type="submit" // This one should be type="submit"
               disabled={isSubmitting}
               className={`px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
             >

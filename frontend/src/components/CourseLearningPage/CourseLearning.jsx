@@ -7,6 +7,7 @@ import ResourcesPage from './templ/ResourcesPage';
 import QuizIntro from './templ/QuizIntro'; // Make sure to import QuizIntro instead of QuizzesPage directly
 import InstructionsPage from './templ/InstructionsPage';
 import Sidebar from './Sidebar';
+import axios from 'axios';
 
 // Update the function signature to accept onSidebarToggle prop
 const CourseLearning = ({ courseId, onSidebarToggle }) => {
@@ -22,117 +23,41 @@ const CourseLearning = ({ courseId, onSidebarToggle }) => {
   const videoRef = useRef(null);
   const navigate = useNavigate();
 
-  // Simulated course data
   useEffect(() => {
-    setLoading(true);
-    
-    setTimeout(() => {
-      setCourse({
-        id: courseId,
-        title: "Web Development: From Zero to Hero",
-        instructor: {
-          name: "YT",
-          avatar: "https://via.placeholder.com/150",
-        },
-        description: "This comprehensive course takes you from the basics of Next.js to deploying production-ready applications.",
-        chapters: [
-          {
-            title: "Getting Started with Next.js",
-            lessons: [
-              { 
-                title: "Introduction to Next.js", 
-                duration: "12:45", 
-                type: 'video',
-                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-                completed: false
-              },
-              { 
-                title: "Additional Resources", 
-                duration: "Reading", 
-                type: 'resources',
-                completed: false
-              },
-              { 
-                title: "Knowledge Check", 
-                duration: "Quiz", 
-                type: 'quiz',
-                completed: false
-              },
-              { 
-                title: "Practice Project", 
-                duration: "Project", 
-                type: 'instructions',
-                completed: false
-              }
-            ]
-          },
-          {
-            title: "Routing in Next.js",
-            lessons: [
-              { 
-                title: "File-based Routing", 
-                duration: "15:20", 
-                completed: false,
-                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" 
-              },
-              { 
-                title: "Dynamic Routes", 
-                duration: "22:15", 
-                completed: false,
-                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" 
-              }
-            ]
-          },
-          {
-            title: "Data Fetching in Next.js",
-            lessons: [
-              { 
-                title: "getStaticProps", 
-                duration: "18:45", 
-                completed: false,
-                type: 'video',
-                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" 
-              },
-              { 
-                title: "getServerSideProps", 
-                duration: "20:30", 
-                completed: false,
-                type: 'video',
-                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" 
-              },
-              { 
-                title: "API Routes", 
-                duration: "16:15", 
-                completed: false,
-                type: 'video',
-                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ" 
-              },
-              {
-                title: "Resources",
-                duration: "Reading",
-                completed: false,
-                type: 'resources'
-              },
-              {
-                title: "Quiz",
-                duration: "Quiz",
-                completed: false,
-                type: 'quiz'
-              },
-              {
-                title: "Practice Project",
-                duration: "Project",
-                completed: false,
-                type: 'instructions'
-              }
-            ]
-          }
-        ]
-      });
-      
-      setExpandedChapters({0: true});
-      setLoading(false);
-    }, 800);
+    const fetchCourseData = async () => {
+      try {
+        const response = await axios.get(`http://127.0.0.1:8000/api/courses/engineering/${courseId}/`);
+        const courseData = response.data;
+        console.log("Fetched Course Data:", courseData); // Debugging
+        // Transform sections into chapters for the sidebar
+        const transformedCourse = {
+          ...courseData,
+          chapters: courseData.sections.map((section) => ({
+            title: section.name,
+            lessons: section.lessons.map((lesson) => ({
+              title: lesson.title,
+              type: lesson.type,
+              videoUrl: lesson.video_url,
+              description: lesson.description,
+              completed: false, // Default to not completed
+            })),
+          })),
+        };
+
+        setCourse(transformedCourse);
+
+        // Expand the first chapter by default
+        if (transformedCourse.chapters.length > 0) {
+          setExpandedChapters({ 0: true });
+        }
+      } catch (error) {
+        console.error('Error fetching course data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourseData();
   }, [courseId]);
 
   // Handle chapter toggling
