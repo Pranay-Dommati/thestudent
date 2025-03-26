@@ -5,6 +5,7 @@ import { FaSearch, FaBookReader, FaClock, FaRegThumbsUp, FaRegComment, FaShare }
 const MentorInsights = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [activeSection, setActiveSection] = useState('');
 
   const insights = [
     {

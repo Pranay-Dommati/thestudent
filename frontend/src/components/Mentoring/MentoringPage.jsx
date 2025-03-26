@@ -173,9 +173,12 @@ const MentoringPage = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row justify-center gap-6 mb-12">
-              <button className="px-12 py-5 bg-white text-blue-600 rounded-full font-semibold hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-lg">
+              <Link
+                to="/connect-mentors"
+                className="px-12 py-5 bg-white text-blue-600 rounded-full font-semibold hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-lg"
+              >
                 Connect with Mentors
-              </button>
+              </Link>
               <button className="px-12 py-5 border-2 border-white text-white rounded-full font-semibold hover:bg-white/10 transition-all hover:shadow-lg text-lg">
                 Become a Mentor
               </button>
@@ -387,9 +390,12 @@ const MentoringPage = () => {
             Join our community of learners and mentors to accelerate your growth
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-6">
-            <button className="px-8 py-4 bg-white text-blue-600 rounded-full font-semibold hover:bg-blue-50 transition-all shadow-lg">
+            <Link
+              to="/connect-mentors"
+              className="px-8 py-4 bg-white text-blue-600 rounded-full font-semibold hover:bg-blue-50 transition-all shadow-lg"
+            >
               Find a Mentor
-            </button>
+            </Link>
             <button className="px-8 py-4 border-2 border-white text-white rounded-full font-semibold hover:bg-white/10 transition-all">
               Become a Mentor
             </button>

@@ -28,6 +28,7 @@ import ConnectMentors from './components/Mentoring/ConnectMentors';
 import SeniorsAlumniPage from './components/Mentoring/SeniorsAlumniPage';
 import MentorInsights from './components/Mentoring/MentorInsights';
 
+
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
   
@@ -146,6 +147,7 @@ function App() {
             <Route path="/connect-mentors" element={<ConnectMentors />} />
             <Route path="/seniors-alumni" element={<SeniorsAlumniPage />} />
             <Route path="/mentor-insights" element={<MentorInsights />} />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>

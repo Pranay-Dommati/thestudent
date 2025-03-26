@@ -7,6 +7,11 @@ const ConnectMentors = () => {
   const [selectedField, setSelectedField] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [activeSection, setActiveSection] = useState('seniors');
+  const [selectedMentor, setSelectedMentor] = useState(null);
+  const [sessionType, setSessionType] = useState('one-on-one');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [paymentOption, setPaymentOption] = useState('');
 
   const mentors = [
     {
@@ -123,6 +128,194 @@ const ConnectMentors = () => {
       availability: "Wed, Sat",
       image: "https://randomuser.me/api/portraits/women/10.jpg",
       type: "free"
+    },
+    // Web Development
+    {
+      id: 11,
+      name: "Chris Evans",
+      role: "Frontend Developer",
+      company: "Netflix",
+      expertise: ["Web Development", "React", "JavaScript"],
+      rating: 4.8,
+      availability: "Mon, Wed, Fri",
+      image: "https://randomuser.me/api/portraits/men/11.jpg",
+      type: "free"
+    },
+    {
+      id: 12,
+      name: "Anna Taylor",
+      role: "Backend Developer",
+      company: "Spotify",
+      expertise: ["Web Development", "Node.js", "Databases"],
+      rating: 4.7,
+      availability: "Tue, Thu",
+      image: "https://randomuser.me/api/portraits/women/12.jpg",
+      type: "paid",
+      rate: "$40/hour"
+    },
+    {
+      id: 13,
+      name: "James Brown",
+      role: "Full Stack Developer",
+      company: "Uber",
+      expertise: ["Web Development", "Full Stack", "Cloud"],
+      rating: 4.9,
+      availability: "Mon, Fri",
+      image: "https://randomuser.me/api/portraits/men/13.jpg",
+      type: "paid",
+      rate: "$50/hour"
+    },
+    {
+      id: 14,
+      name: "Sophia Green",
+      role: "Mobile Developer",
+      company: "Instagram",
+      expertise: ["Web Development", "Mobile Development", "Flutter"],
+      rating: 4.6,
+      availability: "Wed, Sat",
+      image: "https://randomuser.me/api/portraits/women/14.jpg",
+      type: "free"
+    },
+    // AI/ML
+    {
+      id: 15,
+      name: "Ethan White",
+      role: "AI Engineer",
+      company: "Google DeepMind",
+      expertise: ["AI/ML", "Reinforcement Learning", "Python"],
+      rating: 4.9,
+      availability: "Mon, Thu",
+      image: "https://randomuser.me/api/portraits/men/15.jpg",
+      type: "paid",
+      rate: "$90/hour"
+    },
+    {
+      id: 16,
+      name: "Olivia Brown",
+      role: "Data Scientist",
+      company: "Facebook",
+      expertise: ["AI/ML", "Data Analysis", "R"],
+      rating: 4.8,
+      availability: "Tue, Fri",
+      image: "https://randomuser.me/api/portraits/women/16.jpg",
+      type: "free"
+    },
+    {
+      id: 17,
+      name: "Liam Wilson",
+      role: "ML Engineer",
+      company: "Amazon",
+      expertise: ["AI/ML", "Computer Vision", "TensorFlow"],
+      rating: 4.7,
+      availability: "Wed, Sat",
+      image: "https://randomuser.me/api/portraits/men/17.jpg",
+      type: "paid",
+      rate: "$75/hour"
+    },
+    {
+      id: 18,
+      name: "Emma Davis",
+      role: "AI Researcher",
+      company: "OpenAI",
+      expertise: ["AI/ML", "Natural Language Processing", "Deep Learning"],
+      rating: 4.9,
+      availability: "Mon, Tue",
+      image: "https://randomuser.me/api/portraits/women/18.jpg",
+      type: "free"
+    },
+    // Product Management
+    {
+      id: 19,
+      name: "Noah Johnson",
+      role: "Product Manager",
+      company: "Microsoft",
+      expertise: ["Product Management", "Agile", "Scrum"],
+      rating: 4.8,
+      availability: "Mon, Thu",
+      image: "https://randomuser.me/api/portraits/men/19.jpg",
+      type: "paid",
+      rate: "$60/hour"
+    },
+    {
+      id: 20,
+      name: "Ava Martinez",
+      role: "Product Strategist",
+      company: "Apple",
+      expertise: ["Product Management", "Product Strategy", "Market Research"],
+      rating: 4.7,
+      availability: "Tue, Fri",
+      image: "https://randomuser.me/api/portraits/women/20.jpg",
+      type: "free"
+    },
+    {
+      id: 21,
+      name: "William Garcia",
+      role: "Senior Product Manager",
+      company: "Slack",
+      expertise: ["Product Management", "User Research", "Analytics"],
+      rating: 4.9,
+      availability: "Wed, Sat",
+      image: "https://randomuser.me/api/portraits/men/21.jpg",
+      type: "paid",
+      rate: "$70/hour"
+    },
+    {
+      id: 22,
+      name: "Isabella Lopez",
+      role: "Product Lead",
+      company: "Zoom",
+      expertise: ["Product Management", "Leadership", "Roadmapping"],
+      rating: 4.8,
+      availability: "Mon, Fri",
+      image: "https://randomuser.me/api/portraits/women/22.jpg",
+      type: "free"
+    },
+    // Entrepreneurship
+    {
+      id: 23,
+      name: "Mason Clark",
+      role: "Startup Founder",
+      company: "TechStart",
+      expertise: ["Entrepreneurship", "Fundraising", "Pitching"],
+      rating: 4.9,
+      availability: "Mon, Wed",
+      image: "https://randomuser.me/api/portraits/men/23.jpg",
+      type: "paid",
+      rate: "$100/hour"
+    },
+    {
+      id: 24,
+      name: "Mia Hernandez",
+      role: "Business Consultant",
+      company: "BizConsult",
+      expertise: ["Entrepreneurship", "Growth Marketing", "Business Strategy"],
+      rating: 4.7,
+      availability: "Tue, Thu",
+      image: "https://randomuser.me/api/portraits/women/24.jpg",
+      type: "free"
+    },
+    {
+      id: 25,
+      name: "Lucas Walker",
+      role: "Startup Advisor",
+      company: "Startup Hub",
+      expertise: ["Entrepreneurship", "Business Development", "Networking"],
+      rating: 4.8,
+      availability: "Wed, Sat",
+      image: "https://randomuser.me/api/portraits/men/25.jpg",
+      type: "paid",
+      rate: "$120/hour"
+    },
+    {
+      id: 26,
+      name: "Amelia Scott",
+      role: "Innovation Coach",
+      company: "InnovateNow",
+      expertise: ["Entrepreneurship", "Idea Validation", "Leadership"],
+      rating: 4.9,
+      availability: "Mon, Fri",
+      image: "https://randomuser.me/api/portraits/women/26.jpg",
+      type: "free"
     }
   ];
 
@@ -133,6 +326,27 @@ const ConnectMentors = () => {
     const matchesType = selectedType === 'all' || mentor.type === selectedType;
     return matchesSearch && matchesField && matchesType;
   });
+
+  const handleScheduleClick = (mentor) => {
+    setSelectedMentor(mentor);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedMentor(null);
+    setSessionType('one-on-one');
+    setDate('');
+    setTime('');
+    setPaymentOption('');
+  };
+
+  const handleConfirmSchedule = () => {
+    if (selectedMentor.type === 'paid' && !paymentOption) {
+      alert('Please select a payment option.');
+      return;
+    }
+    alert(`Session scheduled with ${selectedMentor.name} on ${date} at ${time}.`);
+    handleCloseModal();
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -266,12 +480,90 @@ const ConnectMentors = () => {
                     {mentor.type === 'free' ? 'Free Mentoring' : mentor.rate}
                   </span>
                 </div>
-                <button className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                <button
+                  className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  onClick={() => handleScheduleClick(mentor)}
+                >
                   Schedule Session
                 </button>
               </div>
             ))}
           </div>
+
+          {/* Schedule Modal */}
+          {selectedMentor && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+                <h2 className="text-xl font-bold mb-4">Schedule Session with {selectedMentor.name}</h2>
+                <p className="text-gray-600 mb-4">{selectedMentor.role} at {selectedMentor.company}</p>
+                <p className="text-gray-600 mb-4">Expertise: {selectedMentor.expertise.join(', ')}</p>
+                <p className="text-gray-600 mb-4">Rating: {selectedMentor.rating}</p>
+                <p className="text-gray-600 mb-4">Availability: {selectedMentor.availability}</p>
+
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-medium mb-2">Session Type</label>
+                  <select
+                    className="w-full p-2 border rounded-lg"
+                    value={sessionType}
+                    onChange={(e) => setSessionType(e.target.value)}
+                  >
+                    <option value="one-on-one">One-on-One</option>
+                    <option value="group">Group Session</option>
+                  </select>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-medium mb-2">Date</label>
+                  <input
+                    type="date"
+                    className="w-full p-2 border rounded-lg"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-medium mb-2">Time</label>
+                  <input
+                    type="time"
+                    className="w-full p-2 border rounded-lg"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                  />
+                </div>
+
+                {selectedMentor.type === 'paid' && (
+                  <div className="mb-4">
+                    <label className="block text-gray-700 font-medium mb-2">Payment Option</label>
+                    <select
+                      className="w-full p-2 border rounded-lg"
+                      value={paymentOption}
+                      onChange={(e) => setPaymentOption(e.target.value)}
+                    >
+                      <option value="">Select Payment Option</option>
+                      <option value="credit-card">Credit Card</option>
+                      <option value="paypal">PayPal</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-4">
+                  <button
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                    onClick={handleCloseModal}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    onClick={handleConfirmSchedule}
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
