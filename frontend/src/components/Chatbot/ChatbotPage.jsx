@@ -135,21 +135,21 @@ const ChatbotPage = () => {
   };
 
   const formatLearningPath = (learningPath, videoSections) => {
-    let response = `### Structured Learning Path\n\n${learningPath.title}\n\n`;
-    learningPath.sections.forEach((section) => {
-      response += `#### ${section.title}\n- ${section.description}\n\n`;
+    let response = `## 🌟 **${learningPath.title}**\n\n`;
+
+    // Format each section of the learning path
+    learningPath.sections.forEach((section, index) => {
+      response += `### ${index + 1}. ${section.title}\n`;
+      response += `${section.description}\n\n`;
     });
 
-    response += `### Video Resources\n\n`;
+    // Add video resources
+    response += `## 🎥 **Video Resources**\n\n`;
     videoSections.forEach((section) => {
-      response += `#### ${section.section}\n`;
-      if (section.videos.length > 0) {
-        section.videos.forEach((video) => {
-          response += `- [${video.title}](${video.url}) (Channel: ${video.channelTitle})\n`;
-        });
-      } else {
-        response += `No videos found for this section.\n`;
-      }
+      response += `### 🔹 ${section.section}\n`;
+      section.videos.forEach((video, idx) => {
+        response += `- [${video.title}](${video.url}) by **${video.channelTitle}**\n`;
+      });
       response += `\n`;
     });
 

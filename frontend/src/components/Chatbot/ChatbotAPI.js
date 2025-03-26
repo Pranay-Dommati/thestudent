@@ -45,7 +45,6 @@ export const getYoutubeResources = async (query, maxResults = 3) => {
     if (!response.ok) throw new Error("YouTube API request failed");
 
     const data = await response.json();
-
     if (data.items && data.items.length > 0) {
       return data.items.map((video) => ({
         title: video.snippet.title,
@@ -109,28 +108,23 @@ export const getOpenSourceCourses = async (topic) => {
 // 🔹 Generate structured learning paths using Gemini AI
 export const callGeminiAPI = async (userMessage) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-    // System prompt enforcing structured learning path format
-    const prompt = `You are an AI that creates **structured learning paths**. 
-
-    **Rules:**
-    - Follow the **Web Development Example** format.
-    - Divide topics into **Beginner → Intermediate → Advanced** sections.
-    - Each section must include:
-      1. 📌 *Goal*
-      2. 📖 **Documentation**
-      3. 🎥 **YouTube Video**
+    const prompt = `You are an AI that creates **structured learning paths**.  
+    **Rules:**  
+    - Follow the **Web Development Example** format.  
+    - Divide topics into **Beginner → Intermediate → Advanced** sections.  
+    - Each section must include:  
+      1. 📌 *Goal*  
+      2. 📖 **Documentation**  
+      3. 🎥 **YouTube Video**  
       4. 🔹 *Mini-task*  
-    - End with a **real-world project**.
-
-    ---  
+    - End with a **real-world project**.  
 
     ## 🔥 **Example: Web Development Learning Path**  
-
     ## 1️⃣ HTML & CSS - Foundations  
     📌 *Goal*: Learn the basics of HTML structure and CSS styling.  
-
     ### 1.1 HTML Basics  
     - 📖 [MDN HTML Docs](https://developer.mozilla.org/en-US/docs/Web/HTML)  
     - 🎥 [HTML Crash Course by Traversy Media](https://www.youtube.com/watch?v=UB1O30fR-EE)  
@@ -143,11 +137,53 @@ export const callGeminiAPI = async (userMessage) => {
 
     ## Now, generate a structured learning path for: **${userMessage}**`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    const requestBody = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048,
+      },
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+      ],
+    };
+
+    const response = await fetch(`${API_URL}?key=${API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
+
+    const data = await response.json();
+    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+      throw new Error("Invalid response format from Gemini API");
+    }
+
+    const responseText = data.candidates[0].content.parts[0].text;
+    return parseLearningPath(responseText);
   } catch (error) {
     console.error("Error generating learning path with Gemini:", error);
-    return "Sorry, I couldn't generate the learning path at this moment.";
+    return null;
   }
+};
+
+// 🔹 Helper function to parse the response text into a structured object
+const parseLearningPath = (responseText) => {
+  const sections = responseText.split("##").slice(1).map((sectionText) => {
+    const [title, ...descriptionLines] = sectionText.trim().split("\n");
+    return {
+      title: title.trim(),
+      description: descriptionLines.join(" ").trim(),
+    };
+  });
+
+  return {
+    title: "Generated Learning Path",
+    sections,
+  };
 };
