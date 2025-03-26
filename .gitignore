@@ -10,3 +10,4 @@ backend/courses/__pycache__/
 *.pyc
 *.pyo
 backend/venv/
+backend/db.sqlite3
