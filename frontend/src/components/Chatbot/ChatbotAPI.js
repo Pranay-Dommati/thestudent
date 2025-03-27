@@ -105,82 +105,267 @@ export const getOpenSourceCourses = async (topic) => {
   return coursesMap[topic.toLowerCase()] || [];
 };
 
-// 🔹 Generate structured learning paths using Gemini AI
+// 🔹 Generate a mock curated course based on keywords
+export const generateMockCourse = (query) => {
+  // Detect course topic from query
+  const topic = detectTopic(query.toLowerCase());
+  
+  // Generate mock course structure based on topic
+  return {
+    id: crypto.randomUUID(),
+    title: `Complete ${topic.name} Course`,
+    short_description: `Learn ${topic.name} from scratch to advanced concepts`,
+    description: `A comprehensive curriculum to master ${topic.name}. This course covers all essential concepts and practical skills needed to become proficient.`,
+    thumbnail: topic.image,
+    duration: "25",
+    sources: "YouTube & Open Source",
+    proficiency: "beginner",
+    certificate_given: false,
+    project_based: true,
+    learning_points: topic.learningPoints,
+    requirements: topic.requirements,
+    category: topic.category,
+    last_updated: new Date().toISOString().split('T')[0],
+    is_published: true,
+    sections: topic.sections
+  };
+};
+
+// Helper function to detect course topic from query
+function detectTopic(query) {
+  // Default topic is web development
+  const webDev = {
+    name: "Web Development",
+    category: "webdev",
+    image: "https://images.unsplash.com/photo-1627398242454-45a1465c2479?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+    learningPoints: [
+      "Build responsive websites with HTML5 and CSS3",
+      "Create interactive web applications using JavaScript",
+      "Work with modern frameworks like React",
+      "Implement backend functionality with Node.js"
+    ],
+    requirements: ["Basic computer skills", "Internet connection"],
+    sections: [
+      {
+        id: 1,
+        name: "HTML & CSS Fundamentals",
+        order: 0,
+        subsections: [
+          {
+            id: 1,
+            name: "Getting Started with HTML",
+            lessons: [
+              {
+                id: 1,
+                title: "Introduction to HTML",
+                type: "video",
+                video_url: "<iframe width='560' height='315' src='https://www.youtube.com/embed/UB1O30fR-EE' frameborder='0' allowfullscreen></iframe>"
+              },
+              {
+                id: 2,
+                title: "HTML Document Structure",
+                type: "video",
+                video_url: "<iframe width='560' height='315' src='https://www.youtube.com/embed/9gTw2EDkaDQ' frameborder='0' allowfullscreen></iframe>"
+              }
+            ]
+          },
+          {
+            id: 2,
+            name: "CSS Styling",
+            lessons: [
+              {
+                id: 1,
+                title: "CSS Basics",
+                type: "video",
+                video_url: "<iframe width='560' height='315' src='https://www.youtube.com/embed/yfoY53QXEnI' frameborder='0' allowfullscreen></iframe>"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: 2,
+        name: "JavaScript Essentials",
+        order: 1,
+        subsections: [
+          {
+            id: 1,
+            name: "JavaScript Fundamentals",
+            lessons: [
+              {
+                id: 1,
+                title: "JavaScript Crash Course",
+                type: "video",
+                video_url: "<iframe width='560' height='315' src='https://www.youtube.com/embed/hdI2bqOjy3c' frameborder='0' allowfullscreen></iframe>"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+  
+  // Add more topics here as needed
+  const topics = {
+    "web development": webDev,
+    "web dev": webDev,
+    "website": webDev,
+    "frontend": webDev,
+    "html": webDev,
+    "css": webDev,
+    "react": {
+      ...webDev, 
+      name: "React",
+      image: "https://images.unsplash.com/photo-1633356122102-3fe601e05bd2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+    },
+    "python": {
+      name: "Python Programming",
+      category: "programming",
+      image: "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+      learningPoints: [
+        "Master Python syntax and core concepts",
+        "Work with libraries like NumPy and Pandas",
+        "Build real-world applications",
+        "Understand object-oriented programming"
+      ],
+      requirements: ["No prior programming knowledge required", "Computer with internet access"],
+      sections: [
+        {
+          id: 1,
+          name: "Python Basics",
+          order: 0,
+          subsections: [
+            {
+              id: 1,
+              name: "Getting Started with Python",
+              lessons: [
+                {
+                  id: 1,
+                  title: "Python Crash Course",
+                  type: "video",
+                  video_url: "<iframe width='560' height='315' src='https://www.youtube.com/embed/JJmcL1N2KQs' frameborder='0' allowfullscreen></iframe>"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  };
+  
+  // Find matching topic
+  for (const [key, value] of Object.entries(topics)) {
+    if (query.includes(key)) {
+      return value;
+    }
+  }
+  
+  // Default to web development if no match
+  return webDev;
+}
+
+// Sample course topics for random selection
+const COURSE_TOPICS = [
+  {
+    name: "Web Development",
+    image: "https://images.unsplash.com/photo-1627398242454-45a1465c2479",
+    tags: ["HTML", "CSS", "JavaScript"]
+  },
+  {
+    name: "Machine Learning",
+    image: "https://images.unsplash.com/photo-1555255707-c07966088b7b",
+    tags: ["Python", "AI", "Data Science"]
+  },
+  {
+    name: "Mobile Development",
+    image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c",
+    tags: ["React Native", "iOS", "Android"]
+  }
+];
+
 export const callGeminiAPI = async (userMessage) => {
   try {
-    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-    const prompt = `Create a structured learning path based on the input: ${userMessage}
-
-    Rules:
-    - Organize content into main sections based on the input (e.g., 1. HTML and CSS, 2. JavaScript, etc.)
-    - Each section should be a numbered title (e.g., 1. HTML and CSS, 2. JavaScript, 3. Frameworks)
-    - Each subsection must be numbered as well (e.g., 1.1, 1.2, 1.3, etc.)
-    - Each subsection must include one YouTube video link only, no description
-    - Format the response in Markdown with clear headers and bullet points.
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 800));
     
-    Example Output:
-    # 1. HTML and CSS
+    // Generate random course data
+    const topic = COURSE_TOPICS[Math.floor(Math.random() * COURSE_TOPICS.length)];
     
-    ## 1.1 Basic HTML
-    - [HTML Basics](https://www.youtube.com/watch?v=UB1O30fR-EE)
-    
-    ## 1.2 Forms and Inputs
-    - [HTML Forms Tutorial](https://www.youtube.com/watch?v=9YffrCViTVk)
-    
-    ## 1.3 CSS Fundamentals
-    - [CSS Basics](https://www.youtube.com/watch?v=yfoY53QXEnI)
-    
-    # 2. JavaScript
-    
-    ## 2.1 JavaScript Fundamentals
-    - [JavaScript Basics](https://www.youtube.com/watch?v=W6NZfCO5SIk)
-    
-    ## 2.2 DOM Manipulation
-    - [Understanding DOM](https://www.youtube.com/watch?v=0ik6X4DJKCc)
-    
-    ## 2.3 Asynchronous JavaScript
-    - [Understanding Async JS](https://www.youtube.com/watch?v=Y8xWpAX7dGk)
-    
-    # 3. Frameworks
-    
-    ## 3.1 Introduction to React
-    - [React Basics](https://www.youtube.com/watch?v=Ke90Tje7VS0)
-    
-    ## 3.2 State Management
-    - [React State & Props](https://www.youtube.com/watch?v=Oioo0IdoEls)`;
-
-    const requestBody = {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 2048,
+    // Return both chat response and course card
+    return {
+      type: 'course',
+      content: {
+        id: crypto.randomUUID(),
+        title: `Complete ${topic.name} Course`,
+        short_description: `Master ${topic.name} from scratch to advanced level`,
+        description: `A comprehensive curriculum to learn ${topic.name}. Perfect for beginners and intermediate learners.`,
+        thumbnail: `${topic.image}?w=800&auto=format&fit=crop`,
+        duration: "25",
+        sources: "Curated from top resources",
+        proficiency: "beginner",
+        certificate_given: Math.random() > 0.5,
+        project_based: true,
+        learning_points: [
+          `Learn ${topic.name} fundamentals`,
+          "Build real-world projects",
+          "Master industry best practices",
+          "Get hands-on experience"
+        ],
+        requirements: [
+          "Basic computer skills",
+          "Internet connection",
+          "Enthusiasm to learn"
+        ],
+        category: topic.name.toLowerCase().replace(" ", "-"),
+        last_updated: new Date().toISOString().split('T')[0],
+        is_published: true,
+        sections: [
+          {
+            id: 1,
+            name: "Getting Started",
+            order: 0,
+            subsections: [
+              {
+                id: 1,
+                name: "Introduction",
+                lessons: [
+                  {
+                    id: 1,
+                    title: `Introduction to ${topic.name}`,
+                    type: "video",
+                    video_url: "<iframe width='560' height='315' src='https://www.youtube.com/embed/placeholder' frameborder='0' allowfullscreen></iframe>"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            id: 2,
+            name: "Core Concepts",
+            order: 1,
+            subsections: topic.tags.map((tag, index) => ({
+              id: index + 1,
+              name: tag,
+              lessons: [
+                {
+                  id: 1,
+                  title: `${tag} Fundamentals`,
+                  type: "video",
+                  video_url: "<iframe width='560' height='315' src='https://www.youtube.com/embed/placeholder' frameborder='0' allowfullscreen></iframe>"
+                }
+              ]
+            }))
+          }
+        ]
       },
-      safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
-      ],
+      chatResponse: `I've found a great ${topic.name} course for you! This comprehensive course covers everything from basics to advanced concepts. Would you like me to add it to your learning dashboard?`
     };
-
-    const response = await fetch(`${API_URL}?key=${API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) throw new Error(`Gemini API error: ${response.status}`);
-
-    const data = await response.json();
-    const responseText = data.candidates[0]?.content?.parts?.[0]?.text;
-
-    console.log("Raw AI Response:", responseText);
-    return responseText;
   } catch (error) {
-    console.error("Error generating learning path with Gemini:", error);
-    return "Sorry, I couldn't generate the learning path at this moment.";
+    console.error("Error in chat response:", error);
+    return {
+      type: 'text',
+      content: "Sorry, I encountered an error processing your request. Please try again."
+    };
   }
 };
 

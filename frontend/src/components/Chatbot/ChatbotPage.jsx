@@ -217,6 +217,85 @@ const ChatbotPage = () => {
     setMessage(topic);
   };
 
+  const renderMessage = (message) => {
+    // For user messages
+    if (message.type === 'user') {
+      return message.content;
+    }
+  
+    // For bot responses containing course cards
+    if (message.type === 'bot' && message.content?.type === 'course') {
+      return (
+        <>
+          {/* Chat text */}
+          {message.content.chatResponse && (
+            <div className="mb-4 bg-white p-3 rounded-lg">{message.content.chatResponse}</div>
+          )}
+          
+          {/* Course Card - adjusted width */}
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200 max-w-md">
+            <div className="relative h-48">
+              <img 
+                src={message.content.content.thumbnail}
+                alt={message.content.content.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+              <div className="absolute bottom-4 left-4 text-white">
+                <span className="bg-blue-600 text-xs px-2 py-1 rounded-full font-medium">
+                  {message.content.content.proficiency}
+                </span>
+              </div>
+            </div>
+            
+            <div className="p-4">
+              <h3 className="text-xl font-bold text-gray-800 mb-2">
+                {message.content.content.title}
+              </h3>
+              <p className="text-gray-600 text-sm mb-4">
+                {message.content.content.short_description}
+              </p>
+              
+              <div className="mb-4">
+                <h4 className="font-medium mb-2">You'll Learn:</h4>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  {message.content.content.learning_points.slice(0, 3).map((point, idx) => (
+                    <li key={idx} className="text-gray-600">{point}</li>
+                  ))}
+                </ul>
+              </div>
+              
+              <div className="flex flex-wrap gap-2 mb-4">
+                {message.content.content.sections[1].subsections.map(sub => (
+                  <span 
+                    key={sub.id}
+                    className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full text-sm"
+                  >
+                    {sub.name}
+                  </span>
+                ))}
+              </div>
+              
+              <button 
+                onClick={() => console.log('Adding course:', message.content.content.title)}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Add to Learning Dashboard
+              </button>
+            </div>
+          </div>
+        </>
+      );
+    }
+  
+    // For regular bot text responses - add white container
+    return (
+      <div className="bg-white p-3 rounded-lg">
+        {typeof message.content === 'string' ? message.content : message.content.content}
+      </div>
+    );
+  };
+
   return (
     <div className="h-screen flex overflow-hidden">
       {/* Sidebar */}
@@ -269,7 +348,7 @@ const ChatbotPage = () => {
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7-7" />
             </svg>
           </Link>
         </div>
@@ -309,43 +388,35 @@ const ChatbotPage = () => {
           <div className="flex-1 p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {chatHistory.map((chat) => (
               <div key={chat.id} className={`flex ${chat.type === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] rounded-lg p-3 shadow-sm ${chat.type === "user" ? "bg-blue-600 text-white rounded-br-none" : "bg-white text-gray-800 border border-gray-200 rounded-bl-none"}`}>
-                  {chat.type === "user" ? (
-                    <div className="mb-1 whitespace-pre-wrap">{chat.content}</div>
-                  ) : (
-                    <div className="mb-1">
-                      {chat.content.startsWith('# ') ? (
-                        parseMarkdownResponse(chat.content).map((section, index) => (
-                          <CourseSection
-                            key={index}
-                            section={section.title}
-                            subsections={section.subsections}
-                          />
-                        ))
-                      ) : (
-                        <ReactMarkdown>{chat.content}</ReactMarkdown>
-                      )}
+                <div className={`max-w-[80%] ${
+                  chat.type === "user" 
+                    ? "bg-blue-600 text-white rounded-br-none rounded-lg" 
+                    : "text-gray-800"
+                }`}>
+                  <div className="p-3">
+                    {renderMessage(chat)}
+                    <div className={`text-xs ${
+                      chat.type === "user" ? "text-blue-200" : "text-gray-500"
+                    } text-right mt-1`}>
+                      {chat.timestamp}
                     </div>
-                  )}
-                  <div className={`text-xs ${chat.type === "user" ? "text-blue-200" : "text-gray-500"} text-right`}>{chat.timestamp}</div>
+                  </div>
                 </div>
               </div>
             ))}
 
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-white text-gray-800 border border-gray-200 rounded-lg rounded-bl-none p-3 max-w-[80%] shadow-sm">
-                  <div className="flex items-center">
-                    <BiLoaderAlt className="animate-spin text-blue-500 mr-2" />
-                    <span>Thinking...</span>
-                  </div>
+                <div className="bg-white text-gray-800 rounded-lg rounded-bl-none p-3 flex items-center">
+                  <BiLoaderAlt className="animate-spin text-blue-500 mr-2" />
+                  <span>Thinking...</span>
                 </div>
               </div>
             )}
 
             <div ref={messagesEndRef} />
           </div>
-
+          
           {/* Input Section */}
           <div className="p-4 bg-white border-t border-gray-200">
             <div className="max-w-4xl mx-auto">
