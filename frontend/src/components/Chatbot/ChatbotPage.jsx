@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoHome, IoMenu, IoChevronBack } from "react-icons/io5";
+import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle } from "react-icons/io5";
 import { FaRobot, FaHistory } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
@@ -25,6 +25,89 @@ const useWindowSize = () => {
   }, []);
 
   return windowSize;
+};
+
+const CourseSection = ({ section, subsections }) => {
+  const [isOpen, setIsOpen] = useState(true);
+  
+  return (
+    <div className="mb-6 bg-white rounded-lg shadow-sm">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 rounded-t-lg hover:bg-gray-100 transition-colors"
+      >
+        <h3 className="text-lg font-semibold text-gray-800">{section}</h3>
+        <svg
+          className={`w-5 h-5 transform transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {isOpen && (
+        <div className="p-4">
+          {subsections.map((subsection, index) => (
+            <div key={index} className="mb-4 last:mb-0">
+              <h4 className="font-medium text-gray-700 mb-2">{subsection.title}</h4>
+              {subsection.videos.map((video, vIndex) => (
+                <a
+                  key={vIndex}
+                  href={video.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center p-2 rounded hover:bg-blue-50 transition-colors group"
+                >
+                  <IoPlayCircle className="text-blue-500 group-hover:text-blue-600 mr-2" size={20} />
+                  <span className="text-gray-600 group-hover:text-blue-600">{video.title}</span>
+                </a>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const parseMarkdownResponse = (content) => {
+  const sections = [];
+  let currentSection = null;
+  let currentSubsection = null;
+
+  content.split('\n').forEach(line => {
+    if (line.startsWith('# ')) {
+      if (currentSection) {
+        sections.push(currentSection);
+      }
+      currentSection = {
+        title: line.replace('# ', '').trim(),
+        subsections: []
+      };
+    } else if (line.startsWith('## ') && currentSection) {
+      currentSubsection = {
+        title: line.replace('## ', '').trim(),
+        videos: []
+      };
+      currentSection.subsections.push(currentSubsection);
+    } else if (line.includes('youtube.com') && currentSubsection) {
+      const titleMatch = line.match(/\[(.*?)\]/);
+      const urlMatch = line.match(/\((.*?)\)/);
+      if (titleMatch && urlMatch) {
+        currentSubsection.videos.push({
+          title: titleMatch[1],
+          url: urlMatch[1]
+        });
+      }
+    }
+  });
+
+  if (currentSection) {
+    sections.push(currentSection);
+  }
+
+  return sections;
 };
 
 const ChatbotPage = () => {
@@ -231,7 +314,17 @@ const ChatbotPage = () => {
                     <div className="mb-1 whitespace-pre-wrap">{chat.content}</div>
                   ) : (
                     <div className="mb-1">
-                      <ReactMarkdown>{chat.content}</ReactMarkdown>
+                      {chat.content.startsWith('# ') ? (
+                        parseMarkdownResponse(chat.content).map((section, index) => (
+                          <CourseSection
+                            key={index}
+                            section={section.title}
+                            subsections={section.subsections}
+                          />
+                        ))
+                      ) : (
+                        <ReactMarkdown>{chat.content}</ReactMarkdown>
+                      )}
                     </div>
                   )}
                   <div className={`text-xs ${chat.type === "user" ? "text-blue-200" : "text-gray-500"} text-right`}>{chat.timestamp}</div>
