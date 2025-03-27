@@ -277,7 +277,7 @@ const ChatbotPage = () => {
 
       {/* Main chat container */}
       <div className="flex-1 flex flex-col h-screen">
-        {/* Navbar */}
+        {/* Custom Chat Navbar */}
         <nav className="bg-white shadow-sm p-4 flex justify-between items-center">
           <div className="flex items-center">
             {!isSidebarOpen && (

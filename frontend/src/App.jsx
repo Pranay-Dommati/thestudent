@@ -46,16 +46,19 @@ const CourseDetailsWrapper = () => {
   );
 };
 
-const Layout = ({ children }) => {
+const Layout = ({ children, excludePaths = [] }) => {
   const location = useLocation();
 
   // Check if the current route is related to mentoring
   const isMentoring = location.pathname.startsWith('/mentoring');
 
+  // Check if the current route is in the excludePaths array
+  const isExcluded = excludePaths.some(path => location.pathname.startsWith(path));
+
   return (
     <>
       {/* Render MentoringNavbar for mentoring pages, otherwise render Navbar */}
-      {isMentoring ? <MentoringNavbar /> : <Navbar />}
+      {!isExcluded && (isMentoring ? <MentoringNavbar /> : <Navbar />)}
       <div className="min-h-screen">
         {children}
       </div>
@@ -63,7 +66,7 @@ const Layout = ({ children }) => {
   );
 };
 
-function App() {
+const App = () => {
   return (
     <AuthProvider>
       <Toaster 
@@ -91,7 +94,7 @@ function App() {
         }} 
       />
       <BrowserRouter>
-        <Layout>
+        <Layout excludePaths={['/chat']}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             
