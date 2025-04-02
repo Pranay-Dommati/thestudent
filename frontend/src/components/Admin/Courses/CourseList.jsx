@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaPlus, FaSearch, FaFilter, FaEdit, FaTrash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+import { getEngineeringCourses } from '../../../services/courseApi';
+import { toast } from 'react-hot-toast';
 
-const CourseList = ({ courses = [], onAddNew, isDarkMode, onEdit, onDelete }) => {
+const API_URL = 'http://localhost:8000';
+
+const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     category: '',
@@ -12,6 +16,27 @@ const CourseList = ({ courses = [], onAddNew, isDarkMode, onEdit, onDelete }) =>
   });
   const [filterOpen, setFilterOpen] = useState(false);
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [courses, setCourses] = useState([]);
+
+  // Fetch courses from database
+  useEffect(() => {
+    const fetchCourses = async () => {
+      setLoading(true);
+      try {
+        const courseData = await getEngineeringCourses('all');
+        console.log('Courses fetched:', courseData);
+        setCourses(courseData || []);
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+        toast.error('Failed to load courses. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
 
   const handleEdit = (courseId) => {
     if (onEdit) onEdit(courseId);
@@ -22,6 +47,12 @@ const CourseList = ({ courses = [], onAddNew, isDarkMode, onEdit, onDelete }) =>
   const handleDelete = (courseId) => {
     if (onDelete) onDelete(courseId);
   };
+
+  // Filter and search courses
+  const filteredCourses = courses.filter(course => {
+    const matchesSearch = course.title?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSearch;
+  });
 
   return (
     <div className={`bg-white rounded-xl shadow-lg p-6 ${
@@ -76,14 +107,24 @@ const CourseList = ({ courses = [], onAddNew, isDarkMode, onEdit, onDelete }) =>
             </tr>
           </thead>
           <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-            {courses.length > 0 ? (
-              courses.map((course) => (
+            {loading ? (
+              <tr>
+                <td colSpan="4" className="py-6 text-center">
+                  <div className="flex justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                  </div>
+                </td>
+              </tr>
+            ) : filteredCourses.length > 0 ? (
+              filteredCourses.map((course) => (
                 <tr key={course.id} className="hover:bg-gray-50">
                   <td className="py-3 px-4">
                     <div className="flex items-center">
                       {course.thumbnail && (
                         <img 
-                          src={course.thumbnail} 
+                          src={course.thumbnail.startsWith('http') 
+                            ? course.thumbnail 
+                            : `${API_URL}${course.thumbnail}`} 
                           alt={course.title}
                           className="w-10 h-10 mr-3 rounded-md object-cover"
                         />
@@ -92,34 +133,36 @@ const CourseList = ({ courses = [], onAddNew, isDarkMode, onEdit, onDelete }) =>
                     </div>
                   </td>
                   <td className="py-3 px-4 text-center">
-                    {course.classLevel || "N/A"}
+                    {course.category || "Engineering"}
                   </td>
                   <td className="py-3 px-4 text-center">
-                    {course.lastUpdated ? new Date(course.lastUpdated).toLocaleDateString() : "Not specified"}
+                    {course.last_updated ? new Date(course.last_updated).toLocaleDateString() : "Not specified"}
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <button
-                      onClick={() => handleEdit(course.id)}
-                      className={`p-1.5 rounded-md mr-2 ${
-                        isDarkMode 
-                          ? 'text-blue-400 hover:bg-gray-700' 
-                          : 'text-blue-600 hover:bg-blue-50'
-                      }`}
-                      title="Edit course"
-                    >
-                      <FaEdit />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(course.id)}
-                      className={`p-1.5 rounded-md ${
-                        isDarkMode 
-                          ? 'text-red-400 hover:bg-gray-700' 
-                          : 'text-red-600 hover:bg-red-50'
-                      }`}
-                      title="Delete course"
-                    >
-                      <FaTrash />
-                    </button>
+                    <div className="flex justify-end space-x-4">
+                      <button
+                        onClick={() => handleEdit(course.id)}
+                        className={`p-2 rounded-md ${
+                          isDarkMode 
+                            ? 'text-blue-400 hover:bg-gray-700' 
+                            : 'text-blue-600 hover:bg-blue-50'
+                        }`}
+                        title="Edit course"
+                      >
+                        <FaEdit size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(course.id)}
+                        className={`p-2 rounded-md ${
+                          isDarkMode 
+                            ? 'text-red-400 hover:bg-gray-700' 
+                            : 'text-red-600 hover:bg-red-50'
+                        }`}
+                        title="Delete course"
+                      >
+                        <FaTrash size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
