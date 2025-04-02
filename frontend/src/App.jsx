@@ -1,5 +1,5 @@
 import './App.css';
-import { BrowserRouter, Routes, Route, useParams, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useParams, useLocation, Navigate } from 'react-router-dom';
 import HomePage from './components/HomePage/HomePage';
 import Courses from './components/Courses/Courses';
 import ChatBotPage from './components/Chatbot/ChatbotPage';
@@ -18,7 +18,7 @@ import SchoolCourseDetails from './components/CourseDetails/SchoolCourseDetails'
 import Navbar from './components/Navbar/Navbar';
 import AdminDashboard from './components/Admin/Dashboard/AdminDashboard';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import HelpCenter from './components/HelpCenter/HelpCenter';
 import StandaloneQuizPage from './components/CourseLearningPage/templ/StandaloneQuizPage';
 import NotFound from './components/NotFound/NotFound';
@@ -64,6 +64,17 @@ const Layout = ({ children, excludePaths = [] }) => {
       </div>
     </>
   );
+};
+
+// Add a protected route component
+const ProtectedRoute = ({ children }) => {
+  const { isLoggedIn } = useAuth();
+  
+  if (!isLoggedIn) {
+    return <Navigate to="/auth?mode=login" />;
+  }
+  
+  return children;
 };
 
 const App = () => {
@@ -124,7 +135,11 @@ const App = () => {
             <Route path="/chat" element={<ChatBotPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
-            <Route path="/learning-hub" element={<LearningHubPage />} />
+            <Route path="/learning-hub" element={
+              <ProtectedRoute>
+                <LearningHubPage />
+              </ProtectedRoute>
+            } />
             <Route path="/auth" element={<AuthForm />} />
 
             {/* Course Detail Routes */}

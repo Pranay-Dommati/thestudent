@@ -90,19 +90,21 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               >
                 Courses
               </Link>
-              <Link 
-                to="/learning-hub" 
-                className={`font-medium transition-colors ${textColor}`}
-              >
-                Learning Hub
-              </Link>
+              {isLoggedIn && (
+                <Link 
+                  to="/learning-hub" 
+                  className={`font-medium transition-colors ${textColor}`}
+                >
+                  Learning Hub
+                </Link>
+              )}
               <Link 
                 to="/chat" 
                 className={`font-medium transition-colors ${textColor}`}
               >
                 AI Chatbot
               </Link>
-              {/* Mentoring Link */}
+              {/* Mentoring Link - commented out as requested */}
               {/* <Link 
                 to="/mentoring" 
                 className="text-gray-600 hover:text-blue-600 transition-colors"
@@ -198,9 +200,11 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 <a href="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                   AI Chatbot
                 </a>
-                <a href="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
-                  Learning Hub
-                </a>
+                {isLoggedIn && (
+                  <a href="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                    Learning Hub
+                  </a>
+                )}
                 <Link to="/settings" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                   Settings
                 </Link>
@@ -217,7 +221,11 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 <a href="/" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Home</a>
                 <a href="/courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Courses</a>
                 <a href="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">AI Chatbot</a>
-                <a href="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Learning Hub</a>
+                {isLoggedIn && (
+                  <a href="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                    Learning Hub
+                  </a>
+                )}
                 <div className="mt-4 flex flex-col space-y-2 px-4">
                   <a href="/auth?mode=login" className="px-4 py-2 rounded-full text-blue-600 border border-blue-600 font-medium text-center">
                     Log In
