@@ -148,10 +148,11 @@ const App = () => {
             <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
 
             <Route path="*" element={<NotFound />} />
-            <Route path="/mentoring" element={<MentoringHome />} />
-            <Route path="/mentoring/industry-experts" element={<IndustryExperts />} />
-            <Route path="/mentoring/alumni-mentorship" element={<AlumniMentorship />} />
+            {/* Mentoring Routes */}
+            {/* <Route path="/mentoring" element={<MentoringHome />} />
             <Route path="/mentoring/college-seniors" element={<CollegeSeniors />} />
+            <Route path="/mentoring/industry-experts" element={<IndustryExperts />} />
+            <Route path="/mentoring/alumni-mentorship" element={<AlumniMentorship />} /> */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>

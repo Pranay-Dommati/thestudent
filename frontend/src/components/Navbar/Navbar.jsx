@@ -102,12 +102,13 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               >
                 AI Chatbot
               </Link>
-              <Link 
+              {/* Mentoring Link */}
+              {/* <Link 
                 to="/mentoring" 
-                className={`font-medium transition-colors ${textColor}`}
+                className="text-gray-600 hover:text-blue-600 transition-colors"
               >
                 Mentoring
-              </Link>
+              </Link> */}
             </div>
           </div>
           

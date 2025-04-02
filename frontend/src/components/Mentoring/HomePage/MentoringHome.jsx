@@ -1,9 +1,9 @@
 import React from 'react';
 import MentoringNavbar from '../MentoringNavbar';
-import HeroSection from "./HeroSection";
-import HowItWorks from "./HowItWorks";
-import CollegeMentorship from "./CollegeMentorship";
-import CTASection from "./CTASection";
+// import HeroSection from "./HeroSection";
+// import HowItWorks from "./HowItWorks";
+// import CollegeMentorship from "./CollegeMentorship";
+// import CTASection from "./CTASection";
 import CategoryCard from "./CategoryCard";
 import Footer from "../../Footer/Footer";
 import { FaUserGraduate, FaChalkboardTeacher, FaUsers } from "react-icons/fa";
@@ -13,7 +13,7 @@ export default function MentoringHome() {
     <div className="min-h-screen bg-gray-50">
       <MentoringNavbar />
       <main>
-        <HeroSection />
+        {/* <HeroSection /> */}
 
         {/* Mentorship Categories */}
         <section className="py-20 px-8 bg-gray-50">
@@ -60,10 +60,10 @@ export default function MentoringHome() {
           </div>
         </section>
 
-        <HowItWorks />
+        {/* <HowItWorks /> */}
 
-        <CollegeMentorship />
-        <CTASection />
+        {/* <CollegeMentorship /> */}
+        {/* <CTASection /> */}
       </main>
       <Footer />
     </div>
