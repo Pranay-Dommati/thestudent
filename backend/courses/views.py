@@ -266,3 +266,65 @@ def get_engineering_course_by_id(request, course_id):
             {"error": "Course not found"}, 
             status=status.HTTP_404_NOT_FOUND
         )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_all_courses(request):
+    try:
+        category = request.query_params.get('category', 'all')
+        print(f"Requested category: {category}")
+        
+        # Process engineering courses
+        eng_queryset = EngineeringCourse.objects.all()
+        if category != 'all' and category != '' and category != 'school':
+            eng_queryset = eng_queryset.filter(category=category)
+        
+        # Process school courses
+        school_queryset = SchoolCourse.objects.all()
+        if category == 'school':
+            eng_queryset = EngineeringCourse.objects.none()  # Empty if only school courses requested
+        
+        # Combine both types of courses
+        courses_data = []
+        
+        # Engineering courses
+        for course in eng_queryset:
+            course_data = {
+                'id': str(course.id),
+                'title': course.title,
+                'thumbnail': request.build_absolute_uri(course.thumbnail.url) if course.thumbnail else None,
+                'short_description': course.short_description,
+                'course_type': 'engineering',
+                'category': course.category or 'Engineering',
+                'class': 'Engineering',
+                'last_updated': course.last_updated,
+                'is_published': course.is_published
+            }
+            courses_data.append(course_data)
+        
+        # School courses
+        for course in school_queryset:
+            course_data = {
+                'id': str(course.id),
+                'title': course.title,
+                'thumbnail': request.build_absolute_uri(course.thumbnail.url) if course.thumbnail else None,
+                'short_description': course.short_description,
+                'course_type': 'school',
+                'category': course.subject,
+                'class': f"{course.class_level} - {course.board}",
+                'last_updated': course.last_updated,
+                'is_published': course.is_published
+            }
+            courses_data.append(course_data)
+
+        print(f"Successfully processed {len(courses_data)} courses")
+        return Response(courses_data)
+        
+    except Exception as e:
+        print(f"Error in list_all_courses: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": "Internal server error", "details": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

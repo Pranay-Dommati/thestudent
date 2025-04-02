@@ -73,3 +73,15 @@ export const getEngineeringCourseById = async (courseId) => {
     throw error;
   }
 };
+
+export const getAllCourses = async (category = 'all') => {
+  try {
+    console.log('Fetching all courses for category:', category);
+    const response = await axios.get(`${API_URL}/api/courses/all/?category=${category}`);
+    console.log('Course data received:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching courses:', error);
+    throw error;
+  }
+};

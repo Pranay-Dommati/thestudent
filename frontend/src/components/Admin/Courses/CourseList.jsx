@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaSearch, FaFilter, FaEdit, FaTrash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import { getEngineeringCourses } from '../../../services/courseApi';
+import { getAllCourses } from '../../../services/courseApi';
 import { toast } from 'react-hot-toast';
 
 const API_URL = 'http://localhost:8000';
@@ -10,8 +10,7 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     category: '',
-    board: '',
-    subject: '',
+    type: 'all', // 'all', 'engineering', or 'school'
     status: 'all'
   });
   const [filterOpen, setFilterOpen] = useState(false);
@@ -24,8 +23,8 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
     const fetchCourses = async () => {
       setLoading(true);
       try {
-        const courseData = await getEngineeringCourses('all');
-        console.log('Courses fetched:', courseData);
+        const courseData = await getAllCourses(filters.category);
+        console.log('All courses fetched:', courseData);
         setCourses(courseData || []);
       } catch (error) {
         console.error('Error fetching courses:', error);
@@ -36,22 +35,29 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
     };
 
     fetchCourses();
-  }, []);
+  }, [filters.category]);
 
-  const handleEdit = (courseId) => {
-    if (onEdit) onEdit(courseId);
-    // Alternatively navigate to edit page
-    // navigate(`/admin-p/edit-course/${courseId}`);
+  const handleEdit = (courseId, courseType) => {
+    if (onEdit) onEdit(courseId, courseType);
+    // Example edit navigation:
+    // navigate(`/admin-p/edit-course/${courseType}/${courseId}`);
   };
 
-  const handleDelete = (courseId) => {
-    if (onDelete) onDelete(courseId);
+  const handleDelete = (courseId, courseType) => {
+    if (onDelete) onDelete(courseId, courseType);
+  };
+
+  // Apply course type filter
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
   };
 
   // Filter and search courses
   const filteredCourses = courses.filter(course => {
     const matchesSearch = course.title?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
+    const matchesType = filters.type === 'all' || course.course_type === filters.type;
+    return matchesSearch && matchesType;
   });
 
   return (
@@ -81,16 +87,32 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <button
-          onClick={() => setFilterOpen(!filterOpen)}
-          className={`flex items-center px-4 py-2 border rounded-lg ${
-            isDarkMode 
-              ? 'border-gray-600 hover:bg-gray-700' 
-              : 'border-gray-300 hover:bg-gray-50'
-          }`}
-        >
-          <FaFilter className="mr-2" /> Filters
-        </button>
+        
+        <div className="flex gap-2">
+          <select
+            name="type"
+            value={filters.type}
+            onChange={handleFilterChange}
+            className={`px-4 py-2 border rounded-lg ${
+              isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'
+            }`}
+          >
+            <option value="all">All Courses</option>
+            <option value="engineering">Engineering</option>
+            <option value="school">School</option>
+          </select>
+          
+          <button
+            onClick={() => setFilterOpen(!filterOpen)}
+            className={`flex items-center px-4 py-2 border rounded-lg ${
+              isDarkMode 
+                ? 'border-gray-600 hover:bg-gray-700' 
+                : 'border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <FaFilter className="mr-2" /> Filters
+          </button>
+        </div>
       </div>
 
       {/* Course Table */}
@@ -133,7 +155,7 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
                     </div>
                   </td>
                   <td className="py-3 px-4 text-center">
-                    {course.category || "Engineering"}
+                    {course.class || "N/A"}
                   </td>
                   <td className="py-3 px-4 text-center">
                     {course.last_updated ? new Date(course.last_updated).toLocaleDateString() : "Not specified"}
@@ -141,24 +163,24 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
                   <td className="py-3 px-4 text-right">
                     <div className="flex justify-end space-x-4">
                       <button
-                        onClick={() => handleEdit(course.id)}
+                        onClick={() => handleEdit(course.id, course.course_type)}
                         className={`p-2 rounded-md ${
                           isDarkMode 
                             ? 'text-blue-400 hover:bg-gray-700' 
                             : 'text-blue-600 hover:bg-blue-50'
                         }`}
-                        title="Edit course"
+                        title={`Edit ${course.course_type} course`}
                       >
                         <FaEdit size={18} />
                       </button>
                       <button
-                        onClick={() => handleDelete(course.id)}
+                        onClick={() => handleDelete(course.id, course.course_type)}
                         className={`p-2 rounded-md ${
                           isDarkMode 
                             ? 'text-red-400 hover:bg-gray-700' 
                             : 'text-red-600 hover:bg-red-50'
                         }`}
-                        title="Delete course"
+                        title={`Delete ${course.course_type} course`}
                       >
                         <FaTrash size={18} />
                       </button>
