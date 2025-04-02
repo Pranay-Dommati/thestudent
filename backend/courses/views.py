@@ -269,6 +269,19 @@ def get_engineering_course_by_id(request, course_id):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+def get_school_course_by_id(request, course_id):
+    try:
+        course = SchoolCourse.objects.get(id=course_id)
+        serializer = CourseWithChaptersSerializer(course)
+        return Response(serializer.data)
+    except SchoolCourse.DoesNotExist:
+        return Response(
+            {"error": "Course not found"}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def list_all_courses(request):
     try:
         category = request.query_params.get('category', 'all')
@@ -322,6 +335,59 @@ def list_all_courses(request):
         
     except Exception as e:
         print(f"Error in list_all_courses: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": "Internal server error", "details": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_school_courses(request):
+    try:
+        class_level = request.query_params.get('class', '')
+        board = request.query_params.get('board', '')
+        state = request.query_params.get('state', '')
+        
+        print(f"Fetching school courses - Class: {class_level}, Board: {board}, State: {state}")
+        
+        queryset = SchoolCourse.objects.all()
+        
+        if class_level:
+            queryset = queryset.filter(class_level=class_level)
+        
+        if board:
+            queryset = queryset.filter(board=board)
+            
+        if board == 'state' and state:
+            queryset = queryset.filter(state__iexact=state)  # Case-insensitive comparison
+        
+        # Debug the queryset
+        print(f"Found {queryset.count()} courses matching the criteria")
+        for course in queryset:
+            print(f"Course: {course.title}, State: {course.state}, Class: {course.class_level}, Board: {course.board}")
+        
+        courses_data = []
+        for course in queryset:
+            course_data = {
+                'id': str(course.id),
+                'title': course.title,
+                'thumbnail': request.build_absolute_uri(course.thumbnail.url) if course.thumbnail else None,
+                'subject': course.subject,
+                'short_description': course.short_description,
+                'class_level': course.class_level,
+                'board': course.board,
+                'state': course.state,
+                'duration': course.duration,
+                'last_updated': course.last_updated,
+            }
+            courses_data.append(course_data)
+
+        return Response(courses_data)
+        
+    except Exception as e:
+        print(f"Error in list_school_courses: {str(e)}")
         import traceback
         traceback.print_exc()
         return Response(

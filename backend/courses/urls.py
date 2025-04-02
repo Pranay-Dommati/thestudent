@@ -6,4 +6,6 @@ urlpatterns = [
     path('api/courses/engineering/', views.list_engineering_courses, name='list-engineering-courses'),
     path('api/courses/engineering/<str:course_id>/', views.get_engineering_course_by_id, name='get-engineering-course-by-id'),
     path('api/courses/all/', views.list_all_courses, name='list-all-courses'),
+    path('api/courses/school/', views.list_school_courses, name='list-school-courses'),
+    path('api/courses/school/<str:course_id>/', views.get_school_course_by_id, name='get-school-course-by-id'),
 ]
