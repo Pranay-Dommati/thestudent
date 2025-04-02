@@ -366,7 +366,9 @@ def list_school_courses(request):
         # Debug the queryset
         print(f"Found {queryset.count()} courses matching the criteria")
         for course in queryset:
-            print(f"Course: {course.title}, State: {course.state}, Class: {course.class_level}, Board: {course.board}")
+            print(f"Course: {course.title}")
+            print(f"Key Topics: {type(course.key_topics)} - {course.key_topics}")
+            print(f"Learning Points: {type(course.learning_points)} - {course.learning_points}")
         
         courses_data = []
         for course in queryset:
@@ -380,6 +382,9 @@ def list_school_courses(request):
                 'board': course.board,
                 'state': course.state,
                 'duration': course.duration,
+                'sources': course.sources,
+                'key_topics': course.key_topics,
+                'learning_points': course.learning_points,
                 'last_updated': course.last_updated,
             }
             courses_data.append(course_data)

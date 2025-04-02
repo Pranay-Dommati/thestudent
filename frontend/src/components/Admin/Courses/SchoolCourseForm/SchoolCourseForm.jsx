@@ -323,61 +323,59 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     ));
   };
   
-  // REPLACE the existing validateForm function with this:
-const validateForm = () => {
-  const newErrors = {};
-  
-  // Only validate first step fields when on first step
-  if (activeStep === 1) {
-    // Basic info validation
-    if (!courseInfo.thumbnail) newErrors.thumbnail = 'Course thumbnail is required';
-    if (!courseInfo.title.trim()) newErrors.title = 'Course title is required';
-    if (!courseInfo.board) newErrors.board = 'Board selection is required';
-    if (courseInfo.board === 'state' && !courseInfo.state) newErrors.state = 'State selection is required';
-    if (!courseInfo.subject) newErrors.subject = 'Subject selection is required';
-    if (!courseInfo.sources.trim()) newErrors.sources = 'Course sources are required';
-    if (!courseInfo.duration.trim()) newErrors.duration = 'Course duration is required';
+  const validateForm = () => {
+    const newErrors = {};
     
-    // Validate key topics
-    if (courseInfo.keyTopics.length === 0) {
-      newErrors.keyTopics = 'At least one key topic is required';
-    } else if (courseInfo.keyTopics.some(topic => !topic.trim())) {
-      newErrors.keyTopics = 'All key topics must be filled';
-    }
-    
-    // Validate learning points (at least 2)
-    if (courseInfo.learningPoints.length < 2) {
-      newErrors.learningPoints = 'At least 2 learning points are required';
-    } else if (courseInfo.learningPoints.some(point => !point.trim())) {
-      newErrors.learningPoints = 'All learning points must be filled';
-    }
-  }
-  
-  // Only validate second step fields when on second step
-  if (activeStep === 2) {
-    // Validate chapters
-    chapters.forEach((chapter, chapterIndex) => {
-      if (!chapter.name.trim()) {
-        newErrors[`chapter${chapterIndex}name`] = 'Chapter name is required';
+    // Only validate first step fields when on first step
+    if (activeStep === 1) {
+      // Basic info validation
+      if (!courseInfo.thumbnail) newErrors.thumbnail = 'Course thumbnail is required';
+      if (!courseInfo.title.trim()) newErrors.title = 'Course title is required';
+      if (!courseInfo.board) newErrors.board = 'Board selection is required';
+      if (courseInfo.board === 'state' && !courseInfo.state) newErrors.state = 'State selection is required';
+      if (!courseInfo.subject) newErrors.subject = 'Subject selection is required';
+      if (!courseInfo.sources.trim()) newErrors.sources = 'Course sources are required';
+      if (!courseInfo.duration.trim()) newErrors.duration = 'Course duration is required';
+      
+      // Validate key topics
+      if (courseInfo.keyTopics.length === 0) {
+        newErrors.keyTopics = 'At least one key topic is required';
+      } else if (courseInfo.keyTopics.some(topic => !topic.trim())) {
+        newErrors.keyTopics = 'All key topics must be filled';
       }
       
-      chapter.lessons.forEach((lesson, lessonIndex) => {
-        if (!lesson.title.trim()) {
-          newErrors[`chapter${chapterIndex}lesson${lessonIndex}`] = 'Lesson title is required';
+      // Validate learning points (at least 2)
+      if (courseInfo.learningPoints.length < 2) {
+        newErrors.learningPoints = 'At least 2 learning points are required';
+      } else if (courseInfo.learningPoints.some(point => !point.trim())) {
+        newErrors.learningPoints = 'All learning points must be filled';
+      }
+    }
+    
+    // Only validate second step fields when on second step
+    if (activeStep === 2) {
+      // Validate chapters
+      chapters.forEach((chapter, chapterIndex) => {
+        if (!chapter.name.trim()) {
+          newErrors[`chapter${chapterIndex}name`] = 'Chapter name is required';
         }
         
-        if (lesson.type === 'video' && !lesson.videoUrl.trim()) {
-          newErrors[`chapter${chapterIndex}lesson${lessonIndex}video`] = 'Video URL is required';
-        }
+        chapter.lessons.forEach((lesson, lessonIndex) => {
+          if (!lesson.title.trim()) {
+            newErrors[`chapter${chapterIndex}lesson${lessonIndex}`] = 'Lesson title is required';
+          }
+          
+          if (lesson.type === 'video' && !lesson.videoUrl.trim()) {
+            newErrors[`chapter${chapterIndex}lesson${lessonIndex}video`] = 'Video URL is required';
+          }
+        });
       });
-    });
-  }
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
   
-  setErrors(newErrors);
-  return Object.keys(newErrors).length === 0;
-};
-  
-  // Update the handleNext function
   const handleNext = (e) => {
     // Prevent form submission when clicking "Next"
     e.preventDefault();
@@ -400,67 +398,70 @@ const validateForm = () => {
     window.scrollTo(0, 0);
   };
   
-  // Update handleSubmit to only include fields you want
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (!validateForm()) {
-    return;
-  }
-  
-  setIsSubmitting(true);
-  try {
-    // Prepare form data
-    const formData = new FormData();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-    // Add basic course info
-    if (courseInfo.thumbnail) {
-      formData.append('thumbnail', courseInfo.thumbnail);
+    // Validate form data
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setErrors(errors);
+      toast.error('Please fix the form errors');
+      return;
     }
-    formData.append('title', courseInfo.title);
-    formData.append('class_level', classLevel);
-    formData.append('board', courseInfo.board);
-    if (courseInfo.board === 'state') {
-      formData.append('state', courseInfo.state);
+    
+    setIsSubmitting(true);
+    
+    try {
+      const formData = new FormData();
+      
+      // Add basic info
+      formData.append('title', courseInfo.title);
+      formData.append('short_description', courseInfo.title); // Use title as shortDescription
+      formData.append('description', `${courseInfo.title} - ${classLevel} - ${courseInfo.subject}`); // Generate a description
+      formData.append('class_level', classLevel);
+      formData.append('board', courseInfo.board);
+      
+      if (courseInfo.board === 'state') {
+        formData.append('state', courseInfo.state);
+      }
+      
+      formData.append('subject', courseInfo.subject);
+      formData.append('duration', courseInfo.duration);
+      formData.append('sources', courseInfo.sources);
+      
+      // Add key topics and learning points
+      console.log('Key Topics:', courseInfo.keyTopics);
+      console.log('Learning Points:', courseInfo.learningPoints);
+      formData.append('key_topics', JSON.stringify(courseInfo.keyTopics));
+      formData.append('learning_points', JSON.stringify(courseInfo.learningPoints));
+      
+      // Process chapters data for API
+      const chaptersData = chapters.map(chapter => ({
+        name: chapter.name,
+        lessons: chapter.lessons.map(lesson => ({
+          title: lesson.title,
+          type: lesson.type,
+          videoUrl: lesson.videoUrl,
+          aboutLesson: lesson.aboutLesson,
+          resources: lesson.hasResources ? lesson.resources : { downloadable: [], internet: [] },
+          quizQuestions: lesson.quizQuestions || []
+        }))
+      }));
+      
+      // Add chapters data
+      formData.append('chapters', JSON.stringify(chaptersData));
+      
+      // Submit the form
+      await createCourse(formData);
+      toast.success('Course created successfully');
+      navigate('/admin-p/courses');
+    } catch (error) {
+      console.error('Error creating course:', error);
+      toast.error('Failed to create course. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
-    formData.append('subject', courseInfo.subject);
-    formData.append('sources', courseInfo.sources);
-    formData.append('duration', courseInfo.duration);
-    
-    // Add the missing fields to make the backend happy
-    formData.append('shortDescription', courseInfo.title); // Use title as shortDescription
-    formData.append('description', `${courseInfo.title} - ${classLevel} - ${courseInfo.subject}`); // Generate a description
-    
-    formData.append('keyTopics', JSON.stringify(courseInfo.keyTopics));
-    formData.append('learningPoints', JSON.stringify(courseInfo.learningPoints));
-    
-    // Process chapters data for API
-    const chaptersData = chapters.map(chapter => ({
-      name: chapter.name,
-      lessons: chapter.lessons.map(lesson => ({
-        title: lesson.title,
-        type: lesson.type,
-        videoUrl: lesson.videoUrl,
-        aboutLesson: lesson.aboutLesson,
-        resources: lesson.hasResources ? lesson.resources : { downloadable: [], internet: [] },
-        quizQuestions: lesson.quizQuestions || []
-      }))
-    }));
-    
-    // Add chapters data
-    formData.append('chapters', JSON.stringify(chaptersData));
-    
-    // Submit the form
-    await createCourse(formData);
-    toast.success('Course created successfully');
-    navigate('/admin-p/courses');
-  } catch (error) {
-    console.error('Error creating course:', error);
-    toast.error('Failed to create course. Please try again.');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
   
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 max-w-7xl mx-auto">
