@@ -233,7 +233,6 @@ const SchoolCourseDetails = () => {
       </div>
 
       <div className="container mx-auto px-4 py-16">
-        <h2 className="text-2xl font-bold mb-8 text-center">{course.title}</h2>
         
         {/* Course Features - Static as requested */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
@@ -275,6 +274,17 @@ const SchoolCourseDetails = () => {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Add CTA button at the bottom of the page */}
+        <div className="mt-16 text-center">
+          <button 
+            onClick={handleStartLearning}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-5 rounded-lg font-medium flex items-center justify-center space-x-2 transform transition hover:scale-105 shadow-lg mx-auto"
+          >
+            <FaPlay className="mr-2" />
+            Start Learning Now
+          </button>
         </div>
       </div>
     </div>

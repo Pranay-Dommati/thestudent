@@ -11,6 +11,8 @@ const EleventhStandard = () => {
   const location = useLocation();
   const [selectedBoard, setSelectedBoard] = useState(null);
   const [showStateBoards, setShowStateBoards] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [courses, setCourses] = useState([]);
 
   // Add this useEffect to handle URL-based board selection
   useEffect(() => {
@@ -20,6 +22,60 @@ const EleventhStandard = () => {
       setSelectedBoard('cbse');
     }
   }, [location, stateId]);
+
+  // Update the useEffect hook with proper filtering
+  useEffect(() => {
+    if (selectedBoard) {
+      const fetchCourses = async () => {
+        setLoading(true);
+        try {
+          let data;
+
+          if (selectedBoard === 'state' || selectedBoard.startsWith('state-')) {
+            const stateCode = selectedBoard.replace('state-', '') || stateId;
+            const stateValue = stateCode === 'ts' ? 'Telangana' : 
+                             stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
+            
+            console.log(`Fetching state board courses: class=11th, board=state, state=${stateValue}`);
+            data = await getSchoolCourses('11th', 'state', stateValue);
+          } else {
+            console.log(`Fetching courses: class=11th, board=${selectedBoard}`);
+            data = await getSchoolCourses('11th', selectedBoard);
+          }
+
+          console.log('API returned courses:', data);
+          
+          // Apply strict filtering
+          const filteredCourses = data.filter(course => {
+            const classMatch = course.class_level === '11th';
+            const boardMatch = course.board.toLowerCase() === 
+              (selectedBoard.startsWith('state-') ? 'state' : selectedBoard.toLowerCase());
+            
+            let stateMatch = true;
+            if (selectedBoard.startsWith('state-')) {
+              const stateCode = selectedBoard.replace('state-', '') || stateId;
+              const stateValue = stateCode === 'ts' ? 'Telangana' : 
+                               stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
+              
+              stateMatch = course.state && 
+                course.state.toLowerCase().includes(stateValue.toLowerCase());
+            }
+            
+            return classMatch && boardMatch && stateMatch;
+          });
+
+          console.log(`Filtered to ${filteredCourses.length} courses for 11th standard`);
+          setCourses(filteredCourses);
+        } catch (error) {
+          console.error("Error fetching 11th standard courses:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchCourses();
+    }
+  }, [selectedBoard, stateId]);
 
   const boards = [
     { 

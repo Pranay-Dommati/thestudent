@@ -86,36 +86,20 @@ export const getAllCourses = async (category = 'all') => {
   }
 };
 
-export const getSchoolCourses = async (classLevel, board, state = null) => {
+export const getSchoolCourses = async (classLevel, board, state = '') => {
   try {
+    console.log(`API call: getSchoolCourses(${classLevel}, ${board}, ${state})`);
+    
     let url = `${API_URL}/api/courses/school/?class=${classLevel}&board=${board}`;
-    if (state) {
+    if (board === 'state' && state) {
       url += `&state=${state}`;
     }
-    console.log(`Fetching school courses: ${url}`);
     
-    // Add timeout and better error handling
-    const response = await axios.get(url, { 
-      timeout: 10000,
-      headers: { 'Accept': 'application/json' }
-    });
-    
-    console.log('School courses received:', response.data);
+    console.log(`Requesting URL: ${url}`);
+    const response = await axios.get(url);
     return response.data;
   } catch (error) {
-    if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      console.error('Error response:', error.response.data);
-      console.error('Error status:', error.response.status);
-    } else if (error.request) {
-      // The request was made but no response was received
-      console.error('No response received:', error.request);
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      console.error('Error setting up request:', error.message);
-    }
-    
-    throw error;
+    console.error('Error fetching school courses:', error);
+    return [];
   }
-};
+};3

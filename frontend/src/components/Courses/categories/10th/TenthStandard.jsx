@@ -59,22 +59,55 @@ const TenthStandard = () => {
         setLoading(true);
         try {
           let data;
+
           if (selectedBoard === 'state' || selectedBoard.startsWith('state-')) {
-            // For state boards, extract the state
-            const state = selectedBoard.replace('state-', '') || stateId;
-            console.log('Fetching courses for state:', state);
+            // For state boards, extract the state code
+            const stateCode = selectedBoard.replace('state-', '') || stateId;
             
-            // Make sure the state value is correct for your database
-            // For Telangana, use 'Telangana' instead of 'ts' if that's how it's stored
-            const stateValue = state === 'ts' ? 'Telangana' : state;
+            // Map state codes to full state names as stored in database
+            const stateValue = stateCode === 'ts' ? 'Telangana' : 
+                             stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
             
+            console.log(`Fetching state board courses: class=10th, board=state, state=${stateValue}`);
             data = await getSchoolCourses('10th', 'state', stateValue);
           } else {
-            // For CBSE or other boards
+            console.log(`Fetching courses: class=10th, board=${selectedBoard}`);
             data = await getSchoolCourses('10th', selectedBoard);
           }
-          console.log('Received courses:', data);
-          setCourses(data || []);
+
+          console.log('API returned courses:', data);
+
+          // Filter courses for exact matches but do not double-filter by board
+          // since the API should already return correct board courses
+          const filteredCourses = data.filter(course => {
+            const classMatch = course.class_level === '10th';
+            
+            // For state boards, strictly match the state name
+            let stateMatch = true;
+            if (selectedBoard.startsWith('state-')) {
+              const stateCode = selectedBoard.replace('state-', '') || stateId;
+              const stateValue = stateCode === 'ts' ? 'Telangana' : 
+                               stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
+              stateMatch = course.state === stateValue;
+            }
+            
+            console.log(`Filtering course:`, {
+              course: course.title,
+              class: course.class_level,
+              board: course.board,
+              state: course.state,
+              matches: {
+                class: classMatch,
+                board: true, // We trust the API to return correct board
+                state: stateMatch
+              }
+            });
+
+            return classMatch && stateMatch;
+          });
+
+          console.log('Filtered courses:', filteredCourses);
+          setCourses(filteredCourses);
         } catch (error) {
           console.error("Error fetching courses:", error);
         } finally {
@@ -173,38 +206,42 @@ const TenthStandard = () => {
             </div>
           ) : courses.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {courses.map((course) => (
-                <Link 
-                  to={selectedBoard.includes('state') 
-                    ? `/courses/10th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
-                    : `/courses/10th/${selectedBoard}/${course.subject.toLowerCase()}`} 
-                  key={course.id}
-                >
-                  <motion.div 
-                    whileHover={{ y: -5 }} 
-                    className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
+              {courses.map((course) => {
+                console.log("Rendering course:", course.subject, course.board, course.state);
+                
+                return (
+                  <Link 
+                    to={selectedBoard.includes('state') 
+                      ? `/courses/10th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
+                      : `/courses/10th/${selectedBoard}/${course.subject.toLowerCase()}`} 
+                    key={course.id}
                   >
-                    <div className="relative p-6 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl text-white">
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
-                        <FaPlay className="opacity-75" />
-                      </div>
-                      <h3 className="text-xl font-bold mt-2">{course.subject}</h3>
-                      <p className="text-white/80 text-sm mt-1">{course.duration}+ hours of content</p>
-                    </div>
-                    <div className="p-6">
-                      <p className="text-gray-600 text-sm mb-4">{course.short_description}</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <FaBookReader className="text-indigo-600" />
-                          <span className="text-sm text-gray-600">Structured Learning</span>
+                    <motion.div 
+                      whileHover={{ y: -5 }} 
+                      className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
+                    >
+                      <div className="relative p-6 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl text-white">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
+                          <FaPlay className="opacity-75" />
                         </div>
-                        <span className="text-indigo-600 text-sm font-medium">Preview Course →</span>
+                        <h3 className="text-xl font-bold mt-2">{course.title || course.subject}</h3>
+                        <p className="text-white/80 text-sm mt-1">{course.duration}+ hours of content</p>
                       </div>
-                    </div>
-                  </motion.div>
-                </Link>
-              ))}
+                      <div className="p-6">
+                        <p className="text-gray-600 text-sm mb-4">{course.short_description || `Complete curriculum for ${course.class} ${course.subject}`}</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <FaBookReader className="text-indigo-600" />
+                            <span className="text-sm text-gray-600">Structured Learning</span>
+                          </div>
+                          <span className="text-indigo-600 text-sm font-medium">Preview Course →</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </Link>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
