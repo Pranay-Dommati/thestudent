@@ -198,8 +198,6 @@ const SchoolCourseDetails = () => {
                   {course.duration}+ hours
                 </span>
                 <span>•</span>
-                <span>{course.chapters} chapters</span>
-                <span>•</span>
                 <span>Updated {course.lastUpdated}</span>
               </div>
 
