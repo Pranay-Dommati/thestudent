@@ -255,7 +255,17 @@ const TenthStandard = () => {
             <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6">
               <h3 className="text-lg font-semibold mb-3">Sample Papers</h3>
               <p className="text-gray-600 mb-4">CBSE sample papers and previous year questions</p>
-              <button className="text-indigo-600 font-medium hover:text-indigo-800">Access Now →</button>
+              <a 
+                href="https://www.selfstudys.com/books/cbse-prev-paper/english/class-10th" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-indigo-600 font-medium hover:text-indigo-800 inline-flex items-center"
+              >
+                Access Now 
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </a>
             </div>
           </div>
         </>
