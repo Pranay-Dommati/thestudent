@@ -236,7 +236,7 @@ const EleventhStandard = () => {
                           <span className="text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
                           <FaPlay className="opacity-75" />
                         </div>
-                        <h3 className="text-xl font-bold mt-2">{course.title || course.subject}</h3>
+                        <h3 className="text-xl font-bold mt-2">{course.subject}</h3>
                         <p className="text-white/80 text-sm mt-1">{course.duration}+ hours of content</p>
                       </div>
                       <div className="p-6">
