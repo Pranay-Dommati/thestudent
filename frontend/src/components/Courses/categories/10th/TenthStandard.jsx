@@ -165,6 +165,11 @@ const TenthStandard = () => {
                 </motion.button>
               ))}
             </div>
+
+            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
+              <h3 className="text-lg font-semibold text-indigo-900 mb-2">More Boards Coming Soon!</h3>
+              <p className="text-indigo-700">We're working hard to bring you content for ICSE, NIOS, and other boards. Stay tuned for updates!</p>
+            </div>
           </div>
         </>
       ) : showStateBoards ? (
