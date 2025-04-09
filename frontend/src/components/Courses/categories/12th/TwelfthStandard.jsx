@@ -185,7 +185,13 @@ const TwelfthStandard = () => {
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Additional Resources</h2>
               <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6">
                 <h3 className="text-lg font-semibold mb-3">Sample Papers</h3>
-                <p className="text-gray-600 mb-4">CBSE sample papers and previous year questions</p>
+                <p className="text-gray-600 mb-4">
+                  {selectedBoard && selectedBoard.includes('state-ts') 
+                    ? 'Telangana Intermediate previous years question papers'
+                    : selectedBoard && selectedBoard.includes('state-ap')
+                      ? 'Andhra Pradesh Intermediate previous years question papers'
+                      : 'CBSE sample papers and previous year questions'}
+                </p>
                 <a 
                   href={
                     selectedBoard && selectedBoard.includes('state-ap')
