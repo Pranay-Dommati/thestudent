@@ -187,7 +187,13 @@ const TwelfthStandard = () => {
                 <h3 className="text-lg font-semibold mb-3">Sample Papers</h3>
                 <p className="text-gray-600 mb-4">CBSE sample papers and previous year questions</p>
                 <a 
-                  href="https://www.selfstudys.com/books/cbse-prev-paper/english/class-12th" 
+                  href={
+                    selectedBoard && selectedBoard.includes('state-ap')
+                      ? "https://www.selfstudys.com/state-wise/andhra-pradesh/class-12th"
+                      : selectedBoard && selectedBoard.includes('state-ts')
+                        ? "https://www.selfstudys.com/state-wise/telangana/class-12th"
+                        : "https://www.selfstudys.com/books/cbse-prev-paper/english/class-12th"
+                  } 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   className="text-indigo-600 font-medium hover:text-indigo-800 inline-flex items-center"
