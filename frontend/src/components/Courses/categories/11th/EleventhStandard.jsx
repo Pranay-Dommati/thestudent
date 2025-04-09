@@ -4,6 +4,20 @@ import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
 import { stateBoards } from '../../data/states';
+import { getSchoolCourses } from '../../../../services/courseApi';
+
+const SUBJECT_ICONS = {
+  'Mathematics': '📐',
+  'Physics': '🔬',
+  'Chemistry': '⚗️',
+  'Biology': '🧬',
+  'English': '📚',
+  'Hindi': '📖',
+  'Social Science': '🌍',
+  'Science': '🔬',
+  'Computer Science': '💻',
+  'General': '📘'
+};
 
 const EleventhStandard = () => {
   const navigate = useNavigate();
@@ -14,7 +28,6 @@ const EleventhStandard = () => {
   const [loading, setLoading] = useState(false);
   const [courses, setCourses] = useState([]);
 
-  // Add this useEffect to handle URL-based board selection
   useEffect(() => {
     if (location.pathname.includes('/state/')) {
       setSelectedBoard(`state-${stateId}`);
@@ -23,7 +36,6 @@ const EleventhStandard = () => {
     }
   }, [location, stateId]);
 
-  // Update the useEffect hook with proper filtering
   useEffect(() => {
     if (selectedBoard) {
       const fetchCourses = async () => {
@@ -45,26 +57,33 @@ const EleventhStandard = () => {
 
           console.log('API returned courses:', data);
           
-          // Apply strict filtering
           const filteredCourses = data.filter(course => {
             const classMatch = course.class_level === '11th';
-            const boardMatch = course.board.toLowerCase() === 
-              (selectedBoard.startsWith('state-') ? 'state' : selectedBoard.toLowerCase());
             
             let stateMatch = true;
             if (selectedBoard.startsWith('state-')) {
               const stateCode = selectedBoard.replace('state-', '') || stateId;
               const stateValue = stateCode === 'ts' ? 'Telangana' : 
                                stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
-              
-              stateMatch = course.state && 
-                course.state.toLowerCase().includes(stateValue.toLowerCase());
+              stateMatch = course.state && course.state.includes(stateValue);
             }
             
-            return classMatch && boardMatch && stateMatch;
+            console.log(`Filtering course:`, {
+              course: course.title,
+              class: course.class_level,
+              board: course.board,
+              state: course.state,
+              matches: {
+                class: classMatch,
+                board: true,
+                state: stateMatch
+              }
+            });
+            
+            return classMatch && stateMatch;
           });
 
-          console.log(`Filtered to ${filteredCourses.length} courses for 11th standard`);
+          console.log('Filtered courses:', filteredCourses);
           setCourses(filteredCourses);
         } catch (error) {
           console.error("Error fetching 11th standard courses:", error);
@@ -101,49 +120,6 @@ const EleventhStandard = () => {
       name: 'NIOS',
       fullName: 'National Institute of Open Schooling',
       available: false
-    }
-  ];
-
-  const subjects = [
-    {
-      id: 'physics',
-      name: 'Physics',
-      icon: '🔬',
-      courseId: '11th-physics', // Updated courseId
-      description: 'Comprehensive coverage of Physics for 11th grade',
-      duration: '50+ hours of content'
-    },
-    {
-      id: 'chemistry',
-      name: 'Chemistry',
-      icon: '⚗️',
-      courseId: '11th-chemistry', // Updated courseId
-      description: 'In-depth exploration of Chemistry concepts',
-      duration: '45+ hours of content'
-    },
-    {
-      id: 'mathematics',
-      name: 'Mathematics',
-      icon: '📐',
-      courseId: '11th-mathematics', // Updated courseId
-      description: 'Advanced Mathematics for 11th grade',
-      duration: '60+ hours of content'
-    },
-    {
-      id: 'biology',
-      name: 'Biology',
-      icon: '🧬',
-      courseId: '11th-biology', // Updated courseId
-      description: 'Detailed study of Biology topics',
-      duration: '55+ hours of content'
-    },
-    {
-      id: 'english',
-      name: 'English',
-      icon: '📚',
-      courseId: '11th-english', // Updated courseId
-      description: 'Master English language and literature',
-      duration: '40+ hours of content'
     }
   ];
 
@@ -232,45 +208,58 @@ const EleventhStandard = () => {
               stateBoards.find(s => selectedBoard.includes(s.id))?.name : 
               boards.find(b => b.id === selectedBoard)?.name}`}
             subtitle="Complete syllabus coverage with curated video lectures" 
+            onBack={handleBack}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {subjects.map((subject) => (
-              <Link 
-                to={selectedBoard.includes('state') 
-                  ? `/courses/11th/state/${selectedBoard.replace('state-', '')}/${subject.id}` 
-                  : `/courses/11th/${selectedBoard}/${subject.id}`} 
-                key={subject.id}
-              >
-                <motion.div
-                  whileHover={{ y: -5 }}
-                  className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
-                >
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl"></div>
-                    <div className="relative p-6">
-                      <div className="flex items-center justify-between">
-                        <span className="text-white text-2xl">{subject.icon}</span>
-                        <FaPlay className="text-white opacity-75" />
+          {loading ? (
+            <div className="flex justify-center my-12">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : courses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courses.map((course) => {
+                console.log("Rendering course:", course.subject, course.board, course.state);
+                
+                return (
+                  <Link 
+                    to={selectedBoard.includes('state') 
+                      ? `/courses/11th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
+                      : `/courses/11th/${selectedBoard}/${course.subject.toLowerCase()}`} 
+                    key={course.id}
+                  >
+                    <motion.div 
+                      whileHover={{ y: -5 }} 
+                      className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
+                    >
+                      <div className="relative p-6 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl text-white">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
+                          <FaPlay className="opacity-75" />
+                        </div>
+                        <h3 className="text-xl font-bold mt-2">{course.title || course.subject}</h3>
+                        <p className="text-white/80 text-sm mt-1">{course.duration}+ hours of content</p>
                       </div>
-                      <h3 className="text-white text-xl font-bold mt-2">{subject.name}</h3>
-                      <p className="text-white/80 text-sm mt-1">{subject.duration}</p>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <p className="text-gray-600 text-sm mb-4">{subject.description}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <FaBookReader className="text-indigo-600" />
-                        <span className="text-sm text-gray-600">Structured Learning</span>
+                      <div className="p-6">
+                        <p className="text-gray-600 text-sm mb-4">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <FaBookReader className="text-indigo-600" />
+                            <span className="text-sm text-gray-600">Structured Learning</span>
+                          </div>
+                          <span className="text-indigo-600 text-sm font-medium">Preview Course →</span>
+                        </div>
                       </div>
-                      <span className="text-indigo-600 text-sm font-medium">Preview Course →</span>
-                    </div>
-                  </div>
-                </motion.div>
-              </Link>
-            ))}
-          </div>
+                    </motion.div>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No courses found for this selection.</p>
+              <p className="text-sm text-gray-400 mt-2">Check back later or try a different board.</p>
+            </div>
+          )}
 
           <div className="mt-12 bg-gray-50 rounded-2xl p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Additional Resources</h2>

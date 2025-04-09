@@ -97,9 +97,10 @@ export const getSchoolCourses = async (classLevel, board, state = '') => {
     
     console.log(`Requesting URL: ${url}`);
     const response = await axios.get(url);
+    console.log(`Received ${response.data.length} courses from API`); 
     return response.data;
   } catch (error) {
     console.error('Error fetching school courses:', error);
     return [];
   }
-};3
+};

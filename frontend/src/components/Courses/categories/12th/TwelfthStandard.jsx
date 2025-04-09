@@ -4,6 +4,20 @@ import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
 import { stateBoards } from '../../data/states';
+import { getSchoolCourses } from '../../../../services/courseApi';
+
+const SUBJECT_ICONS = {
+  'Mathematics': '📐',
+  'Physics': '🔬',
+  'Chemistry': '⚗️',
+  'Biology': '🧬',
+  'English': '📚',
+  'Hindi': '📖',
+  'Social Science': '🌍',
+  'Science': '🔬',
+  'Computer Science': '💻',
+  'General': '📘'
+};
 
 const TwelfthStandard = () => {
   const navigate = useNavigate();
@@ -11,6 +25,8 @@ const TwelfthStandard = () => {
   const location = useLocation();
   const [selectedBoard, setSelectedBoard] = useState(null);
   const [showStateBoards, setShowStateBoards] = useState(false);
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (location.pathname.includes('/state/')) {
@@ -32,41 +48,6 @@ const TwelfthStandard = () => {
       name: 'State Board',
       fullName: 'State Board of Secondary and Higher Secondary Education',
       available: true
-    }
-  ];
-
-  const subjects = [
-    {
-      id: 'physics',
-      name: 'Physics',
-      icon: '🔬',
-      courseId: '12th-physics',
-      description: 'Comprehensive coverage of Physics for 12th grade',
-      duration: '50+ hours of content'
-    },
-    {
-      id: 'chemistry',
-      name: 'Chemistry',
-      icon: '⚗️',
-      courseId: '12th-chemistry',
-      description: 'In-depth exploration of Chemistry concepts',
-      duration: '45+ hours of content'
-    },
-    {
-      id: 'mathematics',
-      name: 'Mathematics',
-      icon: '📐',
-      courseId: '12th-mathematics',
-      description: 'Advanced Mathematics for 12th grade',
-      duration: '60+ hours of content'
-    },
-    {
-      id: 'biology',
-      name: 'Biology',
-      icon: '🧬',
-      courseId: '12th-biology',
-      description: 'Detailed study of Biology topics',
-      duration: '55+ hours of content'
     }
   ];
 
@@ -92,6 +73,54 @@ const TwelfthStandard = () => {
       navigate('/courses');
     }
   };
+
+  useEffect(() => {
+    if (selectedBoard) {
+      const fetchCourses = async () => {
+        setLoading(true);
+        try {
+          let data;
+
+          if (selectedBoard === 'state' || selectedBoard.startsWith('state-')) {
+            const stateCode = selectedBoard.replace('state-', '') || stateId;
+            const stateValue = stateCode === 'ts' ? 'Telangana' : 
+                             stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
+            
+            console.log(`Fetching state board courses: class=12th, board=state, state=${stateValue}`);
+            data = await getSchoolCourses('12th', 'state', stateValue);
+          } else {
+            console.log(`Fetching courses: class=12th, board=${selectedBoard}`);
+            data = await getSchoolCourses('12th', selectedBoard);
+          }
+
+          console.log('API returned courses:', data);
+          
+          const filteredCourses = data.filter(course => {
+            const classMatch = course.class_level === '12th';
+            
+            let stateMatch = true;
+            if (selectedBoard.startsWith('state-')) {
+              const stateCode = selectedBoard.replace('state-', '') || stateId;
+              const stateValue = stateCode === 'ts' ? 'Telangana' : 
+                               stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
+              stateMatch = course.state && course.state.includes(stateValue);
+            }
+            
+            return classMatch && stateMatch;
+          });
+
+          console.log('Filtered courses:', filteredCourses);
+          setCourses(filteredCourses);
+        } catch (error) {
+          console.error("Error fetching 12th standard courses:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchCourses();
+    }
+  }, [selectedBoard, stateId]);
 
   return (
     <div className="container mx-auto px-4 py-8 pt-20">
@@ -148,68 +177,56 @@ const TwelfthStandard = () => {
               stateBoards.find(s => selectedBoard.includes(s.id))?.name : 
               boards.find(b => b.id === selectedBoard)?.name}`}
             subtitle="Complete syllabus coverage with curated video lectures" 
+            onBack={handleBack}
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {subjects.map((subject) => (
-              <Link 
-                to={selectedBoard.includes('state') 
-                  ? `/courses/12th/state/${selectedBoard.replace('state-', '')}/${subject.id}` 
-                  : `/courses/12th/${selectedBoard}/${subject.id}`} 
-                key={subject.id}
-              >
-                <motion.div whileHover={{ y: -5 }} className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full">
-                  <div className="relative p-6 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl text-white">
-                    <div className="flex items-center justify-between">
-                      <span className="text-2xl">{subject.icon}</span>
-                      <FaPlay className="opacity-75" />
-                    </div>
-                    <h3 className="text-xl font-bold mt-2">{subject.name}</h3>
-                    <p className="text-white/80 text-sm mt-1">{subject.duration}</p>
-                  </div>
-                  <div className="p-6">
-                    <p className="text-gray-600 text-sm mb-4">{subject.description}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <FaBookReader className="text-indigo-600" />
-                        <span className="text-sm text-gray-600">Structured Learning</span>
+
+          {loading ? (
+            <div className="flex justify-center my-12">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : courses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courses.map((course) => {
+                console.log("Rendering course:", course.subject, course.board, course.state);
+                
+                return (
+                  <Link 
+                    to={selectedBoard.includes('state') 
+                      ? `/courses/12th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
+                      : `/courses/12th/${selectedBoard}/${course.subject.toLowerCase()}`} 
+                    key={course.id}
+                  >
+                    <motion.div 
+                      whileHover={{ y: -5 }} 
+                      className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
+                    >
+                      <div className="relative p-6 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl text-white">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
+                          <FaPlay className="opacity-75" />
+                        </div>
+                        <h3 className="text-xl font-bold mt-2">{course.title || course.subject}</h3>
+                        <p className="text-white/80 text-sm mt-1">{course.duration}+ hours of content</p>
                       </div>
-                      <span className="text-indigo-600 text-sm font-medium">Preview Course →</span>
-                    </div>
-                  </div>
-                </motion.div>
-              </Link>
-            ))}
-          </div>
-          {selectedBoard && (
-            <div className="mt-12 bg-gray-50 rounded-2xl p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Additional Resources</h2>
-              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6">
-                <h3 className="text-lg font-semibold mb-3">Sample Papers</h3>
-                <p className="text-gray-600 mb-4">
-                  {selectedBoard && selectedBoard.includes('state-ts') 
-                    ? 'Telangana Intermediate previous years question papers'
-                    : selectedBoard && selectedBoard.includes('state-ap')
-                      ? 'Andhra Pradesh Intermediate previous years question papers'
-                      : 'CBSE sample papers and previous year questions'}
-                </p>
-                <a 
-                  href={
-                    selectedBoard && selectedBoard.includes('state-ap')
-                      ? "https://www.selfstudys.com/state-wise/andhra-pradesh/class-12th"
-                      : selectedBoard && selectedBoard.includes('state-ts')
-                        ? "https://www.selfstudys.com/state-wise/telangana/class-12th"
-                        : "https://www.selfstudys.com/books/cbse-prev-paper/english/class-12th"
-                  } 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-indigo-600 font-medium hover:text-indigo-800 inline-flex items-center"
-                >
-                  Access Now 
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </a>
-              </div>
+                      <div className="p-6">
+                        <p className="text-gray-600 text-sm mb-4">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <FaBookReader className="text-indigo-600" />
+                            <span className="text-sm text-gray-600">Structured Learning</span>
+                          </div>
+                          <span className="text-indigo-600 text-sm font-medium">Preview Course →</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No courses found for this selection.</p>
+              <p className="text-sm text-gray-400 mt-2">Check back later or try a different board.</p>
             </div>
           )}
         </>

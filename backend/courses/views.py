@@ -362,7 +362,8 @@ def list_school_courses(request):
             queryset = queryset.filter(board__iexact=board)
 
         if board == 'state' and state:
-            queryset = queryset.filter(state__iexact=state)  # Case-insensitive match
+            # Use icontains for more flexible state matching
+            queryset = queryset.filter(state__icontains=state)
 
         print(f"Found {queryset.count()} courses matching the criteria:")
         for course in queryset:
