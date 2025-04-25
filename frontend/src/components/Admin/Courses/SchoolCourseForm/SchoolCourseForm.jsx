@@ -429,11 +429,22 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       formData.append('duration', courseInfo.duration);
       formData.append('sources', courseInfo.sources);
       
-      // Add key topics and learning points
-      console.log('Key Topics:', courseInfo.keyTopics);
-      console.log('Learning Points:', courseInfo.learningPoints);
-      formData.append('key_topics', JSON.stringify(courseInfo.keyTopics));
-      formData.append('learning_points', JSON.stringify(courseInfo.learningPoints));
+      // Add key topics and learning points - use the field names expected by the backend
+      // In views.py, the backend expects 'key_topics' and 'learning_points'
+      const filteredKeyTopics = courseInfo.keyTopics.filter(topic => topic.trim() !== '');
+      const filteredLearningPoints = courseInfo.learningPoints.filter(point => point.trim() !== '');
+      
+      console.log('Filtered Key Topics:', filteredKeyTopics);
+      console.log('Filtered Learning Points:', filteredLearningPoints);
+      
+      // Change from 'keyTopics' to 'key_topics' to match backend expectations
+      formData.append('key_topics', JSON.stringify(filteredKeyTopics));
+      formData.append('learning_points', JSON.stringify(filteredLearningPoints));
+      
+      // Add thumbnail if it exists
+      if (courseInfo.thumbnail) {
+        formData.append('thumbnail', courseInfo.thumbnail);
+      }
       
       // Process chapters data for API
       const chaptersData = chapters.map(chapter => ({

@@ -44,8 +44,14 @@ const SchoolCourseDetails = () => {
         console.log('Fetching course with params:', { classLevel, board, subject, state });
         
         // Build API URL to fetch courses matching the parameters
-        let apiUrl = `${API_URL}/api/courses/school/?class=${classLevel}&board=${board}`;
-        if (state && board === 'state') {
+        let apiUrl = `${API_URL}/api/courses/school/?class=${classLevel}`;
+        
+        // Add board parameter only if it exists
+        if (board) {
+          apiUrl += `&board=${board}`;
+        }
+        
+        if (state && (board === 'state' || board === '')) {
           // Handle different state name formats
           const stateValue = state === 'ts' ? 'Telangana' : 
                            state === 'ap' ? 'Andhra Pradesh' : state;
@@ -72,6 +78,10 @@ const SchoolCourseDetails = () => {
           throw new Error('Course not found');
         }
         
+        // Debug key topics and learning points specifically
+        console.log('Key Topics Raw:', courseData.key_topics);
+        console.log('Learning Points Raw:', courseData.learning_points);
+        
         // Format the board display value properly
         let displayBoard = courseData.board.toUpperCase();
         if (courseData.board === 'state' && courseData.state) {
@@ -84,6 +94,29 @@ const SchoolCourseDetails = () => {
         let chapterCount = 0;
         if (courseData.chapters && Array.isArray(courseData.chapters)) {
           chapterCount = courseData.chapters.length;
+        }
+        
+        // Ensure key_topics and learning_points are parsed correctly if they're strings
+        let keyTopics = courseData.key_topics;
+        let learningPoints = courseData.learning_points;
+        
+        // If they're strings (JSON), parse them
+        if (typeof keyTopics === 'string') {
+          try {
+            keyTopics = JSON.parse(keyTopics);
+          } catch (e) {
+            console.error('Error parsing key_topics:', e);
+            keyTopics = [];
+          }
+        }
+        
+        if (typeof learningPoints === 'string') {
+          try {
+            learningPoints = JSON.parse(learningPoints);
+          } catch (e) {
+            console.error('Error parsing learning_points:', e);
+            learningPoints = [];
+          }
         }
         
         // Format the course data for display
@@ -103,8 +136,13 @@ const SchoolCourseDetails = () => {
             { icon: <FaBookReader />, title: "Structured Learning", desc: "Well-organized chapter-wise content" },
             { icon: <FaClock />, title: "Self-Paced", desc: "Learn at your own convenience" }
           ],
-          keyTopics: courseData.key_topics || ["No topics available"],
-          whatYouLearn: courseData.learning_points || ["No learning points available"],
+          // Ensure the arrays are properly handled
+          keyTopics: Array.isArray(keyTopics) && keyTopics.length > 0 
+            ? keyTopics 
+            : ["No topics available"],
+          whatYouLearn: Array.isArray(learningPoints) && learningPoints.length > 0 
+            ? learningPoints 
+            : ["No learning points available"],
           // Use duration from database, but show as "X+ hours"
           duration: courseData.duration || "20",
           chapters: chapterCount,
@@ -113,6 +151,10 @@ const SchoolCourseDetails = () => {
           thumbnail: courseData.thumbnail,
           icon: SUBJECT_ICONS[courseData.subject] || '📚'
         };
+        
+        // Debug key topics and learning points after processing
+        console.log('Processed Key Topics:', formattedCourse.keyTopics);
+        console.log('Processed Learning Points:', formattedCourse.whatYouLearn);
         
         setCourse(formattedCourse);
       } catch (error) {

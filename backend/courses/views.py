@@ -32,10 +32,37 @@ def create_course(request):
                 'subject': data.get('subject', ''),
                 'sources': data.get('sources', ''),
                 'duration': data.get('duration', ''),
-                'key_topics': json.loads(data.get('keyTopics', '[]')),
-                'learning_points': json.loads(data.get('learningPoints', '[]')),
                 'is_published': True,
             }
+            
+            # Handle key_topics and learning_points
+            # Accept both key_topics/learning_points (snake_case) and keyTopics/learningPoints (camelCase) 
+            # for backwards compatibility with existing code
+            if 'key_topics' in data:
+                try:
+                    course_data['key_topics'] = json.loads(data.get('key_topics', '[]'))
+                except json.JSONDecodeError:
+                    course_data['key_topics'] = []
+            elif 'keyTopics' in data:
+                try:
+                    course_data['key_topics'] = json.loads(data.get('keyTopics', '[]'))
+                except json.JSONDecodeError:
+                    course_data['key_topics'] = []
+            else:
+                course_data['key_topics'] = []
+                
+            if 'learning_points' in data:
+                try:
+                    course_data['learning_points'] = json.loads(data.get('learning_points', '[]'))
+                except json.JSONDecodeError:
+                    course_data['learning_points'] = []
+            elif 'learningPoints' in data:
+                try:
+                    course_data['learning_points'] = json.loads(data.get('learningPoints', '[]'))
+                except json.JSONDecodeError:
+                    course_data['learning_points'] = []
+            else:
+                course_data['learning_points'] = []
             
             # If 'shortDescription' is in data, use it, otherwise use title
             course_data['short_description'] = data.get('shortDescription', data.get('title', ''))
