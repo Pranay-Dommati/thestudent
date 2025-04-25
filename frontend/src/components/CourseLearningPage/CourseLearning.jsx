@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import LessonVideo from './LessonVideo';
 import CourseProgress from './CourseProgress';
@@ -9,8 +9,8 @@ import InstructionsPage from './templ/InstructionsPage';
 import Sidebar from './Sidebar';
 import axios from 'axios';
 
-// Update the function signature to accept onSidebarToggle prop
-const CourseLearning = ({ courseId, onSidebarToggle }) => {
+// Update the function signature to accept the new props
+const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeChapter, setActiveChapter] = useState(0);
@@ -22,43 +22,203 @@ const CourseLearning = ({ courseId, onSidebarToggle }) => {
   const [contentType, setContentType] = useState('video'); // 'video', 'resources', 'quiz', 'instructions'
   const videoRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const fetchCourseData = async () => {
       try {
-        const response = await axios.get(`http://127.0.0.1:8000/api/courses/engineering/${courseId}/`);
-        const courseData = response.data;
-        console.log("Fetched Course Data:", courseData); // Debugging
-        // Transform sections into chapters for the sidebar
-        const transformedCourse = {
-          ...courseData,
-          chapters: courseData.sections.map((section) => ({
-            title: section.name,
-            lessons: section.lessons.map((lesson) => ({
-              title: lesson.title,
-              type: lesson.type,
-              videoUrl: lesson.video_url,
-              description: lesson.description,
-              completed: false, // Default to not completed
+        let apiUrl;
+        const path = pathname;
+        
+        // Extract URL parameters manually from the pathname
+        // Example URL: /courses/12th/state/ts/english/learning
+        const pathParts = path.split('/').filter(part => part !== '');
+        
+        console.log("Path parts:", pathParts);
+        
+        // Determine the type of course based on the URL path
+        if (path.includes('/engineering/')) {
+          // Engineering course
+          apiUrl = `http://127.0.0.1:8000/api/courses/engineering/${params.courseId}/`;
+          
+          const response = await axios.get(apiUrl);
+          const courseData = response.data;
+          console.log("Fetched Engineering Course Data:", courseData);
+          
+          // Transform sections into chapters for the sidebar
+          const transformedCourse = {
+            ...courseData,
+            chapters: courseData.sections.map((section) => ({
+              title: section.name,
+              lessons: section.lessons.map((lesson) => ({
+                title: lesson.title,
+                type: lesson.type,
+                videoUrl: lesson.video_url,
+                description: lesson.description,
+                aboutLesson: lesson.about_lesson,
+                completed: false // Default to not completed
+              })),
             })),
-          })),
-        };
-
-        setCourse(transformedCourse);
+          };
+          setCourse(transformedCourse);
+        } else {
+          // School course (10th, 11th, 12th)
+          // Extract parameters from URL parts based on the URL pattern
+          let classLevel, board, stateCode, subject;
+          
+          if (pathParts.length >= 4) {
+            classLevel = pathParts[1]; // e.g., '10th', '11th', '12th'
+            board = pathParts[2];      // e.g., 'cbse', 'state'
+            
+            if (board === 'state' && pathParts.length >= 5) {
+              stateCode = pathParts[3];  // e.g., 'ts', 'ap'
+              subject = pathParts[4];    // e.g., 'english', 'math'
+            } else {
+              subject = pathParts[3];    // For CBSE, subject is the 4th part
+            }
+          }
+          
+          console.log("Extracted parameters:", { classLevel, board, stateCode, subject });
+          
+          // Convert state code to full state name if needed
+          let stateName = null;
+          if (stateCode) {
+            stateName = stateCode === 'ts' ? 'Telangana' : 
+                       stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
+          }
+          
+          // Build the API URL
+          if (board === 'state' && stateName) {
+            apiUrl = `http://127.0.0.1:8000/api/courses/school/?class=${classLevel}&board=${board}&state=${stateName}&subject=${subject}`;
+          } else {
+            apiUrl = `http://127.0.0.1:8000/api/courses/school/?class=${classLevel}&board=${board}&subject=${subject}`;
+          }
+          
+          console.log("Fetching from API URL:", apiUrl);
+          const response = await axios.get(apiUrl);
+          let courseData;
+          
+          if (Array.isArray(response.data)) {
+            console.log("API response courses:", response.data);
+            console.log("Looking for subject:", subject);
+            
+            // More flexible matching - convert to lowercase and trim whitespace
+            courseData = response.data.find(course => {
+              const courseSubject = (course.subject || '').toLowerCase().trim();
+              const urlSubject = (subject || '').toLowerCase().trim();
+              console.log(`Comparing '${courseSubject}' with '${urlSubject}'`);
+              return courseSubject === urlSubject;
+            });
+            
+            if (!courseData) {
+              // If exact match fails, try a more relaxed matching approach
+              console.log("Exact match failed, trying partial match...");
+              courseData = response.data.find(course => {
+                const courseSubject = (course.subject || '').toLowerCase().trim();
+                const urlSubject = (subject || '').toLowerCase().trim();
+                return courseSubject.includes(urlSubject) || urlSubject.includes(courseSubject);
+              });
+            }
+            
+            if (!courseData && response.data.length > 0) {
+              // If all matching fails but we have courses, use the first one as fallback
+              console.log("No matching course found, using first available course as fallback");
+              courseData = response.data[0];
+            }
+            
+            if (!courseData) {
+              // If the array is empty or no match found, create a default course template
+              console.log("No courses returned from API, creating default template");
+              courseData = {
+                id: 1,
+                title: `${classLevel} ${board.toUpperCase()} ${subject}`,
+                subject: subject || "General Course",
+                description: "Course content coming soon",
+                chapters: []
+              };
+            }
+            
+            console.log("Found/created school course:", courseData);
+            
+            // For school courses, we need to transform the structure
+            const transformedCourse = {
+              ...courseData,
+              chapters: courseData.chapters && courseData.chapters.length > 0 
+                ? courseData.chapters.map((chapter) => ({
+                  title: chapter.name,
+                  lessons: chapter.lessons.map((lesson) => ({
+                    title: lesson.title,
+                    type: lesson.type || 'video',
+                    videoUrl: lesson.videoUrl || lesson.video_url,
+                    description: lesson.description || '',
+                    aboutLesson: lesson.aboutLesson || '',
+                    completed: false
+                  }))
+                })) 
+                : [{
+                  title: "Main Content",
+                  lessons: [{
+                    title: courseData.title || "Introduction",
+                    type: 'video',
+                    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ", // Default video if none is provided
+                    description: courseData.description || '',
+                    completed: false
+                  }]
+                }]
+            };
+            setCourse(transformedCourse);
+          } else {
+            console.error("Unexpected API response format", response.data);
+            throw new Error("Invalid API response format");
+          }
+        }
 
         // Expand the first chapter by default
-        if (transformedCourse.chapters.length > 0) {
-          setExpandedChapters({ 0: true });
-        }
+        setCourse(prevCourse => {
+          if (prevCourse?.chapters && prevCourse.chapters.length > 0) {
+            setExpandedChapters({ 0: true });
+          }
+          return prevCourse;
+        });
       } catch (error) {
         console.error('Error fetching course data:', error);
+        
+        // Set up a fallback course with default content when API fails
+        const pathParts = pathname.split('/').filter(part => part !== '');
+        if (pathParts.length >= 4) {
+          const classLevel = pathParts[1];
+          const board = pathParts[2];
+          const subject = pathParts[pathParts.length - 2]; // Get the subject from URL
+          
+          console.log("Creating fallback course for:", { classLevel, board, subject });
+          
+          const fallbackCourse = {
+            id: 1,
+            title: `${classLevel} ${board.toUpperCase()} ${subject}`,
+            subject: subject || "General Course",
+            description: "This is a placeholder course while we prepare the full content.",
+            chapters: [{
+              title: "Getting Started",
+              lessons: [{
+                title: "Introduction",
+                type: 'video',
+                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                description: "Welcome to the course! More content will be added soon.",
+                aboutLesson: "This is a placeholder lesson.",
+                completed: false
+              }]
+            }]
+          };
+          
+          setCourse(fallbackCourse);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchCourseData();
-  }, [courseId]);
+  }, [pathname, params]);
 
   // Handle chapter toggling
   const toggleChapter = (index) => {

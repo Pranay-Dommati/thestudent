@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import Navbar from '../Navbar/Navbar';
 import Footer from '../Footer/Footer';
 import CourseLearning from './CourseLearning';
 
 const CourseLearningPage = () => {
-  const { courseId } = useParams();
+  // Extract all route parameters
+  const params = useParams();
+  const location = useLocation();
   const [sidebarVisible, setSidebarVisible] = useState(true);
 
   // Callback to receive sidebar visibility changes from CourseLearning component
@@ -18,7 +20,8 @@ const CourseLearningPage = () => {
       <Navbar initialStyle="light" />
       <div className="pt-16 min-h-screen bg-gray-50">
         <CourseLearning 
-          courseId={courseId} 
+          params={params}
+          pathname={location.pathname}
           onSidebarToggle={handleSidebarToggle}
         />
       </div>
