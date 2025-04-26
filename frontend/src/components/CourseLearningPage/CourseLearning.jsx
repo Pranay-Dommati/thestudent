@@ -26,6 +26,8 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
   const [contentType, setContentType] = useState('video'); // 'video', 'resources', 'quiz', 'instructions'
   const [courseProgress, setCourseProgress] = useState(null);
   const [savingProgress, setSavingProgress] = useState(false);
+  const [internetResourcesOpen, setInternetResourcesOpen] = useState(false); // Initially closed
+  const [downloadResourcesOpen, setDownloadResourcesOpen] = useState(false); // Initially closed
   const videoRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -669,7 +671,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                   className={`py-4 px-1 font-medium ${activeTab === 'resources' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}
                   onClick={() => setActiveTab('resources')}
                 >
-                  Resources
+                  Additional Resources
                 </button>
                 {/* Remove the Transcript tab button */}
               </div>
@@ -731,44 +733,135 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
               
               {activeTab === 'resources' && (
                 <div>
-
-                  <div className="space-y-4">
-                    <div className="border border-gray-200 rounded-lg p-4 flex items-start hover:bg-gray-50 transition-colors">
-                      <div className="bg-blue-100 rounded p-2 mr-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                  <div className="space-y-6">
+                    {/* Internet Resources collapsible section */}
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <button 
+                        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                        onClick={() => setInternetResourcesOpen(!internetResourcesOpen)}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="bg-blue-100 rounded-lg p-2 flex-shrink-0">
+                            {/* Changed icon style to be more clear and properly sized */}
+                            <svg className="w-5 h-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <line x1="2" y1="12" x2="22" y2="12"></line>
+                              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                          </div>
+                          <div className="text-left"> {/* Added text-left class for left alignment */}
+                            <h4 className="font-medium">Internet Resources</h4>
+                            <p className="text-sm text-gray-600 mt-1">Online documentation and references</p>
+                          </div>
+                        </div>
+                        <svg 
+                          xmlns="http://www.w3.org/2000/svg" 
+                          className={`h-5 w-5 text-gray-500 transition-transform duration-200 ${internetResourcesOpen ? 'transform rotate-180' : ''}`} 
+                          viewBox="0 0 20 20" 
+                          fill="currentColor"
+                        >
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                         </svg>
-                      </div>
-                      <div>
-                        <h4 className="font-medium">Lesson Slides</h4>
-                        <p className="text-sm text-gray-600 mt-1">PDF presentation with all key concepts from this lesson</p>
-                        <a href="#" className="text-indigo-600 hover:text-indigo-800 text-sm font-medium mt-2 inline-block">Download PDF</a>
+                      </button>
+                      
+                      {/* Internet Resources content - collapsible */}
+                      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${internetResourcesOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                        <div className="p-4 border-t border-gray-100 space-y-3">
+                          {/* Resource item 1 */}
+                          <div className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
+                            <div>
+                              <h5 className="font-medium text-gray-800">HTML Elements Reference (Mozilla)</h5>
+                              <p className="text-sm text-gray-500 mt-1">https://developer.mozilla.org/en-US/docs/Web/HTML/Element</p>
+                            </div>
+                            <a
+                              href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded text-sm font-medium hover:bg-blue-100 transition-colors"
+                            >
+                              Open Link
+                            </a>
+                          </div>
+                          
+                          {/* Resource item 2 */}
+                          <div className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
+                            <div>
+                              <h5 className="font-medium text-gray-800">The Form Element (Mozilla)</h5>
+                              <p className="text-sm text-gray-500 mt-1">https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form</p>
+                            </div>
+                            <a
+                              href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded text-sm font-medium hover:bg-blue-100 transition-colors"
+                            >
+                              Open Link
+                            </a>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     
-                    <div className="border border-gray-200 rounded-lg p-4 flex items-start hover:bg-gray-50 transition-colors">
-                      <div className="bg-purple-100 rounded p-2 mr-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    {/* Downloadable Resources collapsible section */}
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <button 
+                        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                        onClick={() => setDownloadResourcesOpen(!downloadResourcesOpen)}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="bg-green-100 rounded-lg p-2 flex-shrink-0">
+                            <svg className="w-5 h-5 text-green-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                              <polyline points="7 10 12 15 17 10" />
+                              <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                          </div>
+                          <div className="text-left">
+                            <h4 className="font-medium">Downloadable Resources</h4>
+                            <p className="text-sm text-gray-600 mt-1">Files and documents to download</p>
+                          </div>
+                        </div>
+                        <svg 
+                          xmlns="http://www.w3.org/2000/svg" 
+                          className={`h-5 w-5 text-gray-500 transition-transform duration-200 ${downloadResourcesOpen ? 'transform rotate-180' : ''}`} 
+                          viewBox="0 0 20 20" 
+                          fill="currentColor"
+                        >
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                         </svg>
-                      </div>
-                      <div>
-                        <h4 className="font-medium">Code Examples</h4>
-                        <p className="text-sm text-gray-600 mt-1">Sample code used in this lesson</p>
-                        <a href="#" className="text-indigo-600 hover:text-indigo-800 text-sm font-medium mt-2 inline-block">View on GitHub</a>
-                      </div>
-                    </div>
-                    
-                    <div className="border border-gray-200 rounded-lg p-4 flex items-start hover:bg-gray-50 transition-colors">
-                      <div className="bg-green-100 rounded p-2 mr-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m-6-8h6M5 5h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h4 className="font-medium">Further Reading</h4>
-                        <p className="text-sm text-gray-600 mt-1">Additional articles and documentation</p>
-                        <a href="#" className="text-indigo-600 hover:text-indigo-800 text-sm font-medium mt-2 inline-block">Read More</a>
+                      </button>
+                      
+                      {/* Downloadable Resources content - collapsible */}
+                      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${downloadResourcesOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                        <div className="p-4 border-t border-gray-100 space-y-3">
+                          {/* Resource item 1 */}
+                          <div className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
+                            <div>
+                              <h5 className="font-medium text-gray-800">Course Slides PDF</h5>
+                              <p className="text-sm text-gray-500 mt-1">Complete presentation of the lesson (5MB)</p>
+                            </div>
+                            <button className="px-3 py-1.5 bg-green-50 text-green-600 rounded text-sm font-medium hover:bg-green-100 transition-colors flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                              Download
+                            </button>
+                          </div>
+                          
+                          {/* Resource item 2 */}
+                          <div className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
+                            <div>
+                              <h5 className="font-medium text-gray-800">Practice Exercises</h5>
+                              <p className="text-sm text-gray-500 mt-1">Additional problems and solutions (2MB)</p>
+                            </div>
+                            <button className="px-3 py-1.5 bg-green-50 text-green-600 rounded text-sm font-medium hover:bg-green-100 transition-colors flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                              Download
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -820,7 +913,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                   <>
                     {currentLesson.completed ? "Next Lesson" : "Mark as Complete"}
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10 10l-2.707-2.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                     </svg>
                   </>
                 )}
