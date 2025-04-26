@@ -179,7 +179,121 @@ const LessonForm = ({
             value={lesson.aboutLesson}
             onChange={(e) => handleLessonChange(sectionIndex, lessonIndex, 'aboutLesson', e)}
             height={300}
+            preview="edit"
+            hideToolbar={false}
+            enableScroll={true}
+            textareaProps={{
+              placeholder: "Paste your formatted content here or start typing...",
+              onPaste: (e) => {
+                // Try to get rich text content
+                const richText = e.clipboardData.getData('text/html');
+                
+                if (richText) {
+                  e.preventDefault();
+                  // Convert HTML to Markdown while preserving structure
+                  const tempDiv = document.createElement('div');
+                  tempDiv.innerHTML = richText;
+                  
+                  // Process headings
+                  const headings = tempDiv.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                  headings.forEach(h => {
+                    const level = h.tagName[1];
+                    const text = h.textContent.trim();
+                    h.textContent = '\n' + '#'.repeat(parseInt(level)) + ' ' + text + '\n';
+                  });
+                  
+                  // Process lists
+                  const lists = tempDiv.querySelectorAll('ul, ol');
+                  lists.forEach(list => {
+                    const isOrdered = list.tagName.toLowerCase() === 'ol';
+                    const items = list.querySelectorAll('li');
+                    items.forEach((item, index) => {
+                      const text = item.textContent.trim();
+                      item.textContent = '\n' + (isOrdered ? `${index + 1}. ` : '- ') + text;
+                    });
+                  });
+                  
+                  // Process bold text
+                  const boldElements = tempDiv.querySelectorAll('b, strong');
+                  boldElements.forEach(el => {
+                    const text = el.textContent.trim();
+                    el.textContent = '**' + text + '**';
+                  });
+                  
+                  // Process italic text
+                  const italicElements = tempDiv.querySelectorAll('i, em');
+                  italicElements.forEach(el => {
+                    const text = el.textContent.trim();
+                    el.textContent = '*' + text + '*';
+                  });
+                  
+                  // Process links
+                  const links = tempDiv.querySelectorAll('a');
+                  links.forEach(link => {
+                    const text = link.textContent.trim();
+                    const href = link.getAttribute('href');
+                    if (href) {
+                      link.textContent = `[${text}](${href})`;
+                    }
+                  });
+                  
+                  // Process paragraphs and add line breaks
+                  const paragraphs = tempDiv.querySelectorAll('p');
+                  paragraphs.forEach(p => {
+                    const text = p.textContent.trim();
+                    if (text && !text.startsWith('#') && !text.startsWith('-') && !text.startsWith('1.')) {
+                      p.textContent = text + '\n\n';
+                    }
+                  });
+                  
+                  // Get the processed text
+                  let markdown = '';
+                  // If we're dealing with complex Word formatting, traverse nodes carefully
+                  function extractText(node) {
+                    if (node.nodeType === 3) { // Text node
+                      return node.textContent;
+                    }
+                    
+                    let result = '';
+                    // Check if this is a formatting node we've already processed
+                    if (node.tagName && ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'B', 'STRONG', 'I', 'EM', 'A', 'LI'].includes(node.tagName.toUpperCase())) {
+                      return node.textContent;
+                    }
+                    
+                    // For other node types, concatenate children
+                    for (const child of node.childNodes) {
+                      result += extractText(child);
+                    }
+                    return result;
+                  }
+                  
+                  markdown = extractText(tempDiv);
+                  
+                  // Clean up excessive newlines
+                  markdown = markdown.replace(/\n{3,}/g, '\n\n');
+                  
+                  // Insert at cursor position
+                  const textarea = e.target;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const text = textarea.value;
+                  const newText = text.substring(0, start) + markdown + text.substring(end);
+                  handleLessonChange(sectionIndex, lessonIndex, 'aboutLesson', newText);
+                }
+              }
+            }}
           />
+          <div className="flex items-center bg-blue-50 text-blue-800 p-3 rounded-lg mt-2">
+            <div className="mr-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="text-sm">
+              <p className="font-medium">Paste formatting supported</p>
+              <p>You can paste formatted text from Word, Google Docs, or other rich text editors to preserve headings, lists, bold, and italic formatting.</p>
+            </div>
+          </div>
         </div>
       )}
       

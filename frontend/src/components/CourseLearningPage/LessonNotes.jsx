@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import RichTextEditor from '../Common/RichTextEditor';
 
 const LessonNotes = ({ lessonId }) => {
   const [notes, setNotes] = useState('');
@@ -12,10 +13,10 @@ const LessonNotes = ({ lessonId }) => {
   }, [lessonId]);
   
   // Save notes to localStorage when they change
-  const handleNotesChange = (e) => {
-    const newNotes = e.target.value;
-    setNotes(newNotes);
-    localStorage.setItem(`course-notes-${lessonId}`, newNotes);
+  const handleNotesChange = (content) => {
+    // The rich text editor provides HTML content directly
+    setNotes(content);
+    localStorage.setItem(`course-notes-${lessonId}`, content);
   };
   
   return (
@@ -24,12 +25,12 @@ const LessonNotes = ({ lessonId }) => {
       <p className="text-gray-600 mb-2">
         Take notes for this lesson. Your notes are saved automatically and are only visible to you.
       </p>
-      <textarea
-        className="w-full h-64 p-4 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-        placeholder="Start typing your notes here..."
+      <RichTextEditor
         value={notes}
         onChange={handleNotesChange}
-      ></textarea>
+        placeholder="Start typing your notes here or paste formatted content..."
+        className="notes-editor"
+      />
     </div>
   );
 };

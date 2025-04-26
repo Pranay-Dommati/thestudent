@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaEdit, FaMapMarkerAlt, FaGlobe, FaGithub, FaLinkedin, FaSave, FaTimes, FaSpinner, FaExternalLinkAlt } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import RichTextEditor from '../../Common/RichTextEditor';
 
 const EditableField = ({ label, value, onChange, type = "text", isDarkMode }) => (
   <div>
@@ -293,17 +294,19 @@ const BasicProfile = ({ isDarkMode, onUpdateProfile }) => {
           Bio
         </h3>
         {isEditing ? (
-          <EditableField
-            label=""
-            value={localProfileData.bio}
-            onChange={(value) => setLocalProfileData({...localProfileData, bio: value})}
-            type="textarea"
-            isDarkMode={isDarkMode}
-          />
+          <div className={isDarkMode ? 'dark' : ''}>
+            <RichTextEditor
+              value={localProfileData.bio}
+              onChange={(content) => setLocalProfileData({...localProfileData, bio: content})}
+              placeholder="Tell us about yourself..."
+              className="bio-editor"
+            />
+          </div>
         ) : (
-          <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            {localProfileData.bio}
-          </p>
+          <div 
+            className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'} prose prose-sm max-w-none`}
+            dangerouslySetInnerHTML={{ __html: localProfileData.bio }}
+          />
         )}
       </div>
 
