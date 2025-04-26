@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     SchoolCourse, EngineeringCourse, CourseChapter, 
-    CourseSection, Lesson, LessonResource, QuizQuestion
+    CourseSection, Lesson, LessonResource, QuizQuestion, UserLessonProgress
 )
 
 class LessonResourceSerializer(serializers.ModelSerializer):
@@ -17,13 +17,20 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
 class LessonSerializer(serializers.ModelSerializer):
     resources = LessonResourceSerializer(many=True, required=False)
     quiz_questions = QuizQuestionSerializer(many=True, required=False)
+    completed = serializers.SerializerMethodField()
     
     class Meta:
         model = Lesson
         fields = [
             'id', 'title', 'type', 'video_url', 'description', 
-            'about_lesson', 'order', 'resources', 'quiz_questions'
+            'about_lesson', 'order', 'resources', 'quiz_questions', 'completed'
         ]
+    
+    def get_completed(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return UserLessonProgress.objects.filter(user=request.user, lesson=obj).exists()
+        return False
 
 class CourseChapterSerializer(serializers.ModelSerializer):
     lessons = LessonSerializer(many=True, required=False)

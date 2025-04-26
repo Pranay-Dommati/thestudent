@@ -8,4 +8,8 @@ urlpatterns = [
     path('api/courses/all/', views.list_all_courses, name='list-all-courses'),
     path('api/courses/school/', views.list_school_courses, name='list-school-courses'),
     path('api/courses/school/<str:course_id>/', views.get_school_course_by_id, name='get-school-course-by-id'),
+    
+    # New progress tracking endpoints
+    path('api/courses/progress/<str:course_id>/', views.get_course_progress, name='get-course-progress'),
+    path('api/lessons/complete/<int:lesson_id>/', views.toggle_lesson_completion, name='toggle-lesson-completion'),
 ]

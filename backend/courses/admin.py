@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     SchoolCourse, EngineeringCourse, CourseChapter, 
-    CourseSection, Lesson, LessonResource, QuizQuestion
+    CourseSection, Lesson, LessonResource, QuizQuestion,
+    UserLessonProgress
 )
 
 class LessonResourceInline(admin.TabularInline):
@@ -38,3 +39,4 @@ admin.site.register(EngineeringCourse, EngineeringCourseAdmin)
 admin.site.register(CourseChapter, ChapterAdmin)
 admin.site.register(CourseSection, SectionAdmin)
 admin.site.register(Lesson)
+admin.site.register(UserLessonProgress)

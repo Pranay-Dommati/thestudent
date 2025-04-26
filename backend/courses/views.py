@@ -1,10 +1,10 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework.permissions import AllowAny
-from .models import SchoolCourse, EngineeringCourse
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress
 from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer
 import json
 from django.conf import settings
@@ -190,7 +190,7 @@ def create_course(request):
                             video_url=lesson_data.get('videoUrl', ''),
                             description=lesson_data.get('description', ''),
                             about_lesson=lesson_data.get('aboutLesson', ''),
-                            order=lesson_idx
+                           
                         )
                         
                         # Add resources if any
@@ -422,4 +422,203 @@ def list_school_courses(request):
         return Response(
             {"error": "Internal server error", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_lesson_completion(request, lesson_id):
+    """
+    Mark a lesson as complete or incomplete for the current user
+    """
+    try:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        user = request.user
+        
+        # Check if lesson progress record exists
+        progress, created = UserLessonProgress.objects.get_or_create(
+            user=user,
+            lesson=lesson
+        )
+        
+        # If it existed and we're toggling, delete it to mark as incomplete
+        if not created:
+            progress.delete()
+            status_message = 'incomplete'
+        else:
+            status_message = 'complete'
+        
+        # Calculate progress percentage for the course
+        total_lessons = 0
+        completed_lessons = 0
+        
+        if lesson.chapter:
+            # School course
+            course = lesson.chapter.school_course
+            for chapter in course.chapters.all():
+                chapter_lessons = chapter.lessons.all()
+                total_lessons += chapter_lessons.count()
+                completed_lessons += UserLessonProgress.objects.filter(
+                    user=user,
+                    lesson__in=chapter_lessons
+                ).count()
+        elif lesson.section:
+            # Engineering course
+            course = lesson.section.engineering_course
+            for section in course.sections.all():
+                section_lessons = section.lessons.all()
+                total_lessons += section_lessons.count()
+                completed_lessons += UserLessonProgress.objects.filter(
+                    user=user, 
+                    lesson__in=section_lessons
+                ).count()
+        
+        progress_percentage = 0
+        if total_lessons > 0:
+            progress_percentage = int((completed_lessons / total_lessons) * 100)
+            
+        return Response({
+            'status': status_message,
+            'lesson_id': lesson_id,
+            'progress': {
+                'completed': completed_lessons,
+                'total': total_lessons,
+                'percentage': progress_percentage
+            }
+        })
+        
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_course_progress(request, course_id):
+    """
+    Get the progress of a specific course for the current user
+    """
+    try:
+        user = request.user
+        total_lessons = 0
+        completed_lessons = 0
+        
+        # Determine if it's a school course or engineering course
+        try:
+            # Try to find a school course first
+            course = SchoolCourse.objects.get(id=course_id)
+            is_school_course = True
+        except SchoolCourse.DoesNotExist:
+            # If not found, try engineering course
+            try:
+                course = EngineeringCourse.objects.get(id=course_id)
+                is_school_course = False
+            except EngineeringCourse.DoesNotExist:
+                return Response(
+                    {"error": "Course not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        # Get lesson completion status
+        if is_school_course:
+            # For school course
+            lessons_by_chapter = []
+            for chapter in course.chapters.all():
+                chapter_lessons = chapter.lessons.all()
+                total_lessons += chapter_lessons.count()
+                
+                # Get completed lessons in this chapter
+                completed_lesson_ids = UserLessonProgress.objects.filter(
+                    user=user, 
+                    lesson__chapter=chapter
+                ).values_list('lesson_id', flat=True)
+                
+                chapter_completed = len(completed_lesson_ids)
+                completed_lessons += chapter_completed
+                
+                # Build chapter data with lessons
+                chapter_data = {
+                    'id': chapter.id,
+                    'name': chapter.name,
+                    'total_lessons': chapter_lessons.count(),
+                    'completed_lessons': chapter_completed,
+                    'lessons': [
+                        {
+                            'id': lesson.id,
+                            'title': lesson.title,
+                            'completed': lesson.id in completed_lesson_ids
+                        }
+                        for lesson in chapter_lessons
+                    ]
+                }
+                lessons_by_chapter.append(chapter_data)
+                
+            response_data = {
+                'course': {
+                    'id': str(course.id),
+                    'title': course.title,
+                    'type': 'school'
+                },
+                'progress': {
+                    'completed': completed_lessons,
+                    'total': total_lessons,
+                    'percentage': int((completed_lessons / total_lessons) * 100) if total_lessons > 0 else 0
+                },
+                'chapters': lessons_by_chapter
+            }
+        else:
+            # For engineering course
+            lessons_by_section = []
+            for section in course.sections.all():
+                section_lessons = section.lessons.all()
+                total_lessons += section_lessons.count()
+                
+                # Get completed lessons in this section
+                completed_lesson_ids = UserLessonProgress.objects.filter(
+                    user=user, 
+                    lesson__section=section
+                ).values_list('lesson_id', flat=True)
+                
+                section_completed = len(completed_lesson_ids)
+                completed_lessons += section_completed
+                
+                # Build section data with lessons
+                section_data = {
+                    'id': section.id,
+                    'name': section.name,
+                    'total_lessons': section_lessons.count(),
+                    'completed_lessons': section_completed,
+                    'lessons': [
+                        {
+                            'id': lesson.id,
+                            'title': lesson.title,
+                            'completed': lesson.id in completed_lesson_ids
+                        }
+                        for lesson in section_lessons
+                    ]
+                }
+                lessons_by_section.append(section_data)
+            
+            response_data = {
+                'course': {
+                    'id': str(course.id),
+                    'title': course.title,
+                    'type': 'engineering'
+                },
+                'progress': {
+                    'completed': completed_lessons,
+                    'total': total_lessons,
+                    'percentage': int((completed_lessons / total_lessons) * 100) if total_lessons > 0 else 0
+                },
+                'sections': lessons_by_section
+            }
+        
+        return Response(response_data)
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
         )

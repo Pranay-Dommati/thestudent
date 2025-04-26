@@ -1,5 +1,6 @@
 from django.db import models
 import uuid
+from django.conf import settings
 
 class BaseCourse(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -127,3 +128,16 @@ class QuizQuestion(models.Model):
     
     def __str__(self):
         return self.question
+
+class UserLessonProgress(models.Model):
+    """Tracks which lessons a user has completed"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='lesson_progress')
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='completed_by_users')
+    completed_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['user', 'lesson']
+        ordering = ['completed_at']
+    
+    def __str__(self):
+        return f"{self.user} - {self.lesson.title} - {self.completed_at.strftime('%Y-%m-%d')}"

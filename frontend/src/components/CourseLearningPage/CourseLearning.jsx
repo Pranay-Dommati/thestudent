@@ -9,6 +9,9 @@ import QuizIntro from './templ/QuizIntro'; // Make sure to import QuizIntro inst
 import InstructionsPage from './templ/InstructionsPage';
 import Sidebar from './Sidebar';
 import axios from 'axios';
+import axiosInstance from '../../utils/axios'; // Import the configured axiosInstance with auth headers
+import { toast } from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext'; // Import auth context
 
 // Update the function signature to accept the new props
 const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
@@ -21,9 +24,12 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [contentType, setContentType] = useState('video'); // 'video', 'resources', 'quiz', 'instructions'
+  const [courseProgress, setCourseProgress] = useState(null);
+  const [savingProgress, setSavingProgress] = useState(false);
   const videoRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { isLoggedIn } = useAuth(); // Get authentication state
 
   useEffect(() => {
     const fetchCourseData = async () => {
@@ -42,7 +48,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
           // Engineering course
           apiUrl = `http://127.0.0.1:8000/api/courses/engineering/${params.courseId}/`;
           
-          const response = await axios.get(apiUrl);
+          const response = await axiosInstance.get(apiUrl);
           const courseData = response.data;
           console.log("Fetched Engineering Course Data:", courseData);
           
@@ -98,7 +104,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
           }
           
           console.log("Fetching from API URL:", listApiUrl);
-          const listResponse = await axios.get(listApiUrl);
+          const listResponse = await axiosInstance.get(listApiUrl);
           let courseId;
           
           if (Array.isArray(listResponse.data) && listResponse.data.length > 0) {
@@ -153,7 +159,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
           if (courseId) {
             const detailApiUrl = `http://127.0.0.1:8000/api/courses/school/${courseId}/`;
             console.log("Fetching detailed course data from:", detailApiUrl);
-            const detailResponse = await axios.get(detailApiUrl);
+            const detailResponse = await axiosInstance.get(detailApiUrl);
             const courseData = detailResponse.data;
             console.log("Detailed course data:", courseData);
             
@@ -247,6 +253,68 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
     fetchCourseData();
   }, [pathname, params]);
 
+  // Add a useEffect to fetch user progress when course data is loaded
+  useEffect(() => {
+    // Only fetch progress if the user is logged in and we have a course
+    const fetchUserProgress = async () => {
+      if (!isLoggedIn || !course || !course.id) return;
+      
+      try {
+        // Call the backend API to get the user's progress for this course
+        const response = await axiosInstance.get(`http://127.0.0.1:8000/api/courses/progress/${course.id}/`);
+        
+        setCourseProgress(response.data);
+        
+        // Update the course lessons with completion status from the API
+        const updatedCourse = {...course};
+        
+        // Check if it's a school course with chapters
+        if (response.data.chapters) {
+          response.data.chapters.forEach(chapter => {
+            const chapterIndex = updatedCourse.chapters.findIndex(c => c.title === chapter.name);
+            if (chapterIndex !== -1) {
+              chapter.lessons.forEach(lessonProgress => {
+                const lessonIndex = updatedCourse.chapters[chapterIndex].lessons.findIndex(l => 
+                  l.title === lessonProgress.title
+                );
+                if (lessonIndex !== -1) {
+                  updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = lessonProgress.completed;
+                }
+              });
+            }
+          });
+        } 
+        // Check if it's an engineering course with sections
+        else if (response.data.sections) {
+          response.data.sections.forEach(section => {
+            const sectionIndex = updatedCourse.chapters.findIndex(c => c.title === section.name);
+            if (sectionIndex !== -1) {
+              section.lessons.forEach(lessonProgress => {
+                const lessonIndex = updatedCourse.chapters[sectionIndex].lessons.findIndex(l => 
+                  l.title === lessonProgress.title
+                );
+                if (lessonIndex !== -1) {
+                  updatedCourse.chapters[sectionIndex].lessons[lessonIndex].completed = lessonProgress.completed;
+                }
+              });
+            }
+          });
+        }
+        
+        setCourse(updatedCourse);
+        
+      } catch (error) {
+        console.error('Error fetching user progress:', error);
+        // Don't show error toast if 401 Unauthorized (user not logged in)
+        if (error.response?.status !== 401) {
+          toast.error('Failed to load your course progress');
+        }
+      }
+    };
+    
+    fetchUserProgress();
+  }, [course, isLoggedIn]);
+
   // Handle chapter toggling
   const toggleChapter = (index) => {
     setExpandedChapters(prev => ({
@@ -271,19 +339,169 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
   };
 
   // Mark lesson as complete
-  const markLessonComplete = () => {
-    if (!course) return;
+  const markLessonComplete = async () => {
+    if (!course || !isLoggedIn) return;
     
-    const updatedCourse = {...course};
-    updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
-    setCourse(updatedCourse);
+    const currentLesson = course.chapters[activeChapter].lessons[activeLesson];
+    if (currentLesson.completed) return; // Already completed
+    
+    setSavingProgress(true);
+    
+    try {
+      // Look for the actual lesson ID in our courseProgress data
+      let lessonId;
+      
+      if (courseProgress) {
+        if (courseProgress.chapters) {
+          // For school courses
+          for (const chapter of courseProgress.chapters) {
+            if (chapter.name === course.chapters[activeChapter].title) {
+              const lessonData = chapter.lessons.find(l => l.title === currentLesson.title);
+              if (lessonData) {
+                lessonId = lessonData.id;
+                break;
+              }
+            }
+          }
+        } else if (courseProgress.sections) {
+          // For engineering courses
+          for (const section of courseProgress.sections) {
+            if (section.name === course.chapters[activeChapter].title) {
+              const lessonData = section.lessons.find(l => l.title === currentLesson.title);
+              if (lessonData) {
+                lessonId = lessonData.id;
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      if (!lessonId) {
+        console.warn("Lesson ID not found in progress data. Progress won't be saved.");
+        return;
+      }
+      
+      // Call the API to toggle lesson completion
+      const response = await axiosInstance.post(
+        `http://127.0.0.1:8000/api/lessons/complete/${lessonId}/`,
+        {},
+        { withCredentials: true }
+      );
+      
+      // Update the local course state
+      const updatedCourse = {...course};
+      updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
+      setCourse(updatedCourse);
+      
+      // Update progress data
+      setCourseProgress(prevProgress => {
+        if (!prevProgress) return response.data;
+        
+        return {
+          ...prevProgress,
+          progress: response.data.progress
+        };
+      });
+      
+    } catch (error) {
+      console.error('Error saving lesson progress:', error);
+      if (error.response?.status === 401) {
+        toast.error('Please log in to save your progress');
+      } else {
+        toast.error('Failed to save your progress');
+      }
+    } finally {
+      setSavingProgress(false);
+    }
+  };
+
+  // Toggle lesson completion status
+  const toggleLessonCompletion = async (chapterIndex, lessonIndex) => {
+    if (!course || !isLoggedIn) return;
+    
+    const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
+    setSavingProgress(true);
+    
+    try {
+      // Look for the actual lesson ID in our courseProgress data
+      let lessonId;
+      
+      if (courseProgress) {
+        if (courseProgress.chapters) {
+          // For school courses
+          for (const chapter of courseProgress.chapters) {
+            if (chapter.name === course.chapters[chapterIndex].title) {
+              const lessonData = chapter.lessons.find(l => l.title === lesson.title);
+              if (lessonData) {
+                lessonId = lessonData.id;
+                break;
+              }
+            }
+          }
+        } else if (courseProgress.sections) {
+          // For engineering courses
+          for (const section of courseProgress.sections) {
+            if (section.name === course.chapters[chapterIndex].title) {
+              const lessonData = section.lessons.find(l => l.title === lesson.title);
+              if (lessonData) {
+                lessonId = lessonData.id;
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      if (!lessonId) {
+        console.warn("Lesson ID not found in progress data. Progress won't be saved.");
+        return;
+      }
+      
+      // Call the API to toggle lesson completion
+      const response = await axiosInstance.post(
+        `http://127.0.0.1:8000/api/lessons/complete/${lessonId}/`,
+        {},
+        { withCredentials: true }
+      );
+      
+      // Update the local course state based on the response
+      const updatedCourse = {...course};
+      const newCompletionStatus = response.data.status === 'complete';
+      updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = newCompletionStatus;
+      setCourse(updatedCourse);
+      
+      // Update progress data
+      setCourseProgress(prevProgress => {
+        if (!prevProgress) return response.data;
+        
+        return {
+          ...prevProgress,
+          progress: response.data.progress
+        };
+      });
+      
+    } catch (error) {
+      console.error('Error toggling lesson completion:', error);
+      if (error.response?.status === 401) {
+        toast.error('Please log in to save your progress');
+      } else {
+        toast.error('Failed to save your progress');
+      }
+    } finally {
+      setSavingProgress(false);
+    }
   };
 
   // Navigate to next lesson
-  const goToNextLesson = () => {
+  const goToNextLesson = async () => {
     if (!course) return;
     
-    markLessonComplete();
+    // If not already completed, mark the lesson as complete
+    if (!currentLesson.completed) {
+      await markLessonComplete();
+    }
+    
     const currentChapter = course.chapters[activeChapter];
     
     if (activeLesson < currentChapter.lessons.length - 1) {
@@ -297,7 +515,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
       }));
     } else {
       // Course completed
-      alert("🎉 Congratulations! You've completed the course!");
+      toast.success("🎉 Congratulations! You've completed the course!");
     }
   };
 
@@ -339,23 +557,29 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
 
   // Handle lesson click
   const handleLessonClick = (chapterIndex, lessonIndex) => {
-    const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
-    setActiveChapter(chapterIndex);
-    setActiveLesson(lessonIndex);
-    
-    // Important: Set the content type based on the lesson type
-    console.log("Lesson clicked:", lesson.title, "Type:", lesson.type);
-    setContentType(lesson.type || 'video');
-    
-    // Expand the chapter
-    setExpandedChapters(prev => ({
-      ...prev,
-      [chapterIndex]: true
-    }));
-    
-    // Only scroll to video ref if it's a video content type
-    if (lesson.type === 'video' && videoRef.current) {
-      videoRef.current.scrollIntoView({ behavior: 'smooth' });
+    const lesson = course.chapters[chapterIndex].lessons[lessonIndex]; 
+    // Only update state if we're actually changing lessons to prevent re-renders
+    if (activeChapter !== chapterIndex || activeLesson !== lessonIndex) {
+      setActiveChapter(chapterIndex);
+      setActiveLesson(lessonIndex);
+      
+      // Set content type based on the lesson type
+      if (lesson.type && lesson.type !== contentType) {
+        setContentType(lesson.type || 'video');
+      }
+      
+      // Expand the chapter
+      if (!expandedChapters[chapterIndex]) {
+        setExpandedChapters(prev => ({
+          ...prev,
+          [chapterIndex]: true
+        }));
+      }
+      
+      // Only scroll to video ref if it's a video content type
+      if (lesson.type === 'video' && videoRef.current) {
+        videoRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   };
 
@@ -390,7 +614,8 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
   // Modified content area rendering
   const renderContent = () => {
     const currentLesson = getCurrentLesson();
-    console.log("Rendering content for type:", contentType);
+    // Remove or comment out this problematic console log
+    // console.log("Rendering content for type:", contentType);
     
     switch(contentType) {
       case 'resources':
@@ -579,13 +804,26 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
               </div>
               
               <button 
-                className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center"
+                className={`px-6 py-3 rounded-lg font-medium flex items-center ${
+                  savingProgress ? 'bg-gray-400 cursor-not-allowed' : 
+                  'bg-indigo-600 hover:bg-indigo-700 transition-colors'
+                } text-white`}
                 onClick={goToNextLesson}
+                disabled={savingProgress}
               >
-                {currentLesson.completed ? "Next Lesson" : "Mark as Complete"}
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                </svg>
+                {savingProgress ? (
+                  <>
+                    <span className="mr-2 h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    {currentLesson.completed ? "Next Lesson" : "Mark as Complete"}
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </>
+                )}
               </button>
             </div>
           </>
@@ -653,6 +891,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
           totalLessons={totalLessons}
           toggleChapter={toggleChapter}
           toggleSidebar={() => setSidebarVisible(!sidebarVisible)}
+          toggleLessonCompletion={toggleLessonCompletion} // Pass the function to toggle lesson completion
         />
       </div>
     </div>
