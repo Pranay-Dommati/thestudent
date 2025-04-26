@@ -60,6 +60,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
               })),
             })),
           };
+          console.log("Transformed course data:", transformedCourse);
           setCourse(transformedCourse);
         } else {
           // School course (10th, 11th, 12th)
@@ -87,89 +88,87 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                        stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
           }
           
-          // Build the API URL
+          // First, fetch the list to get the course ID
+          let listApiUrl;
           if (board === 'state' && stateName) {
-            apiUrl = `http://127.0.0.1:8000/api/courses/school/?class=${classLevel}&board=${board}&state=${stateName}&subject=${subject}`;
+            listApiUrl = `http://127.0.0.1:8000/api/courses/school/?class=${classLevel}&board=${board}&state=${stateName}&subject=${subject}`;
           } else {
-            apiUrl = `http://127.0.0.1:8000/api/courses/school/?class=${classLevel}&board=${board}&subject=${subject}`;
+            listApiUrl = `http://127.0.0.1:8000/api/courses/school/?class=${classLevel}&board=${board}&subject=${subject}`;
           }
           
-          console.log("Fetching from API URL:", apiUrl);
-          const response = await axios.get(apiUrl);
-          let courseData;
+          console.log("Fetching from API URL:", listApiUrl);
+          const listResponse = await axios.get(listApiUrl);
+          let courseId;
           
-          if (Array.isArray(response.data)) {
-            console.log("API response courses:", response.data);
+          if (Array.isArray(listResponse.data) && listResponse.data.length > 0) {
+            console.log("API response courses:", listResponse.data);
             console.log("Looking for subject:", subject);
             
             // More flexible matching - convert to lowercase and trim whitespace
-            courseData = response.data.find(course => {
+            const matchedCourse = listResponse.data.find(course => {
               const courseSubject = (course.subject || '').toLowerCase().trim();
               const urlSubject = (subject || '').toLowerCase().trim();
               console.log(`Comparing '${courseSubject}' with '${urlSubject}'`);
-              return courseSubject === urlSubject;
+              return courseSubject === urlSubject || courseSubject.includes(urlSubject) || urlSubject.includes(courseSubject);
             });
             
-            if (!courseData) {
-              // If exact match fails, try a more relaxed matching approach
-              console.log("Exact match failed, trying partial match...");
-              courseData = response.data.find(course => {
-                const courseSubject = (course.subject || '').toLowerCase().trim();
-                const urlSubject = (subject || '').toLowerCase().trim();
-                return courseSubject.includes(urlSubject) || urlSubject.includes(courseSubject);
-              });
+            if (matchedCourse) {
+              courseId = matchedCourse.id;
+              console.log("Found matching course with ID:", courseId);
+            } else if (listResponse.data.length > 0) {
+              courseId = listResponse.data[0].id;
+              console.log("Using first course with ID:", courseId);
             }
+          }
+          
+          // Now fetch the detailed course data using the specific ID
+          if (courseId) {
+            const detailApiUrl = `http://127.0.0.1:8000/api/courses/school/${courseId}/`;
+            console.log("Fetching detailed course data from:", detailApiUrl);
+            const detailResponse = await axios.get(detailApiUrl);
+            const courseData = detailResponse.data;
+            console.log("Detailed course data:", courseData);
             
-            if (!courseData && response.data.length > 0) {
-              // If all matching fails but we have courses, use the first one as fallback
-              console.log("No matching course found, using first available course as fallback");
-              courseData = response.data[0];
-            }
-            
-            if (!courseData) {
-              // If the array is empty or no match found, create a default course template
-              console.log("No courses returned from API, creating default template");
-              courseData = {
-                id: 1,
-                title: `${classLevel} ${board.toUpperCase()} ${subject}`,
-                subject: subject || "General Course",
-                description: "Course content coming soon",
-                chapters: []
-              };
-            }
-            
-            console.log("Found/created school course:", courseData);
-            
-            // For school courses, we need to transform the structure
+            // Transform the course data with proper structure
             const transformedCourse = {
               ...courseData,
               chapters: courseData.chapters && courseData.chapters.length > 0 
                 ? courseData.chapters.map((chapter) => ({
-                  title: chapter.name,
-                  lessons: chapter.lessons.map((lesson) => ({
-                    title: lesson.title,
-                    type: lesson.type || 'video',
-                    videoUrl: lesson.videoUrl || lesson.video_url,
-                    description: lesson.description || '',
-                    aboutLesson: lesson.aboutLesson || '',
-                    completed: false
-                  }))
-                })) 
+                    title: chapter.name,
+                    lessons: chapter.lessons && chapter.lessons.length > 0
+                      ? chapter.lessons.map((lesson) => ({
+                          title: lesson.title,
+                          type: lesson.type || 'video',
+                          videoUrl: lesson.video_url || '',
+                          description: lesson.description || '',
+                          aboutLesson: lesson.about_lesson || '',
+                          completed: false
+                        }))
+                      : [{
+                          title: "Introduction to " + chapter.name,
+                          type: 'video',
+                          videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                          description: "Introduction to this chapter",
+                          aboutLesson: "Basic introduction to the concepts in this chapter",
+                          completed: false
+                        }]
+                  })) 
                 : [{
-                  title: "Main Content",
-                  lessons: [{
-                    title: courseData.title || "Introduction",
-                    type: 'video',
-                    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ", // Default video if none is provided
-                    description: courseData.description || '',
-                    completed: false
+                    title: "Main Content",
+                    lessons: [{
+                      title: courseData.title || "Introduction",
+                      type: 'video',
+                      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ", // Default video if none is provided
+                      description: courseData.description || '',
+                      completed: false
+                    }]
                   }]
-                }]
             };
+            console.log("Transformed course data:", transformedCourse);
             setCourse(transformedCourse);
           } else {
-            console.error("Unexpected API response format", response.data);
-            throw new Error("Invalid API response format");
+            console.error("Could not find course ID");
+            throw new Error("Course not found");
           }
         }
 
