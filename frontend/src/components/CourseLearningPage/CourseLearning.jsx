@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import ReactMarkdown from 'react-markdown';
 import LessonVideo from './LessonVideo';
 import CourseProgress from './CourseProgress';
 import ResourcesPage from './templ/ResourcesPage';
@@ -104,12 +105,39 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
             console.log("API response courses:", listResponse.data);
             console.log("Looking for subject:", subject);
             
-            // More flexible matching - convert to lowercase and trim whitespace
+            // More precise matching to prevent "Science" vs "Social Science" confusion
             const matchedCourse = listResponse.data.find(course => {
               const courseSubject = (course.subject || '').toLowerCase().trim();
               const urlSubject = (subject || '').toLowerCase().trim();
               console.log(`Comparing '${courseSubject}' with '${urlSubject}'`);
-              return courseSubject === urlSubject || courseSubject.includes(urlSubject) || urlSubject.includes(courseSubject);
+              
+              // First try for an exact match (ignoring case)
+              if (courseSubject === urlSubject) {
+                console.log("Found exact match!");
+                return true;
+              }
+              
+              // Special case for Social vs Social Science (legacy support)
+              if ((urlSubject === "social" && (courseSubject === "social science" || courseSubject === "social")) ||
+                  (courseSubject === "social" && (urlSubject === "social science" || urlSubject === "social"))) {
+                console.log("Handling Social/Social Science compatibility");
+                return true;
+              }
+              
+              // If no exact match and URL is "science", make sure we don't match "social science"
+              if (urlSubject === "science" && courseSubject.includes("social")) {
+                console.log("Avoiding 'social science' when looking for 'science'");
+                return false;
+              }
+              
+              // Prevent "science" from matching "social science" when looking for science courses
+              if ((urlSubject === "social" || urlSubject === "social science") && courseSubject === "science") {
+                console.log("Avoiding 'science' when looking for 'social'");
+                return false;
+              }
+              
+              // Fallback to more flexible matching
+              return courseSubject.includes(urlSubject) || urlSubject.includes(courseSubject);
             });
             
             if (matchedCourse) {
@@ -425,22 +453,54 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
             {/* Tab Content */}
             <div className="mb-8">
               {activeTab === 'content' && (
-                <div className="prose max-w-none">
-                  <p className="text-gray-700">
-                    This lesson covers the essential concepts of {currentLesson.title.toLowerCase()}. 
-                    You'll learn the fundamentals and how to apply them in real-world scenarios.
-                  </p>
-                  <h3 className="text-lg font-semibold mt-6">What you'll learn</h3>
-                  <ul className="list-disc pl-5 space-y-2 mt-2 mb-4">
-                    <li>Understanding the core concepts of {currentLesson.title}</li>
-                    <li>How to implement these patterns in your own projects</li>
-                    <li>Best practices and common pitfalls to avoid</li>
-                    <li>Integration with other Next.js features</li>
-                  </ul>
-                  <p>
-                    After completing this lesson, you'll have a solid understanding of how to use {currentLesson.title.toLowerCase()} 
-                    to build more dynamic and efficient React applications with Next.js.
-                  </p>
+                <div className="prose prose-lg max-w-none markdown-body">
+                  {currentLesson.aboutLesson ? (
+                    <ReactMarkdown
+                      components={{
+                        ul: ({node, ...props}) => <ul className="list-disc pl-5 my-4 space-y-2" {...props} />,
+                        ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-4 space-y-2" {...props} />,
+                        li: ({node, children, ordered, ...props}) => {
+                          // Skip rendering empty list items
+                          if (!children || (Array.isArray(children) && children.length === 0) || 
+                              (typeof children === 'string' && children.trim() === '')) {
+                            return null;
+                          }
+                          return <li className="ml-2 my-1" {...props}>{children}</li>;
+                        },
+                        h1: ({node, ...props}) => <h1 className="text-2xl font-bold my-4" {...props} />,
+                        h2: ({node, ...props}) => <h2 className="text-xl font-bold my-3" {...props} />,
+                        h3: ({node, ...props}) => <h3 className="text-lg font-bold my-3" {...props} />,
+                        p: ({node, children, ...props}) => {
+                          // Skip rendering empty paragraphs
+                          if (!children || (Array.isArray(children) && children.length === 0) || 
+                              (typeof children === 'string' && children.trim() === '')) {
+                            return null;
+                          }
+                          return <p className="my-4" {...props}>{children}</p>;
+                        }
+                      }}
+                    >
+                      {currentLesson.aboutLesson}
+                    </ReactMarkdown>
+                  ) : (
+                    <>
+                      <p className="text-gray-700">
+                        This lesson covers the essential concepts of {currentLesson.title.toLowerCase()}. 
+                        You'll learn the fundamentals and how to apply them in real-world scenarios.
+                      </p>
+                      <h3 className="text-lg font-semibold mt-6">What you'll learn</h3>
+                      <ul className="list-disc pl-5 space-y-2 mt-2 mb-4">
+                        <li>Understanding the core concepts of {currentLesson.title}</li>
+                        <li>How to implement these patterns in your own projects</li>
+                        <li>Best practices and common pitfalls to avoid</li>
+                        <li>Integration with other Next.js features</li>
+                      </ul>
+                      <p>
+                        After completing this lesson, you'll have a solid understanding of how to use {currentLesson.title.toLowerCase()} 
+                        to build more dynamic and efficient React applications with Next.js.
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
               

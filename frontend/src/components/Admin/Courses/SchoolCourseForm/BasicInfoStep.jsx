@@ -21,7 +21,7 @@ const STATE_OPTIONS = [
 // Subject options based on class
 const SUBJECT_OPTIONS = {
   '10th': [
-    'English', 'Hindi', 'Mathematics', 'Science', 'Social Science', 'Sanskrit', 
+    'English', 'Hindi', 'Mathematics', 'Science', 'Social', 'Sanskrit', 
     'Computer Science', 'Other'
   ],
   '11th': [

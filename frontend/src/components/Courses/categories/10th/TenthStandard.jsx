@@ -13,7 +13,7 @@ const SUBJECT_ICONS = {
   'Biology': '🧬',
   'English': '📚',
   'Hindi': '📖',
-  'Social Science': '🌍',
+  'Social': '🌍',
   'Science': '🔬',
   'Computer Science': '💻',
   'General': '📘'

@@ -2,6 +2,7 @@ import React from 'react';
 import { FaTrash, FaVideo, FaFileAlt, FaQuestionCircle, FaBook } from 'react-icons/fa';
 import ResourcesInput from './ResourcesInput';
 import QuizQuestions from './QuizQuestions';
+import MDEditor from '@uiw/react-md-editor';
 
 const LessonForm = ({
   chapterIndex,
@@ -102,14 +103,17 @@ const LessonForm = ({
           </div>
           
           <div className="space-y-2">
-            <label className="block text-gray-700">About This Lesson</label>
-            <textarea
+            <label className="block text-gray-700">
+              About This Lesson <span className="text-xs text-gray-500">(Supports Markdown)</span>
+            </label>
+            <MDEditor
               value={lesson.aboutLesson}
-              onChange={(e) => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', e.target.value)}
-              rows={4}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-              placeholder="Describe what this lesson covers"
-            ></textarea>
+              onChange={(e) => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', e)}
+              height={200}
+            />
+            <div className="text-xs text-gray-500 italic">
+              Tip: Use markdown syntax for formatting - **bold**, *italic*, ## headings, - list items, [links](url), etc.
+            </div>
           </div>
           
           {/* Resources toggle */}
@@ -171,13 +175,11 @@ const LessonForm = ({
           <label className="block text-gray-700">
             Content <span className="text-red-500">*</span>
           </label>
-          <textarea
+          <MDEditor
             value={lesson.aboutLesson}
-            onChange={(e) => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', e.target.value)}
-            rows={6}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-            placeholder="Enter the instruction content (supports Markdown)"
-          ></textarea>
+            onChange={(e) => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', e)}
+            height={300}
+          />
         </div>
       )}
       
