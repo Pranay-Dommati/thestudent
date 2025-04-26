@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import LoadingSpinner from './LoadingSpinner';
 import Navbar from '../Navbar/Navbar';
 import Footer from '../Footer/Footer';
+import { useAuth } from '../../context/AuthContext'; // Import useAuth
 
 const API_URL = 'http://localhost:8000';
 
@@ -15,6 +16,7 @@ const SchoolCourseDetails = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { boardId, stateId, subjectId } = useParams();
+  const { isLoggedIn } = useAuth(); // Get authentication state
 
   // Define subject icons mapping
   const SUBJECT_ICONS = {
@@ -201,11 +203,16 @@ const SchoolCourseDetails = () => {
   }, [location.pathname, boardId, stateId, subjectId]);
 
   const handleStartLearning = () => {
+    if (!isLoggedIn) {
+      toast.error('Please log in to start learning');
+      navigate('/auth?mode=login');
+      return;
+    }
     navigate(`${location.pathname}/learning`);
   };
 
   if (loading) return <LoadingSpinner />;
-  
+
   if (!course) return <div className="p-8 text-center">Course not found</div>;
 
   return (

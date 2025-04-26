@@ -126,10 +126,14 @@ def create_course(request):
                             for res_type in ['downloadable', 'internet']:
                                 if res_type in resources:
                                     for res_data in resources[res_type]:
+                                        # Map frontend field names to backend model field names
+                                        # Frontend: name, description, link
+                                        # Backend: title, description, url
                                         lesson.resources.create(
                                             type=res_type,
-                                            title=res_data.get('title', ''),
-                                            url=res_data.get('url', '')
+                                            title=res_data.get('name', res_data.get('title', '')),
+                                            description=res_data.get('description', ''),
+                                            url=res_data.get('link', res_data.get('url', ''))
                                         )
                         
                         # Add quiz questions if any
@@ -190,7 +194,7 @@ def create_course(request):
                             video_url=lesson_data.get('videoUrl', ''),
                             description=lesson_data.get('description', ''),
                             about_lesson=lesson_data.get('aboutLesson', ''),
-                           
+                            order=lesson_idx
                         )
                         
                         # Add resources if any
@@ -199,10 +203,14 @@ def create_course(request):
                             for res_type in ['downloadable', 'internet']:
                                 if res_type in resources:
                                     for res_data in resources[res_type]:
+                                        # Map frontend field names to backend model field names
+                                        # Frontend: name, description, link
+                                        # Backend: title, description, url
                                         lesson.resources.create(
                                             type=res_type,
-                                            title=res_data.get('title', ''),
-                                            url=res_data.get('url', '')
+                                            title=res_data.get('name', res_data.get('title', '')),
+                                            description=res_data.get('description', ''),
+                                            url=res_data.get('link', res_data.get('url', ''))
                                         )
                         
                         # Add quiz questions if any

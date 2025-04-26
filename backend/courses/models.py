@@ -114,6 +114,7 @@ class LessonResource(models.Model):
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='resources')
     type = models.CharField(max_length=20, choices=RESOURCE_TYPE_CHOICES)
     title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)  # Added description field
     url = models.URLField(blank=True)
     file = models.FileField(upload_to='lesson_resources/', null=True, blank=True)
     

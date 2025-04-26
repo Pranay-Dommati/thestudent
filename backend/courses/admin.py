@@ -34,9 +34,24 @@ class EngineeringCourseAdmin(admin.ModelAdmin):
     list_filter = ['proficiency', 'certificate_given', 'project_based', 'is_published']
     search_fields = ['title', 'subject']
 
+class LessonResourceAdmin(admin.ModelAdmin):
+    list_display = ['title', 'type', 'lesson', 'get_course']
+    list_filter = ['type']
+    search_fields = ['title', 'lesson__title']
+    
+    def get_course(self, obj):
+        if obj.lesson.chapter:
+            return f"School: {obj.lesson.chapter.school_course.title}"
+        elif obj.lesson.section:
+            return f"Engineering: {obj.lesson.section.engineering_course.title}"
+        return "Unknown course"
+    
+    get_course.short_description = 'Course'
+
 admin.site.register(SchoolCourse, SchoolCourseAdmin)
 admin.site.register(EngineeringCourse, EngineeringCourseAdmin)
 admin.site.register(CourseChapter, ChapterAdmin)
 admin.site.register(CourseSection, SectionAdmin)
 admin.site.register(Lesson)
+admin.site.register(LessonResource, LessonResourceAdmin)  # Use custom admin class
 admin.site.register(UserLessonProgress)

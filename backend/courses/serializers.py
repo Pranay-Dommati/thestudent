@@ -7,7 +7,7 @@ from .models import (
 class LessonResourceSerializer(serializers.ModelSerializer):
     class Meta:
         model = LessonResource
-        fields = ['id', 'type', 'title', 'url', 'file']
+        fields = ['id', 'type', 'title', 'url', 'file', 'description']
 
 class QuizQuestionSerializer(serializers.ModelSerializer):
     class Meta:

@@ -5,6 +5,7 @@ import LoadingSpinner from './LoadingSpinner';
 import Footer from '../Footer/Footer';
 import { getEngineeringCourseById } from '../../services/courseApi';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext'; // Import useAuth
 
 // Add this helper function at the top of your file
 const formatDate = (dateString) => {
@@ -19,6 +20,7 @@ const CourseDetails = () => {
   const [openSections, setOpenSections] = useState({});
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const { isLoggedIn } = useAuth(); // Get authentication state
 
   useEffect(() => {
     const fetchCourseDetails = async () => {
@@ -111,6 +113,11 @@ const CourseDetails = () => {
   }, [courseId]);
 
   const handleStartLearning = () => {
+    if (!isLoggedIn) {
+      toast.error('Please log in to start learning');
+      navigate('/auth?mode=login');
+      return;
+    }
     navigate(`/courses/engineering/${courseId}/learning`);
   };
 
@@ -190,6 +197,7 @@ const CourseDetails = () => {
                 <p className="text-gray-600">{feature.text}</p>
               </div>
             ))}
+
           </div>
 
           {/* Course Description */}

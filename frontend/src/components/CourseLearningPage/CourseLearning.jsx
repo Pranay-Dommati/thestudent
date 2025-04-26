@@ -43,8 +43,6 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
         // Example URL: /courses/12th/state/ts/english/learning
         const pathParts = path.split('/').filter(part => part !== '');
         
-        console.log("Path parts:", pathParts);
-        
         // Determine the type of course based on the URL path
         if (path.includes('/engineering/')) {
           // Engineering course
@@ -52,28 +50,53 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
           
           const response = await axiosInstance.get(apiUrl);
           const courseData = response.data;
-          console.log("Fetched Engineering Course Data:", courseData);
           
           // Transform sections into chapters for the sidebar
           const transformedCourse = {
             ...courseData,
             chapters: courseData.sections.map((section) => ({
               title: section.name,
-              lessons: section.lessons.map((lesson) => ({
-                title: lesson.title,
-                type: lesson.type,
-                videoUrl: lesson.video_url,
-                description: lesson.description,
-                aboutLesson: lesson.about_lesson,
-                completed: false // Default to not completed
-              })),
+              lessons: section.lessons.map((lesson) => {
+                // Format resources correctly
+                let formattedResources = { downloadable: [], internet: [] };
+                
+                if (lesson.resources && Array.isArray(lesson.resources)) {
+                  // Group resources by type
+                  lesson.resources.forEach(resource => {
+                    if (resource.type === 'downloadable') {
+                      formattedResources.downloadable.push({
+                        name: resource.title,
+                        description: resource.description || `Download ${resource.title}`, // Improved fallback with resource name
+                        link: resource.url || resource.file
+                      });
+                    } else if (resource.type === 'internet') {
+                      formattedResources.internet.push({
+                        name: resource.title,
+                        description: resource.description || `Online resource for ${resource.title}`, // Improved fallback with resource name
+                        link: resource.url
+                      });
+                    }
+                  });
+                }
+                
+                return {
+                  title: lesson.title,
+                  type: lesson.type,
+                  videoUrl: lesson.video_url,
+                  description: lesson.description,
+                  aboutLesson: lesson.about_lesson,
+                  resources: formattedResources,
+                  completed: false // Default to not completed
+                };
+              }),
             })),
           };
-          console.log("Transformed course data:", transformedCourse);
           setCourse(transformedCourse);
         } else {
           // School course (10th, 11th, 12th)
           // Extract parameters from URL parts based on the URL pattern
+          // Example URL: /courses/12th/state/ts/english/learning
+          // Extract class level, board, state code, and subject from the URL parts
           let classLevel, board, stateCode, subject;
           
           if (pathParts.length >= 4) {
@@ -87,8 +110,6 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
               subject = pathParts[3];    // For CBSE, subject is the 4th part
             }
           }
-          
-          console.log("Extracted parameters:", { classLevel, board, stateCode, subject });
           
           // Convert state code to full state name if needed
           let stateName = null;
@@ -105,42 +126,33 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
             listApiUrl = `http://127.0.0.1:8000/api/courses/school/?class=${classLevel}&board=${board}&subject=${subject}`;
           }
           
-          console.log("Fetching from API URL:", listApiUrl);
           const listResponse = await axiosInstance.get(listApiUrl);
           let courseId;
           
           if (Array.isArray(listResponse.data) && listResponse.data.length > 0) {
-            console.log("API response courses:", listResponse.data);
-            console.log("Looking for subject:", subject);
-            
             // More precise matching to prevent "Science" vs "Social Science" confusion
             const matchedCourse = listResponse.data.find(course => {
               const courseSubject = (course.subject || '').toLowerCase().trim();
               const urlSubject = (subject || '').toLowerCase().trim();
-              console.log(`Comparing '${courseSubject}' with '${urlSubject}'`);
               
               // First try for an exact match (ignoring case)
               if (courseSubject === urlSubject) {
-                console.log("Found exact match!");
                 return true;
               }
               
               // Special case for Social vs Social Science (legacy support)
               if ((urlSubject === "social" && (courseSubject === "social science" || courseSubject === "social")) ||
                   (courseSubject === "social" && (urlSubject === "social science" || urlSubject === "social"))) {
-                console.log("Handling Social/Social Science compatibility");
                 return true;
               }
               
               // If no exact match and URL is "science", make sure we don't match "social science"
               if (urlSubject === "science" && courseSubject.includes("social")) {
-                console.log("Avoiding 'social science' when looking for 'science'");
                 return false;
               }
               
               // Prevent "science" from matching "social science" when looking for science courses
               if ((urlSubject === "social" || urlSubject === "social science") && courseSubject === "science") {
-                console.log("Avoiding 'science' when looking for 'social'");
                 return false;
               }
               
@@ -150,20 +162,16 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
             
             if (matchedCourse) {
               courseId = matchedCourse.id;
-              console.log("Found matching course with ID:", courseId);
             } else if (listResponse.data.length > 0) {
               courseId = listResponse.data[0].id;
-              console.log("Using first course with ID:", courseId);
             }
           }
           
           // Now fetch the detailed course data using the specific ID
           if (courseId) {
             const detailApiUrl = `http://127.0.0.1:8000/api/courses/school/${courseId}/`;
-            console.log("Fetching detailed course data from:", detailApiUrl);
             const detailResponse = await axiosInstance.get(detailApiUrl);
             const courseData = detailResponse.data;
-            console.log("Detailed course data:", courseData);
             
             // Transform the course data with proper structure
             const transformedCourse = {
@@ -172,20 +180,46 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                 ? courseData.chapters.map((chapter) => ({
                     title: chapter.name,
                     lessons: chapter.lessons && chapter.lessons.length > 0
-                      ? chapter.lessons.map((lesson) => ({
-                          title: lesson.title,
-                          type: lesson.type || 'video',
-                          videoUrl: lesson.video_url || '',
-                          description: lesson.description || '',
-                          aboutLesson: lesson.about_lesson || '',
-                          completed: false
-                        }))
+                      ? chapter.lessons.map((lesson) => {
+                          // Format resources correctly
+                          let formattedResources = { downloadable: [], internet: [] };
+                          
+                          if (lesson.resources && Array.isArray(lesson.resources)) {
+                            // Group resources by type
+                            lesson.resources.forEach(resource => {
+                              if (resource.type === 'downloadable') {
+                                formattedResources.downloadable.push({
+                                  name: resource.title,
+                                  description: resource.description || `Download ${resource.title}`, // Improved fallback with resource name
+                                  link: resource.url || resource.file
+                                });
+                              } else if (resource.type === 'internet') {
+                                formattedResources.internet.push({
+                                  name: resource.title,
+                                  description: resource.description || `Online resource for ${resource.title}`, // Improved fallback with resource name
+                                  link: resource.url
+                                });
+                              }
+                            });
+                          }
+                          
+                          return {
+                            title: lesson.title,
+                            type: lesson.type || 'video',
+                            videoUrl: lesson.video_url || '',
+                            description: lesson.description || '',
+                            aboutLesson: lesson.about_lesson || '',
+                            resources: formattedResources,
+                            completed: false
+                          };
+                        })
                       : [{
                           title: "Introduction to " + chapter.name,
                           type: 'video',
                           videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
                           description: "Introduction to this chapter",
                           aboutLesson: "Basic introduction to the concepts in this chapter",
+                          resources: { downloadable: [], internet: [] },
                           completed: false
                         }]
                   })) 
@@ -196,14 +230,13 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                       type: 'video',
                       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ", // Default video if none is provided
                       description: courseData.description || '',
+                      resources: { downloadable: [], internet: [] }, // Empty resources
                       completed: false
                     }]
                   }]
             };
-            console.log("Transformed course data:", transformedCourse);
             setCourse(transformedCourse);
           } else {
-            console.error("Could not find course ID");
             throw new Error("Course not found");
           }
         }
@@ -216,16 +249,12 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
           return prevCourse;
         });
       } catch (error) {
-        console.error('Error fetching course data:', error);
-        
         // Set up a fallback course with default content when API fails
         const pathParts = pathname.split('/').filter(part => part !== '');
         if (pathParts.length >= 4) {
           const classLevel = pathParts[1];
           const board = pathParts[2];
           const subject = pathParts[pathParts.length - 2]; // Get the subject from URL
-          
-          console.log("Creating fallback course for:", { classLevel, board, subject });
           
           const fallbackCourse = {
             id: 1,
@@ -616,8 +645,6 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
   // Modified content area rendering
   const renderContent = () => {
     const currentLesson = getCurrentLesson();
-    // Remove or comment out this problematic console log
-    // console.log("Rendering content for type:", contentType);
     
     switch(contentType) {
       case 'resources':
@@ -749,7 +776,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                             </svg>
                           </div>
-                          <div className="text-left"> {/* Added text-left class for left alignment */}
+                          <div className="text-left">
                             <h4 className="font-medium">Internet Resources</h4>
                             <p className="text-sm text-gray-600 mt-1">Online documentation and references</p>
                           </div>
@@ -767,37 +794,26 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                       {/* Internet Resources content - collapsible */}
                       <div className={`transition-all duration-300 ease-in-out overflow-hidden ${internetResourcesOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
                         <div className="p-4 border-t border-gray-100 space-y-3">
-                          {/* Resource item 1 */}
-                          <div className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
-                            <div>
-                              <h5 className="font-medium text-gray-800">HTML Elements Reference (Mozilla)</h5>
-                              <p className="text-sm text-gray-500 mt-1">https://developer.mozilla.org/en-US/docs/Web/HTML/Element</p>
-                            </div>
-                            <a
-                              href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded text-sm font-medium hover:bg-blue-100 transition-colors"
-                            >
-                              Open Link
-                            </a>
-                          </div>
-                          
-                          {/* Resource item 2 */}
-                          <div className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
-                            <div>
-                              <h5 className="font-medium text-gray-800">The Form Element (Mozilla)</h5>
-                              <p className="text-sm text-gray-500 mt-1">https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form</p>
-                            </div>
-                            <a
-                              href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded text-sm font-medium hover:bg-blue-100 transition-colors"
-                            >
-                              Open Link
-                            </a>
-                          </div>
+                          {currentLesson && currentLesson.resources && currentLesson.resources.internet && currentLesson.resources.internet.length > 0 ? (
+                            currentLesson.resources.internet.map((resource, index) => (
+                              <div key={`internet-${index}`} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
+                                <div>
+                                  <h5 className="font-medium text-gray-800">{resource.name}</h5>
+                                  <p className="text-sm text-gray-500 mt-1">{resource.description}</p>
+                                </div>
+                                <a
+                                  href={resource.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded text-sm font-medium hover:bg-blue-100 transition-colors"
+                                >
+                                  Open Link
+                                </a>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-4 text-gray-500">No internet resources available for this lesson</div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -834,33 +850,30 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                       {/* Downloadable Resources content - collapsible */}
                       <div className={`transition-all duration-300 ease-in-out overflow-hidden ${downloadResourcesOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
                         <div className="p-4 border-t border-gray-100 space-y-3">
-                          {/* Resource item 1 */}
-                          <div className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
-                            <div>
-                              <h5 className="font-medium text-gray-800">Course Slides PDF</h5>
-                              <p className="text-sm text-gray-500 mt-1">Complete presentation of the lesson (5MB)</p>
-                            </div>
-                            <button className="px-3 py-1.5 bg-green-50 text-green-600 rounded text-sm font-medium hover:bg-green-100 transition-colors flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                              </svg>
-                              Download
-                            </button>
-                          </div>
-                          
-                          {/* Resource item 2 */}
-                          <div className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
-                            <div>
-                              <h5 className="font-medium text-gray-800">Practice Exercises</h5>
-                              <p className="text-sm text-gray-500 mt-1">Additional problems and solutions (2MB)</p>
-                            </div>
-                            <button className="px-3 py-1.5 bg-green-50 text-green-600 rounded text-sm font-medium hover:bg-green-100 transition-colors flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                              </svg>
-                              Download
-                            </button>
-                          </div>
+                          {currentLesson && currentLesson.resources && currentLesson.resources.downloadable && currentLesson.resources.downloadable.length > 0 ? (
+                            // Map through and display actual downloadable resources
+                            currentLesson.resources.downloadable.map((resource, index) => (
+                              <div key={`download-${index}`} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
+                                <div>
+                                  <h5 className="font-medium text-gray-800">{resource.name}</h5>
+                                  <p className="text-sm text-gray-500 mt-1">{resource.description}</p>
+                                </div>
+                                <a
+                                  href={resource.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 bg-green-50 text-green-600 rounded text-sm font-medium hover:bg-green-100 transition-colors flex items-center"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                  </svg>
+                                  Download
+                                </a>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-4 text-gray-500">No downloadable resources available for this lesson</div>
+                          )}
                         </div>
                       </div>
                     </div>
