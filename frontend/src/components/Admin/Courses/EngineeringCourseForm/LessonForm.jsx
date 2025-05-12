@@ -13,6 +13,7 @@ const LessonForm = ({
   addResource,
   removeResource,
   handleResourceChange,
+  handleFileChange,
   addQuizQuestion,
   removeQuizQuestion,
   handleQuizQuestionChange,
@@ -146,6 +147,7 @@ const LessonForm = ({
                 addResource={addResource}
                 removeResource={removeResource}
                 handleResourceChange={handleResourceChange}
+                handleFileChange={handleFileChange}
                 errors={errors[`section${sectionIndex}lesson${lessonIndex}downloadable`]}
               />
               
@@ -387,6 +389,7 @@ const LessonForm = ({
             addResource={addResource}
             removeResource={removeResource}
             handleResourceChange={handleResourceChange}
+            handleFileChange={handleFileChange}
             errors={errors[`section${sectionIndex}lesson${lessonIndex}downloadable`]}
           />
           

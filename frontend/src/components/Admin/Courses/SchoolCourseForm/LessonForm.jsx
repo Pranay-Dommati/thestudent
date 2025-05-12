@@ -1,6 +1,6 @@
 import React from 'react';
 import MDEditor from '@uiw/react-md-editor';
-import { FaPlus, FaTrash } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaVideo, FaFileAlt, FaQuestionCircle, FaBook } from 'react-icons/fa';
 import ResourcesInput from './ResourcesInput';
 import QuizQuestions from './QuizQuestions';
 
@@ -13,6 +13,7 @@ const LessonForm = ({
   addResource,
   removeResource,
   handleResourceChange,
+  handleFileChange,
   addQuizQuestion,
   removeQuizQuestion,
   handleQuizQuestionChange,
@@ -146,6 +147,7 @@ const LessonForm = ({
                 addResource={addResource}
                 removeResource={removeResource}
                 handleResourceChange={handleResourceChange}
+                handleFileChange={handleFileChange}
                 errors={errors[`chapter${chapterIndex}lesson${lessonIndex}downloadable`]}
               />
               
@@ -387,6 +389,7 @@ const LessonForm = ({
             addResource={addResource}
             removeResource={removeResource}
             handleResourceChange={handleResourceChange}
+            handleFileChange={handleFileChange}
             errors={errors[`chapter${chapterIndex}lesson${lessonIndex}downloadable`]}
           />
           

@@ -432,25 +432,71 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       formData.append('learningPoints', JSON.stringify(courseInfo.learningPoints));
       formData.append('requirements', JSON.stringify(courseInfo.requirements));
       
+      // Track resource files with unique identifiers
+      let resourceFileCounter = 0;
+      const resourceFiles = [];
       
-      // Make sure sections data is properly formatted
+      // Make sure sections data is properly formatted and handle file uploads
       const sectionsData = sections.map(section => ({
         name: section.name,
-        lessons: section.lessons.map(lesson => ({
-          title: lesson.title,
-          type: lesson.type,
-          videoUrl: lesson.videoUrl,
-          description: lesson.description,
-          aboutLesson: lesson.aboutLesson,
-          resources: lesson.hasResources ? lesson.resources : { downloadable: [], internet: [] },
-          quizQuestions: lesson.quizQuestions || []
-        }))
+        lessons: section.lessons.map(lesson => {
+          // Process resources and handle file uploads
+          let processedResources = { downloadable: [], internet: [] };
+          
+          if (lesson.hasResources || lesson.type === 'resources') {
+            // Handle downloadable resources with potential file uploads
+            processedResources.downloadable = lesson.resources.downloadable.map(resource => {
+              const processedResource = {
+                name: resource.name,
+                description: resource.description,
+                link: resource.link || ''
+              };
+              
+              // If there's a file attached, track it for upload
+              if (resource.file) {
+                const fileId = `resource_file_${resourceFileCounter++}`;
+                resourceFiles.push({
+                  id: fileId,
+                  file: resource.file
+                });
+                processedResource.fileId = fileId;
+              }
+              
+              return processedResource;
+            });
+            
+            // Handle internet resources (no file uploads)
+            processedResources.internet = lesson.resources.internet.map(resource => ({
+              name: resource.name,
+              description: resource.description,
+              link: resource.link
+            }));
+          }
+          
+          return {
+            title: lesson.title,
+            type: lesson.type,
+            videoUrl: lesson.videoUrl,
+            description: lesson.description,
+            aboutLesson: lesson.aboutLesson,
+            resources: lesson.hasResources || lesson.type === 'resources' ? processedResources : { downloadable: [], internet: [] },
+            quizQuestions: lesson.quizQuestions || []
+          };
+        })
       }));
       
       // Add sections data
       formData.append('sections', JSON.stringify(sectionsData));
       
-      console.log('Sending formData:', Object.fromEntries(formData));
+      // Append all resource files with their unique IDs
+      resourceFiles.forEach(({ id, file }) => {
+        formData.append(id, file);
+      });
+      
+      // Add resource files info
+      formData.append('resourceFilesInfo', JSON.stringify(resourceFiles.map(({ id }) => id)));
+      
+      console.log('Sending formData with files:', resourceFiles.map(rf => rf.id));
       
       // Call createCourse API
       await createCourse(formData);
@@ -467,6 +513,34 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+  
+  // Handle file change for downloadable resources
+  const handleFileChange = (sectionIndex, lessonIndex, resourceIndex, file) => {
+    if (!file) return;
+    
+    // Check file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+    
+    setSections(sections.map((section, i) => 
+      i === sectionIndex ? {
+        ...section,
+        lessons: section.lessons.map((lesson, j) => 
+          j === lessonIndex ? {
+            ...lesson,
+            resources: {
+              ...lesson.resources,
+              downloadable: lesson.resources.downloadable.map((resource, k) => 
+                k === resourceIndex ? {...resource, file: file} : resource
+              )
+            }
+          } : lesson
+        )
+      } : section
+    ));
   };
   
   return (
@@ -530,6 +604,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
                 removeQuizQuestion={removeQuizQuestion}
                 handleQuizQuestionChange={handleQuizQuestionChange}
                 errors={errors}
+                handleFileChange={handleFileChange}
               />
             )}
           </motion.div>

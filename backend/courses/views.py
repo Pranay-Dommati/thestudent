@@ -91,6 +91,19 @@ def create_course(request):
                 
                 # Process chapters
                 chapters_data = json.loads(data.get('chapters', '[]'))
+                
+                # Extract resource files info if available
+                resource_files_info = {}
+                if 'resourceFilesInfo' in data:
+                    try:
+                        resource_file_ids = json.loads(data.get('resourceFilesInfo', '[]'))
+                        # Create a mapping of file IDs to actual file objects
+                        for file_id in resource_file_ids:
+                            if file_id in request.FILES:
+                                resource_files_info[file_id] = request.FILES[file_id]
+                    except json.JSONDecodeError:
+                        print("Error parsing resourceFilesInfo")
+                
                 for idx, chapter_data in enumerate(chapters_data):
                     if not chapter_data.get('name'):
                         return Response(
@@ -126,24 +139,21 @@ def create_course(request):
                             for res_type in ['downloadable', 'internet']:
                                 if res_type in resources:
                                     for res_data in resources[res_type]:
-                                        # Map frontend field names to backend model field names
-                                        # Frontend: name, description, link
-                                        # Backend: title, description, url
-                                        lesson.resources.create(
+                                        # Create resource with basic info
+                                        resource = lesson.resources.create(
                                             type=res_type,
                                             title=res_data.get('name', res_data.get('title', '')),
                                             description=res_data.get('description', ''),
                                             url=res_data.get('link', res_data.get('url', ''))
                                         )
-                        
-                        # Add quiz questions if any
-                        if 'quizQuestions' in lesson_data and lesson_data['quizQuestions']:
-                            for question_data in lesson_data['quizQuestions']:
-                                lesson.quiz_questions.create(
-                                    question=question_data.get('question', ''),
-                                    options=question_data.get('options', []),
-                                    correct_answer=question_data.get('correctAnswer', '')
-                                )
+                                        
+                                        # Process file upload if this is a downloadable resource with fileId
+                                        if res_type == 'downloadable' and 'fileId' in res_data:
+                                            file_id = res_data.get('fileId')
+                                            if file_id in resource_files_info:
+                                                # Assign the uploaded file to the resource
+                                                resource.file = resource_files_info[file_id]
+                                                resource.save()
                 
                 return Response(
                     {'message': 'School course created successfully', 'id': course.id}, 
@@ -180,6 +190,19 @@ def create_course(request):
                 
                 # Process sections
                 sections_data = json.loads(data.get('sections', '[]'))
+                
+                # Extract resource files info if available
+                resource_files_info = {}
+                if 'resourceFilesInfo' in data:
+                    try:
+                        resource_file_ids = json.loads(data.get('resourceFilesInfo', '[]'))
+                        # Create a mapping of file IDs to actual file objects
+                        for file_id in resource_file_ids:
+                            if file_id in request.FILES:
+                                resource_files_info[file_id] = request.FILES[file_id]
+                    except json.JSONDecodeError:
+                        print("Error parsing resourceFilesInfo")
+                
                 for idx, section_data in enumerate(sections_data):
                     section = course.sections.create(
                         name=section_data.get('name', f'Section {idx+1}'),
@@ -203,15 +226,21 @@ def create_course(request):
                             for res_type in ['downloadable', 'internet']:
                                 if res_type in resources:
                                     for res_data in resources[res_type]:
-                                        # Map frontend field names to backend model field names
-                                        # Frontend: name, description, link
-                                        # Backend: title, description, url
-                                        lesson.resources.create(
+                                        # Create resource with basic info
+                                        resource = lesson.resources.create(
                                             type=res_type,
                                             title=res_data.get('name', res_data.get('title', '')),
                                             description=res_data.get('description', ''),
                                             url=res_data.get('link', res_data.get('url', ''))
                                         )
+                                        
+                                        # Process file upload if this is a downloadable resource with fileId
+                                        if res_type == 'downloadable' and 'fileId' in res_data:
+                                            file_id = res_data.get('fileId')
+                                            if file_id in resource_files_info:
+                                                # Assign the uploaded file to the resource
+                                                resource.file = resource_files_info[file_id]
+                                                resource.save()
                         
                         # Add quiz questions if any
                         if 'quizQuestions' in lesson_data and lesson_data['quizQuestions']:

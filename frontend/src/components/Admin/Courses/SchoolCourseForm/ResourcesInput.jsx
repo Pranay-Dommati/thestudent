@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaPlus, FaTrash } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaUpload } from 'react-icons/fa';
 
 const ResourcesInput = ({ 
   chapterIndex, 
@@ -9,6 +9,7 @@ const ResourcesInput = ({
   addResource,
   removeResource,
   handleResourceChange,
+  handleFileChange,
   errors
 }) => {
   return (
@@ -56,13 +57,47 @@ const ResourcesInput = ({
             placeholder="Resource description"
           ></textarea>
           
-          <input
-            type="text"
-            value={resource.link}
-            onChange={(e) => handleResourceChange(chapterIndex, lessonIndex, resourceType, resourceIndex, 'link', e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-            placeholder={resourceType === 'downloadable' ? "Download link" : "Resource link"}
-          />
+          {resourceType === 'downloadable' ? (
+            <div className="space-y-2">
+              <label className="block text-sm text-gray-700">Upload a file or provide a link:</label>
+              <div className="flex items-center space-x-2">
+                <input 
+                  type="file"
+                  id={`file-${resourceType}-${chapterIndex}-${lessonIndex}-${resourceIndex}`}
+                  onChange={(e) => handleFileChange(chapterIndex, lessonIndex, resourceIndex, e.target.files[0])}
+                  className="hidden"
+                />
+                <label 
+                  htmlFor={`file-${resourceType}-${chapterIndex}-${lessonIndex}-${resourceIndex}`}
+                  className="flex items-center px-3 py-2 bg-gray-200 text-gray-700 rounded cursor-pointer hover:bg-gray-300"
+                >
+                  <FaUpload className="mr-2" />
+                  {resource.file ? resource.file.name : "Choose file"}
+                </label>
+                <span className="text-xs text-gray-500">
+                  {resource.file ? `Selected: ${resource.file.name}` : "No file selected"}
+                </span>
+              </div>
+              <div className="flex items-center">
+                <span className="text-sm text-gray-700 mr-2">OR</span>
+                <input
+                  type="text"
+                  value={resource.link}
+                  onChange={(e) => handleResourceChange(chapterIndex, lessonIndex, resourceType, resourceIndex, 'link', e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  placeholder="External download link (optional if file uploaded)"
+                />
+              </div>
+            </div>
+          ) : (
+            <input
+              type="text"
+              value={resource.link}
+              onChange={(e) => handleResourceChange(chapterIndex, lessonIndex, resourceType, resourceIndex, 'link', e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+              placeholder="Resource link"
+            />
+          )}
         </div>
       ))}
       

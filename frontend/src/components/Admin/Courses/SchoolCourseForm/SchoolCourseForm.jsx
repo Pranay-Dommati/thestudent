@@ -323,6 +323,34 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     ));
   };
   
+  // Handle file change for downloadable resources
+  const handleFileChange = (chapterIndex, lessonIndex, resourceIndex, file) => {
+    if (!file) return;
+    
+    // Check file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+    
+    setChapters(chapters.map((chapter, i) => 
+      i === chapterIndex ? {
+        ...chapter,
+        lessons: chapter.lessons.map((lesson, j) => 
+          j === lessonIndex ? {
+            ...lesson,
+            resources: {
+              ...lesson.resources,
+              downloadable: lesson.resources.downloadable.map((resource, k) => 
+                k === resourceIndex ? {...resource, file: file} : resource
+              )
+            }
+          } : lesson
+        )
+      } : chapter
+    ));
+  };
+  
   const validateForm = () => {
     const newErrors = {};
     
@@ -367,6 +395,35 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
           
           if (lesson.type === 'video' && !lesson.videoUrl.trim()) {
             newErrors[`chapter${chapterIndex}lesson${lessonIndex}video`] = 'Video URL is required';
+          }
+          
+          if (lesson.hasResources || lesson.type === 'resources') {
+            // Validate resources
+            const hasDownloadable = lesson.resources.downloadable.length > 0;
+            const hasInternet = lesson.resources.internet.length > 0;
+            
+            if (!hasDownloadable && !hasInternet && lesson.type === 'resources') {
+              newErrors[`chapter${chapterIndex}lesson${lessonIndex}resources`] = 'At least one resource is required for a resources lesson';
+            }
+            
+            if (hasDownloadable) {
+              const invalidResources = lesson.resources.downloadable.some(r => {
+                const hasName = !!r.name.trim();
+                const hasDescription = !!r.description.trim();
+                const hasLinkOrFile = !!r.link.trim() || !!r.file;
+                
+                return !hasName || !hasDescription || !hasLinkOrFile;
+              });
+              
+              if (invalidResources) {
+                newErrors[`chapter${chapterIndex}lesson${lessonIndex}downloadable`] = 
+                  'All downloadable resources must have a name, description, and either a link or uploaded file';
+              }
+            }
+            
+            if (hasInternet && lesson.resources.internet.some(r => !r.name.trim() || !r.description.trim() || !r.link.trim())) {
+              newErrors[`chapter${chapterIndex}lesson${lessonIndex}internet`] = 'All internet resource fields must be filled';
+            }
           }
         });
       });
@@ -430,12 +487,8 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       formData.append('sources', courseInfo.sources);
       
       // Add key topics and learning points - use the field names expected by the backend
-      // In views.py, the backend expects 'key_topics' and 'learning_points'
       const filteredKeyTopics = courseInfo.keyTopics.filter(topic => topic.trim() !== '');
       const filteredLearningPoints = courseInfo.learningPoints.filter(point => point.trim() !== '');
-      
-      console.log('Filtered Key Topics:', filteredKeyTopics);
-      console.log('Filtered Learning Points:', filteredLearningPoints);
       
       // Change from 'keyTopics' to 'key_topics' to match backend expectations
       formData.append('key_topics', JSON.stringify(filteredKeyTopics));
@@ -446,21 +499,71 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
         formData.append('thumbnail', courseInfo.thumbnail);
       }
       
+      // Track resource files with unique identifiers
+      let resourceFileCounter = 0;
+      const resourceFiles = [];
+      
       // Process chapters data for API
       const chaptersData = chapters.map(chapter => ({
         name: chapter.name,
-        lessons: chapter.lessons.map(lesson => ({
-          title: lesson.title,
-          type: lesson.type,
-          videoUrl: lesson.videoUrl,
-          aboutLesson: lesson.aboutLesson,
-          resources: lesson.hasResources ? lesson.resources : { downloadable: [], internet: [] },
-          quizQuestions: lesson.quizQuestions || []
-        }))
+        lessons: chapter.lessons.map(lesson => {
+          // Process resources and handle file uploads
+          let processedResources = { downloadable: [], internet: [] };
+          
+          if (lesson.hasResources || lesson.type === 'resources') {
+            // Handle downloadable resources with potential file uploads
+            processedResources.downloadable = lesson.resources.downloadable.map(resource => {
+              const processedResource = {
+                name: resource.name,
+                description: resource.description,
+                link: resource.link || ''
+              };
+              
+              // If there's a file attached, track it for upload
+              if (resource.file) {
+                const fileId = `resource_file_${resourceFileCounter++}`;
+                resourceFiles.push({
+                  id: fileId,
+                  file: resource.file
+                });
+                processedResource.fileId = fileId;
+              }
+              
+              return processedResource;
+            });
+            
+            // Handle internet resources (no file uploads)
+            processedResources.internet = lesson.resources.internet.map(resource => ({
+              name: resource.name,
+              description: resource.description,
+              link: resource.link
+            }));
+          }
+          
+          return {
+            title: lesson.title,
+            type: lesson.type,
+            videoUrl: lesson.videoUrl,
+            description: lesson.description,
+            aboutLesson: lesson.aboutLesson,
+            resources: lesson.hasResources || lesson.type === 'resources' ? processedResources : { downloadable: [], internet: [] },
+            quizQuestions: lesson.quizQuestions || []
+          };
+        })
       }));
       
       // Add chapters data
       formData.append('chapters', JSON.stringify(chaptersData));
+      
+      // Append all resource files with their unique IDs
+      resourceFiles.forEach(({ id, file }) => {
+        formData.append(id, file);
+      });
+      
+      // Add resource files info
+      formData.append('resourceFilesInfo', JSON.stringify(resourceFiles.map(({ id }) => id)));
+      
+      console.log('Sending formData with files:', resourceFiles.map(rf => rf.id));
       
       // Submit the form
       await createCourse(formData);
@@ -536,6 +639,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
                 removeQuizQuestion={removeQuizQuestion}
                 handleQuizQuestionChange={handleQuizQuestionChange}
                 errors={errors}
+                handleFileChange={handleFileChange}
               />
             )}
           </motion.div>

@@ -14,6 +14,7 @@ const CourseStructureStep = ({
   addQuizQuestion,
   removeQuizQuestion,
   handleQuizQuestionChange,
+  handleFileChange,
   errors
 }) => {
   return (
@@ -64,6 +65,7 @@ const CourseStructureStep = ({
                 addResource={addResource}
                 removeResource={removeResource}
                 handleResourceChange={handleResourceChange}
+                handleFileChange={handleFileChange}
                 addQuizQuestion={addQuizQuestion}
                 removeQuizQuestion={removeQuizQuestion}
                 handleQuizQuestionChange={handleQuizQuestionChange}

@@ -11,6 +11,7 @@ const CourseStructureStep = ({
   addResource,
   removeResource,
   handleResourceChange,
+  handleFileChange,
   addQuizQuestion,
   removeQuizQuestion,
   handleQuizQuestionChange,
@@ -35,9 +36,12 @@ const CourseStructureStep = ({
               type="text"
               value={chapter.name}
               onChange={(e) => handleChapterNameChange(chapterIndex, e.target.value)}
-              className={`w-full p-2 border ${errors.chapterNames ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+              className={`w-full p-2 border ${errors[`chapter${chapterIndex}name`] ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
               placeholder="e.g., Introduction to Algebra"
             />
+            {errors[`chapter${chapterIndex}name`] && 
+              <p className="text-red-500 text-sm">{errors[`chapter${chapterIndex}name`]}</p>
+            }
           </div>
           
           {/* Lessons */}
@@ -64,6 +68,7 @@ const CourseStructureStep = ({
                 addResource={addResource}
                 removeResource={removeResource}
                 handleResourceChange={handleResourceChange}
+                handleFileChange={handleFileChange}
                 addQuizQuestion={addQuizQuestion}
                 removeQuizQuestion={removeQuizQuestion}
                 handleQuizQuestionChange={handleQuizQuestionChange}

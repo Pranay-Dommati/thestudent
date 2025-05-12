@@ -64,10 +64,15 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                   // Group resources by type
                   lesson.resources.forEach(resource => {
                     if (resource.type === 'downloadable') {
+                      // Check if the URL is a relative path (doesn't start with http)
+                      const fileLink = resource.url || resource.file;
+                      const absoluteFileLink = fileLink && !fileLink.startsWith('http') ? 
+                        `http://127.0.0.1:8000${fileLink}` : fileLink;
+                        
                       formattedResources.downloadable.push({
                         name: resource.title,
                         description: resource.description || `Download ${resource.title}`, // Improved fallback with resource name
-                        link: resource.url || resource.file
+                        link: absoluteFileLink // Now using the absolute URL
                       });
                     } else if (resource.type === 'internet') {
                       formattedResources.internet.push({
@@ -188,10 +193,15 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                             // Group resources by type
                             lesson.resources.forEach(resource => {
                               if (resource.type === 'downloadable') {
+                                // Check if the URL is a relative path (doesn't start with http)
+                                const fileLink = resource.url || resource.file;
+                                const absoluteFileLink = fileLink && !fileLink.startsWith('http') ? 
+                                  `http://127.0.0.1:8000${fileLink}` : fileLink;
+                                  
                                 formattedResources.downloadable.push({
                                   name: resource.title,
                                   description: resource.description || `Download ${resource.title}`, // Improved fallback with resource name
-                                  link: resource.url || resource.file
+                                  link: absoluteFileLink // Now using the absolute URL
                                 });
                               } else if (resource.type === 'internet') {
                                 formattedResources.internet.push({
