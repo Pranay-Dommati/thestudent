@@ -204,6 +204,43 @@ const LessonForm = ({
                     h.textContent = '\n' + '#'.repeat(parseInt(level)) + ' ' + text + '\n';
                   });
                   
+                  // Process tables
+                  const tables = tempDiv.querySelectorAll('table');
+                  tables.forEach(table => {
+                    // Get table rows
+                    const rows = table.querySelectorAll('tr');
+                    let markdownTable = '\n';
+                    
+                    // Process each row
+                    rows.forEach((row, rowIndex) => {
+                      const cells = row.querySelectorAll('td, th');
+                      const isHeader = rowIndex === 0; // First row is assumed to be header
+                      
+                      // Process each cell in the row
+                      cells.forEach((cell, cellIndex) => {
+                        const cellText = cell.textContent.trim() || ' ';
+                        markdownTable += '| ' + cellText + ' ';
+                        // Add last pipe at the end of the row
+                        if (cellIndex === cells.length - 1) {
+                          markdownTable += '|';
+                        }
+                      });
+                      
+                      markdownTable += '\n';
+                      
+                      // Add separator row after header
+                      if (isHeader) {
+                        cells.forEach(() => {
+                          markdownTable += '| --- ';
+                        });
+                        markdownTable += '|\n';
+                      }
+                    });
+                    
+                    // Replace the table with its markdown representation
+                    table.outerHTML = markdownTable + '\n';
+                  });
+                  
                   // Process lists
                   const lists = tempDiv.querySelectorAll('ul, ol');
                   lists.forEach(list => {

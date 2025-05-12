@@ -1,6 +1,7 @@
 import React from 'react';
 import { FaInfo, FaCheck, FaLaptopCode, FaDownload, FaTasks } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const InstructionsPage = ({ lessonContent }) => {
   // If lesson content is provided, render it using ReactMarkdown
@@ -9,6 +10,7 @@ const InstructionsPage = ({ lessonContent }) => {
       <div className="p-6 max-w-4xl mx-auto">
         <div className="prose prose-lg max-w-none markdown-body">
           <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
             components={{
               ul: ({node, ...props}) => <ul className="list-disc pl-5 my-4 space-y-2" {...props} />,
               ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-4 space-y-2" {...props} />,
@@ -31,6 +33,13 @@ const InstructionsPage = ({ lessonContent }) => {
                 }
                 return <p className="my-4" {...props}>{children}</p>;
               },
+              // Add table rendering components
+              table: ({node, ...props}) => <table className="min-w-full border border-gray-200 my-4" {...props} />,
+              thead: ({node, ...props}) => <thead className="bg-gray-50" {...props} />,
+              tbody: ({node, ...props}) => <tbody className="divide-y divide-gray-200" {...props} />,
+              tr: ({node, ...props}) => <tr className="hover:bg-gray-50" {...props} />,
+              th: ({node, ...props}) => <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 uppercase tracking-wider border border-gray-200" {...props} />,
+              td: ({node, ...props}) => <td className="px-4 py-2 text-sm text-gray-500 border border-gray-200" {...props} />,
               code: ({node, inline, className, children, ...props}) => {
                 if (inline) {
                   return <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>

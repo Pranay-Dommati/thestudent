@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import LessonVideo from './LessonVideo';
 import CourseProgress from './CourseProgress';
 import ResourcesPage from './templ/ResourcesPage';
@@ -778,7 +779,14 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                             return null;
                           }
                           return <p className="my-4" {...props}>{children}</p>;
-                        }
+                        },
+                        // Add table rendering components
+                        table: ({node, ...props}) => <table className="min-w-full border border-gray-200 my-4" {...props} />,
+                        thead: ({node, ...props}) => <thead className="bg-gray-50" {...props} />,
+                        tbody: ({node, ...props}) => <tbody className="divide-y divide-gray-200" {...props} />,
+                        tr: ({node, ...props}) => <tr className="hover:bg-gray-50" {...props} />,
+                        th: ({node, ...props}) => <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 uppercase tracking-wider border border-gray-200" {...props} />,
+                        td: ({node, ...props}) => <td className="px-4 py-2 text-sm text-gray-500 border border-gray-200" {...props} />,
                       }}
                     >
                       {currentLesson.aboutLesson}
