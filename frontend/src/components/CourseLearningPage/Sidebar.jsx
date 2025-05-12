@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaSearch, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
+import { FaChevronRight } from 'react-icons/fa';
 
 const Sidebar = ({ 
   isSidebarOpen, 
@@ -50,20 +50,8 @@ const Sidebar = ({
             </button>
           </div>
           
-          {/* Search bar */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search lessons..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          </div>
-
-          {/* Progress bar */}
-          <div className="mt-4">
+          {/* Progress bar - moved up */}
+          <div>
             <div className="flex justify-between text-sm mb-1">
               <span className="font-medium">Your progress</span>
               <span>{Math.round((completedLessons / totalLessons) * 100)}%</span>
