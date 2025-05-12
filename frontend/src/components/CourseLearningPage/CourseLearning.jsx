@@ -97,6 +97,19 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
             })),
           };
           setCourse(transformedCourse);
+          
+          // Set initial content type based on the first lesson's type
+          if (transformedCourse.chapters && 
+              transformedCourse.chapters.length > 0 && 
+              transformedCourse.chapters[0].lessons &&
+              transformedCourse.chapters[0].lessons.length > 0) {
+            const firstLessonType = transformedCourse.chapters[0].lessons[0].type;
+            if (firstLessonType === 'reading') {
+              setContentType('instructions');
+            } else if (firstLessonType) {
+              setContentType(firstLessonType);
+            }
+          }
         } else {
           // School course (10th, 11th, 12th)
           // Extract parameters from URL parts based on the URL pattern
@@ -246,6 +259,19 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                   }]
             };
             setCourse(transformedCourse);
+            
+            // Set initial content type based on the first lesson's type
+            if (transformedCourse.chapters && 
+                transformedCourse.chapters.length > 0 && 
+                transformedCourse.chapters[0].lessons &&
+                transformedCourse.chapters[0].lessons.length > 0) {
+              const firstLessonType = transformedCourse.chapters[0].lessons[0].type;
+              if (firstLessonType === 'reading') {
+                setContentType('instructions');
+              } else if (firstLessonType) {
+                setContentType(firstLessonType);
+              }
+            }
           } else {
             throw new Error("Course not found");
           }
@@ -608,8 +634,15 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
       setActiveLesson(lessonIndex);
       
       // Set content type based on the lesson type
-      if (lesson.type && lesson.type !== contentType) {
-        setContentType(lesson.type || 'video');
+      if (lesson.type) {
+        // Map 'reading' type to 'instructions' content type for UI rendering
+        if (lesson.type === 'reading') {
+          setContentType('instructions');
+        } else {
+          setContentType(lesson.type);
+        }
+      } else {
+        setContentType('video'); // Default to video
       }
       
       // Expand the chapter
@@ -684,7 +717,8 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
         );
         
       case 'instructions':
-        return <InstructionsPage />; // Removed the white container div
+      case 'reading':
+        return <InstructionsPage lessonContent={currentLesson} />; // Pass the current lesson content
         
       case 'video':
       default:

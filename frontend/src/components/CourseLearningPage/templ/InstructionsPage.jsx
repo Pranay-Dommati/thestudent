@@ -1,8 +1,61 @@
 import React from 'react';
 import { FaInfo, FaCheck, FaLaptopCode, FaDownload, FaTasks } from 'react-icons/fa';
+import ReactMarkdown from 'react-markdown';
 
-const InstructionsPage = () => {
-  // Sample instructions data - would come from API in real implementation
+const InstructionsPage = ({ lessonContent }) => {
+  // If lesson content is provided, render it using ReactMarkdown
+  if (lessonContent && lessonContent.aboutLesson) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="prose prose-lg max-w-none markdown-body">
+          <ReactMarkdown
+            components={{
+              ul: ({node, ...props}) => <ul className="list-disc pl-5 my-4 space-y-2" {...props} />,
+              ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-4 space-y-2" {...props} />,
+              li: ({node, children, ...props}) => {
+                // Skip rendering empty list items
+                if (!children || (Array.isArray(children) && children.length === 0) || 
+                    (typeof children === 'string' && children.trim() === '')) {
+                  return null;
+                }
+                return <li className="ml-2 my-1" {...props}>{children}</li>;
+              },
+              h1: ({node, ...props}) => <h1 className="text-2xl font-bold my-4" {...props} />,
+              h2: ({node, ...props}) => <h2 className="text-xl font-bold my-3" {...props} />,
+              h3: ({node, ...props}) => <h3 className="text-lg font-bold my-3" {...props} />,
+              p: ({node, children, ...props}) => {
+                // Skip rendering empty paragraphs
+                if (!children || (Array.isArray(children) && children.length === 0) || 
+                    (typeof children === 'string' && children.trim() === '')) {
+                  return null;
+                }
+                return <p className="my-4" {...props}>{children}</p>;
+              },
+              code: ({node, inline, className, children, ...props}) => {
+                if (inline) {
+                  return <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>
+                }
+                return (
+                  <div className="bg-gray-800 rounded-md my-4">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700">
+                      <span className="text-xs text-gray-400">code</span>
+                    </div>
+                    <pre className="p-4 overflow-x-auto">
+                      <code className="text-white text-sm">{children}</code>
+                    </pre>
+                  </div>
+                )
+              }
+            }}
+          >
+            {lessonContent.aboutLesson}
+          </ReactMarkdown>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback to sample instructions data if no content is provided
   const instructions = {
     title: "Project: Building Your First Next.js Application",
     description: "Follow these step-by-step instructions to complete the project for this lesson.",
@@ -94,6 +147,7 @@ const InstructionsPage = () => {
     );
   };
 
+  // Render sample data as fallback
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <header className="mb-8">
