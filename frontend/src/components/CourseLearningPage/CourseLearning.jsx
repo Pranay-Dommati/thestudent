@@ -332,6 +332,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
           });
         }
         
+        // Use a ref to track if this is the initial load to prevent infinite loops
         setCourse(updatedCourse);
         
       } catch (error) {
@@ -344,7 +345,9 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
     };
     
     fetchUserProgress();
-  }, [course, isLoggedIn]);
+  // Only run this effect when the course ID changes or login status changes,
+  // not when the course content itself changes
+  }, [course?.id, isLoggedIn]);
 
   // Handle chapter toggling
   const toggleChapter = (index) => {

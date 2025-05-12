@@ -206,11 +206,76 @@ const LessonForm = ({
                   const lists = tempDiv.querySelectorAll('ul, ol');
                   lists.forEach(list => {
                     const isOrdered = list.tagName.toLowerCase() === 'ol';
-                    const items = list.querySelectorAll('li');
-                    items.forEach((item, index) => {
-                      const text = item.textContent.trim();
-                      item.textContent = '\n' + (isOrdered ? `${index + 1}. ` : '- ') + text;
-                    });
+                    
+                    // Process nested lists properly
+                    const processListItems = (items, level = 0) => {
+                      items.forEach((item, index) => {
+                        const text = item.textContent.trim();
+                        const nestedLists = item.querySelectorAll(':scope > ul, :scope > ol');
+                        
+                        // Extract just this item's text without nested list text
+                        let itemText = item.cloneNode(true);
+                        nestedLists.forEach(nl => {
+                          const parent = nl.parentNode;
+                          if (parent && itemText.contains(parent)) {
+                            parent.removeChild(nl);
+                          }
+                        });
+                        itemText = itemText.textContent.trim();
+                        
+                        // Replace the content with properly formatted markdown
+                        // Add indentation based on nesting level
+                        const indent = '  '.repeat(level);
+                        item.textContent = `\n${indent}${isOrdered ? `${index + 1}. ` : '- '}${itemText}`;
+                        
+                        // Process any nested lists inside this item
+                        if (nestedLists.length > 0) {
+                          nestedLists.forEach(nestedList => {
+                            const nestedItems = nestedList.querySelectorAll(':scope > li');
+                            const isNestedOrdered = nestedList.tagName.toLowerCase() === 'ol';
+                            processListItems(nestedItems, level + 1);
+                          });
+                        }
+                      });
+                    };
+                    
+                    // Start processing from top-level list items
+                    const items = list.querySelectorAll(':scope > li');
+                    processListItems(items);
+                  });
+
+                  // Also handle direct list items that might not be in a proper list
+                  const directListItems = Array.from(tempDiv.querySelectorAll('li')).filter(
+                    li => !li.parentElement || (li.parentElement.tagName.toLowerCase() !== 'ul' && li.parentElement.tagName.toLowerCase() !== 'ol')
+                  );
+                  directListItems.forEach(item => {
+                    const text = item.textContent.trim();
+                    item.textContent = '\n- ' + text;
+                  });
+                  
+                  // Handle div elements with list-like formatting (common in Word/Google Docs)
+                  const divElements = tempDiv.querySelectorAll('div');
+                  divElements.forEach(div => {
+                    // Check if this div has bullet-like content (starts with •, -, *, etc.)
+                    const text = div.textContent.trim();
+                    if (text.match(/^[•\-\*\u2022\u2023\u25E6\u2043\u2219]/) && !div.querySelector('ul, ol, li')) {
+                      // This div appears to be a bullet point item but isn't in a proper list
+                      div.textContent = '\n- ' + text.replace(/^[•\-\*\u2022\u2023\u25E6\u2043\u2219]\s*/, '');
+                    }
+                  });
+                  
+                  // Handle spans that might be bullet points (common in some word processors)
+                  const spanElements = tempDiv.querySelectorAll('span');
+                  spanElements.forEach(span => {
+                    const text = span.textContent.trim();
+                    // If span contains only a bullet character, and next sibling has text
+                    if (text.match(/^[•\-\*\u2022\u2023\u25E6\u2043\u2219]$/) && span.nextElementSibling) {
+                      const nextText = span.nextElementSibling.textContent.trim();
+                      if (nextText) {
+                        span.textContent = '\n- ';
+                        span.nextElementSibling.textContent = nextText;
+                      }
+                    }
                   });
                   
                   // Process bold text
