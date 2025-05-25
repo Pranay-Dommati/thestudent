@@ -755,9 +755,9 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
             {/* Tab Content */}
             <div className="mb-8">
               {activeTab === 'content' && (
-                <div className="prose prose-lg max-w-none markdown-body">
-                  {currentLesson.aboutLesson ? (
+                <div className="prose prose-lg max-w-none markdown-body">                  {currentLesson.aboutLesson ? (
                     <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
                       components={{
                         ul: ({node, ...props}) => <ul className="list-disc pl-5 my-4 space-y-2" {...props} />,
                         ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-4 space-y-2" {...props} />,
