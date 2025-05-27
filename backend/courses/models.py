@@ -130,6 +130,20 @@ class QuizQuestion(models.Model):
     def __str__(self):
         return self.question
 
+class QuizResult(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='quiz_results')
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='quiz_results')
+    answers = models.JSONField(default=dict)  # Store user's answers
+    score = models.FloatField()  # Percentage score
+    passed = models.BooleanField(default=False)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-submitted_at']
+    
+    def __str__(self):
+        return f"{self.user} - {self.lesson.title} - {self.score}%"
+
 class UserLessonProgress(models.Model):
     """Tracks which lessons a user has completed"""
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='lesson_progress')

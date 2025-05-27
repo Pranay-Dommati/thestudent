@@ -132,8 +132,7 @@ def create_course(request):
                             about_lesson=lesson_data.get('aboutLesson', ''),
                             order=lesson_idx
                         )
-                        
-                        # Add resources if any
+                          # Add resources if any
                         if 'resources' in lesson_data and lesson_data['resources']:
                             resources = lesson_data['resources']
                             for res_type in ['downloadable', 'internet']:
@@ -154,9 +153,27 @@ def create_course(request):
                                                 # Assign the uploaded file to the resource
                                                 resource.file = resource_files_info[file_id]
                                                 resource.save()
+                          # Add quiz questions if any
+                        if 'quizQuestions' in lesson_data and lesson_data['quizQuestions']:
+                            for question_data in lesson_data['quizQuestions']:
+                                correct_answer_index = question_data.get('correctAnswer', 0)
+                                options = question_data.get('options', [])
+                                
+                                # Convert correctAnswer index to actual option text
+                                if isinstance(correct_answer_index, int) and 0 <= correct_answer_index < len(options):
+                                    correct_answer_text = options[correct_answer_index]
+                                else:
+                                    # Fallback: if it's already text or invalid index, use as-is
+                                    correct_answer_text = str(correct_answer_index)
+                                
+                                lesson.quiz_questions.create(
+                                    question=question_data.get('question', ''),
+                                    options=options,
+                                    correct_answer=correct_answer_text
+                                )
                 
                 return Response(
-                    {'message': 'School course created successfully', 'id': course.id}, 
+                    {'message': 'School course created successfully', 'id': course.id},
                     status=status.HTTP_201_CREATED
                 )
             else:
@@ -241,18 +258,27 @@ def create_course(request):
                                                 # Assign the uploaded file to the resource
                                                 resource.file = resource_files_info[file_id]
                                                 resource.save()
-                        
-                        # Add quiz questions if any
+                          # Add quiz questions if any
                         if 'quizQuestions' in lesson_data and lesson_data['quizQuestions']:
                             for question_data in lesson_data['quizQuestions']:
+                                correct_answer_index = question_data.get('correctAnswer', 0)
+                                options = question_data.get('options', [])
+                                
+                                # Convert correctAnswer index to actual option text
+                                if isinstance(correct_answer_index, int) and 0 <= correct_answer_index < len(options):
+                                    correct_answer_text = options[correct_answer_index]
+                                else:
+                                    # Fallback: if it's already text or invalid index, use as-is
+                                    correct_answer_text = str(correct_answer_index)
+                                
                                 lesson.quiz_questions.create(
                                     question=question_data.get('question', ''),
-                                    options=question_data.get('options', []),
-                                    correct_answer=question_data.get('correctAnswer', '')
+                                    options=options,
+                                    correct_answer=correct_answer_text
                                 )
                 
                 return Response(
-                    {'message': 'Engineering course created successfully', 'id': course.id}, 
+                    {'message': 'Engineering course created successfully', 'id': course.id},
                     status=status.HTTP_201_CREATED
                 )
             else:
@@ -647,11 +673,115 @@ def get_course_progress(request, course_id):
                     'total': total_lessons,
                     'percentage': int((completed_lessons / total_lessons) * 100) if total_lessons > 0 else 0
                 },
-                'sections': lessons_by_section
-            }
+                'sections': lessons_by_section        }
         
         return Response(response_data)
     
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_quiz(request, lesson_id):
+    """
+    Submit quiz answers and calculate score
+    """
+    try:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        user = request.user
+        data = request.data
+        
+        # Get user's answers from request data
+        user_answers = data.get('answers', {})
+        
+        # Get all quiz questions for this lesson
+        quiz_questions = lesson.quiz_questions.all()
+        
+        if not quiz_questions.exists():
+            return Response(
+                {"error": "No quiz questions found for this lesson"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+          # Calculate score
+        total_questions = quiz_questions.count()
+        correct_answers = 0
+        
+        # Debug information
+        print(f"Processing quiz submission for lesson: {lesson_id}")
+        print(f"User answers received: {user_answers}")
+        
+        for question in quiz_questions:
+            question_id = str(question.id)
+            user_answer = user_answers.get(question_id)
+            
+            # Parse options if needed
+            options = question.options
+            if isinstance(options, str):
+                try:
+                    import json
+                    options = json.loads(options)
+                except:
+                    options = []
+            
+            if not isinstance(options, list):
+                options = []
+                
+            print(f"Question {question_id}: {question.question}")
+            print(f"Options: {options}")
+            print(f"Correct answer: {question.correct_answer}")
+            print(f"User answer index: {user_answer}")
+            
+            if user_answer is not None:
+                try:
+                    user_answer_index = int(user_answer)
+                    # Make sure the answer index is valid
+                    if user_answer_index >= 0 and user_answer_index < len(options):
+                        # Check if the option at this index matches the correct answer
+                        if options[user_answer_index] == question.correct_answer:
+                            correct_answers += 1
+                            print(f"Correct answer for question {question_id}")
+                        else:
+                            print(f"Wrong answer for question {question_id}")
+                    else:
+                        print(f"Invalid answer index for question {question_id}: {user_answer_index}")
+                except (ValueError, TypeError):
+                    print(f"Invalid answer format for question {question_id}: {user_answer}")
+                    continue
+        
+        # Calculate percentage score
+        score = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
+        passed = score >= 80  # 80% passing score
+        
+        # Save quiz result to database
+        from .models import QuizResult
+        quiz_result = QuizResult.objects.create(
+            user=user,
+            lesson=lesson,
+            answers=user_answers,
+            score=score,
+            passed=passed
+        )
+          # If quiz passed, mark lesson as complete
+        if passed:
+            UserLessonProgress.objects.get_or_create(
+                user=user,
+                lesson=lesson
+            )
+        
+        return Response({
+            "id": quiz_result.id,
+            "score": score,
+            "passed": passed,
+            "correct_answers": correct_answers,
+            "total_questions": total_questions,
+            "submitted_at": quiz_result.submitted_at
+        })
+        
     except Exception as e:
         import traceback
         traceback.print_exc()

@@ -84,14 +84,14 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                     }
                   });
                 }
-                
-                return {
+                  return {
                   title: lesson.title,
                   type: lesson.type,
                   videoUrl: lesson.video_url,
                   description: lesson.description,
                   aboutLesson: lesson.about_lesson,
                   resources: formattedResources,
+                  quiz_questions: lesson.quiz_questions || [], // Include quiz questions from backend
                   completed: false // Default to not completed
                 };
               }),
@@ -226,14 +226,14 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                               }
                             });
                           }
-                          
-                          return {
+                            return {
                             title: lesson.title,
                             type: lesson.type || 'video',
                             videoUrl: lesson.video_url || '',
                             description: lesson.description || '',
                             aboutLesson: lesson.about_lesson || '',
                             resources: formattedResources,
+                            quiz_questions: lesson.quiz_questions || [], // Include quiz questions from backend
                             completed: false
                           };
                         })
@@ -603,13 +603,65 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
         ...prev,
         [activeChapter - 1]: true
       }));
-    }
-  };
+    }  };
 
   // Get current lesson
   const getCurrentLesson = () => {
-    if (!course) return null;
+    if (!course?.chapters?.[activeChapter]?.lessons?.[activeLesson]) {
+      return null;
+    }
     return course.chapters[activeChapter].lessons[activeLesson];
+  };
+  // Helper function to get current lesson ID from progress data
+  const getCurrentLessonId = () => {
+    const currentLesson = getCurrentLesson();
+    if (!currentLesson) {
+      console.warn('No current lesson found');
+      return null;
+    }
+    
+    // Check if the lesson itself has an ID (it should from the API response)
+    if (currentLesson.id) {
+      console.log('Found lesson ID directly on lesson object:', currentLesson.id);
+      return currentLesson.id;
+    }
+    
+    // If no direct ID, try to find it in the progress data
+    if (!courseProgress) {
+      console.warn('No course progress found, cannot determine lesson ID');
+      return null;
+    }
+
+    let lessonId;
+    
+    if (courseProgress.chapters) {
+      // For school courses
+      for (const chapter of courseProgress.chapters) {
+        if (chapter.name === course.chapters[activeChapter].title) {
+          const lessonData = chapter.lessons.find(l => l.title === currentLesson.title);
+          if (lessonData) {
+            lessonId = lessonData.id;
+            console.log('Found lesson ID in school course progress:', lessonId);
+            break;
+          }
+        }
+      }
+    } else if (courseProgress.sections) {
+      // For engineering courses
+      for (const section of courseProgress.sections) {
+        if (section.name === course.chapters[activeChapter].title) {
+          const lessonData = section.lessons.find(l => l.title === currentLesson.title);
+          if (lessonData) {
+            lessonId = lessonData.id;
+            console.log('Found lesson ID in engineering course progress:', lessonId);
+            break;
+          }
+        }
+      }
+    }
+    
+    console.log('Final lesson ID determined:', lessonId);
+    return lessonId;
   };
 
   // Filter lessons based on search
@@ -624,21 +676,34 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
       
       return filteredLessons.length > 0 ? { ...chapter, lessons: filteredLessons } : null;
     }).filter(Boolean);
-  };
-
-  // Handle lesson click
+  };  // Handle lesson click
   const handleLessonClick = (chapterIndex, lessonIndex) => {
     const lesson = course.chapters[chapterIndex].lessons[lessonIndex]; 
+    // Debug information
+    console.log('Lesson clicked:', lesson);
+    console.log('Lesson type:', lesson.type);
+    console.log('Quiz questions:', lesson.quiz_questions);
+    console.log('Is school course?', window.location.pathname.includes('/10th/') || 
+      window.location.pathname.includes('/11th/') || 
+      window.location.pathname.includes('/12th/'));
+    
     // Only update state if we're actually changing lessons to prevent re-renders
     if (activeChapter !== chapterIndex || activeLesson !== lessonIndex) {
       setActiveChapter(chapterIndex);
       setActiveLesson(lessonIndex);
-      
-      // Set content type based on the lesson type
+        // Set content type based on the lesson type
       if (lesson.type) {
         // Map 'reading' type to 'instructions' content type for UI rendering
         if (lesson.type === 'reading') {
           setContentType('instructions');
+        } else if (lesson.type === 'quiz') {
+          // Always force content type to quiz when lesson type is quiz
+          setContentType('quiz');
+          console.log(`Loading quiz: ${lesson.title}`, {
+            questionCount: lesson.quiz_questions?.length || 0,
+            lessonId: getCurrentLessonId(),
+            isQuizContentType: true
+          });
         } else {
           setContentType(lesson.type);
         }
@@ -693,18 +758,94 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
   const renderContent = () => {
     const currentLesson = getCurrentLesson();
     
+    // Debug the current state
+    console.log('Rendering content:', { 
+      contentType, 
+      lessonType: currentLesson?.type,
+      hasQuizQuestions: Array.isArray(currentLesson?.quiz_questions) && currentLesson.quiz_questions.length > 0
+    });
+    
+    // Override contentType for quiz lessons
+    if (currentLesson?.type === 'quiz') {
+      console.log('Force rendering quiz content for quiz lesson type');
+      
+      // Check if the current lesson has quiz questions
+      if (!currentLesson?.quiz_questions || !Array.isArray(currentLesson.quiz_questions) || currentLesson.quiz_questions.length === 0) {
+        console.warn('No quiz questions found for this lesson', currentLesson);
+        return (
+          <div className="max-w-3xl mx-auto p-8 bg-white rounded-lg shadow-sm">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
+                <span className="text-xl text-red-600">!</span>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Quiz Not Available</h2>
+              <p className="text-gray-600 mb-6">This quiz doesn't have any questions yet. Please check back later.</p>
+            </div>
+          </div>
+        );
+      }
+      
+      const lessonId = getCurrentLessonId();
+      if (!lessonId) {
+        console.warn('No lesson ID found for quiz:', currentLesson.title);
+      }
+      
+      return (
+        <QuizIntro 
+          quizData={{
+            title: currentLesson.title,
+            description: currentLesson.description || "Test your understanding of the concepts covered in this lesson",
+            timeLimit: "15 minutes",
+            totalQuestions: currentLesson.quiz_questions ? currentLesson.quiz_questions.length : 0,
+            passingScore: 80,
+            attempts: "Unlimited",
+            instructions: [
+              "Read each question carefully",
+              "You can review your answers before submission",
+              "You need to score 80% or higher to pass",
+              "You can retake the quiz if needed"
+            ],
+            questions: currentLesson.quiz_questions || []
+          }}
+          lessonId={lessonId}
+        />
+      );
+    }
+    
     switch(contentType) {
       case 'resources':
-        return <ResourcesPage />; // Removed the white container div
-        
+        return <ResourcesPage />; 
+
       case 'quiz':
+        console.log('Rendering quiz content from contentType:', currentLesson);
+        // Check if the current lesson has quiz questions
+        if (!currentLesson?.quiz_questions || !Array.isArray(currentLesson.quiz_questions) || currentLesson.quiz_questions.length === 0) {
+          console.warn('No quiz questions found for this lesson', currentLesson);
+          return (
+            <div className="max-w-3xl mx-auto p-8 bg-white rounded-lg shadow-sm">
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
+                  <span className="text-xl text-red-600">!</span>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Quiz Not Available</h2>
+                <p className="text-gray-600 mb-6">This quiz doesn't have any questions yet. Please check back later.</p>
+              </div>
+            </div>
+          );
+        }
+        
+        const lessonId = getCurrentLessonId();
+        if (!lessonId) {
+          console.warn('No lesson ID found for quiz:', currentLesson.title);
+        }
+        
         return (
           <QuizIntro 
             quizData={{
               title: currentLesson.title,
-              description: "Test your understanding of the concepts covered in this lesson",
+              description: currentLesson.description || "Test your understanding of the concepts covered in this lesson",
               timeLimit: "15 minutes",
-              totalQuestions: 5,
+              totalQuestions: currentLesson.quiz_questions ? currentLesson.quiz_questions.length : 0,
               passingScore: 80,
               attempts: "Unlimited",
               instructions: [
@@ -712,8 +853,10 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
                 "You can review your answers before submission",
                 "You need to score 80% or higher to pass",
                 "You can retake the quiz if needed"
-              ]
+              ],
+              questions: currentLesson.quiz_questions || []
             }}
+            lessonId={lessonId}
           /> // Removed the white container div
         );
         

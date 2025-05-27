@@ -13,6 +13,24 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuizQuestion
         fields = ['id', 'question', 'options', 'correct_answer']
+        
+    def to_representation(self, instance):
+        # Get the default representation
+        data = super().to_representation(instance)
+        
+        # Ensure options is always a list
+        if not isinstance(data['options'], list):
+            # Try to convert JSON string to list if needed
+            try:
+                import json
+                if isinstance(data['options'], str):
+                    data['options'] = json.loads(data['options'])
+                else:
+                    data['options'] = []
+            except:
+                data['options'] = []
+                
+        return data
 
 class LessonSerializer(serializers.ModelSerializer):
     resources = LessonResourceSerializer(many=True, required=False)

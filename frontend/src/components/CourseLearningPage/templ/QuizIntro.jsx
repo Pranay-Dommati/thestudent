@@ -1,14 +1,75 @@
 import React from 'react';
 import { FaClock, FaListAlt, FaRedo, FaCheck } from 'react-icons/fa';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 
-const QuizIntro = ({ quizData, onStart }) => {
+const QuizIntro = ({ quizData, lessonId, onStart }) => {
   const navigate = useNavigate();
-  const { courseId } = useParams();
+  const location = useLocation();
+  const params = useParams();
   
-  const handleStartQuiz = () => {
-    // Navigate to the standalone quiz page instead of showing the quiz in the current page
-    navigate(`/courses/engineering/${courseId}/learning/quiz`);
+  // Log debugging information
+  console.log('QuizIntro props:', { quizData, lessonId });
+  console.log('URL params:', params);
+  console.log('Current path:', location.pathname);
+  console.log('Quiz questions available:', 
+    Array.isArray(quizData?.questions) && quizData.questions.length > 0);
+    const handleStartQuiz = () => {
+    // Determine the correct quiz URL based on the current path
+    const currentPath = location.pathname;
+    let quizPath;
+    
+    console.log('Building quiz path from current path:', currentPath);
+    
+    if (currentPath.includes('/engineering/')) {
+      // Engineering course path
+      quizPath = `/courses/engineering/${params.courseId}/learning/quiz`;
+    } else if (currentPath.includes('/10th/')) {
+      // 10th class course paths
+      if (currentPath.includes('/state/')) {
+        quizPath = `/courses/10th/state/${params.stateId}/${params.subjectId}/learning/quiz`;
+      } else {
+        quizPath = `/courses/10th/cbse/${params.subjectId}/learning/quiz`;
+      }
+    } else if (currentPath.includes('/11th/')) {
+      // 11th class course paths
+      if (currentPath.includes('/state/')) {
+        quizPath = `/courses/11th/state/${params.stateId}/${params.subjectId}/learning/quiz`;
+      } else {
+        quizPath = `/courses/11th/cbse/${params.subjectId}/learning/quiz`;
+      }
+    } else if (currentPath.includes('/12th/')) {
+      // 12th class course paths
+      if (currentPath.includes('/state/')) {
+        quizPath = `/courses/12th/state/${params.stateId}/${params.subjectId}/learning/quiz`;
+      } else {
+        quizPath = `/courses/12th/cbse/${params.subjectId}/learning/quiz`;
+      }
+    } else {
+      // Default fallback - append /quiz to current learning path
+      quizPath = `${currentPath}/quiz`;
+    }
+    
+    console.log('Navigating to quiz path:', quizPath);
+    
+    // Prepare quiz questions data
+    const preparedQuizData = {
+      ...quizData,
+      questions: Array.isArray(quizData.questions) ? 
+        quizData.questions.map(q => ({
+          ...q,
+          // Ensure each question has an id
+          id: q.id || Math.random().toString(36).substr(2, 9)
+        })) : []
+    };
+    
+    // Navigate to the standalone quiz page with quiz data
+    navigate(quizPath, {
+      state: { 
+        quizData: preparedQuizData,
+        lessonId: lessonId,
+        from: location.pathname 
+      }
+    });
   };
 
   return (

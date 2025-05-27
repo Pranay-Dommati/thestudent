@@ -149,18 +149,27 @@ const App = () => {
             <Route path="/courses/11th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
             <Route path="/courses/12th/cbse/:subjectId" element={<SchoolCourseDetails />} />
             <Route path="/courses/12th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
-            <Route path="/courses/engineering/:courseId" element={<CourseDetails />} />
-
-            {/* Learning Routes */}
+            <Route path="/courses/engineering/:courseId" element={<CourseDetails />} />            {/* Learning Routes */}            {/* Engineering Course Routes */}
             <Route path="/courses/engineering/:courseId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/engineering/:courseId/learning/quiz" element={<StandaloneQuizPage />} />
             
+            {/* 10th Class Routes */}
             <Route path="/courses/10th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/10th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
             <Route path="/courses/10th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/10th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
+            
+            {/* 11th Class Routes */}
             <Route path="/courses/11th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/11th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
             <Route path="/courses/11th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/11th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
+            
+            {/* 12th Class Routes */}
             <Route path="/courses/12th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/12th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
             <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/12th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
 
             <Route path="*" element={<NotFound />} />
             {/* Mentoring Routes */}

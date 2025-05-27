@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     SchoolCourse, EngineeringCourse, CourseChapter, 
     CourseSection, Lesson, LessonResource, QuizQuestion,
-    UserLessonProgress
+    UserLessonProgress, QuizResult
 )
 
 class LessonResourceInline(admin.TabularInline):
@@ -48,6 +48,12 @@ class LessonResourceAdmin(admin.ModelAdmin):
     
     get_course.short_description = 'Course'
 
+class QuizResultAdmin(admin.ModelAdmin):
+    list_display = ['user', 'lesson', 'score', 'passed', 'submitted_at']
+    list_filter = ['passed', 'submitted_at']
+    search_fields = ['user__username', 'lesson__title']
+    readonly_fields = ['submitted_at']
+
 admin.site.register(SchoolCourse, SchoolCourseAdmin)
 admin.site.register(EngineeringCourse, EngineeringCourseAdmin)
 admin.site.register(CourseChapter, ChapterAdmin)
@@ -55,3 +61,4 @@ admin.site.register(CourseSection, SectionAdmin)
 admin.site.register(Lesson)
 admin.site.register(LessonResource, LessonResourceAdmin)  # Use custom admin class
 admin.site.register(UserLessonProgress)
+admin.site.register(QuizResult, QuizResultAdmin)
