@@ -1,5 +1,6 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
+from .urls_learning_plan import urlpatterns as learning_plan_urls
 
 urlpatterns = [
     path('api/courses/create/', views.create_course, name='create-course'),
@@ -8,4 +9,7 @@ urlpatterns = [
     path('api/courses/all/', views.list_all_courses, name='list-all-courses'),
     path('api/courses/school/', views.list_school_courses, name='list-school-courses'),
     path('api/courses/school/<str:course_id>/', views.get_school_course_by_id, name='get-school-course-by-id'),
+    
+    # Learning Plan URLs
+    path('api/learning/', include('courses.urls_learning_plan')),
 ]

@@ -127,3 +127,6 @@ class QuizQuestion(models.Model):
     
     def __str__(self):
         return self.question
+
+# Import learning plan models
+from .models_learning_plan import LearningPlan, LearningPlanDay, VideoResource

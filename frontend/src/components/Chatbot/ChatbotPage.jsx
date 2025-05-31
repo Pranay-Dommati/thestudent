@@ -4,7 +4,7 @@ import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle } from "react-icons
 import { FaRobot, FaHistory } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
-import { callGeminiAPI, getYoutubeResources } from "./ChatbotAPI";
+import { callGeminiAPI, getYoutubeResources, generateLearningPlan, getLearningPath } from "./ChatbotAPI";
 
 const useWindowSize = () => {
   const [windowSize, setWindowSize] = useState({
@@ -67,6 +67,171 @@ const CourseSection = ({ section, subsections }) => {
           ))}
         </div>
       )}
+    </div>
+  );
+};
+
+const LearningPlanDisplay = ({ content }) => {
+  // Parse the markdown content to extract days and details
+  const [title, setTitle] = useState('');
+  const [days, setDays] = useState([]);
+  const [activeDay, setActiveDay] = useState(1);
+
+  useEffect(() => {
+    try {
+      console.log("Parsing learning plan content:", content.slice(0, 100) + "...");
+      
+      // Parse markdown content to extract learning plan data
+      const lines = content.split('\n');
+      let currentTitle = '';
+      let currentDays = [];
+      let currentDay = null;
+  
+      // Extract the main title (could be a learning plan title)
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith('# ')) {
+          currentTitle = line.replace('# ', '').trim();
+          break;
+        }
+      }
+  
+      // If no title found, use a default one
+      if (!currentTitle) {
+        currentTitle = "Your Learning Plan";
+      }
+  
+      // Process each line to extract day info, project ideas, and videos
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        // Skip empty lines
+        if (!line) continue;
+        
+        // Extract day information (matches both "## Day 1: Topic" and "## Day 1 - Topic" formats)
+        if (line.startsWith('## Day ')) {
+          // Save the previous day if it exists
+          if (currentDay) {
+            currentDays.push(currentDay);
+          }
+          
+          // Try to match different day header formats
+          const dayMatch = line.match(/## Day (\d+)[:\s-]\s*(.+)/);
+          if (dayMatch) {
+            currentDay = {
+              number: parseInt(dayMatch[1]),
+              topic: dayMatch[2],
+              projectIdea: '',
+              videos: []
+            };
+          }
+        }
+        // Extract project idea
+        else if (line.includes('**Project idea:**') && currentDay) {
+          currentDay.projectIdea = line.replace('**Project idea:**', '').trim();
+        }
+        // Extract videos - handle multiple formats of links
+        else if (line.startsWith('- [') && currentDay) {
+          // Match markdown link format: [title](url)
+          const videoMatch = line.match(/- \[(.+?)\]\((.+?)\)/);
+          if (videoMatch) {
+            currentDay.videos.push({
+              title: videoMatch[1],
+              url: videoMatch[2]
+            });
+            console.log("Found video:", videoMatch[1]);
+          }
+        }
+      }
+  
+      // Add the last day if it exists
+      if (currentDay) {
+        currentDays.push(currentDay);
+      }
+  
+      console.log("Parsed learning plan days:", currentDays.length);
+      
+      setTitle(currentTitle);
+      setDays(currentDays);
+    } catch (error) {
+      console.error("Error parsing learning plan:", error);
+      setTitle("Learning Plan");
+      setDays([]); // Set empty array on error
+    }
+  }, [content]);
+
+  return (
+    <div className="mt-4 bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="bg-blue-600 text-white px-6 py-4">
+        <h2 className="text-xl font-bold">{title}</h2>
+        <p className="text-blue-100 text-sm mt-1">{days.length} days learning journey</p>
+      </div>
+      
+      {/* Day navigation */}
+      <div className="flex overflow-x-auto py-2 bg-gray-50 border-b">
+        {days.map(day => (
+          <button
+            key={day.number}
+            onClick={() => setActiveDay(day.number)}
+            className={`px-4 py-2 mx-1 rounded-full text-sm font-medium whitespace-nowrap ${activeDay === day.number ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+          >
+            Day {day.number}
+          </button>
+        ))}
+      </div>
+
+      {/* Active day content */}
+      {days.map(day => day.number === activeDay && (
+        <div key={day.number} className="p-6">
+          <div className="mb-6">
+            <h3 className="text-xl font-bold text-gray-800">{day.topic}</h3>
+            <div className="mt-3 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <h4 className="font-semibold text-yellow-800 mb-1">Project Idea</h4>
+              <p className="text-gray-700">{day.projectIdea}</p>
+            </div>
+          </div>
+
+          {day.videos.length > 0 && (
+            <div>
+              <h4 className="font-semibold text-gray-800 mb-3">Recommended Videos</h4>
+              <div className="space-y-3">
+                {day.videos.map((video, index) => (
+                  <a
+                    key={index}
+                    href={video.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 border border-gray-200 rounded-md hover:bg-blue-50 transition-colors group"
+                  >
+                    <div className="bg-red-600 text-white p-2 rounded-md mr-3">
+                      <IoPlayCircle size={20} />
+                    </div>
+                    <span className="text-gray-700 group-hover:text-blue-600">{video.title}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Navigation buttons */}
+          <div className="flex justify-between mt-6 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => setActiveDay(prev => Math.max(prev - 1, 1))}
+              disabled={activeDay === 1}
+              className={`px-4 py-2 rounded ${activeDay === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+            >
+              Previous Day
+            </button>
+            <button
+              onClick={() => setActiveDay(prev => Math.min(prev + 1, days.length))}
+              disabled={activeDay === days.length}
+              className={`px-4 py-2 rounded ${activeDay === days.length ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+            >
+              Next Day
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 };
@@ -181,16 +346,100 @@ const ChatbotPage = () => {
     setIsLoading(true);
 
     try {
-      const response = await callGeminiAPI(messageToSend);
+      // Check if this is a learning plan request
+      const isLearningPlanRequest = (
+        messageToSend.toLowerCase().includes('learning plan') ||
+        messageToSend.toLowerCase().includes('learn ') ||
+        messageToSend.toLowerCase().includes('study plan') ||
+        messageToSend.toLowerCase().includes('teach me') ||
+        messageToSend.toLowerCase().includes('day-wise') ||
+        messageToSend.toLowerCase().includes('day by day')
+      );
 
-      const botResponse = {
-        id: chatHistory.length + 2,
-        type: "bot",
-        content: response,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
+      if (isLearningPlanRequest) {
+        // Generate a learning plan using the new API
+        const planResult = await generateLearningPlan(messageToSend);
+        
+        if (planResult.success) {
+          // Format the learning plan response
+          let formattedContent;
+          
+          if (planResult.data.days) {
+            // Format from Django backend response
+            formattedContent = `# Learning Plan: ${planResult.data.title}\n\n`;
+            
+            planResult.data.days.forEach(day => {
+              formattedContent += `## Day ${day.day}: ${day.topic}\n\n`;
+              formattedContent += `**Project idea:** ${day.project_idea}\n\n`;
+              
+              if (day.videos && day.videos.length > 0) {
+                formattedContent += '**Recommended videos:**\n';
+                day.videos.forEach(video => {
+                  // Make sure we have a valid video ID before adding the link
+                  if (video.video_id || video.id) {
+                    const videoId = video.video_id || video.id;
+                    formattedContent += `- [${video.title}](https://www.youtube.com/watch?v=${videoId})\n`;
+                  } else {
+                    // Fallback for videos without IDs
+                    formattedContent += `- ${video.title}\n`;
+                  }
+                });
+                formattedContent += '\n';
+              }
+            });
+          } else {
+            // Format from direct API response
+            formattedContent = `# Learning Path: ${planResult.data.title}\n\n`;
+            
+            if (planResult.data.sections) {
+              planResult.data.sections.forEach((section, index) => {
+                formattedContent += `## ${section.name}\n\n`;
+                
+                if (section.lessons) {
+                  section.lessons.forEach(lesson => {
+                    formattedContent += `- [${lesson.title}](https://www.youtube.com/results?search_query=${encodeURIComponent(lesson.title)})\n`;
+                  });
+                  formattedContent += '\n';
+                }
+              });
+            }
+          }
+          
+          const botResponse = {
+            id: chatHistory.length + 2,
+            type: "bot",
+            content: formattedContent,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            isLearningPlan: true
+          };
+          
+          setChatHistory((prev) => [...prev, botResponse]);
+        } else {
+          // Fallback to regular chatbot response if learning plan generation failed
+          const response = await callGeminiAPI(messageToSend);
+          
+          const botResponse = {
+            id: chatHistory.length + 2,
+            type: "bot",
+            content: response,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          };
+          
+          setChatHistory((prev) => [...prev, botResponse]);
+        }
+      } else {
+        // Regular chatbot response for non-learning plan requests
+        const response = await callGeminiAPI(messageToSend);
 
-      setChatHistory((prev) => [...prev, botResponse]);
+        const botResponse = {
+          id: chatHistory.length + 2,
+          type: "bot",
+          content: response,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+
+        setChatHistory((prev) => [...prev, botResponse]);
+      }
     } catch (error) {
       console.error("Error in chat:", error);
       const errorResponse = {
@@ -205,12 +454,67 @@ const ChatbotPage = () => {
     }
   };
 
+  const MessageBubble = ({ message }) => {
+    // Simple pattern to detect YouTube section format
+    const isCourseContent = message.content.includes("# ") && message.content.includes("## ");
+    const sections = isCourseContent ? parseMarkdownResponse(message.content) : [];
+    const isLearningPlan = message.isLearningPlan || (message.content.includes("Learning Plan") && message.content.includes("Day "));
+
+    return (
+      <div
+        className={`flex ${message.type === "user" ? "justify-end" : "justify-start"} mb-4`}
+      >
+        <div
+          className={`rounded-lg py-2 px-4 ${message.type === "user"
+            ? "bg-blue-600 text-white rounded-br-none max-w-[80%]"
+            : isLearningPlan 
+              ? "bg-white w-full md:w-5/6 lg:w-3/4" 
+              : "bg-gray-100 text-gray-800 rounded-bl-none max-w-[80%]"
+            }`}
+        >
+          {message.type === "bot" && !isCourseContent && !isLearningPlan && (
+            <div className="prose max-w-none dark:prose-invert">
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            </div>
+          )}
+
+          {message.type === "bot" && isCourseContent && !isLearningPlan && (
+            <div className="mt-2">
+              {sections.map((section, index) => (
+                <CourseSection
+                  key={index}
+                  section={section.title}
+                  subsections={section.subsections}
+                />
+              ))}
+            </div>
+          )}
+
+          {message.type === "bot" && isLearningPlan && (
+            <div className="w-full">
+              <LearningPlanDisplay content={message.content} />
+            </div>
+          )}
+
+          {message.type === "user" && <div>{message.content}</div>}
+
+          <div
+            className={`text-xs mt-1 ${message.type === "user" ? "text-blue-200" : isLearningPlan ? "text-gray-400 pl-2" : "text-gray-500"}`}
+          >
+            {message.timestamp}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const suggestionTopics = [
     "Course recommendations",
     "Study techniques",
     "Career paths",
     "Programming help",
-    "Exam preparation",
+    "Learn ReactJS in 30 days",
+    "Create a Python learning plan",
   ];
 
   const handleSuggestion = (topic) => {
@@ -308,28 +612,7 @@ const ChatbotPage = () => {
         <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
           <div className="flex-1 p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {chatHistory.map((chat) => (
-              <div key={chat.id} className={`flex ${chat.type === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[80%] rounded-lg p-3 shadow-sm ${chat.type === "user" ? "bg-blue-600 text-white rounded-br-none" : "bg-white text-gray-800 border border-gray-200 rounded-bl-none"}`}>
-                  {chat.type === "user" ? (
-                    <div className="mb-1 whitespace-pre-wrap">{chat.content}</div>
-                  ) : (
-                    <div className="mb-1">
-                      {chat.content.startsWith('# ') ? (
-                        parseMarkdownResponse(chat.content).map((section, index) => (
-                          <CourseSection
-                            key={index}
-                            section={section.title}
-                            subsections={section.subsections}
-                          />
-                        ))
-                      ) : (
-                        <ReactMarkdown>{chat.content}</ReactMarkdown>
-                      )}
-                    </div>
-                  )}
-                  <div className={`text-xs ${chat.type === "user" ? "text-blue-200" : "text-gray-500"} text-right`}>{chat.timestamp}</div>
-                </div>
-              </div>
+              <MessageBubble key={chat.id} message={chat} />
             ))}
 
             {isLoading && (
