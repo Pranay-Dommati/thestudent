@@ -161,6 +161,9 @@ const App = () => {
             <Route path="/courses/11th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/12th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            
+            {/* AI Learning Plans Route */}
+            <Route path="/learning/:learningPlanId" element={<CourseLearningPage />} />
 
             <Route path="*" element={<NotFound />} />
             {/* Mentoring Routes */}

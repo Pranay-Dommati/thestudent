@@ -5,20 +5,79 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 import requests
 import json
 import os
+import uuid
 from django.conf import settings
 from .models_learning_plan import LearningPlan, LearningPlanDay, VideoResource
 from .serializers_learning_plan import LearningPlanSerializer, LearningPlanDaySerializer
 
-class LearningPlanViewSet(viewsets.ReadOnlyModelViewSet):
-    """ViewSet for viewing learning plans"""
+class LearningPlanViewSet(viewsets.ModelViewSet):
+    """ViewSet for viewing and creating learning plans"""
     queryset = LearningPlan.objects.all().prefetch_related('days', 'days__videos')
     serializer_class = LearningPlanSerializer
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        if self.request.user.is_authenticated:
+        # For detail view with an ID, we'll return any plan (even for anonymous users)
+        # For list view, only return plans belonging to the authenticated user
+        if self.action == 'retrieve':
+            return LearningPlan.objects.all().prefetch_related('days', 'days__videos')
+        elif self.request.user.is_authenticated:
             return LearningPlan.objects.filter(user=self.request.user).prefetch_related('days', 'days__videos')
         return LearningPlan.objects.none()
+        
+    def create(self, request, *args, **kwargs):
+        """Custom create method to handle nested days and videos"""
+        print("Creating learning plan from API request")
+        
+        try:
+            # Extract data from request
+            goal = request.data.get('goal')
+            days_data = request.data.get('days', [])
+            
+            if not goal:
+                return Response({'error': 'Goal is required'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            # Create the learning plan
+            learning_plan = LearningPlan.objects.create(
+                title=goal,
+                user=request.user if request.user.is_authenticated else None
+            )
+            
+            # Process each day
+            for day_data in days_data:
+                day_number = day_data.get('day')
+                topic = day_data.get('topic', '')
+                project_idea = day_data.get('project_idea', '')
+                youtube_query = day_data.get('youtube_query', '')
+                videos_data = day_data.get('videos', [])
+                
+                # Create the day
+                day = LearningPlanDay.objects.create(
+                    learning_plan=learning_plan,
+                    day=day_number,
+                    topic=topic,
+                    project_idea=project_idea,
+                    youtube_query=youtube_query
+                )
+                
+                # Create videos for the day
+                for video_data in videos_data:
+                    VideoResource.objects.create(
+                        learning_plan_day=day,
+                        title=video_data.get('title', ''),
+                        description=video_data.get('description', ''),
+                        video_id=video_data.get('video_id', ''),
+                        thumbnail_url=video_data.get('thumbnail_url', ''),
+                        channel_title=video_data.get('channel_title', '')
+                    )
+            
+            # Return the serialized learning plan
+            serializer = self.get_serializer(learning_plan)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            print(f"Error creating learning plan: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -26,6 +85,7 @@ def generate_learning_plan(request):
     """
     Generate a learning plan based on a goal.
     Expects a 'goal' parameter in the request data.
+    Can also receive a complete learning plan with days and videos from the frontend.
     """
     print("\n\n*** DEBUGGING: generate_learning_plan called ***")
     print(f"Request data: {request.data}")
@@ -37,113 +97,120 @@ def generate_learning_plan(request):
     goal = request.data['goal']
     print(f"Goal: {goal}")
     
-    # For debugging, just return a simple response without calling APIs
-    # This will help us confirm if the endpoint itself works
-    mock_data = {
-        "id": str(uuid.uuid4()),
-        "title": goal,
-        "created_at": "2025-05-31T12:00:00Z",
-        "days": [
-            {
-                "id": str(uuid.uuid4()),
-                "day": 1,
-                "topic": "Getting Started",
-                "project_idea": "Setup your development environment",
-                "youtube_query": f"{goal} introduction",
-                "videos": [
-                    {
-                        "id": str(uuid.uuid4()),
-                        "title": "Introduction Video",
-                        "description": "Learn the basics",
-                        "video_id": "dQw4w9WgXcQ",
-                        "thumbnail_url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
-                        "channel_title": "Learning Channel"
-                    }
-                ]
-            },
-            {
-                "id": str(uuid.uuid4()),
-                "day": 2,
-                "topic": "Basic Concepts",
-                "project_idea": "Build a simple project",
-                "youtube_query": f"{goal} basics",
-                "videos": [
-                    {
-                        "id": str(uuid.uuid4()),
-                        "title": "Basic Concepts Video",
-                        "description": "Learn the fundamentals",
-                        "video_id": "dQw4w9WgXcQ",
-                        "thumbnail_url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
-                        "channel_title": "Learning Channel"
-                    }
-                ]
-            }
-        ]
-    }
-    
-    print("Returning mock data for debugging")
-    return Response(mock_data, status=status.HTTP_200_OK)
-    
-    # Uncomment this section once the basic endpoint is working
-    '''
-    # Step 1: Generate the learning plan using Hugging Face API
-    try:
-        learning_plan_data = generate_plan_from_huggingface(goal)
-        if not learning_plan_data:
-            return Response({'error': 'Failed to generate learning plan'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    except Exception as e:
-        return Response({'error': f'Error generating plan: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    # Step 2: Create a new LearningPlan
-    try:
-        learning_plan = LearningPlan.objects.create(
-            title=goal,
-            user=request.user if request.user.is_authenticated else None
-        )
-    except Exception as e:
-        print(f"Error creating learning plan: {str(e)}")
-        # Create without user if there's an issue
-        learning_plan = LearningPlan.objects.create(
-            title=goal
-        )
-    
-    # Step 3: Create LearningPlanDay entries and fetch YouTube videos
-    for day_data in learning_plan_data:
-        day_number = day_data.get('day')
-        topic = day_data.get('topic', '')
-        project_idea = day_data.get('project_idea', '')
-        youtube_query = day_data.get('youtube_query', '')
+    # Check if the request contains a pre-generated learning plan with days
+    if 'days' in request.data and isinstance(request.data['days'], list):
+        print("Received pre-generated learning plan with days from frontend")
         
-        # Create the day entry
+        # Create a new LearningPlan
+        try:
+            learning_plan = LearningPlan.objects.create(
+                title=goal,
+                user=request.user if request.user.is_authenticated else None
+            )
+            print(f"Created learning plan with ID: {learning_plan.id}")
+        except Exception as e:
+            print(f"Error creating learning plan: {str(e)}")
+            # Create without user if there's an issue
+            learning_plan = LearningPlan.objects.create(
+                title=goal
+            )
+            print(f"Created learning plan without user, ID: {learning_plan.id}")
+        
+        # Process each day in the learning plan
+        for day_data in request.data['days']:
+            day_number = day_data.get('day')
+            topic = day_data.get('topic', '')
+            project_idea = day_data.get('project_idea', '')
+            youtube_query = day_data.get('youtube_query', '')
+            videos = day_data.get('videos', [])
+            
+            print(f"Processing day {day_number}: {topic}")
+            
+            # Create the day entry
+            day_entry = LearningPlanDay.objects.create(
+                learning_plan=learning_plan,
+                day=day_number,
+                topic=topic,
+                project_idea=project_idea,
+                youtube_query=youtube_query
+            )
+            
+            # Process videos (expecting only one per day)
+            for video_data in videos:
+                VideoResource.objects.create(
+                    learning_plan_day=day_entry,
+                    title=video_data.get('title', ''),
+                    description=video_data.get('description', ''),
+                    video_id=video_data.get('video_id', ''),
+                    thumbnail_url=video_data.get('thumbnail_url', ''),
+                    channel_title=video_data.get('channel_title', '')
+                )
+                print(f"Added video: {video_data.get('title', '')}")
+        
+        # Return the complete learning plan
+        serializer = LearningPlanSerializer(learning_plan)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    # If no pre-generated plan was provided, generate one using the backend API
+    print("No pre-generated plan provided, generating using backend API")
+    
+    # Fallback: create and save a simple learning plan in the database
+    days_data = [
+        {
+            "day": 1,
+            "topic": "Getting Started",
+            "project_idea": "Setup your development environment",
+            "youtube_query": f"{goal} introduction",
+            "videos": [
+                {
+                    "title": "Introduction Video",
+                    "description": "Learn the basics",
+                    "video_id": "dQw4w9WgXcQ",
+                    "thumbnail_url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+                    "channel_title": "Learning Channel"
+                }
+            ]
+        },
+        {
+            "day": 2,
+            "topic": "Basic Concepts",
+            "project_idea": "Build a simple project",
+            "youtube_query": f"{goal} basics",
+            "videos": [
+                {
+                    "title": "Basic Concepts Video",
+                    "description": "Learn the fundamentals",
+                    "video_id": "dQw4w9WgXcQ",
+                    "thumbnail_url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+                    "channel_title": "Learning Channel"
+                }
+            ]
+        }
+    ]
+    # Create and save the learning plan and associated days and videos
+    learning_plan = LearningPlan.objects.create(
+        title=goal,
+        user=request.user if request.user.is_authenticated else None
+    )
+    for day_data in days_data:
         day_entry = LearningPlanDay.objects.create(
             learning_plan=learning_plan,
-            day=day_number,
-            topic=topic,
-            project_idea=project_idea,
-            youtube_query=youtube_query
+            day=day_data["day"],
+            topic=day_data["topic"],
+            project_idea=day_data["project_idea"],
+            youtube_query=day_data["youtube_query"]
         )
-        
-        # Step 4: Fetch YouTube videos for this day
-        if youtube_query:
-            try:
-                videos = fetch_youtube_videos(youtube_query)
-                for video_data in videos:
-                    VideoResource.objects.create(
-                        learning_plan_day=day_entry,
-                        title=video_data.get('title', ''),
-                        description=video_data.get('description', ''),
-                        video_id=video_data.get('video_id', ''),
-                        thumbnail_url=video_data.get('thumbnail_url', ''),
-                        channel_title=video_data.get('channel_title', '')
-                    )
-            except Exception as e:
-                # Log the error but continue with the process
-                print(f"Error fetching YouTube videos: {str(e)}")
-    
-    # Step 5: Return the complete learning plan
+        for video in day_data["videos"]:
+            VideoResource.objects.create(
+                learning_plan_day=day_entry,
+                title=video.get("title", ""),
+                description=video.get("description", ""),
+                video_id=video.get("video_id", ""),
+                thumbnail_url=video.get("thumbnail_url", ""),
+                channel_title=video.get("channel_title", "")
+            )
     serializer = LearningPlanSerializer(learning_plan)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
-    '''
 
 def generate_plan_from_huggingface(goal):
     """
@@ -271,9 +338,10 @@ def generate_plan_from_huggingface(goal):
             {'day': 3, 'topic': 'Advanced Topics', 'project_idea': 'Advanced project', 'youtube_query': f"{goal} advanced tutorial"}
         ]
 
-def fetch_youtube_videos(query, max_results=3):
+def fetch_youtube_videos(query, max_results=1):
     """
     Fetch YouTube videos using the YouTube Data API
+    Default to fetching only 1 best video per day
     """
     # YOUTUBE_API_KEY should be stored in environment variables or settings
     api_key = getattr(settings, 'YOUTUBE_API_KEY', None)

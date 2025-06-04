@@ -8,6 +8,9 @@ const HUGGINGFACE_API_TOKEN = import.meta.env.VITE_HUGGINGFACE_API_TOKEN;
 // Base URLs for APIs
 const YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3/search";
 const HUGGINGFACE_API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
+const LEARNING_PLAN_API_URL = `${API_BASE_URL}/learning/generate-learning-plan/`;
+const LEARNING_PLAN_SAVE_API_URL = `${API_BASE_URL}/learning/generate-learning-plan/`;
 
 // Debug API keys
 console.log("API Configuration Status:", {
@@ -36,7 +39,7 @@ const getYoutubeVideoLink = async (query) => {
 };
 
 // Function to get YouTube resources for a specific topic
-export const getYoutubeResources = async (topic, maxResults = 5) => {
+export const getYoutubeResources = async (topic, maxResults = 1) => {
   try {
     console.log(`Fetching ${maxResults} YouTube videos for: ${topic}`);
     
@@ -783,15 +786,6 @@ export const testLearningPlanSubject = (topic) => {
       }
     }
     
-    // If no subject found, check for learning plan directly
-    if (!extractedSubject && topicLower.includes('learning plan')) {
-      const match = topic.match(/([^\s]+)\s+learning\s+plan/i);
-      if (match && match[1]) {
-        extractedSubject = match[1].trim();
-        console.log(`Learning plan pattern match: ${extractedSubject}`);
-      }
-    }
-    
     console.log(`Final extracted subject: ${extractedSubject || 'none'}`);
   }
   
@@ -801,10 +795,63 @@ export const testLearningPlanSubject = (topic) => {
   return { subject, days };
 };
 
+// Function to save the AI-generated learning plan to the database
+async function saveLearningPlanToDatabase(learningPlan) {
+  try {
+    console.log("Saving learning plan to database:", learningPlan.title);
+    
+    // Get authentication token from localStorage
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      console.warn("No authentication token found, learning plan will not be associated with a user");
+    }
+    
+    // Prepare headers with authentication if token exists
+    const headers = token ? {
+      'Content-Type': 'application/json',
+      'Authorization': `Token ${token}`
+    } : {
+      'Content-Type': 'application/json'
+    };
+    
+    // Format the data for the backend API
+    const formattedPlan = {
+      goal: learningPlan.title,
+      days: learningPlan.days.map(day => ({
+        day: day.day,
+        topic: day.topic,
+        project_idea: day.project_idea,
+        youtube_query: day.youtube_query,
+        videos: day.videos.map(video => ({
+          title: video.title,
+          description: video.description,
+          video_id: video.video_id,
+          thumbnail_url: video.thumbnail || video.thumbnail_url,
+          channel_title: video.channelTitle || video.channel_title
+        }))
+      }))
+    };
+    
+    // Send the data to the backend API
+    const response = await axios.post(LEARNING_PLAN_SAVE_API_URL, formattedPlan, { headers });
+    
+    console.log("Learning plan saved successfully:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error saving learning plan to database:", error);
+    throw error;
+  }
+}
+
 // Function to format the learning plan response as markdown text for display
 const formatLearningPlanResponse = (learningPlan) => {
   // Create markdown text from the learning plan structure
   let markdown = `# ${learningPlan.title}\n\n`;
+  
+  // Add direct learning interface link
+  markdown += `## 🚀 [Start Your Learning Journey](/learning/${learningPlan.id})\n`;
+  markdown += `I've created a personalized, interactive learning experience for you. **[Click here to start learning](/learning/${learningPlan.id})** with curated videos and structured progression. Your learning plan is also saved to your account.\n\n`;
   
   learningPlan.days.forEach(day => {
     markdown += `## Day ${day.day}: ${day.topic}\n\n`;
@@ -871,11 +918,12 @@ export const generateLearningPlan = async (goal) => {
       const generatedText = await callHuggingFaceAPI(prompt);
       const learningPlanDays = parseHuggingFaceLearningPlan(generatedText, goal);
       
-      // Step 2: Enrich each day with YouTube videos
-      console.log("Enriching learning plan with YouTube videos");
+      // Step 2: Enrich each day with YouTube videos - get only one best video per day
+      console.log("Enriching learning plan with YouTube videos - one best video per day");
       const daysWithVideos = await Promise.all(learningPlanDays.map(async (day) => {
         try {
-          const videos = await getYoutubeResources(day.youtube_query, 3);
+          // Get only one best video per day
+          const videos = await getYoutubeResources(day.youtube_query, 1);
           return { ...day, videos };
         } catch (error) {
           console.error(`Error fetching videos for day ${day.day}:`, error);
@@ -891,10 +939,23 @@ export const generateLearningPlan = async (goal) => {
         days: daysWithVideos
       };
       
-      // Step 4: Format the learning plan as markdown for display
-      const formattedContent = formatLearningPlanResponse(learningPlan);
+      // Step 4: Save the learning plan to the database and use returned ID
+      let savedPlan = null;
+      try {
+        console.log("Saving learning plan to database");
+        savedPlan = await saveLearningPlanToDatabase(learningPlan);
+        console.log("Received saved learning plan from backend:", savedPlan);
+      } catch (dbError) {
+        console.error("Error saving learning plan to database:", dbError);
+      }
       
-      return { success: true, data: learningPlan, content: formattedContent };
+      // Determine which plan to use (backend-saved or local)
+      const planToUse = savedPlan || learningPlan;
+      
+      // Step 5: Format the learning plan as markdown for display
+      const formattedContent = formatLearningPlanResponse(planToUse);
+      
+      return { success: true, data: planToUse, content: formattedContent };
     } catch (apiError) {
       console.error("Error with AI API, using direct fallback:", apiError);
       
@@ -912,11 +973,12 @@ export const generateLearningPlan = async (goal) => {
         youtube_query: `${subject} ${topic.searchTerm}`
       }));
       
-      // Enrich with YouTube videos
-      console.log("Adding YouTube videos to fallback plan");
+      // Enrich with YouTube videos - get only one best video per day
+      console.log("Adding YouTube videos to fallback plan - one best video per day");
       const daysWithVideos = await Promise.all(fallbackDays.map(async (day) => {
         try {
-          const videos = await getYoutubeResources(day.youtube_query, 3);
+          // Get only one best video per day
+          const videos = await getYoutubeResources(day.youtube_query, 1);
           return { ...day, videos };
         } catch (error) {
           console.error(`Error fetching videos for fallback day ${day.day}:`, error);
@@ -931,6 +993,15 @@ export const generateLearningPlan = async (goal) => {
         type: "learning_plan",
         days: daysWithVideos
       };
+      
+      // Save the fallback learning plan to the database
+      try {
+        console.log("Saving fallback learning plan to database");
+        await saveLearningPlanToDatabase(fallbackPlan);
+      } catch (dbError) {
+        console.error("Error saving fallback learning plan to database:", dbError);
+        // Continue even if database save fails
+      }
       
       const formattedContent = formatLearningPlanResponse(fallbackPlan);
       

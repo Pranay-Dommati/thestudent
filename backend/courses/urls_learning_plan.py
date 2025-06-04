@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views_learning_plan import LearningPlanViewSet, generate_learning_plan
 
 router = DefaultRouter()
-router.register(r'learning-plans', LearningPlanViewSet)
+router.register(r'plans', LearningPlanViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

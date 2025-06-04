@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaSearch, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
+import { FaSearch, FaChevronRight, FaChevronLeft, FaRobot, FaBook } from 'react-icons/fa';
 
 const Sidebar = ({ 
   isSidebarOpen, 
@@ -13,7 +13,10 @@ const Sidebar = ({
   completedLessons = 0, 
   totalLessons = 0, 
   toggleChapter,
-  toggleSidebar  // Add this prop to receive the toggle function
+  toggleSidebar,  // Add this prop to receive the toggle function
+  learningPlans = [], // AI-generated learning plans
+  isAIGeneratedPlan = false, // Whether the current course is an AI-generated plan
+  navigate // For navigation to other learning plans
 }) => {
   // Filter lessons based on search
   const filteredChapters = () => {
@@ -76,6 +79,53 @@ const Sidebar = ({
             <div className="flex justify-between text-xs text-gray-500 mt-1">
               <span>{completedLessons}/{totalLessons} lessons completed</span>
             </div>
+          </div>
+        </div>
+        
+        {/* AI Learning Plans Section (only show when viewing a regular course) */}
+        {!isAIGeneratedPlan && learningPlans.length > 0 && (
+          <div className="border-b border-gray-200 p-4">
+            <div className="flex items-center mb-3">
+              <FaRobot className="text-indigo-600 mr-2" />
+              <h3 className="font-semibold text-gray-800">AI Learning Plans</h3>
+            </div>
+            <div className="space-y-2">
+              <div className="text-xs text-gray-500 mb-2">
+                Your personalized learning journeys:
+              </div>
+              {learningPlans.map((plan) => (
+                <button
+                  key={plan.id}
+                  onClick={() => navigate(`/learning/${plan.id}`)}
+                  className="w-full p-3 text-left text-sm bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 rounded-md flex items-center transition-colors border border-indigo-100"
+                >
+                  <span className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs mr-3 border border-indigo-200">
+                    <FaRobot className="text-sm" />
+                  </span>
+                  <div>
+                    <span className="font-medium text-indigo-800 block">{plan.title}</span>
+                    <span className="text-xs text-gray-500 mt-1 block">Tap to continue learning</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Current Plan Type Indicator */}
+        <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+          <div className="flex items-center">
+            {isAIGeneratedPlan ? (
+              <>
+                <FaRobot className="text-indigo-600 mr-2" />
+                <span className="text-sm font-medium text-gray-700">AI-Generated Learning Plan</span>
+              </>
+            ) : (
+              <>
+                <FaBook className="text-indigo-600 mr-2" />
+                <span className="text-sm font-medium text-gray-700">Course Content</span>
+              </>
+            )}
           </div>
         </div>
         
