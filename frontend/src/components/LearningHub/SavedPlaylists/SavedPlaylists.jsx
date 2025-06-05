@@ -213,7 +213,7 @@ const SavedPlaylists = () => {
                       </div>                      <div className="flex items-center space-x-4">
                         <ProgressCircle progress={course.progress} />
                         <Link 
-                          to={`/learning-plan/${course.id}`}
+                          to={`/learning/${course.id}`}
                           className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-sm font-medium hover:bg-blue-100 transition-colors"
                         >
                           {course.progress === 100 ? 'Review' : 'Start Learning'}
@@ -260,10 +260,9 @@ const SavedPlaylists = () => {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {courses.filter(course => course.progress === 100).map((course) => (
-                <div key={course.id} className="border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+              {courses.filter(course => course.progress === 100).map((course) => (                <div key={course.id} className="border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                   <div className="flex flex-col sm:flex-row">
-                    <Link to={`/learning-plan/${course.id}`} className="sm:w-1/3">
+                    <Link to={`/learning/${course.id}`} className="sm:w-1/3">
                       <img
                         src={course.thumbnail}
                         alt={course.title}
@@ -271,7 +270,7 @@ const SavedPlaylists = () => {
                       />
                     </Link>
                     <div className="p-4 flex-1 flex flex-col">
-                      <Link to={`/learning-plan/${course.id}`} className="hover:text-indigo-600">
+                      <Link to={`/learning/${course.id}`} className="hover:text-indigo-600">
                         <h3 className="font-bold mb-1">{course.title}</h3>
                       </Link>
                       <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
@@ -291,9 +290,8 @@ const SavedPlaylists = () => {
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <span>{course.duration}</span>
                           <span>{course.totalVideos} videos</span>
-                        </div>
-                        <Link 
-                          to={`/learning-plan/${course.id}`}
+                        </div>                        <Link 
+                          to={`/learning/${course.id}`}
                           className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                         >
                           Review
