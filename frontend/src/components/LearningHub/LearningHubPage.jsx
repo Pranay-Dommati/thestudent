@@ -6,6 +6,7 @@ import ActiveCourses from './ActiveCourses/ActiveCourses';
 import SavedPlaylists from './SavedPlaylists/SavedPlaylists';
 import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
 import CourseRecommendations from './CourseRecommendations/CourseRecommendations';
+import AILearningPlans from './AILearningPlans/AILearningPlans';
 
 const LearningHubPage = () => {
   // Mock user data - in a real app, this would come from authentication context
@@ -33,6 +34,7 @@ const LearningHubPage = () => {
             {/* Main content - 2/3 width on large screens */}
             <div className="lg:col-span-2 space-y-8">
               <ActiveCourses />
+              <AILearningPlans />
               <SavedPlaylists />
               <CourseRecommendations />
             </div>

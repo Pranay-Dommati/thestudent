@@ -1,4 +1,5 @@
 import axios from "axios";
+import axiosInstance from "../../utils/axios";
 import { v4 as uuidv4 } from "uuid";
 
 // Use environment variables for API keys
@@ -12,7 +13,10 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api"
 const LEARNING_PLAN_API_URL = `${API_BASE_URL}/learning/generate-learning-plan/`;
 const LEARNING_PLAN_SAVE_API_URL = `${API_BASE_URL}/learning/generate-learning-plan/`;
 
-// Debug API keys
+// Debug API keys and quota monitoring
+let youtubeApiCalls = 0;
+let youtubeQuotaExceeded = false;
+
 console.log("API Configuration Status:", {
   youtube: YOUTUBE_API_KEY ? "✓" : "✗",
   huggingface: HUGGINGFACE_API_TOKEN ? "✓" : "✗"
@@ -43,6 +47,15 @@ export const getYoutubeResources = async (topic, maxResults = 1) => {
   try {
     console.log(`Fetching ${maxResults} YouTube videos for: ${topic}`);
     
+    // Check if quota was previously exceeded
+    if (youtubeQuotaExceeded) {
+      console.warn("YouTube API quota previously exceeded - using fallback");
+      return createFallbackVideo(topic);
+    }
+    
+    youtubeApiCalls++;
+    console.log(`YouTube API call #${youtubeApiCalls}`);
+
     if (!YOUTUBE_API_KEY) {
       console.error("YouTube API key is missing from environment variables");
       throw new Error("YouTube API key is missing");
@@ -104,9 +117,41 @@ export const getYoutubeResources = async (topic, maxResults = 1) => {
     return videos;
   } catch (error) {
     console.error("Error fetching YouTube resources:", error);
-    // Return empty array instead of throwing to make the app more resilient
+    
+    // Handle specific YouTube API errors
+    if (error.response) {
+      const status = error.response.status;
+      if (status === 403) {
+        console.warn("YouTube API quota exceeded - switching to fallback mode");
+        youtubeQuotaExceeded = true; // Prevent further API calls
+        return createFallbackVideo(topic);
+      } else if (status === 401) {
+        console.error("YouTube API authentication failed - invalid API key");
+      } else if (status === 429) {
+        console.warn("YouTube API rate limit exceeded");
+        youtubeQuotaExceeded = true;
+        return createFallbackVideo(topic);
+      }
+    }
+    
+    // Return empty array for other errors to make the app resilient
     return [];
   }
+};
+
+// Helper function to create fallback video data when YouTube API fails
+const createFallbackVideo = (topic) => {
+  return [{
+    id: `fallback_${Date.now()}`,
+    video_id: `fallback_${Date.now()}`,
+    title: `${topic} - Tutorial`,
+    description: `Educational content about ${topic}. Search for this topic on YouTube to find relevant tutorials.`,
+    thumbnail: "https://via.placeholder.com/320x180/4285f4/ffffff?text=Tutorial",
+    channelTitle: "Educational Content",
+    url: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic)}`,
+    embedUrl: null, // No embed for fallback
+    isFallback: true
+  }];
 };
 
 // Function to call the Hugging Face API
@@ -800,21 +845,6 @@ async function saveLearningPlanToDatabase(learningPlan) {
   try {
     console.log("Saving learning plan to database:", learningPlan.title);
     
-    // Get authentication token from localStorage
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      console.warn("No authentication token found, learning plan will not be associated with a user");
-    }
-    
-    // Prepare headers with authentication if token exists
-    const headers = token ? {
-      'Content-Type': 'application/json',
-      'Authorization': `Token ${token}`
-    } : {
-      'Content-Type': 'application/json'
-    };
-    
     // Format the data for the backend API
     const formattedPlan = {
       goal: learningPlan.title,
@@ -833,8 +863,8 @@ async function saveLearningPlanToDatabase(learningPlan) {
       }))
     };
     
-    // Send the data to the backend API
-    const response = await axios.post(LEARNING_PLAN_SAVE_API_URL, formattedPlan, { headers });
+    // Send the data to the backend API using authenticated axios instance
+    const response = await axiosInstance.post(LEARNING_PLAN_SAVE_API_URL, formattedPlan);
     
     console.log("Learning plan saved successfully:", response.data);
     return response.data;
@@ -944,18 +974,24 @@ export const generateLearningPlan = async (goal) => {
       try {
         console.log("Saving learning plan to database");
         savedPlan = await saveLearningPlanToDatabase(learningPlan);
-        console.log("Received saved learning plan from backend:", savedPlan);
+        console.log("Received saved learning plan from backend:");
+        console.log("- ID:", savedPlan?.id);
+        console.log("- Type:", savedPlan?.type);
+        console.log("- Full response:", JSON.stringify(savedPlan, null, 2));
       } catch (dbError) {
         console.error("Error saving learning plan to database:", dbError);
       }
       
-      // Determine which plan to use (backend-saved or local)
-      const planToUse = savedPlan || learningPlan;
+      // Update the learning plan with the backend-returned ID if save was successful
+      if (savedPlan && savedPlan.id) {
+        console.log(`Updating learning plan ID from ${learningPlan.id} to ${savedPlan.id}`);
+        learningPlan.id = savedPlan.id;
+      }
       
       // Step 5: Format the learning plan as markdown for display
-      const formattedContent = formatLearningPlanResponse(planToUse);
+      const formattedContent = formatLearningPlanResponse(learningPlan);
       
-      return { success: true, data: planToUse, content: formattedContent };
+      return { success: true, data: learningPlan, content: formattedContent };
     } catch (apiError) {
       console.error("Error with AI API, using direct fallback:", apiError);
       
@@ -995,12 +1031,23 @@ export const generateLearningPlan = async (goal) => {
       };
       
       // Save the fallback learning plan to the database
+      let savedFallbackPlan = null;
       try {
         console.log("Saving fallback learning plan to database");
-        await saveLearningPlanToDatabase(fallbackPlan);
+        savedFallbackPlan = await saveLearningPlanToDatabase(fallbackPlan);
+        console.log("Received saved fallback learning plan from backend:");
+        console.log("- ID:", savedFallbackPlan?.id);
+        console.log("- Type:", savedFallbackPlan?.type);
+        console.log("- Full response:", JSON.stringify(savedFallbackPlan, null, 2));
       } catch (dbError) {
         console.error("Error saving fallback learning plan to database:", dbError);
         // Continue even if database save fails
+      }
+      
+      // Update the fallback plan with the backend-returned ID if save was successful
+      if (savedFallbackPlan && savedFallbackPlan.id) {
+        console.log(`Updating fallback learning plan ID from ${fallbackPlan.id} to ${savedFallbackPlan.id}`);
+        fallbackPlan.id = savedFallbackPlan.id;
       }
       
       const formattedContent = formatLearningPlanResponse(fallbackPlan);
@@ -1016,3 +1063,6 @@ export const generateLearningPlan = async (goal) => {
     };
   }
 };
+
+// Export the saveLearningPlanToDatabase function so it can be imported
+export { saveLearningPlanToDatabase };

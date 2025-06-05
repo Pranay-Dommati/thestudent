@@ -1,10 +1,11 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework.permissions import AllowAny
-from .models import SchoolCourse, EngineeringCourse
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, QuizResult
 from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer
 import json
 from django.conf import settings
@@ -395,4 +396,429 @@ def list_school_courses(request):
         return Response(
             {"error": "Internal server error", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_lesson_progress(request):
+    """
+    Update the progress of a lesson for a user
+    """
+    data = request.data
+    user = request.user
+    
+    try:
+        lesson_id = data.get('lesson_id')
+        course_id = data.get('course_id')
+        is_completed = data.get('is_completed', False)
+        quiz_score = data.get('quiz_score', 0)
+        
+        # Validate input
+        if not lesson_id or not course_id:
+            return Response(
+                {"error": "lesson_id and course_id are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get or create the user lesson progress
+        progress, created = UserLessonProgress.objects.get_or_create(
+            user=user,
+            lesson_id=lesson_id,
+            course_id=course_id,
+            defaults={'is_completed': is_completed, 'quiz_score': quiz_score}
+        )
+        
+        if not created:
+            # Update existing progress
+            progress.is_completed = is_completed
+            progress.quiz_score = quiz_score
+            progress.save()
+        
+        return Response(
+            {"message": "Progress updated successfully", "id": progress.id},
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print(f"Error in update_lesson_progress: {str(e)}")
+        return Response(
+            {"error": "Internal server error", "details": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_progress(request, course_id):
+    """
+    Get the progress of a user for a specific course
+    """
+    user = request.user
+    
+    try:
+        # Get all lessons for the course
+        lessons = Lesson.objects.filter(course_id=course_id)
+        
+        # Get user's progress for these lessons
+        progress = UserLessonProgress.objects.filter(user=user, lesson__in=lessons)
+        
+        # Serialize progress data
+        progress_data = []
+        for p in progress:
+            progress_data.append({
+                'lesson_id': p.lesson_id,
+                'course_id': p.course_id,
+                'is_completed': p.is_completed,
+                'quiz_score': p.quiz_score,
+            })
+        
+        return Response(progress_data)
+    except Exception as e:
+        print(f"Error in get_user_progress: {str(e)}")
+        return Response(
+            {"error": "Internal server error", "details": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_quiz_results(request, course_id):
+    """
+    Get the quiz results of a user for a specific course
+    """
+    user = request.user
+    
+    try:
+        # Get quiz results for the course
+        results = QuizResult.objects.filter(user=user, course_id=course_id)
+        
+        # Serialize results data
+        results_data = []
+        for r in results:
+            results_data.append({
+                'id': r.id,
+                'course_id': r.course_id,
+                'user_id': r.user_id,
+                'score': r.score,
+                'total_questions': r.total_questions,
+                'correct_answers': r.correct_answers,
+                'attempted_at': r.attempted_at,
+            })
+        
+        return Response(results_data)
+    except Exception as e:
+        print(f"Error in get_quiz_results: {str(e)}")
+        return Response(
+            {"error": "Internal server error", "details": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_lesson_completion(request, lesson_id):
+    """
+    Mark a lesson as complete or incomplete for the current user
+    """
+    try:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        user = request.user
+        
+        # Check if lesson progress record exists
+        progress, created = UserLessonProgress.objects.get_or_create(
+            user=user,
+            lesson=lesson
+        )
+        
+        # If it existed and we're toggling, delete it to mark as incomplete
+        if not created:
+            progress.delete()
+            status_message = 'incomplete'
+        else:
+            status_message = 'complete'
+        
+        # Calculate progress percentage for the course
+        total_lessons = 0
+        completed_lessons = 0
+        
+        if lesson.chapter:
+            # School course
+            course = lesson.chapter.school_course
+            for chapter in course.chapters.all():
+                chapter_lessons = chapter.lessons.all()
+                total_lessons += chapter_lessons.count()
+                completed_lessons += UserLessonProgress.objects.filter(
+                    user=user,
+                    lesson__in=chapter_lessons
+                ).count()
+        elif lesson.section:
+            # Engineering course
+            course = lesson.section.engineering_course
+            for section in course.sections.all():
+                section_lessons = section.lessons.all()
+                total_lessons += section_lessons.count()
+                completed_lessons += UserLessonProgress.objects.filter(
+                    user=user, 
+                    lesson__in=section_lessons
+                ).count()
+        
+        progress_percentage = 0
+        if total_lessons > 0:
+            progress_percentage = int((completed_lessons / total_lessons) * 100)
+            
+        return Response({
+            'status': status_message,
+            'lesson_id': lesson_id,
+            'progress': {
+                'completed': completed_lessons,
+                'total': total_lessons,
+                'percentage': progress_percentage
+            }
+        })
+        
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_course_progress(request, course_id):
+    """
+    Get the progress of a specific course for the current user
+    """
+    try:
+        user = request.user
+        total_lessons = 0
+        completed_lessons = 0
+        
+        # Determine if it's a school course or engineering course
+        try:
+            # Try to find a school course first
+            course = SchoolCourse.objects.get(id=course_id)
+            is_school_course = True
+        except SchoolCourse.DoesNotExist:
+            # If not found, try engineering course
+            try:
+                course = EngineeringCourse.objects.get(id=course_id)
+                is_school_course = False
+            except EngineeringCourse.DoesNotExist:
+                return Response(
+                    {"error": "Course not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        # Get lesson completion status
+        if is_school_course:
+            # For school course
+            lessons_by_chapter = []
+            for chapter in course.chapters.all():
+                chapter_lessons = chapter.lessons.all()
+                total_lessons += chapter_lessons.count()
+                
+                # Get completed lessons in this chapter
+                completed_lesson_ids = UserLessonProgress.objects.filter(
+                    user=user, 
+                    lesson__chapter=chapter
+                ).values_list('lesson_id', flat=True)
+                
+                chapter_completed = len(completed_lesson_ids)
+                completed_lessons += chapter_completed
+                
+                # Build chapter data with lessons
+                chapter_data = {
+                    'id': chapter.id,
+                    'name': chapter.name,
+                    'total_lessons': chapter_lessons.count(),
+                    'completed_lessons': chapter_completed,
+                    'lessons': [
+                        {
+                            'id': lesson.id,
+                            'title': lesson.title,
+                            'completed': lesson.id in completed_lesson_ids
+                        }
+                        for lesson in chapter_lessons
+                    ]
+                }
+                lessons_by_chapter.append(chapter_data)
+                
+            response_data = {
+                'course': {
+                    'id': str(course.id),
+                    'title': course.title,
+                    'type': 'school'
+                },
+                'progress': {
+                    'completed': completed_lessons,
+                    'total': total_lessons,
+                    'percentage': int((completed_lessons / total_lessons) * 100) if total_lessons > 0 else 0
+                },
+                'chapters': lessons_by_chapter
+            }
+        else:
+            # For engineering course
+            lessons_by_section = []
+            for section in course.sections.all():
+                section_lessons = section.lessons.all()
+                total_lessons += section_lessons.count()
+                
+                # Get completed lessons in this section
+                completed_lesson_ids = UserLessonProgress.objects.filter(
+                    user=user, 
+                    lesson__section=section
+                ).values_list('lesson_id', flat=True)
+                
+                section_completed = len(completed_lesson_ids)
+                completed_lessons += section_completed
+                
+                # Build section data with lessons
+                section_data = {
+                    'id': section.id,
+                    'name': section.name,
+                    'total_lessons': section_lessons.count(),
+                    'completed_lessons': section_completed,
+                    'lessons': [
+                        {
+                            'id': lesson.id,
+                            'title': lesson.title,
+                            'completed': lesson.id in completed_lesson_ids
+                        }
+                        for lesson in section_lessons
+                    ]
+                }
+                lessons_by_section.append(section_data)
+            
+            response_data = {
+                'course': {
+                    'id': str(course.id),
+                    'title': course.title,
+                    'type': 'engineering'
+                },
+                'progress': {
+                    'completed': completed_lessons,
+                    'total': total_lessons,
+                    'percentage': int((completed_lessons / total_lessons) * 100) if total_lessons > 0 else 0
+                },
+                'sections': lessons_by_section
+            }
+        
+        return Response(response_data)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_quiz(request, lesson_id):
+    """
+    Submit quiz answers and calculate score
+    """
+    try:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        user = request.user
+        data = request.data
+        
+        # Get user's answers from request data
+        user_answers = data.get('answers', {})
+        
+        # Get all quiz questions for this lesson
+        quiz_questions = lesson.quiz_questions.all()
+        
+        if not quiz_questions.exists():
+            return Response(
+                {"error": "No quiz questions found for this lesson"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        # Calculate score
+        total_questions = quiz_questions.count()
+        correct_answers = 0
+        
+        # Debug information
+        print(f"Processing quiz submission for lesson: {lesson_id}")
+        print(f"User answers received: {user_answers}")
+        
+        for question in quiz_questions:
+            question_id = str(question.id)
+            user_answer = user_answers.get(question_id)
+            
+            # Parse options if needed
+            options = question.options
+            if isinstance(options, str):
+                try:
+                    import json
+                    options = json.loads(options)
+                except:
+                    options = []
+            
+            if not isinstance(options, list):
+                options = []
+                
+            print(f"Question {question_id}: {question.question}")
+            print(f"Options: {options}")
+            print(f"Correct answer: {question.correct_answer}")
+            print(f"User answer index: {user_answer}")
+            
+            if user_answer is not None:
+                try:
+                    user_answer_index = int(user_answer)
+                    # Make sure the answer index is valid
+                    if user_answer_index >= 0 and user_answer_index < len(options):
+                        # Check if the option at this index matches the correct answer
+                        if options[user_answer_index] == question.correct_answer:
+                            correct_answers += 1
+                            print(f"Correct answer for question {question_id}")
+                        else:
+                            print(f"Wrong answer for question {question_id}")
+                    else:
+                        print(f"Invalid answer index for question {question_id}: {user_answer_index}")
+                except (ValueError, TypeError):
+                    print(f"Invalid answer format for question {question_id}: {user_answer}")
+                    continue
+          # Calculate percentage score
+        percentage_score = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
+        passed = percentage_score >= 80  # 80% passing score
+        
+        # Save quiz result to database
+        quiz_result = QuizResult.objects.create(
+            user=user,
+            lesson=lesson,
+            answers=user_answers,
+            score=correct_answers,
+            total_questions=total_questions,
+            passed=passed
+        )
+            # If quiz passed, mark lesson as complete
+        if passed:
+            progress, created = UserLessonProgress.objects.get_or_create(
+                user=user,
+                lesson=lesson,
+                defaults={'is_completed': True, 'completed_at': timezone.now()}
+            )
+            if not created and not progress.is_completed:
+                progress.is_completed = True
+                progress.completed_at = timezone.now()
+                progress.save()
+        
+        return Response({
+            "id": quiz_result.id,
+            "score": percentage_score,
+            "passed": passed,
+            "correct_answers": correct_answers,
+            "total_questions": total_questions,
+            "submitted_at": quiz_result.submitted_at
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
         )

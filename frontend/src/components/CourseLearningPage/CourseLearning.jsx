@@ -8,12 +8,14 @@ import QuizIntro from './templ/QuizIntro'; // Make sure to import QuizIntro inst
 import InstructionsPage from './templ/InstructionsPage';
 import Sidebar from './Sidebar';
 import axios from 'axios';
+import axiosInstance from '../../utils/axios'; // Import authenticated axios instance
 
 // Update the function signature to accept pathname and onSidebarToggle prop
 const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [course, setCourse] = useState(null);
   const [learningPlans, setLearningPlans] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeChapter, setActiveChapter] = useState(0);
   const [activeLesson, setActiveLesson] = useState(0);
   const [expandedChapters, setExpandedChapters] = useState({});
@@ -22,8 +24,92 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [contentType, setContentType] = useState('video'); // 'video', 'resources', 'quiz', 'instructions'
   const [isAIGeneratedPlan, setIsAIGeneratedPlan] = useState(false);
+  const [lastCreatedPlanId, setLastCreatedPlanId] = useState(null);
   const videoRef = useRef(null);
   const navigate = useNavigate();
+
+  // Helper to fetch a learning plan by ID
+  const fetchLearningPlanById = async (planId) => {
+    try {
+      setLoading(true);
+      console.log('🔍 Fetching learning plan with ID:', planId);
+      const response = await axiosInstance.get(`/api/learning/plans/${planId}/`);
+      const planData = response.data;
+      console.log('📦 Received plan data:', JSON.stringify(planData, null, 2));
+      console.log('🔍 Accessing days from plan_data:', planData.plan_data?.days?.length || 0, 'days found');
+      
+      // Check if planData has the expected structure
+      if (!planData) {
+        throw new Error('Learning plan data is missing');
+      }
+      if (!planData.plan_data) {
+        throw new Error('Learning plan is missing the plan_data structure');
+      }
+      if (!planData.plan_data.days) {
+        throw new Error('Learning plan is missing the days structure');
+      }
+      if (!Array.isArray(planData.plan_data.days)) {
+        throw new Error('Learning plan days must be an array');
+      }
+      if (planData.plan_data.days.length === 0) {
+        throw new Error('Learning plan must contain at least one day');  
+      }
+      
+      // Transform days into chapters
+      const transformedPlan = {
+        id: planData.id,
+        title: planData.title,
+        description: planData.description || "AI-generated learning plan",
+        chapters: planData.plan_data.days.map((day) => ({
+          title: `Day ${day.day}: ${day.topic}`,
+          lessons: (day.videos || []).map((video) => ({
+            title: video.title,
+            type: 'video',
+            videoUrl: video.video_id ? `https://www.youtube.com/embed/${video.video_id}` : 
+              (video.url && video.url.includes('youtube.com/watch?v=') ? 
+                `https://www.youtube.com/embed/${video.url.split('v=')[1].split('&')[0]}` : 
+                video.url || ''),
+            description: video.description || "",
+            completed: false,
+            isAIGenerated: true
+          })),
+        })),
+      };
+      setCourse(transformedPlan);
+      setIsAIGeneratedPlan(true);
+      if (transformedPlan.chapters.length > 0) {
+        setExpandedChapters({ 0: true });
+      }
+    } catch (error) {
+      console.error('Error fetching learning plan by ID:', error);
+      setError(error.message || 'Failed to load learning plan');
+      setCourse(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper to generate a new AI learning plan and fetch it immediately
+  const generateAndFetchLearningPlan = async (goal, days=null) => {
+    try {
+      setLoading(true);
+      const response = await axiosInstance.post('/api/learning/generate-learning-plan/', { goal, days });
+      const newPlan = response.data;
+      if (newPlan && newPlan.id) {
+        setLastCreatedPlanId(newPlan.id);
+        // Immediately fetch the new plan by its ID
+        await fetchLearningPlanById(newPlan.id);
+      } else {
+        console.error('No plan ID returned after creation:', newPlan);
+      }
+    } catch (error) {
+      console.error('Error creating new AI learning plan:', error);
+      setError(error.message || 'Failed to generate learning plan');
+      setCourse(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Extract URL path to determine course type and proper API endpoint
@@ -34,67 +120,31 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const learningPlanId = isDirectLearningPlanRoute ? pathParts[1] : null;
     
     // Check if this is an AI-generated learning plan by UUID format
-    const isLearningPlanId = courseId && courseId.length === 36 && courseId.includes('-') || // UUID format check
-                           learningPlanId !== null; // Direct learning route check
+    const isLearningPlanId = (courseId && courseId.length === 36 && courseId.includes('-')) || // UUID format check
+                             (learningPlanId !== null); // Direct learning route check
 
     const fetchData = async () => {
       try {
         setLoading(true);
         
         // Check first if this is an AI-generated learning plan
-        if (isLearningPlanId) {
+        if (isLearningPlanId || lastCreatedPlanId) {
           try {
-            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
-            const planId = learningPlanId || courseId;
+            // Use the last created plan ID if available (after creation)
+            const planId = lastCreatedPlanId || learningPlanId || courseId;
             console.log(`🔍 Fetching AI learning plan with ID: ${planId}`);
-            console.log(`🌐 Making request to: ${API_BASE_URL}/learning/plans/${planId}/`);
-            
-            const response = await axios.get(`${API_BASE_URL}/learning/plans/${planId}/`);
-            const planData = response.data;
-            console.log("✅ Fetched AI Learning Plan successfully:", planData);
-            
-            // Transform learning plan days into chapters for the sidebar
-            const transformedPlan = {
-              id: planData.id,
-              title: planData.title,
-              description: planData.description || "AI-generated learning plan",
-              chapters: planData.days.map((day) => ({
-                title: `Day ${day.day}: ${day.topic}`,
-                lessons: day.videos.map((video) => ({
-                  title: video.title,
-                  type: 'video',
-                  videoUrl: video.video_id ? `https://www.youtube.com/embed/${video.video_id}` : 
-                    (video.url && video.url.includes('youtube.com/watch?v=') ? 
-                      `https://www.youtube.com/embed/${video.url.split('v=')[1].split('&')[0]}` : 
-                      video.url || ''),
-                  description: video.description || "",
-                  completed: false,
-                  isAIGenerated: true
-                })),
-              })),
-            };
-            
-            console.log("🔄 Transformed learning plan:", transformedPlan);
-            setCourse(transformedPlan);
-            setIsAIGeneratedPlan(true);
-            
-            // Expand the first chapter by default
-            if (transformedPlan.chapters.length > 0) {
-              setExpandedChapters({ 0: true });
-            }
-            
+            console.log(`🌐 Making request to: /api/learning/plans/${planId}/`);
+            await fetchLearningPlanById(planId);
             console.log("✅ Learning plan loaded successfully!");
             return; // Exit early since we successfully loaded the plan
           } catch (error) {
-            console.error('❌ Error fetching AI learning plan:', error);
-            console.error('Error details:', {
-              message: error.message,
-              response: error.response?.data,
-              status: error.response?.status,
-              url: error.config?.url
-            });
-            // If AI plan fetch fails, try regular course as fallback
-            await fetchRegularCourse(pathParts);
+            const errorMessage = error.response?.data?.detail || error.message || 'Failed to load AI learning plan';
+            console.error('❌ Error fetching AI learning plan:', errorMessage);
+            setError(errorMessage);
+            // Only try regular course as fallback if it's not explicitly an AI plan
+            if (!isLearningPlanId) {
+              await fetchRegularCourse(pathParts);
+            }
           }
         } else {
           // Fetch regular course data
@@ -143,14 +193,14 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           throw new Error("Could not determine API URL from path");
         }
         
-        const response = await axios.get(apiUrl);
+        const response = await axiosInstance.get(apiUrl);
         let courseData;
         
         if (isSchoolCourse && Array.isArray(response.data) && response.data.length > 0) {
           // For school courses, we get a list, so take the first matching course
           courseData = response.data[0];
           // Now fetch the complete course details
-          const detailResponse = await axios.get(`${API_BASE_URL}/courses/school/${courseData.id}/`);
+          const detailResponse = await axiosInstance.get(`/courses/school/${courseData.id}/`);
           courseData = detailResponse.data;
         } else {
           courseData = response.data;
@@ -198,45 +248,23 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         fetchAILearningPlans();
       } catch (error) {
         console.error('❌ Error fetching course data:', error);
-        console.error('Error details:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-          url: error.config?.url,
-          isLearningPlanId: isLearningPlanId
-        });
+        const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
+        setError(errorMessage);
+        setCourse(null);
         
-        // Create a fallback course if all attempts fail
-        const fallbackCourse = {
-          id: courseId,
-          title: "Placeholder Course",
-          description: "We're having trouble loading the course content. Please try again later.",
-          chapters: [{
-            title: "Introduction",
-            lessons: [{
-              title: "Getting Started",
-              type: 'video',
-              videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ", // Placeholder video
-              description: "Placeholder content",
-              completed: false
-            }]
-          }]
-        };
-        
-        setCourse(fallbackCourse);
-        
-        // Check if it was a learning plan that couldn't be loaded
-        if (isLearningPlanId) {
-          console.log("🚨 Setting contentType to 'notFound' for learning plan");
-          setContentType('notFound'); // Special content type for not found learning plans
+        // Check if error response indicates ID belongs to a learning plan
+        if (error.response?.data?.isLearningPlanId) {
+          setError('This learning plan is not available. It may have been deleted or you may not have permission to access it.');
+        } else if (isLearningPlanId) {
+          setError('Unable to load the learning plan. Please check if the ID is correct.');
+          setContentType('notFound');
         }
       }
     };
     
     const fetchAILearningPlans = async () => {
       try {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
-        const response = await axios.get(`${API_BASE_URL}/learning/plans/`);
+        const response = await axiosInstance.get('/api/learning/plans/');
         
         // Check if response is valid
         if (response.status === 200 && Array.isArray(response.data)) {
@@ -249,6 +277,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
       } catch (error) {
         console.error('Error fetching AI learning plans:', error);
+        const errorMessage = error.response?.data?.detail || error.message || 'Failed to load learning plans';
+        console.warn('AI Learning Plans Error:', errorMessage);
         setLearningPlans([]); // Set empty array to prevent undefined errors
       }
     };
@@ -375,17 +405,62 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     }
   }, [sidebarVisible, onSidebarToggle]);
 
-  // Loading state
+  // Loading and error states
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-96">
+      <div className="flex flex-col justify-center items-center h-96 space-y-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        <p className="text-gray-600">Loading your learning content...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 p-8">
+        <div className="mb-6 text-red-500">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Oops! Something went wrong</h2>
+        <p className="text-gray-600 text-center mb-6">{error}</p>
+        <div className="flex space-x-4">
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            Try Again
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            Go Home
+          </button>
+        </div>
       </div>
     );
   }
 
   if (!course) {
-    return <div className="p-8 text-center">Course not found</div>;
+    return (
+      <div className="flex flex-col items-center justify-center h-96 p-8">
+        <div className="mb-6 text-gray-400">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Course Not Found</h2>
+        <p className="text-gray-600 text-center mb-6">The course you're looking for could not be found. It may have been removed or you might not have access to it.</p>
+        <button
+          onClick={() => navigate('/')}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+        >
+          Browse Courses
+        </button>
+      </div>
+    );
   }
 
   const currentLesson = getCurrentLesson();

@@ -399,6 +399,19 @@ const ChatbotPage = () => {
                 formattedContent += '\n';
               }
             });
+
+            // --- AUTO SAVE AI-GENERATED PLAN TO BACKEND ---
+            import("./ChatbotAPI").then(({ saveLearningPlanToDatabase }) => {
+              saveLearningPlanToDatabase(planResult.data)
+                .then(() => {
+                  if (window.toast) window.toast.success("AI learning plan saved to your account!");
+                })
+                .catch(() => {
+                  if (window.toast) window.toast.error("Failed to save AI plan. Please log in.");
+                });
+            });
+            // --- END AUTO SAVE ---
+
           } else {
             // Format from direct API response
             formattedContent = `# Learning Path: ${planResult.data.title}\n\n`;
