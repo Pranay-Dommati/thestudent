@@ -882,23 +882,11 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                             </ul>
                           </div>
                         )}
-                      </div>
-                    ) : (
-                      // Generic fallback content
+                      </div>                    ) : (                      // Simple message when no content is provided
                       <div>
                         <h3 className="text-lg font-semibold mb-4">About This Lesson</h3>
-                        <p className="text-gray-700 mb-4">
-                          This lesson covers the essential concepts of {currentLesson?.title || 'this topic'}. 
-                          You'll learn the fundamentals and how to apply them effectively.
-                        </p>
-                        <div className="mt-4">
-                          <h4 className="font-medium mb-2">Learning Objectives:</h4>
-                          <ul className="list-disc pl-5 space-y-2 text-gray-700">
-                            <li>Understand the key concepts and principles</li>
-                            <li>Learn practical applications and techniques</li>
-                            <li>Gain hands-on experience through examples</li>
-                            <li>Build confidence in applying the knowledge</li>
-                          </ul>
+                        <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+                          <p className="text-gray-500">No description is available for this lesson.</p>
                         </div>
                       </div>
                     )}
