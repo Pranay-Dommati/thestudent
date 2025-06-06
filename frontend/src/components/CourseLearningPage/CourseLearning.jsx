@@ -23,7 +23,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [activeChapter, setActiveChapter] = useState(0);
   const [activeLesson, setActiveLesson] = useState(0);
   const [expandedChapters, setExpandedChapters] = useState({});
-  const [activeTab, setActiveTab] = useState('content');
+  const [activeTab, setActiveTab] = useState('about');
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [contentType, setContentType] = useState('video'); // 'video', 'resources', 'quiz', 'instructions'
@@ -756,19 +756,18 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                   title={currentLesson?.title}
                 />
               </div>
-              
-              {/* Content Tabs */}
+                {/* Content Tabs */}
               <div className="border-b border-gray-200 mb-6">
                 <nav className="-mb-px flex space-x-8">
                   <button
-                    onClick={() => setActiveTab('content')}
+                    onClick={() => setActiveTab('about')}
                     className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === 'content'
+                      activeTab === 'about'
                         ? 'border-indigo-500 text-indigo-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                   >
-                    Content
+                    About
                   </button>
                   <button
                     onClick={() => setActiveTab('resources')}
@@ -782,67 +781,131 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                   </button>
                 </nav>
               </div>
-              
-              {/* Tab Content */}
-              <div className="mb-8">
-                {activeTab === 'content' && (
-                  <div className="prose max-w-none">
-                    {isAIGeneratedPlan ? (
-                      // AI-generated content description
+                {/* Tab Content */}
+              <div className="mb-8">                {activeTab === 'about' && (
+                  <div className="prose prose-lg max-w-none markdown-body">                    {currentLesson?.aboutLesson ? (
+                      // Use actual lesson content if available with proper markdown components
                       <div>
-                        <p className="text-gray-700">
-                          This video was selected as part of your AI-generated learning plan on {course.title}. 
-                          It covers key concepts about {currentLesson.title.toLowerCase()}.
-                        </p>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            ul: ({node, ...props}) => <ul className="list-disc pl-5 my-4 space-y-2" {...props} />,
+                            ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-4 space-y-2" {...props} />,
+                            li: ({node, children, ...props}) => {
+                              // Skip rendering empty list items
+                              if (!children || (Array.isArray(children) && children.length === 0) || 
+                                  (typeof children === 'string' && children.trim() === '')) {
+                                return null;
+                              }
+                              return <li className="ml-2 my-1" {...props}>{children}</li>;
+                            },
+                            h1: ({node, ...props}) => <h1 className="text-2xl font-bold my-4" {...props} />,
+                            h2: ({node, ...props}) => <h2 className="text-xl font-bold my-3" {...props} />,
+                            h3: ({node, ...props}) => <h3 className="text-lg font-bold my-3" {...props} />,
+                            h4: ({node, ...props}) => <h4 className="text-base font-bold my-2" {...props} />,
+                            h5: ({node, ...props}) => <h5 className="text-sm font-bold my-2" {...props} />,
+                            h6: ({node, ...props}) => <h6 className="text-xs font-bold my-2" {...props} />,
+                            p: ({node, children, ...props}) => {
+                              // Skip rendering empty paragraphs
+                              if (!children || (Array.isArray(children) && children.length === 0) || 
+                                  (typeof children === 'string' && children.trim() === '')) {
+                                return null;
+                              }
+                              // Enhanced paragraph handling for plain text with line breaks
+                              return <p className="my-3 leading-relaxed" {...props}>{children}</p>;
+                            },
+                            // Add table rendering components
+                            table: ({node, ...props}) => <table className="min-w-full border border-gray-200 my-4" {...props} />,
+                            thead: ({node, ...props}) => <thead className="bg-gray-50" {...props} />,
+                            tbody: ({node, ...props}) => <tbody className="divide-y divide-gray-200" {...props} />,
+                            tr: ({node, ...props}) => <tr className="hover:bg-gray-50" {...props} />,
+                            th: ({node, ...props}) => <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 uppercase tracking-wider border border-gray-200" {...props} />,
+                            td: ({node, ...props}) => <td className="px-4 py-2 text-sm text-gray-500 border border-gray-200" {...props} />,
+                            code: ({node, inline, className, children, ...props}) => {
+                              if (inline) {
+                                return <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>
+                              }
+                              return (
+                                <div className="bg-gray-800 rounded-md my-4">
+                                  <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700">
+                                    <span className="text-xs text-gray-400">code</span>
+                                  </div>
+                                  <pre className="p-4 overflow-x-auto">
+                                    <code className="text-green-400 text-sm" {...props}>{children}</code>
+                                  </pre>
+                                </div>
+                              )
+                            },
+                            pre: ({node, children, ...props}) => {
+                              // Return children directly to let code component handle styling
+                              return <>{children}</>;
+                            },
+                            blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-300 pl-4 my-4 italic text-gray-600" {...props} />,
+                            strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                            em: ({node, ...props}) => <em className="italic" {...props} />,
+                            a: ({node, ...props}) => <a className="text-blue-600 hover:text-blue-800 underline" {...props} />,                            hr: ({node, ...props}) => <hr className="my-6 border-gray-300" {...props} />,
+                          }}
+                        >
+                          {currentLesson.aboutLesson}
+                        </ReactMarkdown>
+                      </div>
+                    ) : currentLesson?.description ? (
+                      // Fallback to description if aboutLesson is not available
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">About This Lesson</h3>
+                        <p className="text-gray-700 mb-4">{currentLesson.description}</p>
                         
-                        {currentLesson.description && (
-                          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
-                            <h4 className="font-medium mb-2">Video Description</h4>
-                            <p className="text-sm text-gray-600">{currentLesson.description}</p>
+                        {isAIGeneratedPlan ? (
+                          <div className="mt-6 p-4 border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-md">
+                            <h4 className="font-semibold text-indigo-800 flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                              Learning Tips
+                            </h4>
+                            <ul className="list-disc pl-5 space-y-2 mt-2 text-gray-700">
+                              <li>Take notes on key concepts as you watch</li>
+                              <li>Try to implement what you learn right away</li>
+                              <li>Revisit challenging sections multiple times</li>
+                              <li>Continue to the next video once you understand the material</li>
+                            </ul>
+                          </div>
+                        ) : (
+                          <div className="mt-4">
+                            <h4 className="font-medium mb-2">What you'll learn:</h4>
+                            <ul className="list-disc pl-5 space-y-2 text-gray-700">
+                              <li>Understanding the core concepts of {currentLesson.title}</li>
+                              <li>Practical applications and real-world examples</li>
+                              <li>Best practices and common techniques</li>
+                              <li>Key takeaways for your learning journey</li>
+                            </ul>
                           </div>
                         )}
-                        
-                        <div className="mt-6 p-4 border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-md">
-                          <h4 className="font-semibold text-indigo-800 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                            Learning Tips
-                          </h4>
-                          <ul className="list-disc pl-5 space-y-2 mt-2 text-gray-700">
-                            <li>Take notes on key concepts as you watch</li>
-                            <li>Try to implement what you learn right away</li>
-                            <li>Revisit challenging sections multiple times</li>
-                            <li>Continue to the next video once you understand the material</li>
-                          </ul>
-                        </div>
                       </div>
                     ) : (
-                      // Standard content description
+                      // Generic fallback content
                       <div>
-                        <p className="text-gray-700">
-                          This lesson covers the essential concepts of {currentLesson.title.toLowerCase()}. 
-                          You'll learn the fundamentals and how to apply them in real-world scenarios.
+                        <h3 className="text-lg font-semibold mb-4">About This Lesson</h3>
+                        <p className="text-gray-700 mb-4">
+                          This lesson covers the essential concepts of {currentLesson?.title || 'this topic'}. 
+                          You'll learn the fundamentals and how to apply them effectively.
                         </p>
-                        <ul className="list-disc pl-5 space-y-2 mt-4 text-gray-700">
-                          <li>Understanding the core concepts of {currentLesson.title}</li>
-                          <li>How to implement these patterns in your own projects</li>
-                          <li>Best practices and common pitfalls to avoid</li>
-                          <li>Integration with other related technologies</li>
-                        </ul>
-                        <p>
-                          After completing this lesson, you'll have a solid understanding of how to use {currentLesson.title.toLowerCase()} 
-                          in your own projects and applications.
-                        </p>
+                        <div className="mt-4">
+                          <h4 className="font-medium mb-2">Learning Objectives:</h4>
+                          <ul className="list-disc pl-5 space-y-2 text-gray-700">
+                            <li>Understand the key concepts and principles</li>
+                            <li>Learn practical applications and techniques</li>
+                            <li>Gain hands-on experience through examples</li>
+                            <li>Build confidence in applying the knowledge</li>
+                          </ul>
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
                 
                 {activeTab === 'resources' && (
-                  <div className="space-y-6">
-                    <p className="text-gray-600">Additional resources and materials for this lesson will be available here.</p>
-                  </div>
+                  <ResourcesPage lessonResources={currentLesson?.resources} />
                 )}
               </div>
               

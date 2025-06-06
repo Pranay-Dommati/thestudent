@@ -105,12 +105,15 @@ const LessonForm = ({
           
           <div className="space-y-2">
             <label className="block text-gray-700">
-              About This Lesson <span className="text-xs text-gray-500">(Supports Markdown)</span>
-            </label>
-            <MDEditor
-              value={lesson.aboutLesson}
-              onChange={(e) => handleLessonChange(sectionIndex, lessonIndex, 'aboutLesson', e)}
-              height={200}
+              About This Lesson <span className="text-xs text-gray-500">(Supports Markdown)</span>            </label>            <MDEditor              value={lesson.aboutLesson}
+              onChange={(e) => handleLessonChange(sectionIndex, lessonIndex, 'aboutLesson', e)}              height={200}
+              preview="edit"
+              visibleDragbar={true}
+              visiableDragbar={true}
+              style={{ fontSize: '16px' }}
+              previewOptions={{
+                style: { padding: '20px', fontSize: '16px' }
+              }}
             />
             <div className="text-xs text-gray-500 italic">
               Tip: Use markdown syntax for formatting - **bold**, *italic*, ## headings, - list items, [links](url), etc.
@@ -175,13 +178,15 @@ const LessonForm = ({
       {lesson.type === 'reading' && (
         <div className="space-y-2">
           <label className="block text-gray-700">
-            Content <span className="text-red-500">*</span>
-          </label>
-          <MDEditor
-            value={lesson.aboutLesson}
-            onChange={(e) => handleLessonChange(sectionIndex, lessonIndex, 'aboutLesson', e)}
-            height={300}
+            Content <span className="text-red-500">*</span>          </label>          <MDEditor            value={lesson.aboutLesson}
+            onChange={(e) => handleLessonChange(sectionIndex, lessonIndex, 'aboutLesson', e)}              height={300}
             preview="edit"
+            visibleDragbar={true}
+            visiableDragbar={true}
+            style={{ fontSize: '16px' }}
+            previewOptions={{
+              style: { padding: '20px', fontSize: '16px' }
+            }}
             hideToolbar={false}
             enableScroll={true}
             textareaProps={{

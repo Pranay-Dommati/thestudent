@@ -1,7 +1,12 @@
-import React from 'react';
-import { FaFileAlt, FaExternalLinkAlt, FaDownload, FaFilePdf, FaFileWord, FaFileCode } from 'react-icons/fa';
+import React, { useState } from 'react';
+import { FaFileAlt, FaExternalLinkAlt, FaDownload, FaFilePdf, FaFileWord, FaFileCode, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 
 const ResourcesPage = ({ lessonResources }) => {
+  const [downloadableOpen, setDownloadableOpen] = useState(false);
+  const [internetOpen, setInternetOpen] = useState(false);
+  
+  const toggleDownloadable = () => setDownloadableOpen(!downloadableOpen);
+  const toggleInternet = () => setInternetOpen(!internetOpen);
   // Use lesson resources if available, otherwise fall back to mock data
   const hasResources = lessonResources && (
     (lessonResources.downloadable && lessonResources.downloadable.length > 0) ||
@@ -80,7 +85,52 @@ const ResourcesPage = ({ lessonResources }) => {
       default: return <FaFileAlt className="text-gray-500" />;
     }
   };
-
+  // Separate resources by type
+  const downloadableResources = resources.filter(resource => resource.isDownloadable);
+  const internetResources = resources.filter(resource => !resource.isDownloadable);
+  
+  // Display a specific message when no resources are available
+  const noResourcesMessage = (
+    <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+      <p className="text-gray-500">No resources available for this lesson.</p>
+    </div>
+  );  // Render a resource item
+  const renderResourceItem = (resource) => (
+    <div 
+      className="p-4 bg-white hover:bg-gray-50 transition-colors"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center">
+          <div className="p-2.5 bg-gray-100 rounded-lg mr-4">
+            {getResourceIcon(resource.type)}
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-800">{resource.title}</h3>
+            <p className="text-gray-600 text-sm">{resource.description}</p>
+          </div>
+        </div>
+        {resource.isDownloadable === false || resource.type === 'link' ? (
+          <a 
+            href={resource.downloadUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="ml-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center whitespace-nowrap"
+          >
+            <FaExternalLinkAlt className="mr-2" /> Visit Resource
+          </a>
+        ) : (
+          <a 
+            href={resource.downloadUrl}
+            className="ml-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center whitespace-nowrap"
+            download
+          >
+            <FaDownload className="mr-2" /> Download
+          </a>
+        )}
+      </div>
+    </div>
+  );
+  
   return (
     <div className="p-6">
       <header className="mb-8">
@@ -90,43 +140,71 @@ const ResourcesPage = ({ lessonResources }) => {
         </p>
       </header>
 
-      <div className="space-y-3">
-        {resources.map(resource => (
-          <div 
-            key={resource.id} 
-            className="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-md transition-shadow duration-300"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="p-2.5 bg-gray-100 rounded-lg mr-4">
-                  {getResourceIcon(resource.type)}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-800">{resource.title}</h3>
-                  <p className="text-gray-600 text-sm">{resource.description}</p>
-                </div>
+      {resources.length === 0 ? (
+        noResourcesMessage
+      ) : (
+        <div className="space-y-6">
+          {/* Downloadable Resources Section */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <button 
+              onClick={toggleDownloadable}
+              className="w-full flex items-center justify-between p-4 bg-gray-50 transition-colors hover:bg-gray-100"
+            >
+              <h2 className="text-xl font-semibold text-gray-800">
+                Downloadable Resources
+              </h2>
+              {downloadableOpen ? 
+                <FaChevronUp className="text-gray-600" /> : 
+                <FaChevronDown className="text-gray-600" />
+              }
+            </button>
+            
+            {downloadableOpen && (
+              <div>
+                {downloadableResources.length > 0 ? (
+                  <div className="divide-y divide-gray-200">
+                    {downloadableResources.map((resource) => (
+                      <div key={resource.id}>{renderResourceItem(resource)}</div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 p-4 bg-white">No downloadable resources available.</p>
+                )}
               </div>
-                {resource.isDownloadable === false || resource.type === 'link' ? (
-                <a 
-                  href={resource.downloadUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="ml-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center whitespace-nowrap"
-                >
-                  <FaExternalLinkAlt className="mr-2" /> Visit Resource
-                </a>
-              ) : (
-                <a 
-                  href={resource.downloadUrl}
-                  className="ml-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center whitespace-nowrap"
-                >
-                  <FaDownload className="mr-2" /> Download
-                </a>
-              )}
-            </div>
+            )}
           </div>
-        ))}
-      </div>
+
+          {/* Internet Resources Section */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <button 
+              onClick={toggleInternet}
+              className="w-full flex items-center justify-between p-4 bg-gray-50 transition-colors hover:bg-gray-100"
+            >
+              <h2 className="text-xl font-semibold text-gray-800">
+                Internet Resources
+              </h2>
+              {internetOpen ? 
+                <FaChevronUp className="text-gray-600" /> : 
+                <FaChevronDown className="text-gray-600" />
+              }
+            </button>
+            
+            {internetOpen && (
+              <div>
+                {internetResources.length > 0 ? (
+                  <div className="divide-y divide-gray-200">
+                    {internetResources.map((resource) => (
+                      <div key={resource.id}>{renderResourceItem(resource)}</div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 p-4 bg-white">No internet resources available.</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
