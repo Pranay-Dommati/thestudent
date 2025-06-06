@@ -210,8 +210,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           isSchoolCourse = true;
           const classLevel = pathParts.find(part => ['10th', '11th', '12th'].includes(part));
           const board = pathParts.find(part => ['cbse', 'state'].includes(part));
-          
-          // Handle state board case which has an additional parameter
+            // Handle state board case which has an additional parameter
           if (board === 'state') {
             const stateIndex = pathParts.indexOf('state');
             if (stateIndex !== -1 && stateIndex + 1 < pathParts.length) {
@@ -223,7 +222,9 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             const subjectIndex = pathParts.indexOf(board) + 1;
             if (subjectIndex < pathParts.length) {
               const subjectId = pathParts[subjectIndex];
-              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&subject=${subjectId}`;
+              // Convert subjectId to lowercase to ensure case-insensitive matching with database
+              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&subject=${subjectId.toLowerCase()}`;
+              console.log(`📚 Fetching school course with: class=${classLevel}, board=${board}, subject=${subjectId.toLowerCase()}`);
             }
           }
         } else {

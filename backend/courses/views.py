@@ -439,11 +439,12 @@ def list_school_courses(request):
         class_level = request.query_params.get('class', '')
         board = request.query_params.get('board', '')
         state = request.query_params.get('state', '')
+        subject = request.query_params.get('subject', '')
 
-        print(f"Filtering courses: class={class_level}, board={board}, state={state}")
+        print(f"Filtering courses: class={class_level}, board={board}, state={state}, subject={subject}")
 
         queryset = SchoolCourse.objects.all()
-
+        
         # Apply filters
         if class_level:
             queryset = queryset.filter(class_level=class_level)
@@ -451,6 +452,22 @@ def list_school_courses(request):
         if board:
             queryset = queryset.filter(board__iexact=board)
 
+        if subject:
+            # Log the subject being searched for debugging
+            print(f"Searching for subject: '{subject}'")
+            
+            # Use iexact for case-insensitive but exact subject matching
+            queryset = queryset.filter(subject__iexact=subject)
+            
+            # If no results with iexact, try icontains as fallback
+            if queryset.count() == 0:
+                print(f"No exact matches found for subject '{subject}', trying partial match")
+                queryset = SchoolCourse.objects.filter(
+                    class_level=class_level,
+                    board__iexact=board,
+                    subject__icontains=subject
+                )
+            
         if board == 'state' and state:
             # Use icontains for more flexible state matching
             queryset = queryset.filter(state__icontains=state)
