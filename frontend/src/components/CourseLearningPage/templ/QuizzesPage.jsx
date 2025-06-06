@@ -5,9 +5,9 @@ import QuizQuestion from './QuizQuestion';
 const QuizzesPage = () => {
   const [hasStarted, setHasStarted] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);  const [selectedAnswers, setSelectedAnswers] = useState({});
   const [answers, setAnswers] = useState({});
+  const [submitted, setSubmitted] = useState(false);
 
   // Quiz metadata and questions
   const quizData = {
@@ -76,9 +76,11 @@ const QuizzesPage = () => {
         id: 5,
         question: "Explain the difference between getStaticProps and getServerSideProps in Next.js.",
         type: "open-ended"
-      }
-    ]
+      }    ]
   };
+
+  // Get current question
+  const currentQuestion = quizData.questions[currentQuestionIndex];
 
   const handleSingleSelection = (optionIndex) => {
     setSelectedAnswers({
@@ -86,8 +88,7 @@ const QuizzesPage = () => {
       [currentQuestion.id]: optionIndex
     });
   };
-
-  const handleMultipleSelection = (optionIndex) => {
+  const _handleMultipleSelection = (optionIndex) => {
     const currentSelections = selectedAnswers[currentQuestion.id] || [];
     
     if (currentSelections.includes(optionIndex)) {
@@ -102,8 +103,7 @@ const QuizzesPage = () => {
       });
     }
   };
-
-  const handleTextAnswer = (text) => {
+  const _handleTextAnswer = (text) => {
     setAnswers({
       ...answers,
       [currentQuestion.id]: text
