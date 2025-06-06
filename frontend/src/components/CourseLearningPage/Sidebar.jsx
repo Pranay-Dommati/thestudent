@@ -82,48 +82,26 @@ const Sidebar = ({
           </div>
         </div>
         
-        {/* AI Learning Plans Section (only show when viewing a regular course) */}
-        {!isAIGeneratedPlan && learningPlans.length > 0 && (
-          <div className="border-b border-gray-200 p-4">
-            <div className="flex items-center mb-3">
-              <FaRobot className="text-indigo-600 mr-2" />
-              <h3 className="font-semibold text-gray-800">AI Learning Plans</h3>
-            </div>
-            <div className="space-y-2">
-              <div className="text-xs text-gray-500 mb-2">
-                Your personalized learning journeys:
-              </div>
-              {learningPlans.map((plan) => (
-                <button
-                  key={plan.id}
-                  onClick={() => navigate(`/learning/${plan.id}`)}
-                  className="w-full p-3 text-left text-sm bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 rounded-md flex items-center transition-colors border border-indigo-100"
-                >
-                  <span className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs mr-3 border border-indigo-200">
-                    <FaRobot className="text-sm" />
-                  </span>
-                  <div>
-                    <span className="font-medium text-indigo-800 block">{plan.title}</span>
-                    <span className="text-xs text-gray-500 mt-1 block">Tap to continue learning</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Removed AI Learning Plans Section to maintain clear separation between AI and manual courses */}
         
-        {/* Current Plan Type Indicator */}
-        <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+        {/* Current Plan Type Indicator - Enhanced for better separation */}
+        <div className={`px-4 py-3 border-b border-gray-200 ${isAIGeneratedPlan ? 'bg-gradient-to-r from-indigo-50 to-blue-50' : 'bg-gray-50'}`}>
           <div className="flex items-center">
             {isAIGeneratedPlan ? (
               <>
                 <FaRobot className="text-indigo-600 mr-2" />
-                <span className="text-sm font-medium text-gray-700">AI-Generated Learning Plan</span>
+                <div>
+                  <span className="text-sm font-medium text-indigo-800">AI-Generated Learning Plan</span>
+                  <p className="text-xs text-indigo-600">Personalized content curated by AI</p>
+                </div>
               </>
             ) : (
               <>
-                <FaBook className="text-indigo-600 mr-2" />
-                <span className="text-sm font-medium text-gray-700">Course Content</span>
+                <FaBook className="text-gray-600 mr-2" />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Manual Course Content</span>
+                  <p className="text-xs text-gray-500">Structured curriculum and lessons</p>
+                </div>
               </>
             )}
           </div>

@@ -38,18 +38,49 @@ const SavedPlaylists = () => {
     }
   };
   // Transform learning plans to course format for display
-  const courses = Array.isArray(learningPlans) ? learningPlans.map(plan => ({
-    id: plan.id,
-    title: plan.title,
-    instructor: 'AI Generated',
-    progress: plan.is_completed ? 100 : 0, // Simple progress calculation
-    thumbnail: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop',
-    duration: `${plan.duration_days} days`,
-    difficulty: plan.difficulty_level,
-    category: plan.category,
-    totalVideos: plan.total_videos,
-    daysCount: plan.days_count
-  })) : [];
+  const courses = Array.isArray(learningPlans) ? learningPlans.map(plan => {
+    // Calculate actual progress based on completed lessons
+    let progressPercentage = 0;
+    
+    if (plan.plan_data && plan.plan_data.days && plan.plan_data.progress) {
+      const progress = plan.plan_data.progress;
+      let totalLessons = 0;
+      let completedLessons = 0;
+      
+      // Count total lessons and completed lessons
+      plan.plan_data.days.forEach((day, dayIndex) => {
+        if (day.videos) {
+          day.videos.forEach((video, videoIndex) => {
+            totalLessons++;
+            const lessonKey = `day_${day.day}_video_${videoIndex}`;
+            if (progress[lessonKey]) {
+              completedLessons++;
+            }
+          });
+        }
+      });
+      
+      if (totalLessons > 0) {
+        progressPercentage = Math.round((completedLessons / totalLessons) * 100);
+      }
+    } else if (plan.is_completed) {
+      // Fallback to simple binary progress if no detailed progress data
+      progressPercentage = 100;
+    }
+    
+    return {
+      id: plan.id,
+      title: plan.title,
+      instructor: 'AI Generated',
+      progress: progressPercentage,
+      thumbnail: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop',
+      duration: `${plan.duration_days} days`,
+      difficulty: plan.difficulty_level,
+      category: plan.category,
+      totalVideos: plan.total_videos,
+      daysCount: plan.days_count
+    };
+  }) : [];
 
   // Progress Circle Component
   const ProgressCircle = ({ progress }) => {

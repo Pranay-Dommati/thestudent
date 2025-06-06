@@ -25,8 +25,45 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [contentType, setContentType] = useState('video'); // 'video', 'resources', 'quiz', 'instructions'
   const [isAIGeneratedPlan, setIsAIGeneratedPlan] = useState(false);
   const [lastCreatedPlanId, setLastCreatedPlanId] = useState(null);
-  const videoRef = useRef(null);
-  const navigate = useNavigate();
+  const videoRef = useRef(null);  const navigate = useNavigate();
+
+  // Helper function to update AI learning plan progress
+  const updateAILearningPlanProgress = async (planId, lessonId, isCompleted) => {
+    try {
+      // Get current progress data
+      const currentPlan = await axiosInstance.get(`/api/learning/plans/${planId}/`);
+      const currentProgress = currentPlan.data.plan_data.progress || {};
+      
+      // Update the specific lesson progress
+      const updatedProgress = {
+        ...currentProgress,
+        [lessonId]: isCompleted
+      };
+      
+      // Calculate overall completion
+      const allLessons = course.chapters.reduce((acc, chapter) => {
+        return acc.concat(chapter.lessons.map(lesson => lesson.id));
+      }, []);
+      
+      const completedLessonsCount = allLessons.filter(lessonKey => updatedProgress[lessonKey]).length;
+      const totalLessonsCount = allLessons.length;
+      const isOverallCompleted = totalLessonsCount > 0 && completedLessonsCount === totalLessonsCount;
+      
+      // Send progress update to backend
+      await axiosInstance.patch(`/api/learning/update-progress/${planId}/`, {
+        plan_data: {
+          progress: updatedProgress
+        },
+        is_completed: isOverallCompleted
+      });
+      
+      console.log(`Updated AI learning plan progress: ${completedLessonsCount}/${totalLessonsCount} lessons completed`);
+      
+    } catch (error) {
+      console.error('Error updating AI learning plan progress:', error);
+      throw error; // Re-throw so calling function can handle it
+    }
+  };
 
   // Helper to fetch a learning plan by ID
   const fetchLearningPlanById = async (planId) => {
@@ -54,25 +91,37 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       if (planData.plan_data.days.length === 0) {
         throw new Error('Learning plan must contain at least one day');  
       }
+        // Load existing progress data if available
+      const existingProgress = planData.plan_data.progress || {};
       
-      // Transform days into chapters
+      // Transform days into chapters with progress loading
       const transformedPlan = {
         id: planData.id,
         title: planData.title,
         description: planData.description || "AI-generated learning plan",
-        chapters: planData.plan_data.days.map((day) => ({
+        chapters: planData.plan_data.days.map((day, dayIndex) => ({
           title: `Day ${day.day}: ${day.topic}`,
-          lessons: (day.videos || []).map((video) => ({
-            title: video.title,
-            type: 'video',
-            videoUrl: video.video_id ? `https://www.youtube.com/embed/${video.video_id}` : 
-              (video.url && video.url.includes('youtube.com/watch?v=') ? 
-                `https://www.youtube.com/embed/${video.url.split('v=')[1].split('&')[0]}` : 
-                video.url || ''),
-            description: video.description || "",
-            completed: false,
-            isAIGenerated: true
-          })),
+          lessons: (day.videos || []).map((video, videoIndex) => {
+            // Create unique lesson identifier for AI learning plans
+            const lessonKey = `day_${day.day}_video_${videoIndex}`;
+            const isCompleted = existingProgress[lessonKey] || false;
+            
+            return {
+              id: lessonKey, // Use unique key as ID for AI learning plan lessons
+              title: video.title,
+              type: 'video',
+              videoUrl: video.video_id ? `https://www.youtube.com/embed/${video.video_id}` : 
+                (video.url && video.url.includes('youtube.com/watch?v=') ? 
+                  `https://www.youtube.com/embed/${video.url.split('v=')[1].split('&')[0]}` : 
+                  video.url || ''),
+              description: video.description || "",
+              completed: isCompleted,
+              isAIGenerated: true,
+              aiLearningPlanId: planData.id, // Store plan ID for progress updates
+              dayIndex: dayIndex,
+              videoIndex: videoIndex
+            };
+          }),
         })),
       };
       setCourse(transformedPlan);
@@ -110,7 +159,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     // Extract URL path to determine course type and proper API endpoint
     const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
@@ -119,19 +167,17 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const isDirectLearningPlanRoute = pathParts[0] === 'learning' && pathParts.length > 1;
     const learningPlanId = isDirectLearningPlanRoute ? pathParts[1] : null;
     
-    // Check if this is an AI-generated learning plan by UUID format
-    const isLearningPlanId = (courseId && courseId.length === 36 && courseId.includes('-')) || // UUID format check
-                             (learningPlanId !== null); // Direct learning route check
+    // Only treat as AI learning plan if it's a direct learning route or we have a lastCreatedPlanId
+    const isLearningPlanId = learningPlanId !== null || lastCreatedPlanId !== null;
 
     const fetchData = async () => {
       try {
         setLoading(true);
-        
-        // Check first if this is an AI-generated learning plan
-        if (isLearningPlanId || lastCreatedPlanId) {
+          // Check first if this is an AI-generated learning plan
+        if (isLearningPlanId) {
           try {
-            // Use the last created plan ID if available (after creation)
-            const planId = lastCreatedPlanId || learningPlanId || courseId;
+            // Use the last created plan ID if available, otherwise use the learningPlanId from URL
+            const planId = lastCreatedPlanId || learningPlanId;
             console.log(`🔍 Fetching AI learning plan with ID: ${planId}`);
             console.log(`🌐 Making request to: /api/learning/plans/${planId}/`);
             await fetchLearningPlanById(planId);
@@ -141,10 +187,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             const errorMessage = error.response?.data?.detail || error.message || 'Failed to load AI learning plan';
             console.error('❌ Error fetching AI learning plan:', errorMessage);
             setError(errorMessage);
-            // Only try regular course as fallback if it's not explicitly an AI plan
-            if (!isLearningPlanId) {
-              await fetchRegularCourse(pathParts);
-            }
+            setContentType('notFound');
           }
         } else {
           // Fetch regular course data
@@ -207,30 +250,31 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         
         console.log("Fetched Course Data:", courseData);
-        
-        // Transform sections or chapters into a consistent format for the sidebar
+          // Transform sections or chapters into a consistent format for the sidebar
         const transformedCourse = {
           ...courseData,
           chapters: isSchoolCourse 
             ? courseData.chapters.map((chapter) => ({
                 title: chapter.name,
                 lessons: chapter.lessons.map((lesson) => ({
+                  id: lesson.id, // Include lesson ID for API calls
                   title: lesson.title,
                   type: lesson.type,
                   videoUrl: lesson.video_url,
                   description: lesson.description,
-                  completed: false,
+                  completed: lesson.completed || false, // Use completion status from backend
                   isAIGenerated: false
                 })),
               }))
             : courseData.sections.map((section) => ({
                 title: section.name,
                 lessons: section.lessons.map((lesson) => ({
+                  id: lesson.id, // Include lesson ID for API calls
                   title: lesson.title,
                   type: lesson.type,
                   videoUrl: lesson.video_url,
                   description: lesson.description,
-                  completed: false,
+                  completed: lesson.completed || false, // Use completion status from backend
                   isAIGenerated: false
                 })),
               })),
@@ -307,15 +351,62 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     if (window.innerWidth < 1024) {
       videoRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  };
-
-  // Mark lesson as complete
-  const markLessonComplete = () => {
+  };  // Mark lesson as complete (with backend integration)
+  const markLessonComplete = async () => {
     if (!course) return;
     
-    const updatedCourse = {...course};
-    updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
-    setCourse(updatedCourse);
+    try {
+      const currentLesson = course.chapters[activeChapter].lessons[activeLesson];
+      
+      if (isAIGeneratedPlan && currentLesson.aiLearningPlanId) {
+        // Handle AI learning plan progress
+        await updateAILearningPlanProgress(currentLesson.aiLearningPlanId, currentLesson.id, true);
+      } else if (currentLesson.id && !isAIGeneratedPlan) {
+        // Handle regular course progress
+        await axiosInstance.post(`/api/lessons/toggle-completion/${currentLesson.id}/`);
+      }
+      
+      // Update local state
+      const updatedCourse = {...course};
+      updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
+      setCourse(updatedCourse);
+    } catch (error) {
+      console.error('Error marking lesson as complete:', error);
+      // Still update local state even if API call fails
+      const updatedCourse = {...course};
+      updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
+      setCourse(updatedCourse);
+    }
+  };
+  // Toggle lesson completion from sidebar
+  const toggleLessonCompletion = async (chapterIndex, lessonIndex) => {
+    if (!course) return;
+    
+    try {
+      const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
+      const newCompletionState = !lesson.completed;
+      
+      if (isAIGeneratedPlan && lesson.aiLearningPlanId) {
+        // Handle AI learning plan progress
+        await updateAILearningPlanProgress(lesson.aiLearningPlanId, lesson.id, newCompletionState);
+      } else if (lesson.id && !isAIGeneratedPlan) {
+        // Handle regular course progress
+        const response = await axiosInstance.post(`/api/lessons/toggle-completion/${lesson.id}/`);
+        console.log('Lesson completion toggled:', response.data);
+      }
+      
+      // Update local state
+      const updatedCourse = {...course};
+      updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = newCompletionState;
+      setCourse(updatedCourse);
+    } catch (error) {
+      console.error('Error toggling lesson completion:', error);
+      // Still update local state even if API call fails
+      const updatedCourse = {...course};
+      updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = 
+        !updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed;
+      setCourse(updatedCourse);
+    }
   };
 
   // Navigate to next lesson
@@ -743,8 +834,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         className={`fixed top-0 right-0 h-screen w-[400px] bg-white shadow-lg border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 ${
           sidebarVisible ? 'translate-x-0' : 'translate-x-full'
         }`}
-      >
-        <Sidebar
+      >        <Sidebar
           isSidebarOpen={sidebarVisible}
           course={course}
           searchQuery={searchQuery || ''}
@@ -757,6 +847,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           totalLessons={totalLessons}
           toggleChapter={toggleChapter}
           toggleSidebar={() => setSidebarVisible(!sidebarVisible)}
+          toggleLessonCompletion={toggleLessonCompletion}
           learningPlans={learningPlans}
           isAIGeneratedPlan={isAIGeneratedPlan}
           navigate={navigate}
