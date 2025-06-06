@@ -147,9 +147,11 @@ const App = () => {
             <Route path="/courses/10th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
             <Route path="/courses/11th/cbse/:subjectId" element={<SchoolCourseDetails />} />
             <Route path="/courses/11th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
-            <Route path="/courses/12th/cbse/:subjectId" element={<SchoolCourseDetails />} />
-            <Route path="/courses/12th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
-            <Route path="/courses/engineering/:courseId" element={<CourseDetails />} />            {/* Learning Routes */}            {/* Engineering Course Routes */}
+            <Route path="/courses/12th/cbse/:subjectId" element={<SchoolCourseDetails />} />            <Route path="/courses/12th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/engineering/:courseId" element={<CourseDetails />} />
+            
+            {/* Learning Routes */}
+            {/* Engineering Course Routes */}
             <Route path="/courses/engineering/:courseId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/engineering/:courseId/learning/quiz" element={<StandaloneQuizPage />} />
             
@@ -169,16 +171,15 @@ const App = () => {
             <Route path="/courses/12th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
             <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/12th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
-            
-            {/* AI Learning Plans Route */}
+              {/* AI Learning Plans Route */}
             <Route path="/learning/:learningPlanId" element={<CourseLearningPage />} />
 
-            <Route path="*" element={<NotFound />} />
             {/* Mentoring Routes */}
             {/* <Route path="/mentoring" element={<MentoringHome />} />
             <Route path="/mentoring/college-seniors" element={<CollegeSeniors />} />
             <Route path="/mentoring/industry-experts" element={<IndustryExperts />} />
             <Route path="/mentoring/alumni-mentorship" element={<AlumniMentorship />} /> */}
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
