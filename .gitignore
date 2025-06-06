@@ -1,0 +1,13 @@
+backend/venv/
+backend/.env
+backend/backend/__pycache__/
+__pycache__/
+*.pyc
+*.pyo
+backend/courses/migrations/
+backend/courses/__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+backend/venv/
+backend/db.sqlite3
