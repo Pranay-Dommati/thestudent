@@ -5,10 +5,38 @@ import Footer from '../Footer/Footer';
 import CourseLearning from './CourseLearning';
 
 const CourseLearningPage = () => {
-  // Extract all route parameters
-  const params = useParams();
+  // Get all possible URL params from the different route patterns
+  const { courseId, subjectId, stateId, learningPlanId } = useParams();
   const location = useLocation();
   const [sidebarVisible, setSidebarVisible] = useState(true);
+
+  // Determine the actual course ID based on URL pattern
+  const determineCourseId = () => {
+    // First check for learning plan ID from the dedicated route
+    if (learningPlanId) return learningPlanId;
+    
+    // If we have a direct courseId (like in engineering courses), use it
+    if (courseId) return courseId;
+    
+    // For school courses, the subject is the identifier
+    if (subjectId) return subjectId;
+    
+    // Extract from pathname as fallback
+    const pathParts = location.pathname.split('/');
+    
+    // Check if this is a learning plan in the /learning/:id format
+    if (pathParts[1] === 'learning' && pathParts[2]) {
+      return pathParts[2];
+    }
+    
+    // Return the last non-empty part before 'learning'
+    const learningIndex = pathParts.indexOf('learning');
+    if (learningIndex > 1) {
+      return pathParts[learningIndex - 1];
+    }
+    
+    return null;
+  };
 
   // Callback to receive sidebar visibility changes from CourseLearning component
   const handleSidebarToggle = (isVisible) => {
@@ -20,7 +48,7 @@ const CourseLearningPage = () => {
       <Navbar initialStyle="light" />
       <div className="pt-16 min-h-screen bg-gray-50">
         <CourseLearning 
-          params={params}
+          courseId={determineCourseId()}
           pathname={location.pathname}
           onSidebarToggle={handleSidebarToggle}
         />

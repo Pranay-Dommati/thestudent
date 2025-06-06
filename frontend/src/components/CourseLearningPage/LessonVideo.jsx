@@ -1,41 +1,33 @@
 import React from 'react';
 
 const LessonVideo = ({ videoUrl, title }) => {
-  // Format YouTube URLs to embed format
+  // Helper: convert plain YouTube URL to embed URL
   const getYouTubeEmbedUrl = (url) => {
     if (!url) return '';
-    
-    // If it's already an iframe, extract the src
-    if (url.includes('<iframe')) {
-      const srcMatch = url.match(/src="([^"]+)"/);
-      return srcMatch ? srcMatch[1] : '';
+    // If already an embed URL
+    if (url.includes('youtube.com/embed/')) return url;
+    // If it's a watch?v= URL
+    const match = url.match(/(?:youtube\.com\/(?:watch\?v=|v\/|embed\/)|youtu\.be\/)([\w-]{11})/);
+    if (match && match[1]) {
+      return `https://www.youtube.com/embed/${match[1]}`;
     }
-    
-    // Handle YouTube URLs in various formats
-    let videoId = '';
-    
-    // Format: https://www.youtube.com/watch?v=VIDEO_ID
-    if (url.includes('youtube.com/watch')) {
-      const urlObj = new URL(url);
-      videoId = urlObj.searchParams.get('v');
-    } 
-    // Format: https://youtu.be/VIDEO_ID
-    else if (url.includes('youtu.be/')) {
-      videoId = url.split('youtu.be/')[1].split('?')[0];
-    }
-    // Format: https://www.youtube.com/embed/VIDEO_ID
-    else if (url.includes('youtube.com/embed/')) {
-      videoId = url.split('youtube.com/embed/')[1].split('?')[0];
-    }
-    // If it seems to be just a video ID
-    else if (url.match(/^[a-zA-Z0-9_-]{11}$/)) {
-      videoId = url;
-    }
-    
-    return videoId ? `https://www.youtube.com/embed/${videoId}` : '';
+    return '';
   };
 
-  const videoSrc = getYouTubeEmbedUrl(videoUrl);
+  // Extract src from iframe string if present
+  const extractSrc = (iframeString) => {
+    const srcMatch = iframeString.match(/src="([^"]+)"/);
+    return srcMatch ? srcMatch[1] : '';
+  };
+
+  let videoSrc = '';
+  // If input is an iframe string
+  if (videoUrl && videoUrl.includes('<iframe')) {
+    videoSrc = extractSrc(videoUrl);
+  } else {
+    // Assume it's a plain YouTube URL
+    videoSrc = getYouTubeEmbedUrl(videoUrl);
+  }
 
   return (
     <div className="relative aspect-video w-full">

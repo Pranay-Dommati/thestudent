@@ -6,18 +6,20 @@ import remarkGfm from 'remark-gfm';
 import LessonVideo from './LessonVideo';
 import CourseProgress from './CourseProgress';
 import ResourcesPage from './templ/ResourcesPage';
-import QuizIntro from './templ/QuizIntro'; // Make sure to import QuizIntro instead of QuizzesPage directly
+import QuizIntro from './templ/QuizIntro';
 import InstructionsPage from './templ/InstructionsPage';
 import Sidebar from './Sidebar';
 import axios from 'axios';
-import axiosInstance from '../../utils/axios'; // Import the configured axiosInstance with auth headers
+import axiosInstance from '../../utils/axios';
 import { toast } from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext'; // Import auth context
+import { useAuth } from '../../context/AuthContext';
 
 // Update the function signature to accept the new props
-const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
+const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [course, setCourse] = useState(null);
+  const [learningPlans, setLearningPlans] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeChapter, setActiveChapter] = useState(0);
   const [activeLesson, setActiveLesson] = useState(0);
   const [expandedChapters, setExpandedChapters] = useState({});
@@ -27,305 +29,312 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
   const [contentType, setContentType] = useState('video'); // 'video', 'resources', 'quiz', 'instructions'
   const [courseProgress, setCourseProgress] = useState(null);
   const [savingProgress, setSavingProgress] = useState(false);
-  const [internetResourcesOpen, setInternetResourcesOpen] = useState(false); // Initially closed
-  const [downloadResourcesOpen, setDownloadResourcesOpen] = useState(false); // Initially closed
+  const [internetResourcesOpen, setInternetResourcesOpen] = useState(false);
+  const [downloadResourcesOpen, setDownloadResourcesOpen] = useState(false);
+  const [isAIGeneratedPlan, setIsAIGeneratedPlan] = useState(false);
+  const [lastCreatedPlanId, setLastCreatedPlanId] = useState(null);
   const videoRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isLoggedIn } = useAuth(); // Get authentication state
+  const { isLoggedIn } = useAuth();
+
+  // Helper function to update AI learning plan progress
+  const updateAILearningPlanProgress = async (planId, lessonId, isCompleted) => {
+    try {
+      // Get current progress data
+      const currentPlan = await axiosInstance.get(`/api/learning/plans/${planId}/`);
+      const currentProgress = currentPlan.data.plan_data.progress || {};
+      
+      // Update the specific lesson progress
+      const updatedProgress = {
+        ...currentProgress,
+        [lessonId]: isCompleted
+      };
+      
+      // Calculate overall completion
+      const allLessons = course.chapters.reduce((acc, chapter) => {
+        return acc.concat(chapter.lessons.map(lesson => lesson.id));
+      }, []);
+      
+      const completedLessonsCount = allLessons.filter(lessonKey => updatedProgress[lessonKey]).length;
+      const totalLessonsCount = allLessons.length;
+      const isOverallCompleted = totalLessonsCount > 0 && completedLessonsCount === totalLessonsCount;
+      
+      // Send progress update to backend
+      await axiosInstance.patch(`/api/learning/update-progress/${planId}/`, {
+        plan_data: {
+          progress: updatedProgress
+        },
+        is_completed: isOverallCompleted
+      });
+      
+      console.log(`Updated AI learning plan progress: ${completedLessonsCount}/${totalLessonsCount} lessons completed`);
+      
+    } catch (error) {
+      console.error('Error updating AI learning plan progress:', error);
+      throw error;
+    }
+  };
+
+  // Helper to fetch a learning plan by ID
+  const fetchLearningPlanById = async (planId) => {
+    try {
+      setLoading(true);
+      console.log('🔍 Fetching learning plan with ID:', planId);
+      const response = await axiosInstance.get(`/api/learning/plans/${planId}/`);
+      const planData = response.data;
+      console.log('📦 Received plan data:', JSON.stringify(planData, null, 2));
+      
+      // Check if planData has the expected structure
+      if (!planData || !planData.plan_data || !planData.plan_data.days || !Array.isArray(planData.plan_data.days) || planData.plan_data.days.length === 0) {
+        throw new Error('Learning plan data is missing or invalid');
+      }
+      
+      // Load existing progress data if available
+      const existingProgress = planData.plan_data.progress || {};
+      
+      // Transform days into chapters with progress loading
+      const transformedPlan = {
+        id: planData.id,
+        title: planData.title,
+        description: planData.description || "AI-generated learning plan",
+        chapters: planData.plan_data.days.map((day, dayIndex) => ({
+          title: `Day ${day.day}: ${day.topic}`,
+          lessons: (day.videos || []).map((video, videoIndex) => {
+            // Create unique lesson identifier for AI learning plans
+            const lessonKey = `day_${day.day}_video_${videoIndex}`;
+            const isCompleted = existingProgress[lessonKey] || false;
+            
+            return {
+              id: lessonKey,
+              title: video.title,
+              type: 'video',
+              videoUrl: video.video_id ? `https://www.youtube.com/embed/${video.video_id}` : 
+                (video.url && video.url.includes('youtube.com/watch?v=') ? 
+                  `https://www.youtube.com/embed/${video.url.split('v=')[1].split('&')[0]}` : 
+                  video.url || ''),
+              description: video.description || "",
+              completed: isCompleted,
+              isAIGenerated: true,
+              aiLearningPlanId: planData.id,
+              dayIndex: dayIndex,
+              videoIndex: videoIndex
+            };
+          }),
+        })),
+      };
+      setCourse(transformedPlan);
+      setIsAIGeneratedPlan(true);
+      if (transformedPlan.chapters.length > 0) {
+        setExpandedChapters({ 0: true });
+      }
+    } catch (error) {
+      console.error('Error fetching learning plan by ID:', error);
+      setError(error.message || 'Failed to load learning plan');
+      setCourse(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper to generate a new AI learning plan and fetch it immediately
+  const generateAndFetchLearningPlan = async (goal, days=null) => {
+    try {
+      setLoading(true);
+      const response = await axiosInstance.post('/api/learning/generate-learning-plan/', { goal, days });
+      const newPlan = response.data;
+      if (newPlan && newPlan.id) {
+        setLastCreatedPlanId(newPlan.id);
+        // Immediately fetch the new plan by its ID
+        await fetchLearningPlanById(newPlan.id);
+      } else {
+        console.error('No plan ID returned after creation:', newPlan);
+      }
+    } catch (error) {
+      console.error('Error creating new AI learning plan:', error);
+      setError(error.message || 'Failed to generate learning plan');
+      setCourse(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchCourseData = async () => {
+    // Extract URL path to determine course type and proper API endpoint
+    const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
+    
+    // Check if this is a direct learning plan route (/learning/:id)
+    const isDirectLearningPlanRoute = pathParts[0] === 'learning' && pathParts.length > 1;
+    const learningPlanId = isDirectLearningPlanRoute ? pathParts[1] : null;
+    
+    // Only treat as AI learning plan if it's a direct learning route or we have a lastCreatedPlanId
+    const isLearningPlanId = learningPlanId !== null || lastCreatedPlanId !== null;
+
+    const fetchData = async () => {
       try {
-        let apiUrl;
-        const path = pathname;
-        
-        // Extract URL parameters manually from the pathname
-        // Example URL: /courses/12th/state/ts/english/learning
-        const pathParts = path.split('/').filter(part => part !== '');
-        
-        // Determine the type of course based on the URL path
-        if (path.includes('/engineering/')) {
-          // Engineering course
-          apiUrl = `http://127.0.0.1:8000/api/courses/engineering/${params.courseId}/`;
-          
-          const response = await axiosInstance.get(apiUrl);
-          const courseData = response.data;
-          
-          // Transform sections into chapters for the sidebar
-          const transformedCourse = {
-            ...courseData,
-            chapters: courseData.sections.map((section) => ({
-              title: section.name,
-              lessons: section.lessons.map((lesson) => {
-                // Format resources correctly
-                let formattedResources = { downloadable: [], internet: [] };
-                
-                if (lesson.resources && Array.isArray(lesson.resources)) {
-                  // Group resources by type
-                  lesson.resources.forEach(resource => {
-                    if (resource.type === 'downloadable') {
-                      // Check if the URL is a relative path (doesn't start with http)
-                      const fileLink = resource.url || resource.file;
-                      const absoluteFileLink = fileLink && !fileLink.startsWith('http') ? 
-                        `http://127.0.0.1:8000${fileLink}` : fileLink;
-                        
-                      formattedResources.downloadable.push({
-                        name: resource.title,
-                        description: resource.description || `Download ${resource.title}`, // Improved fallback with resource name
-                        link: absoluteFileLink // Now using the absolute URL
-                      });
-                    } else if (resource.type === 'internet') {
-                      formattedResources.internet.push({
-                        name: resource.title,
-                        description: resource.description || `Online resource for ${resource.title}`, // Improved fallback with resource name
-                        link: resource.url
-                      });
-                    }
-                  });
-                }
-                  return {
-                  title: lesson.title,
-                  type: lesson.type,
-                  videoUrl: lesson.video_url,
-                  description: lesson.description,
-                  aboutLesson: lesson.about_lesson,
-                  resources: formattedResources,
-                  quiz_questions: lesson.quiz_questions || [], // Include quiz questions from backend
-                  completed: false // Default to not completed
-                };
-              }),
-            })),
-          };
-          setCourse(transformedCourse);
-          
-          // Set initial content type based on the first lesson's type
-          if (transformedCourse.chapters && 
-              transformedCourse.chapters.length > 0 && 
-              transformedCourse.chapters[0].lessons &&
-              transformedCourse.chapters[0].lessons.length > 0) {
-            const firstLessonType = transformedCourse.chapters[0].lessons[0].type;
-            if (firstLessonType === 'reading') {
-              setContentType('instructions');
-            } else if (firstLessonType) {
-              setContentType(firstLessonType);
-            }
+        setLoading(true);
+        // Check first if this is an AI-generated learning plan
+        if (isLearningPlanId) {
+          try {
+            // Use the last created plan ID if available, otherwise use the learningPlanId from URL
+            const planId = lastCreatedPlanId || learningPlanId;
+            console.log(`🔍 Fetching AI learning plan with ID: ${planId}`);
+            await fetchLearningPlanById(planId);
+            console.log("✅ Learning plan loaded successfully!");
+            return; // Exit early since we successfully loaded the plan
+          } catch (error) {
+            const errorMessage = error.response?.data?.detail || error.message || 'Failed to load AI learning plan';
+            console.error('❌ Error fetching AI learning plan:', errorMessage);
+            setError(errorMessage);
+            setContentType('notFound');
           }
         } else {
-          // School course (10th, 11th, 12th)
-          // Extract parameters from URL parts based on the URL pattern
-          // Example URL: /courses/12th/state/ts/english/learning
-          // Extract class level, board, state code, and subject from the URL parts
-          let classLevel, board, stateCode, subject;
-          
-          if (pathParts.length >= 4) {
-            classLevel = pathParts[1]; // e.g., '10th', '11th', '12th'
-            board = pathParts[2];      // e.g., 'cbse', 'state'
-            
-            if (board === 'state' && pathParts.length >= 5) {
-              stateCode = pathParts[3];  // e.g., 'ts', 'ap'
-              subject = pathParts[4];    // e.g., 'english', 'math'
-            } else {
-              subject = pathParts[3];    // For CBSE, subject is the 4th part
-            }
-          }
-          
-          // Convert state code to full state name if needed
-          let stateName = null;
-          if (stateCode) {
-            stateName = stateCode === 'ts' ? 'Telangana' : 
-                       stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
-          }
-          
-          // First, fetch the list to get the course ID
-          let listApiUrl;
-          if (board === 'state' && stateName) {
-            listApiUrl = `http://127.0.0.1:8000/api/courses/school/?class=${classLevel}&board=${board}&state=${stateName}&subject=${subject}`;
-          } else {
-            listApiUrl = `http://127.0.0.1:8000/api/courses/school/?class=${classLevel}&board=${board}&subject=${subject}`;
-          }
-          
-          const listResponse = await axiosInstance.get(listApiUrl);
-          let courseId;
-          
-          if (Array.isArray(listResponse.data) && listResponse.data.length > 0) {
-            // More precise matching to prevent "Science" vs "Social Science" confusion
-            const matchedCourse = listResponse.data.find(course => {
-              const courseSubject = (course.subject || '').toLowerCase().trim();
-              const urlSubject = (subject || '').toLowerCase().trim();
-              
-              // First try for an exact match (ignoring case)
-              if (courseSubject === urlSubject) {
-                return true;
-              }
-              
-              // Special case for Social vs Social Science (legacy support)
-              if ((urlSubject === "social" && (courseSubject === "social science" || courseSubject === "social")) ||
-                  (courseSubject === "social" && (urlSubject === "social science" || urlSubject === "social"))) {
-                return true;
-              }
-              
-              // If no exact match and URL is "science", make sure we don't match "social science"
-              if (urlSubject === "science" && courseSubject.includes("social")) {
-                return false;
-              }
-              
-              // Prevent "science" from matching "social science" when looking for science courses
-              if ((urlSubject === "social" || urlSubject === "social science") && courseSubject === "science") {
-                return false;
-              }
-              
-              // Fallback to more flexible matching
-              return courseSubject.includes(urlSubject) || urlSubject.includes(courseSubject);
-            });
-            
-            if (matchedCourse) {
-              courseId = matchedCourse.id;
-            } else if (listResponse.data.length > 0) {
-              courseId = listResponse.data[0].id;
-            }
-          }
-          
-          // Now fetch the detailed course data using the specific ID
-          if (courseId) {
-            const detailApiUrl = `http://127.0.0.1:8000/api/courses/school/${courseId}/`;
-            const detailResponse = await axiosInstance.get(detailApiUrl);
-            const courseData = detailResponse.data;
-            
-            // Transform the course data with proper structure
-            const transformedCourse = {
-              ...courseData,
-              chapters: courseData.chapters && courseData.chapters.length > 0 
-                ? courseData.chapters.map((chapter) => ({
-                    title: chapter.name,
-                    lessons: chapter.lessons && chapter.lessons.length > 0
-                      ? chapter.lessons.map((lesson) => {
-                          // Format resources correctly
-                          let formattedResources = { downloadable: [], internet: [] };
-                          
-                          if (lesson.resources && Array.isArray(lesson.resources)) {
-                            // Group resources by type
-                            lesson.resources.forEach(resource => {
-                              if (resource.type === 'downloadable') {
-                                // Check if the URL is a relative path (doesn't start with http)
-                                const fileLink = resource.url || resource.file;
-                                const absoluteFileLink = fileLink && !fileLink.startsWith('http') ? 
-                                  `http://127.0.0.1:8000${fileLink}` : fileLink;
-                                  
-                                formattedResources.downloadable.push({
-                                  name: resource.title,
-                                  description: resource.description || `Download ${resource.title}`, // Improved fallback with resource name
-                                  link: absoluteFileLink // Now using the absolute URL
-                                });
-                              } else if (resource.type === 'internet') {
-                                formattedResources.internet.push({
-                                  name: resource.title,
-                                  description: resource.description || `Online resource for ${resource.title}`, // Improved fallback with resource name
-                                  link: resource.url
-                                });
-                              }
-                            });
-                          }
-                            return {
-                            title: lesson.title,
-                            type: lesson.type || 'video',
-                            videoUrl: lesson.video_url || '',
-                            description: lesson.description || '',
-                            aboutLesson: lesson.about_lesson || '',
-                            resources: formattedResources,
-                            quiz_questions: lesson.quiz_questions || [], // Include quiz questions from backend
-                            completed: false
-                          };
-                        })
-                      : [{
-                          title: "Introduction to " + chapter.name,
-                          type: 'video',
-                          videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-                          description: "Introduction to this chapter",
-                          aboutLesson: "Basic introduction to the concepts in this chapter",
-                          resources: { downloadable: [], internet: [] },
-                          completed: false
-                        }]
-                  })) 
-                : [{
-                    title: "Main Content",
-                    lessons: [{
-                      title: courseData.title || "Introduction",
-                      type: 'video',
-                      videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ", // Default video if none is provided
-                      description: courseData.description || '',
-                      resources: { downloadable: [], internet: [] }, // Empty resources
-                      completed: false
-                    }]
-                  }]
-            };
-            setCourse(transformedCourse);
-            
-            // Set initial content type based on the first lesson's type
-            if (transformedCourse.chapters && 
-                transformedCourse.chapters.length > 0 && 
-                transformedCourse.chapters[0].lessons &&
-                transformedCourse.chapters[0].lessons.length > 0) {
-              const firstLessonType = transformedCourse.chapters[0].lessons[0].type;
-              if (firstLessonType === 'reading') {
-                setContentType('instructions');
-              } else if (firstLessonType) {
-                setContentType(firstLessonType);
-              }
-            }
-          } else {
-            throw new Error("Course not found");
-          }
-        }
-
-        // Expand the first chapter by default
-        setCourse(prevCourse => {
-          if (prevCourse?.chapters && prevCourse.chapters.length > 0) {
-            setExpandedChapters({ 0: true });
-          }
-          return prevCourse;
-        });
-      } catch (error) {
-        // Set up a fallback course with default content when API fails
-        const pathParts = pathname.split('/').filter(part => part !== '');
-        if (pathParts.length >= 4) {
-          const classLevel = pathParts[1];
-          const board = pathParts[2];
-          const subject = pathParts[pathParts.length - 2]; // Get the subject from URL
-          
-          const fallbackCourse = {
-            id: 1,
-            title: `${classLevel} ${board.toUpperCase()} ${subject}`,
-            subject: subject || "General Course",
-            description: "This is a placeholder course while we prepare the full content.",
-            chapters: [{
-              title: "Getting Started",
-              lessons: [{
-                title: "Introduction",
-                type: 'video',
-                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-                description: "Welcome to the course! More content will be added soon.",
-                aboutLesson: "This is a placeholder lesson.",
-                completed: false
-              }]
-            }]
-          };
-          
-          setCourse(fallbackCourse);
+          // Fetch regular course data
+          await fetchRegularCourse(pathParts);
         }
       } finally {
         setLoading(false);
       }
     };
+    
+    const fetchRegularCourse = async (pathParts = pathname ? pathname.split('/').filter(Boolean) : [], isLearningPlanIdParam = false) => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+        
+        // Extract proper course type and ID from URL path
+        let apiUrl;
+        let isSchoolCourse = false;
+        
+        // Check if it's a school course (e.g., /courses/10th/cbse/math/learning)
+        if (pathParts.includes('10th') || pathParts.includes('11th') || pathParts.includes('12th')) {
+          isSchoolCourse = true;
+          const classLevel = pathParts.find(part => ['10th', '11th', '12th'].includes(part));
+          const board = pathParts.find(part => ['cbse', 'state'].includes(part));
+          
+          // Handle state board case which has an additional parameter
+          if (board === 'state') {
+            const stateIndex = pathParts.indexOf('state');
+            if (stateIndex !== -1 && stateIndex + 1 < pathParts.length) {
+              const stateId = pathParts[stateIndex + 1];
+              const subjectId = pathParts[stateIndex + 2];
+              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&state=${stateId}&subject=${subjectId}`;
+            }
+          } else {
+            const subjectIndex = pathParts.indexOf(board) + 1;
+            if (subjectIndex < pathParts.length) {
+              const subjectId = pathParts[subjectIndex];
+              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&subject=${subjectId}`;
+            }
+          }
+        } else {
+          // Engineering course
+          apiUrl = `${API_BASE_URL}/courses/engineering/${courseId}/`;
+        }
+        
+        if (!apiUrl) {
+          throw new Error("Could not determine API URL from path");
+        }
+        
+        const response = await axiosInstance.get(apiUrl);
+        let courseData;
+        
+        if (isSchoolCourse && Array.isArray(response.data) && response.data.length > 0) {
+          // For school courses, we get a list, so take the first matching course
+          courseData = response.data[0];
+          // Now fetch the complete course details
+          const detailResponse = await axiosInstance.get(`/courses/school/${courseData.id}/`);
+          courseData = detailResponse.data;
+        } else {
+          courseData = response.data;
+        }
+        
+        console.log("Fetched Course Data:", courseData);
+        
+        // Transform sections or chapters into a consistent format for the sidebar
+        const transformedCourse = {
+          ...courseData,
+          chapters: isSchoolCourse 
+            ? courseData.chapters.map((chapter) => ({
+                title: chapter.name,
+                lessons: chapter.lessons.map((lesson) => ({
+                  id: lesson.id,
+                  title: lesson.title,
+                  type: lesson.type,
+                  videoUrl: lesson.video_url,
+                  description: lesson.description,
+                  completed: lesson.completed || false,
+                  isAIGenerated: false
+                })),
+              }))
+            : courseData.sections.map((section) => ({
+                title: section.name,
+                lessons: section.lessons.map((lesson) => ({
+                  id: lesson.id,
+                  title: lesson.title,
+                  type: lesson.type,
+                  videoUrl: lesson.video_url,
+                  description: lesson.description,
+                  completed: lesson.completed || false,
+                  isAIGenerated: false
+                })),
+              })),
+        };
 
-    fetchCourseData();
-  }, [pathname, params]);
+        setCourse(transformedCourse);
+        setIsAIGeneratedPlan(false);
+        
+        // Expand the first chapter by default
+        if (transformedCourse.chapters.length > 0) {
+          setExpandedChapters({ 0: true });
+        }
+        
+        // Also fetch AI-generated learning plans to display in sidebar
+        fetchAILearningPlans();
+      } catch (error) {
+        console.error('❌ Error fetching course data:', error);
+        const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
+        setError(errorMessage);
+        setCourse(null);
+        
+        // Check if error response indicates ID belongs to a learning plan
+        if (error.response?.data?.isLearningPlanId) {
+          setError('This learning plan is not available. It may have been deleted or you may not have permission to access it.');
+        } else if (isLearningPlanId) {
+          setError('Unable to load the learning plan. Please check if the ID is correct.');
+          setContentType('notFound');
+        }
+      }
+    };
+    
+    const fetchAILearningPlans = async () => {
+      try {
+        const response = await axiosInstance.get('/api/learning/plans/');
+        
+        // Check if response is valid
+        if (response.status === 200 && Array.isArray(response.data)) {
+          const plans = response.data;
+          console.log("Fetched AI Learning Plans:", plans);
+          setLearningPlans(plans);
+        } else {
+          console.warn("Unexpected learning plans response format:", response.data);
+          setLearningPlans([]);
+        }
+      } catch (error) {
+        console.error('Error fetching AI learning plans:', error);
+        const errorMessage = error.response?.data?.detail || error.message || 'Failed to load learning plans';
+        console.warn('AI Learning Plans Error:', errorMessage);
+        setLearningPlans([]);
+      }
+    };
+
+    fetchData();
+  }, [courseId, pathname]);
 
   // Add a useEffect to fetch user progress when course data is loaded
   useEffect(() => {
     // Only fetch progress if the user is logged in and we have a course
     const fetchUserProgress = async () => {
-      if (!isLoggedIn || !course || !course.id) return;
+      if (!isLoggedIn || !course || !course.id || isAIGeneratedPlan) return;
       
       try {
         // Call the backend API to get the user's progress for this course
@@ -369,7 +378,6 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
           });
         }
         
-        // Use a ref to track if this is the initial load to prevent infinite loops
         setCourse(updatedCourse);
         
       } catch (error) {
@@ -382,9 +390,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
     };
     
     fetchUserProgress();
-  // Only run this effect when the course ID changes or login status changes,
-  // not when the course content itself changes
-  }, [course?.id, isLoggedIn]);
+  }, [course?.id, isLoggedIn, isAIGeneratedPlan]);
 
   // Handle chapter toggling
   const toggleChapter = (index) => {
@@ -409,158 +415,62 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
     }
   };
 
-  // Mark lesson as complete
+  // Mark lesson as complete (with backend integration)
   const markLessonComplete = async () => {
-    if (!course || !isLoggedIn) return;
-    
-    const currentLesson = course.chapters[activeChapter].lessons[activeLesson];
-    if (currentLesson.completed) return; // Already completed
-    
-    setSavingProgress(true);
+    if (!course) return;
     
     try {
-      // Look for the actual lesson ID in our courseProgress data
-      let lessonId;
+      const currentLesson = course.chapters[activeChapter].lessons[activeLesson];
       
-      if (courseProgress) {
-        if (courseProgress.chapters) {
-          // For school courses
-          for (const chapter of courseProgress.chapters) {
-            if (chapter.name === course.chapters[activeChapter].title) {
-              const lessonData = chapter.lessons.find(l => l.title === currentLesson.title);
-              if (lessonData) {
-                lessonId = lessonData.id;
-                break;
-              }
-            }
-          }
-        } else if (courseProgress.sections) {
-          // For engineering courses
-          for (const section of courseProgress.sections) {
-            if (section.name === course.chapters[activeChapter].title) {
-              const lessonData = section.lessons.find(l => l.title === currentLesson.title);
-              if (lessonData) {
-                lessonId = lessonData.id;
-                break;
-              }
-            }
-          }
-        }
+      if (isAIGeneratedPlan && currentLesson.aiLearningPlanId) {
+        // Handle AI learning plan progress
+        await updateAILearningPlanProgress(currentLesson.aiLearningPlanId, currentLesson.id, true);
+      } else if (currentLesson.id && !isAIGeneratedPlan) {
+        // Handle regular course progress
+        await axiosInstance.post(`/api/lessons/toggle-completion/${currentLesson.id}/`);
       }
       
-      if (!lessonId) {
-        console.warn("Lesson ID not found in progress data. Progress won't be saved.");
-        return;
-      }
-      
-      // Call the API to toggle lesson completion
-      const response = await axiosInstance.post(
-        `http://127.0.0.1:8000/api/lessons/complete/${lessonId}/`,
-        {},
-        { withCredentials: true }
-      );
-      
-      // Update the local course state
+      // Update local state
       const updatedCourse = {...course};
       updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
       setCourse(updatedCourse);
-      
-      // Update progress data
-      setCourseProgress(prevProgress => {
-        if (!prevProgress) return response.data;
-        
-        return {
-          ...prevProgress,
-          progress: response.data.progress
-        };
-      });
-      
     } catch (error) {
-      console.error('Error saving lesson progress:', error);
-      if (error.response?.status === 401) {
-        toast.error('Please log in to save your progress');
-      } else {
-        toast.error('Failed to save your progress');
-      }
-    } finally {
-      setSavingProgress(false);
+      console.error('Error marking lesson as complete:', error);
+      // Still update local state even if API call fails
+      const updatedCourse = {...course};
+      updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
+      setCourse(updatedCourse);
     }
   };
 
-  // Toggle lesson completion status
+  // Toggle lesson completion from sidebar
   const toggleLessonCompletion = async (chapterIndex, lessonIndex) => {
-    if (!course || !isLoggedIn) return;
-    
-    const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
-    setSavingProgress(true);
+    if (!course) return;
     
     try {
-      // Look for the actual lesson ID in our courseProgress data
-      let lessonId;
+      const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
+      const newCompletionState = !lesson.completed;
       
-      if (courseProgress) {
-        if (courseProgress.chapters) {
-          // For school courses
-          for (const chapter of courseProgress.chapters) {
-            if (chapter.name === course.chapters[chapterIndex].title) {
-              const lessonData = chapter.lessons.find(l => l.title === lesson.title);
-              if (lessonData) {
-                lessonId = lessonData.id;
-                break;
-              }
-            }
-          }
-        } else if (courseProgress.sections) {
-          // For engineering courses
-          for (const section of courseProgress.sections) {
-            if (section.name === course.chapters[chapterIndex].title) {
-              const lessonData = section.lessons.find(l => l.title === lesson.title);
-              if (lessonData) {
-                lessonId = lessonData.id;
-                break;
-              }
-            }
-          }
-        }
+      if (isAIGeneratedPlan && lesson.aiLearningPlanId) {
+        // Handle AI learning plan progress
+        await updateAILearningPlanProgress(lesson.aiLearningPlanId, lesson.id, newCompletionState);
+      } else if (lesson.id && !isAIGeneratedPlan) {
+        // Handle regular course progress
+        const response = await axiosInstance.post(`/api/lessons/toggle-completion/${lesson.id}/`);
+        console.log('Lesson completion toggled:', response.data);
       }
       
-      if (!lessonId) {
-        console.warn("Lesson ID not found in progress data. Progress won't be saved.");
-        return;
-      }
-      
-      // Call the API to toggle lesson completion
-      const response = await axiosInstance.post(
-        `http://127.0.0.1:8000/api/lessons/complete/${lessonId}/`,
-        {},
-        { withCredentials: true }
-      );
-      
-      // Update the local course state based on the response
+      // Update local state
       const updatedCourse = {...course};
-      const newCompletionStatus = response.data.status === 'complete';
-      updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = newCompletionStatus;
+      updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = newCompletionState;
       setCourse(updatedCourse);
-      
-      // Update progress data
-      setCourseProgress(prevProgress => {
-        if (!prevProgress) return response.data;
-        
-        return {
-          ...prevProgress,
-          progress: response.data.progress
-        };
-      });
-      
     } catch (error) {
       console.error('Error toggling lesson completion:', error);
-      if (error.response?.status === 401) {
-        toast.error('Please log in to save your progress');
-      } else {
-        toast.error('Failed to save your progress');
-      }
-    } finally {
-      setSavingProgress(false);
+      // Still update local state even if API call fails
+      const updatedCourse = {...course};
+      updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = 
+        !updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed;
+      setCourse(updatedCourse);
     }
   };
 
@@ -569,6 +479,7 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
     if (!course) return;
     
     // If not already completed, mark the lesson as complete
+    const currentLesson = getCurrentLesson();
     if (!currentLesson.completed) {
       await markLessonComplete();
     }
@@ -576,17 +487,16 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
     const currentChapter = course.chapters[activeChapter];
     
     if (activeLesson < currentChapter.lessons.length - 1) {
+      // Move to next lesson in current chapter
       setActiveLesson(activeLesson + 1);
     } else if (activeChapter < course.chapters.length - 1) {
+      // Move to first lesson of next chapter
       setActiveChapter(activeChapter + 1);
       setActiveLesson(0);
       setExpandedChapters(prev => ({
         ...prev,
         [activeChapter + 1]: true
       }));
-    } else {
-      // Course completed
-      toast.success("🎉 Congratulations! You've completed the course!");
     }
   };
 
@@ -597,13 +507,15 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
     if (activeLesson > 0) {
       setActiveLesson(activeLesson - 1);
     } else if (activeChapter > 0) {
+      const prevChapter = course.chapters[activeChapter - 1];
       setActiveChapter(activeChapter - 1);
-      setActiveLesson(course.chapters[activeChapter - 1].lessons.length - 1);
+      setActiveLesson(prevChapter.lessons.length - 1);
       setExpandedChapters(prev => ({
         ...prev,
         [activeChapter - 1]: true
       }));
-    }  };
+    }
+  };
 
   // Get current lesson
   const getCurrentLesson = () => {
@@ -611,57 +523,6 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
       return null;
     }
     return course.chapters[activeChapter].lessons[activeLesson];
-  };
-  // Helper function to get current lesson ID from progress data
-  const getCurrentLessonId = () => {
-    const currentLesson = getCurrentLesson();
-    if (!currentLesson) {
-      console.warn('No current lesson found');
-      return null;
-    }
-    
-    // Check if the lesson itself has an ID (it should from the API response)
-    if (currentLesson.id) {
-      console.log('Found lesson ID directly on lesson object:', currentLesson.id);
-      return currentLesson.id;
-    }
-    
-    // If no direct ID, try to find it in the progress data
-    if (!courseProgress) {
-      console.warn('No course progress found, cannot determine lesson ID');
-      return null;
-    }
-
-    let lessonId;
-    
-    if (courseProgress.chapters) {
-      // For school courses
-      for (const chapter of courseProgress.chapters) {
-        if (chapter.name === course.chapters[activeChapter].title) {
-          const lessonData = chapter.lessons.find(l => l.title === currentLesson.title);
-          if (lessonData) {
-            lessonId = lessonData.id;
-            console.log('Found lesson ID in school course progress:', lessonId);
-            break;
-          }
-        }
-      }
-    } else if (courseProgress.sections) {
-      // For engineering courses
-      for (const section of courseProgress.sections) {
-        if (section.name === course.chapters[activeChapter].title) {
-          const lessonData = section.lessons.find(l => l.title === currentLesson.title);
-          if (lessonData) {
-            lessonId = lessonData.id;
-            console.log('Found lesson ID in engineering course progress:', lessonId);
-            break;
-          }
-        }
-      }
-    }
-    
-    console.log('Final lesson ID determined:', lessonId);
-    return lessonId;
   };
 
   // Filter lessons based on search
@@ -673,56 +534,26 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
       const filteredLessons = chapter.lessons.filter(lesson => 
         lesson.title.toLowerCase().includes(query)
       );
-      
       return filteredLessons.length > 0 ? { ...chapter, lessons: filteredLessons } : null;
     }).filter(Boolean);
-  };  // Handle lesson click
+  };
+
+  // Handle lesson click
   const handleLessonClick = (chapterIndex, lessonIndex) => {
     const lesson = course.chapters[chapterIndex].lessons[lessonIndex]; 
     // Debug information
     console.log('Lesson clicked:', lesson);
     console.log('Lesson type:', lesson.type);
     console.log('Quiz questions:', lesson.quiz_questions);
-    console.log('Is school course?', window.location.pathname.includes('/10th/') || 
-      window.location.pathname.includes('/11th/') || 
-      window.location.pathname.includes('/12th/'));
     
     // Only update state if we're actually changing lessons to prevent re-renders
     if (activeChapter !== chapterIndex || activeLesson !== lessonIndex) {
       setActiveChapter(chapterIndex);
       setActiveLesson(lessonIndex);
-        // Set content type based on the lesson type
-      if (lesson.type) {
-        // Map 'reading' type to 'instructions' content type for UI rendering
-        if (lesson.type === 'reading') {
-          setContentType('instructions');
-        } else if (lesson.type === 'quiz') {
-          // Always force content type to quiz when lesson type is quiz
-          setContentType('quiz');
-          console.log(`Loading quiz: ${lesson.title}`, {
-            questionCount: lesson.quiz_questions?.length || 0,
-            lessonId: getCurrentLessonId(),
-            isQuizContentType: true
-          });
-        } else {
-          setContentType(lesson.type);
-        }
-      } else {
-        setContentType('video'); // Default to video
-      }
-      
-      // Expand the chapter
-      if (!expandedChapters[chapterIndex]) {
-        setExpandedChapters(prev => ({
-          ...prev,
-          [chapterIndex]: true
-        }));
-      }
-      
-      // Only scroll to video ref if it's a video content type
-      if (lesson.type === 'video' && videoRef.current) {
-        videoRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
+      setExpandedChapters(prev => ({
+        ...prev,
+        [chapterIndex]: true
+      }));
     }
   };
 
@@ -733,17 +564,62 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
     }
   }, [sidebarVisible, onSidebarToggle]);
 
-  // Loading state
+  // Loading and error states
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-96">
+      <div className="flex flex-col justify-center items-center h-96 space-y-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        <p className="text-gray-600">Loading your learning content...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 p-8">
+        <div className="mb-6 text-red-500">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Oops! Something went wrong</h2>
+        <p className="text-gray-600 text-center mb-6">{error}</p>
+        <div className="flex space-x-4">
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            Try Again
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            Go Home
+          </button>
+        </div>
       </div>
     );
   }
 
   if (!course) {
-    return <div className="p-8 text-center">Course not found</div>;
+    return (
+      <div className="flex flex-col items-center justify-center h-96 p-8">
+        <div className="mb-6 text-gray-400">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Course Not Found</h2>
+        <p className="text-gray-600 text-center mb-6">The course you're looking for could not be found. It may have been removed or you might not have access to it.</p>
+        <button
+          onClick={() => navigate('/')}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+        >
+          Browse Courses
+        </button>
+      </div>
+    );
   }
 
   const currentLesson = getCurrentLesson();
@@ -754,381 +630,207 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
     (acc, chapter) => acc + chapter.lessons.length, 0
   );
   
-  // Modified content area rendering
+  // Content rendering section in the return statement
   const renderContent = () => {
-    const currentLesson = getCurrentLesson();
-    
-    // Debug the current state
-    console.log('Rendering content:', { 
-      contentType, 
-      lessonType: currentLesson?.type,
-      hasQuizQuestions: Array.isArray(currentLesson?.quiz_questions) && currentLesson.quiz_questions.length > 0
-    });
-    
-    // Override contentType for quiz lessons
-    if (currentLesson?.type === 'quiz') {
-      console.log('Force rendering quiz content for quiz lesson type');
-      
-      // Check if the current lesson has quiz questions
-      if (!currentLesson?.quiz_questions || !Array.isArray(currentLesson.quiz_questions) || currentLesson.quiz_questions.length === 0) {
-        console.warn('No quiz questions found for this lesson', currentLesson);
-        return (
-          <div className="max-w-3xl mx-auto p-8 bg-white rounded-lg shadow-sm">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
-                <span className="text-xl text-red-600">!</span>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Quiz Not Available</h2>
-              <p className="text-gray-600 mb-6">This quiz doesn't have any questions yet. Please check back later.</p>
-            </div>
-          </div>
-        );
-      }
-      
-      const lessonId = getCurrentLessonId();
-      if (!lessonId) {
-        console.warn('No lesson ID found for quiz:', currentLesson.title);
-      }
-      
+    if (loading) {
+      return <div className="animate-pulse bg-gray-200 h-96 rounded-lg"></div>;
+    }
+
+    if (contentType === 'notFound') {
       return (
-        <QuizIntro 
-          quizData={{
-            title: currentLesson.title,
-            description: currentLesson.description || "Test your understanding of the concepts covered in this lesson",
-            timeLimit: "15 minutes",
-            totalQuestions: currentLesson.quiz_questions ? currentLesson.quiz_questions.length : 0,
-            passingScore: 80,
-            attempts: "Unlimited",
-            instructions: [
-              "Read each question carefully",
-              "You can review your answers before submission",
-              "You need to score 80% or higher to pass",
-              "You can retake the quiz if needed"
-            ],
-            questions: currentLesson.quiz_questions || []
-          }}
-          lessonId={lessonId}
-        />
+        <div className="p-8 text-center">
+          <div className="mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Learning Plan Not Found</h2>
+          <p className="text-gray-600 mb-6">The learning plan you're looking for could not be found. It may have been deleted or is unavailable.</p>
+          <div className="flex justify-center">
+            <button
+              onClick={() => navigate('/chat')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Create a New Learning Plan
+            </button>
+          </div>
+        </div>
       );
     }
-    
-    switch(contentType) {
+
+    // Add a special header for AI-generated learning plans
+    const aiLearningPlanHeader = isAIGeneratedPlan && (
+      <div className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 p-4 rounded-lg border border-indigo-100">
+        <div className="flex items-center">
+          <div className="bg-white p-3 rounded-full mr-4 border border-indigo-200">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-indigo-900">AI-Generated Learning Plan</h2>
+            <p className="text-gray-600">This personalized learning journey was created based on your interests and learning goals.</p>
+          </div>
+        </div>
+      </div>
+    );
+
+    switch (contentType) {
       case 'resources':
         return <ResourcesPage />; 
 
       case 'quiz':
-        console.log('Rendering quiz content from contentType:', currentLesson);
-        // Check if the current lesson has quiz questions
-        if (!currentLesson?.quiz_questions || !Array.isArray(currentLesson.quiz_questions) || currentLesson.quiz_questions.length === 0) {
-          console.warn('No quiz questions found for this lesson', currentLesson);
-          return (
-            <div className="max-w-3xl mx-auto p-8 bg-white rounded-lg shadow-sm">
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
-                  <span className="text-xl text-red-600">!</span>
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Quiz Not Available</h2>
-                <p className="text-gray-600 mb-6">This quiz doesn't have any questions yet. Please check back later.</p>
-              </div>
-            </div>
-          );
-        }
-        
-        const lessonId = getCurrentLessonId();
-        if (!lessonId) {
-          console.warn('No lesson ID found for quiz:', currentLesson.title);
-        }
-        
-        return (
-          <QuizIntro 
-            quizData={{
-              title: currentLesson.title,
-              description: currentLesson.description || "Test your understanding of the concepts covered in this lesson",
-              timeLimit: "15 minutes",
-              totalQuestions: currentLesson.quiz_questions ? currentLesson.quiz_questions.length : 0,
-              passingScore: 80,
-              attempts: "Unlimited",
-              instructions: [
-                "Read each question carefully",
-                "You can review your answers before submission",
-                "You need to score 80% or higher to pass",
-                "You can retake the quiz if needed"
-              ],
-              questions: currentLesson.quiz_questions || []
-            }}
-            lessonId={lessonId}
-          /> // Removed the white container div
-        );
+        // Render quiz content
+        return <QuizIntro />; 
         
       case 'instructions':
       case 'reading':
-        return <InstructionsPage lessonContent={currentLesson} />; // Pass the current lesson content
+        return <InstructionsPage lessonContent={currentLesson} />;
         
       case 'video':
       default:
         return (
           <>
-            {/* Video Player */}
-            <div ref={videoRef} className="bg-black rounded-lg overflow-hidden shadow-lg mb-6">
-              <LessonVideo 
-                videoUrl={currentLesson.videoUrl} 
-                title={currentLesson.title}
-              />
-            </div>
-
-            {/* Content Tabs */}
-            <div className="mb-6 border-b border-gray-200">
-              <div className="flex space-x-6">
-                <button 
-                  className={`py-4 px-1 font-medium ${activeTab === 'content' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}
-                  onClick={() => setActiveTab('content')}
-                >
-                  About This Lesson
-                </button>
-                <button 
-                  className={`py-4 px-1 font-medium ${activeTab === 'resources' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}
-                  onClick={() => setActiveTab('resources')}
-                >
-                  Additional Resources
-                </button>
-                {/* Remove the Transcript tab button */}
-              </div>
-            </div>
-
-            {/* Tab Content */}
+            {aiLearningPlanHeader}
+            
+            {/* Video Container */}
             <div className="mb-8">
-              {activeTab === 'content' && (
-                <div className="prose prose-lg max-w-none markdown-body">                  {currentLesson.aboutLesson ? (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        ul: ({node, ...props}) => <ul className="list-disc pl-5 my-4 space-y-2" {...props} />,
-                        ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-4 space-y-2" {...props} />,
-                        li: ({node, children, ordered, ...props}) => {
-                          // Skip rendering empty list items
-                          if (!children || (Array.isArray(children) && children.length === 0) || 
-                              (typeof children === 'string' && children.trim() === '')) {
-                            return null;
-                          }
-                          return <li className="ml-2 my-1" {...props}>{children}</li>;
-                        },
-                        h1: ({node, ...props}) => <h1 className="text-2xl font-bold my-4" {...props} />,
-                        h2: ({node, ...props}) => <h2 className="text-xl font-bold my-3" {...props} />,
-                        h3: ({node, ...props}) => <h3 className="text-lg font-bold my-3" {...props} />,
-                        p: ({node, children, ...props}) => {
-                          // Skip rendering empty paragraphs
-                          if (!children || (Array.isArray(children) && children.length === 0) || 
-                              (typeof children === 'string' && children.trim() === '')) {
-                            return null;
-                          }
-                          return <p className="my-4" {...props}>{children}</p>;
-                        },
-                        // Add table rendering components
-                        table: ({node, ...props}) => <table className="min-w-full border border-gray-200 my-4" {...props} />,
-                        thead: ({node, ...props}) => <thead className="bg-gray-50" {...props} />,
-                        tbody: ({node, ...props}) => <tbody className="divide-y divide-gray-200" {...props} />,
-                        tr: ({node, ...props}) => <tr className="hover:bg-gray-50" {...props} />,
-                        th: ({node, ...props}) => <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 uppercase tracking-wider border border-gray-200" {...props} />,
-                        td: ({node, ...props}) => <td className="px-4 py-2 text-sm text-gray-500 border border-gray-200" {...props} />,
-                      }}
-                    >
-                      {currentLesson.aboutLesson}
-                    </ReactMarkdown>
+              <div ref={videoRef} className="mb-6">
+                <LessonVideo 
+                  videoUrl={currentLesson?.videoUrl} 
+                  title={currentLesson?.title}
+                />
+              </div>
+              
+              {/* Content Tabs */}
+              <div className="border-b border-gray-200 mb-6">
+                <nav className="-mb-px flex space-x-8">
+                  <button
+                    onClick={() => setActiveTab('content')}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                      activeTab === 'content'
+                        ? 'border-indigo-500 text-indigo-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    Content
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('resources')}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                      activeTab === 'resources'
+                        ? 'border-indigo-500 text-indigo-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    Resources
+                  </button>
+                </nav>
+              </div>
+              
+              {/* Tab Content */}
+              <div className="mb-8">
+                {activeTab === 'content' && (
+                  <div className="prose max-w-none">
+                    {isAIGeneratedPlan ? (
+                      // AI-generated content description
+                      <div>
+                        <p className="text-gray-700">
+                          This video was selected as part of your AI-generated learning plan on {course.title}. 
+                          It covers key concepts about {currentLesson.title.toLowerCase()}.
+                        </p>
+                        
+                        {currentLesson.description && (
+                          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
+                            <h4 className="font-medium mb-2">Video Description</h4>
+                            <p className="text-sm text-gray-600">{currentLesson.description}</p>
+                          </div>
+                        )}
+                        
+                        <div className="mt-6 p-4 border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-md">
+                          <h4 className="font-semibold text-indigo-800 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Learning Tips
+                          </h4>
+                          <ul className="list-disc pl-5 space-y-2 mt-2 text-gray-700">
+                            <li>Take notes on key concepts as you watch</li>
+                            <li>Try to implement what you learn right away</li>
+                            <li>Revisit challenging sections multiple times</li>
+                            <li>Continue to the next video once you understand the material</li>
+                          </ul>
+                        </div>
+                      </div>
+                    ) : (
+                      // Standard content description
+                      <div>
+                        <p className="text-gray-700">
+                          This lesson covers the essential concepts of {currentLesson.title.toLowerCase()}. 
+                          You'll learn the fundamentals and how to apply them in real-world scenarios.
+                        </p>
+                        <ul className="list-disc pl-5 space-y-2 mt-4 text-gray-700">
+                          <li>Understanding the core concepts of {currentLesson.title}</li>
+                          <li>How to implement these patterns in your own projects</li>
+                          <li>Best practices and common pitfalls to avoid</li>
+                          <li>Integration with other related technologies</li>
+                        </ul>
+                        <p>
+                          After completing this lesson, you'll have a solid understanding of how to use {currentLesson.title.toLowerCase()} 
+                          in your own projects and applications.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {activeTab === 'resources' && (
+                  <div className="space-y-6">
+                    <p className="text-gray-600">Additional resources and materials for this lesson will be available here.</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Navigation */}
+              <div className="flex justify-between items-center">
+                <button 
+                  className={`px-6 py-3 rounded-lg border font-medium flex items-center ${
+                    activeChapter === 0 && activeLesson === 0 
+                      ? 'border-gray-200 text-gray-400 cursor-not-allowed' 
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors'
+                  }`}
+                  onClick={goToPrevLesson}
+                  disabled={activeChapter === 0 && activeLesson === 0}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Previous Lesson
+                </button>
+                
+                <button 
+                  className={`px-6 py-3 rounded-lg font-medium flex items-center ${
+                    savingProgress ? 'bg-gray-400 cursor-not-allowed' : 
+                    'bg-indigo-600 hover:bg-indigo-700 transition-colors'
+                  } text-white`}
+                  onClick={goToNextLesson}
+                  disabled={savingProgress}
+                >
+                  {savingProgress ? (
+                    <>
+                      <span className="mr-2 h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                      Saving...
+                    </>
                   ) : (
                     <>
-                      <p className="text-gray-700">
-                        This lesson covers the essential concepts of {currentLesson.title.toLowerCase()}. 
-                        You'll learn the fundamentals and how to apply them in real-world scenarios.
-                      </p>
-                      <h3 className="text-lg font-semibold mt-6">What you'll learn</h3>
-                      <ul className="list-disc pl-5 space-y-2 mt-2 mb-4">
-                        <li>Understanding the core concepts of {currentLesson.title}</li>
-                        <li>How to implement these patterns in your own projects</li>
-                        <li>Best practices and common pitfalls to avoid</li>
-                        <li>Integration with other Next.js features</li>
-                      </ul>
-                      <p>
-                        After completing this lesson, you'll have a solid understanding of how to use {currentLesson.title.toLowerCase()} 
-                        to build more dynamic and efficient React applications with Next.js.
-                      </p>
+                      {currentLesson.completed ? "Next Lesson" : "Mark as Complete"}
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" />
+                      </svg>
                     </>
                   )}
-                </div>
-              )}
-              
-              {activeTab === 'resources' && (
-                <div>
-                  <div className="space-y-6">
-                    {/* Internet Resources collapsible section */}
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                      <button 
-                        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-                        onClick={() => setInternetResourcesOpen(!internetResourcesOpen)}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="bg-blue-100 rounded-lg p-2 flex-shrink-0">
-                            {/* Changed icon style to be more clear and properly sized */}
-                            <svg className="w-5 h-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10"></circle>
-                              <line x1="2" y1="12" x2="22" y2="12"></line>
-                              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                            </svg>
-                          </div>
-                          <div className="text-left">
-                            <h4 className="font-medium">Internet Resources</h4>
-                            <p className="text-sm text-gray-600 mt-1">Online documentation and references</p>
-                          </div>
-                        </div>
-                        <svg 
-                          xmlns="http://www.w3.org/2000/svg" 
-                          className={`h-5 w-5 text-gray-500 transition-transform duration-200 ${internetResourcesOpen ? 'transform rotate-180' : ''}`} 
-                          viewBox="0 0 20 20" 
-                          fill="currentColor"
-                        >
-                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                      
-                      {/* Internet Resources content - collapsible */}
-                      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${internetResourcesOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-                        <div className="p-4 border-t border-gray-100 space-y-3">
-                          {currentLesson && currentLesson.resources && currentLesson.resources.internet && currentLesson.resources.internet.length > 0 ? (
-                            currentLesson.resources.internet.map((resource, index) => (
-                              <div key={`internet-${index}`} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
-                                <div>
-                                  <h5 className="font-medium text-gray-800">{resource.name}</h5>
-                                  <p className="text-sm text-gray-500 mt-1">{resource.description}</p>
-                                </div>
-                                <a
-                                  href={resource.link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded text-sm font-medium hover:bg-blue-100 transition-colors"
-                                >
-                                  Open Link
-                                </a>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-4 text-gray-500">No internet resources available for this lesson</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Downloadable Resources collapsible section */}
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                      <button 
-                        className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-                        onClick={() => setDownloadResourcesOpen(!downloadResourcesOpen)}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="bg-green-100 rounded-lg p-2 flex-shrink-0">
-                            <svg className="w-5 h-5 text-green-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                              <polyline points="7 10 12 15 17 10" />
-                              <line x1="12" y1="15" x2="12" y2="3" />
-                            </svg>
-                          </div>
-                          <div className="text-left">
-                            <h4 className="font-medium">Downloadable Resources</h4>
-                            <p className="text-sm text-gray-600 mt-1">Files and documents to download</p>
-                          </div>
-                        </div>
-                        <svg 
-                          xmlns="http://www.w3.org/2000/svg" 
-                          className={`h-5 w-5 text-gray-500 transition-transform duration-200 ${downloadResourcesOpen ? 'transform rotate-180' : ''}`} 
-                          viewBox="0 0 20 20" 
-                          fill="currentColor"
-                        >
-                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                      
-                      {/* Downloadable Resources content - collapsible */}
-                      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${downloadResourcesOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-                        <div className="p-4 border-t border-gray-100 space-y-3">
-                          {currentLesson && currentLesson.resources && currentLesson.resources.downloadable && currentLesson.resources.downloadable.length > 0 ? (
-                            // Map through and display actual downloadable resources
-                            currentLesson.resources.downloadable.map((resource, index) => (
-                              <div key={`download-${index}`} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg">
-                                <div>
-                                  <h5 className="font-medium text-gray-800">{resource.name}</h5>
-                                  <p className="text-sm text-gray-500 mt-1">{resource.description}</p>
-                                </div>
-                                <a
-                                  href={resource.link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-3 py-1.5 bg-green-50 text-green-600 rounded text-sm font-medium hover:bg-green-100 transition-colors flex items-center"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                  </svg>
-                                  Download
-                                </a>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-4 text-gray-500">No downloadable resources available for this lesson</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Remove the transcript tab content section */}
-            </div>
-
-            {/* Navigation Controls */}
-            <div className="flex justify-between items-center mt-8 border-t pt-6">
-              <button 
-                className="px-6 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-gray-800 font-medium flex items-center"
-                onClick={goToPrevLesson}
-                disabled={activeChapter === 0 && activeLesson === 0}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                Previous
-              </button>
-              
-              <div className="text-center hidden md:block">
-                <p className="text-sm text-gray-600 mb-1">
-                  {activeLesson + 1} of {course.chapters[activeChapter].lessons.length} in this section
-                </p>
-                <div className="w-36 bg-gray-200 h-1 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-indigo-600 h-1" 
-                    style={{ width: `${((activeLesson + 1) / course.chapters[activeChapter].lessons.length) * 100}%` }}
-                  ></div>
-                </div>
+                </button>
               </div>
-              
-              <button 
-                className={`px-6 py-3 rounded-lg font-medium flex items-center ${
-                  savingProgress ? 'bg-gray-400 cursor-not-allowed' : 
-                  'bg-indigo-600 hover:bg-indigo-700 transition-colors'
-                } text-white`}
-                onClick={goToNextLesson}
-                disabled={savingProgress}
-              >
-                {savingProgress ? (
-                  <>
-                    <span className="mr-2 h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    {currentLesson.completed ? "Next Lesson" : "Mark as Complete"}
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10 10l-2.707-2.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </>
-                )}
-              </button>
             </div>
           </>
         );
@@ -1195,7 +897,10 @@ const CourseLearning = ({ params, pathname, onSidebarToggle }) => {
           totalLessons={totalLessons}
           toggleChapter={toggleChapter}
           toggleSidebar={() => setSidebarVisible(!sidebarVisible)}
-          toggleLessonCompletion={toggleLessonCompletion} // Pass the function to toggle lesson completion
+          toggleLessonCompletion={toggleLessonCompletion}
+          learningPlans={learningPlans}
+          isAIGeneratedPlan={isAIGeneratedPlan}
+          navigate={navigate}
         />
       </div>
     </div>

@@ -1,6 +1,7 @@
 from django.db import models
-import uuid
 from django.conf import settings
+import uuid
+from django.core.exceptions import ValidationError
 
 class BaseCourse(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -46,6 +47,7 @@ class EngineeringCourse(BaseCourse):
         ('advanced', 'Advanced'),
     )
     
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='engineering_courses')
     subject = models.CharField(max_length=100, blank=True, null=True)
     sources = models.CharField(max_length=255, blank=True, null=True)
     proficiency = models.CharField(max_length=20, choices=PROFICIENCY_CHOICES, default='beginner')
@@ -114,7 +116,7 @@ class LessonResource(models.Model):
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='resources')
     type = models.CharField(max_length=20, choices=RESOURCE_TYPE_CHOICES)
     title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)  # Added description field
+    description = models.TextField(blank=True)
     url = models.URLField(blank=True)
     file = models.FileField(upload_to='lesson_resources/', null=True, blank=True)
     
@@ -135,14 +137,26 @@ class QuizResult(models.Model):
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='quiz_results')
     answers = models.JSONField(default=dict)  # Store user's answers
     score = models.FloatField()  # Percentage score
+    total_questions = models.PositiveIntegerField(default=0)
     passed = models.BooleanField(default=False)
     submitted_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
         ordering = ['-submitted_at']
+        indexes = [
+            models.Index(fields=['user', 'lesson'], name='idx_user_lesson_quiz'),
+            models.Index(fields=['submitted_at'], name='idx_quiz_submitted_at'),
+        ]
+    
+    @property
+    def percentage(self):
+        """Calculate percentage score"""
+        if self.total_questions == 0:
+            return 0
+        return (self.score / self.total_questions) * 100
     
     def __str__(self):
-        return f"{self.user} - {self.lesson.title} - {self.score}%"
+        return f"{self.user.email} - {self.lesson.title} - {self.score}/{self.total_questions}"
 
 class UserLessonProgress(models.Model):
     """Tracks which lessons a user has completed"""
@@ -156,3 +170,126 @@ class UserLessonProgress(models.Model):
     
     def __str__(self):
         return f"{self.user} - {self.lesson.title} - {self.completed_at.strftime('%Y-%m-%d')}"
+
+# AI-Generated Learning Plan Model - Single unified model
+class AILearningPlan(models.Model):
+    """Unified model for AI-generated learning plans with all data stored in JSON fields"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ai_learning_plans')
+    title = models.CharField(max_length=255)  # The learning goal
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_completed = models.BooleanField(default=False)
+    
+    # Store all learning plan data as JSON
+    plan_data = models.JSONField(default=dict, help_text="Complete learning plan data including days, topics, projects, and videos")
+    
+    # Optional metadata
+    duration_days = models.PositiveIntegerField(default=7)
+    difficulty_level = models.CharField(max_length=20, default='beginner')
+    category = models.CharField(max_length=100, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'AI Learning Plan'
+        verbose_name_plural = 'AI Learning Plans'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'title'],
+                name='unique_user_learning_plan_title'
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'created_at'], name='idx_user_created_at'),
+            models.Index(fields=['category', 'difficulty_level'], name='idx_category_difficulty'),
+        ]
+    
+    def __str__(self):
+        return f"{self.title} - {self.user.email if self.user else 'No User'}"
+    
+    def clean(self):
+        """Validate the model before saving"""
+        super().clean()
+        
+        # Validate plan_data structure
+        if self.plan_data:
+            required_keys = ['goal', 'days']
+            for key in required_keys:
+                if key not in self.plan_data:
+                    raise ValidationError(f"plan_data must contain '{key}' field")
+            
+            # Validate days structure
+            days = self.plan_data.get('days', [])
+            if not isinstance(days, list):
+                raise ValidationError("plan_data.days must be a list")
+            
+            for i, day in enumerate(days):
+                if not isinstance(day, dict):
+                    raise ValidationError(f"Day {i+1} must be a dictionary")
+                
+                required_day_keys = ['day', 'topic']
+                for key in required_day_keys:
+                    if key not in day:
+                        raise ValidationError(f"Day {i+1} must contain '{key}' field")
+                
+                # Validate videos structure
+                videos = day.get('videos', [])
+                if not isinstance(videos, list):
+                    raise ValidationError(f"Day {i+1} videos must be a list")
+                
+                for j, video in enumerate(videos):
+                    if not isinstance(video, dict):
+                        raise ValidationError(f"Day {i+1}, Video {j+1} must be a dictionary")
+                    
+                    if 'title' not in video:
+                        raise ValidationError(f"Day {i+1}, Video {j+1} must have a title")
+    
+    def save(self, *args, **kwargs):
+        """Override save to run validation"""
+        self.clean()
+        super().save(*args, **kwargs)
+    
+    @property
+    def days_count(self):
+        """Get the number of days in the learning plan"""
+        return len(self.plan_data.get('days', []))
+    
+    @property
+    def total_videos(self):
+        """Get the total number of videos across all days"""
+        total = 0
+        for day in self.plan_data.get('days', []):
+            total += len(day.get('videos', []))
+        return total
+    
+    @classmethod
+    def find_similar_plans(cls, user, title, threshold=0.8):
+        """Find similar learning plans for the same user"""
+        from difflib import SequenceMatcher
+        
+        existing_plans = cls.objects.filter(user=user)
+        similar_plans = []
+        
+        for plan in existing_plans:
+            similarity = SequenceMatcher(None, title.lower(), plan.title.lower()).ratio()
+            if similarity >= threshold:
+                similar_plans.append((plan, similarity))
+        
+        return sorted(similar_plans, key=lambda x: x[1], reverse=True)
+    
+    @classmethod
+    def create_with_duplicate_check(cls, user, title, **kwargs):
+        """Create a learning plan with duplicate checking"""
+        # Check for exact duplicates
+        if cls.objects.filter(user=user, title=title).exists():
+            raise ValueError(f"Learning plan with title '{title}' already exists for this user")
+        
+        # Check for similar plans
+        similar_plans = cls.find_similar_plans(user, title)
+        if similar_plans:
+            similar_titles = [plan[0].title for plan in similar_plans[:3]]
+            raise ValueError(f"Similar learning plans found: {similar_titles}")
+        
+        # Create the plan
+        return cls.objects.create(user=user, title=title, **kwargs)

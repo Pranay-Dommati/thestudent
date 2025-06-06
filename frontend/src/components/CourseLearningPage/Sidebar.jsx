@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaChevronRight } from 'react-icons/fa';
+import { FaSearch, FaChevronRight, FaChevronLeft, FaRobot, FaBook } from 'react-icons/fa';
 
 const Sidebar = ({ 
   isSidebarOpen, 
@@ -13,8 +13,11 @@ const Sidebar = ({
   completedLessons = 0, 
   totalLessons = 0, 
   toggleChapter,
-  toggleSidebar,  // Toggle sidebar function
-  toggleLessonCompletion // New prop for toggling lesson completion
+  toggleSidebar,  // Add this prop to receive the toggle function
+  toggleLessonCompletion, // Add this prop for handling lesson completion toggle
+  learningPlans = [], // AI-generated learning plans
+  isAIGeneratedPlan = false, // Whether the current course is an AI-generated plan
+  navigate // For navigation to other learning plans
 }) => {
   // Filter lessons based on search
   const filteredChapters = () => {
@@ -65,6 +68,31 @@ const Sidebar = ({
             <div className="flex justify-between text-xs text-gray-500 mt-1">
               <span>{completedLessons}/{totalLessons} lessons completed</span>
             </div>
+          </div>
+        </div>
+        
+        {/* Removed AI Learning Plans Section to maintain clear separation between AI and manual courses */}
+        
+        {/* Current Plan Type Indicator - Enhanced for better separation */}
+        <div className={`px-4 py-3 border-b border-gray-200 ${isAIGeneratedPlan ? 'bg-gradient-to-r from-indigo-50 to-blue-50' : 'bg-gray-50'}`}>
+          <div className="flex items-center">
+            {isAIGeneratedPlan ? (
+              <>
+                <FaRobot className="text-indigo-600 mr-2" />
+                <div>
+                  <span className="text-sm font-medium text-indigo-800">AI-Generated Learning Plan</span>
+                  <p className="text-xs text-indigo-600">Personalized content curated by AI</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <FaBook className="text-gray-600 mr-2" />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Manual Course Content</span>
+                  <p className="text-xs text-gray-500">Structured curriculum and lessons</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
         
