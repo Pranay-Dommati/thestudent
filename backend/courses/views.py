@@ -525,13 +525,15 @@ def toggle_lesson_completion(request, lesson_id):
         # Check if lesson progress record exists
         progress, created = UserLessonProgress.objects.get_or_create(
             user=user,
-            lesson=lesson
+            lesson=lesson,
+            defaults={'is_completed': True}
         )
         
-        # If it existed and we're toggling, delete it to mark as incomplete
+        # Toggle the is_completed status
         if not created:
-            progress.delete()
-            status_message = 'incomplete'
+            progress.is_completed = not progress.is_completed
+            progress.save()
+            status_message = 'incomplete' if not progress.is_completed else 'complete'
         else:
             status_message = 'complete'
         
@@ -547,7 +549,8 @@ def toggle_lesson_completion(request, lesson_id):
                 total_lessons += chapter_lessons.count()
                 completed_lessons += UserLessonProgress.objects.filter(
                     user=user,
-                    lesson__in=chapter_lessons
+                    lesson__in=chapter_lessons,
+                    is_completed=True
                 ).count()
         elif lesson.section:
             # Engineering course
@@ -557,13 +560,14 @@ def toggle_lesson_completion(request, lesson_id):
                 total_lessons += section_lessons.count()
                 completed_lessons += UserLessonProgress.objects.filter(
                     user=user, 
-                    lesson__in=section_lessons
+                    lesson__in=section_lessons,
+                    is_completed=True
                 ).count()
         
         progress_percentage = 0
         if total_lessons > 0:
             progress_percentage = int((completed_lessons / total_lessons) * 100)
-            
+        
         return Response({
             'status': status_message,
             'lesson_id': lesson_id,
@@ -615,11 +619,11 @@ def get_course_progress(request, course_id):
             for chapter in course.chapters.all():
                 chapter_lessons = chapter.lessons.all()
                 total_lessons += chapter_lessons.count()
-                
-                # Get completed lessons in this chapter
+                  # Get completed lessons in this chapter
                 completed_lesson_ids = UserLessonProgress.objects.filter(
                     user=user, 
-                    lesson__chapter=chapter
+                    lesson__chapter=chapter,
+                    is_completed=True
                 ).values_list('lesson_id', flat=True)
                 
                 chapter_completed = len(completed_lesson_ids)

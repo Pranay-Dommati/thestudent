@@ -14,6 +14,7 @@ const Sidebar = ({
   totalLessons = 0, 
   toggleChapter,
   toggleSidebar,  // Add this prop to receive the toggle function
+  toggleLessonCompletion, // Add this prop for handling lesson completion toggle
   learningPlans = [], // AI-generated learning plans
   isAIGeneratedPlan = false, // Whether the current course is an AI-generated plan
   navigate // For navigation to other learning plans
@@ -151,9 +152,16 @@ const Sidebar = ({
                       }`}
                       onClick={() => handleLessonClick(chapterIndex, lessonIndex)}
                     >
-                      <div className={`w-5 h-5 flex-shrink-0 rounded-full border flex items-center justify-center mr-3 ${
-                        lesson.completed ? 'bg-green-100 border-green-400' : 'border-gray-300'
-                      }`}>
+                      {/* Clickable completion indicator - stops event propagation */}
+                      <div 
+                        className={`w-5 h-5 flex-shrink-0 rounded-full border flex items-center justify-center mr-3 cursor-pointer ${
+                          lesson.completed ? 'bg-green-100 border-green-400' : 'border-gray-300'
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering the parent's onClick
+                          toggleLessonCompletion(chapterIndex, lessonIndex);
+                        }}
+                      >
                         {lesson.completed && (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-green-600" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
