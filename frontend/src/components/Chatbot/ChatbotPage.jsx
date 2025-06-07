@@ -535,12 +535,16 @@ const ChatbotPage = () => {
   };
 
   const suggestionTopics = [
-    "Course recommendations",
-    "Study techniques",
-    "Career paths",
-    "Programming help",
-    "Learn ReactJS in 30 days",
-    "Create a Python learning plan",
+    "Learn Web Development in 30 days",
+    "Create a Data Science learning plan",
+    "Master Digital Marketing in 21 days",
+    "Learn UI/UX Design in 14 days",
+    "Create a Machine Learning course",
+    "Learn Mobile App Development",
+    "Master Photography in 30 days",
+    "Create a Business Strategy course",
+    "Learn Game Development",
+    "Master Public Speaking"
   ];
 
   const handleSuggestion = (topic) => {
