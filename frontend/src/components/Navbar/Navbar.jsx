@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
@@ -8,8 +8,6 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-  const dropdownRef = useRef(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -22,30 +20,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
     };
     handleScroll();
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsProfileDropdownOpen(false);
-      }
-    };
-
-    const handleEscapeKey = (event) => {
-      if (event.key === 'Escape') {
-        setIsProfileDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscapeKey);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscapeKey);
-    };
-  }, []);
+    return () => window.removeEventListener('scroll', handleScroll);  }, []);
 
   let backgroundClass = '';
   if (isScrolled) {
@@ -61,11 +36,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const textColor = (isScrolled || initialStyle === 'light') 
     ? 'text-gray-700 hover:text-blue-600' 
     : 'text-white hover:text-blue-200';
-
   const handleLogout = () => {
     logout();
     navigate('/');
-    setIsProfileDropdownOpen(false);
   };
 
   return (
@@ -115,33 +88,16 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           </div>
           
           {/* Profile section - Add md:block to hide on mobile */}
-          <div className="flex items-center justify-end w-[200px]">
-            {isLoggedIn ? (
-              <div className="relative hidden md:block" ref={dropdownRef}>
-                <button 
-                  onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+          <div className="flex items-center justify-end w-[200px]">            {isLoggedIn ? (
+              <div className="hidden md:flex">
+                <Link 
+                  to="/profile"
                   className="flex items-center space-x-2 focus:outline-none"
                 >
                   <div className="w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white cursor-pointer hover:opacity-90 transition-opacity">
                     <FaUserCircle className="w-6 h-6" />
                   </div>
-                </button>
-
-                {isProfileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 py-2 bg-white rounded-lg shadow-xl border border-gray-100">                    <Link to="/profile" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
-                      <FaUserCircle className="w-4 h-4 mr-2" />
-                      <span>Profile</span>
-                    </Link>
-                    <hr className="my-2" />
-                    <button 
-                      onClick={handleLogout}
-                      className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-gray-100 cursor-pointer"
-                    >
-                      <FaSignOutAlt className="w-4 h-4 mr-2" />
-                      <span>Sign Out</span>
-                    </button>
-                  </div>
-                )}
+                </Link>
               </div>
             ) : (
               <div className="hidden md:flex items-center space-x-4">
