@@ -26,15 +26,16 @@ export const AuthProvider = ({ children }) => {
     };
     
     checkAuth();
-  }, []);
-
-  const register = async (name, email, password) => {
+  }, []);  const register = async (registrationData) => {
     try {
-      const response = await axiosInstance.post('/auth/register/', {
-        full_name: name,
-        email: email,
-        password: password
-      });
+      // Map frontend field names to backend field names
+      const backendData = {
+        ...registrationData,
+        full_name: registrationData.name, // Map 'name' to 'full_name'
+      };
+      delete backendData.name; // Remove the 'name' field
+      
+      const response = await axiosInstance.post('/auth/register/', backendData);
 
       const { user, tokens } = response.data;
 
@@ -54,6 +55,10 @@ export const AuthProvider = ({ children }) => {
       if (errorData) {
         if (errorData.password) {
           toast.error(errorData.password[0]); // Show the first password error
+        } else if (errorData.email) {
+          toast.error(errorData.email[0]);
+        } else if (errorData.non_field_errors) {
+          toast.error(errorData.non_field_errors[0]);
         } else {
           toast.error('Registration failed. Please check your input.');
         }

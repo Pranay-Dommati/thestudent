@@ -1,27 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  FaUser, FaLock, FaUsers, FaBrain, FaBell, 
+  FaUser, FaLock, FaUsers, FaBell, 
   FaGoogle, FaGithub
 } from 'react-icons/fa';
-import BasicProfile from './tabs/BasicProfile';
+import BasicProfile from './tabs/BasicProfileTest';
 import SecuritySettings from './tabs/SecuritySettings';
 import CommunitySection from './tabs/CommunitySection';
-import AISettings from './tabs/AISettings';
 import Notifications from './tabs/Notifications';
 import ProfileNavbar from './layout/ProfileNavbar';
 import Footer from '../Footer/Footer';
+import { useAuth } from '../../context/AuthContext';
 
 const ProfilePage = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const { user } = useAuth();
+  
+  // Initialize profile data from user context or defaults
   const [profileData, setProfileData] = useState({
-    name: 'John Doe',
-    username: 'johndoe',
-    bio: 'Passionate learner | Full Stack Developer | AI Enthusiast',
+    name: user?.full_name || 'John Doe',
+    email: user?.email || 'john.doe@example.com',
     avatar: 'https://avatars.githubusercontent.com/u/12345678',
-    badges: [] // Removed badges array
+    classLevel: user?.class_level || '',
+    boardOfEducation: user?.board_of_education || '',
+    country: user?.country || ''
   });
+
+  // Update profile data when user data changes
+  useEffect(() => {
+    if (user) {
+      setProfileData(prev => ({
+        ...prev,
+        name: user.full_name,
+        email: user.email,
+        classLevel: user.class_level,
+        boardOfEducation: user.board_of_education,
+        country: user.country
+      }));
+    }
+  }, [user]);
 
   const handleProfileUpdate = (updatedData) => {
     // Update the profile data in the parent component
@@ -30,15 +48,12 @@ const ProfilePage = () => {
       ...updatedData
     }));
   };
-
   const tabs = [
     { id: 'profile', label: 'Profile', icon: FaUser },
     { id: 'security', label: 'Security', icon: FaLock },
     { id: 'community', label: 'Community', icon: FaUsers },
-    { id: 'ai', label: "AI'Settings", icon: FaBrain },
     { id: 'notifications', label: 'Notifications', icon: FaBell }
   ];
-
   const renderTabContent = () => {
     switch (activeTab) {
       case 'profile':
@@ -47,8 +62,6 @@ const ProfilePage = () => {
         return <SecuritySettings isDarkMode={isDarkMode} />;
       case 'community':
         return <CommunitySection isDarkMode={isDarkMode} />;
-      case 'ai':
-        return <AISettings isDarkMode={isDarkMode} />;
       case 'notifications':
         return <Notifications isDarkMode={isDarkMode} />;
       default:
@@ -75,9 +88,7 @@ const ProfilePage = () => {
                     className="w-full h-full object-cover"
                   />
                 </div>
-              </div>
-
-              {/* Profile Info */}
+              </div>              {/* Profile Info */}
               <div className="flex-1 text-center md:text-left pt-2">
                 <h1 className={`text-3xl font-bold mb-2 ${
                   isDarkMode ? 'text-white' : 'text-gray-800'
@@ -87,14 +98,27 @@ const ProfilePage = () => {
                 <p className={`text-lg mb-2 ${
                   isDarkMode ? 'text-gray-300' : 'text-gray-600'
                 }`}>
-                  @{profileData.username}
+                  {profileData.email}
                 </p>
-                <p className={`text-sm mb-4 max-w-2xl ${
+                <div className={`text-sm mb-4 max-w-2xl ${
                   isDarkMode ? 'text-gray-400' : 'text-gray-500'
                 }`}>
-                  {profileData.bio}
-                </p>
-                {/* Removed badges section */}
+                  {profileData.classLevel && (
+                    <span className="mr-4">
+                      <strong>Class:</strong> {profileData.classLevel}
+                    </span>
+                  )}
+                  {profileData.boardOfEducation && (
+                    <span className="mr-4">
+                      <strong>Board:</strong> {profileData.boardOfEducation.toUpperCase()}
+                    </span>
+                  )}
+                  {profileData.country && (
+                    <span>
+                      <strong>Country:</strong> {profileData.country.charAt(0).toUpperCase() + profileData.country.slice(1)}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Quick Actions - Notifications with onClick handler */}

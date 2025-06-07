@@ -12,7 +12,7 @@ import TenthStandard from './components/Courses/categories/10th/TenthStandard';
 import EleventhStandard from './components/Courses/categories/11th/EleventhStandard';
 import TwelfthStandard from './components/Courses/categories/12th/TwelfthStandard';
 import Undergraduate from './components/Courses/categories/engineering/Engineering';
-import ProfileLayout from './components/Profile/ProfilePage';
+import ProfileLayout from './components/Profile/ProfilePageNew';
 import CourseDetails from './components/CourseDetails/CourseDetails';
 import SchoolCourseDetails from './components/CourseDetails/SchoolCourseDetails';
 import Navbar from './components/Navbar/Navbar';
@@ -28,6 +28,7 @@ import IndustryExperts from './components/Mentoring/IndustryExperts/IndustryExpe
 import AlumniMentorship from './components/Mentoring/AlumniMentorship/AlumniMentorship';
 import CollegeSeniors from './components/Mentoring/CollegeSeniors/CollegeSeniors';
 import MentoringNavbar from './components/Mentoring/MentoringNavbar';
+import TermsAndConditions from './components/Legal/TermsAndConditions';
 import './utils/axios';
 
 const CourseDetailsWrapper = () => {
@@ -127,11 +128,10 @@ const App = () => {
               <Route path="engineering" element={<Undergraduate />} />
               <Route path="engineering/cbse" element={<Undergraduate />} />
               <Route path="engineering/state/:stateId" element={<Undergraduate />} />
-            </Route>
-
-            {/* Other Routes */}
+            </Route>            {/* Other Routes */}
             <Route path="/profile" element={<ProfileLayout />} />
             <Route path="/help-center" element={<HelpCenter />} />
+            <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
             <Route path="/chat" element={<ChatBotPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />

@@ -26,11 +26,15 @@ export default function AuthForm() {
       setIsSignUp(false);
     }
   }, [modeParam]);
-
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
+    confirmPassword: '',
+    classLevel: '',
+    boardOfEducation: '',
+    country: '',
+    agreedToTerms: false
   });
   const [formErrors, setFormErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -52,9 +56,13 @@ export default function AuthForm() {
   };
 
   const { register, login } = useAuth();
-
   const validateForm = () => {
     const errors = {};
+
+    // Validate name (for signup)
+    if (isSignUp && !formData.name) {
+      errors.name = "Full name is required";
+    }
 
     // Validate email
     if (!formData.email) {
@@ -68,6 +76,33 @@ export default function AuthForm() {
       errors.password = "Password is required";
     } else if (formData.password.length < 6) {
       errors.password = "Password must be at least 6 characters";
+    }
+
+    // Validate confirm password (for signup)
+    if (isSignUp && !formData.confirmPassword) {
+      errors.confirmPassword = "Please confirm your password";
+    } else if (isSignUp && formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = "Passwords do not match";
+    }
+
+    // Validate class level (for signup)
+    if (isSignUp && !formData.classLevel) {
+      errors.classLevel = "Class level is required";
+    }
+
+    // Validate board of education (for signup and specific class levels)
+    if (isSignUp && ['10th', '11th', '12th'].includes(formData.classLevel) && !formData.boardOfEducation) {
+      errors.boardOfEducation = "Board of education is required";
+    }
+
+    // Validate country (for signup)
+    if (isSignUp && !formData.country) {
+      errors.country = "Country is required";
+    }
+
+    // Validate terms agreement (for signup)
+    if (isSignUp && !formData.agreedToTerms) {
+      errors.agreedToTerms = "You must agree to the terms and conditions";
     }
 
     return errors;
@@ -91,10 +126,20 @@ export default function AuthForm() {
         const response = await login(formData.email, formData.password);
         if (response) {
           navigate('/'); // Redirect to the homepage on successful login
-        }
-      } else {
-        // Registration logic (already implemented)
-        const success = await register(formData.name, formData.email, formData.password);
+        }      } else {
+        // Registration logic
+        const registrationData = {
+          full_name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          confirm_password: formData.confirmPassword,
+          class_level: formData.classLevel,
+          board_of_education: formData.boardOfEducation,
+          country: formData.country,
+          agreed_to_terms: formData.agreedToTerms
+        };
+        
+        const success = await register(registrationData);
         if (success) {
           navigate('/');
         }
@@ -195,35 +240,36 @@ export default function AuthForm() {
                 <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800">
                   {isSignUp ? 'Create Account' : 'Login'}
                 </h2>
-                
-                <form className="w-full max-w-sm space-y-4" onSubmit={handleSubmit}>
-                  <AnimatePresence>
-                    {isSignUp && (
+                  <form className="w-full max-w-sm space-y-4" onSubmit={handleSubmit}>
+                  <AnimatePresence>                    {isSignUp && (
                       <motion.div 
-                        className="relative"
+                        className="space-y-4"
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2 }}
                       >
-                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                          <FaRegUser />
+                        {/* Full Name */}
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+                            <FaRegUser />
+                          </div>
+                          <input 
+                            className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                              formErrors.name ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                            }`}
+                            type="text" 
+                            name="name"
+                            placeholder="Full Name" 
+                            value={formData.name}
+                            onChange={handleChange}
+                          />
+                          {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
                         </div>
-                        <input 
-                          className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                            formErrors.name ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                          }`}
-                          type="text" 
-                          name="name"
-                          placeholder="Full Name" 
-                          value={formData.name}
-                          onChange={handleChange}
-                        />
-                        {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
                       </motion.div>
-                    )}
-                  </AnimatePresence>
+                    )}                  </AnimatePresence>
                   
+                  {/* Email Field - Common for both login and signup */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
                       <FaRegEnvelope />
@@ -241,6 +287,7 @@ export default function AuthForm() {
                     {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
                   </div>
                   
+                  {/* Password Field - Common for both login and signup */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
                       <FaLock />
@@ -257,6 +304,108 @@ export default function AuthForm() {
                     />
                     {formErrors.password && <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>}
                   </div>
+
+                  <AnimatePresence>
+                    {isSignUp && (
+                      <motion.div 
+                        className="space-y-4"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        {/* Confirm Password */}
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+                            <FaLock />
+                          </div>
+                          <input 
+                            className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                              formErrors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                            }`} 
+                            type="password" 
+                            name="confirmPassword"
+                            placeholder="Confirm Password" 
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
+                          />
+                          {formErrors.confirmPassword && <p className="text-red-500 text-xs mt-1">{formErrors.confirmPassword}</p>}
+                        </div>
+
+                        {/* Class Level */}
+                        <div>
+                          <select 
+                            name="classLevel"
+                            value={formData.classLevel}
+                            onChange={handleChange}
+                            className={`w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                              formErrors.classLevel ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                            }`}
+                          >
+                            <option value="">Select Class Level</option>
+                            <option value="10th">10th Grade</option>
+                            <option value="11th">11th Grade</option>
+                            <option value="12th">12th Grade</option>
+                            <option value="other">Other</option>
+                          </select>
+                          {formErrors.classLevel && <p className="text-red-500 text-xs mt-1">{formErrors.classLevel}</p>}
+                        </div>
+
+                        {/* Board of Education - Only show for 10th, 11th, 12th */}
+                        {['10th', '11th', '12th'].includes(formData.classLevel) && (
+                          <div>
+                            <select 
+                              name="boardOfEducation"
+                              value={formData.boardOfEducation}
+                              onChange={handleChange}
+                              className={`w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                                formErrors.boardOfEducation ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                              }`}
+                            >
+                              <option value="">Select Board of Education</option>
+                              <option value="cbse">CBSE</option>
+                              <option value="state_board">State Board</option>
+                            </select>
+                            {formErrors.boardOfEducation && <p className="text-red-500 text-xs mt-1">{formErrors.boardOfEducation}</p>}
+                          </div>
+                        )}
+
+                        {/* Country */}
+                        <div>
+                          <select 
+                            name="country"
+                            value={formData.country}
+                            onChange={handleChange}
+                            className={`w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                              formErrors.country ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                            }`}
+                          >
+                            <option value="">Select Country</option>
+                            <option value="india">India</option>
+                            <option value="usa">United States</option>
+                            <option value="uk">United Kingdom</option>
+                            <option value="canada">Canada</option>
+                            <option value="australia">Australia</option>
+                            <option value="other">Other</option>
+                          </select>
+                          {formErrors.country && <p className="text-red-500 text-xs mt-1">{formErrors.country}</p>}
+                        </div>
+
+                        {/* Terms and Conditions */}
+                        <div className="flex items-start space-x-2">
+                          <input
+                            type="checkbox"
+                            name="agreedToTerms"
+                            checked={formData.agreedToTerms}
+                            onChange={handleChange}
+                            className="mt-1 form-checkbox text-blue-600 rounded"
+                          />                          <label className="text-sm text-gray-600">
+                            I agree to the <Link to="/terms-and-conditions" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Terms and Conditions</Link>
+                          </label>
+                        </div>                        {formErrors.agreedToTerms && <p className="text-red-500 text-xs mt-1">{formErrors.agreedToTerms}</p>}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                   
                   <motion.button 
                     type="submit"
@@ -265,7 +414,7 @@ export default function AuthForm() {
                     whileHover={{ boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" }}
                     whileTap={{ y: 2 }}
                   >
-                    {isLoading ? "Processing..." : "Login"}
+                    {isLoading ? "Processing..." : (isSignUp ? "Create Account" : "Login")}
                   </motion.button>
                 </form>
 
