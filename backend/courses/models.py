@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 import uuid
 from django.core.exceptions import ValidationError
+import json
 
 class BaseCourse(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -246,7 +247,12 @@ class AILearningPlan(models.Model):
                         raise ValidationError(f"Day {i+1}, Video {j+1} must have a title")
     
     def save(self, *args, **kwargs):
-        """Override save to run validation"""
+        """Override save to run validation and ensure plan_data is a dict"""
+        if isinstance(self.plan_data, str):
+            try:
+                self.plan_data = json.loads(self.plan_data)
+            except json.JSONDecodeError:
+                self.plan_data = {}
         self.clean()
         super().save(*args, **kwargs)
     

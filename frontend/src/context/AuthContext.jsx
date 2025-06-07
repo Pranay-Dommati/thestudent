@@ -65,15 +65,19 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
+      console.log('Attempting login with:', { email }); // Log login attempt
+      
       const response = await axiosInstance.post('/auth/login/', {
         email: email,
         password: password
       });
       
-      const { user, tokens } = response.data;
+      console.log('Login response:', response.data); // Log successful response
       
-      localStorage.setItem('accessToken', tokens.access);
-      localStorage.setItem('refreshToken', tokens.refresh);
+      const { user, access, refresh } = response.data;
+      
+      localStorage.setItem('accessToken', access);
+      localStorage.setItem('refreshToken', refresh);
       
       setUser(user);
       setIsLoggedIn(true);
@@ -81,7 +85,27 @@ export const AuthProvider = ({ children }) => {
       toast.success('Login successful!');
       return true;
     } catch (error) {
-      toast.error('Invalid email or password');
+      console.error('Login error:', error.response?.data || error.message); // Log detailed error
+      
+      // Handle specific error cases
+      if (error.response?.status === 400) {
+        const errorData = error.response.data;
+        if (errorData.email) {
+          toast.error(errorData.email[0]);
+        } else if (errorData.password) {
+          toast.error(errorData.password[0]);
+        } else if (errorData.non_field_errors) {
+          toast.error(errorData.non_field_errors[0]);
+        } else {
+          toast.error('Invalid email or password');
+        }
+      } else if (error.response?.status === 401) {
+        toast.error('Invalid email or password');
+      } else if (error.response?.status === 500) {
+        toast.error('Server error. Please try again later.');
+      } else {
+        toast.error('Login failed. Please try again.');
+      }
       return false;
     }
   };

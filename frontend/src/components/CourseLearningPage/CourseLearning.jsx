@@ -130,7 +130,22 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       }
     } catch (error) {
       console.error('Error fetching learning plan by ID:', error);
-      setError(error.message || 'Failed to load learning plan');
+      let errorMessage = 'Failed to load learning plan';
+      
+      if (error.response) {
+        if (error.response.status === 404) {
+          errorMessage = 'Learning plan not found. It may have been deleted or is unavailable.';
+          setContentType('notFound');
+        } else if (error.response.status === 500) {
+          errorMessage = 'Server error occurred while loading the learning plan. Please try again later.';
+        } else if (error.response.data && error.response.data.error) {
+          errorMessage = error.response.data.error;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
       setCourse(null);
     } finally {
       setLoading(false);

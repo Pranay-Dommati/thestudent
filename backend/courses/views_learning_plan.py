@@ -11,6 +11,7 @@ from django.utils import timezone
 from .models import AILearningPlan
 from .serializers_ai_learning_plan import AILearningPlanSerializer, AILearningPlanCreateSerializer
 import logging
+import re
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -26,7 +27,48 @@ class AILearningPlanViewSet(viewsets.ModelViewSet):
         if self.request.user.is_authenticated:
             return AILearningPlan.objects.filter(user=self.request.user)
         return AILearningPlan.objects.none()
-        
+
+    def retrieve(self, request, *args, **kwargs):
+        """Custom retrieve method to handle learning plan retrieval"""
+        try:
+            instance = self.get_object()
+            logger.info(f"Retrieving learning plan with ID: {instance.id}")
+            
+            # Ensure plan_data is a dictionary
+            if isinstance(instance.plan_data, str):
+                try:
+                    instance.plan_data = json.loads(instance.plan_data)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Error parsing plan_data JSON: {str(e)}")
+                    instance.plan_data = {}
+            
+            # Validate plan_data structure
+            if not isinstance(instance.plan_data, dict):
+                logger.error(f"Invalid plan_data type: {type(instance.plan_data)}")
+                instance.plan_data = {}
+            
+            # Ensure required fields exist
+            if 'days' not in instance.plan_data:
+                instance.plan_data['days'] = []
+            if 'goal' not in instance.plan_data:
+                instance.plan_data['goal'] = instance.title
+            
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+            
+        except AILearningPlan.DoesNotExist:
+            logger.error(f"Learning plan not found with ID: {kwargs.get('pk')}")
+            return Response(
+                {'error': 'Learning plan not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error retrieving learning plan: {str(e)}")
+            return Response(
+                {'error': f'An error occurred while retrieving the learning plan: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     def create(self, request, *args, **kwargs):
         """Custom create method to handle AI learning plan creation"""
         logger.debug("Creating AI learning plan from API request")
@@ -60,10 +102,7 @@ class AILearningPlanViewSet(viewsets.ModelViewSet):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def generate_learning_plan(request):
-    """
-    Generate an AI-powered learning plan based on a goal.
-    Creates a unified AILearningPlan with all data stored in JSON fields.
-    """
+    """Generate an AI-powered learning plan based on a goal."""
     logger.debug("generate_learning_plan called")
     logger.debug(f"Request data: {request.data}")
     
@@ -75,48 +114,38 @@ def generate_learning_plan(request):
     logger.info(f"Generating plan for goal: {goal}")
     
     try:
-        # Check if the request contains pre-generated learning plan with days
-        if 'days' in request.data and isinstance(request.data['days'], list):
-            logger.info("Received pre-generated learning plan with days from frontend")
-            days_data = request.data['days']
-        else:
-            logger.info("No pre-generated plan provided, generating basic structure")
-            # Create a basic structure if no days provided
+        # Extract learning parameters from the goal
+        goal_lower = goal.lower()
+        
+        # Extract duration
+        duration_match = re.search(r'in\s+(\d+)\s+days?', goal_lower)
+        duration_days = int(duration_match.group(1)) if duration_match else 7
+        
+        # Extract difficulty level
+        difficulty_level = 'beginner'
+        if 'intermediate' in goal_lower:
+            difficulty_level = 'intermediate'
+        elif 'advanced' in goal_lower or 'expert' in goal_lower:
+            difficulty_level = 'advanced'
+        
+        # Extract subject/topic
+        subject = goal.split(' in ')[0].strip() if ' in ' in goal else goal
+        
+        # Generate the learning plan using Hugging Face
+        try:
+            days_data = generate_plan_from_huggingface(goal)
+        except Exception as e:
+            logger.error(f"Error generating plan from Hugging Face: {str(e)}")
+            # Fallback to basic structure
             days_data = [
                 {
-                    'day': 1,
-                    'topic': 'Getting Started with ' + goal,
-                    'project_idea': 'Hello World project',
-                    'youtube_query': f"{goal} getting started",
-                    'videos': []
-                },
-                {
-                    'day': 2,
-                    'topic': 'Basic Concepts of ' + goal,
-                    'project_idea': 'Simple practice project',
-                    'youtube_query': f"{goal} basics tutorial",
-                    'videos': []
-                },
-                {
-                    'day': 3,
-                    'topic': 'Advanced ' + goal + ' Topics',
-                    'project_idea': 'Advanced implementation project',
-                    'youtube_query': f"{goal} advanced concepts",
-                    'videos': []
+                    'day': i + 1,
+                    'topic': f'Day {i + 1} of {subject}',
+                    'project_idea': f'Practice project for day {i + 1}',
+                    'youtube_query': f"{subject} day {i + 1} tutorial"
                 }
+                for i in range(duration_days)
             ]
-        
-        # Fetch YouTube videos for each day and set URL
-        for day in days_data:
-            query = day.get('youtube_query')
-            if query and not day.get('videos'):
-                try:
-                    videos = fetch_youtube_videos(query, max_results=1)
-                    for v in videos:
-                        v['url'] = f"https://www.youtube.com/watch?v={v.get('video_id')}"
-                    day['videos'] = videos
-                except Exception as e:
-                    logger.error(f"Failed to fetch YouTube videos for '{query}': {e}")
         
         # Structure the complete plan data
         plan_data = {
@@ -127,12 +156,14 @@ def generate_learning_plan(request):
             'metadata': {
                 'total_days': len(days_data),
                 'total_videos': sum(len(day.get('videos', [])) for day in days_data),
-                'has_projects': any(day.get('project_idea') for day in days_data)
+                'has_projects': any(day.get('project_idea') for day in days_data),
+                'difficulty_level': difficulty_level,
+                'subject': subject
             }
         }
         
-        # Create the AI learning plan with duplicate checking
-        title = f"AI Learning Plan: {goal}"
+        # Create the AI learning plan
+        title = f"AI Learning Plan: {subject}"
         
         try:
             # Check for existing plans with same title
@@ -143,7 +174,6 @@ def generate_learning_plan(request):
             
             if existing_plan:
                 logger.warning(f"Learning plan with title '{title}' already exists for user {request.user.email}")
-                # Return the existing plan instead of creating a duplicate
                 serializer = AILearningPlanSerializer(existing_plan)
                 return Response({
                     'id': existing_plan.id,
@@ -152,40 +182,34 @@ def generate_learning_plan(request):
                     'message': 'Learning plan already exists, returning existing plan'
                 }, status=status.HTTP_200_OK)
             
-            # Check for similar plans
-            similar_plans = AILearningPlan.find_similar_plans(request.user, title, threshold=0.7)
-            if similar_plans:
-                logger.info(f"Found {len(similar_plans)} similar plans for user {request.user.email}")
-                # You could optionally return this info to the frontend for user confirmation
-            
             # Create the new learning plan
             learning_plan = AILearningPlan.objects.create(
                 user=request.user,
                 title=title,
-                description=f"AI-generated personalized learning plan for mastering {goal}",
+                description=f"AI-generated personalized learning plan for mastering {subject} in {duration_days} days",
                 plan_data=plan_data,
-                duration_days=len(days_data),
-                difficulty_level='beginner',
+                duration_days=duration_days,
+                difficulty_level=difficulty_level,
                 category='AI-Generated'
             )
+            
+            logger.info(f"Created AI learning plan with ID: {learning_plan.id}")
+            
+            # Return the serialized learning plan
+            serializer = AILearningPlanSerializer(learning_plan)
+            return Response({
+                'id': learning_plan.id,
+                'type': 'ai_learning_plan',
+                'plan': serializer.data
+            }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
             logger.error(f"Error creating learning plan: {str(e)}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
-        logger.info(f"Created AI learning plan with ID: {learning_plan.id}")
-        
-        # Return the serialized learning plan
-        serializer = AILearningPlanSerializer(learning_plan)
-        return Response({
-            'id': learning_plan.id,
-            'type': 'ai_learning_plan',
-            'plan': serializer.data
-        }, status=status.HTTP_201_CREATED)
-        
+            
     except Exception as e:
-        logger.error(f"Error creating AI learning plan: {str(e)}")
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        logger.error(f"Error in generate_learning_plan: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -239,16 +263,43 @@ def generate_plan_from_huggingface(goal):
     
     api_url = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
     
-    # Create a prompt for the model
+    # Extract parameters from the goal
+    goal_lower = goal.lower()
+    duration_match = re.search(r'in\s+(\d+)\s+days?', goal_lower)
+    duration_days = int(duration_match.group(1)) if duration_match else 7
+    
+    difficulty_level = 'beginner'
+    if 'intermediate' in goal_lower:
+        difficulty_level = 'intermediate'
+    elif 'advanced' in goal_lower or 'expert' in goal_lower:
+        difficulty_level = 'advanced'
+    
+    subject = goal.split(' in ')[0].strip() if ' in ' in goal else goal
+    
+    # Create a detailed prompt for the model
     prompt = f"""
-    Create a day-by-day learning plan for the goal: '{goal}'.
-    Include 7-14 days with specific topics to learn each day.
-    For each day, include:
+    Create a detailed {duration_days}-day learning plan for {subject} at {difficulty_level} level.
+    
+    For each day, provide:
     1. Day number
-    2. Topic to focus on
-    3. A project idea to practice the topic
-    4. A specific YouTube search query to find relevant tutorials
-    Return the response as a JSON array with objects for each day containing keys: day (number), topic (string), project_idea (string), and youtube_query (string).
+    2. Main topic to focus on
+    3. Key concepts to learn
+    4. A practical project idea to reinforce learning
+    5. A specific YouTube search query to find relevant tutorials
+    
+    The plan should:
+    - Start with fundamentals and gradually increase in complexity
+    - Include hands-on projects for practical experience
+    - Focus on {difficulty_level} level concepts and challenges
+    - Be achievable within {duration_days} days
+    - Include clear learning objectives for each day
+    
+    Return the response as a JSON array with objects for each day containing:
+    - day (number)
+    - topic (string)
+    - key_concepts (array of strings)
+    - project_idea (string)
+    - youtube_query (string)
     """
     
     headers = {
@@ -270,88 +321,69 @@ def generate_plan_from_huggingface(goal):
     if response.status_code != 200:
         raise Exception(f"HuggingFace API error: {response.text}")
     
-    # Extract the generated text and parse it as JSON
     try:
-        response_json = response.json()
-        logger.debug(f"Raw HuggingFace response: {response_json}")
+        # Parse the response
+        response_text = response.json()[0]['generated_text']
         
-        # Handle different response formats
-        if isinstance(response_json, list) and len(response_json) > 0:
-            generated_text = response_json[0].get('generated_text', '')
-        elif isinstance(response_json, dict):
-            generated_text = response_json.get('generated_text', '')
-        else:
-            generated_text = str(response_json)
-        
-        logger.debug(f"Generated text: {generated_text}")
-        
-        # Try to extract JSON from the response (the model might wrap it in markdown or other text)
-        import re
-        
-        # Look for JSON array pattern
-        json_match = re.search(r'\[\s*{.*}\s*\]', generated_text, re.DOTALL)
+        # Try to extract JSON array from the response
+        json_match = re.search(r'\[\s*\{.*\}\s*\]', response_text, re.DOTALL)
         if json_match:
-            json_str = json_match.group(0)
-            logger.debug(f"Found JSON array: {json_str}")
-            try:
-                return json.loads(json_str)
-            except json.JSONDecodeError:
-                logger.error("Failed to parse JSON array, trying to clean it up")
-                # Sometimes quotes or escaping might be incorrect, try a fallback
+            days_data = json.loads(json_match.group(0))
+            return days_data
+            
+        # If JSON extraction fails, try to parse the text format
+        days_data = []
+        current_day = None
+        current_data = {}
         
-        # If that doesn't work, try to find individual JSON objects and create an array
-        # Create a simple fallback structure if all else fails
-        fallback_data = []
-        # Extract days using regex pattern matching
-        day_matches = re.findall(r'Day\s+(\d+)[:\s]+(.*?)(?=Day\s+\d+|$)', generated_text, re.DOTALL | re.IGNORECASE)
-        
-        if day_matches:
-            logger.info(f"Found {len(day_matches)} day matches using regex")
-            for day_num, content in day_matches:
-                day_data = {
-                    'day': int(day_num),
-                    'topic': '',
+        for line in response_text.split('\n'):
+            # Look for day headers
+            day_match = re.match(r'Day\s+(\d+)[:.]?\s*(.*)', line, re.IGNORECASE)
+            if day_match:
+                if current_day is not None:
+                    days_data.append(current_data)
+                current_day = int(day_match.group(1))
+                current_data = {
+                    'day': current_day,
+                    'topic': day_match.group(2).strip(),
+                    'key_concepts': [],
                     'project_idea': '',
-                    'youtube_query': ''
+                    'youtube_query': f"{subject} day {current_day} tutorial"
                 }
-                
-                # Try to extract topic
-                topic_match = re.search(r'Topic[:\s]+(.*?)(?=Project|$)', content, re.DOTALL | re.IGNORECASE)
-                if topic_match:
-                    day_data['topic'] = topic_match.group(1).strip()
-                else:
-                    # If no explicit topic label, use the first line
-                    first_line = content.strip().split('\n')[0]
-                    day_data['topic'] = first_line.strip()
-                
-                # Try to extract project idea
-                project_match = re.search(r'Project[:\s]+(.*?)(?=YouTube|$)', content, re.DOTALL | re.IGNORECASE)
-                if project_match:
-                    day_data['project_idea'] = project_match.group(1).strip()
-                
-                # Set YouTube query based on topic
-                day_data['youtube_query'] = f"{day_data['topic']} tutorial"
-                
-                fallback_data.append(day_data)
+                continue
             
-            return fallback_data
+            # Look for key concepts
+            if 'key concepts' in line.lower() or 'concepts' in line.lower():
+                continue
+            elif line.strip().startswith('-') or line.strip().startswith('*'):
+                concept = line.strip('- *').strip()
+                if concept and current_day is not None:
+                    current_data['key_concepts'].append(concept)
             
-        # If all else fails, create a simple structure with the goal
-        if not fallback_data:
-            logger.info("Creating minimal fallback plan")
-            return [
-                {'day': 1, 'topic': 'Getting Started', 'project_idea': 'Hello World application', 'youtube_query': f"{goal} getting started"},
-                {'day': 2, 'topic': 'Basic Concepts', 'project_idea': 'Simple project', 'youtube_query': f"{goal} basics"},
-                {'day': 3, 'topic': 'Advanced Topics', 'project_idea': 'Advanced project', 'youtube_query': f"{goal} advanced tutorial"}
-            ]
-            
+            # Look for project ideas
+            elif 'project' in line.lower():
+                project_match = re.search(r'project[:\s]+(.*)', line, re.IGNORECASE)
+                if project_match and current_day is not None:
+                    current_data['project_idea'] = project_match.group(1).strip()
+        
+        # Add the last day if exists
+        if current_day is not None:
+            days_data.append(current_data)
+        
+        return days_data
+        
     except Exception as e:
         logger.error(f"Failed to parse HuggingFace response: {str(e)}")
-        # Provide a minimal fallback plan rather than raising an exception
+        # Provide a minimal fallback plan
         return [
-            {'day': 1, 'topic': 'Getting Started', 'project_idea': 'Hello World application', 'youtube_query': f"{goal} getting started"},
-            {'day': 2, 'topic': 'Basic Concepts', 'project_idea': 'Simple project', 'youtube_query': f"{goal} basics"},
-            {'day': 3, 'topic': 'Advanced Topics', 'project_idea': 'Advanced project', 'youtube_query': f"{goal} advanced tutorial"}
+            {
+                'day': i + 1,
+                'topic': f'Day {i + 1} of {subject}',
+                'key_concepts': [f'Key concept {j + 1}' for j in range(3)],
+                'project_idea': f'Practice project for day {i + 1}',
+                'youtube_query': f"{subject} day {i + 1} tutorial"
+            }
+            for i in range(duration_days)
         ]
 
 def fetch_youtube_videos(query, max_results=1):
