@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaUserCircle, FaSignOutAlt, FaCog } from 'react-icons/fa';
+import { FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 
 const Navbar = ({ initialStyle = "transparent" }) => {
@@ -128,14 +128,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 </button>
 
                 {isProfileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 py-2 bg-white rounded-lg shadow-xl border border-gray-100">
-                    <Link to="/profile" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
+                  <div className="absolute right-0 mt-2 w-48 py-2 bg-white rounded-lg shadow-xl border border-gray-100">                    <Link to="/profile" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
                       <FaUserCircle className="w-4 h-4 mr-2" />
                       <span>Profile</span>
-                    </Link>
-                    <Link to="/settings" className="flex items-center px-4 py-2 text-gray-800 hover:bg-gray-100">
-                      <FaCog className="w-4 h-4 mr-2" />
-                      <span>Settings</span>
                     </Link>
                     <hr className="my-2" />
                     <button 
@@ -199,16 +194,12 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 </a>
                 <a href="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                   AI Chatbot
-                </a>
-                {isLoggedIn && (
+                </a>                {isLoggedIn && (
                   <a href="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                     Learning Hub
                   </a>
                 )}
-                <Link to="/settings" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
-                  Settings
-                </Link>
-                <button 
+                <button
                   onClick={handleLogout}
                   className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-gray-100 mt-2 border-t border-gray-100"
                 >
