@@ -31,9 +31,6 @@ export default function AuthForm() {
     email: '',
     password: '',
     confirmPassword: '',
-    classLevel: '',
-    boardOfEducation: '',
-    country: '',
     agreedToTerms: false
   });
   const [formErrors, setFormErrors] = useState({});
@@ -85,21 +82,6 @@ export default function AuthForm() {
       errors.confirmPassword = "Passwords do not match";
     }
 
-    // Validate class level (for signup)
-    if (isSignUp && !formData.classLevel) {
-      errors.classLevel = "Class level is required";
-    }
-
-    // Validate board of education (for signup and specific class levels)
-    if (isSignUp && ['10th', '11th', '12th'].includes(formData.classLevel) && !formData.boardOfEducation) {
-      errors.boardOfEducation = "Board of education is required";
-    }
-
-    // Validate country (for signup)
-    if (isSignUp && !formData.country) {
-      errors.country = "Country is required";
-    }
-
     // Validate terms agreement (for signup)
     if (isSignUp && !formData.agreedToTerms) {
       errors.agreedToTerms = "You must agree to the terms and conditions";
@@ -126,16 +108,14 @@ export default function AuthForm() {
         const response = await login(formData.email, formData.password);
         if (response) {
           navigate('/'); // Redirect to the homepage on successful login
-        }      } else {
+        }
+      } else {
         // Registration logic
         const registrationData = {
           full_name: formData.name,
           email: formData.email,
           password: formData.password,
           confirm_password: formData.confirmPassword,
-          class_level: formData.classLevel,
-          board_of_education: formData.boardOfEducation,
-          country: formData.country,
           agreed_to_terms: formData.agreedToTerms
         };
         
@@ -332,77 +312,29 @@ export default function AuthForm() {
                           {formErrors.confirmPassword && <p className="text-red-500 text-xs mt-1">{formErrors.confirmPassword}</p>}
                         </div>
 
-                        {/* Class Level */}
-                        <div>
-                          <select 
-                            name="classLevel"
-                            value={formData.classLevel}
-                            onChange={handleChange}
-                            className={`w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                              formErrors.classLevel ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                            }`}
-                          >
-                            <option value="">Select Class Level</option>
-                            <option value="10th">10th Grade</option>
-                            <option value="11th">11th Grade</option>
-                            <option value="12th">12th Grade</option>
-                            <option value="other">Other</option>
-                          </select>
-                          {formErrors.classLevel && <p className="text-red-500 text-xs mt-1">{formErrors.classLevel}</p>}
-                        </div>
-
-                        {/* Board of Education - Only show for 10th, 11th, 12th */}
-                        {['10th', '11th', '12th'].includes(formData.classLevel) && (
-                          <div>
-                            <select 
-                              name="boardOfEducation"
-                              value={formData.boardOfEducation}
-                              onChange={handleChange}
-                              className={`w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                                formErrors.boardOfEducation ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                              }`}
-                            >
-                              <option value="">Select Board of Education</option>
-                              <option value="cbse">CBSE</option>
-                              <option value="state_board">State Board</option>
-                            </select>
-                            {formErrors.boardOfEducation && <p className="text-red-500 text-xs mt-1">{formErrors.boardOfEducation}</p>}
-                          </div>
-                        )}
-
-                        {/* Country */}
-                        <div>
-                          <select 
-                            name="country"
-                            value={formData.country}
-                            onChange={handleChange}
-                            className={`w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                              formErrors.country ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                            }`}
-                          >
-                            <option value="">Select Country</option>
-                            <option value="india">India</option>
-                            <option value="usa">United States</option>
-                            <option value="uk">United Kingdom</option>
-                            <option value="canada">Canada</option>
-                            <option value="australia">Australia</option>
-                            <option value="other">Other</option>
-                          </select>
-                          {formErrors.country && <p className="text-red-500 text-xs mt-1">{formErrors.country}</p>}
-                        </div>
-
                         {/* Terms and Conditions */}
-                        <div className="flex items-start space-x-2">
+                        <div className="flex items-center">
                           <input
                             type="checkbox"
                             name="agreedToTerms"
                             checked={formData.agreedToTerms}
-                            onChange={handleChange}
-                            className="mt-1 form-checkbox text-blue-600 rounded"
-                          />                          <label className="text-sm text-gray-600">
-                            I agree to the <Link to="/terms-and-conditions" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Terms and Conditions</Link>
+                            onChange={(e) => setFormData({ ...formData, agreedToTerms: e.target.checked })}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <label className="ml-2 block text-sm text-gray-900">
+                            I agree to the{' '}
+                            <Link to="/terms" className="text-blue-600 hover:text-blue-500">
+                              Terms of Service
+                            </Link>
+                            {' '}and{' '}
+                            <Link to="/privacy" className="text-blue-600 hover:text-blue-500">
+                              Privacy Policy
+                            </Link>
                           </label>
-                        </div>                        {formErrors.agreedToTerms && <p className="text-red-500 text-xs mt-1">{formErrors.agreedToTerms}</p>}
+                        </div>
+                        {formErrors.agreedToTerms && (
+                          <p className="text-red-500 text-xs mt-1">{formErrors.agreedToTerms}</p>
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -418,36 +350,44 @@ export default function AuthForm() {
                   </motion.button>
                 </form>
 
-                <div className="w-full max-w-sm">
-                  <div className="flex items-center my-6">
-                    <div className="flex-1 border-t border-gray-300"></div>
-                    <span className="px-3 text-gray-500 text-sm">OR CONTINUE WITH</span>
-                    <div className="flex-1 border-t border-gray-300"></div>
+                {/* Social Login Section */}
+                <div className="mt-6">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                    </div>
                   </div>
-                  
-                  <div className="flex justify-center space-x-4">
-                    <motion.button 
-                      className="flex-1 p-2.5 border border-gray-300 rounded-lg flex items-center justify-center"
-                      whileHover={{ backgroundColor: "#f9fafb" }}
+
+                  <div className="mt-6 grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                     >
-                      <FaGoogle className="text-red-500 mr-2" />
-                      <span className="text-sm font-medium">Google</span>
-                    </motion.button>
-                    <motion.button 
-                      className="flex-1 p-2.5 border border-gray-300 rounded-lg flex items-center justify-center"
-                      whileHover={{ backgroundColor: "#f9fafb" }}
+                      <FaGoogle className="h-5 w-5 text-red-500" />
+                      <span className="ml-2">Google</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                     >
-                      <FaFacebook className="text-blue-700 mr-2" />
-                      <span className="text-sm font-medium">Facebook</span>
-                    </motion.button>
+                      <FaFacebook className="h-5 w-5 text-blue-600" />
+                      <span className="ml-2">Facebook</span>
+                    </button>
                   </div>
                 </div>
 
-                <div className="mt-8 text-sm text-gray-600 text-center">
-                  <span>By continuing, you agree to our </span>
-                  <a href="#" className="text-blue-600 hover:text-blue-800 hover:underline">Terms of Service</a>
-                  <span> & </span>
-                  <a href="#" className="text-blue-600 hover:text-blue-800 hover:underline">Privacy Policy</a>
+                {/* Toggle Form Link */}
+                <div className="mt-6 text-center">
+                  <button
+                    type="button"
+                    onClick={toggleForm}
+                    className="text-sm text-blue-600 hover:text-blue-500"
+                  >
+                    {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
+                  </button>
                 </div>
               </motion.div>
             </AnimatePresence>

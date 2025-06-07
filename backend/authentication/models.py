@@ -32,22 +32,6 @@ class User(AbstractUser):
     email = models.EmailField(_('email address'), unique=True)
     full_name = models.CharField(max_length=255)
     
-    # Educational Information
-    class_level = models.CharField(max_length=50, choices=[
-        ('10th', '10th Grade'),
-        ('11th', '11th Grade'),
-        ('12th', '12th Grade'),
-        ('other', 'Other')
-    ], null=True, blank=True)
-    
-    board_of_education = models.CharField(max_length=100, choices=[
-        ('cbse', 'CBSE'),
-        ('state_board', 'State Board')
-    ], null=True, blank=True)
-    
-    # Location Information
-    country = models.CharField(max_length=100, null=True, blank=True)
-    
     # Terms and Conditions
     agreed_to_terms = models.BooleanField(default=False)
     

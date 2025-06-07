@@ -6,7 +6,7 @@ from django.contrib.auth import authenticate
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'full_name', 'class_level', 'board_of_education', 'country', 'agreed_to_terms')
+        fields = ('id', 'email', 'full_name', 'agreed_to_terms')
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
@@ -14,11 +14,16 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('email', 'full_name', 'password', 'confirm_password', 'class_level', 'board_of_education', 'country', 'agreed_to_terms')
+        fields = ('email', 'full_name', 'password', 'confirm_password', 'agreed_to_terms')
+        extra_kwargs = {
+            'agreed_to_terms': {'required': True}
+        }
 
     def validate(self, attrs):
         if attrs['password'] != attrs['confirm_password']:
             raise serializers.ValidationError("Password fields didn't match.")
+        if not attrs.get('agreed_to_terms'):
+            raise serializers.ValidationError("You must agree to the Terms and Conditions.")
         return attrs
 
     def create(self, validated_data):
@@ -27,9 +32,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             email=validated_data['email'],
             full_name=validated_data['full_name'],
             password=validated_data['password'],
-            class_level=validated_data.get('class_level'),
-            board_of_education=validated_data.get('board_of_education'),
-            country=validated_data.get('country'),
             agreed_to_terms=validated_data.get('agreed_to_terms', False)
         )
         return user
