@@ -146,7 +146,19 @@ def generate_learning_plan(request):
                 }
                 for i in range(duration_days)
             ]
-        
+
+        # Attach YouTube videos for each day
+        for day in days_data:
+            if not day.get('videos') and day.get('youtube_query'):
+                try:
+                    videos = fetch_youtube_videos(day['youtube_query'], max_results=1)
+                    for v in videos:
+                        v['url'] = f"https://www.youtube.com/watch?v={v.get('video_id')}"
+                    day['videos'] = videos
+                except Exception as e:
+                    logger.error(f"Failed to fetch videos for day {day.get('day')}: {e}")
+                    day['videos'] = []
+
         # Structure the complete plan data
         plan_data = {
             'goal': goal,

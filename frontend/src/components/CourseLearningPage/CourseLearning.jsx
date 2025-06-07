@@ -86,8 +86,13 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       console.log('📦 Received plan data:', JSON.stringify(planData, null, 2));
       
       // Check if planData has the expected structure
-      if (!planData || !planData.plan_data || !planData.plan_data.days || !Array.isArray(planData.plan_data.days) || planData.plan_data.days.length === 0) {
+      if (!planData || !planData.plan_data) {
         throw new Error('Learning plan data is missing or invalid');
+      }
+      
+      // Ensure days is an array (can be empty)
+      if (!Array.isArray(planData.plan_data.days)) {
+        throw new Error('Learning plan days data is invalid');
       }
       
       // Load existing progress data if available
@@ -548,10 +553,16 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
   // Get current lesson
   const getCurrentLesson = () => {
-    if (!course?.chapters?.[activeChapter]?.lessons?.[activeLesson]) {
+    if (!course || !course.chapters || !Array.isArray(course.chapters)) {
       return null;
     }
-    return course.chapters[activeChapter].lessons[activeLesson];
+    
+    const chapter = course.chapters[activeChapter];
+    if (!chapter || !chapter.lessons || !Array.isArray(chapter.lessons)) {
+      return null;
+    }
+    
+    return chapter.lessons[activeLesson] || null;
   };
 
   // Filter lessons based on search
@@ -945,7 +956,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                     </>
                   ) : (
                     <>
-                      {currentLesson.completed ? "Next Lesson" : "Mark as Complete"}
+                      {currentLesson?.completed ? "Next Lesson" : "Mark as Complete"}
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" />
                       </svg>
@@ -967,21 +978,37 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         {/* Content Container - Fixed right margin to match sidebar exactly */}
         <div className={`transition-all duration-300 ${sidebarVisible ? 'mr-[400px]' : ''}`}>
           <div className="p-5 w-full">
-            {/* Video content navigation */}
-            {contentType === 'video' && (
-              <div className="mb-6">
-                <nav className="flex items-center text-sm text-gray-600">
-                  <span>Course</span>
-                  <span className="mx-2">•</span>
-                  <span>{course.chapters[activeChapter].title}</span>
-                  <span className="mx-2">•</span>
-                  <span>{currentLesson.title}</span>
-                </nav>
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+              </div>
+            ) : error ? (
+              <div className="text-center p-6 bg-red-50 rounded-lg border border-red-200">
+                <p className="text-red-600">{error}</p>
+              </div>
+            ) : course ? (
+              <>
+                {/* Video content navigation */}
+                {contentType === 'video' && course.chapters && course.chapters[activeChapter] && (
+                  <div className="mb-6">
+                    <nav className="flex items-center text-sm text-gray-600">
+                      <span>Course</span>
+                      <span className="mx-2">•</span>
+                      <span>{course.chapters[activeChapter].title}</span>
+                      <span className="mx-2">•</span>
+                      <span>{currentLesson?.title || 'Loading...'}</span>
+                    </nav>
+                  </div>
+                )}
+
+                {/* Dynamic Content */}
+                {renderContent()}
+              </>
+            ) : (
+              <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-gray-500">No course data available.</p>
               </div>
             )}
-
-            {/* Dynamic Content */}
-            {renderContent()}
           </div>
         </div>
       </div>
