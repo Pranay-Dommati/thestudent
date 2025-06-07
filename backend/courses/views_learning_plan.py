@@ -114,14 +114,65 @@ def generate_learning_plan(request):
     logger.info(f"Generating plan for goal: {goal}")
     
     try:
-        # Extract learning parameters from the goal
+        # Check if frontend has already provided days data (from frontend AI generation)
+        if 'days' in request.data and isinstance(request.data['days'], list) and len(request.data['days']) > 0:
+            logger.info("Using frontend-provided days data with videos")
+            days_data = request.data['days']
+            duration_days = len(days_data)
+            
+            # Ensure each day has required fields and preserve videos
+            for day in days_data:
+                if 'videos' not in day:
+                    day['videos'] = []
+                if 'day' not in day:
+                    day['day'] = days_data.index(day) + 1
+                if 'topic' not in day:
+                    day['topic'] = f"Day {day['day']}"
+                if 'project_idea' not in day:
+                    day['project_idea'] = ""
+                if 'youtube_query' not in day:
+                    day['youtube_query'] = ""
+            
+            logger.info(f"Using {len(days_data)} days with {sum(len(day.get('videos', [])) for day in days_data)} total videos")
+        else:
+            logger.info("No frontend days data provided, generating new plan")
+            # Extract learning parameters from the goal
+            goal_lower = goal.lower()
+            
+            # Extract duration
+            duration_match = re.search(r'in\s+(\d+)\s+days?', goal_lower)
+            duration_days = int(duration_match.group(1)) if duration_match else 7
+            
+            # Generate the learning plan using Hugging Face
+            try:
+                days_data = generate_plan_from_huggingface(goal)
+            except Exception as e:
+                logger.error(f"Error generating plan from Hugging Face: {str(e)}")
+                # Fallback to basic structure
+                days_data = [
+                    {
+                        'day': i + 1,
+                        'topic': f'Day {i + 1} of {goal}',
+                        'project_idea': f'Practice project for day {i + 1}',
+                        'youtube_query': f"{goal} day {i + 1} tutorial"
+                    }
+                    for i in range(duration_days)
+                ]
+
+            # Attach YouTube videos for each day (only if not provided by frontend)
+            for day in days_data:
+                if not day.get('videos') and day.get('youtube_query'):
+                    try:
+                        videos = fetch_youtube_videos(day['youtube_query'], max_results=1)
+                        for v in videos:
+                            v['url'] = f"https://www.youtube.com/watch?v={v.get('video_id')}"
+                        day['videos'] = videos
+                    except Exception as e:
+                        logger.error(f"Failed to fetch videos for day {day.get('day')}: {e}")
+                        day['videos'] = []
+        
+        # Extract learning parameters for metadata
         goal_lower = goal.lower()
-        
-        # Extract duration
-        duration_match = re.search(r'in\s+(\d+)\s+days?', goal_lower)
-        duration_days = int(duration_match.group(1)) if duration_match else 7
-        
-        # Extract difficulty level
         difficulty_level = 'beginner'
         if 'intermediate' in goal_lower:
             difficulty_level = 'intermediate'
@@ -130,34 +181,6 @@ def generate_learning_plan(request):
         
         # Extract subject/topic
         subject = goal.split(' in ')[0].strip() if ' in ' in goal else goal
-        
-        # Generate the learning plan using Hugging Face
-        try:
-            days_data = generate_plan_from_huggingface(goal)
-        except Exception as e:
-            logger.error(f"Error generating plan from Hugging Face: {str(e)}")
-            # Fallback to basic structure
-            days_data = [
-                {
-                    'day': i + 1,
-                    'topic': f'Day {i + 1} of {subject}',
-                    'project_idea': f'Practice project for day {i + 1}',
-                    'youtube_query': f"{subject} day {i + 1} tutorial"
-                }
-                for i in range(duration_days)
-            ]
-
-        # Attach YouTube videos for each day
-        for day in days_data:
-            if not day.get('videos') and day.get('youtube_query'):
-                try:
-                    videos = fetch_youtube_videos(day['youtube_query'], max_results=1)
-                    for v in videos:
-                        v['url'] = f"https://www.youtube.com/watch?v={v.get('video_id')}"
-                    day['videos'] = videos
-                except Exception as e:
-                    logger.error(f"Failed to fetch videos for day {day.get('day')}: {e}")
-                    day['videos'] = []
 
         # Structure the complete plan data
         plan_data = {
