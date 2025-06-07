@@ -17,18 +17,15 @@ const Hero = () => {
           {/* Adjusted text sizes and spacing */}
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20 mb-8">
             <span className="animate-pulse mr-2 h-3 w-3 rounded-full bg-green-400"></span>
-            <span className="text-black text-sm font-medium">10+ Free Courses Available</span>
+            <span className="text-black text-sm font-medium">AI-Powered Learning</span>
           </div>
           
           <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-white mb-6 leading-tight">
-            Discover the <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-400">Free Courses </span>
-            <br className="hidden sm:block" />
-            Organized from Top Online Sources!
+            Effortless Study Plans Tailored to Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-400">School Curriculum!</span>
           </h1>
           
           <p className="text-lg md:text-xl text-white mb-10 max-w-2xl mx-auto px-4">
-            Learn at your own pace with structured playlists from YouTube and beyond, 
-            organized to maximize your learning efficiency.
+            Leverage AI to create personalized, curriculum-aligned courses for Class 10-12. Access structured playlists, videos, and notes to master your school subjects.
           </p>
           
           {/* Adjusted button sizes */}
@@ -39,9 +36,8 @@ const Hero = () => {
                        transition-all duration-300 ease-out transform
                        hover:shadow-lg hover:shadow-white/30 hover:-translate-y-1
                        hover:bg-opacity-95 hover:text-indigo-700
-                       active:translate-y-0"
-            >
-              Start Learning
+                       active:translate-y-0"            >
+              Start Learning Now
             </Link>
             <Link 
               to="/chat" 
@@ -52,17 +48,15 @@ const Hero = () => {
                        hover:bg-opacity-60 hover:border-opacity-50
                        active:translate-y-0"
             >
-              <span className="flex items-center justify-center">
-                <svg 
+              <span className="flex items-center justify-center">                <svg 
                   xmlns="http://www.w3.org/2000/svg" 
                   className="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" 
                   fill="none" 
                   viewBox="0 0 24 24" 
                   stroke="currentColor"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                AI Study Assistant
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />                </svg>
+                Ask AI for Help
               </span>
             </Link>
           </div>
