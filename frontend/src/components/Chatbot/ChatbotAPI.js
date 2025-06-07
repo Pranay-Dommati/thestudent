@@ -402,121 +402,55 @@ const generateFallbackLearningPlan = (topic) => {
   return fallbackPlan;
 };
 
-// Generate relevant topics for common subjects
+// Generate relevant topics for any subject
 export const generateTopicsForSubject = (subject, days) => {
   console.log(`Generating ${days} topics for ${subject}`);
   
   // Normalize subject for better matching
   const subjectLower = subject.toLowerCase();
   
-  // Prepare topic sets for common subjects
-  let topicSet = [];
-  
-  // ReactJS learning path
-  if (subjectLower.includes('react') || subjectLower.includes('reactjs')) {
-    console.log('Using ReactJS learning path');
-    topicSet = [
-      { title: "React Fundamentals and Setup", project: "Create a simple React app with create-react-app", searchTerm: "setup create-react-app" },
-      { title: "JSX and React Components", project: "Build a component-based UI for a simple app", searchTerm: "react components and jsx" },
-      { title: "State and Props in React", project: "Create a counter app with multiple components sharing state", searchTerm: "react state props hooks" },
-      { title: "React Hooks and Effects", project: "Build a data fetching app with useEffect", searchTerm: "react hooks useEffect useState" },
-      { title: "Routing in React", project: "Create a multi-page React app with React Router", searchTerm: "react router navigation" },
-      { title: "Forms and User Input", project: "Build a form validation system", searchTerm: "react forms controlled components" },
-      { title: "State Management with Context API", project: "Create a theme switcher using Context", searchTerm: "react context api state management" },
-      { title: "API Integration and Data Fetching", project: "Build a weather app that fetches data from an API", searchTerm: "react api fetch axios" },
-      { title: "Redux for State Management", project: "Convert a React app to use Redux", searchTerm: "redux react state management" },
-      { title: "Testing and Deployment", project: "Write tests and deploy your React app", searchTerm: "react testing jest deployment" }
+  // Generate a dynamic learning path for any subject
+  const generateDynamicTopics = (subject, days) => {
+    const topics = [];
+    const stages = [
+      "Fundamentals and Introduction",
+      "Core Concepts and Basics",
+      "Essential Skills and Tools",
+      "Intermediate Techniques",
+      "Advanced Concepts",
+      "Practical Applications",
+      "Best Practices and Patterns",
+      "Real-world Projects",
+      "Performance and Optimization",
+      "Expert-level Topics"
     ];
-  }
-  
-  // Python learning path
-  else if (subjectLower.includes('python')) {
-    console.log('Using Python learning path');
-    topicSet = [
-      { title: "Python Basics and Setup", project: "Create a simple calculator program", searchTerm: "python basics for beginners" },
-      { title: "Data Types and Variables", project: "Build a temperature converter", searchTerm: "python data types variables" },
-      { title: "Control Flow and Loops", project: "Create a number guessing game", searchTerm: "python if else loops" },
-      { title: "Functions and Modules", project: "Build a utility toolkit with custom functions", searchTerm: "python functions modules" },
-      { title: "Data Structures: Lists and Dictionaries", project: "Create a contact management system", searchTerm: "python lists dictionaries" },
-      { title: "File Handling and Exceptions", project: "Build a log parser program", searchTerm: "python file handling exceptions" },
-      { title: "Object-Oriented Programming", project: "Create a banking system with classes", searchTerm: "python classes objects OOP" },
-      { title: "Working with External Libraries", project: "Build a data visualization tool with matplotlib", searchTerm: "python libraries pip matplotlib" },
-      { title: "Web Development with Flask", project: "Create a simple web API", searchTerm: "python flask web development" },
-      { title: "Data Analysis with Pandas", project: "Build a data analysis dashboard", searchTerm: "python pandas data analysis" }
-    ];
-  }
-  
-  // AI/Machine Learning path
-  else if (subjectLower.includes('ai') || subjectLower.includes('machine learning')) {
-    console.log('Using AI/ML learning path');
-    topicSet = [
-      { title: "Introduction to AI and ML", project: "Research different AI applications", searchTerm: "introduction to artificial intelligence machine learning" },
-      { title: "Python for AI and Data Science", project: "Set up a data science environment", searchTerm: "python numpy pandas for machine learning" },
-      { title: "Data Preprocessing and Analysis", project: "Clean and analyze a dataset", searchTerm: "data preprocessing machine learning" },
-      { title: "Supervised Learning Algorithms", project: "Build a simple classification model", searchTerm: "supervised learning algorithms" },
-      { title: "Neural Networks Fundamentals", project: "Implement a simple neural network", searchTerm: "neural networks basics tensorflow" },
-      { title: "Deep Learning with TensorFlow", project: "Create an image classifier", searchTerm: "deep learning tensorflow tutorial" },
-      { title: "Natural Language Processing", project: "Build a text classifier", searchTerm: "natural language processing python" },
-      { title: "Computer Vision", project: "Create a face detection system", searchTerm: "computer vision opencv python" },
-      { title: "Reinforcement Learning", project: "Build a simple game-playing AI", searchTerm: "reinforcement learning basics" },
-      { title: "AI Ethics and Future Trends", project: "Analyze bias in an AI system", searchTerm: "AI ethics bias fairness" }
-    ];
-  }
-  
-  // JavaScript learning path
-  else if (subjectLower.includes('javascript') || subjectLower === 'js') {
-    console.log('Using JavaScript learning path');
-    topicSet = [
-      { title: "JavaScript Fundamentals", project: "Create a simple interactive webpage", searchTerm: "javascript basics for beginners" },
-      { title: "DOM Manipulation", project: "Build a dynamic to-do list", searchTerm: "javascript DOM manipulation" },
-      { title: "Functions and Scope", project: "Create a calculator with complex functions", searchTerm: "javascript functions scope closures" },
-      { title: "Async JavaScript and Promises", project: "Build a weather app using APIs", searchTerm: "javascript async await promises" },
-      { title: "ES6+ Features", project: "Refactor code using modern JavaScript", searchTerm: "javascript es6 modern features" },
-      { title: "Error Handling and Debugging", project: "Create a robust form validation system", searchTerm: "javascript error handling debugging" },
-      { title: "Object-Oriented JavaScript", project: "Build a library management system", searchTerm: "javascript OOP classes prototype" },
-      { title: "Working with APIs", project: "Create a data dashboard with multiple APIs", searchTerm: "javascript api fetch axios" },
-      { title: "JavaScript Frameworks Introduction", project: "Convert a vanilla JS app to a framework", searchTerm: "javascript frameworks comparison" },
-      { title: "Testing and Best Practices", project: "Write tests for a JavaScript application", searchTerm: "javascript testing jest mocha" }
-    ];
-  }
-  
-  // Generic fallback plan
-  else {
-    console.log('Using generic learning path');
-    const genericPlan = [];
-    const stages = ["Fundamentals", "Core Concepts", "Intermediate Topics", "Advanced Techniques", "Practical Projects", 
-                    "Best Practices", "Tools and Libraries", "Real-world Applications", "Performance Optimization", "Mastery and Specialization"];
-    
+
     for (let i = 0; i < days; i++) {
       const stageIndex = Math.min(i, stages.length - 1);
-      genericPlan.push({
-        title: `${subject} ${stages[stageIndex]} - Day ${i+1}`,
-        project: `Build a ${subject} project focusing on ${stages[stageIndex].toLowerCase()}`,
+      const day = i + 1;
+      
+      // Generate project ideas based on the stage
+      let projectIdea = "";
+      if (i < 3) {
+        projectIdea = `Create a simple ${subject} project focusing on ${stages[stageIndex].toLowerCase()}`;
+      } else if (i < 6) {
+        projectIdea = `Build an intermediate ${subject} application incorporating ${stages[stageIndex].toLowerCase()}`;
+      } else {
+        projectIdea = `Develop an advanced ${subject} project that demonstrates mastery of ${stages[stageIndex].toLowerCase()}`;
+      }
+
+      topics.push({
+        title: `${subject} ${stages[stageIndex]} - Day ${day}`,
+        project: projectIdea,
         searchTerm: `${subject} ${stages[stageIndex].toLowerCase()} tutorial`
       });
     }
     
-    // For generic subjects, we return the plan directly since it's already sized correctly
-    topicSet = genericPlan;
-  }
-  
-  // If no match found, default to a general programming path
-  if (topicSet.length === 0) {
-    console.log('Using default learning path for:', subject);
-    const defaultTopics = [
-      { title: "Programming Fundamentals", project: "Create a simple command-line application", searchTerm: "programming fundamentals" },
-      { title: "Variables and Data Types", project: "Build a data entry and validation system", searchTerm: "programming variables data types" },
-      { title: "Control Flow and Logic", project: "Create a decision-making program", searchTerm: "programming control flow logic" },
-      { title: "Functions and Modular Code", project: "Build a utility library", searchTerm: "programming functions modules" },
-      { title: "Data Structures", project: "Implement common data structures", searchTerm: "programming data structures" },
-      { title: "Algorithms and Problem Solving", project: "Solve algorithmic challenges", searchTerm: "programming algorithms problems" },
-      { title: "Error Handling and Debugging", project: "Create a robust application with error handling", searchTerm: "programming error handling debugging" },
-      { title: "Working with External Data", project: "Build a data processing pipeline", searchTerm: "programming external data APIs" },
-      { title: "User Interface Development", project: "Create a simple user interface", searchTerm: "programming user interface" },
-      { title: "Software Architecture", project: "Design and implement a complete application", searchTerm: "programming software architecture" }
-    ];
-    topicSet = defaultTopics;
-  }
+    return topics;
+  };
+
+  // Generate topics for the subject
+  const topicSet = generateDynamicTopics(subject, days);
   
   // Return the slice of topics matching the requested number of days
   return topicSet.slice(0, days);
@@ -617,108 +551,60 @@ export const parseHuggingFaceLearningPlan = (generatedText, goal) => {
 const extractSubjectAndDays = (goal) => {
   console.log("Extracting subject and days from:", goal);
   
-  // First check directly for common subjects
   let subject = null;
   let days = 7;
   
-  // Direct check for common subjects first
-  const commonTechnologies = [
-    {name: 'ReactJS', aliases: ['react', 'reactjs', 'react.js', 'react js']},
-    {name: 'JavaScript', aliases: ['javascript', 'js', 'java script']},
-    {name: 'Python', aliases: ['python', 'py']},
-    {name: 'AI', aliases: ['ai', 'artificial intelligence', 'machine learning', 'ml']},
-    {name: 'Java', aliases: ['java']},
-    {name: 'HTML', aliases: ['html', 'html5']},
-    {name: 'CSS', aliases: ['css', 'css3', 'styling']},
-    {name: 'Node.js', aliases: ['node', 'nodejs', 'node.js', 'node js']}
-  ];
-  
-  // Check the topic string for any of our known technologies
+  // Try different regex patterns to extract days first
   const topicLower = goal.toLowerCase();
-  for (const tech of commonTechnologies) {
-    // Check for exact name match or any aliases
-    if (topicLower.includes(tech.name.toLowerCase())) {
-      subject = tech.name;
-      console.log(`Found subject directly: ${subject}`);
-      break;
-    }
-    
-    // Check aliases
-    for (const alias of tech.aliases) {
-      if (topicLower.includes(alias)) {
-        subject = tech.name;
-        console.log(`Found subject via alias '${alias}': ${subject}`);
-        break;
-      }
-    }
-    
-    if (subject) break;
-  }
-  
-  // Try different regex patterns to extract days
   const daysMatch = topicLower.match(/in\s+(\d+)\s+days?/i);
   if (daysMatch && daysMatch[1]) {
     days = parseInt(daysMatch[1]);
     console.log(`Found days: ${days}`);
   }
   
-  // If we still don't have a subject, try more complex extraction
-  if (!subject) {
-    // Try to extract from phrases like "Learn X" or "Master X"
-    let extractedSubject = "";
-    if (topicLower.includes('learn')) {
-      const match = goal.match(/[Ll]earn\s+([^\d]+?)(?:\s+in\s+|$)/i);
-      if (match && match[1]) {
-        extractedSubject = match[1].trim();
-        console.log(`Extracted subject from 'learn' pattern: ${extractedSubject}`);
-      }
-    } else if (topicLower.includes('master')) {
-      const match = goal.match(/[Mm]aster\s+([^\d]+?)(?:\s+in\s+|$)/i);
-      if (match && match[1]) {
-        extractedSubject = match[1].trim();
-        console.log(`Extracted subject from 'master' pattern: ${extractedSubject}`);
-      }
+  // Extract subject using various patterns
+  if (topicLower.includes('learn')) {
+    const match = goal.match(/[Ll]earn\s+([^\d]+?)(?:\s+in\s+|$)/i);
+    if (match && match[1]) {
+      subject = match[1].trim();
+      console.log(`Extracted subject from 'learn' pattern: ${subject}`);
     }
-    
-    // If no subject found, check for learning plan directly
-    if (!extractedSubject && topicLower.includes('learning plan')) {
-      const match = goal.match(/([^\s]+)\s+learning\s+plan/i);
-      if (match && match[1]) {
-        extractedSubject = match[1].trim();
-        console.log(`Extracted subject from 'learning plan' pattern: ${extractedSubject}`);
-      }
+  } else if (topicLower.includes('master')) {
+    const match = goal.match(/[Mm]aster\s+([^\d]+?)(?:\s+in\s+|$)/i);
+    if (match && match[1]) {
+      subject = match[1].trim();
+      console.log(`Extracted subject from 'master' pattern: ${subject}`);
     }
-    
-    // Use the extracted subject
-    if (extractedSubject) {
-      // Check if the extracted subject contains any of our known technologies
-      const extractedLower = extractedSubject.toLowerCase();
-      for (const tech of commonTechnologies) {
-        if (extractedLower.includes(tech.name.toLowerCase())) {
-          subject = tech.name;
-          break;
-        }
-        
-        for (const alias of tech.aliases) {
-          if (extractedLower.includes(alias)) {
-            subject = tech.name;
-            break;
-          }
-        }
-        
-        if (subject) break;
-      }
-      
-      // If still no match with known technologies, use the extracted text directly
-      if (!subject) {
-        subject = extractedSubject;
-      }
+  } else if (topicLower.includes('learning plan')) {
+    const match = goal.match(/([^\s]+)\s+learning\s+plan/i);
+    if (match && match[1]) {
+      subject = match[1].trim();
+      console.log(`Extracted subject from 'learning plan' pattern: ${subject}`);
+    }
+  } else if (topicLower.includes('create') || topicLower.includes('make')) {
+    const match = goal.match(/(?:create|make)\s+(?:a|an)?\s+([^\d]+?)(?:\s+learning\s+plan|\s+course|\s+tutorial|\s+guide|\s+in\s+|$)/i);
+    if (match && match[1]) {
+      subject = match[1].trim();
+      console.log(`Extracted subject from 'create/make' pattern: ${subject}`);
     }
   }
   
-  // Fallback to default if we still don't have a subject
+  // If no subject found yet, try to extract any topic
   if (!subject) {
-    subject = "programming";
+    // Remove common words and extract the main topic
+    const commonWords = ['learn', 'master', 'study', 'create', 'make', 'plan', 'course', 'tutorial', 'guide', 'in', 'days', 'day'];
+    let words = goal.split(/\s+/);
+    words = words.filter(word => !commonWords.includes(word.toLowerCase()));
+    if (words.length > 0) {
+      subject = words.join(' ').trim();
+      console.log(`Extracted subject from remaining words: ${subject}`);
+    }
+  }
+  
+  // If still no subject found, use the entire goal as the subject
+  if (!subject) {
+    subject = goal.replace(/in\s+\d+\s+days?/i, '').trim();
+    console.log(`Using entire goal as subject: ${subject}`);
   }
   
   return { subject, days };
