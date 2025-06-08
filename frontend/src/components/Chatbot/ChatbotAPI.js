@@ -882,14 +882,315 @@ const formatLearningPlanResponse = (learningPlan) => {
   return markdown;
 };
 
-// Function to generate a learning plan using Hugging Face API directly
+// Function to generate a dynamic learning plan using Gemini + Hugging Face
 export const generateLearningPlan = async (goal) => {
   try {
-    console.log("Generating learning plan for:", goal);
+    console.log("🎯 Generating dynamic learning plan for:", goal);
     
-    if (!goal.toLowerCase().includes('learn') && !goal.toLowerCase().includes('master') && !goal.toLowerCase().includes('study')) {
-      return { success: false, message: "Please specify what you want to learn. For example: 'Learn ReactJS in 30 days'" };
+    // Step 1: Use Gemini to create initial course structure
+    console.log("Step 1: Getting course structure from Gemini...");
+    const courseStructure = await generateCourseStructureWithGemini(goal);
+    
+    if (!courseStructure.success) {
+      console.log("❌ Gemini failed, falling back to original method...");
+      return await generateOriginalLearningPlan(goal);
     }
+    
+    // Step 2: Use Hugging Face to create detailed JSON from Gemini's structure
+    console.log("Step 2: Creating detailed course content with Hugging Face...");
+    const detailedCourse = await createDetailedCourseWithHuggingFace(courseStructure.data, goal);
+    
+    return detailedCourse;
+    
+  } catch (error) {
+    console.error("❌ Error in dynamic learning plan generation:", error);
+    console.log("🔄 Falling back to original method...");
+    return await generateOriginalLearningPlan(goal);
+  }
+};
+
+// Step 1: Generate course structure using Gemini API
+const generateCourseStructureWithGemini = async (userQuery) => {
+  try {
+    const geminiPrompt = `
+    Based on this user request: "${userQuery}"
+    
+    Create a comprehensive course outline in the following format:
+    
+    Course Title: [Subject] Course Outline
+    
+    # Section Topics Covered
+    1 [Section Name] • [Topic 1]
+    • [Topic 2] 
+    • [Topic 3]
+    2 [Section Name] • [Topic 1]
+    • [Topic 2]
+    • [Topic 3]
+    
+    Requirements:
+    - Create 8-12 sections based on the subject complexity
+    - Each section should have 3-6 specific topics
+    - Topics should be concrete and actionable (not vague)
+    - Progress from beginner to advanced concepts
+    - Include practical/project sections
+    - Make topics specific enough to find YouTube tutorials
+    
+    Example format:
+    Beginner-Friendly Python Course Outline
+    # Section Topics Covered
+    1 Getting Started • Why Python?
+    • Installing Python & VS Code
+    • Running your first script
+    • How to read official docs
+    2 Python Basics • Variables & data types
+    • Math & comparison operators
+    • Input/output with print() & input()
+    • Comments & docstrings
+    
+    Important: Keep topics specific and tutorial-friendly!
+    `;
+    
+    console.log("🤖 Calling Gemini for course structure...");
+    const geminiResponse = await callRealGeminiAPI(geminiPrompt);
+    
+    if (!geminiResponse || geminiResponse.trim().length === 0) {
+      throw new Error("Empty response from Gemini API");
+    }
+    
+    console.log("✅ Gemini response received, parsing structure...");
+    const parsedStructure = parseCourseStructureFromGemini(geminiResponse);
+    
+    return { success: true, data: parsedStructure };
+    
+  } catch (error) {
+    console.error("❌ Error generating course structure with Gemini:", error);
+    return { 
+      success: false, 
+      message: "Failed to generate course structure. Please try again.",
+      error: error.message
+    };
+  }
+};
+
+// Parse the course structure from Gemini's response
+const parseCourseStructureFromGemini = (geminiResponse) => {
+  console.log("🔍 Parsing Gemini course structure...");
+  
+  const lines = geminiResponse.split('\n');
+  let courseTitle = "Learning Course";
+  let sections = [];
+  let currentSection = null;
+  
+  for (let line of lines) {
+    line = line.trim();
+    
+    // Extract course title
+    if (line.includes('Course Outline') || line.includes('Course Title:')) {
+      courseTitle = line.replace('Course Title:', '').replace('Course Outline', '').trim();
+      continue;
+    }
+    
+    // Parse section headers (numbered lines like "1 Getting Started" or "1\tGetting Started")
+    const sectionMatch = line.match(/^(\d+)\s+(.+?)(?:\s*•|\s*$)/);
+    if (sectionMatch) {
+      // Save previous section
+      if (currentSection) {
+        sections.push(currentSection);
+      }
+      
+      // Start new section
+      currentSection = {
+        sectionNumber: parseInt(sectionMatch[1]),
+        sectionName: sectionMatch[2].trim(),
+        topics: []
+      };
+      
+      // Check if there's a topic on the same line after the section name
+      const topicOnSameLine = line.match(/•\s*(.+)$/);
+      if (topicOnSameLine) {
+        currentSection.topics.push(topicOnSameLine[1].trim());
+      }
+      continue;
+    }
+    
+    // Parse topic lines (lines starting with • or bullet points)
+    const topicMatch = line.match(/^[•·*-]\s*(.+)$/);
+    if (topicMatch && currentSection) {
+      const topic = topicMatch[1].trim();
+      if (topic.length > 0) {
+        currentSection.topics.push(topic);
+      }
+      continue;
+    }
+  }
+  
+  // Add the last section
+  if (currentSection) {
+    sections.push(currentSection);
+  }
+  
+  console.log(`✅ Parsed ${sections.length} sections from Gemini response`);
+  sections.forEach((section, index) => {
+    console.log(`Section ${section.sectionNumber}: ${section.sectionName} (${section.topics.length} topics)`);
+  });
+  
+  return {
+    courseTitle,
+    sections,
+    totalSections: sections.length
+  };
+};
+
+// Step 2: Create detailed course content using Hugging Face
+const createDetailedCourseWithHuggingFace = async (courseStructure, originalGoal) => {
+  try {
+    console.log("🔄 Creating detailed course content with Hugging Face...");
+    
+    const { courseTitle, sections } = courseStructure;
+    
+    // Create days array from sections (each section = 1 day, each topic gets a video)
+    const daysWithDetailedContent = await Promise.all(sections.map(async (section, index) => {
+      const dayNumber = index + 1;
+      
+      console.log(`📅 Processing Day ${dayNumber}: ${section.sectionName}`);
+      
+      // Create project idea for this section using Hugging Face
+      const projectPrompt = `Create a hands-on project idea for learning "${section.sectionName}" that covers these topics: ${section.topics.join(', ')}. 
+      The project should be practical and help beginners practice these concepts. 
+      Respond with just the project description in 1-2 sentences.`;
+      
+      let projectIdea = `Practice ${section.sectionName} concepts with hands-on exercises`;
+      try {
+        const projectResponse = await callHuggingFaceAPI(projectPrompt);
+        if (projectResponse && projectResponse.trim().length > 0) {
+          projectIdea = projectResponse.trim();
+        }
+      } catch (error) {
+        console.warn(`⚠️ Could not generate project for section ${section.sectionName}, using fallback`);
+      }
+      
+      // Get YouTube videos for each topic in this section
+      console.log(`🎥 Fetching videos for ${section.topics.length} topics in section: ${section.sectionName}`);
+      const videosForSection = await Promise.all(section.topics.map(async (topic) => {
+        try {
+          const searchQuery = `${topic} tutorial beginner guide`;
+          console.log(`🔍 Searching YouTube for: ${searchQuery}`);
+          const videos = await getYoutubeResources(searchQuery, 1); // Get 1 video per topic
+          return {
+            topicName: topic,
+            videos: videos || []
+          };
+        } catch (error) {
+          console.error(`❌ Error fetching video for topic "${topic}":`, error);
+          return {
+            topicName: topic,
+            videos: []
+          };
+        }
+      }));
+      
+      // Flatten videos array for this day
+      const allVideosForDay = videosForSection.reduce((acc, topicVideo) => {
+        return acc.concat(topicVideo.videos.map(video => ({
+          ...video,
+          topicName: topicVideo.topicName
+        })));
+      }, []);
+      
+      console.log(`✅ Day ${dayNumber} processed: ${allVideosForDay.length} videos found`);
+      
+      return {
+        day: dayNumber,
+        topic: section.sectionName,
+        topicsInSection: section.topics,
+        project_idea: projectIdea,
+        youtube_query: `${section.sectionName} tutorial guide`,
+        videos: allVideosForDay
+      };
+    }));
+    
+    // Create the complete learning plan object
+    const learningPlan = {
+      id: uuidv4(),
+      title: courseTitle || originalGoal,
+      type: "dynamic_learning_plan",
+      days: daysWithDetailedContent,
+      totalDays: sections.length,
+      generationMethod: "gemini_huggingface_dynamic"
+    };
+    
+    console.log(`🎉 Dynamic course generated: ${learningPlan.totalDays} days, ${learningPlan.days.reduce((acc, day) => acc + day.videos.length, 0)} total videos`);
+    
+    // Save to database
+    let savedPlan = null;
+    try {
+      console.log("💾 Saving dynamic learning plan to database...");
+      savedPlan = await saveLearningPlanToDatabase(learningPlan);
+      if (savedPlan && savedPlan.id) {
+        learningPlan.id = savedPlan.id;
+        console.log(`✅ Saved with ID: ${savedPlan.id}`);
+      }
+    } catch (dbError) {
+      console.error("❌ Error saving to database:", dbError);
+    }
+    
+    // Format for display
+    const formattedContent = formatDynamicLearningPlanResponse(learningPlan);
+    
+    return { success: true, data: learningPlan, content: formattedContent };
+    
+  } catch (error) {
+    console.error("❌ Error creating detailed course with Hugging Face:", error);
+    
+    // Fallback to original method
+    console.log("🔄 Falling back to original course generation method...");
+    return await generateOriginalLearningPlan(originalGoal);
+  }
+};
+
+// Format dynamic learning plan for display
+const formatDynamicLearningPlanResponse = (learningPlan) => {
+  let markdown = `# ${learningPlan.title}\n\n`;
+  
+  markdown += `## 🚀 [Start Your Learning Journey](/learning/${learningPlan.id})\n`;
+  markdown += `I've created a personalized, dynamic learning experience with **${learningPlan.totalDays} comprehensive sections**. **[Click here to start learning](/learning/${learningPlan.id})** with curated videos for each topic.\n\n`;
+  
+  learningPlan.days.forEach(day => {
+    markdown += `## Section ${day.day}: ${day.topic}\n\n`;
+    
+    // Show topics in this section
+    if (day.topicsInSection && day.topicsInSection.length > 0) {
+      markdown += `**Topics covered:**\n`;
+      day.topicsInSection.forEach(topic => {
+        markdown += `• ${topic}\n`;
+      });
+      markdown += '\n';
+    }
+    
+    markdown += `**Project idea:** ${day.project_idea}\n\n`;
+    
+    if (day.videos && day.videos.length > 0) {
+      markdown += `**Tutorial videos (${day.videos.length}):**\n`;
+      day.videos.forEach(video => {
+        const topicLabel = video.topicName ? ` [${video.topicName}]` : '';
+        if (video.video_id || video.id) {
+          const videoId = video.video_id || video.id;
+          markdown += `- [${video.title}${topicLabel}](https://www.youtube.com/watch?v=${videoId})\n`;
+        } else {
+          markdown += `- ${video.title}${topicLabel}\n`;
+        }
+      });
+      markdown += '\n';
+    }
+  });
+  
+  return markdown;
+};
+
+// Original learning plan generation as fallback
+const generateOriginalLearningPlan = async (goal) => {
+  try {
+    console.log("🔄 Using original learning plan generation as fallback...");
     
     // Extract the subject and days from the goal
     const { subject, days: numDaysRequested } = extractSubjectAndDays(goal);
@@ -918,8 +1219,7 @@ export const generateLearningPlan = async (goal) => {
       "youtube_query": "${subject} development environment setup beginners tutorial"
     },
     ...and so on for all ${numDaysRequested} days]
-    `;
-    
+    `;    
     try {
       // Step 1: Call Hugging Face API to generate the learning plan structure
       console.log("Requesting learning plan from AI");
@@ -1027,8 +1327,7 @@ export const generateLearningPlan = async (goal) => {
         console.log(`Updating fallback learning plan ID from ${fallbackPlan.id} to ${savedFallbackPlan.id}`);
         fallbackPlan.id = savedFallbackPlan.id;
       }
-      
-      const formattedContent = formatLearningPlanResponse(fallbackPlan);
+        const formattedContent = formatLearningPlanResponse(fallbackPlan);
       
       return { success: true, data: fallbackPlan, content: formattedContent };
     }
