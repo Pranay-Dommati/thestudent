@@ -12,15 +12,18 @@ const QuizIntro = ({ quizData, lessonId, onStart }) => {
   console.log('URL params:', params);
   console.log('Current path:', location.pathname);
   console.log('Quiz questions available:', 
-    Array.isArray(quizData?.questions) && quizData.questions.length > 0);
-    const handleStartQuiz = () => {
+    Array.isArray(quizData?.questions) && quizData.questions.length > 0);    const handleStartQuiz = () => {
     // Determine the correct quiz URL based on the current path
     const currentPath = location.pathname;
     let quizPath;
     
     console.log('Building quiz path from current path:', currentPath);
     
-    if (currentPath.includes('/engineering/')) {
+    if (currentPath.includes('/learning/') && currentPath.split('/').length === 3) {
+      // AI Learning Plan path: /learning/:learningPlanId
+      const learningPlanId = params.learningPlanId;
+      quizPath = `/learning/${learningPlanId}/quiz`;
+    } else if (currentPath.includes('/engineering/')) {
       // Engineering course path
       quizPath = `/courses/engineering/${params.courseId}/learning/quiz`;
     } else if (currentPath.includes('/10th/')) {

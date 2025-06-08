@@ -822,8 +822,7 @@ export const testLearningPlanSubject = (topic) => {
 async function saveLearningPlanToDatabase(learningPlan) {
   try {
     console.log("Saving learning plan to database:", learningPlan.title);
-    
-    // Format the data for the backend API
+      // Format the data for the backend API
     const formattedPlan = {
       goal: learningPlan.title,
       days: learningPlan.days.map(day => ({
@@ -837,7 +836,9 @@ async function saveLearningPlanToDatabase(learningPlan) {
           video_id: video.video_id,
           thumbnail_url: video.thumbnail || video.thumbnail_url,
           channel_title: video.channelTitle || video.channel_title
-        }))
+        })),
+        // Include quiz questions in the data sent to backend
+        quizQuestions: day.quizQuestions || []
       }))
     };
     
@@ -880,6 +881,135 @@ const formatLearningPlanResponse = (learningPlan) => {
   });
   
   return markdown;
+};
+
+// Function to generate quiz questions using Gemini AI
+const generateQuizQuestions = async (sectionName, topics) => {
+  try {
+    console.log(`🧩 Generating quiz for section: ${sectionName}`);
+    console.log(`📋 Topics: ${topics.join(', ')}`);
+    
+    const quizPrompt = `
+    Create a quiz with 5 multiple choice questions based on the following section and topics:
+    
+    Section: ${sectionName}
+    Topics: ${topics.join(', ')}
+    
+    Requirements:
+    - Each question should have 4 options (A, B, C, D)
+    - Only one option should be correct
+    - Questions should test understanding of the key concepts
+    - Make questions practical and applicable
+    - Difficulty should be appropriate for beginners learning this topic
+    
+    Format your response as JSON:
+    {
+      "questions": [
+        {
+          "id": 1,
+          "question": "Question text here?",
+          "options": ["Option A", "Option B", "Option C", "Option D"],
+          "correct_answer": 0
+        }
+      ]
+    }
+    
+    Make sure to return valid JSON only, no additional text.
+    `;
+    
+    const quizResponse = await callRealGeminiAPI(quizPrompt);
+    
+    if (!quizResponse || quizResponse.trim().length === 0) {
+      throw new Error("Empty quiz response from Gemini");
+    }
+    
+    // Try to parse JSON from the response
+    let quizData;
+    try {
+      // Clean the response to extract JSON
+      const cleanedResponse = quizResponse.replace(/```json\n?|\n?```/g, '').trim();
+      quizData = JSON.parse(cleanedResponse);
+    } catch (parseError) {
+      console.warn("Failed to parse quiz JSON, creating fallback quiz");
+      quizData = createFallbackQuiz(sectionName, topics);
+    }
+    
+    // Validate quiz structure
+    if (!quizData.questions || !Array.isArray(quizData.questions) || quizData.questions.length === 0) {
+      console.warn("Invalid quiz structure, using fallback");
+      quizData = createFallbackQuiz(sectionName, topics);
+    }
+    
+    console.log(`✅ Generated ${quizData.questions.length} quiz questions for ${sectionName}`);
+    return quizData.questions;
+    
+  } catch (error) {
+    console.error(`❌ Error generating quiz for ${sectionName}:`, error);
+    return createFallbackQuiz(sectionName, topics).questions;
+  }
+};
+
+// Create a fallback quiz when AI generation fails
+const createFallbackQuiz = (sectionName, topics) => {
+  return {
+    questions: [
+      {
+        id: 1,
+        question: `What is the main focus of the ${sectionName} section?`,
+        options: [
+          `Understanding ${topics[0] || 'basic concepts'}`,
+          "Learning advanced programming",
+          "Database management",
+          "Network security"
+        ],
+        correct_answer: 0
+      },
+      {
+        id: 2,
+        question: `Which of the following is a key topic covered in ${sectionName}?`,
+        options: [
+          "Artificial Intelligence",
+          topics[1] || topics[0] || "Basic concepts",
+          "Machine Learning",
+          "Data Science"
+        ],
+        correct_answer: 1
+      },
+      {
+        id: 3,
+        question: `When learning ${sectionName}, what should you focus on first?`,
+        options: [
+          "Advanced techniques",
+          "Complex algorithms",
+          "Basic fundamentals",
+          "Professional tools"
+        ],
+        correct_answer: 2
+      },
+      {
+        id: 4,
+        question: `Which approach is best for practicing ${sectionName}?`,
+        options: [
+          "Reading only",
+          "Watching videos only",
+          "Hands-on practice with examples",
+          "Taking notes only"
+        ],
+        correct_answer: 2
+      },
+      {
+        id: 5,
+        question: `What is important to remember about ${topics[0] || sectionName}?`,
+        options: [
+          "It's only for experts",
+          "It requires expensive software",
+          "Practice and patience are key to learning",
+          "It's impossible to learn without a degree"
+        ],
+        correct_answer: 2
+      }
+    ]
+  };
 };
 
 // Function to generate a dynamic learning plan using Gemini + Hugging Face
@@ -1138,7 +1268,17 @@ const createDetailedCourseWithHuggingFace = async (courseStructure, originalGoal
         })));
       }, []);
       
-      console.log(`✅ Day ${dayNumber} processed: ${allVideosForDay.length} videos found`);
+      // Generate quiz questions for this section
+      console.log(`🧩 Generating quiz questions for Day ${dayNumber}: ${section.sectionName}`);
+      let quizQuestions = [];
+      try {
+        quizQuestions = await generateQuizQuestions(section.sectionName, section.topics);
+      } catch (error) {
+        console.warn(`⚠️ Could not generate quiz for section ${section.sectionName}, using fallback`);
+        quizQuestions = createFallbackQuiz(section.sectionName, section.topics).questions;
+      }
+      
+      console.log(`✅ Day ${dayNumber} processed: ${allVideosForDay.length} videos found, ${quizQuestions.length} quiz questions generated`);
       console.log(`📺 Final videos for Day ${dayNumber}:`, allVideosForDay.map(v => `"${v.title}" (for topic: ${v.topicName})`));
       
       return {
@@ -1147,7 +1287,8 @@ const createDetailedCourseWithHuggingFace = async (courseStructure, originalGoal
         topicsInSection: section.topics,
         project_idea: projectIdea,
         youtube_query: `${section.sectionName} tutorial guide`,
-        videos: allVideosForDay
+        videos: allVideosForDay,
+        quizQuestions: quizQuestions // Add quiz questions to each day/section
       };
     }));
     
@@ -1161,7 +1302,7 @@ const createDetailedCourseWithHuggingFace = async (courseStructure, originalGoal
       generationMethod: "gemini_huggingface_dynamic"
     };
     
-    console.log(`🎉 Dynamic course generated: ${learningPlan.totalDays} days, ${learningPlan.days.reduce((acc, day) => acc + day.videos.length, 0)} total videos`);
+    console.log(`🎉 Dynamic course generated: ${learningPlan.totalDays} days, ${learningPlan.days.reduce((acc, day) => acc + day.videos.length, 0)} total videos, ${learningPlan.days.reduce((acc, day) => acc + (day.quizQuestions?.length || 0), 0)} total quiz questions`);
     
     // Save to database
     let savedPlan = null;

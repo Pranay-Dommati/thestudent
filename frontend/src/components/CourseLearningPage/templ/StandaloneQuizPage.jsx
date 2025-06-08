@@ -23,12 +23,15 @@ const StandaloneQuizPage = () => {
     console.log('Questions available:', 
       passedQuizData?.questions && Array.isArray(passedQuizData.questions) ? 
       passedQuizData.questions.length : 0);
-    
-    // Construct return path based on current URL pattern
+      // Construct return path based on current URL pattern
     let defaultReturnPath;
     const currentPath = location.pathname;
     
-    if (currentPath.includes('/engineering/')) {
+    if (currentPath.includes('/learning/') && currentPath.includes('/quiz')) {
+      // AI Learning Plan path: /learning/:learningPlanId/quiz
+      const learningPlanId = params.learningPlanId;
+      defaultReturnPath = `/learning/${learningPlanId}`;
+    } else if (currentPath.includes('/engineering/')) {
       // Engineering course path
       defaultReturnPath = `/courses/engineering/${params.courseId}/learning`;
     } else {
@@ -155,7 +158,8 @@ const StandaloneQuizPage = () => {
     try {
       // Get the lesson ID from the quiz data or location state
       const lessonId = location.state?.lessonId;
-        console.log('Submitting quiz with lesson ID:', lessonId);
+      
+      console.log('Submitting quiz with lesson ID:', lessonId);
       console.log('Selected answers:', selectedAnswers);
       console.log('Quiz data questions:', quizData?.questions);
       
@@ -174,16 +178,36 @@ const StandaloneQuizPage = () => {
         return;
       }
 
-      // Submit quiz answers to backend
-      const response = await axiosInstance.post(
-        `http://127.0.0.1:8000/api/quiz/submit/${lessonId}/`,
-        { answers: selectedAnswers }
-      );
+      // Determine if this is an AI learning plan based on URL pattern
+      const currentPath = location.pathname;
+      const isAILearningPlan = currentPath.includes('/learning/') && currentPath.includes('/quiz');
+      
+      let response;
+      
+      if (isAILearningPlan) {
+        // Use AI learning plan endpoint for string-based lesson IDs
+        const learningPlanId = params.learningPlanId;
+        console.log('Submitting AI learning plan quiz:', { learningPlanId, lessonId });
+        
+        response = await axiosInstance.post(
+          `http://127.0.0.1:8000/api/learning/submit-quiz/${learningPlanId}/${lessonId}/`,
+          { answers: selectedAnswers }
+        );
+      } else {
+        // Use regular course endpoint for integer lesson IDs
+        console.log('Submitting regular course quiz');
+        
+        response = await axiosInstance.post(
+          `http://127.0.0.1:8000/api/quiz/submit/${lessonId}/`,
+          { answers: selectedAnswers }
+        );
+      }
 
       const result = response.data;
       setQuizResult(result);
       setShowResults(true);
-        if (result.passed) {
+      
+      if (result.passed) {
         toast.success(`🎉 Congratulations! You scored ${result.score.toFixed(1)}% and passed the quiz!`);
       } else {
         toast(`You scored ${result.score.toFixed(1)}%. You need 80% to pass. Try again!`, {
