@@ -293,6 +293,7 @@ const ChatbotPage = () => {
   const initialQuery = searchParams.get("q");
 
   const [message, setMessage] = useState("");
+  const [createCourseMode, setCreateCourseMode] = useState(false);
   const [chatHistory, setChatHistory] = useState([
     {
       id: 1,
@@ -355,20 +356,12 @@ const ChatbotPage = () => {
 
     setChatHistory((prev) => [...prev, userMessageObj]);
     if (!customMessage) setMessage("");
-    setIsLoading(true);
+    setIsLoading(true);    try {
+      console.log('Create Course Mode:', createCourseMode);
+      console.log('Message:', messageToSend);
 
-    try {
-      // Check if this is a learning plan request
-      const isLearningPlanRequest = (
-        messageToSend.toLowerCase().includes('learning plan') ||
-        messageToSend.toLowerCase().includes('learn ') ||
-        messageToSend.toLowerCase().includes('study plan') ||
-        messageToSend.toLowerCase().includes('teach me') ||
-        messageToSend.toLowerCase().includes('day-wise') ||
-        messageToSend.toLowerCase().includes('day by day')
-      );
-
-      if (isLearningPlanRequest) {
+      // Only generate learning plans with YouTube videos if Create Course Mode is ON
+      if (createCourseMode) {
         // Generate a learning plan using the new API
         const planResult = await generateLearningPlan(messageToSend);
         
@@ -439,28 +432,34 @@ const ChatbotPage = () => {
             learningPlanId: planResult.data.id || null
           };
           
-          setChatHistory((prev) => [...prev, botResponse]);
-        } else {
+          setChatHistory((prev) => [...prev, botResponse]);        } else {
           // Fallback to regular chatbot response if learning plan generation failed
-          const response = await callGeminiAPI(messageToSend);
+          const response = await callGeminiAPI(messageToSend, { createCourse: true });
+          
+          console.log("Fallback chat response received:");
+          console.log("Response type:", typeof response);
+          console.log("Response value:", response);
           
           const botResponse = {
             id: chatHistory.length + 2,
             type: "bot",
-            content: response,
+            content: typeof response === 'string' ? response : String(response),
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           };
           
           setChatHistory((prev) => [...prev, botResponse]);
-        }
-      } else {
-        // Regular chatbot response for non-learning plan requests
-        const response = await callGeminiAPI(messageToSend);
+        }} else {
+        // Regular chatbot response - NO learning plans, NO YouTube videos, just AI text
+        const response = await callGeminiAPI(messageToSend, { createCourse: false });
+        
+        console.log("Regular chat response received:");
+        console.log("Response type:", typeof response);
+        console.log("Response value:", response);
 
         const botResponse = {
           id: chatHistory.length + 2,
           type: "bot",
-          content: response,
+          content: typeof response === 'string' ? response : String(response),
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         };
 
@@ -497,10 +496,11 @@ const ChatbotPage = () => {
               ? "bg-white w-full md:w-5/6 lg:w-3/4" 
               : "bg-gray-100 text-gray-800 rounded-bl-none max-w-[80%]"
             }`}
-        >
-          {message.type === "bot" && !isCourseContent && !isLearningPlan && (
+        >          {message.type === "bot" && !isCourseContent && !isLearningPlan && (
             <div className="prose max-w-none dark:prose-invert">
-              <ReactMarkdown>{message.content}</ReactMarkdown>
+              <ReactMarkdown>
+                {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
+              </ReactMarkdown>
             </div>
           )}
 
@@ -657,11 +657,38 @@ const ChatbotPage = () => {
             )}
 
             <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input Section */}
+          </div>          {/* Input Section */}
           <div className="p-4 bg-white border-t border-gray-200">
             <div className="max-w-4xl mx-auto">
+              {/* Create Course Toggle */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={createCourseMode}
+                      onChange={(e) => setCreateCourseMode(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      createCourseMode ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}>
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        createCourseMode ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </div>
+                    <span className="ml-3 text-sm font-medium text-gray-700">
+                      Create Course Mode
+                    </span>
+                  </label>
+                  {createCourseMode && (
+                    <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                      Course creation prioritized
+                    </span>
+                  )}
+                </div>
+              </div>
+              
               <div className="relative">
                 <input
                   type="text"

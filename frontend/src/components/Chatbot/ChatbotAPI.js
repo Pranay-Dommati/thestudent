@@ -1,10 +1,12 @@
 import axios from "axios";
 import axiosInstance from "../../utils/axios";
 import { v4 as uuidv4 } from "uuid";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Use environment variables for API keys
 const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
 const HUGGINGFACE_API_TOKEN = import.meta.env.VITE_HUGGINGFACE_API_TOKEN;
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 // Base URLs for APIs
 const YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3/search";
@@ -13,13 +15,23 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api"
 const LEARNING_PLAN_API_URL = `${API_BASE_URL}/learning/generate-learning-plan/`;
 const LEARNING_PLAN_SAVE_API_URL = `${API_BASE_URL}/learning/generate-learning-plan/`;
 
+// Initialize Google Generative AI
+let genAI = null;
+let model = null;
+
+if (GEMINI_API_KEY) {
+  genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+}
+
 // Debug API keys and quota monitoring
 let youtubeApiCalls = 0;
 let youtubeQuotaExceeded = false;
 
 console.log("API Configuration Status:", {
   youtube: YOUTUBE_API_KEY ? "✓" : "✗",
-  huggingface: HUGGINGFACE_API_TOKEN ? "✓" : "✗"
+  huggingface: HUGGINGFACE_API_TOKEN ? "✓" : "✗",
+  gemini: GEMINI_API_KEY ? "✓" : "✗"
 });
 
 // Fetch from YouTube API
@@ -270,6 +282,31 @@ const generateFallbackResponse = (prompt) => {
     `Here's a simplified response to your query about "${userQuery}":\n\n` +
     `To learn more about this topic, I recommend checking resources like Wikipedia, YouTube tutorials, ` +
     `or specialized educational websites. You can also try again later when my advanced features are available again.`;
+};
+
+// Function to call the actual Google Gemini API
+const callRealGeminiAPI = async (prompt) => {
+  if (!GEMINI_API_KEY || !model) {
+    console.error("Gemini API not properly configured");
+    throw new Error("Gemini API configuration missing");
+  }
+
+  try {
+    console.log("Calling Google Gemini API...");
+    console.log("Prompt length:", prompt.length);
+    
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    console.log("Received response from Gemini API");
+    console.log("Response length:", text.length);
+    
+    return text;
+  } catch (error) {
+    console.error("Error calling Gemini API:", error);
+    throw error;
+  }
 };
 
 // Generate a meaningful learning plan when API is unavailable
@@ -611,20 +648,75 @@ const extractSubjectAndDays = (goal) => {
 };
 
 // Compatibility function to replace Gemini API
-export const callGeminiAPI = async (userMessage) => {
+export const callGeminiAPI = async (userMessage, options = {}) => {
   try {
     console.log("Chat request received:", userMessage);
+    console.log("Options:", options);
     
-    // Create a prompt for the Hugging Face model
-    const prompt = `You are a helpful AI assistant. Please respond to the following request from a user: "${userMessage}"`;
-    
-    // Call Hugging Face API using the same function we use for learning plans
-    const generatedText = await callHuggingFaceAPI(prompt);
-    console.log("Generated chat response successfully");
-    
-    return generatedText;
+    if (options.createCourse) {
+      // Course creation mode - use Hugging Face API
+      console.log("Using Hugging Face API for course creation mode");
+      
+      const prompt = `You are an AI course creation assistant. Your primary goal is to help create structured learning courses and educational content. When a user asks you something, always try to interpret their request in the context of course creation, curriculum development, or educational planning.
+
+For the following user request: "${userMessage}"
+
+Please respond by either:
+1. Creating a detailed course outline if the request relates to learning a topic
+2. Providing course creation advice and educational structure recommendations
+3. Suggesting learning objectives, course modules, and teaching methods
+4. If the request is completely unrelated to education, still try to frame your response in an educational context
+
+Focus on creating comprehensive, well-structured educational content.`;
+
+      // Call Hugging Face API for course creation
+      const generatedText = await callHuggingFaceAPI(prompt);
+      console.log("Generated course creation response successfully");
+      
+      // Ensure we always return a string
+      if (typeof generatedText === 'string') {
+        return generatedText;
+      } else if (Array.isArray(generatedText)) {
+        console.warn("Received array instead of string, converting to string");
+        return generatedText.join(' ');
+      } else if (typeof generatedText === 'object') {
+        console.warn("Received object instead of string, converting to string");
+        return JSON.stringify(generatedText);
+      } else {
+        console.warn("Received unexpected type, converting to string");
+        return String(generatedText);
+      }
+    } else {
+      // Regular chat mode - use actual Google Gemini API
+      console.log("Using Google Gemini API for regular chat mode");
+      
+      const prompt = `You are a helpful AI assistant. Please provide a conversational response to the user's question. Do NOT create learning plans, course outlines, or structured educational content unless specifically asked. Just give a normal, informative answer like a regular chatbot would.
+
+User's question: "${userMessage}"
+
+Respond naturally and conversationally without creating any courses or learning plans.`;
+
+      // Call the actual Gemini API
+      const generatedText = await callRealGeminiAPI(prompt);
+      console.log("Generated regular chat response successfully from Gemini API");
+      console.log("Response type:", typeof generatedText);
+      
+      return generatedText;
+    }
   } catch (error) {
-    console.error("Error in chat response:", error);
+    console.error("Error in callGeminiAPI:", error);
+    
+    // If Gemini API fails and we're in regular chat mode, fall back to Hugging Face
+    if (!options.createCourse && HUGGINGFACE_API_TOKEN) {
+      console.log("Falling back to Hugging Face API for regular chat");
+      try {
+        const fallbackPrompt = `You are a helpful AI assistant. Please provide a conversational response to the user's question: "${userMessage}"`;
+        return await callHuggingFaceAPI(fallbackPrompt);
+      } catch (fallbackError) {
+        console.error("Fallback to Hugging Face also failed:", fallbackError);
+      }
+    }
+    
     return "I'm sorry, I'm having trouble processing your request right now. Please try again later.";
   }
 };
