@@ -949,15 +949,18 @@ const generateCourseStructureWithGemini = async (userQuery) => {
     
     Important: Keep topics specific and tutorial-friendly!
     `;
-    
-    console.log("🤖 Calling Gemini for course structure...");
+      console.log("🤖 Calling Gemini for course structure...");
+    console.log("📝 Gemini Prompt:", geminiPrompt);
     const geminiResponse = await callRealGeminiAPI(geminiPrompt);
     
     if (!geminiResponse || geminiResponse.trim().length === 0) {
       throw new Error("Empty response from Gemini API");
     }
     
-    console.log("✅ Gemini response received, parsing structure...");
+    console.log("✅ Gemini response received:");
+    console.log("🔍 RAW GEMINI RESPONSE:", geminiResponse);
+    console.log("📊 Response length:", geminiResponse.length);
+    console.log("🔄 Now parsing structure...");
     const parsedStructure = parseCourseStructureFromGemini(geminiResponse);
     
     return { success: true, data: parsedStructure };
@@ -975,26 +978,36 @@ const generateCourseStructureWithGemini = async (userQuery) => {
 // Parse the course structure from Gemini's response
 const parseCourseStructureFromGemini = (geminiResponse) => {
   console.log("🔍 Parsing Gemini course structure...");
+  console.log("📋 Input for parsing:", geminiResponse);
   
   const lines = geminiResponse.split('\n');
+  console.log(`📝 Total lines to process: ${lines.length}`);
+  
   let courseTitle = "Learning Course";
   let sections = [];
   let currentSection = null;
   
-  for (let line of lines) {
-    line = line.trim();
+  for (let i = 0; i < lines.length; i++) {
+    const originalLine = lines[i];
+    const line = originalLine.trim();
+    
+    console.log(`📍 Line ${i + 1}: "${originalLine}" -> "${line}"`);
     
     // Extract course title
     if (line.includes('Course Outline') || line.includes('Course Title:')) {
       courseTitle = line.replace('Course Title:', '').replace('Course Outline', '').trim();
+      console.log(`🏷️ Found course title: "${courseTitle}"`);
       continue;
     }
     
     // Parse section headers (numbered lines like "1 Getting Started" or "1\tGetting Started")
     const sectionMatch = line.match(/^(\d+)\s+(.+?)(?:\s*•|\s*$)/);
     if (sectionMatch) {
+      console.log(`🔢 Found section match: ${sectionMatch[1]} - ${sectionMatch[2]}`);
+      
       // Save previous section
       if (currentSection) {
+        console.log(`💾 Saving previous section: ${currentSection.sectionName} with ${currentSection.topics.length} topics`);
         sections.push(currentSection);
       }
       
@@ -1005,10 +1018,14 @@ const parseCourseStructureFromGemini = (geminiResponse) => {
         topics: []
       };
       
+      console.log(`🆕 Started new section: ${currentSection.sectionName}`);
+      
       // Check if there's a topic on the same line after the section name
       const topicOnSameLine = line.match(/•\s*(.+)$/);
       if (topicOnSameLine) {
-        currentSection.topics.push(topicOnSameLine[1].trim());
+        const topic = topicOnSameLine[1].trim();
+        currentSection.topics.push(topic);
+        console.log(`➕ Added same-line topic: "${topic}"`);
       }
       continue;
     }
@@ -1019,26 +1036,40 @@ const parseCourseStructureFromGemini = (geminiResponse) => {
       const topic = topicMatch[1].trim();
       if (topic.length > 0) {
         currentSection.topics.push(topic);
+        console.log(`➕ Added topic to ${currentSection.sectionName}: "${topic}"`);
       }
       continue;
+    }
+    
+    // Log lines that don't match any pattern
+    if (line.length > 0) {
+      console.log(`❓ Unmatched line: "${line}"`);
     }
   }
   
   // Add the last section
   if (currentSection) {
+    console.log(`💾 Saving final section: ${currentSection.sectionName} with ${currentSection.topics.length} topics`);
     sections.push(currentSection);
   }
   
-  console.log(`✅ Parsed ${sections.length} sections from Gemini response`);
+  console.log(`✅ PARSING COMPLETE: ${sections.length} sections found`);
   sections.forEach((section, index) => {
-    console.log(`Section ${section.sectionNumber}: ${section.sectionName} (${section.topics.length} topics)`);
+    console.log(`📚 Section ${section.sectionNumber}: ${section.sectionName}`);
+    section.topics.forEach((topic, topicIndex) => {
+      console.log(`   🎯 Topic ${topicIndex + 1}: ${topic}`);
+    });
   });
   
-  return {
+  const result = {
     courseTitle,
     sections,
     totalSections: sections.length
   };
+  
+  console.log("🎉 FINAL PARSED STRUCTURE:", JSON.stringify(result, null, 2));
+  
+  return result;
 };
 
 // Step 2: Create detailed course content using Hugging Face
@@ -1068,14 +1099,25 @@ const createDetailedCourseWithHuggingFace = async (courseStructure, originalGoal
       } catch (error) {
         console.warn(`⚠️ Could not generate project for section ${section.sectionName}, using fallback`);
       }
-      
-      // Get YouTube videos for each topic in this section
+        // Get YouTube videos for each topic in this section
       console.log(`🎥 Fetching videos for ${section.topics.length} topics in section: ${section.sectionName}`);
-      const videosForSection = await Promise.all(section.topics.map(async (topic) => {
+      console.log(`📋 Topics to fetch videos for:`, section.topics);
+        const videosForSection = await Promise.all(section.topics.map(async (topic, topicIndex) => {
         try {
-          const searchQuery = `${topic} tutorial beginner guide`;
-          console.log(`🔍 Searching YouTube for: ${searchQuery}`);
+          // Include course title for language-specific search results
+          const searchQuery = `${courseTitle} ${topic} tutorial beginner guide`;
+          console.log(`🔍 Topic ${topicIndex + 1}/${section.topics.length}: "${topic}"`);
+          console.log(`🔍 YouTube search query: "${searchQuery}"`);
+          
           const videos = await getYoutubeResources(searchQuery, 1); // Get 1 video per topic
+          
+          console.log(`✅ Found ${videos ? videos.length : 0} videos for topic: "${topic}"`);
+          if (videos && videos.length > 0) {
+            videos.forEach((video, vIndex) => {
+              console.log(`   📺 Video ${vIndex + 1}: ${video.title}`);
+            });
+          }
+          
           return {
             topicName: topic,
             videos: videos || []
@@ -1088,8 +1130,7 @@ const createDetailedCourseWithHuggingFace = async (courseStructure, originalGoal
           };
         }
       }));
-      
-      // Flatten videos array for this day
+        // Flatten videos array for this day
       const allVideosForDay = videosForSection.reduce((acc, topicVideo) => {
         return acc.concat(topicVideo.videos.map(video => ({
           ...video,
@@ -1098,6 +1139,7 @@ const createDetailedCourseWithHuggingFace = async (courseStructure, originalGoal
       }, []);
       
       console.log(`✅ Day ${dayNumber} processed: ${allVideosForDay.length} videos found`);
+      console.log(`📺 Final videos for Day ${dayNumber}:`, allVideosForDay.map(v => `"${v.title}" (for topic: ${v.topicName})`));
       
       return {
         day: dayNumber,
