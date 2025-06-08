@@ -350,8 +350,7 @@ def submit_ai_quiz(request, plan_id, lesson_id):
         for question in quiz_questions:
             question_id = str(question.get('id', ''))
             user_answer = user_answers.get(question_id)
-            
-            # Get options and correct answer
+              # Get options and correct answer
             options = question.get('options', [])
             correct_answer = question.get('correct_answer', '')
             
@@ -365,8 +364,8 @@ def submit_ai_quiz(request, plan_id, lesson_id):
                     user_answer_index = int(user_answer)
                     # Make sure the answer index is valid
                     if user_answer_index >= 0 and user_answer_index < len(options):
-                        # Check if the option at this index matches the correct answer
-                        if options[user_answer_index] == correct_answer:
+                        # Check if the user selected index matches the correct answer index
+                        if user_answer_index == correct_answer:
                             correct_answers += 1
                             logger.info(f"Correct answer for question {question_id}")
                         else:
