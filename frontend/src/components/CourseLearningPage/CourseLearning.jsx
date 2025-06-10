@@ -103,9 +103,13 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         id: planData.id,
         title: planData.title,
         description: planData.description || "AI-generated learning plan",
-        chapters: planData.plan_data.days.map((day, dayIndex) => ({
-          title: `Day ${day.day}: ${day.topic}`,
-          lessons: (day.videos || []).map((video, videoIndex) => {
+        chapters: planData.plan_data.days.map((day, dayIndex) => {
+          // DEBUG: Log quiz questions for each day
+          console.log(`🧩 Day ${day.day} (${day.topic}) quiz questions:`, day.quizQuestions);
+          console.log(`🧩 Quiz questions length:`, day.quizQuestions ? day.quizQuestions.length : 0);
+          
+          // Create video lessons from day.videos
+          const videoLessons = (day.videos || []).map((video, videoIndex) => {
             // Create unique lesson identifier for AI learning plans
             const lessonKey = `day_${day.day}_video_${videoIndex}`;
             const isCompleted = existingProgress[lessonKey] || false;
@@ -125,8 +129,42 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               dayIndex: dayIndex,
               videoIndex: videoIndex
             };
-          }),
-        })),
+          });
+
+          // Create quiz lesson if quiz questions exist
+          const quizLessons = [];
+          if (day.quizQuestions && day.quizQuestions.length > 0) {
+            console.log(`✅ Creating quiz lesson for Day ${day.day}: ${day.topic}`);
+            const quizLessonKey = `day_${day.day}_quiz`;
+            const isQuizCompleted = existingProgress[quizLessonKey] || false;
+            
+            quizLessons.push({
+              id: quizLessonKey,
+              title: `${day.topic} - Knowledge Check`,
+              type: 'quiz',
+              description: `Test your understanding of ${day.topic} concepts`,
+              completed: isQuizCompleted,
+              isAIGenerated: true,
+              aiLearningPlanId: planData.id,
+              dayIndex: dayIndex,
+              quiz_questions: day.quizQuestions,
+              quizQuestions: day.quizQuestions
+            });
+          } else {
+            console.log(`❌ No quiz questions found for Day ${day.day}: ${day.topic}`);
+          }
+
+          console.log(`📊 Day ${day.day} final lessons:`, {
+            videoLessons: videoLessons.length,
+            quizLessons: quizLessons.length,
+            totalLessons: videoLessons.length + quizLessons.length
+          });
+
+          return {
+            title: `Day ${day.day}: ${day.topic}`,
+            lessons: [...videoLessons, ...quizLessons]
+          };
+        }),
       };
       setCourse(transformedPlan);
       setIsAIGeneratedPlan(true);

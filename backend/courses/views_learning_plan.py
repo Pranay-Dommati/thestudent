@@ -287,6 +287,134 @@ def update_learning_plan_progress(request, plan_id):
         logger.error(f"Error updating learning plan: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_ai_quiz(request, plan_id, lesson_id):
+    """Submit quiz answers for AI learning plan and calculate score"""
+    try:
+        # Get the AI learning plan
+        learning_plan = AILearningPlan.objects.get(id=plan_id, user=request.user)
+        
+        # Get user's answers from request data
+        user_answers = request.data.get('answers', {})
+        
+        # Parse lesson_id to find the day and quiz questions
+        # lesson_id format: "day_X_quiz"
+        if not lesson_id.startswith('day_') or not lesson_id.endswith('_quiz'):
+            return Response(
+                {"error": "Invalid lesson ID format for AI learning plan"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Extract day number from lesson_id
+        try:
+            day_number = int(lesson_id.split('_')[1])
+        except (IndexError, ValueError):
+            return Response(
+                {"error": "Could not parse day number from lesson ID"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Find the day in the learning plan
+        plan_days = learning_plan.plan_data.get('days', [])
+        target_day = None
+        
+        for day in plan_days:
+            if day.get('day') == day_number:
+                target_day = day
+                break
+        
+        if not target_day:
+            return Response(
+                {"error": f"Day {day_number} not found in learning plan"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get quiz questions for this day
+        quiz_questions = target_day.get('quizQuestions', [])
+        
+        if not quiz_questions:
+            return Response(
+                {"error": f"No quiz questions found for day {day_number}"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Calculate score
+        total_questions = len(quiz_questions)
+        correct_answers = 0
+        
+        # Debug information
+        logger.info(f"Processing AI quiz submission for plan: {plan_id}, lesson: {lesson_id}")
+        logger.info(f"User answers received: {user_answers}")
+        
+        for question in quiz_questions:
+            question_id = str(question.get('id', ''))
+            user_answer = user_answers.get(question_id)
+              # Get options and correct answer
+            options = question.get('options', [])
+            correct_answer = question.get('correct_answer', '')
+            
+            logger.info(f"Question {question_id}: {question.get('question', '')}")
+            logger.info(f"Options: {options}")
+            logger.info(f"Correct answer: {correct_answer}")
+            logger.info(f"User answer index: {user_answer}")
+            
+            if user_answer is not None:
+                try:
+                    user_answer_index = int(user_answer)
+                    # Make sure the answer index is valid
+                    if user_answer_index >= 0 and user_answer_index < len(options):
+                        # Check if the user selected index matches the correct answer index
+                        if user_answer_index == correct_answer:
+                            correct_answers += 1
+                            logger.info(f"Correct answer for question {question_id}")
+                        else:
+                            logger.info(f"Wrong answer for question {question_id}")
+                    else:
+                        logger.info(f"Invalid answer index for question {question_id}: {user_answer_index}")
+                except (ValueError, TypeError):
+                    logger.info(f"Invalid answer format for question {question_id}: {user_answer}")
+                    continue
+        
+        # Calculate percentage score
+        score = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
+        passed = score >= 80  # 80% passing score
+        
+        # Update learning plan progress
+        plan_data = learning_plan.plan_data
+        if 'progress' not in plan_data:
+            plan_data['progress'] = {}
+        
+        # Mark this quiz as completed if passed
+        if passed:
+            plan_data['progress'][lesson_id] = True
+        
+        learning_plan.plan_data = plan_data
+        learning_plan.save()
+        
+        return Response({
+            "score": score,
+            "passed": passed,
+            "correct_answers": correct_answers,
+            "total_questions": total_questions,
+            "lesson_id": lesson_id,
+            "day_number": day_number
+        })
+        
+    except AILearningPlan.DoesNotExist:
+        return Response(
+            {"error": "Learning plan not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        logger.error(f"Error submitting AI quiz: {str(e)}")
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
 def generate_plan_from_huggingface(goal):
     """
     Call Hugging Face API to generate a learning plan
