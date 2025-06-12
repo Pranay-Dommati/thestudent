@@ -6,6 +6,25 @@ import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
 import { callGeminiAPI, getYoutubeResources, generateLearningPlan, getLearningPath } from "./ChatbotAPI";
 
+// Add slide-up animation
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slide-up {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out forwards;
+  }
+`;
+document.head.appendChild(style);
+
 const useWindowSize = () => {
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
@@ -31,14 +50,14 @@ const CourseSection = ({ section, subsections }) => {
   const [isOpen, setIsOpen] = useState(true);
   
   return (
-    <div className="mb-6 bg-white rounded-lg shadow-sm">
+    <div className="mb-4 lg:mb-6 bg-white rounded-lg shadow-sm">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 rounded-t-lg hover:bg-gray-100 transition-colors"
+        className="w-full px-3 lg:px-4 py-2.5 lg:py-3 flex items-center justify-between bg-gray-50 rounded-t-lg hover:bg-gray-100 transition-colors"
       >
-        <h3 className="text-lg font-semibold text-gray-800">{section}</h3>
+        <h3 className="text-base lg:text-lg font-semibold text-gray-800">{section}</h3>
         <svg
-          className={`w-5 h-5 transform transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 lg:w-5 lg:h-5 transform transition-transform ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -47,20 +66,20 @@ const CourseSection = ({ section, subsections }) => {
         </svg>
       </button>
       {isOpen && (
-        <div className="p-4">
+        <div className="p-3 lg:p-4">
           {subsections.map((subsection, index) => (
-            <div key={index} className="mb-4 last:mb-0">
-              <h4 className="font-medium text-gray-700 mb-2">{subsection.title}</h4>
+            <div key={index} className="mb-3 lg:mb-4 last:mb-0">
+              <h4 className="font-medium text-gray-700 mb-2 text-sm lg:text-base">{subsection.title}</h4>
               {subsection.videos.map((video, vIndex) => (
                 <a
                   key={vIndex}
                   href={video.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center p-2 rounded hover:bg-blue-50 transition-colors group"
+                  className="flex items-center p-2 rounded hover:bg-blue-50 transition-colors group mb-2 last:mb-0"
                 >
-                  <IoPlayCircle className="text-blue-500 group-hover:text-blue-600 mr-2" size={20} />
-                  <span className="text-gray-600 group-hover:text-blue-600">{video.title}</span>
+                  <IoPlayCircle className="text-blue-500 group-hover:text-blue-600 mr-2 w-4 h-4 lg:w-5 lg:h-5 flex-shrink-0" />
+                  <span className="text-gray-600 group-hover:text-blue-600 text-sm lg:text-base line-clamp-2">{video.title}</span>
                 </a>
               ))}
             </div>
@@ -72,7 +91,6 @@ const CourseSection = ({ section, subsections }) => {
 };
 
 const LearningPlanDisplay = ({ content, learningPlanId }) => {
-  // Parse the markdown content to extract days and details
   const [title, setTitle] = useState('');
   const [days, setDays] = useState([]);
   const [activeDay, setActiveDay] = useState(1);
@@ -171,52 +189,58 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
   }, [content]);
 
   return (
-    <div className="mt-4 bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="bg-blue-600 text-white px-6 py-4">
-        <h2 className="text-xl font-bold">{title}</h2>
-        <p className="text-blue-100 text-sm mt-1">{days.length} days learning journey</p>
+    <div className="mt-2 bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-blue-600 text-white px-3 lg:px-4 py-3 lg:py-4">
+        <h2 className="text-lg lg:text-xl font-bold">{title}</h2>
+        <p className="text-blue-100 text-xs lg:text-sm mt-1">{days.length} days learning journey</p>
       </div>
       
       {/* Day navigation */}
-      <div className="flex overflow-x-auto py-2 bg-gray-50 border-b">
-        {days.map(day => (
-          <button
-            key={day.number}
-            onClick={() => setActiveDay(day.number)}
-            className={`px-4 py-2 mx-1 rounded-full text-sm font-medium whitespace-nowrap ${activeDay === day.number ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
-          >
-            Day {day.number}
-          </button>
-        ))}
+      <div className="flex overflow-x-auto py-2 bg-gray-50 border-b hide-scrollbar">
+        <div className="flex px-2 gap-1 lg:gap-2 min-w-full">
+          {days.map(day => (
+            <button
+              key={day.number}
+              onClick={() => setActiveDay(day.number)}
+              className={`px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-xs lg:text-sm font-medium whitespace-nowrap flex-shrink-0 ${
+                activeDay === day.number 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+              }`}
+            >
+              Day {day.number}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Active day content */}
       {days.map(day => day.number === activeDay && (
-        <div key={day.number} className="p-6">
-          <div className="mb-6">
-            <h3 className="text-xl font-bold text-gray-800">{day.topic}</h3>
-            <div className="mt-3 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-              <h4 className="font-semibold text-yellow-800 mb-1">Project Idea</h4>
-              <p className="text-gray-700">{day.projectIdea}</p>
+        <div key={day.number} className="p-3 lg:p-4">
+          <div className="mb-4 lg:mb-6">
+            <h3 className="text-base lg:text-xl font-bold text-gray-800">{day.topic}</h3>
+            <div className="mt-3 p-3 lg:p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+              <h4 className="font-semibold text-yellow-800 mb-1 text-sm lg:text-base">Project Idea</h4>
+              <p className="text-gray-700 text-sm lg:text-base">{day.projectIdea}</p>
             </div>
           </div>
 
           {day.videos.length > 0 && (
             <div>
-              <h4 className="font-semibold text-gray-800 mb-3">Recommended Videos</h4>
-              <div className="space-y-3">
+              <h4 className="font-semibold text-gray-800 mb-3 text-sm lg:text-base">Recommended Videos</h4>
+              <div className="space-y-2 lg:space-y-3">
                 {day.videos.map((video, index) => (
                   <a
                     key={index}
                     href={video.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center p-3 border border-gray-200 rounded-md hover:bg-blue-50 transition-colors group"
+                    className="flex items-center p-2 lg:p-3 border border-gray-200 rounded-md hover:bg-blue-50 transition-colors group"
                   >
-                    <div className="bg-red-600 text-white p-2 rounded-md mr-3">
-                      <IoPlayCircle size={20} />
+                    <div className="bg-red-600 text-white p-1.5 lg:p-2 rounded-md mr-2 lg:mr-3 flex-shrink-0">
+                      <IoPlayCircle className="w-4 h-4 lg:w-5 lg:h-5" />
                     </div>
-                    <span className="text-gray-700 group-hover:text-blue-600">{video.title}</span>
+                    <span className="text-gray-700 group-hover:text-blue-600 text-sm lg:text-base line-clamp-2">{video.title}</span>
                   </a>
                 ))}
               </div>
@@ -224,18 +248,18 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
           )}
 
           {/* Learning path card */}
-          <div className="mt-6 pt-4 border-t border-gray-200">
+          <div className="mt-4 lg:mt-6 pt-4 border-t border-gray-200">
             <Link 
               to={`/learning/${extractedPlanId || learningPlanId || '40f897b9-1f2e-4db4-932e-78a8d3a033b4'}`}
-              className="block w-full p-4 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
+              className="block w-full p-3 lg:p-4 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-bold mb-1">Continue Your Learning Journey</h3>
-                  <p className="text-blue-100 text-sm">Access your full learning path with interactive videos</p>
+                  <h3 className="text-base lg:text-lg font-bold mb-1">Continue Your Learning Journey</h3>
+                  <p className="text-blue-100 text-xs lg:text-sm">Access your full learning path with interactive videos</p>
                 </div>
-                <div className="bg-white/20 p-3 rounded-full">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="bg-white/20 p-2 lg:p-3 rounded-full">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
                 </div>
@@ -321,6 +345,8 @@ const ChatbotPage = () => {
       preview: "Create a learning path for machine learning...",
     },
   ]);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // Scroll to the bottom of the chat when chat history updates
   useEffect(() => {
@@ -342,6 +368,16 @@ const ChatbotPage = () => {
   useEffect(() => {
     setIsSidebarOpen(width >= 1024);
   }, [width]);
+
+  // Add window resize listener
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleSendMessage = async (customMessage = null) => {
     const messageToSend = customMessage || message;
@@ -480,24 +516,23 @@ const ChatbotPage = () => {
   };
 
   const MessageBubble = ({ message }) => {
-    // Simple pattern to detect YouTube section format
     const isCourseContent = message.content.includes("# ") && message.content.includes("## ");
     const sections = isCourseContent ? parseMarkdownResponse(message.content) : [];
     const isLearningPlan = message.isLearningPlan || (message.content.includes("Learning Plan") && message.content.includes("Day "));
 
     return (
-      <div
-        className={`flex ${message.type === "user" ? "justify-end" : "justify-start"} mb-4`}
-      >
+      <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"} mb-3 lg:mb-4 px-1`}>
         <div
-          className={`rounded-lg py-2 px-4 ${message.type === "user"
-            ? "bg-blue-600 text-white rounded-br-none max-w-[80%]"
-            : isLearningPlan 
-              ? "bg-white w-full md:w-5/6 lg:w-3/4" 
-              : "bg-gray-100 text-gray-800 rounded-bl-none max-w-[80%]"
-            }`}
-        >          {message.type === "bot" && !isCourseContent && !isLearningPlan && (
-            <div className="prose max-w-none dark:prose-invert">
+          className={`rounded-lg py-2 px-3 lg:px-4 ${
+            message.type === "user"
+              ? "bg-blue-600 text-white rounded-br-none max-w-[85%] lg:max-w-[80%] ml-8 lg:ml-12"
+              : isLearningPlan 
+                ? "bg-white w-full lg:w-5/6" 
+                : "bg-gray-100 text-gray-800 rounded-bl-none max-w-[85%] lg:max-w-[80%] mr-8 lg:mr-12"
+          } shadow-sm`}
+        >
+          {message.type === "bot" && !isCourseContent && !isLearningPlan && (
+            <div className="prose prose-sm lg:prose max-w-none dark:prose-invert">
               <ReactMarkdown>
                 {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
               </ReactMarkdown>
@@ -522,11 +557,15 @@ const ChatbotPage = () => {
             </div>
           )}
 
-          {message.type === "user" && <div>{message.content}</div>}
+          {message.type === "user" && <div className="text-sm lg:text-base">{message.content}</div>}
 
-          <div
-            className={`text-xs mt-1 ${message.type === "user" ? "text-blue-200" : isLearningPlan ? "text-gray-400 pl-2" : "text-gray-500"}`}
-          >
+          <div className={`text-[10px] lg:text-xs mt-1 ${
+            message.type === "user" 
+              ? "text-blue-200" 
+              : isLearningPlan 
+                ? "text-gray-400 pl-2" 
+                : "text-gray-500"
+          }`}>
             {message.timestamp}
           </div>
         </div>
@@ -538,16 +577,30 @@ const ChatbotPage = () => {
     "Learn Web Development in 30 days",
     "Create a Data Science learning plan",
     "Master Digital Marketing in 21 days",
-  ];
-
-  const handleSuggestion = (topic) => {
+  ];  const handleSuggestion = async (topic) => {
+    // First set the message
     setMessage(topic);
+
+    // Handle the send
+    await handleSendMessage(topic);
+
+    // Clear the input and remove focus
+    setMessage("");
+    setIsInputFocused(false);
+
+    // On mobile, ensure the input field is properly updated
+    const input = document.querySelector('input[type="text"]');
+    if (input && isMobile) {
+      input.blur();
+    }
   };
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <div className="h-screen flex overflow-hidden w-full">
       {/* Sidebar */}
-      <div className={`h-screen flex-shrink-0 ${isSidebarOpen ? "w-80" : "w-0"} transition-all duration-300 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}>
+      <div className={`fixed inset-y-0 left-0 z-30 lg:relative lg:flex-shrink-0 ${
+        isSidebarOpen ? "w-full lg:w-80" : "w-0"
+      } transition-all duration-300 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}>
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="font-semibold text-gray-800 flex items-center">
             <FaHistory className="mr-2" />
@@ -603,27 +656,28 @@ const ChatbotPage = () => {
       </div>
 
       {/* Main chat container */}
-      <div className="flex-1 flex flex-col h-screen">
+      <div className="flex-1 flex flex-col h-screen w-full relative">
         {/* Custom Chat Navbar */}
-        <nav className="bg-white shadow-sm p-4 flex justify-between items-center">
+        <nav className="sticky top-0 z-20 bg-white shadow-sm px-4 py-3 flex justify-between items-center">
           <div className="flex items-center">
             {!isSidebarOpen && (
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="mr-4 text-gray-600 hover:text-gray-800 transition-colors"
+                className="mr-3 lg:mr-4 p-2 -ml-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Open sidebar"
               >
-                <IoMenu size={24} />
+                <IoMenu size={22} />
               </button>
             )}
             <div className="flex items-center">
-              <FaRobot className="text-blue-500 mr-2" />
-              <h2 className="text-xl font-semibold text-gray-800">Learning Assistant</h2>
+              <FaRobot className="text-blue-500 mr-2 w-5 h-5" />
+              <h2 className="text-lg lg:text-xl font-semibold text-gray-800">Learning Assistant</h2>
             </div>
           </div>
-          <div className="flex items-center gap-2 lg:pr-6">
+          <div className="flex items-center gap-2">
             <Link
               to="/"
-              className="p-2 rounded-full text-blue-600 hover:bg-blue-50 hover:scale-110 transition-all duration-200"
+              className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 hover:scale-105 transition-all duration-200"
               aria-label="Go to home"
             >
               <IoHome size={20} />
@@ -632,15 +686,17 @@ const ChatbotPage = () => {
         </nav>
 
         {/* Chat messages */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
-          <div className="flex-1 p-4 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+        <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 relative">
+          <div className={`flex-1 p-3 lg:p-4 overflow-y-auto space-y-3 lg:space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 ${
+            isMobile && isInputFocused ? 'pb-32' : ''
+          }`}>
             {chatHistory.map((chat) => (
               <MessageBubble key={chat.id} message={chat} />
             ))}
 
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-white text-gray-800 border border-gray-200 rounded-lg rounded-bl-none p-3 max-w-[80%] shadow-sm">
+                <div className="bg-white text-gray-800 border border-gray-200 rounded-lg rounded-bl-none p-3 max-w-[85%] lg:max-w-[80%] shadow-sm">
                   <div className="flex items-center">
                     <BiLoaderAlt className="animate-spin text-blue-500 mr-2" />
                     <span>Thinking...</span>
@@ -648,14 +704,17 @@ const ChatbotPage = () => {
                 </div>
               </div>
             )}
-
             <div ref={messagesEndRef} />
-          </div>          {/* Input Section */}
-          <div className="p-4 bg-white border-t border-gray-200">
-            <div className="max-w-4xl mx-auto">              {/* Create Course Toggle */}
-              <div className="mb-3">                <div 
+          </div>
+
+          {/* Input Section */}
+          <div className="p-3 lg:p-4 bg-white border-t border-gray-200">
+            <div className="max-w-4xl mx-auto">
+              {/* Create Course Toggle */}
+              <div className="mb-3">
+                <div 
                   onClick={() => setCreateCourseMode(!createCourseMode)}
-                  className={`inline-block cursor-pointer px-4 py-2 rounded-full text-center transition-colors ${
+                  className={`inline-block cursor-pointer px-4 py-2 rounded-full text-sm lg:text-base text-center transition-colors ${
                     createCourseMode 
                       ? 'bg-blue-100 text-blue-700 font-medium' 
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -665,13 +724,24 @@ const ChatbotPage = () => {
                 </div>
               </div>
               
-              <div className="relative">
-                <input
+              <div className="relative">                <input
                   type="text"
                   placeholder="Type your message here..."
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
+                  onFocus={() => {
+                    setIsInputFocused(true);
+                    // On mobile, scroll to make room for suggestions
+                    if (isMobile) {
+                      setTimeout(() => {
+                        window.scrollTo({
+                          top: document.body.scrollHeight,
+                          behavior: 'smooth'
+                        });
+                      }, 100);
+                    }
+                  }}
                   disabled={isLoading}
                   className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-800 placeholder-gray-500"
                 />
@@ -684,19 +754,23 @@ const ChatbotPage = () => {
                 >
                   <IoSend size={20} />
                 </button>
-              </div>
-
-              <div className="flex flex-wrap gap-2 mt-3">
-                {suggestionTopics.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestion(suggestion)}
-                    className="text-sm bg-gray-100 text-gray-700 px-4 py-1.5 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
+              </div>              {/* Topic suggestions - Show based on screen size and input focus */}
+              {(!isMobile || (isMobile && isInputFocused)) && (
+                <div className={`flex flex-wrap gap-2 mt-3 ${
+                  isMobile ? 'fixed left-0 right-0 bottom-[72px] bg-white p-3 border-t border-gray-200 z-10 shadow-lg animate-slide-up' : ''
+                }`}>
+                  {suggestionTopics.map((suggestion, index) => (
+                    <button
+                      key={index}                      onClick={() => {
+                        handleSuggestion(suggestion);
+                      }}
+                      className="text-xs lg:text-sm bg-gray-100 text-gray-700 px-3 lg:px-4 py-1.5 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors active:bg-blue-100"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
