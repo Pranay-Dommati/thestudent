@@ -1,5 +1,6 @@
 import './App.css';
 import { BrowserRouter, Routes, Route, useParams, useLocation, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import HomePage from './components/HomePage/HomePage';
 import Courses from './components/Courses/Courses';
 import ChatBotPage from './components/Chatbot/ChatbotPage';
@@ -63,18 +64,40 @@ const Layout = ({ children, excludePaths = [] }) => {
       <div className="min-h-screen">
         {children}
       </div>
-    </>
+    </> 
   );
 };
 
 // Add a protected route component
 const ProtectedRoute = ({ children }) => {
-  const { isLoggedIn } = useAuth();
-  
-  if (!isLoggedIn) {
-    return <Navigate to="/auth?mode=login" />;
+  const { isLoggedIn, validateAuth } = useAuth();
+  const [isValidating, setIsValidating] = useState(true);
+  const [isValid, setIsValid] = useState(false);
+
+  useEffect(() => {
+    const validate = async () => {
+      const valid = await validateAuth();
+      setIsValid(valid);
+      setIsValidating(false);
+    };
+    validate();
+  }, [validateAuth]);
+
+  if (isValidating) {
+    // Show a loading spinner while validating
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
-  
+
+  if (!isValid) {
+    // Redirect with return URL
+    const currentPath = window.location.pathname;
+    return <Navigate to={`/auth?mode=login&returnTo=${encodeURIComponent(currentPath)}`} />;
+  }
+
   return children;
 };
 
@@ -127,8 +150,11 @@ const App = () => {
               <Route path="engineering" element={<Undergraduate />} />
               <Route path="engineering/cbse" element={<Undergraduate />} />
               <Route path="engineering/state/:stateId" element={<Undergraduate />} />
-            </Route>            {/* Other Routes */}
-            <Route path="/profile" element={<ProfileLayout />} />
+            </Route>            {/* Other Routes */}            <Route path="/profile" element={
+              <ProtectedRoute>
+                <ProfileLayout />
+              </ProtectedRoute>
+            } />
             <Route path="/help-center" element={<HelpCenter />} />
             <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
             <Route path="/chat" element={<ChatBotPage />} />

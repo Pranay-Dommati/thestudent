@@ -222,55 +222,59 @@ const SchoolCourseDetails = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white">
-        <div className="container mx-auto px-4 py-16">
-          <div className="grid pt-8 grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-6">
+        <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-center">
+            <div className="space-y-4 sm:space-y-6">
               <div>
-                <h1 className="text-4xl font-bold mb-4">{course.title}</h1>
-                <div className="flex flex-wrap items-center space-x-4 text-gray-200 mb-6">
+                <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4">{course.title}</h1>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-gray-200 mb-4 sm:mb-6 text-xs sm:text-sm">
                   <span>{course.board}</span>
-                  <span>•</span>
+                  <span className="hidden sm:inline">•</span>
                   <span>{course.class} Standard</span>
-                  <span>•</span>
+                  <span className="hidden sm:inline">•</span>
                   <span>{course.subject}</span>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center space-x-4 text-sm">
+              <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm">
                 <span className="flex items-center">
-                  <FaChalkboardTeacher className="mr-2" />
+                  <FaChalkboardTeacher className="mr-1.5 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                   Expert Teachers
                 </span>
-                <span>•</span>
+                <span className="hidden sm:inline">•</span>
                 <span className="flex items-center">
-                  <FaClock className="mr-2" />
+                  <FaClock className="mr-1.5 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                   {course.duration}+ hours
                 </span>
-                <span>•</span>
-                <span>Updated {course.lastUpdated}</span>
+                <span className="hidden sm:inline">•</span>
+                <span className="flex items-center">
+                  <FaBook className="mr-1.5 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                  {course.chapters} chapters
+                </span>
               </div>
 
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 mb-6">
-                <div className="flex items-center space-x-2">
-                  <FaGlobe className="text-lg" />
-                  <span>Sources : {course.sources}</span>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 sm:p-3 md:p-4 mb-4 sm:mb-6">
+                <div className="flex items-center gap-2">
+                  <FaGlobe className="text-base sm:text-lg" />
+                  <span className="text-xs sm:text-sm md:text-base">Sources : {course.sources}</span>
                 </div>
               </div>
 
               <button 
                 onClick={handleStartLearning}
-                className="bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-4 rounded-lg font-medium flex items-center space-x-2 transform transition hover:scale-105"
+                className="w-full sm:w-auto bg-indigo-500 hover:bg-indigo-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium text-sm sm:text-base
+                         flex items-center justify-center sm:justify-start space-x-2 transform transition hover:scale-105"
               >
-                <FaPlay className="mr-2" />
-                Start Learning Now
+                <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span>Start Learning Now</span>
               </button>
             </div>
-            
-            <div className="rounded-lg overflow-hidden shadow-xl">
+
+            <div className="rounded-lg overflow-hidden shadow-xl mt-4 sm:mt-0">
               <img 
                 src={course.thumbnail} 
                 alt={course.title} 
-                className="w-full h-[350px] object-cover"
+                className="w-full h-[180px] sm:h-[250px] md:h-[300px] object-cover"
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.src = "https://images.unsplash.com/photo-1635070041078-e363dbe005cb";
@@ -281,59 +285,45 @@ const SchoolCourseDetails = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-16">
-        
-        {/* Course Features - Static as requested */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-12">
+        {/* Course Features */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8 md:mb-12">
           {course.features.map((feature, index) => (
-            <div key={index} className="bg-white p-6 rounded-xl shadow-sm flex items-start">
-              <div className="bg-indigo-100 p-3 rounded-lg text-indigo-600 mr-4">
+            <div key={index} className="bg-white p-4 sm:p-6 rounded-lg sm:rounded-xl shadow-sm flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left">
+              <div className="bg-indigo-100 p-2 sm:p-3 rounded-lg text-indigo-600 mb-3 sm:mb-0 sm:mr-4">
                 {feature.icon}
               </div>
               <div>
-                <h3 className="font-bold text-xl mb-2">{feature.title}</h3>
-                <p className="text-gray-600">{feature.desc}</p>
+                <h3 className="font-bold text-base sm:text-lg mb-1 sm:mb-2">{feature.title}</h3>
+                <p className="text-gray-600 text-xs sm:text-sm">{feature.desc}</p>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Key Topics - Dynamic from database */}
-        <div className="mt-16">
-          <h2 className="text-2xl font-bold mb-8">Key Topics Covered</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Key Topics */}
+        <div className="mt-6 sm:mt-8 md:mt-12">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-4 sm:mb-6">Key Topics Covered</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {course.keyTopics.map((topic, index) => (
-              <div key={index} className="bg-white p-4 rounded-lg border border-gray-100">
-                <span className="text-gray-800">{topic}</span>
+              <div key={index} className="bg-white p-3 sm:p-4 rounded-lg sm:rounded-xl border border-gray-100">
+                <span className="text-gray-800 text-xs sm:text-sm">{topic}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* What You'll Learn - Dynamic from database */}
-        <div className="mt-16 bg-white rounded-xl p-8 shadow-sm">
-          <h2 className="text-2xl font-bold mb-6">What You'll Learn</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* What You'll Learn */}
+        <div className="mt-6 sm:mt-8 md:mt-12 bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 md:p-8 shadow-sm">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-4 sm:mb-6">What You'll Learn</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {course.whatYouLearn.map((item, index) => (
               <div key={index} className="flex items-start">
-                <svg className="w-5 h-5 text-green-500 mt-1 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                </svg>
-                <span>{item}</span>
+                <FaCheck className="text-indigo-600 mt-1 flex-shrink-0 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="ml-3 text-gray-700 text-xs sm:text-sm">{item}</span>
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Add CTA button at the bottom of the page */}
-        <div className="mt-16 text-center">
-          <button 
-            onClick={handleStartLearning}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-5 rounded-lg font-medium flex items-center justify-center space-x-2 transform transition hover:scale-105 shadow-lg mx-auto"
-          >
-            <FaPlay className="mr-2" />
-            Start Learning Now
-          </button>
         </div>
       </div>
     </div>

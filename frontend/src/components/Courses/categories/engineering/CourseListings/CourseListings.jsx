@@ -40,25 +40,24 @@ const CourseListings = ({ category, filters }) => {
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 space-y-2 sm:space-y-0">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
                     {category === 'all' ? 'All Courses' : `${category} Courses`}
                 </h2>
-                <span className="text-gray-600">{courses.length} results</span>
+                <span className="text-sm sm:text-base text-gray-600">{courses.length} results</span>
             </div>
             
             {loading ? (
                 <div className="flex justify-center items-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+                    <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-t-2 border-b-2 border-indigo-600"></div>
                 </div>
             ) : courses.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {courses.map(course => (
                         <CourseCard 
                             key={course.id} 
                             course={{
                                 id: course.id,
-                                // Fix: Check if thumbnail starts with http/https, if not prepend API_URL
                                 thumbnail: course.thumbnail?.startsWith('http') 
                                     ? course.thumbnail 
                                     : `${API_URL}${course.thumbnail}`,
@@ -77,8 +76,8 @@ const CourseListings = ({ category, filters }) => {
                     ))}
                 </div>
             ) : (
-                <div className="text-center py-12">
-                    <p className="text-gray-500">No courses found in this category.</p>
+                <div className="text-center py-8 sm:py-12">
+                    <p className="text-gray-500 text-sm sm:text-base">No courses found in this category.</p>
                 </div>
             )}
         </div>

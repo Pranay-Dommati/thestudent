@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
-import { FaBook, FaUsers, FaLock, FaPlus } from 'react-icons/fa';
+import { FaThLarge, FaPlus, FaUsers, FaLock } from 'react-icons/fa';
 import AdminNav from '../layout/AdminNav';
 import AdminSidebar from '../layout/AdminSidebar';
 import AdminCourses from '../Courses/AdminCourses';
@@ -13,12 +13,18 @@ import AdminLogin from '../AdminLogin';
 const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState('courses');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     checkAdminAuth();
   }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const checkAdminAuth = () => {
     try {
@@ -52,7 +58,7 @@ const AdminDashboard = () => {
     { 
       id: 'courses',
       label: 'Courses', 
-      icon: FaBook, 
+      icon: FaThLarge, 
       path: '/admin-p/courses' 
     },
     { 
@@ -85,25 +91,32 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen">
-      <AdminNav onLogout={handleLogout} isLoginPage={false} />
+    <div className="min-h-screen bg-gray-50">
+      <AdminNav 
+        onLogout={handleLogout} 
+        isLoginPage={false}
+        onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+      />
       
       <div className="flex pt-16">
         <AdminSidebar 
           menuItems={menuItems}
           currentView={currentView}
           setCurrentView={setCurrentView}
-          className="fixed left-0 h-[calc(100vh-4rem)] w-64"
+          isMobileOpen={isMobileMenuOpen}
+          setIsMobileOpen={setIsMobileMenuOpen}
         />
         
-        <main className="flex-1 ml-64 p-6 bg-gray-50">
-          <Routes>
-            <Route index element={<Navigate to="/admin-p/courses" />} />
-            <Route path="courses/*" element={<CourseManagement />} />
-            <Route path="add-course" element={<CourseForm onCancel={() => navigate('/admin-p/courses')} />} />
-            <Route path="users" element={<AdminUsers />} />
-            <Route path="settings" element={<AdminSettings />} />
-          </Routes>
+        <main className="flex-1 p-4 sm:p-6 lg:ml-64 transition-all duration-300">
+          <div className="container mx-auto max-w-7xl">
+            <Routes>
+              <Route index element={<Navigate to="/admin-p/courses" />} />
+              <Route path="courses/*" element={<CourseManagement />} />
+              <Route path="add-course" element={<CourseForm onCancel={() => navigate('/admin-p/courses')} />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="settings" element={<AdminSettings />} />
+            </Routes>
+          </div>
         </main>
       </div>
     </div>

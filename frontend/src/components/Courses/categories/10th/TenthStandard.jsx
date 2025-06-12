@@ -143,147 +143,107 @@ const TenthStandard = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 pt-20">
-      {!selectedBoard && !showStateBoards ? (
+    <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-16 sm:pt-20">
+      {selectedBoard ? (
         <>
           <BackButton 
-            title="Select Your Board" 
-            subtitle="Choose your education board to view relevant courses" 
-          />
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {boards.filter(board => board.available).map((board) => (
-                <motion.button
-                  key={board.id}
-                  onClick={() => handleBoardSelect(board.id)}
-                  className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
-                  whileHover={{ y: -5 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{board.name}</h3>
-                  <p className="text-gray-500 text-sm">{board.fullName}</p>
-                </motion.button>
-              ))}
-            </div>
-
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
-              <h3 className="text-lg font-semibold text-indigo-900 mb-2">More Boards Coming Soon!</h3>
-              <p className="text-indigo-700">We're working hard to bring you content for ICSE, NIOS, and other boards. Stay tuned for updates!</p>
-            </div>
-          </div>
-        </>
-      ) : showStateBoards ? (
-        <>
-          <BackButton 
-            title="Select Your State" 
-            subtitle="Choose your state board" 
-          />
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {stateBoards.map((state) => (
-                <motion.button
-                  key={state.id}
-                  onClick={() => handleStateSelect(state.id)}
-                  className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
-                  whileHover={{ y: -5 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{state.name}</h3>
-                  <p className="text-gray-500 text-sm">{state.fullName}</p>
-                </motion.button>
-              ))}
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <BackButton 
-            title={`Class 10 - ${selectedBoard.includes('state') ? 
-              stateBoards.find(s => selectedBoard.includes(s.id))?.name : 
-              boards.find(b => b.id === selectedBoard)?.name}`}
-            subtitle="Complete syllabus coverage with curated video lectures" 
+            title={selectedBoard.includes('state') ? 
+              stateBoards.find(s => selectedBoard.includes(s.id))?.name + ' State Board' : 
+              'CBSE Board'} 
+            subtitle="Select your preferred subject to start learning" 
             onBack={handleBack}
           />
 
           {loading ? (
-            <div className="flex justify-center my-12">
-              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+            <div className="flex justify-center my-6 sm:my-8">
+              <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-t-2 border-b-2 border-blue-500"></div>
             </div>
           ) : courses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {courses.map((course) => {
-                console.log("Rendering course:", course.subject, course.board, course.state);
-                
-                return (
-                  <Link 
-                    to={selectedBoard.includes('state') 
-                      ? `/courses/10th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
-                      : `/courses/10th/${selectedBoard}/${course.subject.toLowerCase()}`} 
-                    key={course.id}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+              {courses.map((course) => (
+                <Link 
+                  to={selectedBoard.includes('state') 
+                    ? `/courses/10th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
+                    : `/courses/10th/${selectedBoard}/${course.subject.toLowerCase()}`} 
+                  key={course.id}
+                >
+                  <motion.div 
+                    whileHover={{ y: -5 }} 
+                    className="bg-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
                   >
-                    <motion.div 
-                      whileHover={{ y: -5 }} 
-                      className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
-                    >
-                      <div className="relative p-6 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl text-white">
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
-                          <FaPlay className="opacity-75" />
-                        </div>
-                        <h3 className="text-xl font-bold mt-2">{course.subject}</h3>
-                        <p className="text-white/80 text-sm mt-1">{course.duration}+ hours of content</p>
+                    <div className="relative p-3 sm:p-4 lg:p-6 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-lg sm:rounded-t-xl text-white">
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg sm:text-xl lg:text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
+                        <FaPlay className="opacity-75 h-4 w-4 sm:h-5 sm:w-5" />
                       </div>
-                      <div className="p-6">
-                        <p className="text-gray-600 text-sm mb-4">{course.short_description || `Complete curriculum for ${course.class} ${course.subject}`}</p>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <FaBookReader className="text-indigo-600" />
-                            <span className="text-sm text-gray-600">Structured Learning</span>
-                          </div>
-                          <span className="text-indigo-600 text-sm font-medium">Preview Course →</span>
+                      <h3 className="text-base sm:text-lg lg:text-xl font-bold mt-2">{course.subject}</h3>
+                      <p className="text-white/80 text-xs sm:text-sm mt-1">{course.duration}+ hours of content</p>
+                    </div>
+                    <div className="p-3 sm:p-4 lg:p-6">
+                      <p className="text-gray-600 text-xs sm:text-sm lg:text-base mb-3 sm:mb-4">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          <FaBookReader className="text-indigo-600 h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="text-xs sm:text-sm text-gray-600">Structured Learning</span>
                         </div>
+                        <span className="text-indigo-600 text-xs sm:text-sm font-medium">Preview Course →</span>
                       </div>
-                    </motion.div>
-                  </Link>
-                );
-              })}
+                    </div>
+                  </motion.div>
+                </Link>
+              ))}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <p className="text-gray-500">No courses found for this selection.</p>
-              <p className="text-sm text-gray-400 mt-2">Check back later or try a different board.</p>
+            <div className="text-center py-6 sm:py-8">
+              <p className="text-gray-500 text-sm sm:text-base">No courses found for this selection.</p>
+              <p className="text-xs sm:text-sm text-gray-400 mt-2">Check back later or try a different board.</p>
             </div>
           )}
-
-          <div className="mt-12 bg-gray-50 rounded-2xl p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Additional Resources</h2>
-            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6">
-              <h3 className="text-lg font-semibold mb-3">Sample Papers</h3>
-              <p className="text-gray-600 mb-4">
-                {selectedBoard && selectedBoard.includes('state-ts') 
-                  ? 'Telangana SSC previous years question papers'
-                  : selectedBoard && selectedBoard.includes('state-ap')
-                    ? 'Andhra Pradesh SSC previous years question papers'
-                    : 'CBSE sample papers and previous year questions'}
-              </p>
-              <a 
-                href={
-                  selectedBoard && selectedBoard.includes('state-ts')
-                    ? "https://byjus.com/telangana-board/ssc-class-10-previous-years-question-papers/"
-                    : selectedBoard && selectedBoard.includes('state-ap')
-                      ? "https://www.selfstudys.com/books/andhra-pradesh/state-books/class-10th/latest/25665"
-                      : "https://www.selfstudys.com/books/cbse-prev-paper/english/class-10th"
-                }
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-indigo-600 font-medium hover:text-indigo-800 inline-flex items-center"
+        </>
+      ) : (
+        <>
+          <BackButton 
+            title="Select Your Board" 
+            subtitle="Choose your board to see available subjects"
+            onBack={handleBack}
+          />
+          
+          <div className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <motion.button
+                onClick={() => handleBoardSelect('cbse')}
+                className="bg-white p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 text-left"
               >
-                Access Now 
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </a>
+                <h3 className="text-base sm:text-lg lg:text-xl font-bold text-blue-600 mb-1 sm:mb-2">CBSE Board</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Central Board of Secondary Education</p>
+              </motion.button>
+              
+              <motion.button
+                onClick={() => setShowStateBoards(true)}
+                className="bg-white p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 text-left"
+              >
+                <h3 className="text-base sm:text-lg lg:text-xl font-bold text-green-600 mb-1 sm:mb-2">State Board</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Select your state board</p>
+              </motion.button>
             </div>
+
+            {/* State Boards Grid */}
+            {showStateBoards && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                {stateBoards.map((state) => (
+                  <motion.button
+                    key={state.id}
+                    onClick={() => handleStateSelect(state.id)}
+                    className="bg-white p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 text-left"
+                    whileHover={{ y: -5 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-1 sm:mb-2">{state.name}</h3>
+                    <p className="text-xs sm:text-sm text-gray-600">{state.fullName}</p>
+                  </motion.button>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}

@@ -10,7 +10,7 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     category: '',
-    type: 'all', // 'all', 'engineering', or 'school'
+    type: 'all',
     status: 'all'
   });
   const [filterOpen, setFilterOpen] = useState(false);
@@ -39,8 +39,6 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
 
   const handleEdit = (courseId, courseType) => {
     if (onEdit) onEdit(courseId, courseType);
-    // Example edit navigation:
-    // navigate(`/admin-p/edit-course/${courseType}/${courseId}`);
   };
 
   const handleDelete = (courseId, courseType) => {
@@ -61,21 +59,23 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
   });
 
   return (
-    <div className={`bg-white rounded-xl shadow-lg p-6 ${
+    <div className={`bg-white rounded-xl shadow-lg p-4 sm:p-6 ${
       isDarkMode ? 'bg-gray-800 text-white' : ''
     }`}>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Courses</h1>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold">Courses</h1>
         <button
           onClick={() => navigate('/admin-p/add-course')}
-          className="flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          className="w-full sm:w-auto flex items-center justify-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
         >
           <FaPlus className="mr-2" /> Add New Course
         </button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="relative flex-1">
           <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -88,7 +88,7 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
           />
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-col sm:flex-row">
           <select
             name="type"
             value={filters.type}
@@ -104,7 +104,7 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
           
           <button
             onClick={() => setFilterOpen(!filterOpen)}
-            className={`flex items-center px-4 py-2 border rounded-lg ${
+            className={`flex items-center justify-center px-4 py-2 border rounded-lg ${
               isDarkMode 
                 ? 'border-gray-600 hover:bg-gray-700' 
                 : 'border-gray-300 hover:bg-gray-50'
@@ -115,88 +115,78 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
         </div>
       </div>
 
-      {/* Course Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className={`text-left ${
-            isDarkMode ? 'text-gray-300' : 'text-gray-600'
-          }`}>
-            <tr>
-              <th className="pb-3 px-4 w-1/4">Title</th>
-              <th className="pb-3 px-4 w-1/4 text-center">Class</th>
-              <th className="pb-3 px-4 w-1/4 text-center">Last Updated</th>
-              <th className="pb-3 px-4 w-1/4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+      {/* Course List */}
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="inline-block min-w-full align-middle">
+          <div className="overflow-hidden">
             {loading ? (
-              <tr>
-                <td colSpan="4" className="py-6 text-center">
-                  <div className="flex justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                  </div>
-                </td>
-              </tr>
+              <div className="py-12 text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+              </div>
             ) : filteredCourses.length > 0 ? (
-              filteredCourses.map((course) => (
-                <tr key={course.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-4">
-                    <div className="flex items-center">
+              <div className="grid grid-cols-1 gap-4">
+                {filteredCourses.map((course) => (
+                  <div 
+                    key={course.id} 
+                    className={`p-4 rounded-lg border ${
+                      isDarkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'
+                    } transition-colors`}
+                  >
+                    <div className="flex items-center space-x-4">
                       {course.thumbnail && (
                         <img 
                           src={course.thumbnail.startsWith('http') 
                             ? course.thumbnail 
                             : `${API_URL}${course.thumbnail}`} 
                           alt={course.title}
-                          className="w-10 h-10 mr-3 rounded-md object-cover"
+                          className="w-12 h-12 rounded-md object-cover flex-shrink-0"
                         />
                       )}
-                      <span className="font-medium">{course.title}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm sm:text-base truncate">
+                          {course.title}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                          {course.class || "N/A"} • Last updated: {course.last_updated ? new Date(course.last_updated).toLocaleDateString() : "Not specified"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEdit(course.id, course.course_type)}
+                          className={`p-2 rounded-md ${
+                            isDarkMode 
+                              ? 'text-blue-400 hover:bg-gray-600' 
+                              : 'text-blue-600 hover:bg-blue-50'
+                          }`}
+                          aria-label={`Edit ${course.course_type} course`}
+                        >
+                          <FaEdit size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(course.id, course.course_type)}
+                          className={`p-2 rounded-md ${
+                            isDarkMode 
+                              ? 'text-red-400 hover:bg-gray-600' 
+                              : 'text-red-600 hover:bg-red-50'
+                          }`}
+                          aria-label={`Delete ${course.course_type} course`}
+                        >
+                          <FaTrash size={18} />
+                        </button>
+                      </div>
                     </div>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    {course.class || "N/A"}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    {course.last_updated ? new Date(course.last_updated).toLocaleDateString() : "Not specified"}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex justify-end space-x-4">
-                      <button
-                        onClick={() => handleEdit(course.id, course.course_type)}
-                        className={`p-2 rounded-md ${
-                          isDarkMode 
-                            ? 'text-blue-400 hover:bg-gray-700' 
-                            : 'text-blue-600 hover:bg-blue-50'
-                        }`}
-                        title={`Edit ${course.course_type} course`}
-                      >
-                        <FaEdit size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(course.id, course.course_type)}
-                        className={`p-2 rounded-md ${
-                          isDarkMode 
-                            ? 'text-red-400 hover:bg-gray-700' 
-                            : 'text-red-600 hover:bg-red-50'
-                        }`}
-                        title={`Delete ${course.course_type} course`}
-                      >
-                        <FaTrash size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                  </div>
+                ))}
+              </div>
             ) : (
-              <tr>
-                <td colSpan="4" className="py-6 text-center text-gray-500">
+              <div className="text-center py-12">
+                <p className="text-gray-500">
                   No courses found. Create your first course by clicking "Add New Course".
-                </td>
-              </tr>
+                </p>
+              </div>
             )}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -8,10 +8,10 @@ import AuthNav from './AuthNav';
 import AuthFooter from './AuthFooter';
 
 export default function AuthForm() {
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location = useLocation();  const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
   const modeParam = queryParams.get('mode');
+  const returnTo = queryParams.get('returnTo');
   
   // Set initial mode based on URL parameter (default to login if no parameter)
   const [isSignUp, setIsSignUp] = useState(() => {
@@ -105,9 +105,9 @@ export default function AuthForm() {
     try {
       if (!isSignUp) {
         // Login request
-        const response = await login(formData.email, formData.password);
-        if (response) {
-          navigate('/'); // Redirect to the homepage on successful login
+        const response = await login(formData.email, formData.password);      if (response) {
+          // Redirect to the return URL if available, otherwise go to homepage
+          navigate(returnTo || '/');
         }
       } else {
         // Registration logic
@@ -134,10 +134,10 @@ export default function AuthForm() {
 
   return (
     <>
-      <AuthNav />
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-50 to-blue-100 px-4 pt-16 pb-20">
+      <AuthNav />      
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 to-blue-100 px-3 sm:px-4 py-8 sm:py-12">
         {/* Background elements */}
-        <div className="absolute inset-0 overflow-hidden">
+        <div className="fixed inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-indigo-50">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320" className="absolute bottom-0 w-full">
               <path fill="#3b82f6" fillOpacity="0.1" d="M0,64L48,80C96,96,192,128,288,144C384,160,480,160,576,144C672,128,768,96,864,106.7C960,117,1056,171,1152,186.7C1248,203,1344,181,1392,170.7L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
@@ -145,251 +145,260 @@ export default function AuthForm() {
             </svg>
           </div>
         </div>
-
-        {/* Main card */}
-        <div className="relative w-full max-w-4xl bg-white shadow-2xl rounded-2xl overflow-hidden">
+        
+        {/* Main card */}        
+        <div className="relative w-full max-w-4xl mx-auto bg-white shadow-2xl rounded-2xl overflow-hidden sm:my-8 flex-1">
           <div className="flex flex-col md:flex-row">
-            <AnimatePresence initial={false} mode="wait">
-              {/* Welcome Panel - Always on top for mobile */}
-              <motion.div
-                key={isSignUp ? "welcome-signup" : "welcome-login"}
-                className={`flex flex-col items-center justify-center p-6 sm:p-10 text-white 
-                  bg-gradient-to-br ${isSignUp ? 'from-blue-600 to-indigo-700' : 'from-indigo-600 to-blue-700'}
-                  w-full md:w-5/12 order-1 ${isSignUp ? 'md:order-2' : 'md:order-1'}`}
-                initial={{ 
-                  x: isSignUp ? '100%' : '-100%',
-                  opacity: 0
-                }}
-                animate={{ 
-                  x: 0,
-                  opacity: 1
-                }}
-                exit={{ 
-                  x: isSignUp ? '-100%' : '100%',
-                  opacity: 0
-                }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              >
-                <div className="mb-6 p-4 bg-white/20 rounded-full">
-                  <FaGraduationCap className="text-4xl sm:text-5xl" />
-                </div>
-                
-                <h2 className="text-2xl sm:text-3xl font-bold mb-3 md:mb-4 text-center">
-                  {isSignUp ? 'Welcome to Students Hub!' : 'Welcome Back!'}
-                </h2>
-                
-                <p className="text-sm text-center mb-6 max-w-xs text-white/90">
-                  {isSignUp 
-                    ? 'Join our community to access free courses, learning paths, and educational resources.' 
-                    : 'Sign in to continue your learning journey and access your saved courses.'}
-                </p>
-                
-                <motion.button 
-                  onClick={toggleForm}
-                  className="mt-2 px-6 py-2.5 border-2 border-white/80 text-white rounded-full transition-colors hover:bg-white hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+            <AnimatePresence mode="wait" initial={false}>
+              {/* Form container */}
+              <div className="flex flex-col md:flex-row w-full" key="form-container">
+                {/* Welcome Panel - Always on top for mobile */}
+                <motion.div
+                  key={isSignUp ? "welcome-signup" : "welcome-login"} 
+                  className={`flex flex-col items-center justify-center px-4 py-8 sm:p-10 text-white 
+                    bg-gradient-to-br ${isSignUp ? 'from-blue-600 to-indigo-700' : 'from-indigo-600 to-blue-700'}
+                    w-full md:w-5/12 order-1 ${isSignUp ? 'md:order-2' : 'md:order-1'}`}
+                  initial={{ 
+                    x: isSignUp ? '-100%' : '100%',
+                    opacity: 0
+                  }}
+                  animate={{ 
+                    x: 0,
+                    opacity: 1
+                  }}
+                  exit={{ 
+                    x: isSignUp ? '100%' : '-100%',
+                    opacity: 0
+                  }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 >
-                  {isSignUp ? 'Already have an account' : 'Create an account'}
-                </motion.button>
-                
-                {/* Decorative elements */}
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-              </motion.div>
-              
-              {/* Form Panel - Always on bottom for mobile */}
-              <motion.div 
-                key={isSignUp ? "form-signup" : "form-login"}
-                className={`flex w-full md:w-7/12 flex-col items-center justify-center px-6 sm:px-10 py-8 sm:py-12
-                  order-2 ${isSignUp ? 'md:order-1' : 'md:order-2'}`}
-                initial={{ 
-                  x: isSignUp ? '-100%' : '100%',
-                  opacity: 0
-                }}
-                animate={{ 
-                  x: 0,
-                  opacity: 1
-                }}
-                exit={{ 
-                  x: isSignUp ? '100%' : '-100%',
-                  opacity: 0
-                }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              >
-                <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800">
-                  {isSignUp ? 'Create Account' : 'Login'}
-                </h2>
-                  <form className="w-full max-w-sm space-y-4" onSubmit={handleSubmit}>
-                  <AnimatePresence>                    {isSignUp && (
-                      <motion.div 
-                        className="space-y-4"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        {/* Full Name */}
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                            <FaRegUser />
-                          </div>
-                          <input 
-                            className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                              formErrors.name ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                            }`}
-                            type="text" 
-                            name="name"
-                            placeholder="Full Name" 
-                            value={formData.name}
-                            onChange={handleChange}
-                          />
-                          {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
-                        </div>
-                      </motion.div>
-                    )}                  </AnimatePresence>
-                  
-                  {/* Email Field - Common for both login and signup */}
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                      <FaRegEnvelope />
-                    </div>
-                    <input 
-                      className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                        formErrors.email ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                      }`} 
-                      type="email" 
-                      name="email"
-                      placeholder="Email Address" 
-                      value={formData.email}
-                      onChange={handleChange}
-                    />
-                    {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
+                  <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-white/20 rounded-full">
+                    <FaGraduationCap className="text-3xl sm:text-4xl md:text-5xl" />
                   </div>
                   
-                  {/* Password Field - Common for both login and signup */}
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                      <FaLock />
-                    </div>
-                    <input 
-                      className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                        formErrors.password ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                      }`} 
-                      type="password" 
-                      name="password"
-                      placeholder="Password" 
-                      value={formData.password}
-                      onChange={handleChange}
-                    />
-                    {formErrors.password && <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>}
-                  </div>
-
-                  <AnimatePresence>
-                    {isSignUp && (
-                      <motion.div 
-                        className="space-y-4"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        {/* Confirm Password */}
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                            <FaLock />
-                          </div>
-                          <input 
-                            className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                              formErrors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                            }`} 
-                            type="password" 
-                            name="confirmPassword"
-                            placeholder="Confirm Password" 
-                            value={formData.confirmPassword}
-                            onChange={handleChange}
-                          />
-                          {formErrors.confirmPassword && <p className="text-red-500 text-xs mt-1">{formErrors.confirmPassword}</p>}
-                        </div>
-
-                        {/* Terms and Conditions */}
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            name="agreedToTerms"
-                            checked={formData.agreedToTerms}
-                            onChange={(e) => setFormData({ ...formData, agreedToTerms: e.target.checked })}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                          />
-                          <label className="ml-2 block text-sm text-gray-900">
-                            I agree to the{' '}
-                            <Link to="/terms" className="text-blue-600 hover:text-blue-500">
-                              Terms of Service
-                            </Link>
-                            {' '}and{' '}
-                            <Link to="/privacy" className="text-blue-600 hover:text-blue-500">
-                              Privacy Policy
-                            </Link>
-                          </label>
-                        </div>
-                        {formErrors.agreedToTerms && (
-                          <p className="text-red-500 text-xs mt-1">{formErrors.agreedToTerms}</p>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 sm:mb-3 md:mb-4 text-center">
+                    {isSignUp ? 'Welcome to Students Hub!' : 'Welcome Back!'}
+                  </h2>
+                  
+                  <p className="text-sm sm:text-base text-center mb-4 sm:mb-6 max-w-xs text-white/90">
+                    {isSignUp 
+                      ? 'Join our community to access free courses, learning paths, and educational resources.' 
+                      : 'Sign in to continue your learning journey and access your saved courses.'}
+                  </p>
                   
                   <motion.button 
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-800"
-                    whileHover={{ boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" }}
-                    whileTap={{ y: 2 }}
-                  >
-                    {isLoading ? "Processing..." : (isSignUp ? "Create Account" : "Login")}
-                  </motion.button>
-                </form>
-
-                {/* Social Login Section */}
-                <div className="mt-6">
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300"></div>
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-2 bg-white text-gray-500">Or continue with</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                    >
-                      <FaGoogle className="h-5 w-5 text-red-500" />
-                      <span className="ml-2">Google</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                    >
-                      <FaFacebook className="h-5 w-5 text-blue-600" />
-                      <span className="ml-2">Facebook</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Toggle Form Link */}
-                <div className="mt-6 text-center">
-                  <button
-                    type="button"
                     onClick={toggleForm}
-                    className="text-sm text-blue-600 hover:text-blue-500"
+                    className="w-full sm:w-auto mt-2 px-4 sm:px-6 py-2.5 border-2 border-white/80 text-white rounded-full transition-colors hover:bg-white hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 text-sm sm:text-base"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
-                  </button>
-                </div>
-              </motion.div>
+                    {isSignUp ? 'Already have an account' : 'Create an account'}
+                  </motion.button>
+                  
+                  {/* Decorative elements */}
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                </motion.div>
+                
+                {/* Form Panel - Always on bottom for mobile */}
+                <motion.div 
+                  key={isSignUp ? "form-signup" : "form-login"}
+                  className={`flex w-full md:w-7/12 flex-col items-center justify-center px-4 sm:px-6 md:px-10 py-6 sm:py-8 md:py-12
+                    order-2 ${isSignUp ? 'md:order-1' : 'md:order-2'}`}
+                  initial={{ 
+                    x: isSignUp ? '-100%' : '100%',
+                    opacity: 0
+                  }}
+                  animate={{ 
+                    x: 0,
+                    opacity: 1
+                  }}
+                  exit={{ 
+                    x: isSignUp ? '100%' : '-100%',
+                    opacity: 0
+                  }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                >
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6 text-gray-800">
+                    {isSignUp ? 'Create Account' : 'Login'}
+                  </h2>
+                  
+                  <form className="w-full max-w-sm space-y-3 sm:space-y-4" onSubmit={handleSubmit}>
+                    <AnimatePresence mode="wait">
+                      {isSignUp && (
+                        <motion.div 
+                          className="space-y-4"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          {/* Full Name */}
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+                              <FaRegUser />
+                            </div>
+                            <input 
+                              className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                                formErrors.name ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                              }`}
+                              type="text" 
+                              name="name"
+                              placeholder="Full Name" 
+                              value={formData.name}
+                              onChange={handleChange}
+                            />
+                            {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    
+                    {/* Email Field - Common for both login and signup */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+                        <FaRegEnvelope />
+                      </div>
+                      <input 
+                        className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                          formErrors.email ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                        }`} 
+                        type="email" 
+                        name="email"
+                        placeholder="Email Address" 
+                        value={formData.email}
+                        onChange={handleChange}
+                      />
+                      {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
+                    </div>
+                    
+                    {/* Password Field - Common for both login and signup */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+                        <FaLock />
+                      </div>
+                      <input 
+                        className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                          formErrors.password ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                        }`} 
+                        type="password" 
+                        name="password"
+                        placeholder="Password" 
+                        value={formData.password}
+                        onChange={handleChange}
+                      />
+                      {formErrors.password && <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>}
+                    </div>
+                    
+                    <AnimatePresence mode="wait">
+                      {isSignUp && (
+                        <motion.div
+                          className="space-y-4"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          {/* Confirm Password */}
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
+                              <FaLock />
+                            </div>
+                            <input 
+                              className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                                formErrors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                              }`} 
+                              type="password" 
+                              name="confirmPassword"
+                              placeholder="Confirm Password" 
+                              value={formData.confirmPassword}
+                              onChange={handleChange}
+                            />
+                            {formErrors.confirmPassword && <p className="text-red-500 text-xs mt-1">{formErrors.confirmPassword}</p>}
+                          </div>
+                          
+                          {/* Terms and Conditions */}
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-start gap-2">
+                              <input
+                                type="checkbox"
+                                id="terms-checkbox"
+                                name="agreedToTerms"
+                                checked={formData.agreedToTerms}
+                                onChange={(e) => setFormData({ ...formData, agreedToTerms: e.target.checked })}
+                                className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              />
+                              <label htmlFor="terms-checkbox" className="flex-1 text-sm text-gray-700">
+                                By creating an account, I agree to Students Hub's{' '}
+                                <Link to="/terms" className="text-blue-600 hover:text-blue-500 whitespace-nowrap">
+                                  Terms of Service
+                                </Link>
+                                {' '}and{' '}
+                                <Link to="/privacy" className="text-blue-600 hover:text-blue-500 whitespace-nowrap">
+                                  Privacy Policy
+                                </Link>
+                              </label>
+                            </div>
+                            {formErrors.agreedToTerms && (
+                              <p className="text-red-500 text-xs">{formErrors.agreedToTerms}</p>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    
+                    <motion.button 
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-800"
+                      whileHover={{ boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" }}
+                      whileTap={{ y: 2 }}
+                    >
+                      {isLoading ? "Processing..." : (isSignUp ? "Create Account" : "Login")}
+                    </motion.button>
+                  </form>
+
+                  {/* Social Login Section */}
+                  <div className="mt-6">
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300"></div>
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                        <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3 w-full max-w-sm">
+                      <button
+                        type="button"
+                        className="w-full inline-flex items-center justify-center py-2.5 sm:py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                      >
+                        <FaGoogle className="h-5 w-5 text-red-500" />
+                        <span className="ml-2">Google</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full inline-flex items-center justify-center py-2.5 sm:py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                      >
+                        <FaFacebook className="h-5 w-5 text-blue-600" />
+                        <span className="ml-2">Facebook</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Toggle Form Link */}
+                  <div className="mt-6 text-center">
+                    <button
+                      type="button"
+                      onClick={toggleForm}
+                      className="text-sm text-blue-600 hover:text-blue-500"
+                    >
+                      {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
             </AnimatePresence>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaUser, FaClock, FaCertificate, FaTools, FaVideo } from 'react-icons/fa';
 
@@ -47,32 +47,27 @@ const CourseCard = ({ course }) => {
         category = 'default'
     } = course;
 
-    const [imgError, setImgError] = useState(false);
-
-    // Remove duration from allTags since we'll display it separately
-    const allTags = [
-        level?.toLowerCase(),
-        ...tags
-    ].filter(Boolean);
-
+    // Remove duplicate tags and filter out empty values
+    const allTags = [...new Set(tags.filter(Boolean))];
+    
     return (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
-            {/* Course Image */}
-            <div className="relative h-48 overflow-hidden group">
-                <img 
-                    src={imgError ? categoryImages[category] || categoryImages.default : thumbnail}
+        <div className="flex flex-col bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300 overflow-hidden h-full">
+            {/* Thumbnail Section */}
+            <div className="relative">
+                <img
+                    src={thumbnail || categoryImages[category] || categoryImages['default']}
                     alt={title}
-                    className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
+                    className="w-full aspect-video object-cover"
                     onError={(e) => {
-                        console.log('Image failed to load:', thumbnail);
-                        setImgError(true);
-                        e.target.src = categoryImages[category] || categoryImages.default;
+                        e.target.onerror = null;
+                        e.target.src = categoryImages['default'];
                     }}
                 />
-                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                {/* Quick Preview Button Overlay */}
+                <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
                     <Link 
                         to={`/courses/engineering/${id}`}
-                        className="bg-white hover:bg-gray-100 text-gray-900 font-medium py-2 px-4 rounded-lg"
+                        className="bg-white hover:bg-gray-100 text-gray-900 font-medium py-2 px-4 rounded-lg text-sm sm:text-base"
                     >
                         Quick Preview
                     </Link>
@@ -80,22 +75,22 @@ const CourseCard = ({ course }) => {
             </div>
             
             {/* Course Info */}
-            <div className="p-5">
+            <div className="flex flex-col flex-grow p-4 sm:p-5">
                 <Link to={`/courses/engineering/${id}`}>
-                    <h3 className="text-xl font-bold text-gray-800 mb-2 hover:text-indigo-600">
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2 hover:text-indigo-600 line-clamp-2">
                         {title}
                     </h3>
                 </Link>
                 
-                <p className="text-gray-600 mb-4 flex items-center">
+                <p className="text-gray-600 text-sm sm:text-base mb-4 flex items-center">
                     <FaUser className="mr-2" />
                     {instructor}
                 </p>
                 
-                {/* Duration and Tags in one row */}
-                <div className="flex flex-wrap gap-2 mb-4 items-center">
+                {/* Duration and Tags */}
+                <div className="flex flex-wrap gap-2 mb-4 mt-auto">
                     {/* Duration Tag */}
-                    <span className="text-xs px-3 py-1.5 rounded-full flex items-center bg-gray-100 text-gray-800">
+                    <span className="text-xs sm:text-sm px-3 py-1.5 rounded-full flex items-center bg-gray-100 text-gray-800">
                         <FaClock className="mr-1" />
                         {duration}
                     </span>
@@ -106,7 +101,7 @@ const CourseCard = ({ course }) => {
                         return (
                             <span 
                                 key={index} 
-                                className={`text-xs px-3 py-1.5 rounded-full flex items-center ${style}`}
+                                className={`text-xs sm:text-sm px-3 py-1.5 rounded-full flex items-center ${style}`}
                             >
                                 <TagIcon tag={tag} />
                                 {tag}
@@ -118,7 +113,7 @@ const CourseCard = ({ course }) => {
                 {/* View Course Button */}
                 <Link 
                     to={`/courses/engineering/${id}`}
-                    className="block text-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg"
+                    className="block text-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg text-sm sm:text-base transition-colors"
                 >
                     View Course
                 </Link>

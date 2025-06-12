@@ -136,178 +136,141 @@ const CourseDetails = () => {
       <div className="min-h-screen bg-gray-50">
         {/* Hero Section */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white">
-          <div className="container mx-auto px-4 py-16">
-            <div className="grid pt-8 grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-4xl font-bold mb-4">{course.title}</h1>
-                  <p className="text-xl text-gray-200">{course.subtitle}</p>
-                </div>
-                
-                <div className="flex items-center space-x-4 text-sm">
-                  <span className="flex items-center">
-                    <FaClock className="mr-2" />
-                    {course.keyFeatures[1].title}
-                  </span>
+          <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-12">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
+              <div className="space-y-4 sm:space-y-6">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold">{course.title}</h1>
+                <p className="text-sm sm:text-base text-gray-200">{course.description}</p>
+                <div className="space-x-2 sm:space-x-4 text-xs sm:text-sm">
+                  <span>Created by {course.instructor}</span>
                   <span>•</span>
-                  <span>{course.stats.lastUpdated}</span>
+                  <span>Last updated {course.lastUpdated}</span>
                 </div>
-
-                <div className="flex items-center space-x-4">
-                  <div className="inline-block bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
-                    <div className="flex items-center space-x-2">
-                      <FaGlobe className="text-lg" />
-                      <span>Sources: {course.instructor.role}</span>
-                    </div>
-                  </div>
-                </div>
-
                 <button 
                   onClick={handleStartLearning}
-                  className="bg-indigo-500 hover:bg-indigo-600 text-white px-8 py-4 rounded-lg font-medium flex items-center space-x-2 transform transition hover:scale-105"
+                  className="w-full sm:w-auto bg-white text-indigo-600 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium text-sm sm:text-base
+                           hover:bg-indigo-50 transition-colors"
                 >
-                  <FaPlay />
-                  <span>Start Learning Now</span>
+                  Start Learning Now
                 </button>
               </div>
-
-              <div className="relative w-full h-[400px]"> {/* Fixed height container */}
+              <div className="rounded-lg overflow-hidden shadow-xl mt-4 sm:mt-0">
                 <img 
-                  src={course.previewImage}
-                  alt={course.title}
-                  className="w-full h-full object-cover rounded-lg shadow-2xl"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = '/default-course-thumbnail.jpg'; // Add a default image path
-                  }}
+                  src={course.previewImage} 
+                  alt={course.title} 
+                  className="w-full h-[200px] sm:h-[300px] object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/50 to-transparent rounded-lg"></div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Course Features */}
-        <div className="container mx-auto px-4 py-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {course.keyFeatures.map((feature, index) => (
-              <div key={index} className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                <div className="text-blue-600 text-2xl mb-4">{feature.icon}</div>
-                <h3 className="font-bold text-lg mb-2">{feature.title}</h3>
-                <p className="text-gray-600">{feature.text}</p>
+        <div className="container mx-auto px-4 sm:px-6 py-8">
+          {/* Course features */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
+            {course.features.map((feature, index) => (
+              <div key={index} className="bg-white p-4 sm:p-6 rounded-xl text-center">
+                <div className="text-blue-600 text-xl sm:text-2xl mb-2 sm:mb-3">{feature.icon}</div>
+                <h3 className="font-bold text-sm sm:text-base mb-1">{feature.title}</h3>
+                <p className="text-gray-600 text-xs sm:text-sm">{feature.text}</p>
               </div>
             ))}
-
           </div>
 
-          {/* Course Description */}
-          <div className="mt-16 grid grid-cols-1 lg:grid-cols-3 gap-12">
-            <div className="lg:col-span-2 space-y-8">
+          {/* Main content */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+            {/* Left column */}
+            <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+              {/* What you'll learn */}
               <div>
-                <h2 className="text-2xl font-bold mb-4">About This Course</h2>
-                <p className="text-gray-700 leading-relaxed">{course.description}</p>
-              </div>
-
-              <div>
-                <h2 className="text-2xl font-bold mb-4">What You'll Learn</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">What You'll Learn</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {course.highlights.map((highlight, index) => (
                     <div key={index} className="flex items-start space-x-3">
-                      <FaCode className="text-blue-600 mt-1" />
-                      <span className="text-gray-700">{highlight}</span>
+                      <FaCheck className="text-blue-600 mt-1 flex-shrink-0 h-4 w-4" />
+                      <span className="text-gray-700 text-sm sm:text-base">{highlight}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
+              {/* Course curriculum */}
               <div>
-                <h2 className="text-2xl font-bold mb-6">Course Curriculum</h2>
-                {/* Course Curriculum */}
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Course Curriculum</h2>
                 <div className="bg-white rounded-lg shadow-lg overflow-hidden">
                   {course.curriculum.map((section, index) => (
                     <div key={index} className="border-b border-gray-100 last:border-b-0">
                       <button
                         onClick={() => toggleSection(index)}
-                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-all duration-200"
+                        className="w-full text-left px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center hover:bg-gray-50"
                       >
-                        <div className="flex items-center space-x-4">
-                          <div className="flex-shrink-0 w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center">
-                            <span className={`text-blue-600 transform transition-transform duration-200 ${
-                              openSections[index] ? 'rotate-180' : ''
-                            }`}>
-                              <FaChevronDown className="w-4 h-4" />
-                            </span>
-                          </div>
-                          <div className="text-left">
-                            <h3 className="font-semibold text-lg text-gray-800">{section.title}</h3>
-                            <p className="text-sm text-gray-500 mt-1">
-                              {section.lectures.length} lectures
-                            </p>
-                          </div>
-                        </div>
+                        <span className="font-medium text-sm sm:text-base">{section.title}</span>
+                        <span className={`transform transition-transform duration-200 ${
+                          openSections[index] ? 'rotate-180' : ''
+                        }`}>
+                          <FaChevronDown />
+                        </span>
                       </button>
-                      
                       {openSections[index] && (
-                        <div className="bg-gray-50 border-t border-gray-100">
-                          {section.lectures.map((lecture, idx) => (
-                            <div
-                              key={idx}
-                              className="px-6 py-3 flex items-center justify-between hover:bg-gray-100 transition-colors"
-                            >
-                              <div className="flex items-center space-x-3">
-                                <span className="text-blue-600 p-1.5 bg-blue-50 rounded-full">
-                                  <FaPlay className="w-3 h-3" />
-                                </span>
-                                <span className="text-gray-700">{lecture.title}</span>
-                              </div>
-                            </div>
-                          ))}
+                        <div className="px-4 sm:px-6 py-2 sm:py-3 bg-gray-50">
+                          <ul className="space-y-1">
+                            {section.lectures.map((lecture, lectureIndex) => (
+                              <li key={lectureIndex} className="text-sm sm:text-base text-gray-600 py-1">
+                                {lecture.title}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
+              </div>
 
-                {/* Requirements Section */}
-                <div className="mt-8">
-                  <h2 className="text-2xl font-bold mb-4">Requirements</h2>
-                  <div className="bg-white rounded-lg shadow-lg p-6">
-                    <ul className="space-y-3">
-                      {course.requirements.map((req, index) => (
-                        <li key={index} className="flex items-start space-x-3">
-                          <span className="text-blue-600 mt-1">•</span>
-                          <span className="text-gray-700">{req}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
+              {/* Requirements */}
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Requirements</h2>
+                <ul className="bg-white rounded-lg shadow-lg p-4 sm:p-6 space-y-2 sm:space-y-3">
+                  {course.requirements.map((req, index) => (
+                    <li key={index} className="flex items-start space-x-3">
+                      <span className="text-blue-600 mt-1">•</span>
+                      <span className="text-gray-700 text-sm sm:text-base">{req}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
 
-            {/* Sidebar */}
+            {/* Right column - Sticky sidebar */}
             <div className="lg:col-span-1">
-              <div className="bg-white rounded-xl shadow-lg p-6 sticky top-6">
-                <div className="space-y-6">
-                  {/* Features List */}
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3 text-gray-700">
-                      <FaClock className="text-blue-600 text-lg" />
-                      <span className="font-medium">Self-Paced Learning</span>
-                    </div>
-                    <div className="flex items-start space-x-3 text-gray-700">
-                      <FaUserGraduate className="text-blue-600 text-lg mt-1" />
-                      <span className="font-medium">Taught by Top YouTube Educational Creators</span>
+              <div className="sticky top-6">
+                <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                  <div className="space-y-4 sm:space-y-6">
+                    <button
+                      onClick={handleStartLearning}
+                      className="w-full bg-indigo-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium text-sm sm:text-base
+                               hover:bg-indigo-700 transition-colors"
+                    >
+                      Start Learning Now
+                    </button>
+                    <div className="border-t pt-4 sm:pt-6">
+                      <h3 className="font-bold text-base sm:text-lg mb-2 sm:mb-3">This course includes:</h3>
+                      <ul className="space-y-2 sm:space-y-3">
+                        <li className="flex items-center text-sm sm:text-base text-gray-600">
+                          <FaVideo className="mr-3 text-gray-400" />
+                          {course.duration} hours of video content
+                        </li>
+                        <li className="flex items-center text-sm sm:text-base text-gray-600">
+                          <FaDownload className="mr-3 text-gray-400" />
+                          Downloadable resources
+                        </li>
+                        <li className="flex items-center text-sm sm:text-base text-gray-600">
+                          <FaMobile className="mr-3 text-gray-400" />
+                          Access on mobile and desktop
+                        </li>
+                      </ul>
                     </div>
                   </div>
-
-                  {/* Enrollment Button */}
-                  <button 
-                    onClick={handleStartLearning}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02]"
-                  >
-                    Enroll Now - Free
-                  </button>
                 </div>
               </div>
             </div>

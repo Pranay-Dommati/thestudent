@@ -1,19 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { FaCheck } from 'react-icons/fa';
+import { FaCheck, FaSync } from 'react-icons/fa';
 import axiosInstance from '../../../utils/axios';
+
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000; // 2 seconds
 
 const SavedPlaylists = () => {
   const [activeTab, setActiveTab] = useState('courses');
   const [learningPlans, setLearningPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  // Fetch user's learning plans on component mount
-  useEffect(() => {
-    fetchUserLearningPlans();
-  }, []);
-  const fetchUserLearningPlans = async () => {
+  // Fetch user's learning plans with retry mechanism
+  const fetchUserLearningPlans = useCallback(async (retryAttempt = 0) => {
     try {
       setLoading(true);
       setError(null);
@@ -23,20 +24,52 @@ const SavedPlaylists = () => {
       if (response.data && Array.isArray(response.data.plans)) {
         setLearningPlans(response.data.plans);
       } else if (Array.isArray(response.data)) {
-        // Fallback if response is directly an array
         setLearningPlans(response.data);
       } else {
-        console.warn('Unexpected API response format:', response.data);
-        setLearningPlans([]);
+        throw new Error('Invalid data format received from server');
       }
+      
+      // Reset retry count on successful fetch
+      setRetryCount(0);
     } catch (err) {
       console.error('Error fetching learning plans:', err);
-      setError('Failed to load learning plans');
-      setLearningPlans([]); // Ensure it's always an array
+      
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load learning plans';
+      
+      if (retryAttempt < MAX_RETRIES) {
+        setError(`${errorMessage} - Retrying... (Attempt ${retryAttempt + 1}/${MAX_RETRIES})`);
+        setTimeout(() => {
+          fetchUserLearningPlans(retryAttempt + 1);
+        }, RETRY_DELAY);
+        setRetryCount(retryAttempt + 1);
+      } else {
+        setError(`${errorMessage} - Please try again later.`);
+        setLearningPlans([]);
+      }
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Initial fetch on component mount
+  useEffect(() => {
+    let mounted = true;
+    
+    if (mounted) {
+      fetchUserLearningPlans();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [fetchUserLearningPlans]);
+
+  // Manual retry handler
+  const handleRetry = () => {
+    setRetryCount(0);
+    fetchUserLearningPlans();
   };
+
   // Transform learning plans to course format for display
   const courses = Array.isArray(learningPlans) ? learningPlans.map(plan => {
     // Calculate actual progress based on completed lessons
@@ -142,53 +175,87 @@ const SavedPlaylists = () => {
     }
   ];
 
-  return (
-    <section className="bg-white rounded-xl shadow-md overflow-hidden">
-      <div className="border-b border-gray-200">        <div className="flex">
+  return (    
+    <section className="bg-white rounded-xl shadow-md overflow-hidden max-w-full">
+      <div className="border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row">
           <button
             onClick={() => setActiveTab('courses')}
-            className={`px-6 py-3 font-medium text-sm focus:outline-none ${
+            className={`flex-1 px-3 sm:px-6 py-3 font-medium text-sm focus:outline-none transition-all duration-200 ${
               activeTab === 'courses'
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50/50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50/50'
             }`}
           >
-            My Learning Plans
+            <span className="relative">
+              My Learning Plans
+              {activeTab === 'courses' && (
+                <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-indigo-600 transform scale-x-100 transition-transform"></span>
+              )}
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('favorites')}
-            className={`px-6 py-3 font-medium text-sm focus:outline-none ${
+            className={`flex-1 px-3 sm:px-6 py-3 font-medium text-sm focus:outline-none transition-all duration-200 ${
               activeTab === 'favorites'
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50/50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50/50'
             }`}
           >
-            Completed Plans
+            <span className="relative">
+              Completed Plans
+              {activeTab === 'favorites' && (
+                <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-indigo-600 transform scale-x-100 transition-transform"></span>
+              )}
+            </span>
           </button>
         </div>
-      </div>      <div className="p-6">
+      </div>
+      
+      <div className="p-4 sm:p-6">
         {activeTab === 'courses' ? (
           <>
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
               <h2 className="text-xl font-bold text-gray-800">My Learning Plans</h2>
               <Link 
                 to="/chatbot" 
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors text-center"
               >
                 Create New Plan
               </Link>
             </div>
 
             {loading && (
-              <div className="flex justify-center items-center py-8">
+              <div className="flex flex-col items-center justify-center py-8 space-y-4">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="ml-2 text-gray-600">Loading learning plans...</span>
+                <div className="text-gray-600 text-center">
+                  <p className="font-medium">Loading learning plans...</p>
+                  {retryCount > 0 && (
+                    <p className="text-sm text-gray-500">Retry attempt {retryCount}/{MAX_RETRIES}</p>
+                  )}
+                </div>
               </div>
             )}
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
-                {error}
+            {error && !loading && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-red-700">{error}</p>
+                    <p className="text-sm text-red-600 mt-1">
+                      Please check your internet connection and try again.
+                    </p>
+                  </div>
+                  {retryCount >= MAX_RETRIES && (
+                    <button
+                      onClick={handleRetry}
+                      className="ml-4 inline-flex items-center px-3 py-2 border border-red-600 text-red-600 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                    >
+                      <FaSync className="w-4 h-4 mr-2" />
+                      Retry
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -215,40 +282,70 @@ const SavedPlaylists = () => {
                 {courses.map((course) => (
                   <div 
                     key={course.id} 
-                    className="flex bg-white rounded-lg border border-gray-100 overflow-hidden hover:shadow-md transition-shadow min-h-24"
+                    className="group bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-200"
                   >
-                    <div className="w-32">
-                      <img 
-                        src={course.thumbnail} 
-                        alt={course.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 px-4 py-3 flex justify-between items-center">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-800 text-base mb-1">{course.title}</h3>
-                        <div className="flex items-center space-x-4 text-sm text-gray-500">
-                          <span>{course.instructor}</span>
-                          <span>•</span>
-                          <span>{course.duration}</span>
-                          <span>•</span>
-                          <span className="capitalize">{course.difficulty}</span>
-                          <span>•</span>
-                          <span>{course.totalVideos} videos</span>
+                    <div className="flex flex-col sm:flex-row">
+                      <div className="relative w-full sm:w-32 h-40 sm:h-auto overflow-hidden">
+                        <img 
+                          src={course.thumbnail} 
+                          alt={course.title}
+                          className="w-full h-full object-cover transform transition-transform duration-300 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent sm:hidden"></div>
+                      </div>
+                      <div className="flex-1 p-4 sm:p-5 flex flex-col">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 text-base sm:text-lg mb-2 line-clamp-2">
+                            {course.title}
+                          </h3>
+                          <div className="flex flex-wrap gap-2 text-xs sm:text-sm text-gray-600 mb-3">
+                            <span>{course.instructor}</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span>{course.duration}</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span className="capitalize">{course.difficulty}</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span>{course.totalVideos} videos</span>
+                          </div>
+                          {course.category && (
+                            <span className="inline-block px-2 sm:px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-medium rounded-full">
+                              {course.category}
+                            </span>
+                          )}
                         </div>
-                        {course.category && (
-                          <span className="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                            {course.category}
-                          </span>
-                        )}
-                      </div>                      <div className="flex items-center space-x-4">
-                        <ProgressCircle progress={course.progress} />
-                        <Link 
-                          to={`/learning/${course.id}`}
-                          className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-sm font-medium hover:bg-blue-100 transition-colors"
-                        >
-                          {course.progress === 100 ? 'Review' : 'Start Learning'}
-                        </Link>
+                        
+                        <div className="mt-4 sm:mt-auto flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:justify-between">
+                          <div className="flex items-center gap-3">
+                            <ProgressCircle progress={course.progress} />
+                            <div className="text-sm">
+                              <div className="font-medium text-gray-900">{course.progress}% Complete</div>
+                              <div className="text-gray-500 text-xs">
+                                {Math.round((course.progress / 100) * course.totalVideos)} of {course.totalVideos} lessons
+                              </div>
+                            </div>
+                          </div>
+                          <Link 
+                            to={`/learning/${course.id}`}
+                            className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg 
+                            hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center"
+                          >
+                            {course.progress === 100 ? (
+                              <>
+                                <span>Review Course</span>
+                                <svg className="w-4 h-4 ml-2" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </>
+                            ) : (
+                              <>
+                                <span>Continue Learning</span>
+                                <svg className="w-4 h-4 ml-2" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </>
+                            )}
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -257,16 +354,16 @@ const SavedPlaylists = () => {
             )}
           </>        ) : (
           <>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
               <h2 className="text-xl font-bold text-gray-800">Completed Learning Plans</h2>
-              <div className="relative">
-                <select className="appearance-none bg-gray-50 border border-gray-200 text-gray-700 py-1 px-3 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+              <div className="relative w-full sm:w-auto">
+                <select className="w-full sm:w-auto appearance-none bg-gray-50 border border-gray-200 text-gray-700 py-2 px-3 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                   <option>Recently Completed</option>
                   <option>Difficulty Level</option>
                   <option>A-Z</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
                 </div>
@@ -290,38 +387,40 @@ const SavedPlaylists = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {courses.filter(course => course.progress === 100).map((course) => (                <div key={course.id} className="border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="flex flex-col sm:flex-row">
-                    <Link to={`/learning/${course.id}`} className="sm:w-1/3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {courses.filter(course => course.progress === 100).map((course) => (
+                <div key={course.id} className="border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+                  <div className="flex flex-col sm:flex-row h-full">
+                    <Link to={`/learning/${course.id}`} className="w-full sm:w-1/3 h-32 sm:h-auto">
                       <img
                         src={course.thumbnail}
                         alt={course.title}
-                        className="h-32 sm:h-full w-full object-cover"
+                        className="h-full w-full object-cover"
                       />
                     </Link>
                     <div className="p-4 flex-1 flex flex-col">
                       <Link to={`/learning/${course.id}`} className="hover:text-indigo-600">
-                        <h3 className="font-bold mb-1">{course.title}</h3>
+                        <h3 className="font-bold text-sm sm:text-base mb-1 line-clamp-2">{course.title}</h3>
                       </Link>
-                      <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
+                      <div className="flex items-center flex-wrap gap-2 text-xs sm:text-sm text-gray-600 mb-2">
                         <span>{course.instructor}</span>
-                        <span>•</span>
+                        <span className="hidden sm:inline">•</span>
                         <span className="capitalize">{course.difficulty}</span>
                       </div>
                       
                       <div className="flex items-center mt-2">
                         <div className="flex items-center text-green-600">
                           <FaCheck className="w-4 h-4 mr-1" />
-                          <span className="text-sm font-medium">Completed</span>
+                          <span className="text-xs sm:text-sm font-medium">Completed</span>
                         </div>
                       </div>
                       
-                      <div className="mt-auto flex justify-between items-center pt-2">
-                        <div className="flex items-center space-x-4 text-xs text-gray-500">
+                      <div className="mt-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pt-2">
+                        <div className="flex items-center flex-wrap gap-2 text-xs text-gray-500">
                           <span>{course.duration}</span>
                           <span>{course.totalVideos} videos</span>
-                        </div>                        <Link 
+                        </div>
+                        <Link 
                           to={`/learning/${course.id}`}
                           className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                         >

@@ -3,22 +3,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FaUser, FaLock, FaRegUser, FaRegEnvelope, FaEye, FaEyeSlash,
   FaEdit, FaCheck, FaTimes, FaSpinner, FaSignOutAlt, FaHome,
-  FaGoogle, FaFacebook, FaUnlink
+  FaGoogle, FaFacebook, FaUnlink, FaCamera, FaGraduationCap,
+  FaBookOpen, FaCertificate
 } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import Footer from '../Footer/Footer';
+import './ProfilePage.css';
 
 const ProfilePage = () => {
   const [activeTab, setActiveTab] = useState('profile');
-  const [isEditing, setIsEditing] = useState(false);  const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
     confirm: false
   });
+  const [profileImage, setProfileImage] = useState(null);
+  const [profileImageUrl, setProfileImageUrl] = useState('https://via.placeholder.com/150');
   
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -51,6 +56,13 @@ const ProfilePage = () => {
 
   const [errors, setErrors] = useState({});
 
+  // Add stats state
+  const [stats] = useState({
+    coursesEnrolled: 12,
+    coursesCompleted: 8,
+    certificatesEarned: 5
+  });
+
   // Update form data when user data changes
   useEffect(() => {
     if (user) {
@@ -61,6 +73,7 @@ const ProfilePage = () => {
         boardOfEducation: user.board_of_education || '',
         country: user.country || ''
       });
+      setProfileImageUrl(user.profile_image_url || 'https://via.placeholder.com/150');
     }
   }, [user]);
 
@@ -286,606 +299,326 @@ const ProfilePage = () => {
     { id: 'security', label: 'Security & Password', icon: FaLock }
   ];
 
+  // Handle profile image change
+  const handleProfileImageChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image size should be less than 5MB');
+        return;
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      if (!allowedTypes.includes(file.type)) {
+        toast.error('Please upload a JPG, PNG, or GIF file');
+        return;
+      }
+
+      setProfileImage(file);
+      const imageUrl = URL.createObjectURL(file);
+      setProfileImageUrl(imageUrl);
+      toast.success('Profile picture updated!');
+    }
+  };
+
+  const formFields = [
+    {
+      id: 'name',
+      label: 'Full Name',
+      type: 'text',
+      icon: FaRegUser,
+      placeholder: 'Enter your full name'
+    },
+    {
+      id: 'email',
+      label: 'Email Address',
+      type: 'email',
+      icon: FaRegEnvelope,
+      placeholder: 'Enter your email'
+    },
+    {
+      id: 'classLevel',
+      label: 'Class Level',
+      type: 'select',
+      options: [
+        { value: '', label: 'Select Class' },
+        { value: '10', label: 'Class 10' },
+        { value: '11', label: 'Class 11' },
+        { value: '12', label: 'Class 12' }
+      ]
+    },
+    {
+      id: 'boardOfEducation',
+      label: 'Board of Education',
+      type: 'select',
+      options: [
+        { value: '', label: 'Select Board' },
+        { value: 'cbse', label: 'CBSE' },
+        { value: 'icse', label: 'ICSE' },
+        { value: 'state', label: 'State Board' },
+        { value: 'ib', label: 'International Baccalaureate' }
+      ]
+    }
+  ];
+
+  const renderFormField = (field) => {
+    const value = formData[field.id];
+    const error = errors[field.id];
+
+    if (!isEditing) {
+      return (
+        <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900">
+          {field.type === 'select'
+            ? field.options.find(opt => opt.value === value)?.label || 'Not provided'
+            : value || 'Not provided'
+          }
+        </div>
+      );
+    }
+
+    if (field.type === 'select') {
+      return (
+        <select
+          name={field.id}
+          value={value}
+          onChange={handleInputChange}
+          className={`w-full p-3 pl-4 border rounded-xl bg-white focus:ring-2 focus:outline-none transition-all shadow-sm ${
+            error
+              ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+              : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
+          }`}
+        >
+          {field.options.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    return (
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-500">
+          <field.icon className="w-5 h-5" />
+        </div>
+        <input
+          type={field.type}
+          name={field.id}
+          value={value}
+          onChange={handleInputChange}
+          className={`w-full p-3 pl-12 border rounded-xl bg-white focus:ring-2 focus:outline-none transition-all shadow-sm ${
+            error
+              ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+              : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
+          }`}
+          placeholder={field.placeholder}
+        />
+        {error && (
+          <motion.p
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center text-red-500 text-sm mt-2"
+          >
+            <FaTimes className="w-4 h-4 mr-1" />
+            {error}
+          </motion.p>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      {/* Modern Navbar */}
+      <nav className="bg-white/70 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">
+            <Link to="/" className="flex items-center space-x-3 group">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl transform transition-all group-hover:scale-105 group-hover:rotate-3">
                 S
               </div>
-              <span className="font-bold text-xl text-gray-800">Students Hub</span>
+              <span className="font-bold text-xl bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                Students Hub
+              </span>
             </Link>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-6">
               <Link 
                 to="/" 
-                className="flex items-center px-3 py-2 text-gray-600 hover:text-blue-600 transition-colors"
+                className="flex items-center text-gray-700 hover:text-blue-600 transition-colors"
               >
-                <FaHome className="w-4 h-4 mr-2" />
-                Home
+                <span className="flex items-center space-x-2 px-4 py-2 rounded-lg hover:bg-blue-50">
+                  <FaHome className="w-4 h-4" />
+                  <span className="hidden sm:inline font-medium">Home</span>
+                </span>
               </Link>
               <button 
                 onClick={handleLogout}
-                className="flex items-center px-3 py-2 text-red-600 hover:text-red-700 transition-colors"
+                className="flex items-center text-red-600 hover:text-red-700 transition-colors"
               >
-                <FaSignOutAlt className="w-4 h-4 mr-2" />
-                Logout
+                <span className="flex items-center space-x-2 px-4 py-2 rounded-lg hover:bg-red-50">
+                  <FaSignOutAlt className="w-4 h-4" />
+                  <span className="hidden sm:inline font-medium">Logout</span>
+                </span>
               </button>
             </div>
           </div>
         </div>
       </nav>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Profile Header - Similar to Auth Form */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-4xl mx-auto space-y-8">
+          {/* Profile Content */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-xl overflow-hidden mb-8"
+            className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100"
           >
-            {/* Header with gradient similar to auth form */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-8 py-6">
-              <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-white">
-                  <FaUser className="w-8 h-8" />
-                </div>
+            {/* Form Content */}
+            <div className="p-6 sm:p-8">
+              <div className="flex justify-between items-center mb-8">
                 <div>
-                  <h1 className="text-2xl font-bold text-white">
-                    {user?.full_name || 'Your Profile'}
-                  </h1>
-                  <p className="text-blue-100">
-                    {user?.email || 'Manage your account settings'}
-                  </p>
+                  <h2 className="text-xl font-semibold text-gray-800">Personal Information</h2>
+                  <p className="text-sm text-gray-500 mt-1">Update your personal details and preferences</p>
+                </div>
+                <div className="flex space-x-3">
+                  {isEditing ? (
+                    <>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleCancel}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors flex items-center space-x-2"
+                      >
+                        <FaTimes className="w-4 h-4" />
+                        <span>Cancel</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors flex items-center space-x-2 shadow-sm disabled:opacity-70"
+                      >
+                        {isSaving ? (
+                          <>
+                            <FaSpinner className="w-4 h-4 animate-spin" />
+                            <span>Saving...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FaCheck className="w-4 h-4" />
+                            <span>Save Changes</span>
+                          </>
+                        )}
+                      </motion.button>
+                    </>
+                  ) : (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setIsEditing(true)}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors flex items-center space-x-2 shadow-sm"
+                    >
+                      <FaEdit className="w-4 h-4" />
+                      <span>Edit Profile</span>
+                    </motion.button>
+                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Tab Navigation */}
-            <div className="border-b">
-              <div className="flex">
-                {tabs.map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center px-6 py-4 font-medium transition-all ${
-                      activeTab === tab.id
-                        ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                        : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <tab.icon className="w-5 h-5 mr-2" />
-                    {tab.label}
-                  </button>
+              {/* Form Fields Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {formFields.map((field) => (
+                  <div key={field.id} className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {field.label}
+                    </label>
+                    {renderFormField(field)}
+                  </div>
                 ))}
               </div>
             </div>
-
-            {/* Tab Content */}
-            <div className="p-8">
-              <AnimatePresence mode="wait">
-                {activeTab === 'profile' && (
+          </motion.div>          {/* Social Connections Card - Improved Version */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100"
+          >
+            <div className="p-6 sm:p-8">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Connected Accounts</h3>
+                  <p className="text-sm text-gray-500 mt-1">Manage your connected social accounts</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {Object.entries({
+                  google: { icon: FaGoogle, color: 'red', bgColor: 'bg-red-50', borderColor: 'border-red-100', hoverBg: 'hover:bg-red-50' },
+                  facebook: { icon: FaFacebook, color: 'blue', bgColor: 'bg-blue-50', borderColor: 'border-blue-100', hoverBg: 'hover:bg-blue-50' }
+                }).map(([provider, { icon: Icon, color, bgColor, borderColor, hoverBg }]) => (
                   <motion.div
-                    key="profile"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-6"
+                    key={provider}
+                    whileHover={{ scale: 1.01 }}
+                    className={`relative overflow-hidden border ${borderColor} rounded-xl p-6 transition-all duration-200 ${hoverBg}`}
                   >
-                    <div className="flex justify-between items-center">
-                      <h2 className="text-xl font-semibold text-gray-800">Personal Information</h2>
-                      <div className="flex space-x-2">
-                        {isEditing ? (
-                          <>
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={handleCancel}
-                              disabled={isSaving}
-                              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                              <FaTimes className="w-4 h-4 mr-2 inline" />
-                              Cancel
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={handleSave}
-                              disabled={isSaving}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-                            >
-                              {isSaving ? (
-                                <FaSpinner className="w-4 h-4 mr-2 animate-spin" />
-                              ) : (
-                                <FaCheck className="w-4 h-4 mr-2" />
-                              )}
-                              {isSaving ? 'Saving...' : 'Save Changes'}
-                            </motion.button>
-                          </>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className={`w-12 h-12 ${bgColor} rounded-xl flex items-center justify-center transform transition-transform group-hover:scale-110`}>
+                          <Icon className={`w-6 h-6 text-${color}-500`} />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-gray-900 capitalize">{provider}</p>
+                          <p className="text-sm text-gray-500">
+                            {socialAccounts[provider].connected ? (
+                              <>
+                                <span>{socialAccounts[provider].email}</span>
+                                <span className="text-xs ml-2 text-gray-400">
+                                  Connected since {socialAccounts[provider].connectedAt}
+                                </span>
+                              </>
+                            ) : (
+                              'Not connected'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        {socialAccounts[provider].connected ? (
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleDisconnectSocialAccount(provider)}
+                            className={`group px-4 py-2 text-sm font-medium border rounded-xl transition-all duration-200
+                              text-${color}-600 border-${color}-200 ${hoverBg} hover:border-${color}-300
+                              flex items-center space-x-2`}
+                          >
+                            <FaUnlink className={`w-4 h-4 text-${color}-500 group-hover:rotate-12 transition-transform`} />
+                            <span>Disconnect</span>
+                          </motion.button>
                         ) : (
                           <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => setIsEditing(true)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleConnectSocialAccount(provider)}
+                            className={`px-4 py-2 text-sm font-medium text-white bg-${color}-500 
+                              hover:bg-${color}-600 rounded-xl transition-colors flex items-center space-x-2 
+                              shadow-sm`}
                           >
-                            <FaEdit className="w-4 h-4 mr-2" />
-                            Edit Profile
+                            <Icon className="w-4 h-4" />
+                            <span>Connect</span>
                           </motion.button>
                         )}
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Full Name */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Full Name
-                        </label>
-                        {isEditing ? (
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                              <FaRegUser />
-                            </div>
-                            <input
-                              type="text"
-                              name="name"
-                              value={formData.name}
-                              onChange={handleInputChange}
-                              className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                                errors.name ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                              }`}
-                              placeholder="Enter your full name"
-                            />
-                            {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900">
-                            {formData.name || 'Not provided'}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Email */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Email Address
-                        </label>
-                        {isEditing ? (
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                              <FaRegEnvelope />
-                            </div>
-                            <input
-                              type="email"
-                              name="email"
-                              value={formData.email}
-                              onChange={handleInputChange}
-                              className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                                errors.email ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                              }`}
-                              placeholder="Enter your email"
-                            />
-                            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900">
-                            {formData.email || 'Not provided'}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Class Level */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Class Level
-                        </label>
-                        {isEditing ? (
-                          <select
-                            name="classLevel"
-                            value={formData.classLevel}
-                            onChange={handleInputChange}
-                            className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all border-gray-300 focus:ring-blue-100 focus:border-blue-500"
-                          >
-                            <option value="">Select Class Level</option>
-                            <option value="10th">10th Standard</option>
-                            <option value="11th">11th Standard</option>
-                            <option value="12th">12th Standard</option>
-                            <option value="undergraduate">Undergraduate</option>
-                          </select>
-                        ) : (
-                          <div className="p-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900">
-                            {formData.classLevel || 'Not provided'}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Board of Education */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Board of Education
-                        </label>
-                        {isEditing ? (
-                          <select
-                            name="boardOfEducation"
-                            value={formData.boardOfEducation}
-                            onChange={handleInputChange}
-                            className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all border-gray-300 focus:ring-blue-100 focus:border-blue-500"
-                          >
-                            <option value="">Select Board</option>
-                            <option value="cbse">CBSE</option>
-                            <option value="icse">ICSE</option>
-                            <option value="state">State Board</option>
-                            <option value="ib">International Baccalaureate</option>
-                          </select>
-                        ) : (
-                          <div className="p-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900">
-                            {formData.boardOfEducation ? formData.boardOfEducation.toUpperCase() : 'Not provided'}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Country */}
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Country
-                        </label>
-                        {isEditing ? (
-                          <select
-                            name="country"
-                            value={formData.country}
-                            onChange={handleInputChange}
-                            className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all border-gray-300 focus:ring-blue-100 focus:border-blue-500"
-                          >
-                            <option value="">Select Country</option>
-                            <option value="India">India</option>
-                            <option value="United States">United States</option>
-                            <option value="United Kingdom">United Kingdom</option>
-                            <option value="Canada">Canada</option>
-                            <option value="Australia">Australia</option>
-                            <option value="other">Other</option>
-                          </select>
-                        ) : (
-                          <div className="p-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-900">
-                            {formData.country || 'Not provided'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </motion.div>
-                )}                {activeTab === 'security' && (
-                  <motion.div
-                    key="security"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-6"
-                  >
-                    {/* Password Section */}
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h2 className="text-xl font-semibold text-gray-800">Password & Security</h2>
-                          <p className="text-sm text-gray-600 mt-1">Manage your password and account security</p>
-                        </div>
-                      </div>                      <AnimatePresence mode="wait">
-                        {!showPasswordForm ? (
-                          // Initial Password Change Button
-                          <motion.div
-                            key="password-button"
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.3, ease: "easeInOut" }}
-                            className="bg-gray-50 border border-gray-200 rounded-lg p-6"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                  <FaLock className="w-5 h-5 text-blue-600" />
-                                </div>
-                                <div>
-                                  <h3 className="font-medium text-gray-800">Password</h3>
-                                  <p className="text-sm text-gray-500">Last updated 2 months ago</p>
-                                </div>
-                              </div>
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => setShowPasswordForm(true)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                              >
-                                <FaEdit className="w-4 h-4" />
-                                <span>Change Password</span>
-                              </motion.button>
-                            </div>
-                          </motion.div>
-                        ) : (
-                          // Password Change Form
-                          <motion.div
-                            key="password-form"
-                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                            transition={{ duration: 0.4, ease: "easeInOut" }}
-                            className="bg-white border border-gray-200 rounded-lg p-6 space-y-6"
-                          >
-                          <div className="flex justify-between items-center">
-                            <h3 className="text-lg font-semibold text-gray-800">Change Password</h3>
-                            <div className="flex space-x-2">
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={handleCancelPasswordChange}
-                                disabled={isSaving}
-                                className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                              >
-                                <FaTimes className="w-4 h-4" />
-                              </motion.button>
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={handlePasswordSave}
-                                disabled={isSaving}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                              >
-                                {isSaving ? (
-                                  <FaSpinner className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <FaCheck className="w-4 h-4" />
-                                )}
-                                <span>{isSaving ? 'Saving...' : 'Save'}</span>
-                              </motion.button>
-                            </div>
-                          </div>                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.1, duration: 0.3 }}
-                            className="space-y-4"
-                          >
-                            {/* Current Password */}
-                            <motion.div
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.2, duration: 0.3 }}
-                            >
-                              <div className="flex justify-between items-center mb-2">
-                                <label className="block text-sm font-medium text-gray-700">
-                                  Current Password
-                                </label>
-                                <button
-                                  type="button"
-                                  onClick={handleForgotPassword}
-                                  className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
-                                >
-                                  Forgot Password?
-                                </button>
-                              </div>
-                              <div className="relative">
-                                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                                  <FaLock />
-                                </div>
-                                <input
-                                  type={showPasswords.current ? 'text' : 'password'}
-                                  name="currentPassword"
-                                  value={passwordData.currentPassword}
-                                  onChange={handlePasswordChange}
-                                  className={`w-full p-3 pl-10 pr-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                                    errors.currentPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                                  }`}
-                                  placeholder="Enter your current password"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => togglePasswordVisibility('current')}
-                                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                                >
-                                  {showPasswords.current ? <FaEyeSlash /> : <FaEye />}
-                                </button>                              </div>
-                              {errors.currentPassword && <p className="text-red-500 text-xs mt-1">{errors.currentPassword}</p>}
-                            </motion.div>                            {/* New Password */}
-                            <motion.div
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.3, duration: 0.3 }}
-                            >
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                New Password
-                              </label>
-                              <div className="relative">
-                                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                                  <FaLock />
-                                </div>
-                                <input
-                                  type={showPasswords.new ? 'text' : 'password'}
-                                  name="newPassword"
-                                  value={passwordData.newPassword}
-                                  onChange={handlePasswordChange}
-                                  className={`w-full p-3 pl-10 pr-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                                    errors.newPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                                  }`}
-                                  placeholder="Enter your new password"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => togglePasswordVisibility('new')}
-                                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                                >
-                                  {showPasswords.new ? <FaEyeSlash /> : <FaEye />}
-                                </button>
-                              </div>
-                              {errors.newPassword && <p className="text-red-500 text-xs mt-1">{errors.newPassword}</p>}
-                            </motion.div>                            {/* Confirm Password */}
-                            <motion.div
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.4, duration: 0.3 }}
-                            >
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Confirm New Password
-                              </label>
-                              <div className="relative">
-                                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                                  <FaLock />
-                                </div>
-                                <input
-                                  type={showPasswords.confirm ? 'text' : 'password'}
-                                  name="confirmPassword"
-                                  value={passwordData.confirmPassword}
-                                  onChange={handlePasswordChange}
-                                  className={`w-full p-3 pl-10 pr-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                                    errors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                                  }`}
-                                  placeholder="Confirm your new password"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => togglePasswordVisibility('confirm')}
-                                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                                >
-                                  {showPasswords.confirm ? <FaEyeSlash /> : <FaEye />}
-                                </button>
-                              </div>
-                              {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>}
-                            </motion.div>                            {/* Password Requirements */}
-                            <motion.div
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: 0.5, duration: 0.3 }}
-                              className="bg-blue-50 border border-blue-200 rounded-lg p-4"
-                            >
-                              <h4 className="font-medium text-blue-800 mb-2">Password Requirements:</h4>
-                              <ul className="text-sm text-blue-700 space-y-1">
-                                <li>• At least 8 characters long</li>
-                                <li>• Mix of uppercase and lowercase letters</li>
-                                <li>• At least one number</li>
-                                <li>• At least one special character</li>
-                              </ul>
-                            </motion.div>
-                          </motion.div>
-                        </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-                    {/* Social Accounts Management Section */}
-                    <div className="mt-8 space-y-6">
-                      <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-semibold text-gray-800">Connected Accounts</h2>
-                      </div>                      <div className="space-y-4">
-                        {/* Google Account */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center">
-                                <FaGoogle className="w-5 h-5 text-red-500" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-800">Google</p>
-                                <p className="text-sm text-gray-500">
-                                  {socialAccounts.google.connected 
-                                    ? socialAccounts.google.email 
-                                    : 'Not connected'
-                                  }
-                                </p>
-                                {socialAccounts.google.connected && socialAccounts.google.connectedAt && (
-                                  <p className="text-xs text-gray-400">
-                                    Connected on {new Date(socialAccounts.google.connectedAt).toLocaleDateString()}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            {socialAccounts.google.connected ? (
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleDisconnectSocialAccount('google')}
-                                className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors flex items-center space-x-2"
-                              >
-                                <FaUnlink className="w-4 h-4" />
-                                <span>Disconnect</span>
-                              </motion.button>
-                            ) : (
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleConnectSocialAccount('google')}
-                                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
-                              >
-                                <FaGoogle className="w-4 h-4" />
-                                <span>Connect</span>
-                              </motion.button>
-                            )}
-                          </div>
-                        </motion.div>
-
-                        {/* Facebook Account */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.1 }}
-                          className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
-                                <FaFacebook className="w-5 h-5 text-blue-700" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-800">Facebook</p>
-                                <p className="text-sm text-gray-500">
-                                  {socialAccounts.facebook.connected 
-                                    ? socialAccounts.facebook.email 
-                                    : 'Not connected'
-                                  }
-                                </p>
-                                {socialAccounts.facebook.connected && socialAccounts.facebook.connectedAt && (
-                                  <p className="text-xs text-gray-400">
-                                    Connected on {new Date(socialAccounts.facebook.connectedAt).toLocaleDateString()}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            {socialAccounts.facebook.connected ? (
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleDisconnectSocialAccount('facebook')}
-                                className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors flex items-center space-x-2"
-                              >
-                                <FaUnlink className="w-4 h-4" />
-                                <span>Disconnect</span>
-                              </motion.button>
-                            ) : (
-                              <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleConnectSocialAccount('facebook')}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                              >
-                                <FaFacebook className="w-4 h-4" />
-                                <span>Connect</span>
-                              </motion.button>
-                            )}                          </div>
-                        </motion.div>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                ))}
+              </div>
             </div>
           </motion.div>
         </div>
       </div>
-
-      <Footer />
     </div>
   );
 };
