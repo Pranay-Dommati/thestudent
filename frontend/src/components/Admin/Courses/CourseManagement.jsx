@@ -33,10 +33,9 @@ const CourseManagement = ({ isDarkMode }) => {
       }
     });
   };
-  
-  return (
-    <div className={`p-0 sm:p-4 md:p-6 ${isDarkMode ? 'text-white' : ''}`}>
-      <div className={`rounded-xl overflow-hidden ${isDarkMode ? 'bg-gray-800 shadow-xl' : 'bg-white shadow-lg'} transition-all`}>
+    return (
+    <div className={`p-0 ${isDarkMode ? 'text-white' : ''}`}>
+      <div className={`rounded-lg sm:rounded-xl overflow-hidden ${isDarkMode ? 'bg-gray-800 shadow-xl' : 'bg-white shadow-lg'} transition-all`}>
         <CourseList 
           onAddNew={handleAddNew} 
           onEdit={handleEditCourse}

@@ -25,30 +25,27 @@ const AdminSidebar = ({ menuItems, currentView, setCurrentView, isDarkMode, isMo
           onClick={() => setIsMobileOpen(false)}
           aria-hidden="true"
         />
-      )}
-
-      {/* Sidebar */}
+      )}      {/* Sidebar */}
       <aside 
-        className={`fixed lg:sticky top-0 lg:top-16 h-screen w-72 md:w-64 bg-white shadow-xl z-50 transform transition-all duration-300 ease-in-out ${
+        className={`fixed lg:sticky top-0 lg:top-16 h-screen w-64 xs:w-72 md:w-64 bg-white shadow-xl z-50 transform transition-all duration-300 ease-in-out ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${isDarkMode ? 'bg-gray-800 text-white' : ''} overflow-y-auto`}
       >
         {/* Mobile close button */}
-        <div className="lg:hidden absolute right-4 top-4">
+        <div className="lg:hidden absolute right-3 xs:right-4 top-3 xs:top-4">
           <button
             onClick={() => setIsMobileOpen(false)}
-            className={`p-2 rounded-full ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors`}
+            className={`p-1.5 xs:p-2 rounded-full ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors`}
             aria-label="Close sidebar"
           >
-            <FaTimes className={`h-5 w-5 ${isDarkMode ? 'text-gray-200' : 'text-gray-600'}`} />
-          </button>
-        </div>        {/* Menu items */}
-        <nav className="h-full py-8 px-4">
-          <div className="mb-6 px-4">
-            <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
+            <FaTimes className={`h-4 w-4 xs:h-5 xs:w-5 ${isDarkMode ? 'text-gray-200' : 'text-gray-600'}`} />
+          </button>        </div>{/* Menu items */}
+        <nav className="h-full py-6 xs:py-8 px-3 xs:px-4">
+          <div className="mb-4 xs:mb-6 px-2 xs:px-4">
+            <h2 className={`text-base xs:text-lg font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>
               Admin Panel
             </h2>
-            <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            <p className={`text-xs xs:text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               Manage your website
             </p>
           </div>
@@ -60,7 +57,7 @@ const AdminSidebar = ({ menuItems, currentView, setCurrentView, isDarkMode, isMo
                     setCurrentView(item.id);
                     setIsMobileOpen(false); // Close sidebar on mobile after clicking
                   }}
-                  className={`flex items-center px-4 py-3 rounded-lg transition-all ${
+                  className={`flex items-center px-3 xs:px-4 py-2.5 xs:py-3 rounded-lg transition-all ${
                     isActiveItem(item)
                       ? isDarkMode 
                         ? 'bg-blue-600 bg-opacity-20 text-blue-400 font-medium' 
@@ -70,18 +67,18 @@ const AdminSidebar = ({ menuItems, currentView, setCurrentView, isDarkMode, isMo
                         : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
                   }`}
                 >
-                  <div className={`p-1.5 rounded-md ${
+                  <div className={`p-1 xs:p-1.5 rounded-md ${
                     isActiveItem(item)
                       ? isDarkMode ? 'bg-blue-500 bg-opacity-20' : 'bg-blue-100'
                       : isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
                   }`}>
-                    <item.icon className={`h-4 w-4 ${
+                    <item.icon className={`h-3.5 w-3.5 xs:h-4 xs:w-4 ${
                       isActiveItem(item)
                         ? isDarkMode ? 'text-blue-300' : 'text-blue-600'
                         : isDarkMode ? 'text-gray-400' : 'text-gray-500'
                     }`} />
                   </div>
-                  <span className="ml-3">{item.label}</span>
+                  <span className="ml-2 xs:ml-3 text-sm xs:text-base">{item.label}</span>
                 </Link>
               </li>
             ))}

@@ -85,8 +85,7 @@ const AdminDashboard = () => {
       <AdminNav isLoginPage={true} />
       <AdminLogin onLoginSuccess={() => setIsAuthenticated(true)} />
     </>
-  ) : (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+  ) : (    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
       <AdminNav 
         onLogout={handleLogout} 
         isLoginPage={false}
@@ -103,13 +102,11 @@ const AdminDashboard = () => {
           setIsMobileOpen={setIsMobileMenuOpen}
           isDarkMode={isDarkMode}
         />
-        
-        <main className={`flex-1 p-4 sm:p-6 lg:ml-64 transition-all duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'}`}>
-          <div className="max-w-7xl mx-auto">
-            <div className="mb-6 flex justify-end">
+          <main className={`flex-1 p-2 xs:p-3 sm:p-4 md:p-5 lg:p-6 lg:ml-64 transition-all duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'}`}>          <div className="max-w-7xl mx-auto">
+            <div className="mb-3 sm:mb-4 md:mb-5 flex justify-end">
               <button 
                 onClick={() => setIsDarkMode(!isDarkMode)} 
-                className={`p-2 rounded-md ${isDarkMode ? 'bg-gray-800 text-yellow-400' : 'bg-gray-200 text-gray-700'}`}
+                className={`p-1.5 sm:p-2 text-sm sm:text-base rounded-md ${isDarkMode ? 'bg-gray-800 text-yellow-400' : 'bg-gray-200 text-gray-700'}`}
               >
                 {isDarkMode ? '☀️ Light' : '🌙 Dark'}
               </button>
@@ -121,7 +118,7 @@ const AdminDashboard = () => {
               <Route path="users" element={<AdminUsers isDarkMode={isDarkMode} />} />
               <Route path="settings" element={<AdminSettings isDarkMode={isDarkMode} />} />
             </Routes>
-          </div>        </main>
+          </div></main>
       </div>
     </div>
   );

@@ -174,35 +174,32 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
         return null;
     }
   };
-
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">
+    <div className="bg-white rounded-xl shadow-lg p-4 sm:p-5 md:p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-4 sm:mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold">
           {initialData ? 'Edit Course' : 'Create New Course'}
         </h2>
         {!showLevelSelection && (
           <button
             onClick={() => setShowLevelSelection(true)}
-            className="text-blue-600 hover:text-blue-700"
+            className="text-blue-600 hover:text-blue-700 text-sm sm:text-base"
           >
             Change Education Level
           </button>
         )}
-      </div>
-
-      {showLevelSelection ? (
-        <div className="space-y-6">
-          <p className="text-gray-600">Select the education level for your new course:</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      </div>      {showLevelSelection ? (
+        <div className="space-y-4 sm:space-y-6">
+          <p className="text-gray-600 text-sm sm:text-base">Select the education level for your new course:</p>
+          <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {EDUCATION_LEVELS.map((level) => (
               <button
                 key={level.id}
                 onClick={() => handleLevelSelect(level)}
-                className="p-6 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 flex flex-col items-center justify-center gap-2"
+                className="p-4 sm:p-6 border-2 border-gray-200 rounded-lg sm:rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 flex flex-col items-center justify-center gap-1 sm:gap-2"
               >
-                <span className="text-lg font-medium text-gray-800">{level.label}</span>
-                <p className="text-sm text-gray-500 text-center">
+                <span className="text-base sm:text-lg font-medium text-gray-800">{level.label}</span>
+                <p className="text-xs sm:text-sm text-gray-500 text-center">
                   {level.id === 'engineering' 
                     ? 'Professional skill development'
                     : `${level.label} standard courses`}
