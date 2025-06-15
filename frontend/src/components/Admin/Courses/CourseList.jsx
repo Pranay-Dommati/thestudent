@@ -57,136 +57,246 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
     const matchesType = filters.type === 'all' || course.course_type === filters.type;
     return matchesSearch && matchesType;
   });
-
   return (
-    <div className={`bg-white rounded-xl shadow-lg p-4 sm:p-6 ${
-      isDarkMode ? 'bg-gray-800 text-white' : ''
-    }`}>
+    <div>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0 mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold">Courses</h1>
-        <button
-          onClick={() => navigate('/admin-p/add-course')}
-          className="w-full sm:w-auto flex items-center justify-center px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-        >
-          <FaPlus className="mr-2" /> Add New Course
-        </button>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search courses..."
-            className={`w-full pl-10 pr-4 py-2 border rounded-lg ${
-              isDarkMode ? 'bg-gray-700 border-gray-600' : 'border-gray-300'
-            }`}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        
-        <div className="flex gap-2 flex-col sm:flex-row">
-          <select
-            name="type"
-            value={filters.type}
-            onChange={handleFilterChange}
-            className={`px-4 py-2 border rounded-lg ${
-              isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'
-            }`}
-          >
-            <option value="all">All Courses</option>
-            <option value="engineering">Engineering</option>
-            <option value="school">School</option>
-          </select>
-          
-          <button
-            onClick={() => setFilterOpen(!filterOpen)}
-            className={`flex items-center justify-center px-4 py-2 border rounded-lg ${
+      <div className={`px-4 py-5 sm:px-6 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className={`text-xl sm:text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+              Course Management
+            </h1>
+            <p className={`mt-1 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              Manage all your courses from this dashboard
+            </p>
+          </div>          <button
+            onClick={() => navigate('/admin-p/add-course')}
+            className={`w-full sm:w-auto flex items-center justify-center px-4 py-2.5 rounded-lg ${
               isDarkMode 
-                ? 'border-gray-600 hover:bg-gray-700' 
-                : 'border-gray-300 hover:bg-gray-50'
-            }`}
+                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            } transition-colors shadow-sm font-medium`}
           >
-            <FaFilter className="mr-2" /> Filters
+            <FaPlus className="mr-2 text-sm" /> Add New Course
           </button>
         </div>
       </div>
-
-      {/* Course List */}
-      <div className="overflow-x-auto -mx-4 sm:mx-0">
-        <div className="inline-block min-w-full align-middle">
-          <div className="overflow-hidden">
-            {loading ? (
-              <div className="py-12 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-              </div>
-            ) : filteredCourses.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4">
-                {filteredCourses.map((course) => (
-                  <div 
-                    key={course.id} 
-                    className={`p-4 rounded-lg border ${
-                      isDarkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'
-                    } transition-colors`}
-                  >
-                    <div className="flex items-center space-x-4">
-                      {course.thumbnail && (
-                        <img 
-                          src={course.thumbnail.startsWith('http') 
-                            ? course.thumbnail 
-                            : `${API_URL}${course.thumbnail}`} 
-                          alt={course.title}
-                          className="w-12 h-12 rounded-md object-cover flex-shrink-0"
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm sm:text-base truncate">
-                          {course.title}
-                        </p>
-                        <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                          {course.class || "N/A"} • Last updated: {course.last_updated ? new Date(course.last_updated).toLocaleDateString() : "Not specified"}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEdit(course.id, course.course_type)}
-                          className={`p-2 rounded-md ${
-                            isDarkMode 
-                              ? 'text-blue-400 hover:bg-gray-600' 
-                              : 'text-blue-600 hover:bg-blue-50'
-                          }`}
-                          aria-label={`Edit ${course.course_type} course`}
-                        >
-                          <FaEdit size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(course.id, course.course_type)}
-                          className={`p-2 rounded-md ${
-                            isDarkMode 
-                              ? 'text-red-400 hover:bg-gray-600' 
-                              : 'text-red-600 hover:bg-red-50'
-                          }`}
-                          aria-label={`Delete ${course.course_type} course`}
-                        >
-                          <FaTrash size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-gray-500">
-                  No courses found. Create your first course by clicking "Add New Course".
-                </p>
-              </div>
-            )}
+      
+      {/* Search and Filters */}
+      <div className="px-4 py-5 sm:px-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <FaSearch />
+            </div>
+            <input
+              type="text"
+              placeholder="Search courses by title, category or type..."
+              className={`block w-full pl-10 pr-4 py-3 rounded-lg text-sm ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500' 
+                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-blue-600 focus:border-blue-500'
+              } border shadow-sm transition-colors`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex gap-3 flex-col sm:flex-row">
+            <select
+              name="type"
+              value={filters.type}
+              onChange={handleFilterChange}
+              className={`px-4 py-3 text-sm rounded-lg border shadow-sm ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300 text-gray-900'
+              }`}
+            >
+              <option value="all">All Course Types</option>
+              <option value="engineering">Engineering</option>
+              <option value="school">School</option>
+            </select>
+            
+            <button
+              onClick={() => setFilterOpen(!filterOpen)}
+              className={`flex items-center justify-center px-4 py-3 border text-sm rounded-lg ${
+                isDarkMode 
+                  ? 'border-gray-600 bg-gray-700 hover:bg-gray-600 text-white' 
+                  : 'border-gray-300 hover:bg-gray-50 text-gray-700'
+              } transition-colors`}
+            >
+              <FaFilter className="mr-2" /> Advanced Filters
+            </button>
           </div>
         </div>
+        
+        {/* Filter tags could go here */}
+        <div className="flex flex-wrap gap-2 mt-4">
+          {filters.type !== 'all' && (
+            <div className={`px-3 py-1.5 text-xs rounded-full flex items-center ${
+              isDarkMode ? 'bg-blue-900/40 text-blue-300' : 'bg-blue-100 text-blue-800'            }`}>
+              Type: {filters.type}
+              <button className="ml-2 focus:outline-none" onClick={() => setFilters({...filters, type: 'all'})}>×</button>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Course List */}
+      <div className={`border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+        {loading ? (
+          <div className="py-16 text-center">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Loading courses...</p>
+          </div>
+        ) : filteredCourses.length > 0 ? (
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {filteredCourses.map((course) => (
+              <div 
+                key={course.id} 
+                className={`p-4 sm:p-6 ${isDarkMode ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50/80'} transition-colors`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex-shrink-0">
+                    {course.thumbnail ? (
+                      <img 
+                        src={course.thumbnail.startsWith('http') ? course.thumbnail : `${API_URL}${course.thumbnail}`} 
+                        alt={course.title}
+                        className="w-16 h-16 rounded-lg object-cover flex-shrink-0 shadow-sm"
+                      />
+                    ) : (
+                      <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${                        isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                        <span className={`text-2xl font-bold ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {course.title?.charAt(0) || 'C'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap gap-2 mb-1">
+                      <span className={`px-2.5 py-0.5 text-xs rounded-full ${
+                        course.course_type === 'engineering' 
+                          ? isDarkMode ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-100 text-purple-800' 
+                          : isDarkMode ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-800'
+                      }`}>
+                        {course.course_type === 'engineering' ? 'Engineering' : 'School'}
+                      </span>
+                      
+                      {course.category && (
+                        <span className={`px-2.5 py-0.5 text-xs rounded-full ${
+                          isDarkMode ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {course.category}
+                        </span>
+                      )}
+                      
+                      {course.is_published ? (
+                        <span className={`px-2.5 py-0.5 text-xs rounded-full ${
+                          isDarkMode ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-800'
+                        }`}>
+                          Published
+                        </span>
+                      ) : (
+                        <span className={`px-2.5 py-0.5 text-xs rounded-full ${
+                          isDarkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-800'
+                        }`}>
+                          Draft
+                        </span>
+                      )}
+                    </div>
+                    
+                    <h3 className={`font-medium text-base sm:text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {course.title}
+                    </h3>
+                    
+                    <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`}>
+                      <span>{course.class || "General"}</span>
+                      <span>•</span>
+                      <span>Last updated: {course.last_updated ? new Date(course.last_updated).toLocaleDateString() : "Not specified"}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                    <button
+                      onClick={() => handleEdit(course.id, course.course_type)}
+                      className={`p-2.5 rounded-lg ${
+                        isDarkMode 
+                          ? 'bg-gray-700 text-blue-400 hover:bg-gray-600' 
+                          : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                      } transition-colors`}
+                      aria-label={`Edit ${course.course_type} course`}
+                    >
+                      <FaEdit size={18} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(course.id, course.course_type)}
+                      className={`p-2.5 rounded-lg ${
+                        isDarkMode 
+                          ? 'bg-gray-700 text-red-400 hover:bg-gray-600' 
+                          : 'bg-red-50 text-red-600 hover:bg-red-100'
+                      } transition-colors`}
+                      aria-label={`Delete ${course.course_type} course`}
+                    >
+                      <FaTrash size={18} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <div className={`inline-flex p-4 rounded-full mb-4 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+              {searchQuery ?                <FaSearch className={`h-8 w-8 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} /> : 
+                <FaPlus className={`h-8 w-8 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+              }</div>
+            <h3 className={`text-lg font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-1`}>
+              {searchQuery ? 'No matching courses found' : 'No courses yet'}
+            </h3>
+            <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-500'} max-w-md mx-auto`}>
+              {searchQuery 
+                ? 'Try adjusting your search or filter criteria to find what you\'re looking for.' 
+                : 'Create your first course by clicking "Add New Course" to get started.'
+              }
+            </p>
+          </div>
+        )}
+        
+        {/* Pagination */}
+        {filteredCourses.length > 0 && (
+          <div className={`px-4 py-5 sm:px-6 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center flex-wrap gap-4`}>
+            <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              Showing <span className="font-medium">{filteredCourses.length}</span> courses
+            </div>
+            <div className="flex items-center space-x-2">
+              <button 
+                className={`px-3 py-1 rounded-md text-sm ${isDarkMode 
+                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} transition-colors disabled:opacity-50`}
+                disabled
+              >
+                Previous
+              </button>
+              <span className={`px-3 py-1 rounded-md text-sm ${isDarkMode 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-blue-600 text-white'}`}>
+                1
+              </span>
+              <button 
+                className={`px-3 py-1 rounded-md text-sm ${isDarkMode 
+                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} transition-colors disabled:opacity-50`}
+                disabled
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

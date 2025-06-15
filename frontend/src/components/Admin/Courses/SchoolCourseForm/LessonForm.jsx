@@ -108,10 +108,8 @@ const LessonForm = ({
               About This Lesson <span className="text-xs text-gray-500">(Supports Markdown)</span>            </label>            <MDEditor
               value={lesson.aboutLesson}              
               onChange={(e) => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', e)}              
-              height={200}              
-              preview="edit"
+              height={200}                preview="edit"
               visibleDragbar={true}
-              visiableDragbar={true}
               style={{ fontSize: '16px' }}
               previewOptions={{
                 style: { padding: '20px', fontSize: '16px' }
@@ -181,10 +179,8 @@ const LessonForm = ({
         <div className="space-y-2">
           <label className="block text-gray-700">
             Content <span className="text-red-500">*</span>          </label>          <MDEditor            value={lesson.aboutLesson}
-            onChange={(e) => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', e)}              height={300}
-            preview="edit"
+            onChange={(e) => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', e)}              height={300}            preview="edit"
             visibleDragbar={true}
-            visiableDragbar={true}
             hideToolbar={false}
             style={{ fontSize: '16px' }}
             previewOptions={{

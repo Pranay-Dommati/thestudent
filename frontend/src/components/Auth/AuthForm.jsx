@@ -126,10 +126,15 @@ export default function AuthForm() {  const location = useLocation();
           // Redirect to the returnTo path if it exists, otherwise to the homepage
           navigate(returnToPath || '/');
         }
-      }
-    } catch (error) {
+      }    } catch (error) {
       console.error("Error during login:", error);
-      toast.error("Invalid email or password");
+      toast("Invalid email or password", {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
     } finally {
       setIsLoading(false);
     }

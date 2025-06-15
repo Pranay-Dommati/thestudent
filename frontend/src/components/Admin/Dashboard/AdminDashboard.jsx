@@ -14,6 +14,7 @@ const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState('courses');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -79,23 +80,18 @@ const AdminDashboard = () => {
       icon: FaLock,
       path: '/admin-p/settings'
     }
-  ];
-
-  if (!isAuthenticated) {
-    return (
-      <>
-        <AdminNav isLoginPage={true} />
-        <AdminLogin onLoginSuccess={() => setIsAuthenticated(true)} />
-      </>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
+  ];  return !isAuthenticated ? (
+    <>
+      <AdminNav isLoginPage={true} />
+      <AdminLogin onLoginSuccess={() => setIsAuthenticated(true)} />
+    </>
+  ) : (
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
       <AdminNav 
         onLogout={handleLogout} 
         isLoginPage={false}
         onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        isDarkMode={isDarkMode}
       />
       
       <div className="flex pt-16">
@@ -105,19 +101,27 @@ const AdminDashboard = () => {
           setCurrentView={setCurrentView}
           isMobileOpen={isMobileMenuOpen}
           setIsMobileOpen={setIsMobileMenuOpen}
+          isDarkMode={isDarkMode}
         />
         
-        <main className="flex-1 p-4 sm:p-6 lg:ml-64 transition-all duration-300">
-          <div className="container mx-auto max-w-7xl">
+        <main className={`flex-1 p-4 sm:p-6 lg:ml-64 transition-all duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'}`}>
+          <div className="max-w-7xl mx-auto">
+            <div className="mb-6 flex justify-end">
+              <button 
+                onClick={() => setIsDarkMode(!isDarkMode)} 
+                className={`p-2 rounded-md ${isDarkMode ? 'bg-gray-800 text-yellow-400' : 'bg-gray-200 text-gray-700'}`}
+              >
+                {isDarkMode ? '☀️ Light' : '🌙 Dark'}
+              </button>
+            </div>
             <Routes>
               <Route index element={<Navigate to="/admin-p/courses" />} />
-              <Route path="courses/*" element={<CourseManagement />} />
-              <Route path="add-course" element={<CourseForm onCancel={() => navigate('/admin-p/courses')} />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="settings" element={<AdminSettings />} />
+              <Route path="courses/*" element={<CourseManagement isDarkMode={isDarkMode} />} />
+              <Route path="add-course" element={<CourseForm onCancel={() => navigate('/admin-p/courses')} isDarkMode={isDarkMode} />} />
+              <Route path="users" element={<AdminUsers isDarkMode={isDarkMode} />} />
+              <Route path="settings" element={<AdminSettings isDarkMode={isDarkMode} />} />
             </Routes>
-          </div>
-        </main>
+          </div>        </main>
       </div>
     </div>
   );

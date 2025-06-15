@@ -76,8 +76,10 @@ export const getEngineeringCourseById = async (courseId) => {
 
 export const getAllCourses = async (category = 'all') => {
   try {
-    console.log('Fetching all courses for category:', category);
-    const response = await axios.get(`${API_URL}/api/courses/all/?category=${category}`);
+    // Remove any colon prefix from category if present (e.g., ":1" becomes "1")
+    const cleanCategory = category.toString().replace(/^:/, '');
+    console.log('Fetching all courses for category:', cleanCategory);
+    const response = await axios.get(`${API_URL}/api/courses/all/?category=${cleanCategory}`);
     console.log('Course data received:', response.data);
     return response.data;
   } catch (error) {

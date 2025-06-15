@@ -195,6 +195,8 @@ def create_course(request):
                 'last_updated': data.get('lastUpdated', None),
                 'learning_points': json.loads(data.get('learningPoints', '[]')),
                 'requirements': json.loads(data.get('requirements', '[]')),
+                'category': data.get('category', ''),  # Make sure to set the category
+                'is_published': True,  # Set it as published by default
             }
             
             if 'thumbnail' in request.FILES:
