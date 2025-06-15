@@ -106,10 +106,16 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         chapters: planData.plan_data.days.map((day, dayIndex) => {
           // DEBUG: Log quiz questions for each day
           console.log(`🧩 Day ${day.day} (${day.topic}) quiz questions:`, day.quizQuestions);
-          console.log(`🧩 Quiz questions length:`, day.quizQuestions ? day.quizQuestions.length : 0);
+          console.log(`🧩 Quiz questions length:`, day.quizQuestions ? day.quizQuestions.length : 0);          // Create video lessons from day.videos
+          // For Day 1 introduction, only use the first video
+          const videosToUse = day.day === 1 ? (day.videos || []).slice(0, 1) : (day.videos || []);
           
-          // Create video lessons from day.videos
-          const videoLessons = (day.videos || []).map((video, videoIndex) => {
+          // Log video count modification for Day 1
+          if (day.day === 1 && (day.videos || []).length > 1) {
+            console.log(`ℹ️ Day 1 (${day.topic}): Limited videos from ${day.videos.length} to 1 video for introduction`);
+          }
+          
+          const videoLessons = videosToUse.map((video, videoIndex) => {
             // Create unique lesson identifier for AI learning plans
             const lessonKey = `day_${day.day}_video_${videoIndex}`;
             const isCompleted = existingProgress[lessonKey] || false;
