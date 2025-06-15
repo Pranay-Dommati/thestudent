@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { FaPlay, FaClock, FaUserGraduate, FaChartLine, FaCode, FaChevronDown, FaChevronUp, FaGlobe } from 'react-icons/fa';
+import { FaPlay, FaClock, FaUserGraduate, FaChartLine, FaCode, FaChevronDown, FaChevronUp, FaGlobe, FaCheck, FaVideo, FaDownload, FaMobile } from 'react-icons/fa';
 import LoadingSpinner from './LoadingSpinner';
 import Footer from '../Footer/Footer';
 import { getEngineeringCourseById } from '../../services/courseApi';
@@ -140,11 +140,10 @@ const CourseDetails = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
               <div className="space-y-4 sm:space-y-6">
                 <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold">{course.title}</h1>
-                <p className="text-sm sm:text-base text-gray-200">{course.description}</p>
-                <div className="space-x-2 sm:space-x-4 text-xs sm:text-sm">
-                  <span>Created by {course.instructor}</span>
+                <p className="text-sm sm:text-base text-gray-200">{course.description}</p>                <div className="space-x-2 sm:space-x-4 text-xs sm:text-sm">
+                  <span>Created by {course.instructor.name}</span>
                   <span>•</span>
-                  <span>Last updated {course.lastUpdated}</span>
+                  <span>{course.stats.lastUpdated}</span>
                 </div>
                 <button 
                   onClick={handleStartLearning}
@@ -165,10 +164,9 @@ const CourseDetails = () => {
           </div>
         </div>
 
-        <div className="container mx-auto px-4 sm:px-6 py-8">
-          {/* Course features */}
+        <div className="container mx-auto px-4 sm:px-6 py-8">          {/* Course features */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
-            {course.features.map((feature, index) => (
+            {course.keyFeatures.map((feature, index) => (
               <div key={index} className="bg-white p-4 sm:p-6 rounded-xl text-center">
                 <div className="text-blue-600 text-xl sm:text-2xl mb-2 sm:mb-3">{feature.icon}</div>
                 <h3 className="font-bold text-sm sm:text-base mb-1">{feature.title}</h3>
@@ -255,10 +253,9 @@ const CourseDetails = () => {
                     </button>
                     <div className="border-t pt-4 sm:pt-6">
                       <h3 className="font-bold text-base sm:text-lg mb-2 sm:mb-3">This course includes:</h3>
-                      <ul className="space-y-2 sm:space-y-3">
-                        <li className="flex items-center text-sm sm:text-base text-gray-600">
+                      <ul className="space-y-2 sm:space-y-3">                        <li className="flex items-center text-sm sm:text-base text-gray-600">
                           <FaVideo className="mr-3 text-gray-400" />
-                          {course.duration} hours of video content
+                          {course.keyFeatures[1].title} of video content
                         </li>
                         <li className="flex items-center text-sm sm:text-base text-gray-600">
                           <FaDownload className="mr-3 text-gray-400" />

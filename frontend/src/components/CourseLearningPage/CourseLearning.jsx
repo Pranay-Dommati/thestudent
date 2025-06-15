@@ -245,10 +245,15 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             console.error('❌ Error fetching AI learning plan:', errorMessage);
             setError(errorMessage);
             setContentType('notFound');
+          }        } else {
+          try {
+            // Fetch regular course data
+            await fetchRegularCourse(pathParts);
+          } catch (error) {
+            console.error('❌ Error fetching course data:', error);
+            setError(error.message || 'Failed to load course data');
+            setContentType('notFound'); 
           }
-        } else {
-          // Fetch regular course data
-          await fetchRegularCourse(pathParts);
         }
       } finally {
         setLoading(false);
@@ -266,15 +271,78 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         // Check if it's a school course (e.g., /courses/10th/cbse/math/learning)
         if (pathParts.includes('10th') || pathParts.includes('11th') || pathParts.includes('12th')) {
           isSchoolCourse = true;
-          const classLevel = pathParts.find(part => ['10th', '11th', '12th'].includes(part));
-          const board = pathParts.find(part => ['cbse', 'state'].includes(part));
-            // Handle state board case which has an additional parameter
+          const classLevel = pathParts.find(part => ['10th', '11th', '12th'].includes(part));          const board = pathParts.find(part => ['cbse', 'state'].includes(part));
+          
+          // Handle state board case which has an additional parameter
           if (board === 'state') {
             const stateIndex = pathParts.indexOf('state');
             if (stateIndex !== -1 && stateIndex + 1 < pathParts.length) {
               const stateId = pathParts[stateIndex + 1];
               const subjectId = pathParts[stateIndex + 2];
-              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&state=${stateId}&subject=${subjectId}`;
+                // Map state codes to full state names
+              const stateMap = {
+                // Southern States
+                'ts': 'Telangana',
+                'ap': 'Andhra Pradesh',
+                'ka': 'Karnataka',
+                'tn': 'Tamil Nadu',
+                'kl': 'Kerala',
+                
+                // Western States
+                'mh': 'Maharashtra',
+                'gj': 'Gujarat',
+                'rj': 'Rajasthan',
+                'ga': 'Goa',
+                
+                // Northern States
+                'dl': 'Delhi',
+                'pb': 'Punjab',
+                'hr': 'Haryana',
+                'hp': 'Himachal Pradesh',
+                'up': 'Uttar Pradesh',
+                'uk': 'Uttarakhand',
+                'jk': 'Jammu and Kashmir',
+                
+                // Eastern States
+                'wb': 'West Bengal',
+                'br': 'Bihar',
+                'or': 'Odisha',
+                'jh': 'Jharkhand',
+                
+                // Central States
+                'mp': 'Madhya Pradesh',
+                'cg': 'Chhattisgarh',
+                
+                // North Eastern States
+                'as': 'Assam',
+                'sk': 'Sikkim',
+                'nl': 'Nagaland',
+                'mn': 'Manipur',
+                'ml': 'Meghalaya',
+                'tr': 'Tripura',
+                'ar': 'Arunachal Pradesh',
+                'mz': 'Mizoram',
+                
+                // Union Territories
+                'ch': 'Chandigarh',
+                'an': 'Andaman and Nicobar Islands',
+                'dn': 'Dadra and Nagar Haveli and Daman and Diu',
+                'ld': 'Lakshadweep',
+                'py': 'Puducherry',
+                'la': 'Ladakh'
+              };                // Use the full state name if available, otherwise use the code
+              const stateCode = stateId.toLowerCase();
+              const stateParam = stateMap[stateCode] || stateId;
+              
+              console.log(`🗺️ State code mapping: "${stateCode}" → "${stateParam}"`);
+              
+              // Warn if state code is not found in the mapping
+              if (!stateMap[stateCode]) {
+                console.warn(`⚠️ Warning: State code "${stateCode}" not found in state mapping. Using raw value instead.`);
+              }
+              
+              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&state=${stateParam}&subject=${subjectId}`;
+              console.log(`🔍 Looking for state board course: class=${classLevel}, state=${stateParam}, subject=${subjectId}`);
             }
           } else {
             const subjectIndex = pathParts.indexOf(board) + 1;
@@ -296,22 +364,33 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           console.log("🔍 Fetching course from API URL:", apiUrl);
         const response = await axiosInstance.get(apiUrl);
         console.log("📝 API Response:", response.data);
-        
-        let courseData;
-        if (isSchoolCourse && Array.isArray(response.data) && response.data.length > 0) {
-          // For school courses, we get a list, so take the first matching course
-          courseData = response.data[0];
-          console.log("🎯 Selected course from list:", courseData);
-          // Now fetch the complete course details
-          const detailResponse = await axiosInstance.get(`/courses/school/${courseData.id}/`);
-          console.log("📚 Complete course details:", detailResponse.data);
-          courseData = detailResponse.data;
+          let courseData;
+        if (isSchoolCourse) {
+          if (Array.isArray(response.data) && response.data.length > 0) {
+            // For school courses, we get a list, so take the first matching course
+            courseData = response.data[0];
+            console.log("🎯 Selected course from list:", courseData);
+            // Now fetch the complete course details
+            const detailResponse = await axiosInstance.get(`/courses/school/${courseData.id}/`);
+            console.log("📚 Complete course details:", detailResponse.data);
+            courseData = detailResponse.data;
+          } else {
+            // No courses found for the given criteria
+            throw new Error(`No courses found for the specified criteria. Please check if the course exists.`);
+          }
         } else {
           courseData = response.data;
         }
+          console.log("Fetched Course Data:", courseData);
         
-        console.log("Fetched Course Data:", courseData);
-          // Transform sections or chapters into a consistent format for the sidebar
+        // Check if courseData is valid and has the expected structure
+        if (!courseData || 
+            (isSchoolCourse && (!courseData.chapters || !Array.isArray(courseData.chapters))) ||
+            (!isSchoolCourse && (!courseData.sections || !Array.isArray(courseData.sections)))) {
+          throw new Error("No course data found or course data is in an unexpected format");
+        }
+          
+        // Transform sections or chapters into a consistent format for the sidebar
         const transformedCourse = {
           ...courseData,
           chapters: isSchoolCourse 
@@ -363,10 +442,25 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         
         // Also fetch AI-generated learning plans to display in sidebar
         fetchAILearningPlans();
-      } catch (error) {
-        console.error('❌ Error fetching course data:', error);
+      } catch (error) {        console.error('❌ Error fetching course data:', error);
         const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
-        setError(errorMessage);
+        
+        // Special handling for state board course errors
+        const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
+        const isStateBoard = pathParts.includes('state');
+        if (isStateBoard) {
+          const stateIndex = pathParts.indexOf('state');
+          if (stateIndex !== -1 && stateIndex + 1 < pathParts.length) {
+            const stateId = pathParts[stateIndex + 1];
+            console.error(`⚠️ State board course error with state code: ${stateId}`);
+            setError(`Unable to find courses for the specified state. Make sure state code "${stateId}" is correct.`);
+          } else {
+            setError('Unable to find state board courses. Invalid URL format.');
+          }
+        } else {
+          setError(errorMessage);
+        }
+        
         setCourse(null);
         
         // Check if error response indicates ID belongs to a learning plan
@@ -741,9 +835,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const renderContent = () => {
     if (loading) {
       return <div className="animate-pulse bg-gray-200 h-96 rounded-lg"></div>;
-    }
-
-    if (contentType === 'notFound') {
+    }    if (contentType === 'notFound') {
       return (
         <div className="p-8 text-center">
           <div className="mb-6">
@@ -751,14 +843,29 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Learning Plan Not Found</h2>
-          <p className="text-gray-600 mb-6">The learning plan you're looking for could not be found. It may have been deleted or is unavailable.</p>
-          <div className="flex justify-center">
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Content Not Found</h2>
+          <p className="text-gray-600 mb-6">{error || "The content you're looking for could not be found. It may have been deleted or is unavailable."}</p>
+          <div className="flex justify-center space-x-4">
+            {isLearningPlanId ? (
+              <button
+                onClick={() => navigate('/chat')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Create a New Learning Plan
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/courses')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Browse Courses
+              </button>
+            )}
             <button
-              onClick={() => navigate('/chat')}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
             >
-              Create a New Learning Plan
+              Try Again
             </button>
           </div>
         </div>

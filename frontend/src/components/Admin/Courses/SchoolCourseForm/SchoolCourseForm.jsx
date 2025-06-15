@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import BasicInfoStep from './BasicInfoStep';
 import CourseStructureStep from './CourseStructureStep';
 import { createCourse } from '../../../../services/courseApi';
+import { sanitizeFileName } from '../../../../utils/fileHelpers';
 
 const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   const navigate = useNavigate();
@@ -51,7 +52,6 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   
   // Errors for validation
   const [errors, setErrors] = useState({});
-  
   // Handle thumbnail upload
   const handleThumbnailChange = (e) => {
     const file = e.target.files[0];
@@ -68,12 +68,25 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       return;
     }
     
+    // Sanitize the filename to ensure it's not too long (100 chars max)
+    const sanitizedFile = sanitizeFileName(file, 100);
+    
+    if (file.name !== sanitizedFile.name) {
+      toast('File name was too long and has been truncated', {
+        icon: 'ℹ️',
+        style: {
+          backgroundColor: '#3B82F6',
+          color: 'white',
+        }
+      });
+    }
+    
     const reader = new FileReader();
     reader.onloadend = () => {
       setThumbnailPreview(reader.result);
-      setCourseInfo({...courseInfo, thumbnail: file});
+      setCourseInfo({...courseInfo, thumbnail: sanitizedFile});
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(sanitizedFile);
   };
   
   // Handle course info changes
@@ -346,7 +359,6 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       } : chapter
     ));
   };
-  
   // Handle file change for downloadable resources
   const handleFileChange = (chapterIndex, lessonIndex, resourceIndex, file) => {
     if (!file) return;
@@ -363,6 +375,19 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       return;
     }
     
+    // Sanitize the filename to ensure it's not too long (100 chars max)
+    const sanitizedFile = sanitizeFileName(file, 100);
+    
+    if (file.name !== sanitizedFile.name) {
+      toast('File name was too long and has been truncated', {
+        icon: 'ℹ️',
+        style: {
+          backgroundColor: '#3B82F6',
+          color: 'white',
+        }
+      });
+    }
+    
     setChapters(chapters.map((chapter, i) => 
       i === chapterIndex ? {
         ...chapter,
@@ -372,7 +397,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
             resources: {
               ...lesson.resources,
               downloadable: lesson.resources.downloadable.map((resource, k) => 
-                k === resourceIndex ? {...resource, file: file} : resource
+                k === resourceIndex ? {...resource, file: sanitizedFile} : resource
               )
             }
           } : lesson

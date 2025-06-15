@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { FaPlay, FaBookReader, FaClock, FaChalkboardTeacher, FaGlobe } from 'react-icons/fa';
+import { FaPlay, FaBookReader, FaClock, FaChalkboardTeacher, FaGlobe, FaBook, FaCheck } from 'react-icons/fa';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import LoadingSpinner from './LoadingSpinner';
