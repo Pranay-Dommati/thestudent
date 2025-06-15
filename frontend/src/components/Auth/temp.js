@@ -7,11 +7,11 @@ import { useAuth } from '../../context/AuthContext';
 import AuthNav from './AuthNav';
 import AuthFooter from './AuthFooter';
 
-export default function AuthForm() {  const location = useLocation();
+export default function AuthForm() {
+  const location = useLocation();
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
   const modeParam = queryParams.get('mode');
-  const returnToPath = queryParams.get('returnTo');
   
   // Set initial mode based on URL parameter (default to login if no parameter)
   const [isSignUp, setIsSignUp] = useState(() => {
@@ -35,16 +35,13 @@ export default function AuthForm() {  const location = useLocation();
   });
   const [formErrors, setFormErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+
   const toggleForm = () => {
     const newMode = !isSignUp;
     setIsSignUp(newMode);
     setFormErrors({});
-    
-    // Preserve the returnTo parameter if it exists
-    const returnToParam = returnToPath ? `&returnTo=${encodeURIComponent(returnToPath)}` : '';
-    
     // Use navigate instead of window.history
-    navigate(`/auth?mode=${newMode ? 'signup' : 'login'}${returnToParam}`);
+    navigate(`/auth?mode=${newMode ? 'signup' : 'login'}`);
   };
 
   const handleChange = (e) => {
@@ -106,11 +103,11 @@ export default function AuthForm() {  const location = useLocation();
     setIsLoading(true);
 
     try {
-      if (!isSignUp) {        // Login request
+      if (!isSignUp) {
+        // Login request
         const response = await login(formData.email, formData.password);
         if (response) {
-          // Redirect to the returnTo path if it exists, otherwise to the homepage
-          navigate(returnToPath || '/');
+          navigate('/'); // Redirect to the homepage on successful login
         }
       } else {
         // Registration logic
@@ -121,10 +118,10 @@ export default function AuthForm() {  const location = useLocation();
           confirm_password: formData.confirmPassword,
           agreed_to_terms: formData.agreedToTerms
         };
-          const success = await register(registrationData);
+        
+        const success = await register(registrationData);
         if (success) {
-          // Redirect to the returnTo path if it exists, otherwise to the homepage
-          navigate(returnToPath || '/');
+          navigate('/');
         }
       }
     } catch (error) {
@@ -150,8 +147,9 @@ export default function AuthForm() {  const location = useLocation();
         </div>
 
         {/* Main card */}
-        <div className="relative w-full max-w-4xl bg-white shadow-2xl rounded-2xl overflow-hidden">          <div className="flex flex-col md:flex-row">
-            <AnimatePresence initial={false} mode="sync">
+        <div className="relative w-full max-w-4xl bg-white shadow-2xl rounded-2xl overflow-hidden">
+          <div className="flex flex-col md:flex-row">
+            <AnimatePresence initial={false} mode="wait">
               {/* Welcome Panel - Always on top for mobile */}
               <motion.div
                 key={isSignUp ? "welcome-signup" : "welcome-login"}
@@ -218,12 +216,12 @@ export default function AuthForm() {  const location = useLocation();
                   opacity: 0
                 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              >                <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800">
+              >
+                <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800">
                   {isSignUp ? 'Create Account' : 'Login'}
                 </h2>
-                <form className="w-full max-w-sm space-y-4" onSubmit={handleSubmit}>
-                  <AnimatePresence>
-                    {isSignUp && (
+                  <form className="w-full max-w-sm space-y-4" onSubmit={handleSubmit}>
+                  <AnimatePresence>                    {isSignUp && (
                       <motion.div 
                         className="space-y-4"
                         initial={{ height: 0, opacity: 0 }}
@@ -245,11 +243,11 @@ export default function AuthForm() {  const location = useLocation();
                             placeholder="Full Name" 
                             value={formData.name}
                             onChange={handleChange}
-                          />                          {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
+                          />
+                          {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
                         </div>
                       </motion.div>
-                    )}
-                  </AnimatePresence>
+                    )}                  </AnimatePresence>
                   
                   {/* Email Field - Common for both login and signup */}
                   <div className="relative">
@@ -266,7 +264,8 @@ export default function AuthForm() {  const location = useLocation();
                       value={formData.email}
                       onChange={handleChange}
                     />
-                    {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}                  </div>
+                    {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
+                  </div>
                   
                   {/* Password Field - Common for both login and signup */}
                   <div className="relative">
@@ -282,31 +281,14 @@ export default function AuthForm() {  const location = useLocation();
                       placeholder="Password" 
                       value={formData.password}
                       onChange={handleChange}
-                    />                    {formErrors.password && <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>}
+                    />
+                    {formErrors.password && <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>}
                   </div>
-                    {!isSignUp && (
-                    <div className="text-right mt-2 mb-1">                      <button
-                        type="button"
-                        onClick={() => toast("Password reset feature will be added soon.", { 
-                          icon: '📧',
-                          style: {
-                            backgroundColor: '#3b82f6',
-                            color: 'white',
-                          }
-                        })}
-                        className="text-sm text-blue-600 hover:text-blue-700 px-2 py-1 inline-block cursor-pointer hover:underline font-medium hover:bg-blue-50 rounded transition-colors"
-                      >
-                        Forgot password?
-                      </button>
-                    </div>                  )}
 
-                  {/* Ensure there's clear separation between sections */}
-                  <div className="w-full h-px mt-1"></div>
-                  
                   <AnimatePresence>
                     {isSignUp && (
                       <motion.div 
-                        className="space-y-4 mt-2"
+                        className="space-y-4"
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
@@ -330,30 +312,22 @@ export default function AuthForm() {  const location = useLocation();
                           {formErrors.confirmPassword && <p className="text-red-500 text-xs mt-1">{formErrors.confirmPassword}</p>}
                         </div>
 
-                        {/* Terms and Conditions */}                        <div className="flex items-start">
+                        {/* Terms and Conditions */}
+                        <div className="flex items-center">
                           <input
                             type="checkbox"
                             name="agreedToTerms"
-                            id="agreedToTerms"
                             checked={formData.agreedToTerms}
                             onChange={(e) => setFormData({ ...formData, agreedToTerms: e.target.checked })}
-                            className="h-4 w-4 mt-1 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0"
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                           />
-                          <label htmlFor="agreedToTerms" className="ml-2 text-sm text-gray-700 flex-1">
+                          <label className="ml-2 block text-sm text-gray-900">
                             I agree to the{' '}
-                            <Link 
-                              to="/terms-and-conditions" 
-                              state={{ returnTo: '/auth?mode=' + (isSignUp ? 'signup' : 'login') + (returnToPath ? `&returnTo=${encodeURIComponent(returnToPath)}` : '') }}
-                              className="text-blue-600 hover:text-blue-500 inline-block"
-                            >
+                            <Link to="/terms" className="text-blue-600 hover:text-blue-500">
                               Terms of Service
                             </Link>
                             {' '}and{' '}
-                            <Link 
-                              to="/privacy-policy" 
-                              state={{ returnTo: '/auth?mode=' + (isSignUp ? 'signup' : 'login') + (returnToPath ? `&returnTo=${encodeURIComponent(returnToPath)}` : '') }}
-                              className="text-blue-600 hover:text-blue-500 inline-block"
-                            >
+                            <Link to="/privacy" className="text-blue-600 hover:text-blue-500">
                               Privacy Policy
                             </Link>
                           </label>
@@ -383,31 +357,20 @@ export default function AuthForm() {  const location = useLocation();
                       <div className="w-full border-t border-gray-300"></div>
                     </div>
                     <div className="relative flex justify-center text-sm">
-                      <span className="px-2 bg-white text-gray-500">Or continue with</span>                    </div>
+                      <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                    </div>
                   </div>
-                  
+
                   <div className="mt-6 grid grid-cols-2 gap-3">
                     <button
-                      type="button"                      onClick={() => toast("Social login will be implemented in the next update.", { 
-                        icon: '🔗',
-                        style: {
-                          backgroundColor: '#3b82f6',
-                          color: 'white',
-                        }
-                      })}
+                      type="button"
                       className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                     >
                       <FaGoogle className="h-5 w-5 text-red-500" />
                       <span className="ml-2">Google</span>
                     </button>
                     <button
-                      type="button"                      onClick={() => toast("Social login will be implemented in the next update.", { 
-                        icon: '🔗',
-                        style: {
-                          backgroundColor: '#3b82f6',
-                          color: 'white',
-                        }
-                      })}
+                      type="button"
                       className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                     >
                       <FaFacebook className="h-5 w-5 text-blue-600" />

@@ -204,12 +204,12 @@ export const AuthProvider = ({ children }) => {
   const isAuthenticated = () => {
     return isLoggedIn && !!localStorage.getItem('accessToken');
   };
-
   return (
     <AuthContext.Provider value={{ 
       user,
       loading,
-      isLoggedIn: isAuthenticated(), // Use the function
+      isLoggedIn,
+      isAuthenticated, // Export the function as well
       register,
       login,
       logout,

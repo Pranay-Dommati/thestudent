@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import BasicInfoStep from './BasicInfoStep';
 import CourseStructureStep from './CourseStructureStep';
 import { createCourse } from '../../../../services/courseApi';
@@ -58,7 +58,13 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     if (!file) return;
     
     if (file.size > 5 * 1024 * 1024) { // 5MB
-      toast.error('Image size must be less than 5MB');
+      toast('Image size must be less than 5MB', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
       return;
     }
     
@@ -98,12 +104,24 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   // Remove item from array field
   const removeArrayField = (fieldName, index) => {
     if (fieldName === 'learningPoints' && courseInfo.learningPoints.length <= 2) {
-      toast.error('At least 2 learning points are required');
+      toast('At least 2 learning points are required', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
       return;
     }
     
     if (fieldName === 'keyTopics' && courseInfo.keyTopics.length <= 1) {
-      toast.error('At least 1 key topic is required');
+      toast('At least 1 key topic is required', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
       return;
     }
     
@@ -183,7 +201,13 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   // Remove lesson from chapter
   const removeLesson = (chapterIndex, lessonIndex) => {
     if (chapters[chapterIndex].lessons.length <= 1) {
-      toast.error('Each chapter must have at least one lesson');
+      toast('Each chapter must have at least one lesson', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
       return;
     }
     
@@ -329,7 +353,13 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     
     // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('File size must be less than 10MB');
+      toast('File size must be less than 10MB', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
       return;
     }
     
@@ -446,7 +476,13 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       window.scrollTo(0, 0);
     } else {
       console.log("Form validation failed", errors);
-      toast.error("Please fill in all required fields correctly");
+      toast("Please fill in all required fields correctly", {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
     }
   };
 
@@ -462,7 +498,13 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setErrors(errors);
-      toast.error('Please fix the form errors');
+      toast('Please fix the form errors', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
       return;
     }
     
@@ -567,11 +609,23 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       
       // Submit the form
       await createCourse(formData);
-      toast.success('Course created successfully');
+      toast('Course created successfully', {
+        icon: '🎉',
+        style: {
+          backgroundColor: '#10B981',
+          color: 'white',
+        }
+      });
       navigate('/admin-p/courses');
     } catch (error) {
       console.error('Error creating course:', error);
-      toast.error('Failed to create course. Please try again.');
+      toast('Failed to create course. Please try again.', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -602,7 +656,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       
       {/* Form Content */}
       <form onSubmit={handleSubmit}>
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="sync">
           <motion.div
             key={activeStep}
             initial={{ opacity: 0, y: 20 }}

@@ -206,9 +206,14 @@ const StandaloneQuizPage = () => {
       const result = response.data;
       setQuizResult(result);
       setShowResults(true);
-      
-      if (result.passed) {
-        toast.success(`🎉 Congratulations! You scored ${result.score.toFixed(1)}% and passed the quiz!`);
+        if (result.passed) {
+        toast(`🎉 Congratulations! You scored ${result.score.toFixed(1)}% and passed the quiz!`, {
+          style: {
+            backgroundColor: '#10B981',
+            color: 'white',
+          },
+          duration: 4000
+        });
       } else {
         toast(`You scored ${result.score.toFixed(1)}%. You need 80% to pass. Try again!`, {
           icon: '📊',
@@ -216,9 +221,15 @@ const StandaloneQuizPage = () => {
         });
       }
       
-    } catch (error) {
-      console.error('Error submitting quiz:', error);
-      toast.error('Failed to submit quiz. Please try again.');
+    } catch (error) {      console.error('Error submitting quiz:', error);
+      toast('Failed to submit quiz. Please try again.', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        },
+        duration: 4000
+      });
     } finally {
       setSubmitting(false);
     }

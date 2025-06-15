@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import BasicInfoStep from './BasicInfoStep';
 import CourseStructureStep from './CourseStructureStep';
 import { createCourse } from '../../../../services/courseApi';
@@ -61,7 +61,13 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     if (!file) return;
     
     if (file.size > 5 * 1024 * 1024) { // 5MB
-      toast.error('Image size must be less than 5MB');
+      toast('Image size must be less than 5MB', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
       return;
     }
     
@@ -101,7 +107,13 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   // Remove item from array field
   const removeArrayField = (fieldName, index) => {
     if (fieldName === 'learningPoints' && courseInfo.learningPoints.length <= 2) {
-      toast.error('At least 2 learning points are required');
+      toast('At least 2 learning points are required', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
       return;
     }
     
@@ -181,7 +193,13 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   // Remove lesson from section
   const removeLesson = (sectionIndex, lessonIndex) => {
     if (sections[sectionIndex].lessons.length <= 1) {
-      toast.error('Each section must have at least one lesson');
+      toast('Each section must have at least one lesson', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
       return;
     }
     
@@ -500,15 +518,33 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       
       // Call createCourse API
       await createCourse(formData);
-      toast.success('Course created successfully!');
+      toast('Course created successfully!', {
+        icon: '🎉',
+        style: {
+          backgroundColor: '#10B981',
+          color: 'white',
+        }
+      });
       navigate('/admin-p/courses');
     } catch (error) {
       console.error('Error creating course:', error);
       if (error.response?.data) {
         console.error('Error response:', error.response.data);
-        toast.error(`Failed to create course: ${JSON.stringify(error.response.data)}`);
+        toast(`Failed to create course: ${JSON.stringify(error.response.data)}`, {
+          icon: '❌',
+          style: {
+            backgroundColor: '#EF4444',
+            color: 'white',
+          }
+        });
       } else {
-        toast.error('Failed to create course. Please try again.');
+        toast('Failed to create course. Please try again.', {
+          icon: '❌',
+          style: {
+            backgroundColor: '#EF4444',
+            color: 'white',
+          }
+        });
       }
     } finally {
       setIsSubmitting(false);
@@ -521,7 +557,13 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     
     // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('File size must be less than 10MB');
+      toast('File size must be less than 10MB', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
       return;
     }
     
@@ -568,7 +610,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       
       {/* Form Content */}
       <form onSubmit={handleSubmit}>
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="sync">
           <motion.div
             key={activeStep}
             initial={{ opacity: 0, y: 20 }}

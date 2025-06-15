@@ -14,12 +14,24 @@ const CourseManagement = () => {
   
   const handleEditCourse = (courseId) => {
     // For future implementation
-    toast.info(`Edit course with ID: ${courseId}`);
+    toast(`Edit course with ID: ${courseId}`, {
+      icon: '📝',
+      style: {
+        backgroundColor: '#3b82f6',
+        color: 'white',
+      }
+    });
   };
   
   const handleDeleteCourse = (courseId) => {
     // For future implementation
-    toast.info(`Delete course with ID: ${courseId}`);
+    toast(`Delete course with ID: ${courseId}`, {
+      icon: '🗑️',
+      style: {
+        backgroundColor: '#3b82f6',
+        color: 'white',
+      }
+    });
   };
   
   return (

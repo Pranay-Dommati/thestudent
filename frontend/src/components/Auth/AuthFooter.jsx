@@ -2,7 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const AuthFooter = () => {
-  return (    <footer className="relative mt-auto bg-white/80 backdrop-blur-sm border-t border-gray-200">
+  return (
+    <footer className="relative mt-auto bg-white/80 backdrop-blur-sm border-t border-gray-200">
       <div className="container mx-auto px-4 py-4">
         <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
           {/* Left side - Links */}
