@@ -124,10 +124,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               id: lessonKey,
               title: video.title,
               type: 'video',
-              videoUrl: video.video_id ? `https://www.youtube.com/embed/${video.video_id}` : 
-                (video.url && video.url.includes('youtube.com/watch?v=') ? 
-                  `https://www.youtube.com/embed/${video.url.split('v=')[1].split('&')[0]}` : 
-                  video.url || ''),
+              // Log every video as it's processed
+              videoUrl: (() => {
+                console.log(`Processing video with ID: ${video.video_id}`);
+                // Return the ID directly for better compatibility with the LessonVideo component
+                return video.video_id;
+              })(),
               description: video.description || "",
               completed: isCompleted,
               isAIGenerated: true,
@@ -733,13 +735,26 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         [chapterIndex]: true
       }));
     }
-  };
-  // Update content type based on current lesson type
+  };  // Update content type based on current lesson type
   useEffect(() => {
     const currentLesson = getCurrentLesson();
     console.log('🎯 Current lesson for content type detection:', currentLesson);
+    
     if (currentLesson && currentLesson.type) {
       console.log('🎮 Setting content type based on lesson type:', currentLesson.type);
+      
+      // Debug video URL if present
+      if (currentLesson.type === 'video') {
+        console.log('🎬 Video URL details:', {
+          videoUrl: currentLesson.videoUrl,
+          type: typeof currentLesson.videoUrl,
+          video_id: currentLesson.video_id,
+          hasVideoIdProperty: currentLesson.videoUrl && 
+            typeof currentLesson.videoUrl === 'object' && 
+            currentLesson.videoUrl.video_id ? true : false
+        });
+      }
+      
       // Map lesson types to content types
       switch (currentLesson.type) {
         case 'quiz':
