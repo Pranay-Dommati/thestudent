@@ -185,4 +185,4 @@ SIMPLE_JWT = {
 # API Keys for third-party services
 # In production, these should be set as environment variables
 HUGGINGFACE_API_TOKEN = os.environ.get('HUGGINGFACE_API_TOKEN', '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')
-YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', 'AIzaSyB5RYfafKGA0xlqNb8Q28iygXZUTnEynFo')
+YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', 'AIzaSyBLn33rjtp5aRamO-hO6-yEWKcgxuvjepI')

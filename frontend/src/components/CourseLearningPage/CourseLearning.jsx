@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
@@ -97,6 +97,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       
       // Load existing progress data if available
       const existingProgress = planData.plan_data.progress || {};
+        // Apply duplicate video filtering to the plan data first
+      console.log('Filtering duplicate videos across all days...');
+      const filteredDays = filterDuplicateVideos(planData.plan_data.days);
+      
+      // Use the filtered days data instead of the original
+      planData.plan_data.days = filteredDays;
       
       // Transform days into chapters with progress loading
       const transformedPlan = {
@@ -1220,6 +1226,91 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       </div>
     </div>
   );
+};
+
+// Utility function to extract YouTube video ID from various formats
+const extractVideoId = (url) => {
+  if (!url) return null;
+  
+  // If already a direct video ID (11 chars)
+  if (typeof url === 'string' && /^[\w-]{11}$/.test(url)) {
+    return url;
+  }
+  
+  // If it's an object with video_id property
+  if (typeof url === 'object' && url !== null && url.video_id) {
+    return url.video_id;
+  }
+  
+  // If it's a string URL, extract ID from various YouTube URL formats
+  if (typeof url === 'string') {
+    const regexPatterns = [
+      /(?:youtube\.com\/(?:watch\?v=|v\/|embed\/)|youtu\.be\/)([\w-]{11})/,
+      /youtube\.com\/embed\/([\w-]{11})/,
+      /youtu\.be\/([\w-]{11})/
+    ];
+    
+    for (const regex of regexPatterns) {
+      const match = url.match(regex);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+  }
+  
+  return null;
+};
+
+// Function to filter duplicate videos from course content
+const filterDuplicateVideos = (courseDays) => {
+  if (!courseDays || !Array.isArray(courseDays)) {
+    console.warn('Invalid course days data provided to filterDuplicateVideos');
+    return courseDays;
+  }
+  
+  const usedVideoIds = new Set();
+  let totalVideos = 0;
+  let duplicatesFound = 0;
+  let failedExtraction = 0;
+  
+  // Deep clone to avoid modifying original data
+  const filteredDays = JSON.parse(JSON.stringify(courseDays));
+  
+  filteredDays.forEach(day => {
+    if (day.videos && Array.isArray(day.videos)) {
+      const originalLength = day.videos.length;
+      
+      // Filter out duplicates
+      day.videos = day.videos.filter(video => {
+        totalVideos++;
+        const videoId = extractVideoId(video.video_id || video.url);
+        
+        if (!videoId) {
+          failedExtraction++;
+          return true; // Keep videos where we can't determine the ID
+        }
+        
+        if (usedVideoIds.has(videoId)) {
+          duplicatesFound++;
+          return false; // Remove duplicate
+        }
+        
+        usedVideoIds.add(videoId);
+        return true; // Keep unique video
+      });
+      
+      console.log(`Day ${day.day}: Filtered ${originalLength - day.videos.length} duplicate videos`);
+    }
+  });
+  
+  console.log('Video deduplication summary:', {
+    totalVideosProcessed: totalVideos,
+    uniqueVideos: usedVideoIds.size,
+    duplicatesRemoved: duplicatesFound,
+    failedIdExtraction: failedExtraction
+  });
+  
+  return filteredDays;
 };
 
 export default CourseLearning;
