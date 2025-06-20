@@ -24,6 +24,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [activeLesson, setActiveLesson] = useState(0);
   const [expandedChapters, setExpandedChapters] = useState({});
   const [activeTab, setActiveTab] = useState('about');
+  const [aiGeneratedContent, setAIGeneratedContent] = useState(null);
+  const [learningPlanOpen, setLearningPlanOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [contentType, setContentType] = useState('video'); // 'video', 'resources', 'quiz', 'instructions'
@@ -579,9 +581,11 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       [index]: !prev[index]
     }));
   };
-
   // Select a lesson
   const selectLesson = (chapterIndex, lessonIndex) => {
+    // Reset AI-generated content when changing lessons
+    setAIGeneratedContent(null);
+    
     setActiveChapter(chapterIndex);
     setActiveLesson(lessonIndex);
     setExpandedChapters(prev => ({
@@ -653,7 +657,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       setCourse(updatedCourse);
     }
   };
-
   // Navigate to next lesson
   const goToNextLesson = async () => {
     if (!course) return;
@@ -663,6 +666,9 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     if (!currentLesson.completed) {
       await markLessonComplete();
     }
+    
+    // Reset AI-generated content when changing lessons
+    setAIGeneratedContent(null);
     
     const currentChapter = course.chapters[activeChapter];
     
@@ -679,10 +685,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       }));
     }
   };
-
   // Navigate to previous lesson
   const goToPrevLesson = () => {
     if (!course) return;
+    
+    // Reset AI-generated content when changing lessons
+    setAIGeneratedContent(null);
     
     if (activeLesson > 0) {
       setActiveLesson(activeLesson - 1);
@@ -731,9 +739,11 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     console.log('❓ Quiz questions:', lesson.quiz_questions);
     console.log('📚 About lesson:', lesson.aboutLesson);
     console.log('📂 Resources:', lesson.resources);
-    
-    // Only update state if we're actually changing lessons to prevent re-renders
+      // Only update state if we're actually changing lessons to prevent re-renders
     if (activeChapter !== chapterIndex || activeLesson !== lessonIndex) {
+      // Reset AI-generated content when changing lessons
+      setAIGeneratedContent(null);
+      
       setActiveChapter(chapterIndex);
       setActiveLesson(lessonIndex);
       setExpandedChapters(prev => ({
@@ -949,10 +959,10 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             
             {/* Video Container */}
             <div className="mb-8">
-              <div ref={videoRef} className="mb-6">
-                <LessonVideo 
+              <div ref={videoRef} className="mb-6">                <LessonVideo 
                   videoUrl={currentLesson?.videoUrl} 
                   title={currentLesson?.title}
+                  onAIContentGenerated={(content) => setAIGeneratedContent(content)}
                 />
               </div>
                 {/* Content Tabs */}
@@ -980,9 +990,73 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                   </button>
                 </nav>
               </div>
-                {/* Tab Content */}
-              <div className="mb-8">                {activeTab === 'about' && (
-                  <div className="prose prose-lg max-w-none markdown-body">                    {currentLesson?.aboutLesson ? (
+                {/* Tab Content */}              <div className="mb-8">                {activeTab === 'about' && (
+                  <div className="prose prose-lg max-w-none markdown-body">                    {aiGeneratedContent ? (
+                      // Use AI-generated content when available
+                      <div>
+                        <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg mb-6">
+                          <h3 className="text-lg font-semibold text-indigo-900 mb-2">{aiGeneratedContent.title}</h3>
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}                            components={{
+                              ul: ({node, ...props}) => <ul className="list-disc pl-5 my-4 space-y-2" {...props} />,
+                              ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-4 space-y-2" {...props} />,
+                              li: ({node, children, ...props}) => {
+                                if (!children || (Array.isArray(children) && children.length === 0) || 
+                                    (typeof children === 'string' && children.trim() === '')) {
+                                  return null;
+                                }
+                                return <li className="ml-2 my-1" {...props}>{children}</li>;
+                              },
+                              h1: ({node, ...props}) => <h1 className="text-2xl font-bold my-4" {...props} />,
+                              h2: ({node, ...props}) => <h2 className="text-xl font-bold my-3" {...props} />,
+                              h3: ({node, ...props}) => <h3 className="text-lg font-bold my-3" {...props} />,
+                              h4: ({node, ...props}) => <h4 className="text-base font-bold my-2" {...props} />,
+                              h5: ({node, ...props}) => <h5 className="text-sm font-bold my-2" {...props} />,
+                              h6: ({node, ...props}) => <h6 className="text-xs font-bold my-2" {...props} />,
+                              p: ({node, children, ...props}) => {
+                                if (!children || (Array.isArray(children) && children.length === 0) || 
+                                    (typeof children === 'string' && children.trim() === '')) {
+                                  return null;
+                                }
+                                return <p className="my-3 leading-relaxed" {...props}>{children}</p>;
+                              },
+                              table: ({node, ...props}) => <table className="min-w-full border border-gray-200 my-4" {...props} />,
+                              thead: ({node, ...props}) => <thead className="bg-gray-50" {...props} />,
+                              tbody: ({node, ...props}) => <tbody className="divide-y divide-gray-200" {...props} />,
+                              tr: ({node, ...props}) => <tr className="hover:bg-gray-50" {...props} />,
+                              th: ({node, ...props}) => <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 uppercase tracking-wider border border-gray-200" {...props} />,
+                              td: ({node, ...props}) => <td className="px-4 py-2 text-sm text-gray-500 border border-gray-200" {...props} />,
+                              code: ({node, inline, className, children, ...props}) => {
+                                if (inline) {
+                                  return <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>
+                                }
+                                return (
+                                  <div className="bg-gray-800 rounded-md my-4">
+                                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700">
+                                      <span className="text-xs text-gray-400">code</span>
+                                    </div>
+                                    <pre className="p-4 overflow-x-auto">
+                                      <code className="text-green-400 text-sm" {...props}>{children}</code>
+                                    </pre>
+                                  </div>
+                                )
+                              },
+                              pre: ({node, children, ...props}) => <>{children}</>,
+                              blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-300 pl-4 my-4 italic text-gray-600" {...props} />,
+                              strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                              em: ({node, ...props}) => <em className="italic" {...props} />,
+                              a: ({node, ...props}) => <a className="text-blue-600 hover:text-blue-800 underline" {...props} />,
+                              hr: ({node, ...props}) => <hr className="my-6 border-gray-300" {...props} />,
+                            }}
+                          >
+                            {aiGeneratedContent.content}
+                          </ReactMarkdown>
+                          <div className="mt-4 text-xs text-gray-500 italic">
+                            This content was generated by AI and may not be 100% accurate.
+                          </div>
+                        </div>
+                      </div>
+                    ) : currentLesson?.aboutLesson ? (
                       // Use actual lesson content if available with proper markdown components
                       <div>
                         <ReactMarkdown

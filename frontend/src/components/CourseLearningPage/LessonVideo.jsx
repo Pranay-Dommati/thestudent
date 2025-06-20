@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { callGeminiAPI } from '../Chatbot/ChatbotAPI';
 
 // YouTube error codes and messages for better user feedback
 const YOUTUBE_ERROR_CODES = {
@@ -66,6 +67,43 @@ const searchYouTubeVideo = async (searchQuery) => {
   }
 };
 
+// Generate AI content when no video is available
+const generateAIContent = async (topic) => {
+  if (!topic) return null;
+  
+  try {
+    console.log(`Generating AI content for topic: ${topic}`);
+    
+    // Create a comprehensive prompt for the AI to generate educational content
+    const prompt = `Create a comprehensive educational markdown guide about "${topic}". 
+    
+Structure your response as a well-formatted markdown document with:
+
+1. A main heading with the topic name
+2. An introductory section explaining the core concepts
+3. 2-3 key sections with subheadings covering important aspects
+4. Use bullet points for lists where appropriate
+5. Include at least one simple table if relevant 
+6. Add emphasis using bold and italics for important terms
+7. Include a brief summary or key takeaways section at the end
+
+Make this educational content informative yet concise (around 300-500 words total).`;
+
+    // Call the Gemini API to generate the content
+    const markdownContent = await callGeminiAPI(prompt);
+    
+    console.log("Successfully generated AI content");
+    return {
+      title: `AI-Generated Guide: ${topic}`,
+      content: markdownContent,
+      isMarkdown: true
+    };
+  } catch (error) {
+    console.error('Error generating AI content:', error);
+    return generateFallbackContent(topic); // Fallback to basic content if AI generation fails
+  }
+};
+
 // Generate fallback content when videos fail
 const generateFallbackContent = (topic) => {
   if (!topic) return null;
@@ -120,17 +158,20 @@ const generateFallbackContent = (topic) => {
   };
 };
 
-const LessonVideo = ({ videoUrl, title }) => {
+const LessonVideo = ({ videoUrl, title, onAIContentGenerated }) => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [videoId, setVideoId] = useState(null);
   const [fallbackContent, setFallbackContent] = useState(null);
+  const [aiContent, setAIContent] = useState(null);
+  const [aiContentLoading, setAIContentLoading] = useState(false);
 
   useEffect(() => {
     const loadVideo = async () => {
       setLoading(true);
       setError(null);
       setFallbackContent(null);
+      setAIContent(null);
       
       try {
         if (!videoUrl) {
@@ -151,9 +192,27 @@ const LessonVideo = ({ videoUrl, title }) => {
         console.error('Video loading error:', err);
         setError(err.message);
         
-        // Generate fallback content when video fails
+        // Generate basic fallback content immediately
         if (title) {
           setFallbackContent(generateFallbackContent(title));
+            // Generate AI content in background
+          setAIContentLoading(true);
+          generateAIContent(title)
+            .then(content => {
+              if (content) {
+                setAIContent(content);
+                // Notify the parent component about the generated content
+                if (onAIContentGenerated && typeof onAIContentGenerated === 'function') {
+                  onAIContentGenerated(content);
+                }
+              }
+            })
+            .catch(aiError => {
+              console.error('AI content generation error:', aiError);
+            })
+            .finally(() => {
+              setAIContentLoading(false);
+            });
         }
       } finally {
         setLoading(false);
@@ -170,11 +229,39 @@ const LessonVideo = ({ videoUrl, title }) => {
       </div>
     );
   }
+  // If we have AI content, show that as the primary fallback
+  if (error && aiContent) {
+    return (
+      <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-indigo-900">{aiContent.title}</h3>
+          {aiContentLoading && (
+            <div className="animate-pulse rounded-full h-3 w-3 bg-indigo-600"></div>
+          )}
+        </div>
+        
+        <div className="prose prose-lg max-w-none markdown-body">
+          {/* This content will be rendered as markdown by the parent component's ReactMarkdown */}
+          <div className="text-gray-700 whitespace-pre-wrap">{aiContent.content}</div>
+        </div>
+      </div>
+    );
+  }
 
+  // Show basic fallback content while AI content might still be loading
   if (error && fallbackContent) {
     return (
       <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p className="text-yellow-700 mb-4">{error}</p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-yellow-700">{error}</p>
+          {aiContentLoading && (
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mr-2"></div>
+              <span className="text-sm text-indigo-600">Generating AI content...</span>
+            </div>
+          )}
+        </div>
+        
         <h3 className="text-lg font-semibold text-gray-800">{fallbackContent.title}</h3>
         <ul className="mt-2 space-y-2">
           {fallbackContent.suggestions.map((suggestion, index) => (
