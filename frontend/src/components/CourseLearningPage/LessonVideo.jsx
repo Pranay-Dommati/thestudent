@@ -232,24 +232,19 @@ const LessonVideo = ({ videoUrl, title, onAIContentGenerated }) => {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
-  }
-  // If we have AI content, show that as the primary fallback
+  }  // If we have AI content, don't display it here - let the parent component handle it in the About tab
   if (error && aiContent) {
     return (
-      <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-indigo-900">{aiContent.title}</h3>
+          <p className="text-blue-700">Video not available, but AI-generated content has been provided in the About section below.</p>
           {aiContentLoading && (
             <div className="animate-pulse rounded-full h-3 w-3 bg-indigo-600"></div>
           )}
-        </div>        <div className="prose prose-lg max-w-none markdown-body text-gray-700">
-          {/* Render markdown content properly using ReactMarkdown */}
-          <ReactMarkdown>{aiContent.content}</ReactMarkdown>
         </div>
       </div>
     );
   }
-
   // Show basic fallback content while AI content might still be loading
   if (error && fallbackContent) {
     return (
@@ -264,12 +259,7 @@ const LessonVideo = ({ videoUrl, title, onAIContentGenerated }) => {
           )}
         </div>
         
-        <h3 className="text-lg font-semibold text-gray-800">{fallbackContent.title}</h3>
-        <ul className="mt-2 space-y-2">
-          {fallbackContent.suggestions.map((suggestion, index) => (
-            <li key={index} className="text-gray-600">{suggestion}</li>
-          ))}
-        </ul>
+        <p className="text-gray-600">Check the About section below for learning resources and content.</p>
       </div>
     );
   }
