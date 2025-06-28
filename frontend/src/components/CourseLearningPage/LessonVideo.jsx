@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { callGeminiAPI } from '../Chatbot/ChatbotAPI';
+import ReactMarkdown from 'react-markdown';
 
 // YouTube error codes and messages for better user feedback
 const YOUTUBE_ERROR_CODES = {
@@ -33,7 +34,10 @@ const extractYouTubeId = (url) => {
 
 // Function to search YouTube videos
 const searchYouTubeVideo = async (searchQuery) => {
-  try {    const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY || 'AIzaSyBLn33rjtp5aRamO-hO6-yEWKcgxuvjepI';
+  try {    
+    // COMMENTED OUT FOR TESTING AI FALLBACK CONTENT
+    // const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY || 'AIzaSyBLn33rjtp5aRamO-hO6-yEWKcgxuvjepI';
+    const apiKey = null; // Force fallback to AI content
     if (!apiKey) {
       throw new Error('YouTube API key not configured');
     }
@@ -238,11 +242,9 @@ const LessonVideo = ({ videoUrl, title, onAIContentGenerated }) => {
           {aiContentLoading && (
             <div className="animate-pulse rounded-full h-3 w-3 bg-indigo-600"></div>
           )}
-        </div>
-        
-        <div className="prose prose-lg max-w-none markdown-body">
-          {/* This content will be rendered as markdown by the parent component's ReactMarkdown */}
-          <div className="text-gray-700 whitespace-pre-wrap">{aiContent.content}</div>
+        </div>        <div className="prose prose-lg max-w-none markdown-body text-gray-700">
+          {/* Render markdown content properly using ReactMarkdown */}
+          <ReactMarkdown>{aiContent.content}</ReactMarkdown>
         </div>
       </div>
     );
