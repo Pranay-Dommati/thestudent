@@ -863,10 +863,46 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const currentLesson = getCurrentLesson();
   const completedLessons = course.chapters.reduce(
     (acc, chapter) => acc + chapter.lessons.filter(l => l.completed).length, 0
-  );
-  const totalLessons = course.chapters.reduce(
+  );  const totalLessons = course.chapters.reduce(
     (acc, chapter) => acc + chapter.lessons.length, 0
   );
+  
+  // Function to generate AI content manually for the current lesson
+  const handleGenerateAIContent = async () => {
+    const currentLesson = getCurrentLesson();
+    if (!currentLesson?.title || !currentLesson?.title.trim()) return;
+    
+    try {
+      // Import the generateAIContent function from LessonVideo
+      const { callGeminiAPI } = await import('../Chatbot/ChatbotAPI');
+      
+      const prompt = `Create a comprehensive educational markdown guide about "${currentLesson.title}". 
+      
+Structure your response as a well-formatted markdown document with:
+
+1. A main heading with the topic name
+2. An introductory section explaining the core concepts
+3. 2-3 key sections with subheadings covering important aspects
+4. Use bullet points for lists where appropriate
+5. Include at least one simple table if relevant 
+6. Add emphasis using bold and italics for important terms
+7. Include a brief summary or key takeaways section at the end
+
+Make this educational content informative yet concise (around 300-500 words total).`;
+
+      const markdownContent = await callGeminiAPI(prompt);
+      
+      const content = {
+        title: `AI-Generated Guide: ${currentLesson.title}`,
+        content: markdownContent,
+        isMarkdown: true
+      };
+      
+      setAIGeneratedContent(content);
+    } catch (error) {
+      console.error('Error generating AI content:', error);
+    }
+  };
   
   // Content rendering section in the return statement
   const renderContent = () => {
@@ -905,26 +941,57 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               Try Again
             </button>
           </div>
-        </div>
-      );
+        </div>      );
     }
 
     // Add a special header for AI-generated learning plans
     const aiLearningPlanHeader = isAIGeneratedPlan && (
       <div className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 p-4 rounded-lg border border-indigo-100">
-        <div className="flex items-center">
-          <div className="bg-white p-3 rounded-full mr-4 border border-indigo-200">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="bg-white p-3 rounded-full mr-4 border border-indigo-200">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-indigo-900">AI-Generated Learning Plan</h2>
+              <p className="text-gray-600">This personalized learning journey was created based on your interests and learning goals.</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-indigo-900">AI-Generated Learning Plan</h2>
-            <p className="text-gray-600">This personalized learning journey was created based on your interests and learning goals.</p>
-          </div>
+          
+          {/* Generate AI Content Button */}
+          <div className="ml-4">
+            <button
+              onClick={handleGenerateAIContent}
+              disabled={aiGeneratedContent}
+              className={`px-4 py-2 text-sm font-medium rounded-lg flex items-center space-x-2 transition-colors ${
+                aiGeneratedContent 
+                  ? 'bg-green-100 text-green-700 cursor-default' 
+                  : 'bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200'
+              }`}
+            >
+              {aiGeneratedContent ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>AI Content Generated</span>
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>Generate AI Content</span>
+                </>
+              )}
+            </button>          </div>
         </div>
       </div>
-    );    switch (contentType) {
+    );
+    
+    switch (contentType) {
       case 'resources':
         return <ResourcesPage lessonResources={currentLesson?.resources} />; 
 

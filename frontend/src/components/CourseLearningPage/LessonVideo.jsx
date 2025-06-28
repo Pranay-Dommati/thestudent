@@ -35,12 +35,7 @@ const extractYouTubeId = (url) => {
 // Function to search YouTube videos
 const searchYouTubeVideo = async (searchQuery) => {
   try {    
-    // COMMENTED OUT FOR TESTING AI FALLBACK CONTENT
-    // const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY || 'AIzaSyBLn33rjtp5aRamO-hO6-yEWKcgxuvjepI';
-    const apiKey = null; // Force fallback to AI content
-    if (!apiKey) {
-      throw new Error('YouTube API key not configured');
-    }
+    const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY || 'AIzaSyBLn33rjtp5aRamO-hO6-yEWKcgxuvjepI';
 
     const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchQuery)}&type=video&maxResults=1&key=${apiKey}`;
     const response = await fetch(apiUrl);
@@ -274,11 +269,9 @@ const LessonVideo = ({ videoUrl, title, onAIContentGenerated }) => {
       </div>
     );
   }
-
   if (!videoId) {
     return null;
   }
-
   return (
     <div className="relative pt-[56.25%] w-full">
       <iframe
