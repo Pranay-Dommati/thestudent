@@ -897,7 +897,7 @@ Format as a structured list with clear categories.`;
   // Enhanced loading component
   const LoadingComponent = () => (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
+      <div className="w-full max-w-md">
         <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 text-center relative overflow-hidden">
           {/* Background decoration */}
           <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-transparent to-purple-50 opacity-50"></div>
@@ -1204,12 +1204,12 @@ Format as a structured list with clear categories.`;
             </div>
             
             {/* Enhanced Video Grid */}
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-1">
+            <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {content.videos.map((video, index) => (
                 <div key={video.id} className="group bg-white border border-gray-200 rounded-2xl hover:shadow-xl transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
-                  <div className="flex flex-col lg:flex-row">
+                  <div className="flex flex-col">
                     {/* Video Thumbnail */}
-                    <div className="relative lg:w-80 h-48 lg:h-auto overflow-hidden">
+                    <div className="relative h-48 overflow-hidden">
                       <img 
                         src={video.thumbnail} 
                         alt={video.title}
@@ -1237,7 +1237,7 @@ Format as a structured list with clear categories.`;
                         <h3 className="font-bold text-gray-900 text-lg line-clamp-2 group-hover:text-red-600 transition-colors">
                           {video.title}
                         </h3>
-                        <div className="ml-4 flex-shrink-0">
+                        <div className="ml-2 flex-shrink-0">
                           <div className="flex items-center bg-yellow-100 px-2 py-1 rounded-full">
                             <IoStar className="text-yellow-500 mr-1" />
                             <span className="text-sm font-semibold text-yellow-700">{video.rating}</span>
@@ -1247,7 +1247,7 @@ Format as a structured list with clear categories.`;
                       
                       <div className="flex items-center text-gray-600 mb-4">
                         <FaYoutube className="text-red-500 mr-2" />
-                        <span className="font-medium">{video.channel}</span>
+                        <span className="font-medium text-sm">{video.channel}</span>
                       </div>
                       
                       <div className="flex items-center justify-between mb-4">
@@ -1264,15 +1264,15 @@ Format as a structured list with clear categories.`;
                       </div>
                       
                       {/* Action buttons */}
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2">
                         <a 
                           href={video.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-1 flex items-center justify-center px-4 py-2 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
+                          className="flex-1 flex items-center justify-center px-3 py-2 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg text-sm"
                         >
-                          <IoPlayCircle className="mr-2" />
-                          Watch Now
+                          <IoPlayCircle className="mr-1" />
+                          Watch
                         </a>
                         <button className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
                           <IoBookmark className="text-lg" />
@@ -1579,7 +1579,7 @@ Format as a structured list with clear categories.`;
             </div>
             
             {/* Compact Resources Grid */}
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {content.resources.map((resource, index) => {
                 const IconComponent = resource.icon;
                 return (
@@ -1679,7 +1679,7 @@ Format as a structured list with clear categories.`;
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
       {/* Enhanced Header */}
       <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-2 sm:px-4 lg:px-6">
           <div className="flex items-center justify-between h-16">
             {/* Left section */}
             <div className="flex items-center">
@@ -1803,9 +1803,9 @@ Format as a structured list with clear categories.`;
       )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="w-full px-2 sm:px-4 lg:px-6 py-4">
         {/* Enhanced Tab Navigation */}
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border mb-8 hidden md:block">
+        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border mb-6 hidden md:block">
           <div className="p-2">
             <nav className="flex space-x-2" aria-label="Tabs">
               {tabs.map((tab) => {
@@ -1841,7 +1841,7 @@ Format as a structured list with clear categories.`;
         </div>
 
         {/* Mobile Tab Indicator */}
-        <div className="md:hidden mb-6">
+        <div className="md:hidden mb-4">
           <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
@@ -1869,7 +1869,7 @@ Format as a structured list with clear categories.`;
 
         {/* Tab Content */}
         <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border overflow-hidden">
-          <div className="p-6 lg:p-8">
+          <div className="p-4 lg:p-6">
             {renderTabContent()}
           </div>
         </div>
