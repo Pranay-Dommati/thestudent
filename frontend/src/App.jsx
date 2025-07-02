@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import HomePage from './components/HomePage/HomePage';
 import Courses from './components/Courses/Courses';
 import ChatBotPage from './components/Chatbot/ChatbotPage';
+import ProLearningPage from './components/ProLearning/ProLearningPage';
 import CourseDetailsPage from './components/CourseDetails/CourseDetailsPage/CourseDetailsPage';
 import CourseLearningPage from './components/CourseLearningPage/CourseLearningPage';
 import LearningHubPage from './components/LearningHub/LearningHubPage';
@@ -160,6 +161,7 @@ const App = () => {
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/privacy" element={<Navigate to="/privacy-policy" />} />
             <Route path="/chat" element={<ChatBotPage />} />
+            <Route path="/pro-learning" element={<ProLearningPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
             <Route path="/learning-hub" element={

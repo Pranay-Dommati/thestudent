@@ -317,7 +317,7 @@ const ChatbotPage = () => {
   const initialQuery = searchParams.get("q");
 
   const [message, setMessage] = useState("");
-  const [createCourseMode, setCreateCourseMode] = useState(false);
+  const [proMode, setProMode] = useState(false);
   const [chatHistory, setChatHistory] = useState([
     {
       id: 1,
@@ -392,103 +392,28 @@ const ChatbotPage = () => {
 
     setChatHistory((prev) => [...prev, userMessageObj]);
     if (!customMessage) setMessage("");
-    setIsLoading(true);    try {
-      console.log('Create Course Mode:', createCourseMode);
+    setIsLoading(true);
+
+    try {
+      console.log('Pro Mode:', proMode);
       console.log('Message:', messageToSend);
 
-      // Only generate learning plans with YouTube videos if Create Course Mode is ON
-      if (createCourseMode) {
-        // Generate a learning plan using the new API
-        const planResult = await generateLearningPlan(messageToSend);
-        
-        if (planResult.success) {
-          // Format the learning plan response
-          let formattedContent;
-          
-          if (planResult.data.days) {
-            // Format from Django backend response
-            formattedContent = `# Learning Plan: ${planResult.data.title}\n\n`;
-            
-            planResult.data.days.forEach(day => {
-              formattedContent += `## Day ${day.day}: ${day.topic}\n\n`;
-              formattedContent += `**Project idea:** ${day.project_idea}\n\n`;
-              
-              if (day.videos && day.videos.length > 0) {
-                formattedContent += '**Recommended videos:**\n';
-                day.videos.forEach(video => {
-                  // Make sure we have a valid video ID before adding the link
-                  if (video.video_id || video.id) {
-                    const videoId = video.video_id || video.id;
-                    formattedContent += `- [${video.title}](https://www.youtube.com/watch?v=${videoId})\n`;
-                  } else {
-                    // Fallback for videos without IDs
-                    formattedContent += `- ${video.title}\n`;
-                  }
-                });
-                formattedContent += '\n';
-              }
-            });
-
-            // --- AUTO SAVE AI-GENERATED PLAN TO BACKEND ---
-            import("./ChatbotAPI").then(({ saveLearningPlanToDatabase }) => {
-              saveLearningPlanToDatabase(planResult.data)
-                .then(() => {
-                  if (window.toast) window.toast.success("AI learning plan saved to your account!");
-                })
-                .catch(() => {
-                  if (window.toast) window.toast.error("Failed to save AI plan. Please log in.");
-                });
-            });
-            // --- END AUTO SAVE ---
-
-          } else {
-            // Format from direct API response
-            formattedContent = `# Learning Path: ${planResult.data.title}\n\n`;
-            
-            if (planResult.data.sections) {
-              planResult.data.sections.forEach((section, index) => {
-                formattedContent += `## ${section.name}\n\n`;
-                
-                if (section.lessons) {
-                  section.lessons.forEach(lesson => {
-                    formattedContent += `- [${lesson.title}](https://www.youtube.com/results?search_query=${encodeURIComponent(lesson.title)})\n`;
-                  });
-                  formattedContent += '\n';
-                }
-              });
-            }
-          }
-          
-          const botResponse = {
-            id: chatHistory.length + 2,
-            type: "bot",
-            content: formattedContent,
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            isLearningPlan: true,
-            learningPlanId: planResult.data.id || null
-          };
-          
-          setChatHistory((prev) => [...prev, botResponse]);        } else {
-          // Fallback to regular chatbot response if learning plan generation failed
-          const response = await callGeminiAPI(messageToSend, { createCourse: true });
-          
-          console.log("Fallback chat response received:");
-          console.log("Response type:", typeof response);
-          console.log("Response value:", response);
-          
-          const botResponse = {
-            id: chatHistory.length + 2,
-            type: "bot",
-            content: typeof response === 'string' ? response : String(response),
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          };
-          
-          setChatHistory((prev) => [...prev, botResponse]);
-        }} else {
-        // Regular chatbot response - NO learning plans, NO YouTube videos, just AI text
+      if (proMode) {
+        // Pro mode - show redirect card
+        const proResponse = {
+          id: chatHistory.length + 2,
+          type: "bot",
+          content: `I'll create a comprehensive learning experience for "${messageToSend}". Click the card below to access detailed reading materials, summaries, videos, quizzes, and resources.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          isProCard: true,
+          topic: messageToSend,
+        };
+        setChatHistory((prev) => [...prev, proResponse]);
+      } else {
+        // Regular chatbot response - just AI text
         const response = await callGeminiAPI(messageToSend, { createCourse: false });
         
-        console.log("Regular chat response received:");
+        console.log("Chat response received:");
         console.log("Response type:", typeof response);
         console.log("Response value:", response);
 
@@ -519,6 +444,7 @@ const ChatbotPage = () => {
     const isCourseContent = message.content.includes("# ") && message.content.includes("## ");
     const sections = isCourseContent ? parseMarkdownResponse(message.content) : [];
     const isLearningPlan = message.isLearningPlan || (message.content.includes("Learning Plan") && message.content.includes("Day "));
+    const isProCard = message.isProCard || false;
 
     return (
       <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"} mb-3 lg:mb-4 px-1`}>
@@ -526,12 +452,12 @@ const ChatbotPage = () => {
           className={`rounded-lg py-2 px-3 lg:px-4 ${
             message.type === "user"
               ? "bg-blue-600 text-white rounded-br-none max-w-[85%] lg:max-w-[80%] ml-8 lg:ml-12"
-              : isLearningPlan 
+              : isLearningPlan || isProCard
                 ? "bg-white w-full lg:w-5/6" 
                 : "bg-gray-100 text-gray-800 rounded-bl-none max-w-[85%] lg:max-w-[80%] mr-8 lg:mr-12"
           } shadow-sm`}
         >
-          {message.type === "bot" && !isCourseContent && !isLearningPlan && (
+          {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
             <div className="prose prose-sm lg:prose max-w-none dark:prose-invert">
               <ReactMarkdown>
                 {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
@@ -539,7 +465,7 @@ const ChatbotPage = () => {
             </div>
           )}
 
-          {message.type === "bot" && isCourseContent && !isLearningPlan && (
+          {message.type === "bot" && isCourseContent && !isLearningPlan && !isProCard && (
             <div className="mt-2">
               {sections.map((section, index) => (
                 <CourseSection
@@ -557,12 +483,43 @@ const ChatbotPage = () => {
             </div>
           )}
 
+          {message.type === "bot" && isProCard && (
+            <div className="w-full">
+              <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 mb-2">
+                <div className="text-sm text-gray-700 mb-4">{message.content}</div>
+                <Link 
+                  to={`/pro-learning?topic=${encodeURIComponent(message.topic)}`}
+                  className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold mb-1">🚀 Pro Learning Experience</h3>
+                      <p className="text-purple-100 text-sm">Complete study materials for: {message.topic}</p>
+                      <div className="flex items-center mt-2 text-xs text-purple-200">
+                        <span className="mr-4">📘 Reading</span>
+                        <span className="mr-4">🧠 Summary</span>
+                        <span className="mr-4">🎥 Videos</span>
+                        <span className="mr-4">✅ Quiz</span>
+                        <span>📚 Resources</span>
+                      </div>
+                    </div>
+                    <div className="bg-white/20 p-3 rounded-full">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </div>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          )}
+
           {message.type === "user" && <div className="text-sm lg:text-base">{message.content}</div>}
 
           <div className={`text-[10px] lg:text-xs mt-1 ${
             message.type === "user" 
               ? "text-blue-200" 
-              : isLearningPlan 
+              : isLearningPlan || isProCard
                 ? "text-gray-400 pl-2" 
                 : "text-gray-500"
           }`}>
@@ -710,17 +667,17 @@ const ChatbotPage = () => {
           {/* Input Section */}
           <div className="p-3 lg:p-4 bg-white border-t border-gray-200">
             <div className="max-w-4xl mx-auto">
-              {/* Create Course Toggle */}
+              {/* Enable Pro Toggle */}
               <div className="mb-3">
                 <div 
-                  onClick={() => setCreateCourseMode(!createCourseMode)}
+                  onClick={() => setProMode(!proMode)}
                   className={`inline-block cursor-pointer px-4 py-2 rounded-full text-sm lg:text-base text-center transition-colors ${
-                    createCourseMode 
-                      ? 'bg-blue-100 text-blue-700 font-medium' 
+                    proMode 
+                      ? 'bg-purple-100 text-purple-700 font-medium' 
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  Create Course
+                  Enable Pro
                 </div>
               </div>
               
