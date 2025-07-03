@@ -4,7 +4,6 @@ import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle } from "react-icons
 import { FaRobot, FaHistory } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
-import { callGeminiAPI, getYoutubeResources, generateLearningPlan, getLearningPath } from "./ChatbotAPI";
 
 // Add slide-up animation
 const style = document.createElement('style');
@@ -411,7 +410,7 @@ const ChatbotPage = () => {
         setChatHistory((prev) => [...prev, proResponse]);
       } else {
         // Regular chatbot response - just AI text
-        const response = await callGeminiAPI(messageToSend, { createCourse: false });
+        const response = await callGeminiAPI(messageToSend);
         
         console.log("Chat response received:");
         console.log("Response type:", typeof response);
