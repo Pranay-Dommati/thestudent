@@ -28,6 +28,9 @@ import {
   splitMarkdownSections,
   generateProContent,
   generateReadingContent,
+  formatDuration,
+  formatViewCount,
+  formatSubscriberCount,
   generateSummaryContent,
   generateVideosContent,
   generateQuizContent,
@@ -495,22 +498,65 @@ const ProLearningPage = () => {
                   </div>
                   <div>
                     <h2 className="text-lg font-bold text-gray-900">Video Learning</h2>
-                    <p className="text-sm text-gray-600">Curated educational content</p>
+                    <p className="text-sm text-gray-600">
+                      {content.videosMetadata?.source === 'youtube_api' ? 'Live YouTube Data' : 'Curated educational content'}
+                    </p>
                   </div>
                 </div>
                 <div className="hidden md:flex items-center space-x-3 text-xs">
                   <div className="bg-white px-2 py-1 rounded-full shadow-sm">
                     <span className="text-red-600 font-medium">{content.videos.length} videos</span>
                   </div>
+                  {content.videosMetadata?.avgViewCount && (
+                    <div className="bg-white px-2 py-1 rounded-full shadow-sm">
+                      <span className="text-gray-600">
+                        Avg: {formatViewCount(content.videosMetadata.avgViewCount)}
+                      </span>
+                    </div>
+                  )}
                   <div className="bg-white px-2 py-1 rounded-full shadow-sm">
                     <span className="text-gray-600">HD Quality</span>
                   </div>
                   <div className="flex items-center text-gray-600">
                     <FaYoutube className="text-red-500 mr-1" />
-                    <span>YouTube Curated</span>
+                    <span>
+                      {content.videosMetadata?.source === 'youtube_api' ? 'Real YouTube Data' : 'YouTube Curated'}
+                    </span>
                   </div>
                 </div>
               </div>
+              
+              {/* Video Stats Summary */}
+              {content.videosMetadata?.source === 'youtube_api' && content.videos.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-red-200">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-red-600">
+                        {content.videos.reduce((sum, v) => sum + (v.viewCount || 0), 0).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600">Total Views</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-purple-600">
+                        {content.videos.reduce((sum, v) => sum + (v.subscriberCount || 0), 0).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600">Total Subscribers</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-green-600">
+                        {content.videosMetadata.totalDuration || 0} min
+                      </div>
+                      <div className="text-xs text-gray-600">Total Duration</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-blue-600">
+                        {content.videos.filter(v => v.isEducationalChannel).length}
+                      </div>
+                      <div className="text-xs text-gray-600">Verified Channels</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             
             {/* Enhanced Video Grid */}
@@ -533,7 +579,7 @@ const ProLearningPage = () => {
                       </div>
                       {/* Duration badge */}
                       <div className="absolute bottom-3 right-3 bg-black/80 text-white px-2 py-1 rounded-lg text-sm font-medium">
-                        {video.duration}
+                        {video.formattedDuration || formatDuration(video.duration) || video.duration + ' min'}
                       </div>
                       {/* Quality badge */}
                       <div className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold">
@@ -548,30 +594,67 @@ const ProLearningPage = () => {
                           {video.title}
                         </h3>
                         <div className="ml-2 flex-shrink-0">
-                          <div className="flex items-center bg-yellow-100 px-2 py-1 rounded-full">
-                            <IoStar className="text-yellow-500 mr-1" />
-                            <span className="text-sm font-semibold text-yellow-700">{video.rating}</span>
-                          </div>
+                          {video.isEducationalChannel && (
+                            <div className="flex items-center bg-blue-100 px-2 py-1 rounded-full">
+                              <IoCheckmarkCircle className="text-blue-500 mr-1 text-xs" />
+                              <span className="text-xs font-semibold text-blue-700">Verified</span>
+                            </div>
+                          )}
+                          {video.difficulty && (
+                            <div className={`mt-1 px-2 py-1 rounded-full text-xs font-medium ${
+                              video.difficulty === 'Beginner' ? 'bg-green-100 text-green-700' :
+                              video.difficulty === 'Intermediate' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {video.difficulty}
+                            </div>
+                          )}
                         </div>
                       </div>
                       
                       <div className="flex items-center text-gray-600 mb-4">
                         <FaYoutube className="text-red-500 mr-2" />
-                        <span className="font-medium text-sm">{video.channel}</span>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm">{video.channel}</span>
+                          {video.formattedSubscriberCount && (
+                            <span className="text-xs text-gray-500">{video.formattedSubscriberCount}</span>
+                          )}
+                        </div>
                       </div>
                       
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center space-x-4 text-sm text-gray-500">
                           <div className="flex items-center">
                             <IoEye className="mr-1" />
-                            <span>{video.views} views</span>
+                            <span>{video.formattedViewCount || (video.viewCount ? formatViewCount(video.viewCount) : video.views + ' views')}</span>
                           </div>
                           <div className="flex items-center">
                             <BiTime className="mr-1" />
-                            <span>{video.duration}</span>
+                            <span>{video.formattedDuration || formatDuration(video.duration) || video.duration + ' min'}</span>
                           </div>
                         </div>
                       </div>
+                      
+                      {/* Video Description/Key Topics */}
+                      {video.description && (
+                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                          {video.description}
+                        </p>
+                      )}
+                      
+                      {/* Key Topics Tags */}
+                      {video.keyTopics && video.keyTopics.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-4">
+                          {video.keyTopics.slice(0, 3).map((topic, idx) => (
+                            <span 
+                              key={idx}
+                              className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
+                            >
+                              {topic}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       
                       {/* Action buttons */}
                       <div className="flex items-center space-x-2">
