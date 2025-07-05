@@ -12,8 +12,16 @@ export {
   filterResourcesByDifficulty, 
   filterFreeResources, 
   getResourcesByRating, 
-  searchResources 
+  searchResources,
+  getResourceIcon,
+  addIconsToResources
 } from './resourcesContentService.js';
 
 // Re-export utility functions for videos
-export { formatDuration, filterVideosByDifficulty, getVideosByTopic } from './videosContentService.js';
+export { 
+  formatDuration, 
+  formatViewCount, 
+  formatSubscriberCount, 
+  filterVideosByDifficulty, 
+  getVideosByTopic 
+} from './videosContentService.js';

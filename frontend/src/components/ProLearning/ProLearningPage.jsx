@@ -3,13 +3,15 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { 
   IoHome, IoChevronBack, IoPlayCircle, IoBookmark, IoDownload, 
   IoCheckmarkCircle, IoTime, IoEye, IoStar, IoSparkles, IoRocket, 
-  IoTrendingUp, IoMenu, IoClose, IoChevronDown, IoShare 
+  IoTrendingUp, IoMenu, IoClose, IoChevronDown, IoShare, IoStatsChart
 } from "react-icons/io5";
 import { 
   FaRobot, FaYoutube, FaGithub, FaFilePdf, FaExternalLinkAlt, 
   FaBookOpen, FaBrain, FaVideo, FaQuestionCircle, FaLink, 
   FaGraduationCap, FaClock, FaUsers, FaChartLine, FaLightbulb,
-  FaBolt, FaBullseye, FaCheck, FaTrophy
+  FaBolt, FaBullseye, FaCheck, FaTrophy, FaBook, FaNewspaper,
+  FaCode, FaDownload, FaBookmark, FaCertificate, FaLaptopCode,
+  FaStar
 } from "react-icons/fa";
 import { 
   BiLoaderAlt, BiTrophy, BiCode, BiTargetLock, BiCheckShield,
@@ -28,9 +30,6 @@ import {
   splitMarkdownSections,
   generateProContent,
   generateReadingContent,
-  formatDuration,
-  formatViewCount,
-  formatSubscriberCount,
   generateSummaryContent,
   generateVideosContent,
   generateQuizContent,
@@ -41,11 +40,38 @@ import {
   prevQuestion,
   toggleBookmark
 } from './ProLearningLogic';
+import {
+  formatDuration,
+  formatViewCount,
+  formatSubscriberCount,
+  getResourceIcon
+} from './services/index.js';
 
 const ProLearningPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const topic = searchParams.get("topic") || "Learning Topic";
+
+  // Map icon names to actual React components
+  const getIconComponent = (iconName) => {
+    const iconMap = {
+      'FaBookOpen': FaBookOpen,
+      'FaGraduationCap': FaGraduationCap,
+      'FaVideo': FaVideo,
+      'FaCode': FaCode,
+      'FaDownload': FaDownload,
+      'FaBook': FaBook,
+      'FaNewspaper': FaNewspaper,
+      'FaLaptopCode': FaLaptopCode,
+      'FaUsers': FaUsers,
+      'FaBookmark': FaBookmark,
+      'FaYoutube': FaYoutube,
+      'FaCertificate': FaCertificate,
+      'FaExternalLinkAlt': FaExternalLinkAlt,
+      'FaStar': FaStar
+    };
+    return iconMap[iconName] || FaExternalLinkAlt;
+  };
   
   const [activeTab, setActiveTab] = useState("reading");
   const [isLoading, setIsLoading] = useState(true);
@@ -938,128 +964,288 @@ const ProLearningPage = () => {
 
       case "resources":
         return (
-          <div>
+          <div className="space-y-6">
             {/* Compact Resources Header */}
-            <div className="bg-gradient-to-r from-cyan-50 via-blue-50 to-cyan-100 border border-cyan-200 rounded-xl p-4 mb-6 shadow-sm">
+            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 rounded-2xl p-6 text-white shadow-xl">
               <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-lg flex items-center justify-center shadow-lg mr-3">
-                    <FaLink className="text-sm" />
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
+                    <FaLink className="text-xl text-white" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-gray-900">Additional Resources</h2>
-                    <p className="text-sm text-gray-600">Curated links and materials for deeper learning</p>
+                    <h2 className="text-2xl font-bold mb-1">Learning Resources</h2>
+                    <p className="text-indigo-100 text-sm">
+                      Curated materials for {topic} mastery
+                    </p>
                   </div>
                 </div>
-                <div className="hidden md:flex items-center space-x-3 text-xs">
-                  <div className="bg-white px-2 py-1 rounded-full shadow-sm">
-                    <span className="text-cyan-600 font-medium">{content.resources.length} resources</span>
+                <div className="hidden lg:flex items-center space-x-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">{content.resources.length}</div>
+                    <div className="text-indigo-200 text-xs">Resources</div>
                   </div>
-                  <div className="flex items-center text-gray-600">
-                    <IoSparkles className="mr-1 text-blue-500" />
-                    <span>Handpicked</span>
-                  </div>
-                  <div className="flex items-center text-gray-600">
-                    <FaGithub className="mr-1 text-cyan-600" />
-                    <span>GitHub</span>
-                  </div>
-                  <div className="flex items-center text-gray-600">
-                    <FaFilePdf className="mr-1 text-blue-600" />
-                    <span>Docs</span>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">⭐</div>
+                    <div className="text-indigo-200 text-xs">Quality</div>
                   </div>
                 </div>
               </div>
+              
+              {/* Resource Categories */}
+              <div className="mt-4 flex flex-wrap gap-2">
+                {content.resourcesMetadata?.categories?.map((category, index) => (
+                  <span
+                    key={index}
+                    className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 text-xs font-medium text-white"
+                  >
+                    {category}
+                  </span>
+                )) || ['Documentation', 'Tutorials', 'Community', 'Tools'].map((cat, index) => (
+                  <span
+                    key={index}
+                    className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 text-xs font-medium text-white"
+                  >
+                    {cat}
+                  </span>
+                ))}
+              </div>
             </div>
             
-            {/* Compact Resources Grid */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            {/* Compact Professional Resources Grid */}
+            <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
               {content.resources.map((resource, index) => {
-                const IconComponent = resource.icon;
+                const iconName = getResourceIcon(resource.type);
+                const IconComponent = getIconComponent(iconName);
+                
+                // Define type-specific styling
+                const getTypeStyles = (type) => {
+                  const typeStyles = {
+                    'Documentation': {
+                      gradient: 'from-blue-500 to-indigo-600',
+                      bgColor: 'bg-blue-50',
+                      borderColor: 'border-blue-200',
+                      textColor: 'text-blue-700',
+                      badgeColor: 'bg-blue-100 text-blue-800'
+                    },
+                    'Tutorial': {
+                      gradient: 'from-green-500 to-emerald-600',
+                      bgColor: 'bg-green-50',
+                      borderColor: 'border-green-200',
+                      textColor: 'text-green-700',
+                      badgeColor: 'bg-green-100 text-green-800'
+                    },
+                    'Course': {
+                      gradient: 'from-purple-500 to-violet-600',
+                      bgColor: 'bg-purple-50',
+                      borderColor: 'border-purple-200',
+                      textColor: 'text-purple-700',
+                      badgeColor: 'bg-purple-100 text-purple-800'
+                    },
+                    'Tool': {
+                      gradient: 'from-orange-500 to-red-600',
+                      bgColor: 'bg-orange-50',
+                      borderColor: 'border-orange-200',
+                      textColor: 'text-orange-700',
+                      badgeColor: 'bg-orange-100 text-orange-800'
+                    },
+                    'Community': {
+                      gradient: 'from-pink-500 to-rose-600',
+                      bgColor: 'bg-pink-50',
+                      borderColor: 'border-pink-200',
+                      textColor: 'text-pink-700',
+                      badgeColor: 'bg-pink-100 text-pink-800'
+                    },
+                    'Book': {
+                      gradient: 'from-amber-500 to-yellow-600',
+                      bgColor: 'bg-amber-50',
+                      borderColor: 'border-amber-200',
+                      textColor: 'text-amber-700',
+                      badgeColor: 'bg-amber-100 text-amber-800'
+                    },
+                    'Article': {
+                      gradient: 'from-cyan-500 to-teal-600',
+                      bgColor: 'bg-cyan-50',
+                      borderColor: 'border-cyan-200',
+                      textColor: 'text-cyan-700',
+                      badgeColor: 'bg-cyan-100 text-cyan-800'
+                    }
+                  };
+                  return typeStyles[type] || typeStyles['Documentation'];
+                };
+                
+                const styles = getTypeStyles(resource.type);
+                
                 return (
-                  <a
+                  <div
                     key={resource.id}
-                    href={resource.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-cyan-200 transform hover:-translate-y-2"
+                    className={`group relative bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border ${styles.borderColor} overflow-hidden transform hover:-translate-y-1`}
                   >
-                    {/* Resource Header */}
-                    <div className="flex items-start mb-6">
-                      <div className="relative">
-                        <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                          <IconComponent className="text-2xl" />
-                        </div>
-                        <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-md">
-                          <span className="text-white text-xs font-bold">#{index + 1}</span>
-                        </div>
+                    {/* Resource Number Badge */}
+                    <div className="absolute top-3 right-3 z-10">
+                      <div className={`w-6 h-6 bg-gradient-to-r ${styles.gradient} rounded-full flex items-center justify-center shadow-md`}>
+                        <span className="text-white text-xs font-bold">{index + 1}</span>
                       </div>
-                      
-                      <div className="ml-4 flex-1">
-                        <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold mb-3 ${
-                          resource.type === 'documentation' ? 'bg-blue-100 text-blue-800' :
-                          resource.type === 'tutorial' ? 'bg-green-100 text-green-800' :
-                          resource.type === 'course' ? 'bg-purple-100 text-purple-800' :
-                          resource.type === 'project' ? 'bg-orange-100 text-orange-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {resource.type.toUpperCase()}
+                    </div>
+                    
+                    {/* Header Section */}
+                    <div className={`${styles.bgColor} p-4`}>
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-12 h-12 bg-gradient-to-r ${styles.gradient} rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-300`}>
+                          <IconComponent className="text-lg text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${styles.badgeColor}`}>
+                              {resource.type}
+                            </span>
+                            {resource.free ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                FREE
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                PAID
+                              </span>
+                            )}
+                          </div>
+                          <h3 className={`text-lg font-bold ${styles.textColor} line-clamp-2 group-hover:text-gray-900 transition-colors`}>
+                            {resource.title}
+                          </h3>
                         </div>
                       </div>
                     </div>
                     
-                    {/* Resource Content */}
-                    <div className="mb-6">
-                      <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-cyan-600 transition-colors leading-tight line-clamp-2">
-                        {resource.title}
-                      </h3>
-                      <p className="text-gray-600 leading-relaxed line-clamp-4 mb-4">
+                    {/* Content Section */}
+                    <div className="p-4">
+                      <p className="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-2">
                         {resource.description}
                       </p>
-                    </div>
-                    
-                    {/* Resource Footer */}
-                    <div className="flex items-center justify-between pt-6 border-t border-gray-100">
-                      <div className="flex items-center text-gray-500 text-sm">
-                        <FaExternalLinkAlt className="mr-2" />
-                        <span>External Link</span>
-                      </div>
                       
-                      <div className="flex items-center text-cyan-600 font-bold group-hover:text-cyan-700">
-                        <span className="mr-2">Explore</span>
-                        <div className="w-8 h-8 bg-cyan-100 rounded-full flex items-center justify-center group-hover:bg-cyan-600 group-hover:text-white transition-all duration-300 group-hover:scale-110">
-                          <FaExternalLinkAlt className="text-sm" />
+                      {/* Tags */}
+                      {resource.tags && resource.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-4">
+                          {resource.tags.slice(0, 3).map((tag, tagIndex) => (
+                            <span
+                              key={tagIndex}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Difficulty and Rating */}
+                      <div className="flex items-center justify-between mb-4">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+                          resource.difficulty === 'Beginner' ? 'bg-green-100 text-green-700' :
+                          resource.difficulty === 'Intermediate' ? 'bg-yellow-100 text-yellow-700' :
+                          resource.difficulty === 'Advanced' ? 'bg-red-100 text-red-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {resource.difficulty}
+                        </span>
+                        <div className="flex items-center space-x-0.5">
+                          {[...Array(resource.rating === 'High' ? 5 : resource.rating === 'Medium' ? 4 : 3)].map((_, i) => (
+                            <FaStar key={i} className="w-3 h-3 text-yellow-400" />
+                          ))}
                         </div>
                       </div>
+                      
+                      {/* Action Button */}
+                      <a
+                        href={resource.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`group/btn w-full inline-flex items-center justify-center px-4 py-2.5 bg-gradient-to-r ${styles.gradient} text-white rounded-lg text-sm font-semibold hover:shadow-md transition-all duration-300 transform hover:scale-105`}
+                      >
+                        <span className="mr-2">Explore</span>
+                        <FaExternalLinkAlt className="text-xs group-hover/btn:translate-x-0.5 transition-transform duration-300" />
+                      </a>
                     </div>
                     
                     {/* Hover Effect Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-blue-500/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-                  </a>
+                    <div className={`absolute inset-0 bg-gradient-to-r ${styles.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none rounded-xl`}></div>
+                  </div>
                 );
               })}
             </div>
             
-            {/* Call to Action */}
-            <div className="mt-12 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-3xl p-8 text-center">
-              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <IoBookmark className="text-white text-2xl" />
+            {/* Compact Call to Action */}
+            <div className="bg-gradient-to-r from-gray-900 via-purple-900 to-violet-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+              {/* Background Pattern */}
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-y-6"></div>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Want More Resources?</h3>
-              <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-                Bookmark this page and check back regularly. We continuously update our resource collection 
-                with the latest and most relevant materials for {topic}.
-              </p>
-              <div className="flex justify-center space-x-4">
-                <button className="flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl font-semibold hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:-translate-y-1 shadow-lg hover:shadow-xl">
-                  <IoBookmark className="mr-2" />
-                  Bookmark Page
-                </button>
-                <button className="flex items-center px-6 py-3 bg-white text-purple-600 border-2 border-purple-200 rounded-2xl font-semibold hover:bg-purple-50 transition-all duration-300 transform hover:-translate-y-1">
-                  <IoDownload className="mr-2" />
-                  Download Resources
-                </button>
+              
+              <div className="relative z-10 text-center max-w-3xl mx-auto">
+                <div className="w-16 h-16 bg-gradient-to-r from-purple-400 to-pink-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl">
+                  <IoBookmark className="text-2xl text-white" />
+                </div>
+                
+                <h3 className="text-2xl font-bold mb-3">
+                  Ready to dive deeper into {topic}?
+                </h3>
+                <p className="text-lg text-gray-300 mb-6 leading-relaxed">
+                  These curated resources will guide your learning journey. 
+                  Bookmark and track your progress.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                  <button className="group flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:-translate-y-0.5 shadow-lg">
+                    <IoBookmark className="mr-2 group-hover:scale-110 transition-transform duration-300" />
+                    Bookmark Resources
+                  </button>
+                  
+                  <button className="group flex items-center px-6 py-3 bg-white/10 backdrop-blur-sm border border-white/20 text-white rounded-xl font-semibold hover:bg-white/20 transition-all duration-300">
+                    <IoDownload className="mr-2 group-hover:scale-110 transition-transform duration-300" />
+                    Download Guide
+                  </button>
+                  
+                  <button 
+                    onClick={() => setActiveTab('quiz')}
+                    className="group flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 shadow-lg"
+                  >
+                    <FaQuestionCircle className="mr-2 group-hover:scale-110 transition-transform duration-300" />
+                    Test Knowledge
+                  </button>
+                </div>
               </div>
             </div>
+            
+            {/* Compact Resources Statistics */}
+            {content.resourcesMetadata && (
+              <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4">
+                <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
+                  <IoStatsChart className="mr-2 text-blue-600" />
+                  Resource Overview
+                </h4>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-blue-600">{content.resourcesMetadata.totalResources}</div>
+                    <div className="text-xs text-gray-600">Total</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-green-600">
+                      {content.resources.filter(r => r.free).length}
+                    </div>
+                    <div className="text-xs text-gray-600">Free</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-purple-600">
+                      {content.resourcesMetadata.categories?.length || 0}
+                    </div>
+                    <div className="text-xs text-gray-600">Categories</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-orange-600">
+                      {content.resources.filter(r => r.rating === 'High').length}
+                    </div>
+                    <div className="text-xs text-gray-600">High Quality</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
 
