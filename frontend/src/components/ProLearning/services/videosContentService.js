@@ -355,193 +355,75 @@ export function getVideosByTopic(videos, topic) {
 
 // Fetch top YouTube videos using YouTube Data API v3
 async function fetchTopYouTubeVideos(topic) {
-  const youtubeApiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
-  
-  if (!youtubeApiKey) {
-    console.warn('YouTube API key not found, falling back to AI recommendations');
-    return generateCuratedVideos(topic);
-  }
+  // Sanitize the search query
+  const sanitizedQuery = topic
+    .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+    .trim()                // Remove leading/trailing spaces
+    .replace(/[^\w\s-]/g, '') // Remove special characters except spaces and hyphens
+    .replace(/\s/g, '+');  // Replace spaces with + for URL
+
+  const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+  const MAX_RESULTS = 10;
 
   try {
-    // Create multiple targeted search queries to match YouTube's top results
-    const searchQueries = [
-      `${topic} explained tutorial beginner`,
-      `${topic} complete guide introduction`,
-      `${topic} basics fundamentals course`,
-      `${topic} transistor electronics tutorial`,
-      `what is ${topic} explained`
-    ];
-    
-    // Get videos from multiple search queries for better coverage
-    let allSearchResults = [];
-    
-    for (const query of searchQueries) {
-      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(query)}&order=relevance&videoDuration=medium&videoDefinition=high&maxResults=8&key=${youtubeApiKey}`;
-      
-      const searchResponse = await fetch(searchUrl);
-      if (searchResponse.ok) {
-        const searchData = await searchResponse.json();
-        if (searchData.items) {
-          allSearchResults = allSearchResults.concat(searchData.items);
-        }
-      }
-      
-      // Small delay between requests to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
-    // Remove duplicates based on video ID
-    const uniqueResults = allSearchResults.filter((video, index, self) => 
-      index === self.findIndex(v => v.id.videoId === video.id.videoId)
+    const response = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${sanitizedQuery}&type=video&maxResults=${MAX_RESULTS}&videoEmbeddable=true&relevanceLanguage=en&safeSearch=strict&key=${YOUTUBE_API_KEY}`
     );
-    
-    if (uniqueResults.length === 0) {
-      throw new Error('No videos found on YouTube');
-    }
-    
-    // Use the unique results for further processing
-    const searchData = { items: uniqueResults.slice(0, 20) }; // Limit to top 20 for processing
-    
-    if (!searchData.items || searchData.items.length === 0) {
-      throw new Error('No videos found on YouTube');
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('YouTube API Error:', errorData);
+      throw new Error(`YouTube API ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
     }
 
-    // Get video IDs for detailed statistics
-    const videoIds = searchData.items.map(item => item.id.videoId).join(',');
+    const data = await response.json();
     
-    // Fetch detailed video statistics
-    const statsUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails,snippet&id=${videoIds}&key=${youtubeApiKey}`;
-    
-    const statsResponse = await fetch(statsUrl);
-    if (!statsResponse.ok) {
-      throw new Error(`YouTube stats failed: ${statsResponse.status}`);
+    if (!data.items?.length) {
+      throw new Error('No videos found');
     }
-    
-    const statsData = await statsResponse.json();
-    
-    // Get channel information for subscriber counts
-    const channelIds = statsData.items.map(item => item.snippet.channelId).join(',');
-    const channelsUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet&id=${channelIds}&key=${youtubeApiKey}`;
-    
-    const channelsResponse = await fetch(channelsUrl);
-    const channelsData = channelsResponse.ok ? await channelsResponse.json() : { items: [] };
-    
-    // Create channel lookup map
-    const channelMap = {};
-    channelsData.items?.forEach(channel => {
-      channelMap[channel.id] = {
-        subscriberCount: parseInt(channel.statistics.subscriberCount) || 0,
-        channelTitle: channel.snippet.title,
-        channelThumbnail: channel.snippet.thumbnails.default?.url
-      };
-    });
 
-    // Process and rank videos by quality metrics with enhanced scoring
-    const processedVideos = statsData.items.map((video, index) => {
-      const channelInfo = channelMap[video.snippet.channelId] || {};
-      const viewCount = parseInt(video.statistics.viewCount) || 0;
-      const likeCount = parseInt(video.statistics.likeCount) || 0;
-      const subscriberCount = channelInfo.subscriberCount || 0;
-      const commentCount = parseInt(video.statistics.commentCount) || 0;
-      
-      // Enhanced quality score that prioritizes educational indicators
-      const educationalBonus = isEducationalContent(video.snippet.title, video.snippet.description) ? 1000000 : 0;
-      const popularityScore = viewCount + (likeCount * 50) + (commentCount * 25);
-      const channelReputationScore = subscriberCount * 0.5;
-      const engagementRate = viewCount > 0 ? (likeCount / viewCount) * 100000 : 0;
-      
-      // Bonus for established educational channels
-      const isEducationalChannel = isEducationalChannelName(channelInfo.channelTitle || video.snippet.channelTitle);
-      const channelBonus = isEducationalChannel ? 2000000 : 0;
-      
-      // Recency bonus (newer videos get slight preference)
-      const publishDate = new Date(video.snippet.publishedAt);
-      const now = new Date();
-      const daysSincePublish = (now - publishDate) / (1000 * 60 * 60 * 24);
-      const recencyBonus = daysSincePublish < 365 ? 500000 : daysSincePublish < 1095 ? 250000 : 0;
-      
-      const qualityScore = popularityScore + channelReputationScore + engagementRate + 
-                          educationalBonus + channelBonus + recencyBonus;
-      
+    // Get video details (duration, views, etc)
+    const videoIds = data.items.map(item => item.id.videoId).join(',');
+    const detailsResponse = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${videoIds}&key=${YOUTUBE_API_KEY}`
+    );
+
+    if (!detailsResponse.ok) {
+      throw new Error(`Failed to fetch video details: ${detailsResponse.status}`);
+    }
+
+    const detailsData = await detailsResponse.json();
+    
+    // Map video details to our format
+    return data.items.map((item, index) => {
+      const details = detailsData.items[index];
       return {
-        id: video.id,
-        title: video.snippet.title,
-        description: video.snippet.description.substring(0, 250) + '...',
-        duration: parseDuration(video.contentDetails.duration),
-        difficulty: categorizeDifficulty(video.snippet.title, video.snippet.description),
-        channel: channelInfo.channelTitle || video.snippet.channelTitle,
-        channelId: video.snippet.channelId,
-        subscriberCount: subscriberCount,
-        viewCount: viewCount,
-        likeCount: likeCount,
-        commentCount: commentCount,
-        qualityScore: qualityScore,
-        publishedAt: video.snippet.publishedAt,
-        keyTopics: extractKeyTopics(video.snippet.title, video.snippet.description, topic),
-        thumbnail: getBestThumbnail(video.snippet.thumbnails),
-        url: `https://www.youtube.com/watch?v=${video.id}`,
-        embedUrl: `https://www.youtube.com/embed/${video.id}`,
-        channelUrl: `https://www.youtube.com/channel/${video.snippet.channelId}`,
-        channelThumbnail: channelInfo.channelThumbnail,
-        // Additional metadata for display
-        formattedViewCount: formatViewCount(viewCount),
-        formattedSubscriberCount: formatSubscriberCount(subscriberCount),
-        formattedDuration: formatDuration(parseDuration(video.contentDetails.duration)),
-        engagementRate: engagementRate,
-        isEducationalChannel: isEducationalChannel
+        id: item.id.videoId,
+        title: item.snippet.title,
+        description: item.snippet.description,
+        thumbnail: item.snippet.thumbnails.high.url,
+        channelTitle: item.snippet.channelTitle,
+        publishedAt: item.snippet.publishedAt,
+        duration: details?.contentDetails?.duration || 'N/A',
+        viewCount: parseInt(details?.statistics?.viewCount) || 0,
+        quality: calculateVideoQuality(details)
       };
     });
-
-    // Enhanced filtering and sorting to match YouTube's top results
-    const topVideos = processedVideos
-      .filter(video => {
-        // More lenient filtering to include high-quality videos
-        const minViews = topic.toLowerCase().includes('bjt') || topic.toLowerCase().includes('transistor') ? 500 : 1000;
-        const hasGoodDuration = video.duration >= 3 && video.duration <= 180; // 3 min to 3 hours
-        const hasEducationalContent = isEducationalContent(video.title, video.description) || 
-                                    isEducationalChannelName(video.channel) ||
-                                    video.viewCount > 50000; // Popular videos even if not explicitly educational
-        
-        // Special handling for technical/engineering topics
-        const isTechnicalTopic = ['bjt', 'transistor', 'electronics', 'circuit', 'engineering'].some(term => 
-          topic.toLowerCase().includes(term) || video.title.toLowerCase().includes(term)
-        );
-        
-        if (isTechnicalTopic) {
-          return video.viewCount >= minViews && hasGoodDuration;
-        }
-        
-        return video.viewCount >= minViews && hasGoodDuration && hasEducationalContent;
-      })
-      .sort((a, b) => {
-        // Prioritize exact topic matches in title
-        const aHasExactMatch = a.title.toLowerCase().includes(topic.toLowerCase());
-        const bHasExactMatch = b.title.toLowerCase().includes(topic.toLowerCase());
-        
-        if (aHasExactMatch && !bHasExactMatch) return -1;
-        if (!aHasExactMatch && bHasExactMatch) return 1;
-        
-        // Then sort by quality score
-        return b.qualityScore - a.qualityScore;
-      })
-      .slice(0, 6); // Return top 6 videos
-
-    console.log('🎯 Top educational videos found:');
-    topVideos.forEach((video, index) => {
-      console.log(`${index + 1}. "${video.title.substring(0, 60)}..."`);
-      console.log(`   📺 Channel: ${video.channel} (${video.formattedSubscriberCount})`);
-      console.log(`   👀 Views: ${video.formattedViewCount} | Duration: ${video.formattedDuration}`);
-      console.log(`   🎯 Quality Score: ${Math.round(video.qualityScore).toLocaleString()}`);
-      console.log(`   🔗 URL: ${video.url}`);
-      console.log('');
-    });
-
-    return topVideos;
-
   } catch (error) {
-    console.error('YouTube API error:', error);
+    console.error('YouTube API request failed:', error);
     throw error;
   }
+}
+
+// Helper function to calculate video quality score
+function calculateVideoQuality(videoDetails) {
+  if (!videoDetails) return 0;
+  
+  const views = parseInt(videoDetails.statistics?.viewCount) || 0;
+  const likes = parseInt(videoDetails.statistics?.likeCount) || 0;
+  
+  // Simple quality score based on views and likes
+  return (views * 0.7) + (likes * 0.3);
 }
 
 // Parse YouTube duration format (PT4M13S) to minutes

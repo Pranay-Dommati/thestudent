@@ -8,7 +8,7 @@
  * @param {string} readingContent - The main reading content to summarize (optional)
  */
 export async function generateSummaryContent(setContent, topic = '', readingContent = '') {
-  console.log(`🧠 Generating summary content for: ${topic}...`);
+  console.log(`🧠 Generating summary content for topic: "${topic}", with ${readingContent?.length || 0} chars of reading content...`);
   
   try {
     let summary;
@@ -17,19 +17,23 @@ export async function generateSummaryContent(setContent, topic = '', readingCont
       topic: topic
     };
 
-    // Prioritize user input over reading content
-    if (topic && topic.length > 0) {
-      // Generate topic-based summary
-      summary = await generateTopicBasedSummary(topic, readingContent);
-      metadata.type = 'topic-based';
-      metadata.hasReadingContent = readingContent.length > 100;
-    } else if (readingContent && readingContent.length > 100) {
-      // Fallback to content-based summary if no topic
-      summary = await generateAISummary(readingContent);
+    // Prioritize reading content for actual summaries
+    if (readingContent && readingContent.length > 100) {
+      // Generate content-based summary from actual reading material
+      console.log('📚 Generating content-based summary from reading material...');
+      summary = await generateAISummary(readingContent, topic);
       metadata.type = 'content-based';
       metadata.sourceLength = readingContent.length;
+      metadata.topic = topic;
+    } else if (topic && topic.length > 0) {
+      // Generate topic-based summary only when no reading content
+      console.log('🎯 Generating topic-based summary...');
+      summary = await generateTopicBasedSummary(topic, readingContent);
+      metadata.type = 'topic-based';
+      metadata.hasReadingContent = false;
     } else {
       // Use fallback summary
+      console.log('⚠️ Using fallback summary...');
       summary = generateFallbackSummary(topic || 'General Learning');
       metadata.type = 'fallback';
     }
@@ -120,15 +124,15 @@ async function generateTopicBasedSummary(topic, readingContent = '') {
   }
 }
 
-// Generate AI-powered summary from reading content (legacy function for content-based summary)
-async function generateAISummary(readingContent) {
+// Generate AI-powered summary from reading content
+async function generateAISummary(readingContent, topic = '') {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   
   if (!apiKey) {
     throw new Error('No API key available for summary generation');
   }
 
-  const prompt = createContentSummaryPrompt(readingContent);
+  const prompt = createContentSummaryPrompt(readingContent, topic);
   
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
   
@@ -138,7 +142,7 @@ async function generateAISummary(readingContent) {
       parts: [{ text: prompt }]
     }],
     generationConfig: {
-      temperature: 0.3, // Lower temperature for more focused summaries
+      temperature: 0.2, // Lower temperature for more focused summaries
       topK: 20,
       topP: 0.8,
       maxOutputTokens: 1024,
@@ -167,53 +171,58 @@ async function generateAISummary(readingContent) {
   return result.candidates[0].content.parts[0].text.trim();
 }
 
-// Create prompt for content-based summary (legacy)
-function createContentSummaryPrompt(readingContent) {
-  return `
-You are an expert educational content summarizer. Create a comprehensive but concise summary of the following learning material.
+// Create prompt for content-based summary
+function createContentSummaryPrompt(readingContent, topic = '') {
+  let topicContext = '';
+  if (topic && topic.trim()) {
+    topicContext = `\n**Learning Focus**: ${topic}\n`;
+  }
 
-**Source Content:**
+  return `
+You are an expert educational content summarizer. Your task is to create a comprehensive yet concise summary of the provided reading material. Focus on extracting the ACTUAL information from the content, not generating generic templates.
+${topicContext}
+**Source Content to Summarize:**
 ${readingContent}
 
-**Requirements:**
-Create a well-structured summary that includes:
+**Instructions:**
+Analyze the above content and create a structured summary that captures the ACTUAL information presented. Do NOT create generic templates or placeholder content.
 
-## 📋 Key Points Summary
+## 📋 Content Summary
 
-### 🎯 Main Concepts
-- List the 5-7 most important concepts covered
-- Use bullet points with brief explanations
-- Focus on fundamental understanding
+### 🎯 Main Topics Covered
+- Extract and list the actual main topics/concepts discussed in the content
+- Include specific details mentioned in the source material
+- Focus on what was actually taught or explained
 
-### 💡 Essential Takeaways
-- Highlight the critical information learners must remember
-- Include any important formulas, commands, or syntax
-- Mention key terminology and definitions
+### 💡 Key Information & Facts
+- Summarize the specific facts, data, or information presented
+- Include important definitions, explanations, or concepts from the content
+- Highlight any formulas, procedures, or step-by-step processes mentioned
 
-### 🔧 Practical Applications
-- Summarize real-world uses and implementations
-- Include the most relevant examples
-- Focus on actionable insights
+### 🔧 Practical Examples & Applications
+- Summarize any examples, use cases, or applications mentioned in the content
+- Include specific implementations or real-world scenarios discussed
+- Note any tools, technologies, or methods specifically referenced
 
-### ⚡ Quick Reference
-- Create a rapid-access section for key information
-- Include important code snippets or commands
-- Provide essential facts and figures
+### ⚡ Important Points & Takeaways
+- Extract the most critical information from the content
+- Include any warnings, tips, or best practices mentioned
+- Highlight conclusions or key insights from the source material
 
-### 📚 Study Tips
-- Suggest the best way to approach learning this topic
-- Recommend what to focus on first
-- Include common pitfalls to avoid
+### � Additional Details
+- Summarize any supporting information, context, or background provided
+- Include relevant statistics, comparisons, or analysis from the content
+- Note any references to further resources or next steps mentioned
 
-**Formatting Guidelines:**
-- Use clear, concise language
-- Keep bullet points short but informative
-- Use markdown formatting for structure
-- Maintain professional tone
-- No unnecessary explanations or filler content
-- Focus on actionable, memorable information
+**Critical Requirements:**
+- Base your summary ONLY on the actual content provided
+- Do NOT add generic information not present in the source
+- Extract and synthesize the real information, don't create templates
+- Keep the summary comprehensive but concise
+- Use specific details from the source material
+- Maintain the factual accuracy of the original content
 
-Generate only the markdown summary content. Be comprehensive yet concise.
+Generate only the markdown summary based on the ACTUAL content provided above.
 `;
 }
 
