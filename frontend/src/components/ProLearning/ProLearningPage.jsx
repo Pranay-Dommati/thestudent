@@ -51,6 +51,60 @@ const ProLearningPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const topic = searchParams.get("topic") || "Learning Topic";
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+
+  // Parse multiple topics from the search parameter
+  const parseTopics = (topicString) => {
+    if (!topicString) return [];
+    
+    // Split by spaces and filter out empty strings
+    const topics = topicString.split(/\s+/).filter(topic => topic.trim().length > 0);
+    
+    // If only one topic or no valid separation, return as single topic
+    if (topics.length <= 1) {
+      return [{ id: 1, name: topicString.trim(), isActive: true }];
+    }
+    
+    // Return multiple topics with the first one active by default
+    return topics.map((topicName, index) => ({
+      id: index + 1,
+      name: topicName.trim(),
+      isActive: index === 0
+    }));
+  };
+
+  const [topicsList, setTopicsList] = useState(() => parseTopics(topic));
+
+  // Handle topic selection from sidebar
+  const handleTopicSelect = (topicId) => {
+    setTopicsList(prev => 
+      prev.map(t => ({ ...t, isActive: t.id === topicId }))
+    );
+    
+    // Get the selected topic name for content generation
+    const selectedTopicObj = topicsList.find(t => t.id === topicId);
+    if (selectedTopicObj) {
+      setSelectedTopic(selectedTopicObj.name);
+      // Trigger content generation for the selected topic
+      generateProContent({ 
+        topic: selectedTopicObj.name, 
+        setIsLoading, 
+        setLoadingProgress, 
+        setShowSkeletons, 
+        setLoadingStep, 
+        setContent, 
+        setStats, 
+        content 
+      });
+    }
+  };
+
+  // Get currently active topic
+  const getCurrentTopic = () => {
+    const activeTopic = topicsList.find(t => t.isActive);
+    return activeTopic ? activeTopic.name : topic;
+  };
 
   // Map icon names to actual React components
   const getIconComponent = (iconName) => {
@@ -155,8 +209,25 @@ const ProLearningPage = () => {
   };
 
   useEffect(() => {
-    if (topic) {
-      generateProContent({ topic, setIsLoading, setLoadingProgress, setShowSkeletons, setLoadingStep, setContent, setStats, content });
+    // Re-parse topics when URL parameter changes
+    const newTopics = parseTopics(topic);
+    setTopicsList(newTopics);
+    
+    // Generate content for the first/active topic
+    const activeTopic = newTopics.find(t => t.isActive);
+    const topicToGenerate = activeTopic ? activeTopic.name : topic;
+    
+    if (topicToGenerate) {
+      generateProContent({ 
+        topic: topicToGenerate, 
+        setIsLoading, 
+        setLoadingProgress, 
+        setShowSkeletons, 
+        setLoadingStep, 
+        setContent, 
+        setStats, 
+        content 
+      });
     }
   }, [topic]);
 
@@ -242,7 +313,7 @@ const ProLearningPage = () => {
           </h3>
           
           <p className="text-sm text-gray-600 mb-6 relative z-10">
-            Generating materials for <span className="font-semibold text-blue-600">{topic}</span>
+            Generating materials for <span className="font-semibold text-blue-600">{getCurrentTopic()}</span>
           </p>
 
           {/* Enhanced progress bar */}
@@ -927,7 +998,7 @@ const ProLearningPage = () => {
                   <div className="mb-6">
                     {((correctAnswers / content.quiz.length) * 100) >= 80 ? (
                       <div className="bg-green-100 border border-green-300 rounded-xl p-4">
-                        <p className="text-green-800 font-medium">🎉 Excellent work! You have a strong understanding of {topic}.</p>
+                        <p className="text-green-800 font-medium">🎉 Excellent work! You have a strong understanding of {getCurrentTopic()}.</p>
                       </div>
                     ) : ((correctAnswers / content.quiz.length) * 100) >= 60 ? (
                       <div className="bg-yellow-100 border border-yellow-300 rounded-xl p-4">
@@ -975,7 +1046,7 @@ const ProLearningPage = () => {
                   <div>
                     <h2 className="text-2xl font-bold mb-1">Learning Resources</h2>
                     <p className="text-indigo-100 text-sm">
-                      Curated materials for {topic} mastery
+                      Curated materials for {getCurrentTopic()} mastery
                     </p>
                   </div>
                 </div>
@@ -1184,7 +1255,7 @@ const ProLearningPage = () => {
                 </div>
                 
                 <h3 className="text-2xl font-bold mb-3">
-                  Ready to dive deeper into {topic}?
+                  Ready to dive deeper into {getCurrentTopic()}?
                 </h3>
                 <p className="text-lg text-gray-300 mb-6 leading-relaxed">
                   These curated resources will guide your learning journey. 
@@ -1274,7 +1345,7 @@ const ProLearningPage = () => {
                 </div>
                 <div>
                   <h1 className="text-lg font-bold text-gray-900">Pro Learning</h1>
-                  <p className="text-sm text-gray-600 line-clamp-1">{topic}</p>
+                  <p className="text-sm text-gray-600 line-clamp-1">{getCurrentTopic()}</p>
                 </div>
               </div>
             </div>
@@ -1381,75 +1452,302 @@ const ProLearningPage = () => {
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="w-full px-2 sm:px-4 lg:px-6 py-4">
-        {/* Enhanced Tab Navigation */}
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border mb-6 hidden md:block">
-          <div className="p-2">
-            <nav className="flex space-x-2" aria-label="Tabs">
-              {tabs.map((tab) => {
-                const IconComponent = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    disabled={isLoading}
-                    className={`group flex-1 p-4 rounded-xl font-medium transition-all duration-300 ${
-                      isActive
-                        ? `bg-gradient-to-r ${tab.gradient} text-white shadow-lg transform scale-105`
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <div className="flex flex-col items-center space-y-2">
-                      <div className={`p-2 rounded-lg transition-colors ${
-                        isActive ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-gray-200'
-                      }`}>
-                        <IconComponent className="text-lg" />
-                      </div>
-                      <span className="text-sm font-semibold">{tab.label}</span>
-                      <span className={`text-xs ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
-                        {tab.description}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
+      {/* Main Content with Sidebar Layout */}
+      <div className="min-h-screen flex">
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col">
+          {/* Content Container - Fixed right margin to match sidebar exactly */}
+          <div className={`transition-all duration-300 ${sidebarVisible ? 'mr-[400px]' : ''}`}>
+            <div className="w-full px-2 sm:px-4 lg:px-6 py-4">
+              {/* Enhanced Tab Navigation */}
+              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border mb-6 hidden md:block">
+                <div className="p-2">
+                  <nav className="flex space-x-2" aria-label="Tabs">
+                    {tabs.map((tab) => {
+                      const IconComponent = tab.icon;
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id)}
+                          disabled={isLoading}
+                          className={`group flex-1 p-4 rounded-xl font-medium transition-all duration-300 ${
+                            isActive
+                              ? `bg-gradient-to-r ${tab.gradient} text-white shadow-lg transform scale-105`
+                              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <div className="flex flex-col items-center space-y-2">
+                            <div className={`p-2 rounded-lg transition-colors ${
+                              isActive ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-gray-200'
+                            }`}>
+                              <IconComponent className="text-lg" />
+                            </div>
+                            <span className="text-sm font-semibold">{tab.label}</span>
+                            <span className={`text-xs ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
+                              {tab.description}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </div>
+              </div>
 
-        {/* Mobile Tab Indicator */}
-        <div className="md:hidden mb-4">
-          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                {React.createElement(tabs.find(tab => tab.id === activeTab)?.icon, { 
-                  className: "mr-2 text-lg text-blue-600" 
-                })}
-                <div>
-                  <div className="font-semibold text-gray-900">
-                    {tabs.find(tab => tab.id === activeTab)?.label}
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    {tabs.find(tab => tab.id === activeTab)?.description}
+              {/* Mobile Tab Indicator */}
+              <div className="md:hidden mb-4">
+                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      {React.createElement(tabs.find(tab => tab.id === activeTab)?.icon, { 
+                        className: "mr-2 text-lg text-blue-600" 
+                      })}
+                      <div>
+                        <div className="font-semibold text-gray-900">
+                          {tabs.find(tab => tab.id === activeTab)?.label}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {tabs.find(tab => tab.id === activeTab)?.description}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsMobileMenuOpen(true)}
+                      className="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                    >
+                      <IoChevronDown />
+                    </button>
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
-              >
-                <IoChevronDown />
-              </button>
+
+              {/* Tab Content */}
+              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border overflow-hidden">
+                <div className="p-4 lg:p-6">
+                  {renderTabContent()}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Tab Content */}
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border overflow-hidden">
-          <div className="p-4 lg:p-6">
-            {renderTabContent()}
+        {/* Sidebar Toggle Button */}
+        <button
+          onClick={() => setSidebarVisible(!sidebarVisible)}
+          className={`fixed top-20 transition-all duration-300 ${
+            sidebarVisible ? 'right-[400px]' : 'right-0'
+          } transform bg-white p-3 shadow-md rounded-l-lg z-40 hover:bg-gray-50`}
+          aria-label={sidebarVisible ? "Close sidebar" : "Open sidebar"}
+        >
+          {sidebarVisible ? 
+            <IoChevronBack className="w-5 h-5 text-gray-600" /> : 
+            <IoMenu className="w-5 h-5 text-gray-600" />
+          }
+        </button>
+
+        {/* Sidebar */}
+        <div 
+          className={`fixed top-0 right-0 h-screen w-[400px] bg-white shadow-lg border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 ${
+            sidebarVisible ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        >
+          {/* Sidebar Header */}
+          <div className="pt-20 px-4 pb-3 border-b border-gray-200 bg-white">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-lg">Learning Guide</h2>
+              <button
+                onClick={() => setSidebarVisible(false)}
+                className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                aria-label="Close sidebar"
+              >
+                <IoClose className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+            
+            {/* Topic Information */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 mb-4">
+              <div className="flex items-center mb-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                  <FaRobot className="text-white text-sm" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">
+                    {topicsList.length > 1 ? 'Learning Topics' : 'Current Topic'}
+                  </h3>
+                </div>
+              </div>
+              
+              {/* Display multiple topics or single topic */}
+              {topicsList.length > 1 ? (
+                <div className="space-y-2">
+                  <p className="text-blue-700 font-medium text-sm mb-3">
+                    Select a topic to focus on:
+                  </p>
+                  {topicsList.map((topicItem) => (
+                    <button
+                      key={topicItem.id}
+                      onClick={() => handleTopicSelect(topicItem.id)}
+                      className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
+                        topicItem.isActive
+                          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
+                          : 'bg-white text-blue-700 hover:bg-blue-100 border border-blue-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium capitalize">{topicItem.name}</span>
+                        {topicItem.isActive && (
+                          <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
+                            <FaCheck className="text-white text-xs" />
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <p className="text-blue-600 text-xs">
+                      Currently learning: <span className="font-semibold">{getCurrentTopic()}</span>
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-blue-700 font-medium">{getCurrentTopic()}</p>
+              )}
+            </div>
+
+            {/* Progress Overview */}
+            {!isLoading && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-700">Learning Progress</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-blue-600">{stats.estimatedReadTime}m</div>
+                    <div className="text-xs text-blue-700">Read Time</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-green-600">{stats.totalQuestions}</div>
+                    <div className="text-xs text-green-700">Questions</div>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-red-600">{stats.totalVideos}</div>
+                    <div className="text-xs text-red-700">Videos</div>
+                  </div>
+                  <div className="bg-orange-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-orange-600">{stats.totalResources}</div>
+                    <div className="text-xs text-orange-700">Resources</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Sidebar Content */}
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-gray-700">Quick Navigation</h4>
+                {topicsList.length > 1 && (
+                  <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                    {topicsList.length} topics
+                  </div>
+                )}
+              </div>
+              
+              {/* Tab Navigation in Sidebar */}
+              <div className="space-y-2">
+                {tabs.map((tab) => {
+                  const IconComponent = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      disabled={isLoading}
+                      className={`w-full text-left p-3 rounded-xl transition-all duration-200 ${
+                        isActive
+                          ? `bg-gradient-to-r ${tab.gradient} text-white shadow-md`
+                          : 'text-gray-700 hover:bg-gray-100'
+                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <div className="flex items-center">
+                        <div className={`p-2 rounded-lg mr-3 ${
+                          isActive ? 'bg-white/20' : 'bg-gray-200'
+                        }`}>
+                          <IconComponent className="text-sm" />
+                        </div>
+                        <div>
+                          <div className="font-medium">{tab.label}</div>
+                          <div className={`text-xs ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
+                            {tab.description}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Reading Section Navigation */}
+              {activeTab === 'reading' && !isLoading && readingSections.length > 1 && (
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Reading Sections</h4>
+                  <div className="space-y-2">
+                    {readingSections.map((section, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setReadingSectionIndex(index)}
+                        className={`w-full text-left p-2 rounded-lg transition-colors text-sm ${
+                          readingSectionIndex === index
+                            ? 'bg-blue-100 text-blue-800 border-l-4 border-blue-600'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        <div className="font-medium">{section.header || `Section ${index + 1}`}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {section.content.substring(0, 60)}...
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Learning Tips */}
+              <div className="border-t pt-4 mt-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Learning Tips</h4>
+                <div className="space-y-3">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div className="flex items-start">
+                      <FaLightbulb className="text-yellow-600 mt-0.5 mr-2" />
+                      <div>
+                        <div className="font-medium text-yellow-800 text-sm">Stay Engaged</div>
+                        <div className="text-xs text-yellow-700 mt-1">Take notes and ask questions as you learn</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-start">
+                      <FaTrophy className="text-green-600 mt-0.5 mr-2" />
+                      <div>
+                        <div className="font-medium text-green-800 text-sm">Practice Regularly</div>
+                        <div className="text-xs text-green-700 mt-1">Apply what you learn through exercises</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                    <div className="flex items-start">
+                      <FaBrain className="text-purple-600 mt-0.5 mr-2" />
+                      <div>
+                        <div className="font-medium text-purple-800 text-sm">Review Summary</div>
+                        <div className="text-xs text-purple-700 mt-1">Use summaries to reinforce key concepts</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
