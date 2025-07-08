@@ -45,6 +45,7 @@ import {
   formatSubscriberCount,
   getResourceIcon
 } from './services/index.js';
+import Navbar from '../Navbar/Navbar';
 
 const ProLearningPage = () => {
   const [searchParams] = useSearchParams();
@@ -1368,6 +1369,7 @@ const ProLearningPage = () => {
 
   return (
     <>
+      <Navbar initialStyle="light" />
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
         <style jsx>{`
           .scrollbar-hide {
@@ -1379,142 +1381,10 @@ const ProLearningPage = () => {
           }
         `}</style>
       {/* Enhanced Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50">
-        <div className="w-full px-2 sm:px-4 lg:px-6 max-w-full overflow-hidden">
-          <div className="flex items-center justify-between h-16 min-w-0">
-            {/* Left section */}
-            <div className="flex items-center min-w-0 flex-shrink-0">
-              <button
-                onClick={() => navigate(-1)}
-                className="mr-2 sm:mr-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors flex-shrink-0"
-              >
-                <IoChevronBack size={20} />
-              </button>
-              <div className="flex items-center min-w-0">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mr-2 sm:mr-3 shadow-lg flex-shrink-0">
-                  <FaRobot className="text-white text-sm sm:text-base" />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-base sm:text-lg font-bold text-gray-900">Pro Learning</h1>
-                  <p className="text-xs sm:text-sm text-gray-600 truncate">{getCurrentTopic()}</p>
-                </div>
-              </div>
-            </div>
-            
-            {/* Center section - Mobile tab indicator */}
-            <div className="flex items-center space-x-2">
-              {/* Mobile Sidebar Toggle */}
-              <button
-                onClick={() => handleSidebarToggle(!sidebarVisible)}
-                className="lg:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-                aria-label="Toggle learning guide"
-              >
-                <IoMenu size={18} />
-              </button>
-              
-              {/* Mobile Menu Toggle */}
-              <button
-                onClick={() => handleMobileMenuToggle(true)}
-                className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-              >
-                <IoChevronDown size={18} />
-              </button>
-            </div>
-            
-            {/* Right section */}
-            <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-              {!isLoading && (
-                <div className="hidden lg:flex items-center space-x-2 xl:space-x-4 text-sm">
-                  <div className="flex items-center bg-gray-100 px-2 xl:px-3 py-1 rounded-full">
-                    <FaClock className="mr-1 text-blue-500 text-xs" />
-                    <span className="text-gray-700 text-xs xl:text-sm">{stats.estimatedReadTime}m</span>
-                  </div>
-                  <div className="flex items-center bg-gray-100 px-2 xl:px-3 py-1 rounded-full">
-                    <FaVideo className="mr-1 text-red-500 text-xs" />
-                    <span className="text-gray-700 text-xs xl:text-sm">{stats.totalVideos}</span>
-                  </div>
-                  <div className="flex items-center bg-gray-100 px-2 xl:px-3 py-1 rounded-full">
-                    <FaQuestionCircle className="mr-1 text-green-500 text-xs" />
-                    <span className="text-gray-700 text-xs xl:text-sm">{stats.totalQuestions}</span>
-                  </div>
-                </div>
-              )}
-              
-              <button
-                onClick={toggleBookmark}
-                className={`p-2 rounded-xl transition-colors flex-shrink-0 ${
-                  bookmarked 
-                    ? 'text-yellow-600 bg-yellow-100 hover:bg-yellow-200' 
-                    : 'text-gray-500 hover:text-yellow-600 hover:bg-yellow-50'
-                }`}
-              >
-                <IoBookmark size={18} />
-              </button>
-              
-              <Link
-                to="/"
-                className="flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg text-sm flex-shrink-0"
-              >
-                <IoHome className="mr-1 sm:mr-2" size={16} />
-                <span className="hidden sm:inline">Home</span>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-[60] md:hidden">
-          <div className="fixed inset-0 bg-black/50" onClick={() => handleMobileMenuToggle(false)} />
-          <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl transform transition-transform z-[70]">
-            <div className="p-4 border-b">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">Navigation</h2>
-                <button
-                  onClick={() => handleMobileMenuToggle(false)}
-                  className="p-2 text-gray-500 hover:text-gray-700 rounded-xl"
-                >
-                  <IoClose size={20} />
-                </button>
-              </div>
-            </div>
-            <div className="p-4 space-y-2">
-              {tabs.map((tab) => {
-                const IconComponent = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setActiveTab(tab.id);
-                      handleMobileMenuToggle(false);
-                    }}
-                    disabled={isLoading}
-                    className={`w-full text-left p-3 rounded-xl transition-colors ${
-                      activeTab === tab.id
-                        ? `bg-gradient-to-r ${tab.gradient} text-white`
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <div className="flex items-center">
-                      <IconComponent className="mr-3" />
-                      <div>
-                        <div className="font-medium">{tab.label}</div>
-                        <div className={`text-xs ${activeTab === tab.id ? 'text-white/80' : 'text-gray-500'}`}>
-                          {tab.description}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50"> ... </header> */}
 
       {/* Main Content with Sidebar Layout */}
-      <div className="min-h-screen relative">
+      <div className="min-h-screen relative pt-20">
         {/* Main Content Area */}
         <div className={`transition-all duration-300 min-h-screen ${
           sidebarVisible 
@@ -1547,9 +1417,7 @@ const ProLearningPage = () => {
                               <IconComponent className="text-lg" />
                             </div>
                             <span className="text-sm font-semibold whitespace-nowrap">{tab.label}</span>
-                            <span className={`text-xs text-center ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
-                              {tab.description}
-                            </span>
+                            {/* Removed tab.description here */}
                           </div>
                         </button>
                       );
@@ -1570,9 +1438,7 @@ const ProLearningPage = () => {
                         <div className="font-semibold text-gray-900">
                           {tabs.find(tab => tab.id === activeTab)?.label}
                         </div>
-                        <div className="text-sm text-gray-600">
-                          {tabs.find(tab => tab.id === activeTab)?.description}
-                        </div>
+                        {/* Removed tab.description here */}
                       </div>
                     </div>
                     <button
