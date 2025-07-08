@@ -37,8 +37,7 @@ import {
   handleQuizAnswer,
   restartQuiz,
   nextQuestion,
-  prevQuestion,
-  toggleBookmark
+  prevQuestion
 } from './ProLearningLogic';
 import {
   formatDuration,
@@ -51,8 +50,32 @@ const ProLearningPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const topic = searchParams.get("topic") || "Learning Topic";
-  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [sidebarVisible, setSidebarVisible] = useState(false); // Start hidden on mobile
   const [selectedTopic, setSelectedTopic] = useState(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Initialize sidebar visibility based on screen size
+  useEffect(() => {
+    const handleResize = () => {
+      // Show sidebar by default on large screens, hide on mobile
+      if (window.innerWidth >= 1024) {
+        setSidebarVisible(true);
+      } else {
+        setSidebarVisible(false);
+        // Also close mobile menu if open
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    // Set initial state
+    handleResize();
+
+    // Add event listener
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Parse multiple topics from the search parameter
   const parseTopics = (topicString) => {
@@ -132,7 +155,25 @@ const ProLearningPage = () => {
   const [loadingStep, setLoadingStep] = useState("Initializing...");
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [showSkeletons, setShowSkeletons] = useState(true);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Handle mobile menu state changes
+  const handleMobileMenuToggle = (isOpen) => {
+    setIsMobileMenuOpen(isOpen);
+    // Close sidebar when mobile menu opens on mobile devices
+    if (isOpen && window.innerWidth < 1024) {
+      setSidebarVisible(false);
+    }
+  };
+
+  // Handle sidebar toggle
+  const handleSidebarToggle = (isVisible) => {
+    setSidebarVisible(isVisible);
+    // Close mobile menu when sidebar opens on mobile devices
+    if (isVisible && window.innerWidth < 1024) {
+      setIsMobileMenuOpen(false);
+    }
+  };
+  
   const [quizScore, setQuizScore] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showQuizResults, setShowQuizResults] = useState(false);
@@ -657,7 +698,7 @@ const ProLearningPage = () => {
             </div>
             
             {/* Enhanced Video Grid */}
-            <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {content.videos.map((video, index) => (
                 <div key={video.id} className="group bg-white border border-gray-200 rounded-2xl hover:shadow-xl transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
                   <div className="flex flex-col">
@@ -1083,7 +1124,7 @@ const ProLearningPage = () => {
             </div>
             
             {/* Compact Professional Resources Grid */}
-            <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
               {content.resources.map((resource, index) => {
                 const iconName = getResourceIcon(resource.type);
                 const IconComponent = getIconComponent(iconName);
@@ -1326,75 +1367,95 @@ const ProLearningPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+        <style jsx>{`
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
       {/* Enhanced Header */}
       <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50">
-        <div className="w-full px-2 sm:px-4 lg:px-6">
-          <div className="flex items-center justify-between h-16">
+        <div className="w-full px-2 sm:px-4 lg:px-6 max-w-full overflow-hidden">
+          <div className="flex items-center justify-between h-16 min-w-0">
             {/* Left section */}
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0 flex-shrink-0">
               <button
                 onClick={() => navigate(-1)}
-                className="mr-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+                className="mr-2 sm:mr-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors flex-shrink-0"
               >
                 <IoChevronBack size={20} />
               </button>
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mr-3 shadow-lg">
-                  <FaRobot className="text-white" />
+              <div className="flex items-center min-w-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mr-2 sm:mr-3 shadow-lg flex-shrink-0">
+                  <FaRobot className="text-white text-sm sm:text-base" />
                 </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">Pro Learning</h1>
-                  <p className="text-sm text-gray-600 line-clamp-1">{getCurrentTopic()}</p>
+                <div className="min-w-0">
+                  <h1 className="text-base sm:text-lg font-bold text-gray-900">Pro Learning</h1>
+                  <p className="text-xs sm:text-sm text-gray-600 truncate">{getCurrentTopic()}</p>
                 </div>
               </div>
             </div>
             
             {/* Center section - Mobile tab indicator */}
-            <div className="flex md:hidden items-center">
+            <div className="flex items-center space-x-2">
+              {/* Mobile Sidebar Toggle */}
               <button
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+                onClick={() => handleSidebarToggle(!sidebarVisible)}
+                className="lg:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+                aria-label="Toggle learning guide"
               >
-                <IoMenu size={20} />
+                <IoMenu size={18} />
+              </button>
+              
+              {/* Mobile Menu Toggle */}
+              <button
+                onClick={() => handleMobileMenuToggle(true)}
+                className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                <IoChevronDown size={18} />
               </button>
             </div>
             
             {/* Right section */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
               {!isLoading && (
-                <div className="hidden lg:flex items-center space-x-4 text-sm">
-                  <div className="flex items-center bg-gray-100 px-3 py-1 rounded-full">
-                    <FaClock className="mr-1 text-blue-500" />
-                    <span className="text-gray-700">{stats.estimatedReadTime}m</span>
+                <div className="hidden lg:flex items-center space-x-2 xl:space-x-4 text-sm">
+                  <div className="flex items-center bg-gray-100 px-2 xl:px-3 py-1 rounded-full">
+                    <FaClock className="mr-1 text-blue-500 text-xs" />
+                    <span className="text-gray-700 text-xs xl:text-sm">{stats.estimatedReadTime}m</span>
                   </div>
-                  <div className="flex items-center bg-gray-100 px-3 py-1 rounded-full">
-                    <FaVideo className="mr-1 text-red-500" />
-                    <span className="text-gray-700">{stats.totalVideos}</span>
+                  <div className="flex items-center bg-gray-100 px-2 xl:px-3 py-1 rounded-full">
+                    <FaVideo className="mr-1 text-red-500 text-xs" />
+                    <span className="text-gray-700 text-xs xl:text-sm">{stats.totalVideos}</span>
                   </div>
-                  <div className="flex items-center bg-gray-100 px-3 py-1 rounded-full">
-                    <FaQuestionCircle className="mr-1 text-green-500" />
-                    <span className="text-gray-700">{stats.totalQuestions}</span>
+                  <div className="flex items-center bg-gray-100 px-2 xl:px-3 py-1 rounded-full">
+                    <FaQuestionCircle className="mr-1 text-green-500 text-xs" />
+                    <span className="text-gray-700 text-xs xl:text-sm">{stats.totalQuestions}</span>
                   </div>
                 </div>
               )}
               
               <button
                 onClick={toggleBookmark}
-                className={`p-2 rounded-xl transition-colors ${
+                className={`p-2 rounded-xl transition-colors flex-shrink-0 ${
                   bookmarked 
                     ? 'text-yellow-600 bg-yellow-100 hover:bg-yellow-200' 
                     : 'text-gray-500 hover:text-yellow-600 hover:bg-yellow-50'
                 }`}
               >
-                <IoBookmark size={20} />
+                <IoBookmark size={18} />
               </button>
               
               <Link
                 to="/"
-                className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
+                className="flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg text-sm flex-shrink-0"
               >
-                <IoHome className="mr-2" />
+                <IoHome className="mr-1 sm:mr-2" size={16} />
                 <span className="hidden sm:inline">Home</span>
               </Link>
             </div>
@@ -1404,14 +1465,14 @@ const ProLearningPage = () => {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl transform transition-transform">
+        <div className="fixed inset-0 z-[60] md:hidden">
+          <div className="fixed inset-0 bg-black/50" onClick={() => handleMobileMenuToggle(false)} />
+          <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-xl transform transition-transform z-[70]">
             <div className="p-4 border-b">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">Navigation</h2>
                 <button
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => handleMobileMenuToggle(false)}
                   className="p-2 text-gray-500 hover:text-gray-700 rounded-xl"
                 >
                   <IoClose size={20} />
@@ -1426,7 +1487,7 @@ const ProLearningPage = () => {
                     key={tab.id}
                     onClick={() => {
                       setActiveTab(tab.id);
-                      setIsMobileMenuOpen(false);
+                      handleMobileMenuToggle(false);
                     }}
                     disabled={isLoading}
                     className={`w-full text-left p-3 rounded-xl transition-colors ${
@@ -1453,16 +1514,18 @@ const ProLearningPage = () => {
       )}
 
       {/* Main Content with Sidebar Layout */}
-      <div className="min-h-screen flex">
+      <div className="min-h-screen relative">
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Content Container - Fixed right margin to match sidebar exactly */}
-          <div className={`transition-all duration-300 ${sidebarVisible ? 'mr-[400px]' : ''}`}>
-            <div className="w-full px-2 sm:px-4 lg:px-6 py-4">
+        <div className={`transition-all duration-300 min-h-screen ${
+          sidebarVisible 
+            ? 'lg:mr-[400px]' // Add right margin on large screens when sidebar is visible
+            : ''
+        }`}>
+          <div className="w-full px-2 sm:px-4 lg:px-6 py-4 max-w-full overflow-x-hidden">
               {/* Enhanced Tab Navigation */}
-              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border mb-6 hidden md:block">
+              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border mb-6 hidden md:block overflow-hidden">
                 <div className="p-2">
-                  <nav className="flex space-x-2" aria-label="Tabs">
+                  <nav className="flex space-x-2 overflow-x-auto scrollbar-hide" aria-label="Tabs">
                     {tabs.map((tab) => {
                       const IconComponent = tab.icon;
                       const isActive = activeTab === tab.id;
@@ -1471,7 +1534,7 @@ const ProLearningPage = () => {
                           key={tab.id}
                           onClick={() => setActiveTab(tab.id)}
                           disabled={isLoading}
-                          className={`group flex-1 p-4 rounded-xl font-medium transition-all duration-300 ${
+                          className={`group flex-1 min-w-[120px] p-4 rounded-xl font-medium transition-all duration-300 ${
                             isActive
                               ? `bg-gradient-to-r ${tab.gradient} text-white shadow-lg transform scale-105`
                               : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1483,8 +1546,8 @@ const ProLearningPage = () => {
                             }`}>
                               <IconComponent className="text-lg" />
                             </div>
-                            <span className="text-sm font-semibold">{tab.label}</span>
-                            <span className={`text-xs ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
+                            <span className="text-sm font-semibold whitespace-nowrap">{tab.label}</span>
+                            <span className={`text-xs text-center ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
                               {tab.description}
                             </span>
                           </div>
@@ -1513,7 +1576,7 @@ const ProLearningPage = () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => setIsMobileMenuOpen(true)}
+                      onClick={() => handleMobileMenuToggle(true)}
                       className="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
                     >
                       <IoChevronDown />
@@ -1524,7 +1587,7 @@ const ProLearningPage = () => {
 
               {/* Tab Content */}
               <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border overflow-hidden">
-                <div className="p-4 lg:p-6">
+                <div className="p-4 lg:p-6 max-w-full overflow-x-hidden">
                   {renderTabContent()}
                 </div>
               </div>
@@ -1534,10 +1597,12 @@ const ProLearningPage = () => {
 
         {/* Sidebar Toggle Button */}
         <button
-          onClick={() => setSidebarVisible(!sidebarVisible)}
-          className={`fixed top-20 transition-all duration-300 ${
-            sidebarVisible ? 'right-[400px]' : 'right-0'
-          } transform bg-white p-3 shadow-md rounded-l-lg z-40 hover:bg-gray-50`}
+          onClick={() => handleSidebarToggle(!sidebarVisible)}
+          className={`fixed transition-all duration-300 z-40 hover:bg-gray-50 ${
+            sidebarVisible 
+              ? 'top-20 right-[400px] lg:right-[400px] xl:right-[400px] transform bg-white p-3 shadow-md rounded-l-lg' 
+              : 'top-20 right-4 bg-white p-3 shadow-lg rounded-lg'
+          } hidden lg:flex items-center justify-center`}
           aria-label={sidebarVisible ? "Close sidebar" : "Open sidebar"}
         >
           {sidebarVisible ? 
@@ -1546,18 +1611,32 @@ const ProLearningPage = () => {
           }
         </button>
 
+        {/* Mobile Sidebar Backdrop */}
+        {sidebarVisible && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-[25] lg:hidden"
+            onClick={() => handleSidebarToggle(false)}
+          />
+        )}
+
         {/* Sidebar */}
         <div 
-          className={`fixed top-0 right-0 h-screen w-[400px] bg-white shadow-lg border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 ${
+          className={`fixed top-0 right-0 h-screen bg-white shadow-lg border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 flex flex-col ${
             sidebarVisible ? 'translate-x-0' : 'translate-x-full'
+          } ${
+            // Responsive width
+            'w-full sm:w-[380px] md:w-[400px] lg:w-[400px] xl:w-[400px]'
+          } ${
+            // Hide on mobile by default, show only when explicitly opened
+            'lg:block'
           }`}
         >
           {/* Sidebar Header */}
-          <div className="pt-20 px-4 pb-3 border-b border-gray-200 bg-white">
+          <div className="flex-shrink-0 pt-20 px-4 pb-3 border-b border-gray-200 bg-white">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-lg">Learning Guide</h2>
               <button
-                onClick={() => setSidebarVisible(false)}
+                onClick={() => handleSidebarToggle(false)}
                 className="p-2 rounded-md hover:bg-gray-100 transition-colors"
                 aria-label="Close sidebar"
               >
@@ -1642,50 +1721,8 @@ const ProLearningPage = () => {
           </div>
           
           {/* Sidebar Content */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto min-h-0 p-4">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-gray-700">Quick Navigation</h4>
-                {topicsList.length > 1 && (
-                  <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                    {topicsList.length} topics
-                  </div>
-                )}
-              </div>
-              
-              {/* Tab Navigation in Sidebar */}
-              <div className="space-y-2">
-                {tabs.map((tab) => {
-                  const IconComponent = tab.icon;
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      disabled={isLoading}
-                      className={`w-full text-left p-3 rounded-xl transition-all duration-200 ${
-                        isActive
-                          ? `bg-gradient-to-r ${tab.gradient} text-white shadow-md`
-                          : 'text-gray-700 hover:bg-gray-100'
-                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <div className="flex items-center">
-                        <div className={`p-2 rounded-lg mr-3 ${
-                          isActive ? 'bg-white/20' : 'bg-gray-200'
-                        }`}>
-                          <IconComponent className="text-sm" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{tab.label}</div>
-                          <div className={`text-xs ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
-                            {tab.description}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
 
               {/* Reading Section Navigation */}
               {activeTab === 'reading' && !isLoading && readingSections.length > 1 && (
@@ -1751,7 +1788,7 @@ const ProLearningPage = () => {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
