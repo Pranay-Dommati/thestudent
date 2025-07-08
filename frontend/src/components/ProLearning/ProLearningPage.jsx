@@ -26,6 +26,8 @@ import {
   MdSchool, MdAutoAwesome, MdTimeline, MdExplore
 } from "react-icons/md";
 import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
   splitMarkdownSections,
   generateProContent,
@@ -323,6 +325,19 @@ const ProLearningPage = () => {
     // Here you could save to localStorage or send to backend
   };
 
+  const [copySuccess, setCopySuccess] = useState("");
+
+  const handleCopyCode = async (code) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopySuccess("Copied!");
+      setTimeout(() => setCopySuccess(""), 1200);
+    } catch (err) {
+      setCopySuccess("Failed to copy");
+      setTimeout(() => setCopySuccess(""), 1200);
+    }
+  };
+
   // Enhanced loading component
   const LoadingComponent = () => (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
@@ -501,19 +516,45 @@ const ProLearningPage = () => {
                         {children}
                       </p>
                     ),
-                    code: ({children}) => (
-                      <code className="bg-gradient-to-r from-purple-100 to-blue-100 text-purple-800 px-2 py-1 rounded-md text-sm font-mono border">
-                        {children}
-                      </code>
-                    ),
-                    pre: ({children}) => (
-                      <div className="bg-gray-900 text-gray-100 p-4 rounded-xl overflow-x-auto mb-6 shadow-lg border">
-                        <div className="flex items-center justify-between mb-2 text-xs">
-                          <span className="text-gray-400">Code</span>
-                          <button className="text-gray-400 hover:text-white">
-                            <IoShare />
-                          </button>
+                    code({node, inline, className, children, ...props}) {
+                      const match = /language-(\w+)/.exec(className || "");
+                      const lang = match ? match[1] : "";
+                      if (inline) {
+                        return (
+                          <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border" {...props}>{children}</code>
+                        );
+                      }
+                      return (
+                        <div className="relative my-6">
+                          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
+                            <span className="text-xs text-gray-500 font-mono">{lang || "code"}</span>
+                            <button
+                              className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-100 bg-white ml-2"
+                              onClick={() => handleCopyCode(String(children).replace(/\n$/, ""))}
+                              type="button"
+                            >
+                              {copySuccess ? copySuccess : "Copy"}
+                            </button>
+                          </div>
+                          <SyntaxHighlighter
+                            style={oneLight}
+                            language={lang}
+                            customStyle={{
+                              borderRadius: "0 0 0.75rem 0.75rem",
+                              fontSize: "1rem",
+                              margin: 0,
+                              background: "#f8fafc"
+                            }}
+                            codeTagProps={{ style: { fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace' } }}
+                            showLineNumbers={false}
+                          >
+                            {String(children).replace(/\n$/, "")}
+                          </SyntaxHighlighter>
                         </div>
+                      );
+                    },
+                    pre: ({children}) => (
+                      <div className="mb-6">
                         <pre className="text-sm">{children}</pre>
                       </div>
                     ),
