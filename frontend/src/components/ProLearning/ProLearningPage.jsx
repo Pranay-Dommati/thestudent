@@ -1104,24 +1104,7 @@ const ProLearningPage = () => {
                 </div>
               </div>
               
-              {/* Resource Categories */}
-              <div className="mt-4 flex flex-wrap gap-2">
-                {content.resourcesMetadata?.categories?.map((category, index) => (
-                  <span
-                    key={index}
-                    className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 text-xs font-medium text-white"
-                  >
-                    {category}
-                  </span>
-                )) || ['Documentation', 'Tutorials', 'Community', 'Tools'].map((cat, index) => (
-                  <span
-                    key={index}
-                    className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 text-xs font-medium text-white"
-                  >
-                    {cat}
-                  </span>
-                ))}
-              </div>
+              {/* Removed resource categories display for a cleaner look */}
             </div>
             
             {/* Compact Professional Resources Grid */}
@@ -1130,235 +1113,33 @@ const ProLearningPage = () => {
                 const iconName = getResourceIcon(resource.type);
                 const IconComponent = getIconComponent(iconName);
                 
-                // Define type-specific styling
-                const getTypeStyles = (type) => {
-                  const typeStyles = {
-                    'Documentation': {
-                      gradient: 'from-blue-500 to-indigo-600',
-                      bgColor: 'bg-blue-50',
-                      borderColor: 'border-blue-200',
-                      textColor: 'text-blue-700',
-                      badgeColor: 'bg-blue-100 text-blue-800'
-                    },
-                    'Tutorial': {
-                      gradient: 'from-green-500 to-emerald-600',
-                      bgColor: 'bg-green-50',
-                      borderColor: 'border-green-200',
-                      textColor: 'text-green-700',
-                      badgeColor: 'bg-green-100 text-green-800'
-                    },
-                    'Course': {
-                      gradient: 'from-purple-500 to-violet-600',
-                      bgColor: 'bg-purple-50',
-                      borderColor: 'border-purple-200',
-                      textColor: 'text-purple-700',
-                      badgeColor: 'bg-purple-100 text-purple-800'
-                    },
-                    'Tool': {
-                      gradient: 'from-orange-500 to-red-600',
-                      bgColor: 'bg-orange-50',
-                      borderColor: 'border-orange-200',
-                      textColor: 'text-orange-700',
-                      badgeColor: 'bg-orange-100 text-orange-800'
-                    },
-                    'Community': {
-                      gradient: 'from-pink-500 to-rose-600',
-                      bgColor: 'bg-pink-50',
-                      borderColor: 'border-pink-200',
-                      textColor: 'text-pink-700',
-                      badgeColor: 'bg-pink-100 text-pink-800'
-                    },
-                    'Book': {
-                      gradient: 'from-amber-500 to-yellow-600',
-                      bgColor: 'bg-amber-50',
-                      borderColor: 'border-amber-200',
-                      textColor: 'text-amber-700',
-                      badgeColor: 'bg-amber-100 text-amber-800'
-                    },
-                    'Article': {
-                      gradient: 'from-cyan-500 to-teal-600',
-                      bgColor: 'bg-cyan-50',
-                      borderColor: 'border-cyan-200',
-                      textColor: 'text-cyan-700',
-                      badgeColor: 'bg-cyan-100 text-cyan-800'
-                    }
-                  };
-                  return typeStyles[type] || typeStyles['Documentation'];
-                };
-                
-                const styles = getTypeStyles(resource.type);
-                
                 return (
                   <div
                     key={resource.id}
-                    className={`group relative bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border ${styles.borderColor} overflow-hidden transform hover:-translate-y-1`}
+                    className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 flex flex-col gap-2 h-full"
                   >
-                    {/* Resource Number Badge */}
-                    <div className="absolute top-3 right-3 z-10">
-                      <div className={`w-6 h-6 bg-gradient-to-r ${styles.gradient} rounded-full flex items-center justify-center shadow-md`}>
-                        <span className="text-white text-xs font-bold">{index + 1}</span>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center">
+                        <IconComponent className="text-xl text-gray-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-gray-500 font-medium mb-1">{resource.type}</div>
+                        <div className="text-base font-semibold text-gray-900 line-clamp-2">{resource.title}</div>
                       </div>
                     </div>
-                    
-                    {/* Header Section */}
-                    <div className={`${styles.bgColor} p-4`}>
-                      <div className="flex items-start space-x-3">
-                        <div className={`w-12 h-12 bg-gradient-to-r ${styles.gradient} rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-300`}>
-                          <IconComponent className="text-lg text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${styles.badgeColor}`}>
-                              {resource.type}
-                            </span>
-                            {resource.free ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                FREE
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                PAID
-                              </span>
-                            )}
-                          </div>
-                          <h3 className={`text-lg font-bold ${styles.textColor} line-clamp-2 group-hover:text-gray-900 transition-colors`}>
-                            {resource.title}
-                          </h3>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Content Section */}
-                    <div className="p-4">
-                      <p className="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-2">
-                        {resource.description}
-                      </p>
-                      
-                      {/* Tags */}
-                      {resource.tags && resource.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-4">
-                          {resource.tags.slice(0, 3).map((tag, tagIndex) => (
-                            <span
-                              key={tagIndex}
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600"
-                            >
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {/* Difficulty and Rating */}
-                      <div className="flex items-center justify-between mb-4">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
-                          resource.difficulty === 'Beginner' ? 'bg-green-100 text-green-700' :
-                          resource.difficulty === 'Intermediate' ? 'bg-yellow-100 text-yellow-700' :
-                          resource.difficulty === 'Advanced' ? 'bg-red-100 text-red-700' :
-                          'bg-blue-100 text-blue-700'
-                        }`}>
-                          {resource.difficulty}
-                        </span>
-                        <div className="flex items-center space-x-0.5">
-                          {[...Array(resource.rating === 'High' ? 5 : resource.rating === 'Medium' ? 4 : 3)].map((_, i) => (
-                            <FaStar key={i} className="w-3 h-3 text-yellow-400" />
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {/* Action Button */}
-                      <a
-                        href={resource.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`group/btn w-full inline-flex items-center justify-center px-4 py-2.5 bg-gradient-to-r ${styles.gradient} text-white rounded-lg text-sm font-semibold hover:shadow-md transition-all duration-300 transform hover:scale-105`}
-                      >
-                        <span className="mr-2">Explore</span>
-                        <FaExternalLinkAlt className="text-xs group-hover/btn:translate-x-0.5 transition-transform duration-300" />
-                      </a>
-                    </div>
-                    
-                    {/* Hover Effect Overlay */}
-                    <div className={`absolute inset-0 bg-gradient-to-r ${styles.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300 pointer-events-none rounded-xl`}></div>
+                    <div className="text-sm text-gray-600 line-clamp-3 mb-2">{resource.description}</div>
+                    <a
+                      href={resource.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-auto inline-block text-blue-600 hover:underline text-sm font-medium"
+                    >
+                      Visit Resource
+                    </a>
                   </div>
                 );
               })}
             </div>
-            
-            {/* Compact Call to Action */}
-            <div className="bg-gradient-to-r from-gray-900 via-purple-900 to-violet-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
-              {/* Background Pattern */}
-              <div className="absolute inset-0 opacity-10">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-y-6"></div>
-              </div>
-              
-              <div className="relative z-10 text-center max-w-3xl mx-auto">
-                <div className="w-16 h-16 bg-gradient-to-r from-purple-400 to-pink-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl">
-                  <IoBookmark className="text-2xl text-white" />
-                </div>
-                
-                <h3 className="text-2xl font-bold mb-3">
-                  Ready to dive deeper into {getCurrentTopic()}?
-                </h3>
-                <p className="text-lg text-gray-300 mb-6 leading-relaxed">
-                  These curated resources will guide your learning journey. 
-                  Bookmark and track your progress.
-                </p>
-                
-                <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-                  <button className="group flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:-translate-y-0.5 shadow-lg">
-                    <IoBookmark className="mr-2 group-hover:scale-110 transition-transform duration-300" />
-                    Bookmark Resources
-                  </button>
-                  
-                  <button className="group flex items-center px-6 py-3 bg-white/10 backdrop-blur-sm border border-white/20 text-white rounded-xl font-semibold hover:bg-white/20 transition-all duration-300">
-                    <IoDownload className="mr-2 group-hover:scale-110 transition-transform duration-300" />
-                    Download Guide
-                  </button>
-                  
-                  <button 
-                    onClick={() => setActiveTab('quiz')}
-                    className="group flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 shadow-lg"
-                  >
-                    <FaQuestionCircle className="mr-2 group-hover:scale-110 transition-transform duration-300" />
-                    Test Knowledge
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            {/* Compact Resources Statistics */}
-            {content.resourcesMetadata && (
-              <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4">
-                <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
-                  <IoStatsChart className="mr-2 text-blue-600" />
-                  Resource Overview
-                </h4>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="text-center">
-                    <div className="text-xl font-bold text-blue-600">{content.resourcesMetadata.totalResources}</div>
-                    <div className="text-xs text-gray-600">Total</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xl font-bold text-green-600">
-                      {content.resources.filter(r => r.free).length}
-                    </div>
-                    <div className="text-xs text-gray-600">Free</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xl font-bold text-purple-600">
-                      {content.resourcesMetadata.categories?.length || 0}
-                    </div>
-                    <div className="text-xs text-gray-600">Categories</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xl font-bold text-orange-600">
-                      {content.resources.filter(r => r.rating === 'High').length}
-                    </div>
-                    <div className="text-xs text-gray-600">High Quality</div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         );
 
