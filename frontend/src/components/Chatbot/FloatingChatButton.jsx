@@ -10,7 +10,8 @@ const FloatingChatButton = () => {
   if (
     location.pathname === '/chat' || 
     location.pathname.includes('/learning/quiz') ||
-    location.pathname.startsWith('/admin-p') // Add this condition
+    location.pathname.startsWith('/admin-p') || // Add this condition
+    location.pathname === '/pro-learning' // Hide on Pro Learning page
   ) {
     return null;
   }
