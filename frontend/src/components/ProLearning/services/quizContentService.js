@@ -304,7 +304,7 @@ function parseQuizQuestions(quizText, topic) {
       }
     });
     
-    return questions.slice(0, 10); // Limit to 10 questions
+    return questions.slice(0, 5); // Limit to 5 questions
     
   } catch (error) {
     console.warn('Failed to parse quiz questions:', error);
@@ -437,7 +437,7 @@ function generateFallbackQuiz(topic) {
     }
   ];
   
-  return fallbackQuestions;
+  return fallbackQuestions.slice(0, 5); // Limit fallback to 5 questions
 }
 
 // Calculate overall quiz difficulty

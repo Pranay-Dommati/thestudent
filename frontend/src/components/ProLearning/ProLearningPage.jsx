@@ -870,18 +870,20 @@ const ProLearningPage = () => {
                   <div className="bg-white px-2 py-1 rounded-full shadow-sm">
                     <span className="text-green-600 font-medium">{content.quiz.length} questions</span>
                   </div>
-                  {answeredQuestions > 0 && (
-                    <div className="bg-white px-2 py-1 rounded-full shadow-sm">
-                      <span className="text-gray-600">{correctAnswers}/{answeredQuestions} correct</span>
-                    </div>
-                  )}
                   {answeredQuestions === content.quiz.length && (
-                    <button 
-                      onClick={restartQuiz}
-                      className="text-green-600 hover:text-green-700 font-medium"
-                    >
-                      Restart Quiz
-                    </button>
+                    <>
+                      <div className="bg-white px-2 py-1 rounded-full shadow-sm">
+                        <span className="text-gray-600">{correctAnswers}/{answeredQuestions} correct</span>
+                      </div>
+                      <button 
+                        onClick={restartQuiz}
+                        className="flex items-center border border-green-500 text-green-600 hover:bg-green-50 hover:border-green-600 font-medium rounded px-3 py-1 transition-colors duration-150 ml-2 cursor-pointer"
+                        style={{gap: '0.4em'}}
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582M20 20v-5h-.581M5.582 9A7.003 7.003 0 0112 5c3.314 0 6.127 2.163 6.918 5M18.418 15A7.003 7.003 0 0112 19c-3.314 0-6.127-2.163-6.918-5" /></svg>
+                        Restart Quiz
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -902,80 +904,35 @@ const ProLearningPage = () => {
             <div className="space-y-6">
               {content.quiz.map((question, index) => {
                 const isAnswered = question.userAnswer !== null;
-                const isCorrect = question.userAnswer === question.correct;
-                
+                // const isCorrect = question.userAnswer === question.correct; // No instant feedback
                 return (
                   <div key={question.id} className="bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300">
                     {/* Question Header */}
                     <div className="p-6 border-b border-gray-100">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white mr-4 ${
-                            isAnswered 
-                              ? isCorrect 
-                                ? 'bg-gradient-to-br from-green-500 to-emerald-600' 
-                                : 'bg-gradient-to-br from-red-500 to-pink-600'
-                              : 'bg-gradient-to-br from-blue-500 to-purple-600'
-                          }`}>
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white mr-4 bg-gradient-to-br from-blue-500 to-purple-600">
                             {index + 1}
                           </div>
                           <div>
                             <span className="text-sm font-medium text-gray-600">Question {index + 1} of {content.quiz.length}</span>
-                            {isAnswered && (
-                              <div className={`text-xs px-2 py-1 rounded-full font-medium mt-1 inline-block ${
-                                isCorrect 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {isCorrect ? '✓ Correct' : '✗ Incorrect'}
-                              </div>
-                            )}
                           </div>
                         </div>
-                        
-                        {isAnswered && (
-                          <div className="text-right">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              isCorrect ? 'bg-green-100' : 'bg-red-100'
-                            }`}>
-                              {isCorrect ? (
-                                <FaCheck className="text-green-600" />
-                              ) : (
-                                <span className="text-red-600 font-bold">×</span>
-                              )}
-                            </div>
-                          </div>
-                        )}
                       </div>
-                      
                       <h3 className="text-lg font-semibold text-gray-900 leading-relaxed">
                         {question.question}
                       </h3>
                     </div>
-                    
                     {/* Answer Options */}
                     <div className="p-6">
                       <div className="space-y-3 mb-6">
                         {question.options.map((option, optionIndex) => {
                           let buttonStyle = "border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700";
                           let iconStyle = "border-gray-300 text-gray-600";
-                          
-                          if (isAnswered) {
-                            if (optionIndex === question.correct) {
-                              buttonStyle = "border-2 border-green-500 bg-green-50 text-green-800";
-                              iconStyle = "border-green-500 bg-green-500 text-white";
-                            } else if (question.userAnswer === optionIndex) {
-                              buttonStyle = "border-2 border-red-500 bg-red-50 text-red-800";
-                              iconStyle = "border-red-500 bg-red-500 text-white";
-                            } else {
-                              buttonStyle = "border-2 border-gray-200 bg-gray-50 text-gray-500";
-                              iconStyle = "border-gray-300 text-gray-400";
-                            }
-                          } else if (question.userAnswer === optionIndex) {
+                          if (question.userAnswer === optionIndex) {
                             buttonStyle = "border-2 border-blue-500 bg-blue-50 text-blue-800";
                             iconStyle = "border-blue-500 bg-blue-500 text-white";
                           }
-                          
                           return (
                             <button
                               key={optionIndex}
@@ -990,85 +947,54 @@ const ProLearningPage = () => {
                                   {String.fromCharCode(65 + optionIndex)}
                                 </div>
                                 <span className="font-medium leading-relaxed">{option}</span>
-                                {isAnswered && optionIndex === question.correct && (
-                                  <div className="ml-auto">
-                                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                                      <FaCheck className="text-white text-xs" />
-                                    </div>
-                                  </div>
-                                )}
                               </div>
                             </button>
                           );
                         })}
                       </div>
-                      
-                      {/* Explanation */}
-                      {isAnswered && (
-                        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4">
-                          <div className="flex items-start">
-                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
-                              <HiLightBulb className="text-white text-sm" />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-blue-800 mb-2">Explanation</div>
-                              <p className="text-blue-700 leading-relaxed">{question.explanation}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
               })}
-              
               {/* Quiz Summary */}
               {answeredQuestions === content.quiz.length && (
-                <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 border-2 border-green-200 rounded-2xl p-8 text-center shadow-lg">
-                  <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                    <FaTrophy className="text-white text-2xl" />
+                <div className="bg-white border border-gray-200 rounded-xl p-6 text-center shadow-sm">
+                  <div className="w-12 h-12 mx-auto mb-3 flex items-center justify-center rounded-full bg-green-100">
+                    <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Quiz Completed!</h3>
-                  <div className="text-4xl font-bold text-green-600 mb-2">
-                    {correctAnswers}/{content.quiz.length}
+                  <h3 className="text-xl font-bold text-gray-900 mb-1">Quiz Completed</h3>
+                  <div className="text-2xl font-bold text-green-600 mb-1">
+                    {correctAnswers}/{content.quiz.length} correct
                   </div>
-                  <p className="text-gray-600 mb-4">
+                  <div className="text-gray-600 mb-4">
                     Score: {((correctAnswers / content.quiz.length) * 100).toFixed(0)}%
-                  </p>
-                  
-                  {/* Performance message */}
-                  <div className="mb-6">
-                    {((correctAnswers / content.quiz.length) * 100) >= 80 ? (
-                      <div className="bg-green-100 border border-green-300 rounded-xl p-4">
-                        <p className="text-green-800 font-medium">🎉 Excellent work! You have a strong understanding of {getCurrentTopic()}.</p>
-                      </div>
-                    ) : ((correctAnswers / content.quiz.length) * 100) >= 60 ? (
-                      <div className="bg-yellow-100 border border-yellow-300 rounded-xl p-4">
-                        <p className="text-yellow-800 font-medium">👍 Good job! Review the explanations to strengthen your knowledge.</p>
-                      </div>
-                    ) : (
-                      <div className="bg-blue-100 border border-blue-300 rounded-xl p-4">
-                        <p className="text-blue-800 font-medium">📚 Keep learning! Consider reviewing the reading material and trying again.</p>
-                      </div>
-                    )}
                   </div>
-                  
-                  <div className="flex justify-center space-x-4">
-                    <button 
-                      onClick={restartQuiz}
-                      className="flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
-                    >
-                      <IoRocket className="mr-2" />
-                      Try Again
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('reading')}
-                      className="flex items-center px-6 py-3 bg-white text-green-600 border-2 border-green-200 hover:bg-green-50 rounded-xl font-semibold transition-all duration-300"
-                    >
-                      <FaBookOpen className="mr-2" />
-                      Review Material
-                    </button>
+                  <div className="mb-4 text-gray-700 font-medium">
+                    {((correctAnswers / content.quiz.length) * 100) >= 80
+                      ? 'Excellent work!'
+                      : ((correctAnswers / content.quiz.length) * 100) >= 60
+                        ? 'Good job! Review explanations to improve.'
+                        : 'Keep practicing and try again!'}
                   </div>
+                  {/* Show explanations for all questions after quiz is completed */}
+                  <div className="text-left mt-6">
+                    <h4 className="font-semibold text-gray-800 mb-2">Explanations</h4>
+                    <ul className="space-y-3">
+                      {content.quiz.map((question, idx) => (
+                        <li key={question.id} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                          <div className="font-medium text-gray-900 mb-1">Q{idx + 1}: {question.question}</div>
+                          <div className="text-sm text-gray-700 mb-1">Correct Answer: <span className="font-semibold">{question.options[question.correct]}</span></div>
+                          <div className="text-sm text-gray-600">{question.explanation}</div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <button 
+                    onClick={restartQuiz}
+                    className="px-5 py-2 mt-6 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
+                  >
+                    Try Again
+                  </button>
                 </div>
               )}
             </div>
