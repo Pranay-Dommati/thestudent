@@ -919,6 +919,9 @@ const ProLearningPage = () => {
                           </div>
                         </div>
                       </div>
+                      {question.code && (
+                        <pre className="mb-4 bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-sm"><code>{question.code.replace(/^```[a-zA-Z]*|```$/g, '').trim()}</code></pre>
+                      )}
                       <h3 className="text-lg font-semibold text-gray-900 leading-relaxed">
                         {question.question}
                       </h3>

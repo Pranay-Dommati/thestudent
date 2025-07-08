@@ -104,7 +104,12 @@ async function generateAIQuizQuestions(topic, readingContent) {
     }
 
     const quizText = result.candidates[0].content.parts[0].text.trim();
-    return parseQuizQuestions(quizText, topic);
+    const parsed = parseQuizQuestions(quizText, topic);
+    if (parsed && parsed.length > 0) {
+      return parsed;
+    } else {
+      return generateFallbackQuiz(topic);
+    }
     
   } catch (error) {
     console.warn('AI quiz generation failed, using fallback:', error.message);
@@ -158,7 +163,12 @@ async function generateTopicQuizQuestions(topic) {
     }
 
     const quizText = result.candidates[0].content.parts[0].text.trim();
-    return parseQuizQuestions(quizText, topic);
+    const parsed = parseQuizQuestions(quizText, topic);
+    if (parsed && parsed.length > 0) {
+      return parsed;
+    } else {
+      return generateFallbackQuiz(topic);
+    }
     
   } catch (error) {
     console.warn('Topic quiz generation failed, using fallback:', error.message);
@@ -187,6 +197,7 @@ CORRECT: [A/B/C/D]
 EXPLANATION: [Brief explanation of why this answer is correct]
 DIFFICULTY: [Beginner/Intermediate/Advanced]
 TOPIC: [Specific subtopic this question covers]
+CODE: [If the question references an example, code, or code analysis, include a code block in markdown triple backticks here. Otherwise, omit this line.]
 
 **Guidelines:**
 - Cover different aspects of the content evenly
@@ -195,6 +206,7 @@ TOPIC: [Specific subtopic this question covers]
 - Avoid trick questions or ambiguous wording
 - Make incorrect options plausible but clearly wrong
 - Include code-related questions if the content covers programming
+- If a question references an example, code, or code analysis, always include the relevant code block in markdown triple backticks in the CODE field above the question text.
 - Ensure questions are directly based on the provided content
 - Keep questions clear and concise
 - Provide helpful explanations that reinforce learning
@@ -270,13 +282,31 @@ function parseQuizQuestions(quizText, topic) {
         explanation: '',
         difficulty: 'Beginner',
         topic: topic,
-        userAnswer: null
+        userAnswer: null,
+        code: '' // Add code field
       };
       
       let currentOptionIndex = 0;
+      let codeBlock = '';
+      let inCodeBlock = false;
       
       lines.forEach(line => {
-        if (line.match(/^[A-D]\)/)) {
+        if (line.startsWith('CODE:')) {
+          // Start of code block
+          const codeLine = line.replace('CODE:', '').trim();
+          if (codeLine.startsWith('```')) {
+            inCodeBlock = true;
+            codeBlock = codeLine + '\n';
+          } else {
+            question.code = codeLine;
+          }
+        } else if (inCodeBlock) {
+          codeBlock += line + '\n';
+          if (line.startsWith('```')) {
+            inCodeBlock = false;
+            question.code = codeBlock.trim();
+          }
+        } else if (line.match(/^[A-D]\)/)) {
           const optionLetter = line.charAt(0);
           const optionText = line.substring(2).trim();
           const optionIndex = optionLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
@@ -296,16 +326,13 @@ function parseQuizQuestions(quizText, topic) {
           question.question = line;
         }
       });
-      
       // Validate question
       if (question.question && question.options.every(opt => opt.length > 0) && 
           question.correct >= 0 && question.correct < 4) {
         questions.push(question);
       }
     });
-    
     return questions.slice(0, 5); // Limit to 5 questions
-    
   } catch (error) {
     console.warn('Failed to parse quiz questions:', error);
     return generateFallbackQuiz(topic);
