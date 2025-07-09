@@ -612,3 +612,30 @@ function isEducationalChannelName(channelName) {
   const channelLower = channelName.toLowerCase();
   return educationalIndicators.some(indicator => channelLower.includes(indicator));
 }
+
+// Gemini model fallback configuration
+const GEMINI_FALLBACK_MODELS = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+
+// Try Gemini models in order until one succeeds
+async function tryGeminiModels(requestBody, apiKey) {
+  let lastError;
+  for (const model of GEMINI_FALLBACK_MODELS) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+      if (!response.ok) throw new Error(`Gemini API request failed: ${response.status}`);
+      const result = await response.json();
+      if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return result.candidates[0].content.parts[0].text.trim();
+      }
+      throw new Error('Invalid Gemini API response');
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('All Gemini models failed');
+}

@@ -114,8 +114,9 @@ async function generateCuratedResources(topic, options = {}) {
     
     const resourcesPrompt = createResourcesPrompt(topic, options);
     
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
     const requestBody = {
       contents: [{
         role: 'user',
@@ -137,41 +138,21 @@ async function generateCuratedResources(topic, options = {}) {
           category: "HARM_CATEGORY_HATE_SPEECH",
           threshold: "BLOCK_MEDIUM_AND_ABOVE"
         }
-      ]
+      ],
+      signal: controller.signal
     };
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Resources API request failed: ${response.status} - ${errorText}`);
+    try {
+      const resourcesText = await tryGeminiModels(requestBody, apiKey);
+      clearTimeout(timeoutId);
+      if (resourcesText.length < 100) {
+        throw new Error('Resources response too short, likely incomplete');
+      }
+      return parseResourceRecommendations(resourcesText, topic);
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
     }
-
-    const result = await response.json();
-    
-    if (!result?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid resources API response structure');
-    }
-
-    const resourcesText = result.candidates[0].content.parts[0].text.trim();
-    
-    if (resourcesText.length < 100) {
-      throw new Error('Resources response too short, likely incomplete');
-    }
-    
-    return parseResourceRecommendations(resourcesText, topic);
     
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -989,4 +970,32 @@ export function addIconsToResources(resources) {
     ...resource,
     iconName: getResourceIcon(resource.type)
   }));
+}
+
+// Gemini model fallback configuration
+const GEMINI_FALLBACK_MODELS = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+
+// Try Gemini models in order until one succeeds
+async function tryGeminiModels(requestBody, apiKey) {
+  let lastError;
+  for (const model of GEMINI_FALLBACK_MODELS) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: requestBody.signal
+      });
+      if (!response.ok) throw new Error(`Gemini API request failed: ${response.status}`);
+      const result = await response.json();
+      if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return result.candidates[0].content.parts[0].text.trim();
+      }
+      throw new Error('Invalid Gemini API response');
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('All Gemini models failed');
 }

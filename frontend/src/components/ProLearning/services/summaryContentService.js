@@ -98,25 +98,7 @@ async function generateTopicBasedSummary(topic, readingContent = '') {
       }
     };
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Topic summary API request failed: ${response.status}`);
-    }
-
-    const result = await response.json();
-    
-    if (!result?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid topic summary API response');
-    }
-
-    return result.candidates[0].content.parts[0].text.trim();
+    return await tryGeminiModels(requestBody, apiKey);
     
   } catch (error) {
     console.warn('Topic-based summary generation failed, using fallback:', error.message);
@@ -150,25 +132,7 @@ async function generateAISummary(readingContent, topic = '') {
     }
   };
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(requestBody)
-  });
-
-  if (!response.ok) {
-    throw new Error(`Summary API request failed: ${response.status}`);
-  }
-
-  const result = await response.json();
-  
-  if (!result?.candidates?.[0]?.content?.parts?.[0]?.text) {
-    throw new Error('Invalid summary API response');
-  }
-
-  return result.candidates[0].content.parts[0].text.trim();
+  return await tryGeminiModels(requestBody, apiKey);
 }
 
 // Create prompt for content-based summary
@@ -401,4 +365,31 @@ function createSummaryMetadata(originalContent, summaryContent) {
     estimatedReadTime: estimateReadingTime(summaryContent),
     generatedAt: new Date().toISOString()
   };
+}
+
+// Gemini model fallback configuration
+const GEMINI_FALLBACK_MODELS = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+
+// Try Gemini models in order until one succeeds
+async function tryGeminiModels(requestBody, apiKey) {
+  let lastError;
+  for (const model of GEMINI_FALLBACK_MODELS) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+      if (!response.ok) throw new Error(`Gemini API request failed: ${response.status}`);
+      const result = await response.json();
+      if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return result.candidates[0].content.parts[0].text.trim();
+      }
+      throw new Error('Invalid Gemini API response');
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('All Gemini models failed');
 }

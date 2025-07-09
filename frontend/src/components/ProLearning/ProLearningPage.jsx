@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { 
   IoHome, IoChevronBack, IoPlayCircle, IoBookmark, IoDownload, 
@@ -49,6 +49,80 @@ import {
 } from './services/index.js';
 import Navbar from '../Navbar/Navbar';
 
+// Replace parseTopics with classifyTopicsWithGemini
+// Get Gemini API key from environment variables
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// Gemini-based topic classifier
+export async function classifyTopicsWithGemini(userInput, apiKey) {
+  console.log('[Gemini] classifyTopicsWithGemini called with:', userInput, apiKey ? 'API KEY PRESENT' : 'NO API KEY');
+  // Prevent API calls for empty or very short input
+  if (!userInput || userInput.trim().length < 3) {
+    return [];
+  }
+  // Validate API key (like getGeminiApiKey)
+  if (!apiKey || apiKey.length < 10) {
+    throw new Error('Invalid or missing Gemini API key. Please check your environment variables.');
+  }
+
+  const models = ['gemini-2.5-pro', 'gemini-2.0-flash-lite','Gemini 2.0 Flash','gemini-1.5-flash'];
+  let lastError;
+
+  for (const model of models) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const prompt = `\n  You are a smart educational topic classifier AI integrated into a student learning platform.\n  \n  Your task is:\n  - Given any user input, extract only the *meaningful and realistic learning topics*.\n  - Return the final result as a *JSON array of strings* (no explanations, just the array).\n  - Avoid extracting generic or non-informative words like \"I\", \"want\", \"learn\", \"something\", etc.\n  - If the user input contains fake, irrelevant, or gibberish content, return an empty array.\n  - Each topic in the array should be a concise, standardized topic name (e.g., \"HTML\", \"CSS\", \"Python\", \"React.js\").\n  - Do not include duplicate or highly similar topics.\n  - Return between 1 to 5 *actual learning topics* only if they exist in the input.\n  \n  Examples:\n  \n  Input: \"I want to learn HTML and CSS\"\n  Output: [\"HTML\", \"CSS\"]\n  \n  Input: \"Please help me with machine learning and data science basics\"\n  Output: [\"Machine Learning\", \"Data Science\"]\n  \n  Input: \"I wanna be a hacker and learn something\"\n  Output: []\n  \n  Input: \"Teach me React.js, TypeScript, and Node.js\"\n  Output: [\"React.js\", \"TypeScript\", \"Node.js\"]\n  \n  Input: \"I need Java and DSA\"\n  Output: [\"Java\", \"Data Structures and Algorithms\"]\n  \n  Now classify the user input below accordingly.\n  \n  User input: \"${userInput}\"\n  \n  Topics (JSON array only):\n  `;
+
+    // Add timeout (AbortController)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage += ` - ${JSON.stringify(errorData)}`;
+        } catch {}
+        if (response.status === 429 || response.status === 403) {
+          lastError = new Error(errorMessage);
+          continue; // Try next model
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      // Extract the JSON array from the model's response
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      try {
+        const topics = JSON.parse(text);
+        if (Array.isArray(topics)) {
+          return topics.map((name, idx) => ({ id: idx + 1, name: name.trim(), isActive: idx === 0 }));
+        }
+      } catch (e) {
+        lastError = new Error('Failed to parse Gemini response as JSON array.');
+        continue;
+      }
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+  }
+  // If all models fail, throw last error
+  throw lastError || new Error('All Gemini models failed');
+}
+
+
 const ProLearningPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -80,27 +154,49 @@ const ProLearningPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Parse multiple topics from the search parameter
-  const parseTopics = (topicString) => {
-    if (!topicString) return [];
-    
-    // Split by spaces and filter out empty strings
-    const topics = topicString.split(/\s+/).filter(topic => topic.trim().length > 0);
-    
-    // If only one topic or no valid separation, return as single topic
-    if (topics.length <= 1) {
-      return [{ id: 1, name: topicString.trim(), isActive: true }];
-    }
-    
-    // Return multiple topics with the first one active by default
-    return topics.map((topicName, index) => ({
-      id: index + 1,
-      name: topicName.trim(),
-      isActive: index === 0
-    }));
-  };
+  // Update topicsList initialization and update logic
+  const [topicsList, setTopicsList] = useState([]);
+  // Use environment variable for Gemini API key
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-  const [topicsList, setTopicsList] = useState(() => parseTopics(topic));
+  // Debounce and cache for Gemini topic classification
+  const geminiCache = useRef({});
+  const debounceTimeout = useRef();
+
+  useEffect(() => {
+    console.log('[Gemini] useEffect for topic classification triggered:', topic);
+    if (!topic) return;
+
+    // If cached, use it immediately
+    if (geminiCache.current[topic]) {
+      setTopicsList(geminiCache.current[topic]);
+      return;
+    }
+
+    // Debounce Gemini API call
+    clearTimeout(debounceTimeout.current);
+    debounceTimeout.current = setTimeout(async () => {
+      // Prevent API call for empty/short topic
+      if (!topic || topic.trim().length < 3) {
+        setTopicsList([]);
+        return;
+      }
+      try {
+        console.log('[Gemini] Debounced API call for topic:', topic);
+        const classified = await classifyTopicsWithGemini(topic, GEMINI_API_KEY);
+        geminiCache.current[topic] = classified;
+        setTopicsList(classified);
+      } catch (error) {
+        setTopicsList([]);
+        // Optionally, show error to user via toast or UI
+        console.error('Gemini topic classification failed:', error.message);
+      }
+    }, 1000); // 1000ms debounce
+
+    // Cleanup on unmount/change
+    return () => clearTimeout(debounceTimeout.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topic, GEMINI_API_KEY]);
 
   // Handle topic selection from sidebar
   const handleTopicSelect = (topicId) => {
@@ -254,11 +350,11 @@ const ProLearningPage = () => {
 
   useEffect(() => {
     // Re-parse topics when URL parameter changes
-    const newTopics = parseTopics(topic);
-    setTopicsList(newTopics);
+    // const newTopics = parseTopics(topic); // This line is no longer needed
+    // setTopicsList(newTopics);
     
     // Generate content for the first/active topic
-    const activeTopic = newTopics.find(t => t.isActive);
+    const activeTopic = topicsList.find(t => t.isActive);
     const topicToGenerate = activeTopic ? activeTopic.name : topic;
     
     if (topicToGenerate) {
@@ -273,7 +369,7 @@ const ProLearningPage = () => {
         content 
       });
     }
-  }, [topic]);
+  }, [topic, topicsList]); // Added topicsList to dependency array
 
   const handleQuizAnswer = (questionId, answerIndex) => {
     setContent(prev => ({
@@ -1122,7 +1218,7 @@ const ProLearningPage = () => {
     <>
       <Navbar initialStyle="light" />
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
-        <style jsx>{`
+        <style>{`
           .scrollbar-hide {
             -ms-overflow-style: none;
             scrollbar-width: none;

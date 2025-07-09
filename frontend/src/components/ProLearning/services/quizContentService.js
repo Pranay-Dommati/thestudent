@@ -69,8 +69,6 @@ async function generateAIQuizQuestions(topic, readingContent) {
   try {
     const quizPrompt = createQuizPrompt(topic, readingContent);
     
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    
     const requestBody = {
       contents: [{
         role: 'user',
@@ -85,25 +83,7 @@ async function generateAIQuizQuestions(topic, readingContent) {
       }
     };
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Quiz API request failed: ${response.status}`);
-    }
-
-    const result = await response.json();
-    
-    if (!result?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid quiz API response');
-    }
-
-    const quizText = result.candidates[0].content.parts[0].text.trim();
+    const quizText = await tryGeminiModels(requestBody, apiKey);
     const parsed = parseQuizQuestions(quizText, topic);
     if (parsed && parsed.length > 0) {
       return parsed;
@@ -128,8 +108,6 @@ async function generateTopicQuizQuestions(topic) {
   try {
     const topicQuizPrompt = createTopicQuizPrompt(topic);
     
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    
     const requestBody = {
       contents: [{
         role: 'user',
@@ -144,25 +122,7 @@ async function generateTopicQuizQuestions(topic) {
       }
     };
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Topic quiz API request failed: ${response.status}`);
-    }
-
-    const result = await response.json();
-    
-    if (!result?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid topic quiz API response');
-    }
-
-    const quizText = result.candidates[0].content.parts[0].text.trim();
+    const quizText = await tryGeminiModels(requestBody, apiKey);
     const parsed = parseQuizQuestions(quizText, topic);
     if (parsed && parsed.length > 0) {
       return parsed;
@@ -546,4 +506,31 @@ export function getQuizResults(questions) {
 
 export function resetQuiz(questions) {
   return questions.map(q => ({ ...q, userAnswer: null }));
+}
+
+// Gemini model fallback configuration
+const GEMINI_FALLBACK_MODELS = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+
+// Try Gemini models in order until one succeeds
+async function tryGeminiModels(requestBody, apiKey) {
+  let lastError;
+  for (const model of GEMINI_FALLBACK_MODELS) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+      if (!response.ok) throw new Error(`Gemini API request failed: ${response.status}`);
+      const result = await response.json();
+      if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return result.candidates[0].content.parts[0].text.trim();
+      }
+      throw new Error('Invalid Gemini API response');
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('All Gemini models failed');
 }
