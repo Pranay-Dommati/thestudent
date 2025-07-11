@@ -11,7 +11,7 @@ import {
   FaGraduationCap, FaClock, FaUsers, FaChartLine, FaLightbulb,
   FaBolt, FaBullseye, FaCheck, FaTrophy, FaBook, FaNewspaper,
   FaCode, FaDownload, FaBookmark, FaCertificate, FaLaptopCode,
-  FaStar
+  FaStar, FaRegHandPaper
 } from "react-icons/fa";
 import { 
   BiLoaderAlt, BiTrophy, BiCode, BiTargetLock, BiCheckShield,
@@ -352,16 +352,23 @@ const ProLearningPage = () => {
     // Here you could save to localStorage or send to backend
   };
 
-  const [copySuccess, setCopySuccess] = useState("");
+  // Replace the single copySuccess state with a map for per-block state
+  const [copySuccessMap, setCopySuccessMap] = useState({});
+  const codeBlockIdRef = useRef(0); // To generate unique ids for code blocks
 
-  const handleCopyCode = async (code) => {
+  // Update handleCopyCode to accept an id
+  const handleCopyCode = async (code, blockId) => {
     try {
       await navigator.clipboard.writeText(code);
-      setCopySuccess("Copied!");
-      setTimeout(() => setCopySuccess(""), 1200);
+      setCopySuccessMap((prev) => ({ ...prev, [blockId]: "Copied!" }));
+      setTimeout(() => {
+        setCopySuccessMap((prev) => ({ ...prev, [blockId]: "" }));
+      }, 1200);
     } catch (err) {
-      setCopySuccess("Failed to copy");
-      setTimeout(() => setCopySuccess(""), 1200);
+      setCopySuccessMap((prev) => ({ ...prev, [blockId]: "Failed to copy" }));
+      setTimeout(() => {
+        setCopySuccessMap((prev) => ({ ...prev, [blockId]: "" }));
+      }, 1200);
     }
   };
 
@@ -558,16 +565,25 @@ const ProLearningPage = () => {
                           <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border" {...props}>{children}</code>
                         );
                       }
+                      // Use the code string as a unique id for this code block
+                      const codeString = String(children).replace(/\n$/, "");
+                      const blockId = codeString;
                       return (
                         <div className="relative my-6">
                           <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
                             <span className="text-xs text-gray-500 font-mono">{lang || "code"}</span>
                             <button
-                              className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-100 bg-white ml-2"
-                              onClick={() => handleCopyCode(String(children).replace(/\n$/, ""))}
+                              className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-100 bg-white ml-2 flex items-center gap-1 cursor-pointer"
+                              onClick={() => handleCopyCode(codeString, blockId)}
                               type="button"
                             >
-                              {copySuccess ? copySuccess : "Copy"}
+                              {copySuccessMap[blockId] ? (
+                                <>
+                                  <FaCheck className="inline-block text-green-600" /> Copied!
+                                </>
+                              ) : (
+                                <>Copy</>
+                              )}
                             </button>
                           </div>
                           <SyntaxHighlighter
@@ -586,7 +602,7 @@ const ProLearningPage = () => {
                             }}
                             showLineNumbers={false}
                           >
-                            {String(children).replace(/\n$/, "")}
+                            {codeString}
                           </SyntaxHighlighter>
                         </div>
                       );
