@@ -57,6 +57,7 @@ const ProLearningPage = () => {
   const topic = searchParams.get("topic") || "Learning Topic";
   const [sidebarVisible, setSidebarVisible] = useState(false); // Start hidden on mobile
   const [selectedTopic, setSelectedTopic] = useState(null);
+  const [completedTopics, setCompletedTopics] = useState([]); // Track completed topics
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Initialize sidebar visibility based on screen size
@@ -131,7 +132,8 @@ const ProLearningPage = () => {
     setTopicsList(prev => 
       prev.map(t => ({ ...t, isActive: t.id === topicId }))
     );
-    
+    // Mark topic as completed
+    setCompletedTopics((prev) => prev.includes(topicId) ? prev : [...prev, topicId]);
     // Get the selected topic name for content generation
     const selectedTopicObj = topicsList.find(t => t.id === topicId);
     if (selectedTopicObj) {
@@ -178,6 +180,7 @@ const ProLearningPage = () => {
   };
   
   const [activeTab, setActiveTab] = useState("reading");
+  const [completedTabs, setCompletedTabs] = useState([]); // Track completed tabs
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStep, setLoadingStep] = useState("Initializing...");
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -415,16 +418,23 @@ const ProLearningPage = () => {
 
           {/* Enhanced status indicators */}
           <div className="flex justify-center space-x-3 mb-4 relative z-10">
-            {tabs.slice(0, 5).map((tab, index) => {
+            {tabs.slice(0, 5).map((tab) => {
               const IconComponent = tab.icon;
-              const isCompleted = loadingProgress > (index + 1) * 20;
-              const isActive = loadingProgress >= index * 20 && loadingProgress <= (index + 1) * 20;
-              
+              const isCompleted = completedTabs.includes(tab.id);
+              const isActive = activeTab === tab.id;
               return (
-                <div key={tab.id} className="flex flex-col items-center">
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setCompletedTabs((prev) => prev.includes(tab.id) ? prev : [...prev, tab.id]);
+                  }}
+                  className="focus:outline-none"
+                  aria-label={tab.label}
+                >
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                    isCompleted 
-                      ? 'bg-gradient-to-br from-green-400 to-green-600 text-white scale-110' 
+                    isCompleted
+                      ? 'bg-gradient-to-br from-green-400 to-green-600 text-white scale-110'
                       : isActive
                         ? 'bg-gradient-to-br from-blue-400 to-purple-600 text-white animate-pulse scale-105'
                         : 'bg-gray-200 text-gray-400'
@@ -436,12 +446,12 @@ const ProLearningPage = () => {
                     )}
                   </div>
                   <span className={`text-xs mt-1 transition-colors ${
-                    isCompleted ? 'text-green-600 font-medium' : 
+                    isCompleted ? 'text-green-600 font-medium' :
                     isActive ? 'text-blue-600 font-medium' : 'text-gray-400'
                   }`}>
                     {tab.label}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -1174,25 +1184,32 @@ const ProLearningPage = () => {
                     {tabs.map((tab) => {
                       const IconComponent = tab.icon;
                       const isActive = activeTab === tab.id;
+                      const isCompleted = completedTabs.includes(tab.id);
                       return (
                         <button
                           key={tab.id}
-                          onClick={() => setActiveTab(tab.id)}
+                          onClick={() => {
+                            setActiveTab(tab.id);
+                            setCompletedTabs((prev) => prev.includes(tab.id) ? prev : [...prev, tab.id]);
+                          }}
                           disabled={isLoading}
                           className={`group flex-1 min-w-[120px] p-4 rounded-xl font-medium transition-all duration-300 ${
-                            isActive
-                              ? `bg-gradient-to-r ${tab.gradient} text-white shadow-lg transform scale-105`
-                              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                            isCompleted
+                              ? 'bg-gradient-to-r from-green-400 to-green-600 text-white shadow-lg transform scale-105'
+                              : isActive
+                                ? `bg-gradient-to-r ${tab.gradient} text-white shadow-lg transform scale-105`
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                           } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <div className="flex flex-col items-center space-y-2">
                             <div className={`p-2 rounded-lg transition-colors ${
-                              isActive ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-gray-200'
+                              isCompleted
+                                ? 'bg-white/20'
+                                : isActive ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-gray-200'
                             }`}>
-                              <IconComponent className="text-lg" />
+                              {isCompleted ? <FaCheck className="text-lg" /> : <IconComponent className="text-lg" />}
                             </div>
                             <span className="text-sm font-semibold whitespace-nowrap">{tab.label}</span>
-                            {/* Removed tab.description here */}
                           </div>
                         </button>
                       );
@@ -1311,14 +1328,35 @@ const ProLearningPage = () => {
                       className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
                         topicItem.isActive
                           ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
-                          : 'bg-white text-blue-700 hover:bg-blue-100 border border-blue-200'
+                          : completedTopics.includes(topicItem.id)
+                            ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                            : 'bg-white text-blue-700 hover:bg-blue-100 border border-blue-200'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-medium capitalize">{topicItem.name}</span>
-                        {topicItem.isActive && (
+                        {/* Make the circle clickable to toggle completion */}
+                        {topicItem.isActive ? (
                           <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
                             <FaCheck className="text-white text-xs" />
+                          </div>
+                        ) : (
+                          <div
+                            className={`w-5 h-5 rounded-full flex items-center justify-center cursor-pointer transition-colors ${
+                              completedTopics.includes(topicItem.id)
+                                ? 'bg-blue-200' : 'bg-gray-200 hover:bg-blue-100'
+                            }`}
+                            onClick={e => {
+                              e.stopPropagation();
+                              setCompletedTopics(prev =>
+                                prev.includes(topicItem.id)
+                                  ? prev.filter(id => id !== topicItem.id)
+                                  : [...prev, topicItem.id]
+                              );
+                            }}
+                            title={completedTopics.includes(topicItem.id) ? 'Mark as incomplete' : 'Mark as complete'}
+                          >
+                            {completedTopics.includes(topicItem.id) && <FaCheck className="text-blue-600 text-xs" />}
                           </div>
                         )}
                       </div>
