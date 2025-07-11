@@ -30,11 +30,12 @@ export async function classifyTopicsWithGemini(userInput, apiKey = GEMINI_API_KE
 You are a smart educational topic classifier AI integrated into a student learning platform.
 
 Your task is:
-- Given any user input, extract only the *meaningful and realistic learning topics*.
+- Given any user input, extract only the *meaningful and realistic learning topics*, including *multi-word technical terms* (e.g., "Dynamic Programming", "Data Science").
+- Carefully check if adjacent words form a known learning topic (e.g., "dynamic programming", "machine learning") and do not split them into separate entries.
 - Return the final result as a *JSON array of strings* (no explanations, just the array).
 - Avoid extracting generic or non-informative words like "I", "want", "learn", "something", etc.
 - If the user input contains fake, irrelevant, or gibberish content, return an empty array.
-- Each topic in the array should be a concise, standardized topic name (e.g., "HTML", "CSS", "Python", "React.js").
+- Each topic in the array should be a concise, standardized topic name (e.g., "HTML", "CSS", "Python", "React.js", "Dynamic Programming").
 - Do not include duplicate or highly similar topics.
 - Return between 1 to 5 *actual learning topics* only if they exist in the input.
 
@@ -55,12 +56,16 @@ Output: ["React.js", "TypeScript", "Node.js"]
 Input: "I need Java and DSA"  
 Output: ["Java", "Data Structures and Algorithms"]
 
+Input: "Create a course for dynamic programming"  
+Output: ["Dynamic Programming"]
+
 Now classify the user input below accordingly.
 
 User input: "${userInput}"
 
 Topics (JSON array only):
 `;
+
 
     // Add timeout (AbortController)
     const controller = new AbortController();
