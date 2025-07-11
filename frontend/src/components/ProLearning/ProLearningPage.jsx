@@ -437,33 +437,22 @@ const ProLearningPage = () => {
           <div className="flex justify-center space-x-3 mb-4 relative z-10">
             {tabs.slice(0, 5).map((tab) => {
               const IconComponent = tab.icon;
-              const isCompleted = completedTabs.includes(tab.id);
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    setCompletedTabs((prev) => prev.includes(tab.id) ? prev : [...prev, tab.id]);
-                  }}
+                  onClick={() => setActiveTab(tab.id)}
                   className="focus:outline-none"
                   aria-label={tab.label}
                 >
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                    isCompleted
-                      ? 'bg-gradient-to-br from-green-400 to-green-600 text-white scale-110'
-                      : isActive
-                        ? 'bg-gradient-to-br from-blue-400 to-purple-600 text-white animate-pulse scale-105'
-                        : 'bg-gray-200 text-gray-400'
+                    isActive
+                      ? 'bg-gradient-to-br from-blue-400 to-purple-600 text-white animate-pulse scale-105'
+                      : 'bg-gray-200 text-gray-400'
                   }`}>
-                    {isCompleted ? (
-                      <FaCheck className="text-xs" />
-                    ) : (
-                      <IconComponent className="text-xs" />
-                    )}
+                    <IconComponent className="text-xs" />
                   </div>
                   <span className={`text-xs mt-1 transition-colors ${
-                    isCompleted ? 'text-green-600 font-medium' :
                     isActive ? 'text-blue-600 font-medium' : 'text-gray-400'
                   }`}>
                     {tab.label}
@@ -1220,30 +1209,24 @@ const ProLearningPage = () => {
                     {tabs.map((tab) => {
                       const IconComponent = tab.icon;
                       const isActive = activeTab === tab.id;
-                      const isCompleted = completedTabs.includes(tab.id);
                       return (
                         <button
                           key={tab.id}
                           onClick={() => {
                             setActiveTab(tab.id);
-                            setCompletedTabs((prev) => prev.includes(tab.id) ? prev : [...prev, tab.id]);
                           }}
                           disabled={isLoading}
                           className={`group flex-1 min-w-[120px] p-4 rounded-xl font-medium transition-all duration-300 ${
-                            isCompleted
-                              ? 'bg-gradient-to-r from-green-400 to-green-600 text-white shadow-lg transform scale-105'
-                              : isActive
-                                ? `bg-gradient-to-r ${tab.gradient} text-white shadow-lg transform scale-105`
-                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                            isActive
+                              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg transform scale-105'
+                              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                           } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <div className="flex flex-col items-center space-y-2">
                             <div className={`p-2 rounded-lg transition-colors ${
-                              isCompleted
-                                ? 'bg-white/20'
-                                : isActive ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-gray-200'
+                              isActive ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-gray-200'
                             }`}>
-                              {isCompleted ? <FaCheck className="text-lg" /> : <IconComponent className="text-lg" />}
+                              {isActive ? <FaCheck className="text-lg" /> : <IconComponent className="text-lg" />}
                             </div>
                             <span className="text-sm font-semibold whitespace-nowrap">{tab.label}</span>
                           </div>
