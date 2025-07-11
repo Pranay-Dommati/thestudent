@@ -4,6 +4,11 @@
 // Get Gemini API key from environment variables
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
+// Helper to sleep for ms milliseconds
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Gemini-based topic classifier
 export async function classifyTopicsWithGemini(userInput, apiKey = GEMINI_API_KEY) {
   console.log('[Gemini] classifyTopicsWithGemini called with:', userInput, apiKey ? 'API KEY PRESENT' : 'NO API KEY');
@@ -16,7 +21,7 @@ export async function classifyTopicsWithGemini(userInput, apiKey = GEMINI_API_KE
     throw new Error('Invalid or missing Gemini API key. Please check your environment variables.');
   }
 
-  const models = ['gemini-1.5-flash','gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro'];
+  const models = ['gemini-1.5-flash','gemini-1.5-pro'];
   let lastError;
 
   for (const model of models) {
@@ -82,6 +87,8 @@ Topics (JSON array only):
         } catch {}
         if (response.status === 429 || response.status === 403) {
           lastError = new Error(errorMessage);
+          // Throttle before next model
+          await sleep(200);
           continue; // Try next model
         }
         throw new Error(errorMessage);
@@ -97,16 +104,22 @@ Topics (JSON array only):
         }
       } catch (e) {
         lastError = new Error('Failed to parse Gemini response as JSON array.');
+        // Throttle before next model
+        await sleep(200);
         continue;
       }
     } catch (error) {
       lastError = error;
+      // Throttle before next model
+      await sleep(200);
       continue;
     }
+    // Throttle before next model (even if successful, but will return before this)
+    await sleep(200);
   }
   // If all models fail, use regex-based fallback to extract meaningful words/phrases
   const stopWords = [
-    'i', 'want', 'all', 'those', 'something', 'to', 'learn', 'me', 'please', 'help', 'be', 'a', 'the', 'and', 'with', 'need', 'teach', 'become', 'like', 'in', 'on', 'for', 'of', 'about', 'my', 'some', 'any', 'that', 'this', 'these', 'those', 'it', 'is', 'an', 'as', 'at', 'by', 'do', 'so', 'from', 'just', 'can', 'could', 'would', 'should', 'will', 'may', 'might', 'must', 'shall', 'if', 'or', 'but', 'not', 'no', 'yes', 'you', 'your', 'we', 'our', 'us', 'they', 'their', 'them', 'he', 'his', 'she', 'her', 'him', 'its', 'are', 'was', 'were', 'been', 'being', 'have', 'has', 'had', 'having', 'get', 'got', 'getting', 'gotten', 'make', 'made', 'making', 'see', 'saw', 'seen', 'seeing', 'go', 'went', 'gone', 'going', 'come', 'came', 'coming', 'know', 'knew', 'known', 'knowing', 'think', 'thought', 'thinking', 'say', 'said', 'saying', 'tell', 'told', 'telling', 'ask', 'asked', 'asking', 'give', 'gave', 'given', 'giving', 'find', 'found', 'finding', 'take', 'took', 'taken', 'taking', 'use', 'used', 'using', 'work', 'worked', 'working', 'try', 'tried', 'trying', 'start', 'started', 'starting', 'stop', 'stopped', 'stopping', 'continue', 'continued', 'continuing', 'begin', 'began', 'begun', 'beginning', 'end', 'ended', 'ending', 'show', 'showed', 'shown', 'showing', 'let', 'lets', "let's", 'see', 'look', 'looked', 'looking', 'watch', 'watched', 'watching', 'read', 'reading', 'write', 'wrote', 'written', 'writing', 'study', 'studied', 'studying', 'practice', 'practiced', 'practicing', 'learned', 'learning', 'teach', 'taught', 'teaching', 'understand', 'understood', 'understanding', 'explain', 'explained', 'explaining', 'helped', 'helping', 'showed', 'showing', 'told', 'telling', 'taught', 'teaching', 'explained', 'explaining'
+    'i', 'want', 'all', 'those', 'something', 'to','course', 'learn', 'me', 'please', 'help', 'be', 'a', 'the', 'and', 'with', 'need', 'teach', 'become', 'like', 'in', 'on', 'for', 'of', 'about', 'my', 'some', 'any', 'that', 'this', 'these', 'those', 'it', 'is', 'an', 'as', 'at', 'by', 'do', 'so', 'from', 'just', 'can', 'could', 'would', 'should', 'will', 'may', 'might', 'must', 'shall', 'if', 'or', 'but', 'not', 'no', 'yes', 'you', 'your', 'we', 'our', 'us', 'they', 'their', 'them', 'he', 'his', 'she', 'her', 'him', 'its', 'are', 'was', 'were', 'been', 'being', 'have', 'has', 'had', 'having', 'get', 'got', 'getting', 'gotten', 'make', 'made', 'making', 'see', 'saw', 'seen', 'seeing', 'go', 'went', 'gone', 'going', 'come', 'came', 'coming', 'know', 'knew', 'known', 'knowing', 'think', 'thought', 'thinking', 'say', 'said', 'saying', 'tell', 'told', 'telling', 'ask', 'asked', 'asking', 'give', 'gave', 'given', 'giving', 'find', 'found', 'finding', 'take', 'took', 'taken', 'taking', 'use', 'used', 'using', 'work', 'worked', 'working', 'try', 'tried', 'trying', 'start', 'started', 'starting', 'stop', 'stopped', 'stopping', 'continue', 'continued', 'continuing', 'begin', 'began', 'begun', 'beginning', 'end', 'ended', 'ending', 'show', 'showed', 'shown', 'showing', 'let', 'lets', "let's", 'see', 'look', 'looked', 'looking', 'watch', 'watched', 'watching', 'read', 'reading', 'write', 'wrote', 'written', 'writing', 'study', 'studied', 'studying', 'practice', 'practiced', 'practicing', 'learned', 'learning', 'teach', 'taught', 'teaching', 'understand', 'understood', 'understanding', 'explain', 'explained', 'explaining', 'helped', 'helping', 'showed', 'showing', 'told', 'telling', 'taught', 'teaching', 'explained', 'explaining'
   ];
   // Extract words/phrases, filter out stop words, return unique capitalized topics
   const words = userInput.match(/\b([a-zA-Z][a-zA-Z0-9\-\.#\+]+)\b/g) || [];
