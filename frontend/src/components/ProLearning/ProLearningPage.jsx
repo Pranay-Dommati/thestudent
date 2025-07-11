@@ -127,29 +127,39 @@ const ProLearningPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topic, GEMINI_API_KEY]);
 
+  // Ensure the initially active topic is always marked as completed
+  useEffect(() => {
+    if (topicsList.length > 0) {
+      const activeTopic = topicsList.find(t => t.isActive);
+      if (activeTopic && !completedTopics.includes(activeTopic.id)) {
+        setCompletedTopics(prev => [...prev, activeTopic.id]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topicsList]);
+
   // Handle topic selection from sidebar
   const handleTopicSelect = (topicId) => {
-    setTopicsList(prev => 
-      prev.map(t => ({ ...t, isActive: t.id === topicId }))
-    );
-    // Mark topic as completed
+    setTopicsList(prev => {
+      const updated = prev.map(t => ({ ...t, isActive: t.id === topicId }));
+      // Get the selected topic from the updated list
+      const selectedTopicObj = updated.find(t => t.id === topicId);
+      if (selectedTopicObj) {
+        setSelectedTopic(selectedTopicObj.name);
+        generateProContent({ 
+          topic: selectedTopicObj.name, 
+          setIsLoading, 
+          setLoadingProgress, 
+          setShowSkeletons, 
+          setLoadingStep, 
+          setContent, 
+          setStats, 
+          content 
+        });
+      }
+      return updated;
+    });
     setCompletedTopics((prev) => prev.includes(topicId) ? prev : [...prev, topicId]);
-    // Get the selected topic name for content generation
-    const selectedTopicObj = topicsList.find(t => t.id === topicId);
-    if (selectedTopicObj) {
-      setSelectedTopic(selectedTopicObj.name);
-      // Trigger content generation for the selected topic
-      generateProContent({ 
-        topic: selectedTopicObj.name, 
-        setIsLoading, 
-        setLoadingProgress, 
-        setShowSkeletons, 
-        setLoadingStep, 
-        setContent, 
-        setStats, 
-        content 
-      });
-    }
   };
 
   // Get currently active topic
