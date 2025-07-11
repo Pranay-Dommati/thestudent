@@ -1226,7 +1226,7 @@ const ProLearningPage = () => {
                             <div className={`p-2 rounded-lg transition-colors ${
                               isActive ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-gray-200'
                             }`}>
-                              {isActive ? <FaCheck className="text-lg" /> : <IconComponent className="text-lg" />}
+                              <IconComponent className="text-lg" />
                             </div>
                             <span className="text-sm font-semibold whitespace-nowrap">{tab.label}</span>
                           </div>
