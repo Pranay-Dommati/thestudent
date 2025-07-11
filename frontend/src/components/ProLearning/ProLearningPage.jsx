@@ -48,79 +48,7 @@ import {
   getResourceIcon
 } from './services/index.js';
 import Navbar from '../Navbar/Navbar';
-
-// Replace parseTopics with classifyTopicsWithGemini
-// Get Gemini API key from environment variables
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-// Gemini-based topic classifier
-export async function classifyTopicsWithGemini(userInput, apiKey) {
-  console.log('[Gemini] classifyTopicsWithGemini called with:', userInput, apiKey ? 'API KEY PRESENT' : 'NO API KEY');
-  // Prevent API calls for empty or very short input
-  if (!userInput || userInput.trim().length < 3) {
-    return [];
-  }
-  // Validate API key (like getGeminiApiKey)
-  if (!apiKey || apiKey.length < 10) {
-    throw new Error('Invalid or missing Gemini API key. Please check your environment variables.');
-  }
-
-  const models = ['gemini-2.5-pro', 'gemini-2.0-flash-lite','Gemini 2.0 Flash','gemini-1.5-flash'];
-  let lastError;
-
-  for (const model of models) {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const prompt = `\n  You are a smart educational topic classifier AI integrated into a student learning platform.\n  \n  Your task is:\n  - Given any user input, extract only the *meaningful and realistic learning topics*.\n  - Return the final result as a *JSON array of strings* (no explanations, just the array).\n  - Avoid extracting generic or non-informative words like \"I\", \"want\", \"learn\", \"something\", etc.\n  - If the user input contains fake, irrelevant, or gibberish content, return an empty array.\n  - Each topic in the array should be a concise, standardized topic name (e.g., \"HTML\", \"CSS\", \"Python\", \"React.js\").\n  - Do not include duplicate or highly similar topics.\n  - Return between 1 to 5 *actual learning topics* only if they exist in the input.\n  \n  Examples:\n  \n  Input: \"I want to learn HTML and CSS\"\n  Output: [\"HTML\", \"CSS\"]\n  \n  Input: \"Please help me with machine learning and data science basics\"\n  Output: [\"Machine Learning\", \"Data Science\"]\n  \n  Input: \"I wanna be a hacker and learn something\"\n  Output: []\n  \n  Input: \"Teach me React.js, TypeScript, and Node.js\"\n  Output: [\"React.js\", \"TypeScript\", \"Node.js\"]\n  \n  Input: \"I need Java and DSA\"\n  Output: [\"Java\", \"Data Structures and Algorithms\"]\n  \n  Now classify the user input below accordingly.\n  \n  User input: \"${userInput}\"\n  \n  Topics (JSON array only):\n  `;
-
-    // Add timeout (AbortController)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        try {
-          const errorData = await response.json();
-          errorMessage += ` - ${JSON.stringify(errorData)}`;
-        } catch {}
-        if (response.status === 429 || response.status === 403) {
-          lastError = new Error(errorMessage);
-          continue; // Try next model
-        }
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      // Extract the JSON array from the model's response
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      try {
-        const topics = JSON.parse(text);
-        if (Array.isArray(topics)) {
-          return topics.map((name, idx) => ({ id: idx + 1, name: name.trim(), isActive: idx === 0 }));
-        }
-      } catch (e) {
-        lastError = new Error('Failed to parse Gemini response as JSON array.');
-        continue;
-      }
-    } catch (error) {
-      lastError = error;
-      continue;
-    }
-  }
-  // If all models fail, throw last error
-  throw lastError || new Error('All Gemini models failed');
-}
+import { classifyTopicsWithGemini } from './topicclassifier';
 
 
 const ProLearningPage = () => {
@@ -1407,30 +1335,7 @@ const ProLearningPage = () => {
               )}
             </div>
 
-            {/* Progress Overview */}
-            {!isLoading && (
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-gray-700">Learning Progress</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-blue-50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-bold text-blue-600">{stats.estimatedReadTime}m</div>
-                    <div className="text-xs text-blue-700">Read Time</div>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-bold text-green-600">{stats.totalQuestions}</div>
-                    <div className="text-xs text-green-700">Questions</div>
-                  </div>
-                  <div className="bg-red-50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-bold text-red-600">{stats.totalVideos}</div>
-                    <div className="text-xs text-red-700">Videos</div>
-                  </div>
-                  <div className="bg-orange-50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-bold text-orange-600">{stats.totalResources}</div>
-                    <div className="text-xs text-orange-700">Resources</div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Removed Learning Progress and Learning Tips sections from sidebar */}
           </div>
           
           {/* Sidebar Content */}
@@ -1462,41 +1367,7 @@ const ProLearningPage = () => {
                 </div>
               )}
 
-              {/* Learning Tips */}
-              <div className="border-t pt-4 mt-4">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">Learning Tips</h4>
-                <div className="space-y-3">
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <div className="flex items-start">
-                      <FaLightbulb className="text-yellow-600 mt-0.5 mr-2" />
-                      <div>
-                        <div className="font-medium text-yellow-800 text-sm">Stay Engaged</div>
-                        <div className="text-xs text-yellow-700 mt-1">Take notes and ask questions as you learn</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div className="flex items-start">
-                      <FaTrophy className="text-green-600 mt-0.5 mr-2" />
-                      <div>
-                        <div className="font-medium text-green-800 text-sm">Practice Regularly</div>
-                        <div className="text-xs text-green-700 mt-1">Apply what you learn through exercises</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                    <div className="flex items-start">
-                      <FaBrain className="text-purple-600 mt-0.5 mr-2" />
-                      <div>
-                        <div className="font-medium text-purple-800 text-sm">Review Summary</div>
-                        <div className="text-xs text-purple-700 mt-1">Use summaries to reinforce key concepts</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {/* Removed Learning Tips section from sidebar */}
             </div>
           </div>
         </div>

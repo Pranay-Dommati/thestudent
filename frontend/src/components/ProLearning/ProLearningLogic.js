@@ -56,7 +56,6 @@ export async function generateProContent({ topic, setIsLoading, setLoadingProgre
     setLoadingStep('📘 Generating comprehensive reading material...');
     setLoadingProgress(10);
     await generateReadingContent(topic, setContent);
-    
     // Wait a bit to ensure content is updated
     await new Promise(resolve => setTimeout(resolve, 100));
     
