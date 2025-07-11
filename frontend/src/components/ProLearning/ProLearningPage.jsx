@@ -577,9 +577,13 @@ const ProLearningPage = () => {
                               borderRadius: "0 0 0.75rem 0.75rem",
                               fontSize: "1rem",
                               margin: 0,
-                              background: "#f8fafc"
+                              background: "#23272f",
+                              border: "1px solid #222c37"
                             }}
-                            codeTagProps={{ style: { fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace' } }}
+                            codeTagProps={{
+                              style: { fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace' },
+                              className: 'custom-syntax-highlight'
+                            }}
                             showLineNumbers={false}
                           >
                             {String(children).replace(/\n$/, "")}
@@ -1163,6 +1167,12 @@ const ProLearningPage = () => {
           }
           .scrollbar-hide::-webkit-scrollbar {
             display: none;
+          }
+          .custom-syntax-highlight .token.punctuation,
+          .custom-syntax-highlight .token.punctuation * {
+            color: #fff !important;
+            font-weight: 900 !important;
+            text-shadow: 0 0 2px #fff, 0 0 1px #fff;
           }
         `}</style>
       {/* Enhanced Header */}
