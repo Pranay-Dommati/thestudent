@@ -4,6 +4,33 @@ import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle } from "react-icons
 import { FaRobot, FaHistory } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
+import { classifyTopicsWithGemini } from "../ProLearning/topicclassifier";
+
+// Simple Gemini API call for regular chat
+const callGeminiAPI = async (message) => {
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) {
+    throw new Error('Gemini API key not found');
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: message }] }],
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Gemini API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+};
 
 // Add slide-up animation
 const style = document.createElement('style');
@@ -398,16 +425,49 @@ const ChatbotPage = () => {
       console.log('Message:', messageToSend);
 
       if (proMode) {
-        // Pro mode - show redirect card
-        const proResponse = {
-          id: chatHistory.length + 2,
-          type: "bot",
-          content: `I'll create a comprehensive learning experience for "${messageToSend}". Click the card below to access detailed reading materials, summaries, videos, quizzes, and resources.`,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          isProCard: true,
-          topic: messageToSend,
-        };
-        setChatHistory((prev) => [...prev, proResponse]);
+        // Pro mode - extract topics using AI first
+        try {
+          console.log('🚀 Starting topic extraction for:', messageToSend);
+          const extractedTopics = await classifyTopicsWithGemini(messageToSend);
+          console.log('✅ AI Extracted Topics:', extractedTopics);
+          
+          if (extractedTopics && extractedTopics.length > 0) {
+            // Create the topic string for URL - extract just the names from objects
+            const topicNames = extractedTopics.map(topic => topic.name);
+            const topicString = topicNames.join(', ');
+            console.log('📝 Topic names:', topicNames);
+            console.log('📝 Topic string for URL:', topicString);
+            
+            const proResponse = {
+              id: chatHistory.length + 2,
+              type: "bot",
+              content: `🎓 I've analyzed your query and extracted these learning topics: **${topicNames.join(', ')}**. Click the card below to access comprehensive course materials including reading materials, summaries, videos, quizzes, and resources.`,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              isProCard: true,
+              topic: topicString,
+              extractedTopics: extractedTopics,
+            };
+            setChatHistory((prev) => [...prev, proResponse]);
+          } else {
+            // No topics extracted - show error
+            const errorResponse = {
+              id: chatHistory.length + 2,
+              type: "bot",
+              content: "❌ I couldn't extract any learning topics from your query. Please try to be more specific about what you'd like to learn (e.g., 'JavaScript arrays and functions', 'Python data structures', etc.)",
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+            setChatHistory((prev) => [...prev, errorResponse]);
+          }
+        } catch (error) {
+          console.error('❌ Topic extraction failed:', error);
+          const errorResponse = {
+            id: chatHistory.length + 2,
+            type: "bot",
+            content: `❌ Topic extraction failed: ${error.message}. Please try again with a clearer learning query.`,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          };
+          setChatHistory((prev) => [...prev, errorResponse]);
+        }
       } else {
         // Regular chatbot response - just AI text
         const response = await callGeminiAPI(messageToSend);

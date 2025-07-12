@@ -1,42 +1,202 @@
 // topicclassifier.js
-// Gemini-based topic classifier for ProLearningPage
+// Multi-API topic classifier with dual Gemini API key load balancing
 
-// Get Gemini API key from environment variables
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// Get API keys from environment variables
+const GEMINI_API_KEYS = [
+  import.meta.env.VITE_GEMINI_API_KEY,     // First account
+  import.meta.env.VITE_GEMINI_API_KEY_2    // Second account
+].filter(key => key && key.length > 10); // Only use valid keys
+
+const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY;
+
+// Rate limiting: Cache results and track API key usage
+const topicCache = new Map();
+const MIN_API_DELAY = 1000; // Reduced to 1 second since we have multiple keys
+
+// Track usage for each API key to implement intelligent load balancing
+const apiKeyUsage = GEMINI_API_KEYS.map((_, index) => ({
+  lastUsed: 0,
+  requestCount: 0,
+  failures: 0,
+  cooldownUntil: 0
+}));
+
+// Intelligent API key selection with load balancing
+function selectBestApiKey() {
+  const now = Date.now();
+  const FAILURE_COOLDOWN = 30000; // 30 seconds cooldown after rate limit
+  const USAGE_COOLDOWN = 5000;    // 5 seconds between uses of same key
+  
+  // Filter available keys (not in cooldown)
+  const availableKeys = GEMINI_API_KEYS.map((key, index) => ({
+    key,
+    index,
+    usage: apiKeyUsage[index],
+    isAvailable: now > apiKeyUsage[index].cooldownUntil && 
+                 (now - apiKeyUsage[index].lastUsed) > USAGE_COOLDOWN
+  })).filter(keyInfo => keyInfo.isAvailable);
+
+  if (availableKeys.length === 0) {
+    // All keys are in cooldown, use the one with earliest cooldown end
+    const bestKey = GEMINI_API_KEYS.map((key, index) => ({
+      key, index, cooldownEnds: apiKeyUsage[index].cooldownUntil
+    })).sort((a, b) => a.cooldownEnds - b.cooldownEnds)[0];
+    
+    console.log(`🔑 All keys in cooldown, using Key ${bestKey.index + 1} (forced)`);
+    return bestKey;
+  }
+
+  // Select key with least recent usage among available keys
+  const bestKey = availableKeys.sort((a, b) => 
+    a.usage.lastUsed - b.usage.lastUsed
+  )[0];
+
+  console.log(`🔑 Selected API Key ${bestKey.index + 1} (${availableKeys.length} available)`);
+  return bestKey;
+}
+
+// Update API key usage and handle failures
+function updateApiKeyUsage(keyIndex, wasSuccessful = true, wasRateLimit = false) {
+  const now = Date.now();
+  apiKeyUsage[keyIndex].lastUsed = now;
+  apiKeyUsage[keyIndex].requestCount++;
+  
+  if (wasRateLimit) {
+    apiKeyUsage[keyIndex].failures++;
+    apiKeyUsage[keyIndex].cooldownUntil = now + (30000 * Math.min(apiKeyUsage[keyIndex].failures, 5)); // Max 2.5 min cooldown
+    console.log(`⏰ API Key ${keyIndex + 1} in cooldown until ${new Date(apiKeyUsage[keyIndex].cooldownUntil).toLocaleTimeString()}`);
+  } else if (wasSuccessful) {
+    apiKeyUsage[keyIndex].failures = Math.max(0, apiKeyUsage[keyIndex].failures - 1); // Reduce failure count on success
+  }
+}
 
 // Helper to sleep for ms milliseconds
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Gemini-based topic classifier
-export async function classifyTopicsWithGemini(userInput, apiKey = GEMINI_API_KEY) {
-  console.log('[Gemini] classifyTopicsWithGemini called with:', userInput, apiKey ? 'API KEY PRESENT' : 'NO API KEY');
+// DeepSeek API fallback for when Gemini hits rate limits
+async function classifyTopicsWithDeepSeek(userInput) {
+  if (!DEEPSEEK_API_KEY || DEEPSEEK_API_KEY.length < 10) {
+    throw new Error('DeepSeek API key not available');
+  }
+
+  console.log('[DeepSeek] Trying DeepSeek API as fallback...');
+  
+  // Check cache first (using same cache key format)
+  const cacheKey = userInput.trim().toLowerCase();
+  if (topicCache.has(cacheKey)) {
+    console.log('[Cache] Returning cached result for DeepSeek fallback:', userInput);
+    return topicCache.get(cacheKey);
+  }
+  
+  const prompt = `You are an educational topic classifier. Extract 1-5 concrete learning topics from the user input. Return only a JSON array of topic names.
+
+Examples:
+Input: "I want to learn JavaScript arrays and functions"
+Output: ["JavaScript", "Arrays", "Functions"]
+
+Input: "Teach me Python and Django"
+Output: ["Python", "Django"]
+
+Input: "hello world"
+Output: []
+
+User input: "${userInput}"
+JSON array:`;
+
+  const response = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 200,
+      temperature: 0.1
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`DeepSeek API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const text = data?.choices?.[0]?.message?.content || '';
+  
+  try {
+    const topics = JSON.parse(text);
+    if (Array.isArray(topics)) {
+      // Cache the result before returning
+      const result = topics.map((name, idx) => ({ id: idx + 1, name: name.trim(), isActive: idx === 0 }));
+      topicCache.set(cacheKey, result);
+      console.log('[Cache] Stored DeepSeek result for:', userInput);
+      return result;
+    }
+  } catch (e) {
+    throw new Error('Failed to parse DeepSeek response as JSON array');
+  }
+  
+  throw new Error('DeepSeek returned invalid response format');
+}
+
+// Gemini-based topic classifier with dual API key load balancing
+export async function classifyTopicsWithGemini(userInput, apiKey = null) {
+  console.log('[Gemini] classifyTopicsWithGemini called with:', userInput);
+  
   // Prevent API calls for empty or very short input
   if (!userInput || userInput.trim().length < 3) {
     return [];
   }
-  // Validate API key (like getGeminiApiKey)
-  if (!apiKey || apiKey.length < 10) {
-    throw new Error('Invalid or missing Gemini API key. Please check your environment variables.');
+
+  // Check cache first
+  const cacheKey = userInput.trim().toLowerCase();
+  if (topicCache.has(cacheKey)) {
+    console.log('[Cache] Returning cached result for:', userInput);
+    return topicCache.get(cacheKey);
   }
 
-  const models = ['gemini-1.5-flash','gemini-1.5-pro'];
+  // Validate that we have at least one API key
+  if (GEMINI_API_KEYS.length === 0) {
+    throw new Error('No valid Gemini API keys available. Please check your environment variables.');
+  }
+
+  console.log(`[Keys] Available Gemini API keys: ${GEMINI_API_KEYS.length}`);
+
+  const models = ['gemini-1.5-flash']; // Use lighter model to avoid rate limits
   let lastError;
 
+  // Try each model with intelligent key selection
   for (const model of models) {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const prompt = `
+    const maxKeyRetries = Math.min(GEMINI_API_KEYS.length, 2); // Try up to 2 different keys
+    
+    for (let keyAttempt = 0; keyAttempt < maxKeyRetries; keyAttempt++) {
+      try {
+        const selectedKey = selectBestApiKey();
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${selectedKey.key}`;
+        
+        console.log(`[Gemini] Trying ${model} with API Key ${selectedKey.index + 1} (attempt ${keyAttempt + 1})`);
+
+        // Rate limiting: ensure minimum delay between API calls
+        const now = Date.now();
+        const timeSinceLastCall = now - selectedKey.usage.lastUsed;
+        if (timeSinceLastCall < MIN_API_DELAY) {
+          const waitTime = MIN_API_DELAY - timeSinceLastCall;
+          console.log(`[Rate Limit] Waiting ${waitTime}ms before API call...`);
+          await sleep(waitTime);
+        }
+
+        const prompt = `
 You are a smart educational topic classifier AI integrated into a student learning platform.
 
-Your task is:
-- Given any user input, extract only the *meaningful and realistic learning topics*, including *multi-word technical terms* (e.g., "Dynamic Programming", "Data Science").
-- Carefully check if adjacent words form a known learning topic (e.g., "dynamic programming", "machine learning") and do not split them into separate entries.
-- Return the final result as a *JSON array of strings* (no explanations, just the array).
-- Avoid extracting generic or non-informative words like "I", "want", "learn", "something", etc.
-- If the user input contains fake, irrelevant, or gibberish content, return an empty array.
-- Each topic in the array should be a concise, standardized topic name (e.g., "HTML", "CSS", "Python", "React.js", "Dynamic Programming").
-- Do not include duplicate or highly similar topics.
+Your task: Extract 1-5 concrete learning topics from user input.
+- Focus on technical subjects, programming languages, frameworks, concepts
+- Return a clean JSON array of topic names only
+- Use proper capitalization and standard naming
+- Return empty array [] if no learning topics found
+- Expand abbreviations to full names when clear (e.g., "DSA" → "Data Structures and Algorithms")
 - Return between 1 to 5 *actual learning topics* only if they exist in the input.
 
 Examples:
@@ -66,71 +226,77 @@ User input: "${userInput}"
 Topics (JSON array only):
 `;
 
+        // Add timeout (AbortController)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-    // Add timeout (AbortController)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+        if (!response.ok) {
+          let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          try {
+            const errorData = await response.json();
+            errorMessage += ` - ${JSON.stringify(errorData)}`;
+          } catch {}
+          
+          if (response.status === 429) {
+            // Rate limit hit - mark key as failed and try next key
+            updateApiKeyUsage(selectedKey.index, false, true);
+            console.log(`[Gemini] Rate limit hit for ${model} with Key ${selectedKey.index + 1}, trying different key...`);
+            lastError = new Error(`Rate limit exceeded for ${model} with Key ${selectedKey.index + 1}.`);
+            continue; // Try next key
+          }
+          
+          if (response.status === 403) {
+            updateApiKeyUsage(selectedKey.index, false, false);
+            lastError = new Error(`API access forbidden for ${model} with Key ${selectedKey.index + 1}. Please check your API key and billing.`);
+            continue; // Try next key
+          }
+          
+          throw new Error(errorMessage);
+        }
 
-      if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        const data = await response.json();
+        // Extract the JSON array from the model's response
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        
         try {
-          const errorData = await response.json();
-          errorMessage += ` - ${JSON.stringify(errorData)}`;
-        } catch {}
-        if (response.status === 429 || response.status === 403) {
-          lastError = new Error(errorMessage);
-          // Throttle before next model
-          await sleep(200);
-          continue; // Try next model
+          const topics = JSON.parse(text);
+          if (Array.isArray(topics)) {
+            // Success! Update usage and cache result
+            updateApiKeyUsage(selectedKey.index, true, false);
+            const result = topics.map((name, idx) => ({ id: idx + 1, name: name.trim(), isActive: idx === 0 }));
+            topicCache.set(cacheKey, result);
+            console.log(`[Success] Got topics using Key ${selectedKey.index + 1}:`, result.map(t => t.name));
+            return result;
+          }
+        } catch (e) {
+          updateApiKeyUsage(selectedKey.index, false, false);
+          lastError = new Error(`Failed to parse ${model} response as JSON array.`);
+          continue; // Try next key
         }
-        throw new Error(errorMessage);
+      } catch (error) {
+        lastError = error;
       }
-
-      const data = await response.json();
-      // Extract the JSON array from the model's response
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      try {
-        const topics = JSON.parse(text);
-        if (Array.isArray(topics)) {
-          return topics.map((name, idx) => ({ id: idx + 1, name: name.trim(), isActive: idx === 0 }));
-        }
-      } catch (e) {
-        lastError = new Error('Failed to parse Gemini response as JSON array.');
-        // Throttle before next model
-        await sleep(200);
-        continue;
-      }
-    } catch (error) {
-      lastError = error;
-      // Throttle before next model
-      await sleep(200);
-      continue;
     }
-    // Throttle before next model (even if successful, but will return before this)
-    await sleep(200);
   }
-  // If all models fail, use regex-based fallback to extract meaningful words/phrases
-  const stopWords = [
-    'i', 'want', 'all', 'those', 'something', 'to','course', 'learn', 'me', 'create','please', 'help', 'be', 'a', 'the', 'and', 'with', 'need', 'teach', 'become', 'like', 'in', 'on', 'for', 'of', 'about', 'my', 'some', 'any', 'that', 'this', 'these', 'those', 'it', 'is', 'an', 'as', 'at', 'by', 'do', 'so', 'from', 'just', 'can', 'could', 'would', 'should', 'will', 'may', 'might', 'must', 'shall', 'if', 'or', 'but', 'not', 'no', 'yes', 'you', 'your', 'we', 'our', 'us', 'they', 'their', 'them', 'he', 'his', 'she', 'her', 'him', 'its', 'are', 'was', 'were', 'been', 'being', 'have', 'has', 'had', 'having', 'get', 'got', 'getting', 'gotten', 'make', 'made', 'making', 'see', 'saw', 'seen', 'seeing', 'go', 'went', 'gone', 'going', 'come', 'came', 'coming', 'know', 'knew', 'known', 'knowing', 'think', 'thought', 'thinking', 'say', 'said', 'saying', 'tell', 'told', 'telling', 'ask', 'asked', 'asking', 'give', 'gave', 'given', 'giving', 'find', 'found', 'finding', 'take', 'took', 'taken', 'taking', 'use', 'used', 'using', 'work', 'worked', 'working', 'try', 'tried', 'trying', 'start', 'started', 'starting', 'stop', 'stopped', 'stopping', 'continue', 'continued', 'continuing', 'begin', 'began', 'begun', 'beginning', 'end', 'ended', 'ending', 'show', 'showed', 'shown', 'showing', 'let', 'lets', "let's", 'see', 'look', 'looked', 'looking', 'watch', 'watched', 'watching', 'read', 'reading', 'write', 'wrote', 'written', 'writing', 'study', 'studied', 'studying', 'practice', 'practiced', 'practicing', 'learned', 'learning', 'teach', 'taught', 'teaching', 'understand', 'understood', 'understanding', 'explain', 'explained', 'explaining', 'helped', 'helping', 'showed', 'showing', 'told', 'telling', 'taught', 'teaching', 'explained', 'explaining'
-  ];
-  // Extract words/phrases, filter out stop words, return unique capitalized topics
-  const words = userInput.match(/\b([a-zA-Z][a-zA-Z0-9\-\.#\+]+)\b/g) || [];
-  const filtered = words.filter(w => !stopWords.includes(w.toLowerCase()));
-  // Remove duplicates, capitalize, and return as topic objects
-  const unique = [...new Set(filtered.map(w => w.trim()))];
-  if (unique.length === 0) throw lastError || new Error('All Gemini models failed and no topics found');
-  return unique.slice(0, 5).map((name, idx) => ({ id: idx + 1, name: name.charAt(0).toUpperCase() + name.slice(1), isActive: idx === 0 }));
+
+  // If all Gemini keys failed, try DeepSeek fallback
+  console.log('[Fallback] All Gemini keys failed, trying DeepSeek...');
+  try {
+    return await classifyTopicsWithDeepSeek(userInput);
+  } catch (deepseekError) {
+    console.error('[Fallback] DeepSeek also failed:', deepseekError);
+    throw lastError || new Error('All AI models failed to extract topics. Please wait a moment and try again with a clearer learning query.');
+  }
 } 
