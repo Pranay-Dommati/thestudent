@@ -8,7 +8,7 @@ const AI_CONFIG = {
   TIMEOUT: 30000, // 30 seconds
   MAX_TOPICS_PARALLEL: 3, // Prevent rate limiting
   MIN_CONTENT_LENGTH: 100,
-  FALLBACK_MODELS: ['gemini-1.5-flash', 'gemini-1.5-pro'],
+  FALLBACK_MODELS: ['gemini-1.5-flash'], // Only use gemini-1.5-flash
   RATE_LIMIT_DELAY: 500 // Delay between requests
 };
 
@@ -66,21 +66,7 @@ async function retryWithBackoff(fn, maxRetries = AI_CONFIG.MAX_RETRIES) {
 
 // Model fallback logic for when primary model fails
 async function tryModelFallback(topic, apiKey, primaryModel) {
-  console.log(`🔄 Trying fallback models for topic: ${topic}`);
-  
-  for (const fallbackModel of AI_CONFIG.FALLBACK_MODELS) {
-    if (fallbackModel === primaryModel) continue; // Skip the model that already failed
-    
-    try {
-      console.log(`🧪 Attempting with model: ${fallbackModel}`);
-      const content = await generateSingleTopicContent(topic, apiKey, fallbackModel);
-      console.log(`✅ Fallback successful with model: ${fallbackModel}`);
-      return content;
-    } catch (error) {
-      console.warn(`❌ Fallback model ${fallbackModel} also failed:`, error.message);
-    }
-  }
-  
+  // Only use gemini-1.5-flash, so no fallback
   throw new Error(`All model fallbacks failed for topic: ${topic}`);
 }
 
@@ -117,7 +103,8 @@ async function enforceRateLimit() {
 
 // Generate content for a single topic with enhanced error handling
 async function generateSingleTopicContent(topic, apiKey, model) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  // Always use gemini-1.5-flash
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
   
   const prompt = createOptimizedPrompt(topic);
   
