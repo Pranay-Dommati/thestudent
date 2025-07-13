@@ -23,7 +23,7 @@ export async function generateQuizContent(setContent, topic = '', readingContent
     
     // Ensure we have at least some questions
     if (quizQuestions.length === 0) {
-      quizQuestions = generateFallbackQuiz(topic);
+      throw new Error('No quiz questions generated');
     }
     
     setContent((prev) => ({
@@ -43,97 +43,39 @@ export async function generateQuizContent(setContent, topic = '', readingContent
   } catch (error) {
     console.error('🚨 Quiz generation failed:', error);
     
-    // Use fallback quiz on error
-    const fallbackQuiz = generateFallbackQuiz(topic);
-    setContent((prev) => ({
-      ...prev,
-      quiz: fallbackQuiz,
-      quizMetadata: {
-        generatedAt: new Date().toISOString(),
-        type: 'fallback',
-        totalQuestions: fallbackQuiz.length,
-        error: error.message
-      }
-    }));
+    // Throw error instead of using fallback
+    throw new Error('Quiz generation failed');
   }
 }
 
 // Generate AI-powered quiz questions based on content
 async function generateAIQuizQuestions(topic, readingContent) {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  if (!apiKey) {
-    return generateFallbackQuiz(topic);
-  }
-
   try {
-    const quizPrompt = createQuizPrompt(topic, readingContent);
-    
-    const requestBody = {
-      contents: [{
-        role: 'user',
-        parts: [{ text: quizPrompt }]
-      }],
-      generationConfig: {
-        temperature: 0.3, // Lower temperature for more consistent quiz format
-        topK: 20,
-        topP: 0.8,
-        maxOutputTokens: 3072,
-        stopSequences: []
-      }
-    };
-
-    const quizText = await tryGeminiModels(requestBody, apiKey);
+    const response = await fetch('/ai/quiz/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, reading_content: readingContent })
+    });
+    if (!response.ok) throw new Error('Backend AI quiz endpoint failed');
+    const result = await response.json();
+    // Parse backend AI response
+    const quizText = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const parsed = parseQuizQuestions(quizText, topic);
     if (parsed && parsed.length > 0) {
       return parsed;
     } else {
-      return generateFallbackQuiz(topic);
+      throw new Error('AI quiz generation failed');
     }
-    
   } catch (error) {
-    console.warn('AI quiz generation failed, using fallback:', error.message);
-    return generateFallbackQuiz(topic);
+    console.warn('AI quiz generation failed:', error.message);
+    throw new Error('AI quiz generation failed');
   }
 }
 
 // Generate quiz questions for a topic without specific content
 async function generateTopicQuizQuestions(topic) {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  if (!apiKey) {
-    return generateFallbackQuiz(topic);
-  }
-
-  try {
-    const topicQuizPrompt = createTopicQuizPrompt(topic);
-    
-    const requestBody = {
-      contents: [{
-        role: 'user',
-        parts: [{ text: topicQuizPrompt }]
-      }],
-      generationConfig: {
-        temperature: 0.3,
-        topK: 20,
-        topP: 0.8,
-        maxOutputTokens: 2048,
-        stopSequences: []
-      }
-    };
-
-    const quizText = await tryGeminiModels(requestBody, apiKey);
-    const parsed = parseQuizQuestions(quizText, topic);
-    if (parsed && parsed.length > 0) {
-      return parsed;
-    } else {
-      return generateFallbackQuiz(topic);
-    }
-    
-  } catch (error) {
-    console.warn('Topic quiz generation failed, using fallback:', error.message);
-    return generateFallbackQuiz(topic);
-  }
+  // Just call the backend with topic and empty reading_content
+  return await generateAIQuizQuestions(topic, '');
 }
 
 // Create optimized prompt for quiz generation based on content
@@ -295,136 +237,8 @@ function parseQuizQuestions(quizText, topic) {
     return questions.slice(0, 5); // Limit to 5 questions
   } catch (error) {
     console.warn('Failed to parse quiz questions:', error);
-    return generateFallbackQuiz(topic);
+    throw new Error('Failed to parse quiz questions');
   }
-}
-
-// Generate fallback quiz when AI is not available
-function generateFallbackQuiz(topic) {
-  const fallbackQuestions = [
-    {
-      id: 'q_1',
-      question: `What is the primary purpose of ${topic}?`,
-      options: [
-        'To solve complex computational problems',
-        'To provide a structured approach to development',
-        'To replace traditional programming methods',
-        'To optimize system performance only'
-      ],
-      correct: 1,
-      explanation: `${topic} primarily provides a structured approach that helps developers create more efficient and maintainable solutions.`,
-      difficulty: 'Beginner',
-      topic: topic,
-      userAnswer: null
-    },
-    {
-      id: 'q_2',
-      question: `Which of the following is a key benefit of using ${topic}?`,
-      options: [
-        'Increased code complexity',
-        'Reduced development time',
-        'Limited scalability',
-        'Higher memory usage'
-      ],
-      correct: 1,
-      explanation: `${topic} typically reduces development time by providing efficient tools and methodologies.`,
-      difficulty: 'Beginner',
-      topic: topic,
-      userAnswer: null
-    },
-    {
-      id: 'q_3',
-      question: `When implementing ${topic}, what should be your first step?`,
-      options: [
-        'Write the complete code immediately',
-        'Understand the requirements and plan the approach',
-        'Optimize for performance',
-        'Deploy to production'
-      ],
-      correct: 1,
-      explanation: 'Understanding requirements and planning is essential before implementation to ensure success.',
-      difficulty: 'Beginner',
-      topic: topic,
-      userAnswer: null
-    },
-    {
-      id: 'q_4',
-      question: `Which practice is considered essential when working with ${topic}?`,
-      options: [
-        'Avoiding documentation',
-        'Following established patterns and best practices',
-        'Using only the latest features',
-        'Ignoring testing procedures'
-      ],
-      correct: 1,
-      explanation: 'Following established patterns and best practices ensures reliable and maintainable code.',
-      difficulty: 'Intermediate',
-      topic: topic,
-      userAnswer: null
-    },
-    {
-      id: 'q_5',
-      question: `How can you improve performance when using ${topic}?`,
-      options: [
-        'Add more features',
-        'Optimize algorithms and data structures',
-        'Use more memory',
-        'Avoid caching'
-      ],
-      correct: 1,
-      explanation: 'Optimizing algorithms and data structures is key to improving performance in any implementation.',
-      difficulty: 'Intermediate',
-      topic: topic,
-      userAnswer: null
-    },
-    {
-      id: 'q_6',
-      question: `What is a common mistake when learning ${topic}?`,
-      options: [
-        'Starting with fundamentals',
-        'Practicing regularly',
-        'Jumping to advanced concepts too quickly',
-        'Reading documentation'
-      ],
-      correct: 2,
-      explanation: 'Jumping to advanced concepts without mastering fundamentals often leads to confusion and gaps in understanding.',
-      difficulty: 'Intermediate',
-      topic: topic,
-      userAnswer: null
-    },
-    {
-      id: 'q_7',
-      question: `For advanced ${topic} implementation, which approach is recommended?`,
-      options: [
-        'Use only basic features',
-        'Implement custom solutions for everything',
-        'Balance built-in features with custom optimizations',
-        'Avoid any optimization'
-      ],
-      correct: 2,
-      explanation: 'Balancing built-in features with custom optimizations provides the best of both worlds - reliability and performance.',
-      difficulty: 'Advanced',
-      topic: topic,
-      userAnswer: null
-    },
-    {
-      id: 'q_8',
-      question: `What indicates mastery of ${topic}?`,
-      options: [
-        'Memorizing all syntax',
-        'Ability to solve complex problems efficiently',
-        'Using the most advanced features',
-        'Writing the longest code'
-      ],
-      correct: 1,
-      explanation: 'True mastery is demonstrated by the ability to solve complex problems efficiently and elegantly.',
-      difficulty: 'Advanced',
-      topic: topic,
-      userAnswer: null
-    }
-  ];
-  
-  return fallbackQuestions.slice(0, 5); // Limit fallback to 5 questions
 }
 
 // Calculate overall quiz difficulty
@@ -506,23 +320,4 @@ export function getQuizResults(questions) {
 
 export function resetQuiz(questions) {
   return questions.map(q => ({ ...q, userAnswer: null }));
-}
-
-// Gemini model configuration (only use gemini-1.5-flash)
-const GEMINI_MODEL = 'gemini-1.5-flash';
-
-// Try Gemini model (no fallback)
-async function tryGeminiModels(requestBody, apiKey) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody)
-  });
-  if (!response.ok) throw new Error(`Gemini API request failed: ${response.status}`);
-  const result = await response.json();
-  if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
-    return result.candidates[0].content.parts[0].text.trim();
-  }
-  throw new Error('Invalid Gemini API response');
 }

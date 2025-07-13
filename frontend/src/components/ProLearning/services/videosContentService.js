@@ -41,77 +41,30 @@ export async function generateVideosContent(setContent, topic = '') {
           generatedAt: new Date().toISOString(),
           type: 'ai_curated',
           totalVideos: aiVideoContent.length,
-          source: 'gemini_ai'
+          source: 'backend_ai'
         }
       }));
     } catch (aiError) {
       // Ultimate fallback
-      const fallbackVideos = generateFallbackVideos(topic);
-      setContent((prev) => ({
-        ...prev,
-        videos: fallbackVideos,
-        videosMetadata: {
-          generatedAt: new Date().toISOString(),
-          type: 'fallback',
-          totalVideos: fallbackVideos.length,
-          error: error.message
-        }
-      }));
+      throw new Error('Video generation failed');
     }
   }
 }
 
 // Generate curated video recommendations based on topic
 async function generateCuratedVideos(topic) {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  if (!apiKey) {
-    return generateFallbackVideos(topic);
-  }
-
   try {
-    const videoPrompt = createVideoPrompt(topic);
-    
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    
-    const requestBody = {
-      contents: [{
-        role: 'user',
-        parts: [{ text: videoPrompt }]
-      }],
-      generationConfig: {
-        temperature: 0.4,
-        topK: 30,
-        topP: 0.9,
-        maxOutputTokens: 2048,
-        stopSequences: []
-      }
-    };
-
-    const response = await fetch(endpoint, {
+    const response = await fetch('/ai/videos/', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic })
     });
-
-    if (!response.ok) {
-      throw new Error(`Video API request failed: ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error('Backend AI videos endpoint failed');
     const result = await response.json();
-    
-    if (!result?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid video API response');
-    }
-
-    const videoText = result.candidates[0].content.parts[0].text.trim();
+    const videoText = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
     return parseVideoRecommendations(videoText, topic);
-    
   } catch (error) {
-    console.warn('AI video generation failed, using fallback:', error.message);
-    return generateFallbackVideos(topic);
+    throw new Error('Video generation failed');
   }
 }
 
@@ -208,82 +161,8 @@ function parseVideoRecommendations(videoText, topic) {
     
   } catch (error) {
     console.warn('Failed to parse video recommendations:', error);
-    return generateFallbackVideos(topic);
+    throw new Error('Video generation failed');
   }
-}
-
-// Generate fallback videos when AI is not available
-function generateFallbackVideos(topic) {
-  const fallbackVideos = [
-    {
-      id: 'video_1',
-      title: `${topic} - Complete Beginner Tutorial`,
-      description: `A comprehensive introduction to ${topic} covering all the fundamental concepts you need to get started. Perfect for beginners with no prior experience.`,
-      duration: 45,
-      difficulty: 'Beginner',
-      channel: 'Learning Hub',
-      keyTopics: [topic, 'Basics', 'Introduction', 'Getting Started'],
-      thumbnail: generateThumbnailUrl(topic, 0),
-      url: generateVideoUrl(topic, 0)
-    },
-    {
-      id: 'video_2',
-      title: `${topic} Fundamentals Explained`,
-      description: `Deep dive into the core concepts of ${topic} with practical examples and real-world applications. Build a solid foundation.`,
-      duration: 35,
-      difficulty: 'Beginner',
-      channel: 'Tech Academy',
-      keyTopics: [topic, 'Fundamentals', 'Core Concepts', 'Examples'],
-      thumbnail: generateThumbnailUrl(topic, 1),
-      url: generateVideoUrl(topic, 1)
-    },
-    {
-      id: 'video_3',
-      title: `Hands-On ${topic} Project`,
-      description: `Build a complete project using ${topic} from scratch. Follow along and create something meaningful while learning.`,
-      duration: 60,
-      difficulty: 'Intermediate',
-      channel: 'Code Workshop',
-      keyTopics: [topic, 'Project', 'Hands-On', 'Implementation'],
-      thumbnail: generateThumbnailUrl(topic, 2),
-      url: generateVideoUrl(topic, 2)
-    },
-    {
-      id: 'video_4',
-      title: `${topic} Best Practices & Tips`,
-      description: `Learn industry best practices, common pitfalls to avoid, and professional tips for working with ${topic} effectively.`,
-      duration: 25,
-      difficulty: 'Intermediate',
-      channel: 'Pro Developer',
-      keyTopics: [topic, 'Best Practices', 'Tips', 'Professional'],
-      thumbnail: generateThumbnailUrl(topic, 3),
-      url: generateVideoUrl(topic, 3)
-    },
-    {
-      id: 'video_5',
-      title: `Advanced ${topic} Techniques`,
-      description: `Master advanced concepts and techniques in ${topic}. Learn optimization strategies and advanced implementation patterns.`,
-      duration: 50,
-      difficulty: 'Advanced',
-      channel: 'Expert Tutorials',
-      keyTopics: [topic, 'Advanced', 'Optimization', 'Expert Level'],
-      thumbnail: generateThumbnailUrl(topic, 4),
-      url: generateVideoUrl(topic, 4)
-    },
-    {
-      id: 'video_6',
-      title: `${topic} in Real-World Applications`,
-      description: `See how ${topic} is used in real industry projects. Case studies and examples from actual production environments.`,
-      duration: 40,
-      difficulty: 'Intermediate',
-      channel: 'Industry Insights',
-      keyTopics: [topic, 'Real-World', 'Industry', 'Case Studies'],
-      thumbnail: generateThumbnailUrl(topic, 5),
-      url: generateVideoUrl(topic, 5)
-    }
-  ];
-  
-  return fallbackVideos;
 }
 
 // Generate placeholder thumbnail URL
@@ -611,23 +490,4 @@ function isEducationalChannelName(channelName) {
   
   const channelLower = channelName.toLowerCase();
   return educationalIndicators.some(indicator => channelLower.includes(indicator));
-}
-
-// Gemini model configuration (only use gemini-1.5-flash)
-const GEMINI_MODEL = 'gemini-1.5-flash';
-
-// Try Gemini model (no fallback)
-async function tryGeminiModels(requestBody, apiKey) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody)
-  });
-  if (!response.ok) throw new Error(`Gemini API request failed: ${response.status}`);
-  const result = await response.json();
-  if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
-    return result.candidates[0].content.parts[0].text.trim();
-  }
-  throw new Error('Invalid Gemini API response');
 }

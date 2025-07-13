@@ -186,3 +186,9 @@ SIMPLE_JWT = {
 # In production, these should be set as environment variables
 HUGGINGFACE_API_TOKEN = os.environ.get('HUGGINGFACE_API_TOKEN', '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')
 YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', 'AIzaSyBK8JXhEc4HLz5_Mbv0ta0JnriW1YSSqNY')
+
+# Single Gemini API key
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'YOUR_API_KEY_HERE')
+
+# DeepSeek API key for fallback
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')

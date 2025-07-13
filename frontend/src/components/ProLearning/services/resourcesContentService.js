@@ -81,86 +81,25 @@ export async function generateResourcesContent(setContent, topic = '', options =
   } catch (error) {
     console.error('🚨 Resources generation failed:', error);
     
-    // Use fallback resources on error
-    const fallbackResources = generateFallbackResources(topic);
-    const metadata = {
-      generatedAt: new Date().toISOString(),
-      type: 'fallback',
-      totalResources: fallbackResources.length,
-      error: error.message,
-      topic: topic
-    };
-    
-    setContent((prev) => ({
-      ...prev,
-      resources: fallbackResources,
-      resourcesMetadata: metadata
-    }));
+    // Throw error instead of using fallback
+    throw new Error('Resources generation failed');
   }
 }
 
 // Generate curated resources based on topic
 async function generateCuratedResources(topic, options = {}) {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  if (!apiKey) {
-    console.warn('⚠️ No API key available, using fallback resources');
-    return generateFallbackResources(topic);
-  }
-
   try {
-    // Rate limiting check
-    await checkRateLimit();
-    
-    const resourcesPrompt = createResourcesPrompt(topic, options);
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-    const requestBody = {
-      contents: [{
-        role: 'user',
-        parts: [{ text: resourcesPrompt }]
-      }],
-      generationConfig: {
-        temperature: 0.4,
-        topK: 30,
-        topP: 0.9,
-        maxOutputTokens: 4096, // Increased for more resources
-        stopSequences: []
-      },
-      safetySettings: [
-        {
-          category: "HARM_CATEGORY_HARASSMENT",
-          threshold: "BLOCK_MEDIUM_AND_ABOVE"
-        },
-        {
-          category: "HARM_CATEGORY_HATE_SPEECH",
-          threshold: "BLOCK_MEDIUM_AND_ABOVE"
-        }
-      ],
-      signal: controller.signal
-    };
-
-    try {
-      const resourcesText = await tryGeminiModels(requestBody, apiKey);
-      clearTimeout(timeoutId);
-      if (resourcesText.length < 100) {
-        throw new Error('Resources response too short, likely incomplete');
-      }
-      return parseResourceRecommendations(resourcesText, topic);
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
-    }
-    
+    const response = await fetch('/ai/resources/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic })
+    });
+    if (!response.ok) throw new Error('Backend AI resources endpoint failed');
+    const result = await response.json();
+    const resourcesText = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return parseResourceRecommendations(resourcesText, topic);
   } catch (error) {
-    if (error.name === 'AbortError') {
-      console.warn('Resources API request timed out, using fallback');
-    } else {
-      console.warn('AI resources generation failed, using fallback:', error.message);
-    }
-    return generateFallbackResources(topic);
+    throw new Error('Resources generation failed');
   }
 }
 
@@ -355,7 +294,7 @@ function parseResourceRecommendations(resourcesText, topic) {
     
   } catch (error) {
     console.warn('Failed to parse resource recommendations:', error);
-    return generateFallbackResources(topic);
+    throw new Error('Resources generation failed');
   }
 }
 
@@ -485,62 +424,6 @@ function generateResourceTitle(topic, type, index) {
   };
   
   return templates[type] || `${topic} ${type} Resource ${index + 1}`;
-}
-
-// Generate fallback resources when AI is not available
-function generateFallbackResources(topic) {
-  const fallbackResources = [
-    {
-      id: 'resource_1',
-      title: `Official ${topic} Documentation`,
-      type: 'Documentation',
-      description: `Comprehensive official documentation for ${topic}. Includes detailed guides, API references, and best practices. Essential for understanding core concepts and serves as the authoritative source.`,
-      url: generateResourceUrl(topic, 'Documentation'),
-      difficulty: 'All Levels',
-      free: true,
-      rating: 'High',
-      tags: [topic, 'Documentation', 'Official', 'Reference'],
-      category: 'Documentation'
-    },
-    {
-      id: 'resource_2',
-      title: `${topic} Interactive Tutorial`,
-      type: 'Tutorial',
-      description: `Step-by-step interactive tutorial covering ${topic} fundamentals. Features hands-on exercises, practical examples, and progressive learning to build solid understanding.`,
-      url: generateResourceUrl(topic, 'Tutorial'),
-      difficulty: 'Beginner',
-      free: true,
-      rating: 'High',
-      tags: [topic, 'Tutorial', 'Interactive', 'Beginner'],
-      category: 'Learning'
-    },
-    {
-      id: 'resource_3',
-      title: `Complete ${topic} Course`,
-      type: 'Course',
-      description: `Comprehensive online course covering ${topic} from basics to advanced concepts. Includes structured lessons, real-world projects, and certification upon completion.`,
-      url: generateResourceUrl(topic, 'Course'),
-      difficulty: 'All Levels',
-      free: false,
-      rating: 'High',
-      tags: [topic, 'Course', 'Comprehensive', 'Certification'],
-      category: 'Learning'
-    },
-    {
-      id: 'resource_4',
-      title: `${topic} Developer Community`,
-      type: 'Community',
-      description: `Active community forum for ${topic} developers and learners. Connect with experts, get help with problems, share knowledge, and stay updated with latest trends.`,
-      url: generateResourceUrl(topic, 'Community'),
-      difficulty: 'All Levels',
-      free: true,
-      rating: 'High',
-      tags: [topic, 'Community', 'Support', 'Networking'],
-      category: 'Community'
-    }
-  ];
-  
-  return fallbackResources;
 }
 
 // Categorize resource based on type
@@ -970,24 +853,4 @@ export function addIconsToResources(resources) {
     ...resource,
     iconName: getResourceIcon(resource.type)
   }));
-}
-
-// Gemini model configuration (only use gemini-1.5-flash)
-const GEMINI_MODEL = 'gemini-1.5-flash';
-
-// Try Gemini model (no fallback)
-async function tryGeminiModels(requestBody, apiKey) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-    signal: requestBody.signal
-  });
-  if (!response.ok) throw new Error(`Gemini API request failed: ${response.status}`);
-  const result = await response.json();
-  if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
-    return result.candidates[0].content.parts[0].text.trim();
-  }
-  throw new Error('Invalid Gemini API response');
 }
