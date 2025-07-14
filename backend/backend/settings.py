@@ -195,9 +195,5 @@ SIMPLE_JWT = {
 HUGGINGFACE_API_TOKEN = os.environ.get('HUGGINGFACE_API_TOKEN', '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')
 YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', 'AIzaSyBK8JXhEc4HLz5_Mbv0ta0JnriW1YSSqNY')
 
-# Dual Gemini API keys for load balancing and rate limit handling
+# Gemini API key for AI services
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCoZJC3kzWosQEJpbb0Q2QmoQpMUuBpVlI')
-GEMINI_API_KEY_2 = os.environ.get('GEMINI_API_KEY_2', 'AIzaSyBCdje-JTv2S_ShDocwdgM9lVsC4nfKJpQ')
-
-# DeepSeek API key for fallback
-DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', 'sk-5fea7ac35e3645c0afb6526053ec2e87')
