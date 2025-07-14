@@ -344,6 +344,9 @@ const ChatbotPage = () => {
 
   const [message, setMessage] = useState("");
   const [proMode, setProMode] = useState(false);
+  const [showTopicConfirmation, setShowTopicConfirmation] = useState(false);
+  const [pendingTopics, setPendingTopics] = useState([]);
+  const [originalPrompt, setOriginalPrompt] = useState("");
   const [chatHistory, setChatHistory] = useState([
     {
       id: 1,
@@ -432,22 +435,19 @@ const ChatbotPage = () => {
           console.log('✅ AI Extracted Topics:', extractedTopics);
           
           if (extractedTopics && extractedTopics.length > 0) {
-            // Create the topic string for URL - extract just the names from objects
-            const topicNames = extractedTopics.map(topic => topic.name);
-            const topicString = topicNames.join(', ');
-            console.log('📝 Topic names:', topicNames);
-            console.log('📝 Topic string for URL:', topicString);
+            // Store topics for confirmation and show confirmation dialog
+            setPendingTopics(extractedTopics);
+            setOriginalPrompt(messageToSend);
+            setShowTopicConfirmation(true);
             
-            const proResponse = {
+            const confirmationResponse = {
               id: chatHistory.length + 2,
               type: "bot",
-              content: `🎓 I've analyzed your query and extracted these learning topics: **${topicNames.join(', ')}**. Click the card below to access comprehensive course materials including reading materials, summaries, videos, quizzes, and resources.`,
+              content: `🤔 I've analyzed your query "${messageToSend}" and extracted ${extractedTopics.length} learning topic(s). Please review and confirm the topics you'd like to include in your course.`,
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              isProCard: true,
-              topic: topicString,
-              extractedTopics: extractedTopics,
+              isTopicConfirmation: true,
             };
-            setChatHistory((prev) => [...prev, proResponse]);
+            setChatHistory((prev) => [...prev, confirmationResponse]);
           } else {
             // No topics extracted - show error
             const errorResponse = {
@@ -497,6 +497,70 @@ const ChatbotPage = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Topic confirmation functions
+  const handleTopicEdit = (index, newName) => {
+    const updatedTopics = [...pendingTopics];
+    updatedTopics[index] = { ...updatedTopics[index], name: newName };
+    setPendingTopics(updatedTopics);
+  };
+
+  const handleTopicDelete = (index) => {
+    const updatedTopics = pendingTopics.filter((_, i) => i !== index);
+    setPendingTopics(updatedTopics);
+  };
+
+  const handleTopicAdd = () => {
+    const newTopic = {
+      id: Date.now(),
+      name: "New Topic",
+      isActive: true
+    };
+    setPendingTopics([...pendingTopics, newTopic]);
+  };
+
+  const handleTopicConfirm = () => {
+    if (pendingTopics.length === 0) {
+      alert("Please add at least one topic to create a course.");
+      return;
+    }
+
+    // Create the topic string for URL - extract just the names from objects
+    const topicNames = pendingTopics.map(topic => topic.name);
+    const topicString = topicNames.join(', ');
+    console.log('📝 Confirmed topic names:', topicNames);
+    console.log('📝 Topic string for URL:', topicString);
+    
+    const proResponse = {
+      id: chatHistory.length + 1,
+      type: "bot",
+      content: `🎓 Perfect! I'll create a comprehensive course on: **${topicNames.join(', ')}**. Click the card below to access your customized course materials including reading materials, summaries, videos, quizzes, and resources.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      isProCard: true,
+      topic: topicString,
+      extractedTopics: pendingTopics,
+    };
+    
+    // Update chat history and close confirmation dialog
+    setChatHistory((prev) => [...prev, proResponse]);
+    setShowTopicConfirmation(false);
+    setPendingTopics([]);
+    setOriginalPrompt("");
+  };
+
+  const handleTopicCancel = () => {
+    const cancelResponse = {
+      id: chatHistory.length + 1,
+      type: "bot",
+      content: "❌ Course creation cancelled. Feel free to ask me anything else or try again with a different query!",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+    
+    setChatHistory((prev) => [...prev, cancelResponse]);
+    setShowTopicConfirmation(false);
+    setPendingTopics([]);
+    setOriginalPrompt("");
   };
 
   const MessageBubble = ({ message }) => {
@@ -720,6 +784,72 @@ const ChatbotPage = () => {
                 </div>
               </div>
             )}
+
+            {/* Topic Confirmation Dialog */}
+            {showTopicConfirmation && (
+              <div className="flex justify-start mb-4">
+                <div className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg rounded-bl-none p-4 max-w-[90%] lg:max-w-[85%] shadow-lg">
+                  <div className="flex items-center mb-3">
+                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                      <span className="text-white text-sm font-bold">✓</span>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-800">Confirm Course Topics</h3>
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 mb-4">
+                    I found <strong>{pendingTopics.length}</strong> topic(s) from your query: "<em>{originalPrompt}</em>". 
+                    You can edit, delete, or add topics before creating your course.
+                  </p>
+                  
+                  <div className="space-y-2 mb-4">
+                    {pendingTopics.map((topic, index) => (
+                      <div key={topic.id || index} className="flex items-center bg-white rounded-lg p-2 border border-gray-200">
+                        <span className="text-blue-500 mr-2 font-bold">{index + 1}.</span>
+                        <input
+                          type="text"
+                          value={topic.name}
+                          onChange={(e) => handleTopicEdit(index, e.target.value)}
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                        <button
+                          onClick={() => handleTopicDelete(index)}
+                          className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                          title="Delete topic"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <button
+                    onClick={handleTopicAdd}
+                    className="w-full mb-4 p-2 border-2 border-dashed border-blue-300 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors text-sm"
+                  >
+                    + Add New Topic
+                  </button>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleTopicConfirm}
+                      disabled={pendingTopics.length === 0}
+                      className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                    >
+                      ✓ Create Course ({pendingTopics.length} topic{pendingTopics.length !== 1 ? 's' : ''})
+                    </button>
+                    <button
+                      onClick={handleTopicCancel}
+                      className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
+                    >
+                      ✗ Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
 

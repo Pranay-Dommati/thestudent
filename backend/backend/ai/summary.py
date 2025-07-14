@@ -1,13 +1,11 @@
 from django.http import JsonResponse
 from django.conf import settings
-import requests
+from .ai_service import call_gemini_api
 import json
 
 def handle_summary(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    GEMINI_API_KEY = settings.GEMINI_API_KEY
-    GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
     try:
         body = json.loads(request.body.decode('utf-8'))
         topic = body.get('topic', '')
@@ -119,24 +117,11 @@ Create a well-structured summary specifically focused on "{topic}" that includes
 
 Generate only the markdown summary content focused on "{topic}". Be comprehensive yet concise.
 """
-        
-        headers = {'Content-Type': 'application/json'}
-        data = {
-            'contents': [{
-                'role': 'user',
-                'parts': [{'text': prompt}]
-            }],
-            'generationConfig': {
-                'temperature': 0.2,
-                'topK': 20,
-                'topP': 0.8,
-                'maxOutputTokens': 1024,
-                'stopSequences': []
-            }
-        }
-        response = requests.post(f'{GEMINI_API_URL}?key={GEMINI_API_KEY}', headers=headers, data=json.dumps(data))
-        if response.status_code != 200:
-            return JsonResponse({'error': f'Gemini API error: {response.status_code}'}, status=response.status_code)
-        return JsonResponse(response.json(), safe=False)
+        try:
+            # Use ai_service with dual key support
+            result = call_gemini_api(prompt)
+            return JsonResponse(result, safe=False)
+        except Exception as api_error:
+            return JsonResponse({'error': f'AI service error: {str(api_error)}'}, status=500)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500) 
