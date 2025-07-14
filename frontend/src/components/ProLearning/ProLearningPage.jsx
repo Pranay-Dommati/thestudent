@@ -57,8 +57,19 @@ const ProLearningPage = () => {
   const topic = searchParams.get("topic") || "Learning Topic";
   const [sidebarVisible, setSidebarVisible] = useState(false); // Start hidden on mobile
   const [selectedTopic, setSelectedTopic] = useState(null);
-  const [completedTopics, setCompletedTopics] = useState([]); // Track completed topics
+  const [completedTopics, setCompletedTopics] = useState(() => {
+    // Load completed topics from localStorage
+    try {
+      const saved = localStorage.getItem('proLearning_completedTopics');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }); // Track completed topics
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // Add content cache to store generated content per topic
+  const [contentCache, setContentCache] = useState(new Map());
 
   // Initialize sidebar visibility based on screen size
   useEffect(() => {
@@ -127,16 +138,23 @@ const ProLearningPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topic, GEMINI_API_KEY]);
 
-  // Ensure the initially active topic is always marked as completed
+  // Ensure the initially active topic is always marked as completed and load cached content
   useEffect(() => {
     if (topicsList.length > 0) {
       const activeTopic = topicsList.find(t => t.isActive);
-      if (activeTopic && !completedTopics.includes(activeTopic.id)) {
-        setCompletedTopics(prev => [...prev, activeTopic.id]);
+      if (activeTopic) {
+        // Check if content is cached for the active topic
+        const cacheKey = activeTopic.name.toLowerCase().trim();
+        if (contentCache.has(cacheKey)) {
+          console.log('📋 Loading cached content for initial topic:', activeTopic.name);
+          setContent(contentCache.get(cacheKey));
+          setIsLoading(false);
+          setShowSkeletons(false);
+        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topicsList]);
+  }, [topicsList, contentCache]);
 
   // Handle topic selection from sidebar
   const handleTopicSelect = (topicId) => {
@@ -146,26 +164,111 @@ const ProLearningPage = () => {
       const selectedTopicObj = updated.find(t => t.id === topicId);
       if (selectedTopicObj) {
         setSelectedTopic(selectedTopicObj.name);
-        generateProContent({ 
-          topic: selectedTopicObj.name, 
-          setIsLoading, 
-          setLoadingProgress, 
-          setShowSkeletons, 
-          setLoadingStep, 
-          setContent, 
-          setStats, 
-          content 
-        });
+        
+        // Check if content is cached for this topic
+        const cacheKey = selectedTopicObj.name.toLowerCase().trim();
+        if (contentCache.has(cacheKey)) {
+          console.log('📋 Using cached content for topic:', selectedTopicObj.name);
+          setContent(contentCache.get(cacheKey));
+          setIsLoading(false);
+          setShowSkeletons(false);
+          
+          // Optional: Show a subtle notification that content was loaded from cache
+          setLoadingStep('✨ Content loaded instantly from cache');
+          setTimeout(() => setLoadingStep(''), 2000);
+        } else {
+          console.log('🔄 Generating new content for topic:', selectedTopicObj.name);
+          generateProContent({ 
+            topic: selectedTopicObj.name, 
+            setIsLoading, 
+            setLoadingProgress, 
+            setShowSkeletons, 
+            setLoadingStep, 
+            setContent: (newContent) => {
+              // Update current content and cache it
+              if (typeof newContent === 'function') {
+                setContent(prev => {
+                  const updated = newContent(prev);
+                  setContentCache(cache => {
+                    const newCache = new Map(cache);
+                    newCache.set(cacheKey, updated);
+                    return newCache;
+                  });
+                  return updated;
+                });
+              } else {
+                setContent(newContent);
+                setContentCache(cache => {
+                  const newCache = new Map(cache);
+                  newCache.set(cacheKey, newContent);
+                  return newCache;
+                });
+              }
+            },
+            setStats, 
+            content 
+          });
+        }
       }
       return updated;
     });
-    setCompletedTopics((prev) => prev.includes(topicId) ? prev : [...prev, topicId]);
   };
+
+  // Toggle topic completion status
+  const toggleTopicCompletion = (topicId, event) => {
+    event.stopPropagation(); // Prevent topic selection when clicking the toggle
+    setCompletedTopics(prev => {
+      const updated = prev.includes(topicId)
+        ? prev.filter(id => id !== topicId)
+        : [...prev, topicId];
+      
+      // Save to localStorage
+      try {
+        localStorage.setItem('proLearning_completedTopics', JSON.stringify(updated));
+      } catch (error) {
+        console.warn('Failed to save completion status:', error);
+      }
+      
+      return updated;
+    });
+  };
+
+  // Add content cache persistence
+  useEffect(() => {
+    // Load content cache from localStorage on mount
+    try {
+      const savedCache = localStorage.getItem('proLearning_contentCache');
+      if (savedCache) {
+        const parsed = JSON.parse(savedCache);
+        const cacheMap = new Map(Object.entries(parsed));
+        setContentCache(cacheMap);
+      }
+    } catch (error) {
+      console.warn('Failed to load content cache:', error);
+    }
+  }, []);
+
+  // Save content cache to localStorage when it changes
+  useEffect(() => {
+    try {
+      const cacheObj = Object.fromEntries(contentCache);
+      localStorage.setItem('proLearning_contentCache', JSON.stringify(cacheObj));
+    } catch (error) {
+      console.warn('Failed to save content cache:', error);
+    }
+  }, [contentCache]);
 
   // Get currently active topic
   const getCurrentTopic = () => {
     const activeTopic = topicsList.find(t => t.isActive);
     return activeTopic ? activeTopic.name : topic;
+  };
+
+  // Clear cache function (for debugging/development)
+  const clearContentCache = () => {
+    setContentCache(new Map());
+    localStorage.removeItem('proLearning_contentCache');
+    console.log('🧹 Content cache cleared');
   };
 
   // Map icon names to actual React components
@@ -1344,40 +1447,51 @@ const ProLearningPage = () => {
                     <button
                       key={topicItem.id}
                       onClick={() => handleTopicSelect(topicItem.id)}
-                      className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
+                      className={`w-full text-left p-3 rounded-lg transition-all duration-200 relative ${
                         topicItem.isActive
                           ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
                           : completedTopics.includes(topicItem.id)
-                            ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                            : 'bg-white text-blue-700 hover:bg-blue-100 border border-blue-200'
+                            ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300 shadow-sm'
+                            : 'bg-white text-blue-700 hover:bg-blue-100 border border-blue-200 hover:shadow-sm'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-medium capitalize">{topicItem.name}</span>
-                        {/* Make the circle clickable to toggle completion */}
-                        {topicItem.isActive ? (
-                          <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
-                            <FaCheck className="text-white text-xs" />
-                          </div>
-                        ) : (
-                          <div
-                            className={`w-5 h-5 rounded-full flex items-center justify-center cursor-pointer transition-colors ${
-                              completedTopics.includes(topicItem.id)
-                                ? 'bg-blue-200' : 'bg-gray-200 hover:bg-blue-100'
-                            }`}
-                            onClick={e => {
-                              e.stopPropagation();
-                              setCompletedTopics(prev =>
-                                prev.includes(topicItem.id)
-                                  ? prev.filter(id => id !== topicItem.id)
-                                  : [...prev, topicItem.id]
-                              );
-                            }}
-                            title={completedTopics.includes(topicItem.id) ? 'Mark as incomplete' : 'Mark as complete'}
-                          >
-                            {completedTopics.includes(topicItem.id) && <FaCheck className="text-blue-600 text-xs" />}
-                          </div>
-                        )}
+                        <div className="flex items-center">
+                          <span className="font-medium capitalize">{topicItem.name}</span>
+                          {/* Show cached indicator */}
+                          {contentCache.has(topicItem.name.toLowerCase().trim()) && !topicItem.isActive && (
+                            <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded-full">
+                              Cached
+                            </span>
+                          )}
+                        </div>
+                        {/* Clickable completion toggle */}
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:scale-110 ${
+                            topicItem.isActive
+                              ? 'bg-white/20 hover:bg-white/30'
+                              : completedTopics.includes(topicItem.id)
+                                ? 'bg-green-500 hover:bg-green-600 shadow-md'
+                                : 'bg-gray-300 hover:bg-green-400 border-2 border-gray-400 hover:border-green-500'
+                          }`}
+                          onClick={(e) => toggleTopicCompletion(topicItem.id, e)}
+                          title={
+                            topicItem.isActive 
+                              ? 'Currently learning'
+                              : completedTopics.includes(topicItem.id) 
+                                ? 'Mark as incomplete' 
+                                : 'Mark as complete'
+                          }
+                        >
+                          {(topicItem.isActive || completedTopics.includes(topicItem.id)) && (
+                            <IoCheckmarkCircle className={`text-sm ${
+                              topicItem.isActive ? 'text-white' : 'text-white'
+                            }`} />
+                          )}
+                          {!topicItem.isActive && !completedTopics.includes(topicItem.id) && (
+                            <div className="w-2 h-2 rounded-full bg-white opacity-60" />
+                          )}
+                        </div>
                       </div>
                     </button>
                   ))}
@@ -1385,6 +1499,19 @@ const ProLearningPage = () => {
                     <p className="text-blue-600 text-xs">
                       Currently learning: <span className="font-semibold">{getCurrentTopic()}</span>
                     </p>
+                    {/* Development debug info */}
+                    {import.meta.env.DEV && (
+                      <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700">
+                        <div>Cached topics: {contentCache.size}</div>
+                        <div>Completed: {completedTopics.length}</div>
+                        <button 
+                          onClick={clearContentCache}
+                          className="mt-1 px-2 py-1 bg-blue-200 hover:bg-blue-300 rounded text-blue-800"
+                        >
+                          Clear Cache
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
