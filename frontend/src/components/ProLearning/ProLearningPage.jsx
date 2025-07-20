@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { 
   IoHome, IoChevronBack, IoPlayCircle, IoBookmark, IoDownload, 
   IoCheckmarkCircle, IoTime, IoEye, IoStar, IoSparkles, IoRocket, 
@@ -11,7 +11,7 @@ import {
   FaGraduationCap, FaClock, FaUsers, FaChartLine, FaLightbulb,
   FaBolt, FaBullseye, FaCheck, FaTrophy, FaBook, FaNewspaper,
   FaCode, FaDownload, FaBookmark, FaCertificate, FaLaptopCode,
-  FaStar, FaRegHandPaper
+  FaStar, FaRegHandPaper, FaArrowLeft, FaExclamationTriangle
 } from "react-icons/fa";
 import { 
   BiLoaderAlt, BiTrophy, BiCode, BiTargetLock, BiCheckShield,
@@ -45,173 +45,489 @@ import {
   formatDuration,
   formatViewCount,
   formatSubscriberCount,
-  getResourceIcon
+  getResourceIcon,
+  clearReadingContentCache,
+  getReadingContentCacheInfo
 } from './services/index.js';
+import { 
+  batchGenerateAllTopics, 
+  isTopicContentGenerated,
+  getStoredTopicContent,
+  getGenerationProgress,
+  initializeCourseStorage
+} from './ProBatchGenerator';
+import proContentManager from '../../services/ProContentManager';
 import Navbar from '../Navbar/Navbar';
 import { classifyTopicsWithGemini } from './topicclassifier';
+import BatchGenerationStatus from './BatchGenerationStatus';
 
 
 const ProLearningPage = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const topic = searchParams.get("topic") || "Learning Topic";
-  const [sidebarVisible, setSidebarVisible] = useState(false); // Start hidden on mobile
+  const params = useParams();
+  
+  // UI state
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Course and topic management with enhanced URL structure
+  const courseId = params.courseId; // Get courseId from URL path
+  const courseTitle = searchParams.get("courseTitle") || "";
+  const topicParam = searchParams.get("topic"); // Get topic from URL if provided
+  const activeTabParam = searchParams.get("tab") || "reading"; // Get active tab from URL
   const [selectedTopic, setSelectedTopic] = useState(null);
+  const [topicsList, setTopicsList] = useState([]);
+  
+  // Set default topics and initialize with consistent course ID
+  useEffect(() => {
+    const initializeDefaultTopics = async () => {
+      if (!courseTitle) {
+        const defaultTopics = [
+          { id: 1, name: "Introduction" },
+          { id: 2, name: "Getting Started" },
+          { id: 3, name: "Key Concepts" },
+          { id: 4, name: "Best Practices" },
+          { id: 5, name: "Advanced Topics" }
+        ];
+        setTopicsList(defaultTopics);
+        
+        // Get or generate a consistent course ID
+        const existingCourseId = getCourseId();
+        const currentCourseId = existingCourseId || generateCourseId();
+        
+        if (!existingCourseId) {
+          // Only navigate if we generated a new ID
+          setAndNavigateToCourseId(currentCourseId);
+        }
+
+        try {
+          proContentManager.setCourse("Default Course", currentCourseId);
+          await proContentManager.storeTopics(defaultTopics, currentCourseId);
+          console.log('✅ Default topics stored successfully for course:', currentCourseId);
+        } catch (error) {
+          console.error('❌ Failed to store default topics:', error);
+        }
+      };
+    };
+
+    initializeDefaultTopics();
+  }, [courseTitle]);
+  
+  // Content state
+  const [content, setContent] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSkeletons, setShowSkeletons] = useState(false);
+  const [loadingStep, setLoadingStep] = useState("");
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [stats, setStats] = useState({});
+  
+  // Overall course generation state
+  const [isGeneratingCourse, setIsGeneratingCourse] = useState(false);
+  const [courseGenerationProgress, setCourseGenerationProgress] = useState(0);
+  const [courseGenerationStatus, setCourseGenerationStatus] = useState("");
+  const [allTopicsGenerated, setAllTopicsGenerated] = useState(false);
+  
+  // Batch generation state
+  const [isBatchGenerating, setIsBatchGenerating] = useState(false);
+  const [batchGenerationProgress, setBatchGenerationProgress] = useState(0);
+  const [batchGenerationStatus, setBatchGenerationStatus] = useState("");
+  
+  // Reading sections state
+  const [readingSections, setReadingSections] = useState([]);
+  const [readingSectionIndex, setReadingSectionIndex] = useState(0);
+  
+  // Bookmark state
+  const [bookmarked, setBookmarked] = useState(false);
+  
+  // Copy code functionality
+  const [copySuccessMap, setCopySuccessMap] = useState({});
+  
+  // Completion tracking
   const [completedTopics, setCompletedTopics] = useState(() => {
-    // Load completed topics from localStorage
     try {
       const saved = localStorage.getItem('proLearning_completedTopics');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
-  }); // Track completed topics
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  });
   
-  // Add content cache to store generated content per topic
-  const [contentCache, setContentCache] = useState(new Map());
+  // Flag to prevent storage loading during direct URL generation
+  const [isDirectUrlGeneration, setIsDirectUrlGeneration] = useState(false);
 
   // Initialize sidebar visibility based on screen size
   useEffect(() => {
     const handleResize = () => {
-      // Show sidebar by default on large screens, hide on mobile
       if (window.innerWidth >= 1024) {
         setSidebarVisible(true);
       } else {
         setSidebarVisible(false);
-        // Also close mobile menu if open
         setIsMobileMenuOpen(false);
       }
     };
 
-    // Set initial state
     handleResize();
-
-    // Add event listener
     window.addEventListener('resize', handleResize);
-
-    // Cleanup
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Update topicsList initialization and update logic
-  const [topicsList, setTopicsList] = useState([]);
+  // Initialize ProContentManager with course context
+  useEffect(() => {
+    if (courseTitle) {
+      const currentCourseId = getCourseId();
+      proContentManager.setCourse(courseTitle, currentCourseId);
+    }
+  }, [courseTitle, courseId]);
+
   // Use environment variable for Gemini API key
   const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-  // Debounce and cache for Gemini topic classification
+  // Initialize course in ProContentManager when component mounts
+  useEffect(() => {
+    const currentCourseId = getCourseId();
+    if (currentCourseId && courseTitle) {
+      // Set the current course in ProContentManager
+      proContentManager.setCourse(courseTitle, currentCourseId);
+      console.log('✅ Course initialized in ProContentManager:', { courseTitle, currentCourseId });
+    }
+  }, [courseTitle]);
+
+  // Topic generation and caching
   const geminiCache = useRef({});
   const debounceTimeout = useRef();
 
   useEffect(() => {
-    console.log('[Gemini] useEffect for topic classification triggered:', topic);
-    if (!topic) return;
+    if (!courseTitle || courseTitle === "") return;
 
     // If cached, use it immediately
-    if (geminiCache.current[topic]) {
-      setTopicsList(geminiCache.current[topic]);
+    if (geminiCache.current[courseTitle]) {
+      setTopicsList(geminiCache.current[courseTitle]);
+      console.log('✅ Using cached topics for:', courseTitle);
       return;
     }
 
-    // Debounce Gemini API call
+    // Debounce topic generation
     clearTimeout(debounceTimeout.current);
     debounceTimeout.current = setTimeout(async () => {
-      // Prevent API call for empty/short topic
-      if (!topic || topic.trim().length < 3) {
-        setTopicsList([]);
+      // Prevent generation for very short titles
+      if (courseTitle.trim().length < 3) {
+        console.log('⚠️ Course title too short:', courseTitle);
         return;
       }
       try {
-        console.log('[Gemini] Debounced API call for topic:', topic);
-        const classified = await classifyTopicsWithGemini(topic, GEMINI_API_KEY);
-        geminiCache.current[topic] = classified;
+
+        const classified = await classifyTopicsWithGemini(courseTitle, GEMINI_API_KEY);
+        geminiCache.current[courseTitle] = classified;
         setTopicsList(classified);
+        
+        // Store topics in ProContentManager
+        const currentCourseId = getCourseId();
+        if (currentCourseId && classified.length > 0) {
+          proContentManager.setCourse(courseTitle, currentCourseId);
+          await proContentManager.storeTopics(classified);
+        }
       } catch (error) {
         setTopicsList([]);
         // Optionally, show error to user via toast or UI
-        console.error('Gemini topic classification failed:', error.message);
       }
     }, 1000); // 1000ms debounce
 
     // Cleanup on unmount/change
     return () => clearTimeout(debounceTimeout.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topic, GEMINI_API_KEY]);
+  }, [courseTitle, GEMINI_API_KEY]);
 
-  // Ensure the initially active topic is always marked as completed and load cached content
+  // Separate useEffect to handle batch generation when topics are available
   useEffect(() => {
-    if (topicsList.length > 0) {
-      const activeTopic = topicsList.find(t => t.isActive);
-      if (activeTopic) {
-        // Check if content is cached for the active topic
-        const cacheKey = activeTopic.name.toLowerCase().trim();
-        if (contentCache.has(cacheKey)) {
-          console.log('📋 Loading cached content for initial topic:', activeTopic.name);
-          setContent(contentCache.get(cacheKey));
-          setIsLoading(false);
-          setShowSkeletons(false);
-        }
+    const currentCourseId = getCourseId();
+    if (topicsList.length > 0 && !isBatchGenerating && currentCourseId) {
+      // Check if we need to start batch generation using new storage system
+      const progress = getGenerationProgress(currentCourseId);
+      
+      // If not all topics have content, start batch generation
+      if (progress.generated < progress.total) {
+        setIsBatchGenerating(true);
+        setBatchGenerationStatus('Starting content generation for all topics...');
+        
+        // Generate content for all topics using new storage system
+        setTimeout(async () => {
+          const result = await batchGenerateAllTopics(
+            currentCourseId,
+            topicsList, 
+            generateProContent, 
+            setBatchGenerationStatus, 
+            setIsBatchGenerating, 
+            setBatchGenerationProgress
+          );
+          
+        }, 500);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topicsList, contentCache]);
+  }, [topicsList, courseTitle]); // Depend on both topicsList and courseTitle
 
-  // Handle topic selection from sidebar
-  const handleTopicSelect = (topicId) => {
-    setTopicsList(prev => {
-      const updated = prev.map(t => ({ ...t, isActive: t.id === topicId }));
-      // Get the selected topic from the updated list
-      const selectedTopicObj = updated.find(t => t.id === topicId);
-      if (selectedTopicObj) {
-        setSelectedTopic(selectedTopicObj.name);
+  // Load content for initially active topic using new storage system
+  useEffect(() => {
+    // Skip if we're handling URL-based topic loading directly or during direct URL generation
+    if (isDirectUrlGeneration || (topicParam && !topicsList.length)) {
+      return; // Let the URL topic loading useEffect handle this
+    }
+    
+    if (topicsList.length > 0 && courseTitle) {
+      const activeTopic = topicsList.find(t => t.isActive);
+      if (activeTopic) {
+        // Check if content exists in storage for the active topic
+        const storedContent = getStoredTopicContent(activeTopic.name, courseTitle, getCourseId());
         
-        // Check if content is cached for this topic
-        const cacheKey = selectedTopicObj.name.toLowerCase().trim();
-        if (contentCache.has(cacheKey)) {
-          console.log('📋 Using cached content for topic:', selectedTopicObj.name);
-          setContent(contentCache.get(cacheKey));
+        if (storedContent) {
+          setContent(storedContent);
+          
+          // Parse reading content into sections if available
+          if (storedContent.reading) {
+            const sections = parseReadingSections(storedContent.reading);
+            setReadingSections(sections);
+            setReadingSectionIndex(0);
+          }
+          
           setIsLoading(false);
           setShowSkeletons(false);
+        } else if (isBatchGenerating) {
+          // Show loading if content is being generated in batch
+          setIsLoading(true);
+          setShowSkeletons(true);
+          setLoadingStep(`Generating content for ${activeTopic.name}... Please wait.`);
           
-          // Optional: Show a subtle notification that content was loaded from cache
-          setLoadingStep('✨ Content loaded instantly from cache');
-          setTimeout(() => setLoadingStep(''), 2000);
-        } else {
-          console.log('🔄 Generating new content for topic:', selectedTopicObj.name);
-          generateProContent({ 
-            topic: selectedTopicObj.name, 
-            setIsLoading, 
-            setLoadingProgress, 
-            setShowSkeletons, 
-            setLoadingStep, 
-            setContent: (newContent) => {
-              // Update current content and cache it
-              if (typeof newContent === 'function') {
-                setContent(prev => {
-                  const updated = newContent(prev);
-                  setContentCache(cache => {
-                    const newCache = new Map(cache);
-                    newCache.set(cacheKey, updated);
-                    return newCache;
-                  });
-                  return updated;
-                });
-              } else {
-                setContent(newContent);
-                setContentCache(cache => {
-                  const newCache = new Map(cache);
-                  newCache.set(cacheKey, newContent);
-                  return newCache;
-                });
+          // Check periodically if content becomes available in storage
+          const checkContentInterval = setInterval(() => {
+            const newStoredContent = getStoredTopicContent(activeTopic.name, courseTitle, getCourseId());
+            if (newStoredContent) {
+              setContent(newStoredContent);
+              
+              // Parse reading content into sections
+              if (newStoredContent.reading) {
+                const sections = parseReadingSections(newStoredContent.reading);
+                setReadingSections(sections);
+                setReadingSectionIndex(0);
               }
-            },
-            setStats, 
-            content 
-          });
+              
+              setIsLoading(false);
+              setShowSkeletons(false);
+              clearInterval(checkContentInterval);
+            }
+          }, 1000); // Check every second
+          
+          // Clean up interval
+          return () => clearInterval(checkContentInterval);
+        } else {
+          // If not in batch generation and no stored content, load from ProContentManager
+          setIsLoading(true);
+          setShowSkeletons(true);
+          
+          proContentManager.getTopicContent(activeTopic.name, generateProContent)
+            .then(result => {
+              if (result && result.content) {
+                setContent(result.content);
+                
+                // Parse reading content into sections
+                if (result.content && result.content.reading) {
+                  const sections = parseReadingSections(result.content.reading);
+                  setReadingSections(sections);
+                  setReadingSectionIndex(0);
+                } else {
+                  setReadingSections([]);
+                  setReadingSectionIndex(0);
+                }
+                
+              }
+              setIsLoading(false);
+              setShowSkeletons(false);
+            })
+            .catch(error => {
+              setIsLoading(false);
+              setShowSkeletons(false);
+            });
         }
       }
-      return updated;
+    } else if (topicParam && !topicsList.length) {
+      // If no topics list but we have a topic from URL, handle content loading/generation
+      const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
+      const currentCourseId = getCourseId();
+      
+      if (currentCourseId) {
+        setIsLoading(true);
+        setShowSkeletons(true);
+        setLoadingStep(`Loading content for ${actualTopic}...`);
+        
+        // Use ProContentManager to handle content retrieval/generation
+        proContentManager.setCourse(courseTitle, currentCourseId);
+        proContentManager.getTopicContent(actualTopic, generateProContent)
+          .then(result => {
+            if (result?.content?.reading) {
+              setContent(result.content);
+              const sections = parseReadingSections(result.content.reading);
+              setReadingSections(sections);
+              setReadingSectionIndex(0);
+              console.log('✅ Content ready:', result.source === 'storage' ? 'from storage' : 'newly generated');
+            } else {
+              throw new Error('Invalid content received');
+            }
+          })
+          .catch(error => {
+            console.error('❌ Failed to load/generate content:', error);
+          })
+          .finally(() => {
+            setIsLoading(false);
+            setShowSkeletons(false);
+          });
+      }
+    }
+  }, [topicsList, courseTitle, isBatchGenerating, topicParam, isDirectUrlGeneration]);
+
+  // Watch for content updates and trigger regeneration if content is empty
+  const [regenerationAttempted, setRegenerationAttempted] = useState(false);
+  
+  // Reset regeneration flag when topic changes
+  useEffect(() => {
+    setRegenerationAttempted(false);
+    setIsDirectUrlGeneration(false); // Reset direct generation flag when topic changes
+  }, [topicParam]);
+  
+  // DISABLED: Content watcher that was causing timing conflicts
+  /*
+  useEffect(() => {
+      hasContent: !!content,
+      hasReading: !!content?.reading,
+      readingLength: content?.reading?.length || 0,
+      isLoading,
+      topicParam,
+      regenerationAttempted
     });
+
+    if (content && !content.reading && !isLoading && topicParam && !regenerationAttempted) {
+      
+      // Check if this is a newly created empty content that needs population
+      const isEmpty = !content.reading && !content.summary && 
+                     (!content.videos || content.videos.length === 0) &&
+                     (!content.quiz || content.quiz.length === 0) &&
+                     (!content.resources || content.resources.length === 0);
+
+      if (isEmpty) {
+        setRegenerationAttempted(true); // Prevent infinite loops
+        setIsLoading(true);
+        setShowSkeletons(true);
+        setLoadingStep(`Generating content for ${topicParam}...`);
+
+        const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
+        
+        // Force regeneration by clearing stored content first
+        
+        // Call generateProContent directly to bypass storage
+        generateProContent({
+          topic: actualTopic,
+          setIsLoading: () => {},
+          setLoadingProgress: () => {},
+          setShowSkeletons: () => {},
+          setLoadingStep: () => {},
+          setContent: (newContent) => {
+              hasReading: !!newContent?.reading,
+              readingLength: newContent?.reading?.length || 0,
+              contentType: typeof newContent
+            });
+            
+            if (newContent && newContent.reading) {
+              setContent(newContent);
+              const sections = parseReadingSections(newContent.reading);
+              setReadingSections(sections);
+              setReadingSectionIndex(0);
+            } else {
+            }
+            setIsLoading(false);
+            setShowSkeletons(false);
+          },
+          setStats: () => {},
+          content: null
+        }).catch(error => {
+          setIsLoading(false);
+          setShowSkeletons(false);
+        });
+      }
+    }
+  }, [content, isLoading, topicParam, regenerationAttempted]); // Watch for content changes
+  */
+
+  // Helper function to check if topic content exists in batch-generated data
+  const hasTopicContent = (topicName) => {
+    const currentCourseId = getCourseId();
+    if (!currentCourseId) return false;
+    
+    const storedContent = proContentManager.getStoredTopicContent(currentCourseId, topicName);
+    return storedContent && Object.keys(storedContent).length > 0;
+  };
+
+  // Helper function to load topic content from batch-generated data
+  const loadTopicContent = async (topicName) => {
+    const currentCourseId = getCourseId();
+    if (!currentCourseId) return;
+
+    try {
+      setIsLoading(true);
+      setLoadingStep(`Loading ${topicName} content...`);
+
+      const storedContent = proContentManager.getStoredTopicContent(currentCourseId, topicName);
+      
+      if (storedContent) {
+        // Transform stored content to the expected format
+        setContent({
+          reading: storedContent.reading || 'Content not available',
+          summary: storedContent.summary || 'Summary not available',
+          quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
+          videos: storedContent.videos || [],
+          resources: storedContent.resources || []
+        });
+        
+        console.log('✅ Loaded content from storage for:', topicName);
+      } else {
+        // Fallback to generating content if not in storage
+        console.log('⚠️ No stored content found, generating for:', topicName);
+        const result = await proContentManager.getTopicContent(topicName, generateProContent);
+        setContent(result.content);
+      }
+    } catch (error) {
+      console.error('❌ Failed to load topic content:', error);
+      setContent({
+        reading: 'Failed to load content. Please try again.',
+        summary: 'Failed to load summary.',
+        quiz: { questions: [], currentQuestion: 0 },
+        videos: [],
+        resources: []
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle topic selection from sidebar using new storage system
+  const handleTopicSelect = (topicId) => {
+    // Find the topic in the list
+    const selectedTopic = topicsList.find(t => t.id === topicId);
+    if (!selectedTopic) return;
+
+    // Update URL with new topic
+    updateTopicInUrl(selectedTopic.name);
+
+    // Update active states
+    setTopicsList(topics => topics.map(topic => ({
+      ...topic,
+      isActive: topic.id === topicId
+    })));
+
+    // If all topics are generated, load from storage
+    if (allTopicsGenerated || hasTopicContent(selectedTopic.name)) {
+      loadTopicContent(selectedTopic.name);
+    } else {
+      // Show message that content needs to be generated
+      setContent(null);
+    }
   };
 
   // Toggle topic completion status
@@ -226,49 +542,195 @@ const ProLearningPage = () => {
       try {
         localStorage.setItem('proLearning_completedTopics', JSON.stringify(updated));
       } catch (error) {
-        console.warn('Failed to save completion status:', error);
       }
       
       return updated;
     });
   };
 
-  // Add content cache persistence
+  // Sidebar toggle handlers
+  const handleSidebarToggle = (isVisible) => {
+    setSidebarVisible(isVisible);
+  };
+
+  const handleMobileMenuToggle = (isOpen) => {
+    setIsMobileMenuOpen(isOpen);
+  };
+
+  // Copy code functionality
+  const handleCopyCode = (codeString, blockId) => {
+    navigator.clipboard.writeText(codeString).then(() => {
+      setCopySuccessMap(prev => ({ ...prev, [blockId]: true }));
+      setTimeout(() => {
+        setCopySuccessMap(prev => ({ ...prev, [blockId]: false }));
+      }, 2000);
+    });
+  };
+
+  // Check for pending topics
   useEffect(() => {
-    // Load content cache from localStorage on mount
+    
+    // Check if we have pending topics from the chatbot
     try {
-      const savedCache = localStorage.getItem('proLearning_contentCache');
-      if (savedCache) {
-        const parsed = JSON.parse(savedCache);
-        const cacheMap = new Map(Object.entries(parsed));
-        setContentCache(cacheMap);
+      const pendingTopicsString = localStorage.getItem('proLearning_pendingTopics');
+      const generationTriggered = localStorage.getItem('proLearning_generationTriggered');
+      
+      if (pendingTopicsString && generationTriggered === 'true') {
+        const pendingTopics = JSON.parse(pendingTopicsString);
+        
+        // Use these topics if we don't have topics yet
+        if (pendingTopics.length > 0 && (!topicsList || topicsList.length === 0)) {
+          setTopicsList(pendingTopics);
+        }
+        
+        // Clear the pending topics so we don't process them again
+        localStorage.removeItem('proLearning_pendingTopics');
+        localStorage.removeItem('proLearning_generationTriggered');
       }
     } catch (error) {
-      console.warn('Failed to load content cache:', error);
     }
-  }, []);
-
-  // Save content cache to localStorage when it changes
-  useEffect(() => {
-    try {
-      const cacheObj = Object.fromEntries(contentCache);
-      localStorage.setItem('proLearning_contentCache', JSON.stringify(cacheObj));
-    } catch (error) {
-      console.warn('Failed to save content cache:', error);
-    }
-  }, [contentCache]);
+    
+    // Start batch generation for all topics if needed
+    const initializeBatchGeneration = async () => {
+      if (topicsList.length > 0 && courseTitle) {
+        
+        // Get current generation progress using the storage service
+        const progress = getGenerationProgress(courseTitle);
+        
+        // If not all topics have content, start batch generation
+        if (progress.generated < progress.total) {
+          setIsBatchGenerating(true);
+          setBatchGenerationStatus('Starting batch content generation...');
+          
+          // Generate content for all topics using new storage system
+          await batchGenerateAllTopics(
+            courseTitle,
+            topicsList, 
+            generateProContent, 
+            setBatchGenerationStatus, 
+            setIsBatchGenerating, 
+            setBatchGenerationProgress
+          );
+        } else {
+        }
+      }
+    };
+    
+    // Add a small delay to ensure topicsList and courseTitle are populated
+    const timer = setTimeout(() => {
+      if (topicsList.length > 0 && courseTitle) {
+        initializeBatchGeneration();
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [topicsList, courseTitle]); // Add courseTitle dependency
 
   // Get currently active topic
   const getCurrentTopic = () => {
     const activeTopic = topicsList.find(t => t.isActive);
-    return activeTopic ? activeTopic.name : topic;
+    return activeTopic ? activeTopic.name : (topicParam || (topicsList.length > 0 ? topicsList[0].name : ''));
   };
 
-  // Clear cache function (for debugging/development)
-  const clearContentCache = () => {
-    setContentCache(new Map());
-    localStorage.removeItem('proLearning_contentCache');
-    console.log('🧹 Content cache cleared');
+  // Handle Pro Learning Experience button click - Generate all topics
+  const handleProLearningStart = async () => {
+    if (topicsList.length === 0) {
+      return;
+    }
+
+    setIsGeneratingCourse(true);
+    setAllTopicsGenerated(false);
+    setCourseGenerationProgress(0);
+    setCourseGenerationStatus("🚀 Initializing Pro Learning Experience...");
+
+    const currentCourseId = getCourseId();
+    if (!currentCourseId) {
+      setIsGeneratingCourse(false);
+      return;
+    }
+
+    try {
+      // Generate content for all topics using batch generation
+      await batchGenerateAllTopics(
+        courseTitle,
+        topicsList,
+        generateProContent,
+        setCourseGenerationStatus,
+        setIsGeneratingCourse,
+        setCourseGenerationProgress
+      );
+
+      // Mark all topics as generated
+      setAllTopicsGenerated(true);
+      setCourseGenerationStatus("✅ All topics generated successfully!");
+      
+      // Auto-load first topic content
+      if (topicsList.length > 0) {
+        const firstTopic = topicsList[0];
+        loadTopicContent(firstTopic.name);
+      }
+
+    } catch (error) {
+      setCourseGenerationStatus("❌ Generation failed. Please try again.");
+    } finally {
+      setTimeout(() => {
+        setIsGeneratingCourse(false);
+        setCourseGenerationProgress(0);
+        setCourseGenerationStatus("");
+      }, 2000);
+    }
+  };
+
+  // Clear storage function (for debugging/development)
+  const clearContentStorage = () => {
+    proContentManager.clearStorage();
+    clearReadingContentCache();
+    
+    // Reset local state to force regeneration
+    setContent(null);
+    setReadingSections([]);
+    setReadingSectionIndex(0);
+    setTopicsList([]);
+    setCompletedTopics([]);
+  };
+
+  // Reading section navigation handlers
+  const handlePrevSection = () => {
+    if (readingSectionIndex > 0) {
+      setReadingSectionIndex(readingSectionIndex - 1);
+    }
+  };
+
+  const handleNextSection = () => {
+    if (readingSectionIndex < readingSections.length - 1) {
+      setReadingSectionIndex(readingSectionIndex + 1);
+    }
+  };
+
+  // Parse reading content into sections
+  const parseReadingSections = (readingContent) => {
+    if (!readingContent || typeof readingContent !== 'string') {
+      return [{ header: 'Reading Material', content: readingContent || '' }];
+    }
+
+    // Split by ## headers (markdown H2)
+    const sections = readingContent.split(/^## /m).filter(section => section.trim());
+    
+    if (sections.length <= 1) {
+      // No clear sections, return as single section
+      return [{ header: 'Reading Material', content: readingContent }];
+    }
+
+    return sections.map((section, index) => {
+      const lines = section.trim().split('\n');
+      const header = index === 0 ? 'Introduction' : lines[0].trim();
+      const content = index === 0 ? section : lines.slice(1).join('\n').trim();
+      
+      return {
+        header: header || `Section ${index + 1}`,
+        content: content || ''
+      };
+    });
   };
 
   // Map icon names to actual React components
@@ -292,200 +754,151 @@ const ProLearningPage = () => {
     return iconMap[iconName] || FaExternalLinkAlt;
   };
   
-  const [activeTab, setActiveTab] = useState("reading");
-  const [completedTabs, setCompletedTabs] = useState([]); // Track completed tabs
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadingStep, setLoadingStep] = useState("Initializing...");
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const [showSkeletons, setShowSkeletons] = useState(true);
-
-  // Handle mobile menu state changes
-  const handleMobileMenuToggle = (isOpen) => {
-    setIsMobileMenuOpen(isOpen);
-    // Close sidebar when mobile menu opens on mobile devices
-    if (isOpen && window.innerWidth < 1024) {
-      setSidebarVisible(false);
-    }
-  };
-
-  // Handle sidebar toggle
-  const handleSidebarToggle = (isVisible) => {
-    setSidebarVisible(isVisible);
-    // Close mobile menu when sidebar opens on mobile devices
-    if (isVisible && window.innerWidth < 1024) {
-      setIsMobileMenuOpen(false);
-    }
-  };
-  
-  const [quizScore, setQuizScore] = useState(0);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [showQuizResults, setShowQuizResults] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
-  
-  const [content, setContent] = useState({
-    reading: "",
-    summary: "",
-    videos: [],
-    quiz: [],
-    resources: []
-  });
-  
-  const [stats, setStats] = useState({
-    estimatedReadTime: 0,
-    totalQuestions: 0,
-    totalVideos: 0,
-    totalResources: 0,
-    difficulty: "Intermediate",
-    completionRate: 0
-  });
-
+  // Define tabs array with icons and labels - MOVED ABOVE LoadingComponent
   const tabs = [
-    { 
-      id: "reading", 
-      label: "Reading", 
-      icon: FaBookOpen,
-      description: "Comprehensive study material",
-      color: "blue",
-      gradient: "from-blue-500 to-indigo-600"
-    },
-    { 
-      id: "summary", 
-      label: "Summary", 
-      icon: FaBrain,
-      description: "Key points & concepts",
-      color: "purple",
-      gradient: "from-purple-500 to-pink-600"
-    },
-    { 
-      id: "videos", 
-      label: "Videos", 
-      icon: FaVideo,
-      description: "Curated video content",
-      color: "red",
-      gradient: "from-red-500 to-pink-600"
-    },
-    { 
-      id: "quiz", 
-      label: "Quiz", 
-      icon: FaQuestionCircle,
-      description: "Test your knowledge",
-      color: "green",
-      gradient: "from-green-500 to-emerald-600"
-    },
-    { 
-      id: "resources", 
-      label: "Resources", 
-      icon: FaLink,
-      description: "Additional materials",
-      color: "orange",
-      gradient: "from-orange-500 to-amber-600"
-    }
+    { id: 'reading', label: 'Reading', icon: FaBookOpen },
+    { id: 'summary', label: 'Summary', icon: FaBrain },
+    { id: 'videos', label: 'Videos', icon: FaVideo },
+    { id: 'quiz', label: 'Quiz', icon: FaQuestionCircle },
+    { id: 'resources', label: 'Resources', icon: FaLink }
   ];
+  
+  
+  const [activeTab, setActiveTab] = useState(activeTabParam);
+  const [completedTabs, setCompletedTabs] = useState([]); // Track completed tabs
 
-  const [readingSectionIndex, setReadingSectionIndex] = useState(0);
-  const readingSections = useMemo(() => splitMarkdownSections(content.reading), [content.reading]);
-
-  const handleNextSection = () => {
-    setReadingSectionIndex((prev) => Math.min(prev + 1, readingSections.length - 1));
+  // Update URL when activeTab changes
+  const updateActiveTab = (newTab) => {
+    setActiveTab(newTab);
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('tab', newTab);
+    setSearchParams(newSearchParams, { replace: true });
   };
-  const handlePrevSection = () => {
-    setReadingSectionIndex((prev) => Math.max(prev - 1, 0));
+
+  // Update URL when topic changes
+  const updateTopicInUrl = (newTopic) => {
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('topic', newTopic);
+    // Reset tab to reading when changing topics
+    newSearchParams.set('tab', 'reading');
+    updateActiveTab('reading');
+    setSearchParams(newSearchParams, { replace: true });
   };
 
+  // Generate or get course ID for current session
+  const generateCourseId = () => `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  const getCourseId = () => {
+    return courseId || localStorage.getItem('currentCourseId') || null;
+  };
+
+  const setAndNavigateToCourseId = (id) => {
+    localStorage.setItem('currentCourseId', id);
+    navigate(`/pro-learning/${id}${window.location.search}`, { replace: true });
+  };
+
+  // Effect to handle course ID generation and redirection
   useEffect(() => {
-    // Re-parse topics when URL parameter changes
-    // const newTopics = parseTopics(topic); // This line is no longer needed
-    // setTopicsList(newTopics);
-    
-    // Generate content for the first/active topic
-    const activeTopic = topicsList.find(t => t.isActive);
-    const topicToGenerate = activeTopic ? activeTopic.name : topic;
-    
-    if (topicToGenerate) {
-      generateProContent({ 
-        topic: topicToGenerate, 
-        setIsLoading, 
-        setLoadingProgress, 
-        setShowSkeletons, 
-        setLoadingStep, 
-        setContent, 
-        setStats, 
-        content 
-      });
+    if (!courseId) {
+      const existingId = getCourseId();
+      if (existingId) {
+        setAndNavigateToCourseId(existingId);
+      } else {
+        const newId = generateCourseId();
+        setAndNavigateToCourseId(newId);
+      }
     }
-  }, [topic, topicsList]); // Added topicsList to dependency array
+  }, [courseId, navigate]);
 
-  const handleQuizAnswer = (questionId, answerIndex) => {
-    setContent(prev => ({
-      ...prev,
-      quiz: prev.quiz.map(q => 
-        q.id === questionId ? { ...q, userAnswer: answerIndex } : q
-      )
-    }));
-    
-    // Calculate score and update stats
-    const updatedQuiz = content.quiz.map(q => 
-      q.id === questionId ? { ...q, userAnswer: answerIndex } : q
-    );
-    const correctAnswers = updatedQuiz.filter(q => q.userAnswer === q.correct).length;
-    const answeredQuestions = updatedQuiz.filter(q => q.userAnswer !== null).length;
-    
-    setQuizScore(correctAnswers);
-    
-    // Show results if all questions answered
-    if (answeredQuestions === content.quiz.length) {
-      setTimeout(() => setShowQuizResults(true), 500);
-    }
-  };
+  // Initialize course ID on first render
+  useEffect(() => {
+    const id = getCourseId();
+  }, []);
 
-  const restartQuiz = () => {
-    setContent(prev => ({
-      ...prev,
-      quiz: prev.quiz.map(q => ({ ...q, userAnswer: null }))
-    }));
-    setQuizScore(0);
-    setCurrentQuestionIndex(0);
-    setShowQuizResults(false);
-  };
+  // Handle batch generation from ChatbotPage
+  useEffect(() => {
+    const handleBatchGeneration = async () => {
+      try {
+        const batchData = localStorage.getItem('proLearning_batchGeneration');
+        if (!batchData) return;
 
-  const nextQuestion = () => {
-    if (currentQuestionIndex < content.quiz.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    }
-  };
+        const {
+          courseId: batchCourseId,
+          topics,
+          topicString,
+          triggerBatchGeneration,
+          timestamp
+        } = JSON.parse(batchData);
 
-  const prevQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-    }
-  };
+        // Only trigger if this is a recent request (within 5 minutes) and for this course
+        const isRecent = Date.now() - timestamp < 5 * 60 * 1000;
+        const isCurrentCourse = batchCourseId === courseId;
+        
+        if (!triggerBatchGeneration || !isRecent || !isCurrentCourse) {
+          return;
+        }
 
-  const toggleBookmark = () => {
-    setBookmarked(!bookmarked);
-    // Here you could save to localStorage or send to backend
-  };
+        console.log('🚀 Starting batch generation for course:', batchCourseId);
+        console.log('📚 Topics to generate:', topics);
 
-  // Replace the single copySuccess state with a map for per-block state
-  const [copySuccessMap, setCopySuccessMap] = useState({});
-  const codeBlockIdRef = useRef(0); // To generate unique ids for code blocks
+        // Check if content already exists for this course
+        const existingContent = proContentManager.getStoredCourseContent(batchCourseId);
+        if (existingContent && existingContent.metadata.status === 'completed') {
+          console.log('✅ Course content already exists, loading from storage');
+          setTopicsList(topics);
+          setAllTopicsGenerated(true);
+          return;
+        }
 
-  // Update handleCopyCode to accept an id
-  const handleCopyCode = async (code, blockId) => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopySuccessMap((prev) => ({ ...prev, [blockId]: "Copied!" }));
-      setTimeout(() => {
-        setCopySuccessMap((prev) => ({ ...prev, [blockId]: "" }));
-      }, 1200);
-    } catch (err) {
-      setCopySuccessMap((prev) => ({ ...prev, [blockId]: "Failed to copy" }));
-      setTimeout(() => {
-        setCopySuccessMap((prev) => ({ ...prev, [blockId]: "" }));
-      }, 1200);
-    }
-  };
+        // Set up the batch generation
+        setIsBatchGenerating(true);
+        setBatchGenerationProgress(0);
+        setBatchGenerationStatus('Initializing course generation...');
+        setTopicsList(topics);
 
-  // Enhanced loading component
+        // Start batch generation
+        await proContentManager.generateAllContentBatch(
+          topics,
+          batchCourseId,
+          (current, total, topicName, contentType) => {
+            const progress = Math.round((current / total) * 100);
+            setBatchGenerationProgress(progress);
+            setBatchGenerationStatus(`Generating ${contentType} for ${topicName}...`);
+            console.log(`📈 Batch Generation Progress: ${progress}% - ${contentType} for ${topicName}`);
+          }
+        );
+
+        // Mark generation as complete
+        setIsBatchGenerating(false);
+        setAllTopicsGenerated(true);
+        setBatchGenerationStatus('Course generation completed!');
+        
+        // Auto-load the first topic or topic from URL
+        const topicToLoad = topicParam || topics[0]?.name;
+        if (topicToLoad) {
+          console.log('🎯 Auto-loading topic after batch generation:', topicToLoad);
+          loadTopicContent(topicToLoad);
+        }
+        
+        // Clear the trigger so it doesn't run again
+        localStorage.removeItem('proLearning_batchGeneration');
+        
+        console.log('🎉 Batch generation completed for course:', batchCourseId);
+
+      } catch (error) {
+        console.error('❌ Batch generation failed:', error);
+        setIsBatchGenerating(false);
+        setBatchGenerationStatus('Generation failed. Please try again.');
+      }
+    };
+
+    // Run the handler
+    handleBatchGeneration();
+  }, [courseId]); // Depend on courseId so it runs when course changes
+
+  // ...existing code...
+
+  // Enhanced loading component with batch generation support
   const LoadingComponent = () => (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -501,72 +914,67 @@ const ProLearningPage = () => {
             {/* Floating particles */}
             <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
               <div className="flex space-x-2">
-                {[...Array(3)].map((_, i) => (
-                  <div 
-                    key={i}
-                    className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full animate-bounce"
-                    style={{ animationDelay: `${i * 0.2}s` }}
-                  ></div>
-                ))}
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
 
-          <h3 className="text-xl font-bold text-gray-900 mb-2 relative z-10">
-            Creating Your Learning Experience
-          </h3>
-          
-          <p className="text-sm text-gray-600 mb-6 relative z-10">
-            Generating materials for <span className="font-semibold text-blue-600">{getCurrentTopic()}</span>
-          </p>
-
-          {/* Enhanced progress bar */}
-          <div className="mb-6 relative z-10">
-            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-              <span className="font-medium">{loadingStep.replace(/[📘🧠🎥✅📚✨❌]/g, '').trim()}</span>
-              <span className="font-bold text-blue-600">{loadingProgress}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner">
-              <div 
-                className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-500 relative overflow-hidden"
-                style={{width: `${loadingProgress}%`}}
-              >
-                <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+          {/* Progress section for batch generation */}
+          {isBatchGenerating && (
+            <div className="mb-6">
+              <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
+                <div 
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-300"
+                  style={{ width: `${batchGenerationProgress}%` }}
+                ></div>
+              </div>
+              <div className="text-sm text-gray-600 mb-2">
+                {batchGenerationProgress}% Complete
               </div>
             </div>
+          )}
+
+          {/* Status messages */}
+          <div className="relative z-10 mb-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-2">
+              {isBatchGenerating ? '🚀 Generating Your Course' : 'Preparing Content'}
+            </h3>
+            <p className="text-gray-600 text-sm leading-relaxed">
+              {isBatchGenerating ? batchGenerationStatus : (loadingStep || 'Setting up your learning materials...')}
+            </p>
           </div>
 
-          {/* Enhanced status indicators */}
-          <div className="flex justify-center space-x-3 mb-4 relative z-10">
-            {tabs.slice(0, 5).map((tab) => {
-              const IconComponent = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className="focus:outline-none"
-                  aria-label={tab.label}
-                >
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                    isActive
-                      ? 'bg-gradient-to-br from-blue-400 to-purple-600 text-white animate-pulse scale-105'
-                      : 'bg-gray-200 text-gray-400'
-                  }`}>
-                    <IconComponent className="text-xs" />
-                  </div>
-                  <span className={`text-xs mt-1 transition-colors ${
-                    isActive ? 'text-blue-600 font-medium' : 'text-gray-400'
-                  }`}>
-                    {tab.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          
-          <div className="text-xs text-gray-400 relative z-10">
-            Powered by AI • Personalized Content
+          {/* Content types being generated */}
+          {isBatchGenerating && (
+            <div className="relative z-10 grid grid-cols-2 gap-3 mb-6">
+              <div className="flex items-center justify-center p-3 bg-blue-50 rounded-lg">
+                <FaBookOpen className="text-blue-500 mr-2" />
+                <span className="text-xs text-blue-700 font-medium">Reading</span>
+              </div>
+              <div className="flex items-center justify-center p-3 bg-purple-50 rounded-lg">
+                <FaBrain className="text-purple-500 mr-2" />
+                <span className="text-xs text-purple-700 font-medium">Summary</span>
+              </div>
+              <div className="flex items-center justify-center p-3 bg-red-50 rounded-lg">
+                <FaVideo className="text-red-500 mr-2" />
+                <span className="text-xs text-red-700 font-medium">Videos</span>
+              </div>
+              <div className="flex items-center justify-center p-3 bg-green-50 rounded-lg">
+                <FaQuestionCircle className="text-green-500 mr-2" />
+                <span className="text-xs text-green-700 font-medium">Quiz</span>
+              </div>
+            </div>
+          )}
+
+          {/* Loading dots animation */}
+          <div className="relative z-10">
+            <div className="flex justify-center space-x-2">
+              <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
+              <div className="w-3 h-3 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-3 h-3 bg-indigo-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+            </div>
           </div>
         </div>
       </div>
@@ -574,14 +982,132 @@ const ProLearningPage = () => {
   );
 
   const renderTabContent = () => {
-    if (isLoading) {
+    
+    // Show loading if generating course, individual content, or batch generating
+    if (isGeneratingCourse || isLoading || isBatchGenerating) {
       return <LoadingComponent />;
+    }
+
+    // If no content and course not generated, show Pro Learning Experience button
+    if (!content && !allTopicsGenerated) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl text-center">
+            <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-12 relative overflow-hidden">
+              {/* Background decoration */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-transparent to-purple-50 opacity-50"></div>
+              
+              <div className="relative z-10">
+                {/* Hero Icon */}
+                <div className="w-24 h-24 mx-auto mb-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-3xl flex items-center justify-center shadow-lg">
+                  <FaRobot className="text-3xl text-white" />
+                </div>
+
+                <h1 className="text-3xl font-bold text-gray-900 mb-4">
+                  🚀 Pro Learning Experience
+                </h1>
+                
+                <p className="text-lg text-gray-600 mb-2">
+                  Complete study materials for: <span className="font-bold text-blue-600">{getCurrentTopic()}</span>
+                </p>
+
+                <div className="flex justify-center space-x-6 my-8 text-sm text-gray-700">
+                  <div className="flex items-center">
+                    <FaBookOpen className="text-blue-500 mr-2" />
+                    <span>📘 Reading</span>
+                  </div>
+                  <div className="flex items-center">
+                    <FaBrain className="text-purple-500 mr-2" />
+                    <span>🧠 Summary</span>
+                  </div>
+                  <div className="flex items-center">
+                    <FaVideo className="text-red-500 mr-2" />
+                    <span>🎥 Videos</span>
+                  </div>
+                  <div className="flex items-center">
+                    <FaQuestionCircle className="text-green-500 mr-2" />
+                    <span>✅ Quiz</span>
+                  </div>
+                  <div className="flex items-center">
+                    <FaLink className="text-indigo-500 mr-2" />
+                    <span>📚 Resources</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleProLearningStart}
+                  disabled={topicsList.length === 0}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+                >
+                  {topicsList.length === 0 ? 
+                    'Loading Topics...' : 
+                    `🚀 Start Pro Learning Experience`
+                  }
+                </button>
+
+                <p className="text-xs text-gray-500 mt-4">
+                  {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // If no content but course is generated, show message
+    if (!content) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center max-w-lg">
+            {!courseTitle ? (
+              <div>
+                <p className="text-gray-600 mb-4">Enter a course title to get started</p>
+                <div className="text-gray-500 text-sm space-y-2">
+                  <p>Try clicking the Pro Learning title above and entering a course like:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Web Development with React</li>
+                    <li>Python Programming Basics</li>
+                    <li>Machine Learning Fundamentals</li>
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p className="text-gray-600 mb-4">Select a topic from the sidebar to view content</p>
+                <button
+                  className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition-all duration-300 flex items-center space-x-2"
+                  onClick={() => setSidebarVisible(!sidebarVisible)}
+                >
+                  <IoMenu className="text-xl" />
+                  <span>Open Topics Menu</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
     }
 
     switch (activeTab) {
       case "reading":
+        
+        // Additional fallback: if content exists but reading is empty, try to show other content
+        const hasAnyContent = content && (content.reading || content.summary || content.videos?.length || content.quiz?.length || content.resources?.length);
+        
         return (
           <div className="max-w-none">
+            {/* Debug info in development */}
+            {import.meta.env.DEV && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+                <strong>Debug Info:</strong>
+                <div>Content: {content ? 'EXISTS' : 'NULL'}</div>
+                <div>Reading: {content?.reading ? `${content.reading.length} chars` : 'EMPTY'}</div>
+                <div>Sections: {readingSections.length}</div>
+                <div>Has Any Content: {hasAnyContent ? 'YES' : 'NO'}</div>
+              </div>
+            )}
+            
             {/* Compact Reading Header */}
             <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-xl p-4 mb-6 shadow-sm">
               <div className="flex items-center justify-between">
@@ -634,7 +1160,7 @@ const ProLearningPage = () => {
             )}
             {/* Enhanced Content with better typography, one section at a time */}
             <div className="prose prose-lg max-w-none">
-              {readingSections.length > 0 && (
+              {readingSections.length > 0 ? (
                 <ReactMarkdown
                   components={{
                     h1: ({children}) => (
@@ -733,6 +1259,115 @@ const ProLearningPage = () => {
                 >
                   {`${readingSections[readingSectionIndex].header}\n${readingSections[readingSectionIndex].content}`}
                 </ReactMarkdown>
+              ) : (
+                // Fallback: render raw content if sections are empty
+                content && content.reading ? (
+                  <ReactMarkdown
+                    components={{
+                      h1: ({children}) => (
+                        <h1 className="text-3xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                          {children}
+                        </h1>
+                      ),
+                      h2: ({children}) => (
+                        <h2 className="text-2xl font-semibold text-gray-800 mb-4 mt-8 flex items-center">
+                          <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-3"></div>
+                          {children}
+                        </h2>
+                      ),
+                      h3: ({children}) => (
+                        <h3 className="text-xl font-medium text-gray-700 mb-3 mt-6 flex items-center">
+                          <FaLightbulb className="text-yellow-500 mr-2" />
+                          {children}
+                        </h3>
+                      ),
+                      p: ({children}) => (
+                        <p className="text-gray-700 leading-relaxed mb-4 text-base">
+                          {children}
+                        </p>
+                      ),
+                      pre: ({children}) => (
+                        <div className="mb-6">
+                          <pre className="text-sm">{children}</pre>
+                        </div>
+                      ),
+                      ul: ({children}) => <ul className="space-y-2 mb-6 ml-6">{children}</ul>,
+                      li: ({children}) => (
+                        <li className="flex items-start text-gray-700">
+                          <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mt-2.5 mr-3 flex-shrink-0"></div>
+                          <span>{children}</span>
+                        </li>
+                      ),
+                      blockquote: ({children}) => (
+                        <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-6 py-4 my-6 rounded-r-lg">
+                          <div className="flex items-start">
+                            <FaLightbulb className="text-blue-500 mt-1 mr-3 flex-shrink-0" />
+                            <div className="text-blue-800 italic">{children}</div>
+                          </div>
+                        </blockquote>
+                      )
+                    }}
+                  >
+                    {content.reading}
+                  </ReactMarkdown>
+                ) : isLoading ? (
+                  <div className="text-center py-12">
+                    <div className="inline-flex items-center px-6 py-3 bg-blue-50 rounded-lg">
+                      <BiLoaderAlt className="animate-spin text-blue-600 mr-3" />
+                      <span className="text-blue-800 font-medium">
+                        {loadingStep || `Generating content for ${topicParam || 'topic'}...`}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-4">
+                      <FaExclamationTriangle className="text-yellow-600 text-2xl mx-auto mb-3" />
+                      <p className="text-yellow-800 font-medium mb-2">No reading content available</p>
+                      <p className="text-yellow-700 text-sm mb-4">
+                        The content may still be generating or there was an issue loading it.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setRegenerationAttempted(false); // Reset flag
+                          setIsLoading(true);
+                          setShowSkeletons(true);
+                          setLoadingStep('Regenerating content...');
+                          
+                          const actualTopic = topicParam?.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
+                          if (actualTopic) {
+                            // Force regeneration by calling generateProContent directly
+                            generateProContent({
+                              topic: actualTopic,
+                              setIsLoading: () => {},
+                              setLoadingProgress: () => {},
+                              setShowSkeletons: () => {},
+                              setLoadingStep: () => {},
+                              setContent: (newContent) => {
+                                if (newContent && newContent.reading) {
+                                  setContent(newContent);
+                                  const sections = parseReadingSections(newContent.reading);
+                                  setReadingSections(sections);
+                                  setReadingSectionIndex(0);
+                                }
+                                setIsLoading(false);
+                                setShowSkeletons(false);
+                              },
+                              setStats: () => {},
+                              content: null
+                            }).catch(error => {
+                              setIsLoading(false);
+                              setShowSkeletons(false);
+                            });
+                          }
+                        }}
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                      >
+                        Refresh Content
+                      </button>
+                    </div>
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -1274,6 +1909,12 @@ const ProLearningPage = () => {
     }
   };
 
+  // Handle closing of batch generation status notification
+  const handleCloseBatchStatus = () => {
+    setBatchGenerationProgress(0);
+    setBatchGenerationStatus('');
+  };
+
   return (
     <>
       <Navbar initialStyle="light" />
@@ -1292,7 +1933,29 @@ const ProLearningPage = () => {
             font-weight: 900 !important;
             text-shadow: 0 0 2px #fff, 0 0 1px #fff;
           }
+          @keyframes slide-up {
+            from {
+              transform: translateY(100%);
+              opacity: 0;
+            }
+            to {
+              transform: translateY(0);
+              opacity: 1;
+            }
+          }
+          .animate-slide-up {
+            animation: slide-up 0.3s ease-out forwards;
+          }
         `}</style>
+        
+      {/* Batch Generation Status Indicator */}
+      <BatchGenerationStatus
+        isGenerating={isBatchGenerating}
+        progress={batchGenerationProgress}
+        status={batchGenerationStatus}
+        onClose={handleCloseBatchStatus}
+      />
+      
       {/* Enhanced Header */}
       {/* <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50"> ... </header> */}
 
@@ -1316,7 +1979,7 @@ const ProLearningPage = () => {
                         <button
                           key={tab.id}
                           onClick={() => {
-                            setActiveTab(tab.id);
+                            updateActiveTab(tab.id);
                           }}
                           disabled={isLoading}
                           className={`group flex-1 min-w-[120px] p-4 rounded-xl font-medium transition-all duration-300 ${
@@ -1458,10 +2121,10 @@ const ProLearningPage = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
                           <span className="font-medium capitalize">{topicItem.name}</span>
-                          {/* Show cached indicator */}
-                          {contentCache.has(topicItem.name.toLowerCase().trim()) && !topicItem.isActive && (
+                          {/* Show content generated indicator */}
+                          {hasTopicContent(topicItem.name) && !topicItem.isActive && (
                             <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded-full">
-                              Cached
+                              Generated
                             </span>
                           )}
                         </div>
@@ -1502,13 +2165,13 @@ const ProLearningPage = () => {
                     {/* Development debug info */}
                     {import.meta.env.DEV && (
                       <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700">
-                        <div>Cached topics: {contentCache.size}</div>
+                        <div>Generated topics: {getCourseId() ? getGenerationProgress(getCourseId()).generated : 0}</div>
                         <div>Completed: {completedTopics.length}</div>
                         <button 
-                          onClick={clearContentCache}
+                          onClick={clearContentStorage}
                           className="mt-1 px-2 py-1 bg-blue-200 hover:bg-blue-300 rounded text-blue-800"
                         >
-                          Clear Cache
+                          Clear Storage
                         </button>
                       </div>
                     )}

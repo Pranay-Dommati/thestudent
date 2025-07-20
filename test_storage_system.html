@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Learning Storage System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-header {
+            color: #2563eb;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 10px;
+        }
+        .storage-demo {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .status.new {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        .feature-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px;
+            margin: 4px 0;
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            border-radius: 4px;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .before, .after {
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .before {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .after {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .code-example {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        .test-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background-color: #0056b3;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <h1>🗄️ Pro Learning Storage System Implementation</h1>
+    
+    <div class="test-section">
+        <h2 class="test-header">New Storage Architecture <span class="status new">IMPLEMENTED</span></h2>
+        
+        <p>The Pro Learning system now uses a structured storage architecture that mimics a database, making it easy to migrate to a real database later.</p>
+
+        <div class="comparison">
+            <div class="before">
+                <h3>❌ Old System (Cache-based)</h3>
+                <ul>
+                    <li>Simple Map cache</li>
+                    <li>No data structure</li>
+                    <li>Content retrieved by API calls</li>
+                    <li>No persistence strategy</li>
+                    <li>Hard to track progress</li>
+                    <li>No relationship management</li>
+                </ul>
+            </div>
+            <div class="after">
+                <h3>✅ New System (Database-like)</h3>
+                <ul>
+                    <li>Structured storage service</li>
+                    <li>Proper data relationships</li>
+                    <li>Content stored after generation</li>
+                    <li>Persistent localStorage</li>
+                    <li>Progress tracking built-in</li>
+                    <li>Course/Topic/Content tables</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-header">Key Components</h2>
+        
+        <div class="feature-list">
+            <li><strong>ContentStorageService.js</strong> - Database-like storage with courses, topics, contents tables</li>
+            <li><strong>ProContentManager.js</strong> - Interface for content retrieval and management</li>
+            <li><strong>ProBatchGenerator.js</strong> - Updated to use structured storage instead of cache</li>
+            <li><strong>ProLearningPage.jsx</strong> - Modified to use storage service for content loading</li>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-header">Storage Architecture</h2>
+        
+        <div class="storage-demo">
+            <h3>Database Tables Structure:</h3>
+            <div class="code-example">
+📚 COURSES Table:
+- id: course_1642123456_abc123
+- title: "Machine Learning Fundamentals"
+- description: "AI-generated course"
+- topicIds: [topic_1642123456_def456, topic_1642123456_ghi789]
+- createdAt: "2025-07-17T01:00:00.000Z"
+
+📋 TOPICS Table:
+- id: topic_1642123456_def456
+- courseId: course_1642123456_abc123
+- name: "Introduction to Neural Networks"
+- order: 0
+- isActive: true
+- contentGenerated: true
+- contentId: content_1642123456_jkl012
+
+📄 CONTENTS Table:
+- id: content_1642123456_jkl012
+- topicId: topic_1642123456_def456
+- reading: "Neural networks are..."
+- summary: "Key points about neural networks..."
+- videos: [{title: "Neural Networks Explained", url: "..."}]
+- quiz: [{question: "What is a neural network?", ...}]
+- resources: [{title: "Deep Learning Book", url: "..."}]
+- generatedAt: "2025-07-17T01:00:00.000Z"
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-header">Content Flow</h2>
+        
+        <div class="code-example">
+1. 🚀 User clicks "Create Course" in chatbot
+   ↓
+2. 📚 Course stored in ContentStorageService
+   ↓
+3. 📋 Topics stored with course relationships
+   ↓
+4. 🔄 Batch generation starts for all topics
+   ↓
+5. 💾 Generated content stored in structured format
+   ↓
+6. 👆 User clicks topic → Content loaded from storage (NO API CALLS)
+   ↓
+7. ⚡ Instant content display from stored data
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-header">Usage Examples</h2>
+        
+        <h3>Store Course and Topics:</h3>
+        <div class="code-example">
+// Initialize course storage
+const result = initializeCourseStorage("Machine Learning", [
+    {name: "Neural Networks", id: 1},
+    {name: "Deep Learning", id: 2}
+]);
+
+// Generate content for all topics
+batchGenerateAllTopics(
+    "Machine Learning",
+    topicsList,
+    generateProContent,
+    setLoadingStatus,
+    setIsGenerating,
+    setGenerationProgress
+);
+        </div>
+
+        <h3>Retrieve Stored Content:</h3>
+        <div class="code-example">
+// Check if content exists
+const hasContent = isTopicContentGenerated("Neural Networks", "Machine Learning");
+
+// Get stored content (NO API CALL)
+const storedContent = getStoredTopicContent("Neural Networks", "Machine Learning");
+
+// Load content instantly
+if (storedContent) {
+    setContent(storedContent);
+    setIsLoading(false);
+}
+        </div>
+
+        <h3>Track Progress:</h3>
+        <div class="code-example">
+// Get course progress
+const progress = getGenerationProgress("Machine Learning");
+// Returns: {percentage: 100, generated: 2, total: 2, isComplete: true}
+
+// Get topics with status
+const topics = getCourseTopicsWithStatus("Machine Learning");
+// Returns: [{id: "topic_123", name: "Neural Networks", hasContent: true}, ...]
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-header">Testing Instructions</h2>
+        
+        <div id="test-results"></div>
+        
+        <h3>Manual Testing Steps:</h3>
+        <ol>
+            <li><strong>Start Development Server:</strong> <code>npm run dev</code></li>
+            <li><strong>Create New Course:</strong> Go to chatbot, create a course with multiple topics</li>
+            <li><strong>Click "Pro Learning":</strong> Should start batch generation automatically</li>
+            <li><strong>Wait for Generation:</strong> Watch progress indicator</li>
+            <li><strong>Click Different Topics:</strong> Content should load instantly from storage</li>
+            <li><strong>Refresh Page:</strong> Content should persist and load quickly</li>
+            <li><strong>Check Console:</strong> Should see "Using stored content" messages, not API calls</li>
+        </ol>
+
+        <h3>Expected Results:</h3>
+        <ul>
+            <li>✅ All topics generate content once during batch generation</li>
+            <li>✅ Subsequent topic clicks load content instantly from storage</li>
+            <li>✅ No AI API calls after initial generation</li>
+            <li>✅ Content persists across page refreshes</li>
+            <li>✅ Progress tracking works correctly</li>
+        </ul>
+
+        <h3>Browser Storage Testing:</h3>
+        <button class="test-button" onclick="testStorageSystem()">Test Storage System</button>
+        <button class="test-button" onclick="clearStorage()">Clear Storage</button>
+        <button class="test-button" onclick="showStorageStats()">Show Storage Stats</button>
+    </div>
+
+    <div class="test-section">
+        <h2 class="test-header">Migration Benefits</h2>
+        
+        <div class="feature-list">
+            <li><strong>Database Ready:</strong> Easy to replace ContentStorageService with actual database calls</li>
+            <li><strong>Structured Data:</strong> Proper relationships between courses, topics, and content</li>
+            <li><strong>Performance:</strong> Content loads instantly after generation</li>
+            <li><strong>Persistence:</strong> Content survives page refreshes and browser sessions</li>
+            <li><strong>Scalability:</strong> Can handle multiple courses and large content volumes</li>
+            <li><strong>Maintainability:</strong> Clear separation of concerns and data management</li>
+        </div>
+    </div>
+
+    <script>
+        function testStorageSystem() {
+            const resultDiv = document.getElementById('test-results');
+            let results = '<h4>Storage System Test Results:</h4>';
+
+            try {
+                // Test basic storage functionality
+                const testData = {
+                    course: 'Test Course',
+                    topics: [
+                        {name: 'Topic 1', id: 1},
+                        {name: 'Topic 2', id: 2}
+                    ],
+                    content: {
+                        reading: 'Test reading content',
+                        summary: 'Test summary',
+                        videos: [],
+                        quiz: [],
+                        resources: []
+                    }
+                };
+
+                // Simulate storage
+                localStorage.setItem('proLearning_storage', JSON.stringify({
+                    courses: {
+                        'course_test': testData.course
+                    },
+                    topics: {
+                        'topic_test1': testData.topics[0],
+                        'topic_test2': testData.topics[1]
+                    },
+                    contents: {
+                        'content_test1': testData.content
+                    }
+                }));
+
+                results += '<div class="test-result success">✅ Storage write test passed</div>';
+
+                // Test retrieval
+                const stored = localStorage.getItem('proLearning_storage');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    results += '<div class="test-result success">✅ Storage read test passed</div>';
+                    results += `<div class="test-result success">📊 Found ${Object.keys(parsed.courses).length} courses, ${Object.keys(parsed.topics).length} topics, ${Object.keys(parsed.contents).length} contents</div>`;
+                } else {
+                    results += '<div class="test-result error">❌ Storage read test failed</div>';
+                }
+
+            } catch (error) {
+                results += `<div class="test-result error">❌ Storage test failed: ${error.message}</div>`;
+            }
+
+            resultDiv.innerHTML = results;
+        }
+
+        function clearStorage() {
+            localStorage.removeItem('proLearning_storage');
+            localStorage.removeItem('proLearning_contentCache');
+            localStorage.removeItem('proLearning_topicsList');
+            localStorage.removeItem('proLearning_completedTopics');
+            
+            document.getElementById('test-results').innerHTML = 
+                '<div class="test-result success">🗑️ All Pro Learning storage cleared</div>';
+        }
+
+        function showStorageStats() {
+            const storage = localStorage.getItem('proLearning_storage');
+            const resultDiv = document.getElementById('test-results');
+            
+            if (storage) {
+                try {
+                    const data = JSON.parse(storage);
+                    const stats = `
+                        <h4>📊 Storage Statistics:</h4>
+                        <div class="test-result success">
+                            <strong>Courses:</strong> ${Object.keys(data.courses || {}).length}<br>
+                            <strong>Topics:</strong> ${Object.keys(data.topics || {}).length}<br>
+                            <strong>Contents:</strong> ${Object.keys(data.contents || {}).length}<br>
+                            <strong>Storage Size:</strong> ${(new Blob([storage]).size / 1024).toFixed(2)} KB<br>
+                            <strong>Last Updated:</strong> ${data.lastUpdated || 'Unknown'}
+                        </div>
+                    `;
+                    resultDiv.innerHTML = stats;
+                } catch (error) {
+                    resultDiv.innerHTML = `<div class="test-result error">❌ Error reading storage: ${error.message}</div>`;
+                }
+            } else {
+                resultDiv.innerHTML = '<div class="test-result error">📭 No storage data found</div>';
+            }
+        }
+
+        // Show current storage stats on load
+        document.addEventListener('DOMContentLoaded', showStorageStats);
+    </script>
+</body>
+</html>

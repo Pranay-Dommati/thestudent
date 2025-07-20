@@ -19,6 +19,12 @@ const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 function getCachedContent(cacheKey) {
   const cached = contentCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    // Don't return empty cached content - force regeneration
+    if (!cached.content || cached.content.trim() === '') {
+      console.log(`🗑️ Removing empty cached content for: ${cacheKey}`);
+      contentCache.delete(cacheKey);
+      return null;
+    }
     console.log(`📋 Using cached content for: ${cacheKey}`);
     return cached.content;
   }
@@ -90,18 +96,35 @@ async function enforceRateLimit() {
 // Generate content for a single topic with enhanced error handling
 async function generateSingleTopicContent(topic) {
   try {
+    console.log(`🚀 Generating AI content for topic: ${topic}`);
     const response = await fetch('/ai/reading/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic })
     });
-    if (!response.ok) throw new Error('Backend AI reading endpoint failed');
+    
+    if (!response.ok) {
+      console.error(`❌ Backend AI reading endpoint failed with status: ${response.status}`);
+      throw new Error('Backend AI reading endpoint failed');
+    }
+    
     const result = await response.json();
+    console.log(`📋 Raw AI response for ${topic}:`, result);
+    
     const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    console.log(`📝 Extracted text length for ${topic}: ${generatedText.length} characters`);
+    
+    if (!generatedText || generatedText.length === 0) {
+      console.error(`❌ Empty content generated for topic: ${topic}`);
+      throw new Error(`Empty content generated for topic: ${topic}`);
+    }
+    
     validateGeneratedContent(generatedText, topic);
+    console.log(`✅ Successfully generated and validated content for: ${topic}`);
     return generatedText;
   } catch (error) {
-    throw new Error('Reading content generation failed');
+    console.error(`❌ Error generating content for ${topic}:`, error);
+    throw new Error(`Reading content generation failed for ${topic}: ${error.message}`);
   }
 }
 
@@ -215,8 +238,13 @@ export async function generateReadingContent(user_input, setContent, options = {
     }
 
     const finalContent = validResponses.join('\n\n---\n\n');
-    setContent((prev) => ({
-      ...prev,
+    console.log('📋 Final content being set:', {
+      length: finalContent.length,
+      preview: finalContent.substring(0, 200) + '...',
+      validResponses: validResponses.length
+    });
+    
+    const contentToSet = {
       reading: finalContent,
       metadata: {
         generatedAt: new Date().toISOString(),
@@ -224,7 +252,40 @@ export async function generateReadingContent(user_input, setContent, options = {
         topicsProcessed: topics.length,
         successRate: (validResponses.length / topics.length * 100).toFixed(1) + '%'
       }
-    }));
+    };
+    
+    console.log('🔧 About to call setContent with:', {
+      readingLength: contentToSet.reading.length,
+      hasReading: !!contentToSet.reading,
+      preview: contentToSet.reading.substring(0, 100) + '...'
+    });
+    
+    setContent((prev) => {
+      console.log('🔧 readingContentService: setContent callback - detailed analysis:', {
+        hasPrev: !!prev,
+        prevType: typeof prev,
+        prevKeys: prev ? Object.keys(prev) : 'NO_PREV',
+        prevReadingExists: !!prev?.reading,
+        prevReadingLength: prev?.reading?.length || 0,
+        contentToSetReadingLength: contentToSet.reading?.length || 0,
+        finalContentLength: finalContent.length,
+        contentToSetKeys: Object.keys(contentToSet)
+      });
+      
+      const newContent = {
+        ...prev,
+        ...contentToSet
+      };
+      
+      console.log('🔧 readingContentService: setContent callback - final result:', {
+        newContentKeys: Object.keys(newContent),
+        prevReading: prev?.reading?.length || 0,
+        newReading: newContent.reading?.length || 0,
+        finalHasReading: !!newContent.reading,
+        readingPreview: newContent.reading ? newContent.reading.substring(0, 50) + '...' : 'NO_READING'
+      });
+      return newContent;
+    });
     setCachedContent(user_input, finalContent);
     console.log(`✅ Successfully generated content for ${validResponses.length}/${topics.length} topics`);
   } catch (error) {
@@ -242,4 +303,23 @@ export async function generateReadingContent(user_input, setContent, options = {
     }));
     console.warn('Content generation failed');
   }
+}
+
+// Export function to clear cache for debugging
+export function clearReadingContentCache() {
+  contentCache.clear();
+  console.log('🗑️ Cleared all reading content cache');
+}
+
+// Export function to check cache status
+export function getReadingContentCacheInfo() {
+  const cacheEntries = Array.from(contentCache.entries()).map(([key, value]) => ({
+    key,
+    timestamp: value.timestamp,
+    contentLength: value.content?.length || 0,
+    isEmpty: !value.content || value.content.trim() === ''
+  }));
+  
+  console.log('📊 Reading Content Cache Info:', cacheEntries);
+  return cacheEntries;
 }

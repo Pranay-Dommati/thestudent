@@ -162,6 +162,7 @@ const App = () => {
             <Route path="/privacy" element={<Navigate to="/privacy-policy" />} />
             <Route path="/chat" element={<ChatBotPage />} />
             <Route path="/pro-learning" element={<ProLearningPage />} />
+            <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
             <Route path="/learning-hub" element={

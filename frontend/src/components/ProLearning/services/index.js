@@ -1,7 +1,11 @@
 // ProLearning Services Index
 // Central export file for all ProLearning content generation services
 
-export { generateReadingContent } from './readingContentService.js';
+export { 
+  generateReadingContent, 
+  clearReadingContentCache, 
+  getReadingContentCacheInfo 
+} from './readingContentService.js';
 export { generateSummaryContent } from './summaryContentService.js';
 export { generateVideosContent } from './videosContentService.js';
 export { generateQuizContent, calculateQuizScore, getQuizResults, resetQuiz } from './quizContentService.js';

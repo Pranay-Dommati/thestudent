@@ -520,26 +520,31 @@ const ChatbotPage = () => {
     setPendingTopics([...pendingTopics, newTopic]);
   };
 
-  const handleTopicConfirm = () => {
+  const handleTopicConfirm = async () => {
     if (pendingTopics.length === 0) {
       alert("Please add at least one topic to create a course.");
       return;
     }
 
+    // Generate a unique course ID
+    const courseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
     // Create the topic string for URL - extract just the names from objects
     const topicNames = pendingTopics.map(topic => topic.name);
     const topicString = topicNames.join(', ');
     console.log('📝 Confirmed topic names:', topicNames);
+    console.log('📝 Generated course ID:', courseId);
     console.log('📝 Topic string for URL:', topicString);
     
     const proResponse = {
       id: chatHistory.length + 1,
       type: "bot",
-      content: `🎓 Perfect! I'll create a comprehensive course on: **${topicNames.join(', ')}**. Click the card below to access your customized course materials including reading materials, summaries, videos, quizzes, and resources.`,
+      content: `🎓 Perfect! I'll create a comprehensive course on: **${topicNames.join(', ')}**. Click the card below to access your customized course materials. Content generation will begin automatically and you'll see a loading screen until all materials are ready.`,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       isProCard: true,
       topic: topicString,
       extractedTopics: pendingTopics,
+      courseId: courseId, // Include the generated course ID
     };
     
     // Update chat history and close confirmation dialog
@@ -611,8 +616,25 @@ const ChatbotPage = () => {
               <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 mb-2">
                 <div className="text-sm text-gray-700 mb-4">{message.content}</div>
                 <Link 
-                  to={`/pro-learning?topic=${encodeURIComponent(message.topic)}`}
+                  to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
                   className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
+                  onClick={() => {
+                    // Store the topics and course data for batch generation
+                    try {
+                      const batchGenerationData = {
+                        courseId: message.courseId,
+                        topics: message.extractedTopics || [],
+                        topicString: message.topic,
+                        triggerBatchGeneration: true,
+                        timestamp: Date.now()
+                      };
+                      
+                      localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
+                      console.log('🚀 Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
+                    } catch (error) {
+                      console.error('Failed to store batch generation data:', error);
+                    }
+                  }}
                 >
                   <div className="flex items-center justify-between">
                     <div>

@@ -41,6 +41,7 @@ export async function generateProContent({ topic, setIsLoading, setLoadingProgre
   
   // Initialize content structure if not exists
   if (!content) {
+    console.log('🔧 ProLearningLogic: Initializing empty content structure');
     setContent({
       reading: '',
       summary: '',
@@ -49,13 +50,20 @@ export async function generateProContent({ topic, setIsLoading, setLoadingProgre
       resources: [],
       metadata: {}
     });
+  } else {
+    console.log('🔧 ProLearningLogic: Content already exists:', {
+      readingLength: content?.reading?.length || 0,
+      hasReading: !!content?.reading
+    });
   }
   
   try {
     // Step 1: Generate Reading Content
     setLoadingStep('📘 Generating comprehensive reading material...');
     setLoadingProgress(10);
+    console.log('🔧 ProLearningLogic: About to call generateReadingContent for topic:', topic);
     await generateReadingContent(topic, setContent);
+    console.log('🔧 ProLearningLogic: generateReadingContent completed for topic:', topic);
     // Wait a bit to ensure content is updated
     await new Promise(resolve => setTimeout(resolve, 100));
     
