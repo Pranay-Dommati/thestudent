@@ -313,6 +313,10 @@ class ProContentManager {
                       generatedContent.summary = content.summary;
                     }
                   }, topicName, generatedContent.reading);
+                  // Ensure we have summary content
+                  if (!generatedContent.summary) {
+                    generatedContent.summary = `## Summary of ${topicName}\n\n• **Key Topic**: ${topicName}\n• **Main Focus**: Understanding core concepts and applications\n• **Learning Outcome**: Practical knowledge and implementation skills`;
+                  }
                   break;
                 case 'quiz':
                   await generateQuizContent((content) => {
@@ -320,6 +324,23 @@ class ProContentManager {
                       generatedContent.quiz = content.quiz;
                     }
                   }, topicName, generatedContent.reading);
+                  // Ensure we have quiz content
+                  if (!generatedContent.quiz || generatedContent.quiz.length === 0) {
+                    generatedContent.quiz = [
+                      {
+                        id: 1,
+                        question: `What is ${topicName}?`,
+                        options: [
+                          'A fundamental programming concept',
+                          'A type of data structure',
+                          'A programming language',
+                          'A software tool'
+                        ],
+                        correctAnswer: 0,
+                        explanation: `${topicName} is a fundamental concept in programming.`
+                      }
+                    ];
+                  }
                   break;
                 case 'resources':
                   await generateResourcesContent((content) => {
@@ -327,6 +348,18 @@ class ProContentManager {
                       generatedContent.resources = content.resources;
                     }
                   }, topicName);
+                  // Ensure we have resources content
+                  if (!generatedContent.resources || generatedContent.resources.length === 0) {
+                    generatedContent.resources = [
+                      {
+                        title: `${topicName} Documentation`,
+                        url: `https://developer.mozilla.org/en-US/docs/`,
+                        type: 'documentation',
+                        icon: 'FaBook',
+                        description: `Official documentation for ${topicName}`
+                      }
+                    ];
+                  }
                   break;
                 case 'videos':
                   await generateVideosContent((content) => {
@@ -366,99 +399,23 @@ class ProContentManager {
               
             } catch (error) {
               console.error(`❌ Failed to generate ${contentType} for ${topic.name}:`, error);
-              // Provide fallback content instead of failing completely
-              switch (contentType) {
-                case 'reading':
-                  generatedContent.reading = `# ${topic.name}\n\n## Introduction\n\nThis is a comprehensive guide to ${topic.name}.\n\n## Key Concepts\n\n• Understanding the fundamentals of ${topic.name}\n• Practical applications and examples\n• Best practices and common patterns\n\n## Getting Started\n\nTo begin learning about ${topic.name}, it's important to understand the core concepts and how they apply in real-world scenarios.\n\n## Summary\n\n${topic.name} is an important topic that requires understanding of its fundamental principles and practical applications.`;
-                  break;
-                case 'summary':
-                  generatedContent.summary = `## Summary of ${topic.name}\n\n• **Key Topic**: ${topic.name}\n• **Main Focus**: Understanding core concepts and applications\n• **Learning Outcome**: Practical knowledge and implementation skills\n• **Next Steps**: Practice with examples and explore advanced topics`;
-                  break;
-                case 'quiz':
-                  generatedContent.quiz = [
-                    {
-                      id: 1,
-                      question: `What is ${topic.name}?`,
-                      options: [
-                        'A fundamental programming concept',
-                        'A type of data structure',
-                        'A programming language',
-                        'A software tool'
-                      ],
-                      correctAnswer: 0,
-                      explanation: `${topic.name} is a fundamental concept in programming that helps organize and manipulate data effectively.`
-                    },
-                    {
-                      id: 2,
-                      question: `Which of the following is true about ${topic.name}?`,
-                      options: [
-                        'It is used for data organization',
-                        'It improves code efficiency',
-                        'It helps solve complex problems',
-                        'All of the above'
-                      ],
-                      correctAnswer: 3,
-                      explanation: `${topic.name} serves multiple purposes including data organization, efficiency, and problem-solving.`
-                    }
-                  ];
-                  break;
-                case 'resources':
-                  generatedContent.resources = [
-                    {
-                      title: `${topic.name} Documentation`,
-                      url: `https://developer.mozilla.org/en-US/docs/Web/JavaScript`,
-                      type: 'documentation',
-                      icon: 'FaBook',
-                      description: `Official documentation and reference for ${topic.name}`
-                    },
-                    {
-                      title: `${topic.name} Tutorial`,
-                      url: `https://www.w3schools.com/`,
-                      type: 'tutorial',
-                      icon: 'FaGraduationCap',
-                      description: `Step-by-step tutorial for learning ${topic.name}`
-                    },
-                    {
-                      title: `${topic.name} Examples`,
-                      url: `https://github.com/`,
-                      type: 'code',
-                      icon: 'FaCode',
-                      description: `Code examples and practical implementations of ${topic.name}`
-                    }
-                  ];
-                  break;
-                case 'videos':
-                  generatedContent.videos = [
-                    {
-                      title: `${topic.name} - Complete Tutorial`,
-                      url: `https://www.youtube.com/watch?v=dQw4w9WgXcQ`,
-                      thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
-                      duration: '15:30',
-                      views: '1.2M',
-                      channel: 'Programming Tutorials',
-                      description: `Learn ${topic.name} from scratch with this comprehensive tutorial`
-                    },
-                    {
-                      title: `${topic.name} Best Practices`,
-                      url: `https://www.youtube.com/watch?v=dQw4w9WgXcQ`,
-                      thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
-                      duration: '10:45',
-                      views: '856K',
-                      channel: 'Code Academy',
-                      description: `Best practices and tips for working with ${topic.name}`
-                    }
-                  ];
-                  break;
-                default:
-                  generatedContent[contentType] = { error: error.message };
-              }
               currentStep++;
+              // Continue with next content type instead of failing completely
             }
           }
           
           // Call setContent with the complete generated content
           if (params.setContent) {
+            console.log('🔧 Calling setContent with generated content:', {
+              hasReading: !!generatedContent.reading,
+              hasSummary: !!generatedContent.summary,
+              hasQuiz: !!generatedContent.quiz,
+              hasVideos: !!generatedContent.videos,
+              hasResources: !!generatedContent.resources
+            });
             params.setContent(generatedContent);
+          } else {
+            console.warn('⚠️ No setContent callback available');
           }
           
           return generatedContent;

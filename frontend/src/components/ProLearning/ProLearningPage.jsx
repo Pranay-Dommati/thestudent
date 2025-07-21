@@ -626,6 +626,52 @@ const ProLearningPage = () => {
     return () => clearTimeout(timer);
   }, [topicsList, courseTitle]); // Add courseTitle dependency
 
+  // Handle initial content loading when page loads with topic parameter
+  useEffect(() => {
+    const loadInitialTopicContent = async () => {
+      if (topicParam && !isLoading && !content) {
+        console.log('🎯 Loading initial content for topic from URL:', topicParam);
+        
+        const currentCourseId = getCourseId();
+        if (!currentCourseId) {
+          console.log('❌ No course ID found, cannot load topic content');
+          return;
+        }
+
+        // Check if we have stored content for this topic
+        const storedContent = proContentManager.getStoredTopicContent(currentCourseId, topicParam);
+        
+        if (storedContent && storedContent.reading) {
+          console.log('✅ Found stored content for topic:', topicParam);
+          
+          // Set content directly from storage
+          setContent({
+            reading: storedContent.reading,
+            summary: storedContent.summary || 'Summary not available',
+            quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
+            videos: storedContent.videos || [],
+            resources: storedContent.resources || []
+          });
+          
+          // Update topicsList to mark this topic as active if it exists
+          setTopicsList(topics => topics.map(topic => ({
+            ...topic,
+            isActive: topic.name === topicParam
+          })));
+          
+          console.log('✅ Initial content loaded successfully for:', topicParam);
+        } else {
+          console.log('⚠️ No stored content found for topic:', topicParam);
+          // The existing logic will handle generating content
+        }
+      }
+    };
+
+    // Run after a small delay to ensure ProContentManager is initialized
+    const timer = setTimeout(loadInitialTopicContent, 100);
+    return () => clearTimeout(timer);
+  }, [topicParam]); // Only depend on topicParam to prevent loops
+
   // Get currently active topic
   const getCurrentTopic = () => {
     const activeTopic = topicsList.find(t => t.isActive);
@@ -646,31 +692,36 @@ const ProLearningPage = () => {
     const currentCourseId = getCourseId();
     if (!currentCourseId) {
       setIsGeneratingCourse(false);
+      setCourseGenerationStatus("❌ No course ID found");
       return;
     }
 
     try {
-      // Generate content for all topics using batch generation
-      await batchGenerateAllTopics(
-        courseTitle,
+      // Use the new ProContentManager batch generation
+      await proContentManager.generateAllContentBatch(
         topicsList,
-        generateProContent,
-        setCourseGenerationStatus,
-        setIsGeneratingCourse,
-        setCourseGenerationProgress
+        currentCourseId,
+        (current, total, topicName, contentType) => {
+          const progress = Math.round((current / total) * 100);
+          setCourseGenerationProgress(progress);
+          setCourseGenerationStatus(`Generating ${contentType} for ${topicName}...`);
+          console.log(`📈 Pro Learning Start Progress: ${progress}% - ${contentType} for ${topicName}`);
+        }
       );
 
       // Mark all topics as generated
       setAllTopicsGenerated(true);
       setCourseGenerationStatus("✅ All topics generated successfully!");
       
-      // Auto-load first topic content
-      if (topicsList.length > 0) {
-        const firstTopic = topicsList[0];
-        loadTopicContent(firstTopic.name);
+      // Auto-load first topic content or topic from URL
+      const topicToLoad = topicParam || topicsList[0]?.name;
+      if (topicToLoad) {
+        console.log('🎯 Auto-loading topic after Pro Learning start:', topicToLoad);
+        await loadTopicContent(topicToLoad);
       }
 
     } catch (error) {
+      console.error('❌ Pro Learning start failed:', error);
       setCourseGenerationStatus("❌ Generation failed. Please try again.");
     } finally {
       setTimeout(() => {
