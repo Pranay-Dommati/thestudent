@@ -1197,17 +1197,6 @@ const ProLearningPage = () => {
         
         return (
           <div className="max-w-none">
-            {/* Debug info in development */}
-            {import.meta.env.DEV && (
-              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
-                <strong>Debug Info:</strong>
-                <div>Content: {content ? 'EXISTS' : 'NULL'}</div>
-                <div>Reading: {content?.reading ? `${content.reading.length} chars` : 'EMPTY'}</div>
-                <div>Sections: {readingSections.length}</div>
-                <div>Has Any Content: {hasAnyContent ? 'YES' : 'NO'}</div>
-              </div>
-            )}
-            
             {/* Compact Reading Header */}
             <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-xl p-4 mb-6 shadow-sm">
               <div className="flex items-center justify-between">
@@ -2245,21 +2234,9 @@ const ProLearningPage = () => {
                         {/* Topic content */}
                         <div className="flex items-center justify-between flex-1">
                           <div className="flex items-center gap-2">
-                            <span className={`font-medium capitalize ${
-                              completedTopics.includes(topicItem.id) ? 'line-through' : ''
-                            }`}>
+                            <span className="font-medium capitalize">
                               {topicItem.name}
                             </span>
-                            {/* Show content generated indicator */}
-                            {hasTopicContent(topicItem.name) && !topicItem.isActive && (
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                topicItem.isActive 
-                                  ? 'bg-white/20 text-white'
-                                  : 'bg-blue-100 text-blue-600'
-                              }`}>
-                                Generated
-                              </span>
-                            )}
                             {/* Completion status indicator */}
                             {completedTopics.includes(topicItem.id) && (
                               <span className="px-2 py-1 text-xs bg-green-100 text-green-600 rounded-full">
@@ -2292,25 +2269,6 @@ const ProLearningPage = () => {
                       <div className="mt-2 flex items-center gap-1 text-green-600">
                         <FaTrophy className="text-sm" />
                         <span className="text-xs font-medium">Course completed! 🎉</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="mt-3 pt-3 border-t border-blue-200">
-                    <p className="text-blue-600 text-xs">
-                      Currently learning: <span className="font-semibold">{getCurrentTopic()}</span>
-                    </p>
-                    {/* Development debug info */}
-                    {import.meta.env.DEV && (
-                      <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700">
-                        <div>Generated topics: {getCourseId() ? getGenerationProgress(getCourseId()).generated : 0}</div>
-                        <div>Completed: {completedTopics.length}</div>
-                        <button 
-                          onClick={clearContentStorage}
-                          className="mt-1 px-2 py-1 bg-blue-200 hover:bg-blue-300 rounded text-blue-800"
-                        >
-                          Clear Storage
-                        </button>
                       </div>
                     )}
                   </div>
