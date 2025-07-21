@@ -307,14 +307,21 @@ class ProContentManager {
                   }
                   break;
                 case 'summary':
+                  console.log(`📝 Generating summary for ${topicName} with reading content:`, 
+                    generatedContent.reading ? `${generatedContent.reading.length} chars` : 'NO READING CONTENT');
                   // Summary service expects (setContent, topic, readingContent)
                   await generateSummaryContent((content) => {
+                    console.log(`📝 Summary content received:`, content);
                     if (content && content.summary) {
                       generatedContent.summary = content.summary;
+                      console.log(`📝 Summary stored:`, generatedContent.summary.length, 'chars');
+                    } else {
+                      console.log(`⚠️ No summary content in response:`, content);
                     }
                   }, topicName, generatedContent.reading);
                   // Ensure we have summary content
                   if (!generatedContent.summary) {
+                    console.log(`⚠️ No summary generated, using fallback for ${topicName}`);
                     generatedContent.summary = `## Summary of ${topicName}\n\n• **Key Topic**: ${topicName}\n• **Main Focus**: Understanding core concepts and applications\n• **Learning Outcome**: Practical knowledge and implementation skills`;
                   }
                   break;

@@ -13,8 +13,7 @@ export async function generateVideosContent(setContent, topic = '') {
     // First try to get real YouTube videos
     const videoContent = await fetchTopYouTubeVideos(topic);
     
-    setContent((prev) => ({
-      ...prev,
+    setContent({
       videos: videoContent,
       videosMetadata: {
         generatedAt: new Date().toISOString(),
@@ -24,7 +23,7 @@ export async function generateVideosContent(setContent, topic = '') {
         source: 'youtube_api',
         avgViewCount: calculateAverageViews(videoContent)
       }
-    }));
+    });
     
     console.log(`✅ Found ${videoContent.length} top YouTube videos with ${calculateTotalViews(videoContent)} total views`);
     
@@ -34,8 +33,7 @@ export async function generateVideosContent(setContent, topic = '') {
     try {
       // Fallback to AI-generated recommendations with YouTube search links
       const aiVideoContent = await generateCuratedVideos(topic);
-      setContent((prev) => ({
-        ...prev,
+      setContent({
         videos: aiVideoContent,
         videosMetadata: {
           generatedAt: new Date().toISOString(),
@@ -43,7 +41,7 @@ export async function generateVideosContent(setContent, topic = '') {
           totalVideos: aiVideoContent.length,
           source: 'backend_ai'
         }
-      }));
+      });
     } catch (aiError) {
       // Ultimate fallback
       throw new Error('Video generation failed');

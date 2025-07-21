@@ -8,7 +8,9 @@
  * @param {string} readingContent - The main reading content to summarize (optional)
  */
 export async function generateSummaryContent(setContent, topic = '', readingContent = '') {
-  console.log(`🧠 Generating summary content for topic: "${topic}", with ${readingContent?.length || 0} chars of reading content...`);
+  console.log(`🧠 Generating summary content for topic: "${topic}"`);
+  console.log(`📖 Reading content available:`, readingContent ? `${readingContent.length} chars` : 'NONE');
+  console.log(`📖 Reading content preview:`, readingContent ? readingContent.substring(0, 200) + '...' : 'NO CONTENT');
   
   try {
     let summary;
@@ -44,13 +46,14 @@ export async function generateSummaryContent(setContent, topic = '', readingCont
       }
     }
 
-    setContent((prev) => ({
-      ...prev,
+    console.log('✅ Summary content generated successfully:', summary ? `${summary.length} chars` : 'EMPTY');
+    console.log('📊 Summary metadata:', metadata);
+
+    // Call setContent with the generated summary
+    setContent({
       summary: summary,
       summaryMetadata: metadata
-    }));
-    
-    console.log('✅ Summary content generated successfully');
+    });
     
   } catch (error) {
     console.error('🚨 Summary generation failed:', error);
@@ -78,16 +81,32 @@ async function generateTopicBasedSummary(topic, readingContent = '') {
 
 // Generate AI-powered summary from reading content
 async function generateAISummary(readingContent, topic = '') {
+  console.log(`🤖 Calling AI summary API for topic: "${topic}"`);
+  console.log(`📖 Sending reading content:`, readingContent ? `${readingContent.length} chars` : 'NO CONTENT');
+  
   try {
     const response = await fetch('/ai/summary/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic, reading_content: readingContent })
     });
-    if (!response.ok) throw new Error('Backend AI summary endpoint failed');
+    
+    console.log(`🤖 AI Summary API response status:`, response.status);
+    
+    if (!response.ok) {
+      console.error(`🚨 AI Summary API failed:`, response.status, response.statusText);
+      throw new Error('Backend AI summary endpoint failed');
+    }
+    
     const result = await response.json();
-    return result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log(`🤖 AI Summary API result:`, result);
+    
+    const summaryText = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log(`✅ Generated summary:`, summaryText ? `${summaryText.length} chars` : 'EMPTY');
+    
+    return summaryText;
   } catch (error) {
+    console.error(`🚨 AI Summary generation error:`, error);
     throw new Error('Summary generation failed');
   }
 }

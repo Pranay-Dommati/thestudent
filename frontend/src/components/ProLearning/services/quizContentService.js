@@ -26,8 +26,7 @@ export async function generateQuizContent(setContent, topic = '', readingContent
       throw new Error('No quiz questions generated');
     }
     
-    setContent((prev) => ({
-      ...prev,
+    setContent({
       quiz: quizQuestions,
       quizMetadata: {
         generatedAt: new Date().toISOString(),
@@ -36,7 +35,7 @@ export async function generateQuizContent(setContent, topic = '', readingContent
         topics: extractQuizTopics(quizQuestions),
         estimatedTime: estimateQuizTime(quizQuestions)
       }
-    }));
+    });
     
     console.log(`✅ Generated ${quizQuestions.length} quiz questions`);
     

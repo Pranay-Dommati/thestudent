@@ -16,15 +16,14 @@ export async function generateResourcesContent(setContent, topic = '', options =
   
   if (!topic || topic.trim().length === 0) {
     console.warn('⚠️ No topic provided for resource generation');
-    setContent((prev) => ({
-      ...prev,
+    setContent({
       resources: [],
       resourcesMetadata: {
         generatedAt: new Date().toISOString(),
         totalResources: 0,
         error: 'No topic provided'
       }
-    }));
+    });
     return;
   }
 
@@ -35,14 +34,13 @@ export async function generateResourcesContent(setContent, topic = '', options =
     const cached = resourcesCache.get(cacheKey);
     if (Date.now() - cached.timestamp < CACHE_DURATION) {
       console.log('📋 Using cached resources');
-      setContent((prev) => ({
-        ...prev,
+      setContent({
         resources: cached.resources,
         resourcesMetadata: {
           ...cached.metadata,
           fromCache: true
         }
-      }));
+      });
       return;
     }
   }
@@ -70,11 +68,10 @@ export async function generateResourcesContent(setContent, topic = '', options =
       timestamp: Date.now()
     });
     
-    setContent((prev) => ({
-      ...prev,
+    setContent({
       resources: validatedResources,
       resourcesMetadata: metadata
-    }));
+    });
     
     console.log(`✅ Curated ${validatedResources.length} learning resources`);
     

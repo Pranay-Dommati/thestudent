@@ -162,8 +162,7 @@ export async function generateReadingContent(user_input, setContent, options = {
   // Check cache first
   const cachedContent = getCachedContent(user_input);
   if (cachedContent) {
-    setContent((prev) => ({
-      ...prev,
+    setContent({
       reading: cachedContent,
       metadata: {
         generatedAt: new Date().toISOString(),
@@ -171,7 +170,7 @@ export async function generateReadingContent(user_input, setContent, options = {
         topicsProcessed: topics.length,
         successRate: '100%'
       }
-    }));
+    });
     console.log(`📦 Served from cache: ${user_input}`);
     return;
   }
@@ -248,50 +247,24 @@ export async function generateReadingContent(user_input, setContent, options = {
       reading: finalContent,
       metadata: {
         generatedAt: new Date().toISOString(),
-        model: 'backend-ai',
-        topicsProcessed: topics.length,
-        successRate: (validResponses.length / topics.length * 100).toFixed(1) + '%'
+        model: 'gemini-pro',
+        topicsProcessed: validResponses.length,
+        successRate: `${Math.round((validResponses.length / topics.length) * 100)}%`
       }
     };
     
-    console.log('🔧 About to call setContent with:', {
-      readingLength: contentToSet.reading.length,
-      hasReading: !!contentToSet.reading,
-      preview: contentToSet.reading.substring(0, 100) + '...'
+    console.log('🔧 readingContentService: setContent with data:', {
+      contentKeys: Object.keys(contentToSet),
+      readingLength: contentToSet.reading?.length || 0,
+      readingPreview: contentToSet.reading ? contentToSet.reading.substring(0, 50) + '...' : 'NO_READING'
     });
     
-    setContent((prev) => {
-      console.log('🔧 readingContentService: setContent callback - detailed analysis:', {
-        hasPrev: !!prev,
-        prevType: typeof prev,
-        prevKeys: prev ? Object.keys(prev) : 'NO_PREV',
-        prevReadingExists: !!prev?.reading,
-        prevReadingLength: prev?.reading?.length || 0,
-        contentToSetReadingLength: contentToSet.reading?.length || 0,
-        finalContentLength: finalContent.length,
-        contentToSetKeys: Object.keys(contentToSet)
-      });
-      
-      const newContent = {
-        ...prev,
-        ...contentToSet
-      };
-      
-      console.log('🔧 readingContentService: setContent callback - final result:', {
-        newContentKeys: Object.keys(newContent),
-        prevReading: prev?.reading?.length || 0,
-        newReading: newContent.reading?.length || 0,
-        finalHasReading: !!newContent.reading,
-        readingPreview: newContent.reading ? newContent.reading.substring(0, 50) + '...' : 'NO_READING'
-      });
-      return newContent;
-    });
+    setContent(contentToSet);
     setCachedContent(user_input, finalContent);
     console.log(`✅ Successfully generated content for ${validResponses.length}/${topics.length} topics`);
   } catch (error) {
     console.error('🚨 Content generation failed:', error);
-    setContent((prev) => ({
-      ...prev,
+    setContent({
       reading: '',
       metadata: {
         generatedAt: new Date().toISOString(),
@@ -300,7 +273,7 @@ export async function generateReadingContent(user_input, setContent, options = {
         topicsProcessed: topics.length,
         successRate: '0%'
       }
-    }));
+    });
     console.warn('Content generation failed');
   }
 }
