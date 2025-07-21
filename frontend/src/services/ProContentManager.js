@@ -466,6 +466,27 @@ class ProContentManager {
   }
 
   /**
+   * Get stored topics for a course
+   * @param {String} courseId - Course ID
+   * @returns {Array} - Array of topic objects
+   */
+  getStoredTopics(courseId) {
+    const courseContent = this.getStoredCourseContent(courseId);
+    
+    if (!courseContent || !courseContent.topics) {
+      return [];
+    }
+    
+    // Convert topics object to array format
+    return Object.values(courseContent.topics).map((topic, index) => ({
+      id: topic.id || index + 1,
+      name: topic.name,
+      isActive: false,
+      hasContent: !!(topic.content && topic.content.reading)
+    }));
+  }
+
+  /**
    * Get specific topic content from stored course data
    * @param {String} courseId - Course ID
    * @param {String} topicName - Topic name

@@ -82,6 +82,34 @@ const ProLearningPage = () => {
   // Set default topics and initialize with consistent course ID
   useEffect(() => {
     const initializeDefaultTopics = async () => {
+      const currentCourseId = getCourseId();
+      
+      // First check if we have stored topics for this course
+      if (currentCourseId) {
+        const storedTopics = proContentManager.getStoredTopics(currentCourseId);
+        if (storedTopics.length > 0) {
+          console.log('✅ Loading stored topics for course:', currentCourseId, storedTopics);
+          setTopicsList(storedTopics);
+          return; // Don't set default topics
+        }
+        
+        // Also check if there's batch generation data with topics
+        const batchData = localStorage.getItem('proLearning_batchGeneration');
+        if (batchData) {
+          try {
+            const { courseId: batchCourseId, topics } = JSON.parse(batchData);
+            if (batchCourseId === currentCourseId && topics && topics.length > 0) {
+              console.log('✅ Loading topics from batch generation data:', topics);
+              setTopicsList(topics);
+              return; // Don't set default topics
+            }
+          } catch (error) {
+            console.warn('Failed to parse batch generation data:', error);
+          }
+        }
+      }
+      
+      // Only set default topics if no courseTitle AND no stored topics found
       if (!courseTitle) {
         const defaultTopics = [
           { id: 1, name: "Introduction" },
@@ -94,17 +122,17 @@ const ProLearningPage = () => {
         
         // Get or generate a consistent course ID
         const existingCourseId = getCourseId();
-        const currentCourseId = existingCourseId || generateCourseId();
+        const finalCourseId = existingCourseId || generateCourseId();
         
         if (!existingCourseId) {
           // Only navigate if we generated a new ID
-          setAndNavigateToCourseId(currentCourseId);
+          setAndNavigateToCourseId(finalCourseId);
         }
 
         try {
-          proContentManager.setCourse("Default Course", currentCourseId);
-          await proContentManager.storeTopics(defaultTopics, currentCourseId);
-          console.log('✅ Default topics stored successfully for course:', currentCourseId);
+          proContentManager.setCourse("Default Course", finalCourseId);
+          await proContentManager.storeTopics(defaultTopics, finalCourseId);
+          console.log('✅ Default topics stored successfully for course:', finalCourseId);
         } catch (error) {
           console.error('❌ Failed to store default topics:', error);
         }
@@ -112,7 +140,7 @@ const ProLearningPage = () => {
     };
 
     initializeDefaultTopics();
-  }, [courseTitle]);
+  }, [courseTitle, courseId]); // Add courseId dependency
   
   // Content state
   const [content, setContent] = useState(null);
