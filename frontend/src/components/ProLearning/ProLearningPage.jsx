@@ -894,7 +894,7 @@ const ProLearningPage = () => {
 
     // Run the handler
     handleBatchGeneration();
-  }, [courseId]); // Depend on courseId so it runs when course changes
+  }, []); // Remove courseId dependency to prevent multiple triggers
 
   // ...existing code...
 
