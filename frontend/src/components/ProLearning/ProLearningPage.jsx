@@ -36,8 +36,6 @@ import {
   generateVideosContent,
   generateQuizContent,
   generateResourcesContent,
-  handleQuizAnswer,
-  restartQuiz,
   nextQuestion,
   prevQuestion
 } from './ProLearningLogic';
@@ -866,6 +864,7 @@ const ProLearningPage = () => {
   
   const [activeTab, setActiveTab] = useState(activeTabParam);
   const [completedTabs, setCompletedTabs] = useState([]); // Track completed tabs
+  const [quizSubmitted, setQuizSubmitted] = useState(false); // Track if quiz is submitted
 
   // Update URL when activeTab changes
   const updateActiveTab = (newTab) => {
@@ -1772,6 +1771,7 @@ const ProLearningPage = () => {
         const answeredQuestions = content.quiz.filter(q => q.userAnswer !== null).length;
         const correctAnswers = content.quiz.filter(q => q.userAnswer === q.correct).length;
         const quizProgress = (answeredQuestions / content.quiz.length) * 100;
+        const allQuestionsAnswered = answeredQuestions === content.quiz.length;
         
         return (
           <div>
@@ -1791,13 +1791,20 @@ const ProLearningPage = () => {
                   <div className="bg-white px-2 py-1 rounded-full shadow-sm">
                     <span className="text-green-600 font-medium">{content.quiz.length} questions</span>
                   </div>
-                  {answeredQuestions === content.quiz.length && (
+                  {quizSubmitted && (
                     <>
                       <div className="bg-white px-2 py-1 rounded-full shadow-sm">
                         <span className="text-gray-600">{correctAnswers}/{answeredQuestions} correct</span>
                       </div>
                       <button 
-                        onClick={restartQuiz}
+                        onClick={() => {
+                          // Restart quiz by resetting all user answers and submission state
+                          setContent(prev => ({
+                            ...prev,
+                            quiz: prev.quiz.map(q => ({ ...q, userAnswer: null }))
+                          }));
+                          setQuizSubmitted(false);
+                        }}
                         className="flex items-center border border-green-500 text-green-600 hover:bg-green-50 hover:border-green-600 font-medium rounded px-3 py-1 transition-colors duration-150 ml-2 cursor-pointer"
                         style={{gap: '0.4em'}}
                       >
@@ -1811,7 +1818,9 @@ const ProLearningPage = () => {
               
               {/* Compact Quiz Progress */}
               <div className="flex items-center justify-between text-xs mb-2">
-                <span className="text-gray-600">Progress: {Math.round(quizProgress)}% complete</span>
+                <span className="text-gray-600">
+                  {quizSubmitted ? `Quiz completed: ${Math.round(quizProgress)}%` : `Progress: ${Math.round(quizProgress)}% complete`}
+                </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-1.5">
                 <div 
@@ -1825,7 +1834,6 @@ const ProLearningPage = () => {
             <div className="space-y-6">
               {content.quiz.map((question, index) => {
                 const isAnswered = question.userAnswer !== null;
-                // const isCorrect = question.userAnswer === question.correct; // No instant feedback
                 return (
                   <div key={question.id} className="bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300">
                     {/* Question Header */}
@@ -1853,17 +1861,45 @@ const ProLearningPage = () => {
                         {question.options.map((option, optionIndex) => {
                           let buttonStyle = "border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700";
                           let iconStyle = "border-gray-300 text-gray-600";
+                          
                           if (question.userAnswer === optionIndex) {
-                            buttonStyle = "border-2 border-blue-500 bg-blue-50 text-blue-800";
-                            iconStyle = "border-blue-500 bg-blue-500 text-white";
+                            if (quizSubmitted) {
+                              // Show correct/incorrect styling after submission
+                              if (optionIndex === question.correct) {
+                                buttonStyle = "border-2 border-green-500 bg-green-50 text-green-800";
+                                iconStyle = "border-green-500 bg-green-500 text-white";
+                              } else {
+                                buttonStyle = "border-2 border-red-500 bg-red-50 text-red-800";
+                                iconStyle = "border-red-500 bg-red-500 text-white";
+                              }
+                            } else {
+                              // Show selected styling before submission
+                              buttonStyle = "border-2 border-blue-500 bg-blue-50 text-blue-800";
+                              iconStyle = "border-blue-500 bg-blue-500 text-white";
+                            }
+                          } else if (quizSubmitted && optionIndex === question.correct) {
+                            // Show correct answer after submission
+                            buttonStyle = "border-2 border-green-500 bg-green-50 text-green-800";
+                            iconStyle = "border-green-500 bg-green-500 text-white";
                           }
+                          
                           return (
                             <button
                               key={optionIndex}
-                              onClick={() => handleQuizAnswer(question.id, optionIndex)}
-                              disabled={isAnswered}
+                              onClick={() => {
+                                // Only allow changes before quiz is submitted
+                                if (!quizSubmitted) {
+                                  setContent(prev => ({
+                                    ...prev,
+                                    quiz: prev.quiz.map(q =>
+                                      q.id === question.id ? { ...q, userAnswer: optionIndex } : q
+                                    )
+                                  }));
+                                }
+                              }}
+                              disabled={quizSubmitted}
                               className={`w-full text-left p-4 rounded-xl transition-all duration-200 ${buttonStyle} ${
-                                isAnswered ? 'cursor-default' : 'cursor-pointer transform hover:scale-[1.02]'
+                                quizSubmitted ? 'cursor-default' : 'cursor-pointer transform hover:scale-[1.02]'
                               }`}
                             >
                               <div className="flex items-center">
@@ -1871,6 +1907,12 @@ const ProLearningPage = () => {
                                   {String.fromCharCode(65 + optionIndex)}
                                 </div>
                                 <span className="font-medium leading-relaxed">{option}</span>
+                                {quizSubmitted && optionIndex === question.correct && (
+                                  <span className="ml-auto text-green-600 font-semibold text-sm">✓ Correct</span>
+                                )}
+                                {quizSubmitted && question.userAnswer === optionIndex && optionIndex !== question.correct && (
+                                  <span className="ml-auto text-red-600 font-semibold text-sm">✗ Your answer</span>
+                                )}
                               </div>
                             </button>
                           );
@@ -1880,13 +1922,33 @@ const ProLearningPage = () => {
                   </div>
                 );
               })}
-              {/* Quiz Summary */}
-              {answeredQuestions === content.quiz.length && (
+              
+              {/* Submit Quiz Button */}
+              {allQuestionsAnswered && !quizSubmitted && (
+                <div className="bg-white border border-gray-200 rounded-xl p-6 text-center shadow-sm">
+                  <div className="w-12 h-12 mx-auto mb-3 flex items-center justify-center rounded-full bg-blue-100">
+                    <FaQuestionCircle className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Ready to Submit?</h3>
+                  <p className="text-gray-600 mb-4">
+                    You've answered all {content.quiz.length} questions. You can still change your answers before submitting.
+                  </p>
+                  <button 
+                    onClick={() => setQuizSubmitted(true)}
+                    className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
+                  >
+                    Submit Quiz
+                  </button>
+                </div>
+              )}
+              
+              {/* Quiz Summary - Only show after submission */}
+              {quizSubmitted && (
                 <div className="bg-white border border-gray-200 rounded-xl p-6 text-center shadow-sm">
                   <div className="w-12 h-12 mx-auto mb-3 flex items-center justify-center rounded-full bg-green-100">
                     <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-1">Quiz Completed</h3>
+                  <h3 className="text-xl font-bold text-gray-900 mb-1">Quiz Results</h3>
                   <div className="text-2xl font-bold text-green-600 mb-1">
                     {correctAnswers}/{content.quiz.length} correct
                   </div>
@@ -1895,26 +1957,70 @@ const ProLearningPage = () => {
                   </div>
                   <div className="mb-4 text-gray-700 font-medium">
                     {((correctAnswers / content.quiz.length) * 100) >= 80
-                      ? 'Excellent work!'
+                      ? 'Excellent work! 🎉'
                       : ((correctAnswers / content.quiz.length) * 100) >= 60
-                        ? 'Good job! Review explanations to improve.'
-                        : 'Keep practicing and try again!'}
+                        ? 'Good job! Review explanations to improve. 📚'
+                        : 'Keep practicing and try again! 💪'}
                   </div>
-                  {/* Show explanations for all questions after quiz is completed */}
+                  {/* Show explanations for all questions after quiz is submitted */}
                   <div className="text-left mt-6">
-                    <h4 className="font-semibold text-gray-800 mb-2">Explanations</h4>
-                    <ul className="space-y-3">
-                      {content.quiz.map((question, idx) => (
-                        <li key={question.id} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                          <div className="font-medium text-gray-900 mb-1">Q{idx + 1}: {question.question}</div>
-                          <div className="text-sm text-gray-700 mb-1">Correct Answer: <span className="font-semibold">{question.options[question.correct]}</span></div>
-                          <div className="text-sm text-gray-600">{question.explanation}</div>
-                        </li>
-                      ))}
-                    </ul>
+                    <h4 className="font-semibold text-gray-800 mb-4">Question Review</h4>
+                    <div className="space-y-4">
+                      {content.quiz.map((question, idx) => {
+                        const isCorrect = question.userAnswer === question.correct;
+                        return (
+                          <div key={question.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900 mb-2">Q{idx + 1}: {question.question}</div>
+                              </div>
+                              <div className="ml-4 flex-shrink-0">
+                                {isCorrect ? (
+                                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  </div>
+                                ) : (
+                                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2 text-sm">
+                              <div>
+                                <span className="text-gray-600 font-medium">Your Answer: </span>
+                                <span className="text-gray-800">{question.options[question.userAnswer]}</span>
+                              </div>
+                              
+                              <div>
+                                <span className="text-gray-600 font-medium">Correct Answer: </span>
+                                <span className="text-gray-800">{question.options[question.correct]}</span>
+                              </div>
+                              
+                              <div className="mt-3 pt-3 border-t border-gray-200">
+                                <span className="text-gray-600 font-medium">Explanation:</span>
+                                <p className="text-gray-700 mt-1">{question.explanation}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                   <button 
-                    onClick={restartQuiz}
+                    onClick={() => {
+                      // Restart quiz by resetting all user answers and submission state
+                      setContent(prev => ({
+                        ...prev,
+                        quiz: prev.quiz.map(q => ({ ...q, userAnswer: null }))
+                      }));
+                      setQuizSubmitted(false);
+                    }}
                     className="px-5 py-2 mt-6 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
                   >
                     Try Again
