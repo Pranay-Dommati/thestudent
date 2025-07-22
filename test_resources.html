@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .resource-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .resource-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .resource-type {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 10px;
+        }
+        .resource-rating {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        .resource-url {
+            color: #007bff;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        .resource-url:hover {
+            text-decoration: underline;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .topic-input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Resource System Test</h1>
+        <p>This page tests the enhanced resource generation system that provides real online resources for learning topics.</p>
+        
+        <div class="test-section">
+            <h2>Quick Tests</h2>
+            <button class="test-button" onclick="testTopic('arrays')">Test: Arrays</button>
+            <button class="test-button" onclick="testTopic('javascript')">Test: JavaScript</button>
+            <button class="test-button" onclick="testTopic('react')">Test: React</button>
+            <button class="test-button" onclick="testTopic('python')">Test: Python</button>
+            <button class="test-button" onclick="testTopic('machine learning')">Test: Machine Learning</button>
+            <button class="test-button" onclick="testTopic('css')">Test: CSS</button>
+        </div>
+
+        <div class="test-section">
+            <h2>Custom Topic Test</h2>
+            <input type="text" id="customTopic" class="topic-input" placeholder="Enter any topic..." value="algorithms">
+            <button class="test-button" onclick="testCustomTopic()">Test Custom Topic</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Mock the resource service for testing
+        const REAL_RESOURCE_DATABASE = {
+            'arrays': [
+                {
+                    title: 'MDN Web Docs - Arrays',
+                    type: 'Documentation',
+                    description: 'Comprehensive guide to JavaScript arrays from Mozilla Developer Network. Covers array methods, properties, and best practices with interactive examples.',
+                    url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array',
+                    difficulty: 'All Levels',
+                    free: true,
+                    rating: 'High'
+                },
+                {
+                    title: 'Arrays - GeeksforGeeks',
+                    type: 'Tutorial',
+                    description: 'Detailed tutorials on array data structures across multiple programming languages. Includes implementation examples, complexity analysis, and practice problems.',
+                    url: 'https://www.geeksforgeeks.org/array-data-structure/',
+                    difficulty: 'Beginner',
+                    free: true,
+                    rating: 'High'
+                },
+                {
+                    title: 'LeetCode Array Problems',
+                    type: 'Practice',
+                    description: 'Collection of array-based coding challenges ranging from easy to hard difficulty. Perfect for interview preparation and skill building.',
+                    url: 'https://leetcode.com/tag/array/',
+                    difficulty: 'All Levels',
+                    free: false,
+                    rating: 'High'
+                },
+                {
+                    title: 'Array Methods Visualizer',
+                    type: 'Tool',
+                    description: 'Interactive tool to visualize how JavaScript array methods work. See real-time transformations and understand array operations visually.',
+                    url: 'https://arrayexplorer.netlify.app/',
+                    difficulty: 'Beginner',
+                    free: true,
+                    rating: 'Medium'
+                }
+            ],
+            'javascript': [
+                {
+                    title: 'MDN JavaScript Guide',
+                    type: 'Documentation',
+                    description: 'The definitive guide to JavaScript from Mozilla. Covers everything from basics to advanced topics with detailed explanations and examples.',
+                    url: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide',
+                    difficulty: 'All Levels',
+                    free: true,
+                    rating: 'High'
+                },
+                {
+                    title: 'JavaScript.info',
+                    type: 'Tutorial',
+                    description: 'Modern JavaScript tutorial covering the language from the ground up. Interactive lessons with practical examples and exercises.',
+                    url: 'https://javascript.info/',
+                    difficulty: 'Beginner',
+                    free: true,
+                    rating: 'High'
+                },
+                {
+                    title: 'Eloquent JavaScript',
+                    type: 'Book',
+                    description: 'A modern introduction to programming with JavaScript. Available free online with interactive code examples and exercises.',
+                    url: 'https://eloquentjavascript.net/',
+                    difficulty: 'Intermediate',
+                    free: true,
+                    rating: 'High'
+                },
+                {
+                    title: 'JavaScript30',
+                    type: 'Course',
+                    description: '30 Day Vanilla JS Coding Challenge by Wes Bos. Build 30 things in 30 days with vanilla JavaScript - no frameworks, libraries, or compilers.',
+                    url: 'https://javascript30.com/',
+                    difficulty: 'Intermediate',
+                    free: true,
+                    rating: 'High'
+                }
+            ]
+        };
+
+        const GENERIC_RESOURCE_TEMPLATES = [
+            {
+                title: '{topic} Documentation',
+                type: 'Documentation',
+                description: 'Official documentation and reference materials for {topic}. Comprehensive guides, API references, and examples.',
+                urlPattern: 'https://www.google.com/search?q={topic}+official+documentation',
+                suitableFor: ['programming', 'web', 'technology']
+            },
+            {
+                title: '{topic} Tutorial - GeeksforGeeks',
+                type: 'Tutorial',
+                description: 'Comprehensive {topic} tutorials with examples, explanations, and practice problems from GeeksforGeeks.',
+                urlPattern: 'https://www.geeksforgeeks.org/search/?query={topic}',
+                suitableFor: ['programming', 'algorithms', 'data structures']
+            },
+            {
+                title: '{topic} Course - Coursera',
+                type: 'Course',
+                description: 'Professional {topic} courses from top universities and companies. Structured learning with certificates.',
+                urlPattern: 'https://www.coursera.org/search?query={topic}',
+                suitableFor: ['all']
+            },
+            {
+                title: '{topic} Practice - LeetCode',
+                type: 'Practice',
+                description: 'Coding challenges and practice problems related to {topic}. Perfect for interview preparation.',
+                urlPattern: 'https://leetcode.com/problemset/all/?search={topic}',
+                suitableFor: ['programming', 'algorithms', 'data structures']
+            }
+        ];
+
+        function findSpecificTopicResources(topic) {
+            const topicLower = topic.toLowerCase();
+            
+            // Check for exact matches first
+            if (REAL_RESOURCE_DATABASE[topicLower]) {
+                return REAL_RESOURCE_DATABASE[topicLower];
+            }
+            
+            // Check for partial matches
+            for (const [key, resources] of Object.entries(REAL_RESOURCE_DATABASE)) {
+                if (topicLower.includes(key) || key.includes(topicLower)) {
+                    return resources;
+                }
+            }
+            
+            return [];
+        }
+
+        function generateFromTemplates(topic) {
+            const resources = [];
+            
+            GENERIC_RESOURCE_TEMPLATES.forEach(template => {
+                const resource = {
+                    title: template.title.replace('{topic}', topic),
+                    type: template.type,
+                    description: template.description.replace('{topic}', topic),
+                    url: template.urlPattern.replace('{topic}', encodeURIComponent(topic.toLowerCase().replace(/\s+/g, '-'))),
+                    difficulty: 'All Levels',
+                    free: true,
+                    rating: 'Medium'
+                };
+                resources.push(resource);
+            });
+            
+            return resources;
+        }
+
+        function generateResourcesContent(topic) {
+            console.log('Generating resources for topic:', topic);
+            
+            // First try to get real resources
+            let realResources = findSpecificTopicResources(topic);
+            console.log('Real resources found:', realResources.length);
+            
+            // If we don't have enough real resources, supplement with templates
+            let templateResources = [];
+            if (realResources.length < 4) {
+                templateResources = generateFromTemplates(topic);
+                console.log('Template resources generated:', templateResources.length);
+            }
+            
+            // Combine resources
+            const allResources = [...realResources, ...templateResources];
+            
+            // Limit to 6 resources
+            const finalResources = allResources.slice(0, 6);
+            
+            console.log('Final resources count:', finalResources.length);
+            
+            return {
+                resources: finalResources,
+                summary: `Found ${realResources.length} curated resources and ${Math.min(templateResources.length, 6 - realResources.length)} additional resources for ${topic}.`
+            };
+        }
+
+        function testTopic(topic) {
+            console.log(`\n=== Testing Topic: ${topic} ===`);
+            
+            const result = generateResourcesContent(topic);
+            displayResults(topic, result);
+        }
+
+        function testCustomTopic() {
+            const topic = document.getElementById('customTopic').value.trim();
+            if (topic) {
+                testTopic(topic);
+            } else {
+                alert('Please enter a topic to test');
+            }
+        }
+
+        function displayResults(topic, result) {
+            const resultsDiv = document.getElementById('results');
+            
+            let html = `
+                <div class="test-section">
+                    <h2>Results for: ${topic}</h2>
+                    <p><strong>Summary:</strong> ${result.summary}</p>
+                    <h3>Resources (${result.resources.length}):</h3>
+            `;
+            
+            result.resources.forEach((resource, index) => {
+                html += `
+                    <div class="resource-item">
+                        <div class="resource-title">${index + 1}. ${resource.title}</div>
+                        <div style="margin: 5px 0;">
+                            <span class="resource-type">${resource.type}</span>
+                            <span class="resource-rating">${resource.rating} Quality</span>
+                            ${resource.free ? '<span class="resource-rating" style="background: #28a745;">Free</span>' : '<span class="resource-rating" style="background: #dc3545;">Paid</span>'}
+                        </div>
+                        <div style="color: #666; margin: 5px 0;">${resource.description}</div>
+                        <div><strong>Difficulty:</strong> ${resource.difficulty}</div>
+                        <div><strong>URL:</strong> <a href="${resource.url}" target="_blank" class="resource-url">${resource.url}</a></div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+        }
+
+        // Run initial test on page load
+        window.onload = function() {
+            testTopic('arrays');
+        };
+    </script>
+</body>
+</html>
