@@ -2189,93 +2189,93 @@ const ProLearningPage = () => {
                 </div>
               </div>
               
-              {/* Display multiple topics or single topic */}
-              {topicsList.length > 1 ? (
-                <div className="space-y-2">
+              {/* Display topics (both single and multiple) */}
+              <div className="space-y-2">
+                {topicsList.length > 1 && (
                   <p className="text-blue-700 font-medium text-sm mb-3">
                     Select a topic to focus on:
                   </p>
-                  {topicsList.map((topicItem) => (
-                    <button
-                      key={topicItem.id}
-                      onClick={() => handleTopicSelect(topicItem.id)}
-                      className={`w-full text-left p-3 rounded-lg transition-all duration-200 relative group ${
-                        topicItem.isActive
-                          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
-                          : completedTopics.includes(topicItem.id)
-                            ? 'bg-white text-gray-700 border border-gray-200 shadow-sm opacity-75'
-                            : 'bg-white text-blue-700 hover:bg-blue-50 border border-blue-200 hover:shadow-sm'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {/* Completion checkbox - moved to left */}
-                        <div
-                          className={`relative flex items-center justify-center w-5 h-5 rounded border-2 cursor-pointer transition-all duration-200 hover:scale-110 ${
-                            completedTopics.includes(topicItem.id)
-                              ? 'bg-green-500 border-green-500 shadow-sm'
-                              : topicItem.isActive
-                                ? 'border-white/40 hover:border-white/60'
-                                : 'border-gray-300 hover:border-green-400 group-hover:border-green-400'
-                          }`}
-                          onClick={(e) => toggleTopicCompletion(topicItem.id, e)}
-                          title={
-                            topicItem.isActive 
-                              ? 'Complete this topic'
-                              : completedTopics.includes(topicItem.id) 
-                                ? 'Mark as incomplete' 
-                                : 'Mark as complete'
-                          }
-                        >
+                )}
+                {topicsList.map((topicItem) => (
+                  <button
+                    key={topicItem.id}
+                    onClick={() => handleTopicSelect(topicItem.id)}
+                    className={`w-full text-left p-3 rounded-lg transition-all duration-200 relative group ${
+                      topicItem.isActive
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
+                        : completedTopics.includes(topicItem.id)
+                          ? 'bg-white text-gray-700 border border-gray-200 shadow-sm opacity-75'
+                          : 'bg-white text-blue-700 hover:bg-blue-50 border border-blue-200 hover:shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Completion checkbox - moved to left */}
+                      <div
+                        className={`relative flex items-center justify-center w-5 h-5 rounded border-2 cursor-pointer transition-all duration-200 hover:scale-110 ${
+                          completedTopics.includes(topicItem.id)
+                            ? 'bg-green-500 border-green-500 shadow-sm'
+                            : topicItem.isActive
+                              ? 'border-white/40 hover:border-white/60'
+                              : 'border-gray-300 hover:border-green-400 group-hover:border-green-400'
+                        }`}
+                        onClick={(e) => toggleTopicCompletion(topicItem.id, e)}
+                        title={
+                          topicItem.isActive 
+                            ? 'Complete this topic'
+                            : completedTopics.includes(topicItem.id) 
+                              ? 'Mark as incomplete' 
+                              : 'Mark as complete'
+                        }
+                      >
+                        {completedTopics.includes(topicItem.id) && (
+                          <IoCheckmarkCircle className="text-white text-sm" />
+                        )}
+                      </div>
+                      
+                      {/* Topic content */}
+                      <div className="flex items-center justify-between flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium capitalize">
+                            {topicItem.name}
+                          </span>
+                          {/* Completion status indicator */}
                           {completedTopics.includes(topicItem.id) && (
-                            <IoCheckmarkCircle className="text-white text-sm" />
+                            <span className="px-2 py-1 text-xs bg-green-100 text-green-600 rounded-full">
+                              Completed
+                            </span>
                           )}
                         </div>
-                        
-                        {/* Topic content */}
-                        <div className="flex items-center justify-between flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium capitalize">
-                              {topicItem.name}
-                            </span>
-                            {/* Completion status indicator */}
-                            {completedTopics.includes(topicItem.id) && (
-                              <span className="px-2 py-1 text-xs bg-green-100 text-green-600 rounded-full">
-                                Completed
-                              </span>
-                            )}
-                          </div>
-                        </div>
                       </div>
-                    </button>
-                  ))}
-                  
-                  {/* Progress indicator */}
-                  <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">Progress</span>
-                      <span className="text-sm font-semibold text-blue-600">
-                        {completedTopics.length} / {topicsList.length} completed
+                    </div>
+                  </button>
+                ))}
+                
+                {/* Progress indicator - show for both single and multiple topics */}
+                <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">Progress</span>
+                    <span className="text-sm font-semibold text-blue-600">
+                      {completedTopics.length} / {topicsList.length} completed
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-green-400 to-green-500 h-2 rounded-full transition-all duration-500"
+                      style={{ 
+                        width: `${topicsList.length > 0 ? (completedTopics.length / topicsList.length) * 100 : 0}%` 
+                      }}
+                    ></div>
+                  </div>
+                  {completedTopics.length === topicsList.length && topicsList.length > 0 && (
+                    <div className="mt-2 flex items-center gap-1 text-green-600">
+                      <FaTrophy className="text-sm" />
+                      <span className="text-xs font-medium">
+                        {topicsList.length === 1 ? 'Topic completed! 🎉' : 'Course completed! 🎉'}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-gradient-to-r from-green-400 to-green-500 h-2 rounded-full transition-all duration-500"
-                        style={{ 
-                          width: `${topicsList.length > 0 ? (completedTopics.length / topicsList.length) * 100 : 0}%` 
-                        }}
-                      ></div>
-                    </div>
-                    {completedTopics.length === topicsList.length && topicsList.length > 0 && (
-                      <div className="mt-2 flex items-center gap-1 text-green-600">
-                        <FaTrophy className="text-sm" />
-                        <span className="text-xs font-medium">Course completed! 🎉</span>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
-              ) : (
-                <p className="text-blue-700 font-medium">{getCurrentTopic()}</p>
-              )}
+              </div>
             </div>
 
             {/* Removed Learning Progress and Learning Tips sections from sidebar */}
