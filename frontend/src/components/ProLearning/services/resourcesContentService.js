@@ -1,180 +1,158 @@
 // Resources Content Generation Service
-// Uses Gemini AI to generate real, quality online learning resources
+// Uses Google Programmable Search API to find real, quality online learning resources
+// Excludes YouTube videos since they're handled in the Videos tab
 
 // Cache for storing resources to avoid repeated API calls
 const resourcesCache = new Map();
 const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
 
-// Gemini API function for generating resources
-const generateResourcesWithGemini = async (topic) => {
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API key not found');
-  }
-
-  const prompt = `Generate 6 high-quality, real online learning resources for the topic: "${topic}"
-
-IMPORTANT REQUIREMENTS:
-1. All URLs must be real, working links (no placeholders)
-2. Include diverse resource types: Documentation, Tutorials, Courses, Practice Sites, Tools, Books
-3. Prioritize well-known, reputable sources like MDN, GeeksforGeeks, Coursera, YouTube, GitHub, official documentation
-4. Each resource should have accurate descriptions
-5. Include difficulty levels and whether they're free or paid
-
-Please respond in this EXACT JSON format:
-{
-  "resources": [
-    {
-      "title": "Resource Title",
-      "type": "Documentation|Tutorial|Course|Practice|Tool|Book|Video",
-      "description": "Detailed description of what this resource offers",
-      "url": "https://real-working-url.com",
-      "difficulty": "Beginner|Intermediate|Advanced|All Levels",
-      "free": true|false,
-      "rating": "High|Medium",
-      "provider": "Provider name (e.g., MDN, Google, Microsoft)"
-    }
-  ]
-}
-
-Focus on providing real, working URLs from these trusted sources:
-- MDN Web Docs (developer.mozilla.org)
-- W3Schools (w3schools.com)
-- GeeksforGeeks (geeksforgeeks.org)
-- FreeCodeCamp (freecodecamp.org)
-- Coursera (coursera.org)
-- edX (edx.org)
-- Khan Academy (khanacademy.org)
-- YouTube (youtube.com)
-- GitHub (github.com)
-- Stack Overflow (stackoverflow.com)
-- Official documentation sites
-- LeetCode (leetcode.com)
-- HackerRank (hackerrank.com)
-
-Generate exactly 6 resources with real URLs only.`;
-
+/**
+ * Generate resources using Google Programmable Search API
+ * Fetches real, working resources from trusted educational sources
+ */
+const generateResourcesWithGoogleSearch = async (topic) => {
   try {
-    console.log('🤖 Requesting resources from Gemini for topic:', topic);
+    console.log('🔍 Generating high-quality resources for topic:', topic);
     
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.3, // Lower temperature for more consistent, factual responses
-            topP: 0.8,
-            maxOutputTokens: 2048,
-          },
-        }),
-      }
-    );
+    // Check cache first
+    const cacheKey = topic.toLowerCase().trim();
+    const cached = resourcesCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      console.log('📋 Using cached resources for:', topic);
+      return cached.resources;
+    }
+
+    // Call our backend API that uses Google Search
+    const response = await fetch('/api/resources/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        topic: topic,
+        excludeYoutube: true // Exclude YouTube since we have a dedicated Videos tab
+      })
+    });
 
     if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`);
+      console.error(`❌ API Error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    console.log('📊 Backend API Response:', data);
     
-    if (!responseText) {
-      throw new Error('No response from Gemini API');
+    if (!data.resources || !Array.isArray(data.resources)) {
+      console.error('❌ Invalid response format:', data);
+      throw new Error(`Invalid response format from API: ${JSON.stringify(data)}`);
     }
 
-    console.log('📝 Raw Gemini response:', responseText.slice(0, 200) + '...');
+    // If we got results, use them
+    if (data.resources.length > 0) {
+      console.log(`✅ Got ${data.resources.length} resources from Google Search API`);
+      
+      // Enhance resources with additional metadata
+      const enhancedResources = data.resources.map((resource, index) => ({
+        ...resource,
+        id: `resource_${Date.now()}_${index}`,
+        tags: [topic.toLowerCase(), resource.type?.toLowerCase()].filter(Boolean),
+        category: 'Learning'
+      }));
+      
+      // Cache the results
+      resourcesCache.set(cacheKey, {
+        resources: enhancedResources,
+        timestamp: Date.now()
+      });
 
-    // Extract JSON from the response (remove any markdown formatting)
-    let cleanedResponse = responseText.trim();
-    if (cleanedResponse.startsWith('```json')) {
-      cleanedResponse = cleanedResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    } else if (cleanedResponse.startsWith('```')) {
-      cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      console.log(`✅ Final result: ${enhancedResources.length} high-quality resources for: ${topic}`);
+      return enhancedResources;
+    } else {
+      console.warn('⚠️ No resources returned from Google Search API, using fallback');
+      throw new Error('No resources found from Google Search');
     }
-
-    const resourcesData = JSON.parse(cleanedResponse);
-    
-    if (!resourcesData.resources || !Array.isArray(resourcesData.resources)) {
-      throw new Error('Invalid response format from Gemini');
-    }
-
-    console.log('✅ Successfully parsed', resourcesData.resources.length, 'resources from Gemini');
-    return resourcesData.resources;
 
   } catch (error) {
-    console.error('❌ Error generating resources with Gemini:', error);
+    console.error('❌ Error generating resources with Google Search:', error);
     
-    // Return fallback resources if Gemini fails
-    return getFallbackResources(topic);
+    // Fallback to basic resources if Google Search fails
+    console.log('🔄 Falling back to basic resources');
+    return generateFallbackResources(topic);
   }
 };
 
-// Fallback resources for when Gemini API fails
-const getFallbackResources = (topic) => {
-  return [
+/**
+ * Fallback resource generation when Google Search API fails
+ * Provides basic educational resource recommendations (excluding YouTube)
+ */
+const generateFallbackResources = (topic) => {
+  console.log('🔄 Using fallback resources for:', topic);
+  
+  const baseResources = [
     {
-      title: `${topic} - MDN Web Docs`,
-      type: 'Documentation',
-      description: `Official documentation and guides for ${topic} from Mozilla Developer Network.`,
-      url: `https://developer.mozilla.org/en-US/search?q=${encodeURIComponent(topic)}`,
-      difficulty: 'All Levels',
+      title: `${topic} - Wikipedia`,
+      type: "Documentation",
+      description: `Comprehensive overview and introduction to ${topic}`,
+      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(topic.replace(/\s+/g, '_'))}`,
+      difficulty: "All Levels",
       free: true,
-      rating: 'High',
-      provider: 'Mozilla'
+      rating: "High",
+      provider: "Wikipedia"
     },
     {
-      title: `${topic} Tutorial - W3Schools`,
-      type: 'Tutorial',
-      description: `Comprehensive ${topic} tutorial with examples and exercises.`,
-      url: `https://www.w3schools.com/search/search_tryit.asp?searchtext=${encodeURIComponent(topic)}`,
-      difficulty: 'Beginner',
+      title: `${topic} Tutorial - GeeksforGeeks`,
+      type: "Tutorial",
+      description: `Step-by-step tutorial and examples for ${topic}`,
+      url: `https://www.geeksforgeeks.org/?s=${encodeURIComponent(topic)}`,
+      difficulty: "Beginner",
       free: true,
-      rating: 'High',
-      provider: 'W3Schools'
-    },
-    {
-      title: `${topic} - GeeksforGeeks`,
-      type: 'Tutorial',
-      description: `Detailed ${topic} tutorials with programming examples and practice problems.`,
-      url: `https://www.geeksforgeeks.org/search/?query=${encodeURIComponent(topic)}`,
-      difficulty: 'Intermediate',
-      free: true,
-      rating: 'High',
-      provider: 'GeeksforGeeks'
+      rating: "High",
+      provider: "GeeksforGeeks"
     },
     {
       title: `${topic} Course - freeCodeCamp`,
-      type: 'Course',
-      description: `Free interactive ${topic} course with hands-on projects.`,
-      url: `https://www.freecodecamp.org/search?query=${encodeURIComponent(topic)}`,
-      difficulty: 'Beginner',
+      type: "Course",
+      description: `Free comprehensive course covering ${topic}`,
+      url: `https://www.freecodecamp.org/learn`,
+      difficulty: "Beginner",
       free: true,
-      rating: 'High',
-      provider: 'freeCodeCamp'
+      rating: "High",
+      provider: "freeCodeCamp"
     },
     {
-      title: `${topic} Videos - YouTube`,
-      type: 'Video',
-      description: `Educational videos and tutorials about ${topic} from various creators.`,
-      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' tutorial')}`,
-      difficulty: 'All Levels',
+      title: `${topic} Practice - HackerRank`,
+      type: "Practice",
+      description: `Practice exercises and challenges for ${topic}`,
+      url: `https://www.hackerrank.com/domains`,
+      difficulty: "All Levels",
       free: true,
-      rating: 'Medium',
-      provider: 'YouTube'
+      rating: "High",
+      provider: "HackerRank"
+    },
+    {
+      title: `${topic} Documentation - MDN Web Docs`,
+      type: "Documentation",
+      description: `Official documentation and reference for ${topic}`,
+      url: `https://developer.mozilla.org/en-US/search?q=${encodeURIComponent(topic)}`,
+      difficulty: "All Levels",
+      free: true,
+      rating: "High",
+      provider: "MDN Web Docs"
     },
     {
       title: `${topic} Questions - Stack Overflow`,
-      type: 'Reference',
-      description: `Community questions, answers, and discussions about ${topic}.`,
+      type: "Reference",
+      description: `Community questions, answers, and discussions about ${topic}`,
       url: `https://stackoverflow.com/search?q=${encodeURIComponent(topic)}`,
-      difficulty: 'All Levels',
+      difficulty: "All Levels",
       free: true,
-      rating: 'High',
-      provider: 'Stack Overflow'
+      rating: "High",
+      provider: "Stack Overflow"
     }
   ];
+
+  return baseResources;
 };
 
 // Helper function to validate and enhance resources
@@ -211,47 +189,48 @@ const extractResourceTypes = (resources) => {
   return Array.from(types);
 };
 
-// Main function to generate resources content using Gemini AI
+// Main function to generate resources content using Google Search API
 export async function generateResourcesContent(setContent, topic = '', options = {}) {
-  console.log('📚 Generating AI-powered resources for:', topic);
+  console.log('📚 Generating Google Search-powered resources for:', topic);
   
-  if (!topic || topic.trim().length === 0) {
-    console.warn('⚠️ No topic provided for resource generation');
-    setContent({
-      resources: [],
-      resourcesMetadata: {
-        generatedAt: new Date().toISOString(),
-        totalResources: 0,
-        error: 'No topic provided'
-      }
-    });
-    return;
-  }
-
-  const cacheKey = `gemini_${topic.toLowerCase()}_${JSON.stringify(options)}`;
-  
-  // Check cache first
-  if (resourcesCache.has(cacheKey)) {
-    const cached = resourcesCache.get(cacheKey);
-    if (Date.now() - cached.timestamp < CACHE_DURATION) {
-      console.log('📋 Using cached Gemini resources');
+  // Add a try-catch to ensure setContent is always called
+  try {
+    if (!topic || topic.trim().length === 0) {
+      console.warn('⚠️ No topic provided for resource generation');
       setContent({
-        resources: cached.resources,
+        resources: [],
         resourcesMetadata: {
-          ...cached.metadata,
-          fromCache: true
+          generatedAt: new Date().toISOString(),
+          totalResources: 0,
+          error: 'No topic provided'
         }
       });
       return;
     }
-  }
-  
-  try {
-    // Generate resources using Gemini AI
-    const geminiResources = await generateResourcesWithGemini(topic);
+
+    const cacheKey = `google_search_${topic.toLowerCase()}_${JSON.stringify(options)}`;
+    
+    // Check cache first
+    if (resourcesCache.has(cacheKey)) {
+      const cached = resourcesCache.get(cacheKey);
+      if (Date.now() - cached.timestamp < CACHE_DURATION) {
+        console.log('📋 Using cached Google Search resources');
+        setContent({
+          resources: cached.resources,
+          resourcesMetadata: {
+            ...cached.metadata,
+            fromCache: true
+          }
+        });
+        return;
+      }
+    }
+    
+    // Generate resources using Google Programmable Search API
+    const searchResources = await generateResourcesWithGoogleSearch(topic);
     
     // Validate and enhance resources
-    const validatedResources = validateAndEnhanceResources(geminiResources, topic);
+    const validatedResources = validateAndEnhanceResources(searchResources, topic);
     
     const metadata = {
       generatedAt: new Date().toISOString(),
@@ -260,8 +239,9 @@ export async function generateResourcesContent(setContent, topic = '', options =
       types: extractResourceTypes(validatedResources),
       topic: topic,
       fromCache: false,
-      source: 'gemini_ai',
-      model: 'gemini-1.5-flash'
+      source: 'google_search_api',
+      searchEngine: 'google_programmable_search',
+      excludesYoutube: true
     };
     
     // Cache the results
@@ -271,7 +251,7 @@ export async function generateResourcesContent(setContent, topic = '', options =
       timestamp: Date.now()
     });
     
-    console.log('✅ Successfully generated', validatedResources.length, 'AI-powered resources');
+    console.log('✅ Successfully generated', validatedResources.length, 'Google Search-powered resources');
     
     // Set the content
     setContent({
@@ -282,25 +262,42 @@ export async function generateResourcesContent(setContent, topic = '', options =
   } catch (error) {
     console.error('❌ Error generating resources:', error);
     
-    // Fallback to basic resources
-    const fallbackResources = getFallbackResources(topic);
-    const validatedFallback = validateAndEnhanceResources(fallbackResources, topic);
-    
-    const errorMetadata = {
-      generatedAt: new Date().toISOString(),
-      totalResources: validatedFallback.length,
-      categories: extractResourceCategories(validatedFallback),
-      types: extractResourceTypes(validatedFallback),
-      topic: topic,
-      fromCache: false,
-      source: 'fallback',
-      error: error.message
-    };
-    
-    setContent({
-      resources: validatedFallback,
-      resourcesMetadata: errorMetadata
-    });
+    try {
+      // Fallback to basic resources
+      const fallbackResources = generateFallbackResources(topic);
+      const validatedFallback = validateAndEnhanceResources(fallbackResources, topic);
+      
+      const errorMetadata = {
+        generatedAt: new Date().toISOString(),
+        totalResources: validatedFallback.length,
+        categories: extractResourceCategories(validatedFallback),
+        types: extractResourceTypes(validatedFallback),
+        topic: topic,
+        fromCache: false,
+        source: 'fallback',
+        error: error.message
+      };
+      
+      console.log('🔄 Using fallback resources due to error:', error.message);
+      setContent({
+        resources: validatedFallback,
+        resourcesMetadata: errorMetadata
+      });
+    } catch (fallbackError) {
+      console.error('❌ Even fallback failed:', fallbackError);
+      // Ensure we ALWAYS call setContent, even with empty results
+      setContent({
+        resources: [],
+        resourcesMetadata: {
+          generatedAt: new Date().toISOString(),
+          totalResources: 0,
+          topic: topic,
+          fromCache: false,
+          source: 'error',
+          error: `Both main and fallback failed: ${error.message}`
+        }
+      });
+    }
   }
 }
 
@@ -364,7 +361,8 @@ export function getResourceIcon(type) {
     'Video': '🎥',
     'Reference': '📋',
     'Interactive': '🎮',
-    'Article': '📄'
+    'Article': '📄',
+    'Resource': '🔗'
   };
   return icons[type] || '📝';
 }
@@ -391,7 +389,7 @@ export function generateCuratedResources(topic) {
   }
 
   // Generate fallback resources
-  const fallbackResources = getFallbackResources(topic);
+  const fallbackResources = generateFallbackResources(topic);
   const validatedResources = validateAndEnhanceResources(fallbackResources, topic);
   
   return {

@@ -16,6 +16,9 @@ urlpatterns = [
     # Quiz endpoints
     path('api/quiz/submit/<int:lesson_id>/', views.submit_quiz, name='submit-quiz'),
     
+    # Resources endpoints
+    path('api/resources/', views.get_resources, name='get-resources'),
+    
     # Learning Plan URLs
     path('api/learning/', include('courses.urls_learning_plan')),
 ]

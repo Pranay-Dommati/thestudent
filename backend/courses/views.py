@@ -808,3 +808,232 @@ def submit_quiz(request, lesson_id):
             {"error": str(e)},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def get_resources(request):
+    """
+    Get high-quality learning resources using Google Programmable Search API
+    Excludes YouTube videos and focuses on educational content
+    """
+    import requests
+    import json
+    from datetime import datetime
+    
+    try:
+        data = request.data
+        topic = data.get('topic', '').strip()
+        exclude_youtube = data.get('excludeYoutube', True)
+        
+        if not topic:
+            return Response({
+                'error': 'Topic is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Your Google Programmable Search API credentials
+        API_KEY = 'AIzaSyCoZJC3kzWosQEJpbb0Q2QmoQpMUuBpVlI'
+        SEARCH_ENGINE_ID = '2593cd20d7e52429f'
+        
+        print(f"🔍 Getting resources for topic: {topic}")
+        print(f"🎛️ Exclude YouTube: {exclude_youtube}")
+        
+        resources = []
+        
+        # Define trusted educational sites for specific searches
+        trusted_sites = [
+            'freecodecamp.org',
+            'geeksforgeeks.org', 
+            'developer.mozilla.org',
+            'w3schools.com',
+            'stackoverflow.com',
+            'github.com',
+            'coursera.org',
+            'edx.org',
+            'khanacademy.org',
+            'codecademy.com',
+            'udemy.com',
+            'tutorialspoint.com'
+        ]
+        
+        # Create multiple targeted search queries for better coverage
+        search_queries = [
+            f'"{topic} tutorial" site:freecodecamp.org OR site:geeksforgeeks.org OR site:codecademy.com',
+            f'"{topic} documentation" site:developer.mozilla.org OR site:w3schools.com OR site:tutorialspoint.com',
+            f'"{topic} guide" site:medium.com OR site:dev.to OR site:stackoverflow.com',
+            f'"{topic} course" site:coursera.org OR site:edx.org OR site:khanacademy.org',
+            f'"{topic} practice" site:hackerrank.com OR site:leetcode.com OR site:codewars.com'
+        ]
+        
+        for query in search_queries:
+            try:
+                print(f"🔍 Searching with query: {query}")
+                
+                url = 'https://www.googleapis.com/customsearch/v1'
+                params = {
+                    'key': API_KEY,
+                    'cx': SEARCH_ENGINE_ID,
+                    'q': query,
+                    'num': 3,  # Get 3 results per query type
+                    'safe': 'active'
+                }
+                
+                response = requests.get(url, params=params, timeout=10)
+                print(f"📊 Google API Response Status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    search_data = response.json()
+                    
+                    if 'items' in search_data:
+                        print(f"✅ Found {len(search_data['items'])} items for query: {query}")
+                        for item in search_data['items']:
+                            link = item.get('link', '')
+                            domain = item.get('displayLink', '')
+                            
+                            # Filter out YouTube and video content
+                            if exclude_youtube and any(video_domain in link.lower() for video_domain in [
+                                'youtube.com', 'youtu.be', 'vimeo.com', 'dailymotion.com',
+                                'video', 'watch', 'embed'
+                            ]):
+                                print(f"⏭️ Skipping video resource: {item.get('title', '')[:50]}...")
+                                continue
+                            
+                            # Categorize resource based on domain and content
+                            resource_type = categorize_resource_type(item.get('title', ''), domain)
+                            
+                            resource = {
+                                'title': item.get('title', ''),
+                                'url': link,
+                                'description': item.get('snippet', ''),
+                                'provider': domain,
+                                'type': resource_type,
+                                'difficulty': determine_difficulty(item.get('title', ''), item.get('snippet', '')),
+                                'free': is_free_resource(domain),
+                                'rating': 'High' if domain in trusted_sites else 'Medium'
+                            }
+                            
+                            # Avoid duplicates
+                            if not any(r['url'] == resource['url'] for r in resources):
+                                resources.append(resource)
+                                print(f"📌 Added resource: {resource['title'][:50]}...")
+                    else:
+                        print(f"⚠️ No 'items' in search response for query: {query}")
+                        if 'error' in search_data:
+                            print(f"❌ Google API Error: {search_data['error']}")
+                else:
+                    error_text = response.text[:200]
+                    print(f"❌ Google API Error {response.status_code}: {error_text}")
+                
+                # Small delay between requests to avoid rate limiting
+                import time
+                time.sleep(0.1)
+                
+            except Exception as search_error:
+                print(f"❌ Search error for query '{query}': {search_error}")
+                continue
+        
+        # Sort by quality and limit to top 8 resources
+        quality_resources = sorted(resources, key=lambda x: get_quality_score(x), reverse=True)[:8]
+        
+        print(f"✅ Found {len(quality_resources)} quality resources for topic: {topic}")
+        
+        return Response({
+            'resources': quality_resources,
+            'metadata': {
+                'topic': topic,
+                'total_found': len(quality_resources),
+                'search_method': 'google_programmable_search',
+                'exclude_youtube': exclude_youtube,
+                'generated_at': datetime.now().isoformat()
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ Error in get_resources: {e}")
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'error': str(e),
+            'resources': []
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def categorize_resource_type(title, domain):
+    """Categorize resource based on title and domain"""
+    title_lower = title.lower()
+    domain_lower = domain.lower()
+    
+    if 'youtube.com' in domain_lower:
+        return 'Video'
+    elif any(word in domain_lower for word in ['coursera', 'edx', 'udemy', 'khanacademy', 'codecademy']):
+        return 'Course'
+    elif any(word in domain_lower for word in ['github.com']):
+        return 'Tool'
+    elif any(word in domain_lower for word in ['stackoverflow.com']):
+        return 'Reference'
+    elif any(word in domain_lower for word in ['developer.mozilla.org', 'w3schools', 'docs.', 'tutorialspoint']):
+        return 'Documentation'
+    elif any(word in title_lower for word in ['tutorial', 'guide', 'learn', 'how to']):
+        return 'Tutorial'
+    elif any(word in title_lower for word in ['practice', 'exercise', 'challenge']):
+        return 'Practice'
+    elif any(word in domain_lower for word in ['medium.com', 'dev.to']):
+        return 'Article'
+    else:
+        return 'Resource'
+
+
+def determine_difficulty(title, description):
+    """Determine difficulty level based on content"""
+    content = (title + ' ' + description).lower()
+    
+    if any(word in content for word in ['beginner', 'basic', 'intro', 'getting started', 'fundamentals']):
+        return 'Beginner'
+    elif any(word in content for word in ['advanced', 'expert', 'deep dive', 'mastery', 'complex']):
+        return 'Advanced'
+    elif any(word in content for word in ['intermediate', 'beyond basics']):
+        return 'Intermediate'
+    else:
+        return 'All Levels'
+
+
+def is_free_resource(domain):
+    """Determine if resource is likely free based on domain"""
+    free_domains = [
+        'freecodecamp.org', 'w3schools.com', 'developer.mozilla.org',
+        'geeksforgeeks.org', 'stackoverflow.com', 'github.com',
+        'khanacademy.org', 'tutorialspoint.com', 'medium.com', 'dev.to'
+    ]
+    return any(free_domain in domain.lower() for free_domain in free_domains)
+
+
+def get_quality_score(resource):
+    """Calculate quality score for resource ranking"""
+    score = 0
+    domain = resource.get('provider', '').lower()
+    
+    # High-quality educational domains get higher scores
+    quality_domains = {
+        'freecodecamp.org': 10,
+        'developer.mozilla.org': 9,
+        'geeksforgeeks.org': 8,
+        'w3schools.com': 8,
+        'stackoverflow.com': 7,
+        'codecademy.com': 9,
+        'coursera.org': 8,
+        'edx.org': 8,
+        'khanacademy.org': 7,
+        'tutorialspoint.com': 6
+    }
+    
+    for domain_key, domain_score in quality_domains.items():
+        if domain_key in domain:
+            score += domain_score
+            break
+    
+    # Boost score for comprehensive content
+    title = resource.get('title', '').lower()
+    if any(word in title for word in ['complete', 'comprehensive', 'full', 'ultimate']):
+        score += 2
+    
+    return score

@@ -197,3 +197,7 @@ YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', 'AIzaSyBK8JXhEc4HLz5_Mbv0ta0
 
 # Gemini API key for AI services
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCoZJC3kzWosQEJpbb0Q2QmoQpMUuBpVlI')
+
+# Google Programmable Search API for Resources
+GOOGLE_SEARCH_API_KEY = os.environ.get('GOOGLE_SEARCH_API_KEY', 'AIzaSyCoZJC3kzWosQEJpbb0Q2QmoQpMUuBpVlI')
+GOOGLE_SEARCH_ENGINE_ID = os.environ.get('GOOGLE_SEARCH_ENGINE_ID', '2593cd20d7e52429f')
