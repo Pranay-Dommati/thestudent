@@ -172,25 +172,52 @@ const ProLearningPage = () => {
   // Completion tracking
   const [completedTopics, setCompletedTopics] = useState(() => {
     try {
-      // Try to get course-specific completed topics first
-      const urlParams = new URLSearchParams(window.location.search);
+      // Only load completion data if we have a valid courseId from URL
       const courseIdFromUrl = window.location.pathname.split('/')[2];
       
-      if (courseIdFromUrl) {
+      if (courseIdFromUrl && courseIdFromUrl.startsWith('course_')) {
         const courseSpecificKey = `proLearning_completedTopics_${courseIdFromUrl}`;
         const courseSpecific = localStorage.getItem(courseSpecificKey);
         if (courseSpecific) {
-          return JSON.parse(courseSpecific);
+          const parsed = JSON.parse(courseSpecific);
+          // Ensure it's an array and has valid data
+          return Array.isArray(parsed) ? parsed : [];
         }
       }
       
-      // Fallback to general completed topics
-      const general = localStorage.getItem('proLearning_completedTopics');
-      return general ? JSON.parse(general) : [];
+      // For new courses or invalid data, start with empty completion state
+      return [];
     } catch {
       return [];
     }
   });
+  
+  // Validate and clean completion data when topics change
+  useEffect(() => {
+    if (topicsList.length > 0) {
+      const validTopicIds = topicsList.map(t => t.id);
+      const currentCompleted = completedTopics.filter(id => validTopicIds.includes(id));
+      
+      // Only update if there are invalid IDs to remove
+      if (currentCompleted.length !== completedTopics.length) {
+        console.log('🧹 Cleaning invalid completion data:', {
+          before: completedTopics,
+          after: currentCompleted,
+          validTopicIds
+        });
+        setCompletedTopics(currentCompleted);
+        
+        // Update localStorage with cleaned data
+        try {
+          const courseId = getCourseId();
+          const storageKey = courseId ? `proLearning_completedTopics_${courseId}` : 'proLearning_completedTopics';
+          localStorage.setItem(storageKey, JSON.stringify(currentCompleted));
+        } catch (error) {
+          console.warn('Failed to save cleaned completion data:', error);
+        }
+      }
+    }
+  }, [topicsList]); // Run when topics change
   
   // Flag to prevent storage loading during direct URL generation
   const [isDirectUrlGeneration, setIsDirectUrlGeneration] = useState(false);
