@@ -853,17 +853,42 @@ def get_resources(request):
             'khanacademy.org',
             'codecademy.com',
             'udemy.com',
-            'tutorialspoint.com'
+            'tutorialspoint.com',
+            'programiz.com',
+            'javatpoint.com',
+            'leetcode.com',
+            'hackerrank.com',
+            'codewars.com',
+            'realpython.com',
+            'python.org',
+            'java.com',
+            'cplusplus.com'
         ]
         
-        # Create multiple targeted search queries for better coverage
+        # Create highly targeted search queries for the specific topic
+        # Make sure queries are precise and topic-focused
         search_queries = [
-            f'"{topic} tutorial" site:freecodecamp.org OR site:geeksforgeeks.org OR site:codecademy.com',
-            f'"{topic} documentation" site:developer.mozilla.org OR site:w3schools.com OR site:tutorialspoint.com',
-            f'"{topic} guide" site:medium.com OR site:dev.to OR site:stackoverflow.com',
-            f'"{topic} course" site:coursera.org OR site:edx.org OR site:khanacademy.org',
-            f'"{topic} practice" site:hackerrank.com OR site:leetcode.com OR site:codewars.com'
+            f'{topic} programming tutorial',
+            f'{topic} data structure tutorial',
+            f'{topic} algorithm tutorial', 
+            f'learn {topic} programming',
+            f'{topic} implementation examples',
+            f'{topic} coding practice problems',
+            f'{topic} programming guide',
+            f'how to use {topic} in programming'
         ]
+        
+        # Enhanced search queries with site restrictions for quality
+        enhanced_queries = []
+        for base_query in search_queries[:4]:  # Use top 4 most relevant queries
+            enhanced_queries.extend([
+                f'{base_query} site:geeksforgeeks.org OR site:freecodecamp.org',
+                f'{base_query} site:tutorialspoint.com OR site:w3schools.com',
+                f'{base_query} site:programiz.com OR site:javatpoint.com'
+            ])
+        
+        # Use the enhanced queries
+        search_queries = enhanced_queries[:6]  # Limit to 6 queries to avoid too many API calls
         
         for query in search_queries:
             try:
@@ -896,6 +921,11 @@ def get_resources(request):
                                 'video', 'watch', 'embed'
                             ]):
                                 print(f"⏭️ Skipping video resource: {item.get('title', '')[:50]}...")
+                                continue
+                            
+                            # Check topic relevance - ensure the resource is actually about the topic
+                            if not is_topic_relevant(item.get('title', ''), item.get('snippet', ''), topic):
+                                print(f"⏭️ Skipping irrelevant resource: {item.get('title', '')[:50]}...")
                                 continue
                             
                             # Categorize resource based on domain and content
@@ -958,6 +988,53 @@ def get_resources(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def is_topic_relevant(title, description, topic):
+    """Check if the resource content is actually relevant to the topic"""
+    content = (title + ' ' + description).lower()
+    topic_lower = topic.lower()
+    
+    # Direct topic match
+    if topic_lower in content:
+        return True
+    
+    # Handle common programming topics and their variations
+    topic_variations = {
+        'arrays': ['array', 'arrays', 'list', 'lists', 'data structure'],
+        'strings': ['string', 'strings', 'text', 'character'],
+        'loops': ['loop', 'loops', 'for loop', 'while loop', 'iteration'],
+        'functions': ['function', 'functions', 'method', 'methods'],
+        'variables': ['variable', 'variables', 'var', 'declaration'],
+        'classes': ['class', 'classes', 'object', 'oop'],
+        'recursion': ['recursion', 'recursive', 'recursively'],
+        'sorting': ['sort', 'sorting', 'bubble sort', 'merge sort', 'quick sort'],
+        'searching': ['search', 'searching', 'binary search', 'linear search'],
+        'linked lists': ['linked list', 'linkedlist', 'node', 'pointer'],
+        'trees': ['tree', 'trees', 'binary tree', 'bst'],
+        'graphs': ['graph', 'graphs', 'vertex', 'edge', 'node'],
+        'stacks': ['stack', 'stacks', 'lifo', 'push', 'pop'],
+        'queues': ['queue', 'queues', 'fifo', 'enqueue', 'dequeue'],
+        'hash tables': ['hash', 'hashtable', 'hashmap', 'dictionary', 'map'],
+        'dynamic programming': ['dynamic programming', 'dp', 'memoization'],
+    }
+    
+    # Check for topic variations
+    variations = topic_variations.get(topic_lower, [topic_lower])
+    for variation in variations:
+        if variation in content:
+            return True
+    
+    # If it's a programming concept, check for programming-related keywords
+    programming_keywords = [
+        'programming', 'code', 'coding', 'algorithm', 'data structure', 
+        'computer science', 'software', 'development'
+    ]
+    
+    has_programming_context = any(keyword in content for keyword in programming_keywords)
+    has_topic_mention = any(variation in content for variation in variations)
+    
+    return has_programming_context and has_topic_mention
+
+
 def categorize_resource_type(title, domain):
     """Categorize resource based on title and domain"""
     title_lower = title.lower()
@@ -1015,15 +1092,20 @@ def get_quality_score(resource):
     # High-quality educational domains get higher scores
     quality_domains = {
         'freecodecamp.org': 10,
+        'geeksforgeeks.org': 10,
         'developer.mozilla.org': 9,
-        'geeksforgeeks.org': 8,
+        'programiz.com': 9,
         'w3schools.com': 8,
+        'tutorialspoint.com': 8,
+        'javatpoint.com': 8,
         'stackoverflow.com': 7,
         'codecademy.com': 9,
         'coursera.org': 8,
         'edx.org': 8,
         'khanacademy.org': 7,
-        'tutorialspoint.com': 6
+        'leetcode.com': 8,
+        'hackerrank.com': 8,
+        'realpython.com': 9
     }
     
     for domain_key, domain_score in quality_domains.items():
