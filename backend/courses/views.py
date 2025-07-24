@@ -973,8 +973,8 @@ def get_resources(request):
                 deduplicated_resources.append(resource)
         print(f"✅ After deduplication: {len(deduplicated_resources)} unique resources")
         
-        # Sort by quality and limit to top 8 resources
-        quality_resources = sorted(deduplicated_resources, key=lambda x: get_quality_score(x), reverse=True)[:8]
+        # Sort by quality and limit to top 7 resources
+        quality_resources = sorted(deduplicated_resources, key=lambda x: get_quality_score(x), reverse=True)[:7]
         
         print(f"✅ Found {len(quality_resources)} quality resources for topic: {topic}")
         
