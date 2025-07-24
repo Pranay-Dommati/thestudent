@@ -942,10 +942,13 @@ def get_resources(request):
                                 'rating': 'High' if domain in trusted_sites else 'Medium'
                             }
                             
-                            # Avoid duplicates
-                            if not any(r['url'] == resource['url'] for r in resources):
-                                resources.append(resource)
-                                print(f"📌 Added resource: {resource['title'][:50]}...")
+                            # Enhanced duplicate checking - check URL, normalized URL, and similar titles
+                            if is_duplicate_resource(resource, resources):
+                                print(f"⏭️ Skipping duplicate resource: {resource['title'][:50]}...")
+                                continue
+                            
+                            resources.append(resource)
+                            print(f"📌 Added resource: {resource['title'][:50]}...")
                     else:
                         print(f"⚠️ No 'items' in search response for query: {query}")
                         if 'error' in search_data:
@@ -962,8 +965,16 @@ def get_resources(request):
                 print(f"❌ Search error for query '{query}': {search_error}")
                 continue
         
+        # Final deduplication pass to ensure no duplicates slipped through
+        print(f"🔍 Before deduplication: {len(resources)} resources")
+        deduplicated_resources = []
+        for resource in resources:
+            if not is_duplicate_resource(resource, deduplicated_resources):
+                deduplicated_resources.append(resource)
+        print(f"✅ After deduplication: {len(deduplicated_resources)} unique resources")
+        
         # Sort by quality and limit to top 8 resources
-        quality_resources = sorted(resources, key=lambda x: get_quality_score(x), reverse=True)[:8]
+        quality_resources = sorted(deduplicated_resources, key=lambda x: get_quality_score(x), reverse=True)[:8]
         
         print(f"✅ Found {len(quality_resources)} quality resources for topic: {topic}")
         
@@ -986,6 +997,89 @@ def get_resources(request):
             'error': str(e),
             'resources': []
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def normalize_url(url):
+    """Normalize URL for better duplicate detection"""
+    if not url:
+        return ""
+    
+    # Remove common URL parameters and fragments
+    url = url.split('?')[0].split('#')[0]
+    # Remove trailing slashes
+    url = url.rstrip('/')
+    # Convert to lowercase
+    url = url.lower()
+    # Remove www prefix
+    url = url.replace('://www.', '://')
+    
+    return url
+
+
+def normalize_title(title):
+    """Normalize title for similarity comparison"""
+    if not title:
+        return ""
+    
+    # Convert to lowercase and remove extra spaces
+    title = ' '.join(title.lower().split())
+    # Remove common prefixes and suffixes
+    prefixes_to_remove = ['learn', 'tutorial', 'guide', 'how to', 'introduction to', 'intro to']
+    suffixes_to_remove = ['tutorial', 'guide', 'explained', 'basics', 'fundamentals']
+    
+    for prefix in prefixes_to_remove:
+        if title.startswith(prefix + ' '):
+            title = title[len(prefix):].strip()
+    
+    for suffix in suffixes_to_remove:
+        if title.endswith(' ' + suffix):
+            title = title[:-len(suffix)].strip()
+    
+    return title
+
+
+def is_duplicate_resource(new_resource, existing_resources):
+    """Enhanced duplicate checking for resources"""
+    new_url = normalize_url(new_resource.get('url', ''))
+    new_title = normalize_title(new_resource.get('title', ''))
+    
+    for existing in existing_resources:
+        existing_url = normalize_url(existing.get('url', ''))
+        existing_title = normalize_title(existing.get('title', ''))
+        
+        # Check for exact URL match
+        if new_url == existing_url:
+            return True
+        
+        # Check for very similar titles (same content, different formatting)
+        if new_title and existing_title and len(new_title) > 10:
+            # Calculate similarity - if titles are very similar, consider duplicate
+            common_words = set(new_title.split()) & set(existing_title.split())
+            total_words = set(new_title.split()) | set(existing_title.split())
+            
+            if len(total_words) > 0:
+                similarity = len(common_words) / len(total_words)
+                if similarity > 0.8:  # 80% similarity threshold
+                    return True
+        
+        # Check for same domain with very similar paths
+        if new_url and existing_url:
+            try:
+                from urllib.parse import urlparse
+                new_parsed = urlparse(new_url)
+                existing_parsed = urlparse(existing_url)
+                
+                # Same domain and very similar paths
+                if (new_parsed.netloc == existing_parsed.netloc and 
+                    new_parsed.path and existing_parsed.path):
+                    
+                    path_similarity = len(set(new_parsed.path.split('/')) & set(existing_parsed.path.split('/'))) / max(len(set(new_parsed.path.split('/'))), len(set(existing_parsed.path.split('/'))))
+                    if path_similarity > 0.7:  # 70% path similarity
+                        return True
+            except:
+                pass  # If URL parsing fails, continue with other checks
+    
+    return False
 
 
 def is_topic_relevant(title, description, topic):
