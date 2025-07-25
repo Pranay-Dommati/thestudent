@@ -1,13 +1,16 @@
 from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse, Http404
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress
+from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource
 from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer
 import json
 from django.conf import settings
+import os
+import mimetypes
 import os
 
 @api_view(['POST'])
@@ -1213,3 +1216,49 @@ def get_quality_score(resource):
         score += 2
     
     return score
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def download_resource(request, resource_id):
+    """
+    Download a lesson resource file with proper headers
+    """
+    try:
+        resource = get_object_or_404(LessonResource, id=resource_id)
+        
+        if not resource.file:
+            return Response(
+                {'error': 'No file associated with this resource'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get the file path
+        file_path = resource.file.path
+        
+        if not os.path.exists(file_path):
+            return Response(
+                {'error': 'File not found on server'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Guess the content type
+        content_type, _ = mimetypes.guess_type(file_path)
+        if content_type is None:
+            content_type = 'application/octet-stream'
+        
+        # Read the file
+        with open(file_path, 'rb') as file:
+            response = HttpResponse(file.read(), content_type=content_type)
+            
+        # Set the Content-Disposition header to force download
+        filename = os.path.basename(file_path)
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Length'] = os.path.getsize(file_path)
+        
+        return response
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to download file: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

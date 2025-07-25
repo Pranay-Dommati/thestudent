@@ -55,9 +55,11 @@ class LessonSerializer(serializers.ModelSerializer):
         
         for resource in lesson_resources:
             resource_data = {
+                'id': resource.id,
                 'name': resource.title,
                 'description': resource.description,
-                'link': resource.url if resource.url else (resource.file.url if resource.file else '')
+                'link': resource.url if resource.url else (resource.file.url if resource.file else ''),
+                'download_url': f'/api/resources/download/{resource.id}/' if resource.file else None
             }
             
             if resource.type == 'downloadable':
