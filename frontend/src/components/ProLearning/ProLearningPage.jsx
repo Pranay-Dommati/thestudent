@@ -1384,9 +1384,11 @@ const ProLearningPage = () => {
                               borderRadius: "0 0 0.75rem 0.75rem",
                               fontSize: "1rem",
                               margin: 0,
+                              padding: "1rem",
                               background: "#23272f",
                               border: "1px solid #222c37",
-                              color: "#f8f8f2"
+                              color: "#f8f8f2",
+                              lineHeight: "1.4"
                             }}
                             codeTagProps={{
                               style: { 
@@ -1537,9 +1539,11 @@ const ProLearningPage = () => {
                                 borderRadius: "0 0 0.75rem 0.75rem",
                                 fontSize: "1rem",
                                 margin: 0,
+                                padding: "1rem",
                                 background: "#23272f",
                                 border: "1px solid #222c37",
-                                color: "#f8f8f2"
+                                color: "#f8f8f2",
+                                lineHeight: "1.4"
                               }}
                               codeTagProps={{
                                 style: { 
