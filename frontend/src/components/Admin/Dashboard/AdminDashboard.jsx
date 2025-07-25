@@ -99,13 +99,11 @@ const AdminDashboard = () => {
       <AdminNav 
         onLogout={handleLogout} 
         isLoginPage={false}
-        onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         isDarkMode={isDarkMode}
       />
       
       <div className="pt-16">
-        <div className="lg:flex min-h-screen">
+        <div className="min-h-screen">
           <AdminSidebar 
             menuItems={menuItems}
             currentView={currentView}
@@ -113,22 +111,15 @@ const AdminDashboard = () => {
             isMobileOpen={isMobileMenuOpen}
             setIsMobileOpen={setIsMobileMenuOpen}
             isSidebarOpen={isSidebarOpen}
+            setIsSidebarOpen={setIsSidebarOpen}
             isDarkMode={isDarkMode}
           />
           
-          <main className={`flex-1 transition-all duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'} min-h-screen lg:min-h-0`}>
+          <main className={`transition-all duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'} min-h-screen ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
             <div className="p-6 lg:p-8">
               <div className="max-w-7xl mx-auto">
-                <div className="mb-6 flex justify-between items-center">
-                  {/* Show sidebar toggle info on desktop when sidebar is closed */}
-                  {!isSidebarOpen && (
-                    <div className={`hidden lg:flex items-center px-3 py-2 rounded-lg ${isDarkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-600 shadow-sm border'}`}>
-                      <FaBars className="h-4 w-4 mr-2" />
-                      <span className="text-sm">Sidebar hidden - click menu to show</span>
-                    </div>
-                  )}
-                  
-                  <div className={`ml-auto`}>
+                <div className="mb-6 flex justify-end items-center">
+                  <div>
                     <button 
                       onClick={() => setIsDarkMode(!isDarkMode)} 
                       className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${isDarkMode ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' : 'bg-white text-gray-700 hover:bg-gray-100 shadow-sm border'}`}
