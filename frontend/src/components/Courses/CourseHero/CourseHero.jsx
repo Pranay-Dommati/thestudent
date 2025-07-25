@@ -1,41 +1,73 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { motion } from 'framer-motion';
+import { FaGraduationCap, FaBook, FaChartLine, FaUsers } from 'react-icons/fa';
 
 const CourseHero = () => {
-    const [searchQuery, setSearchQuery] = useState('');
-
-    const handleSearch = (e) => {
-        e.preventDefault();
-        // Implement search functionality
-        console.log("Searching for:", searchQuery);
-    };
+    const highlights = [
+        {
+            icon: FaGraduationCap,
+            title: "Structured Learning",
+            description: "Organized courses from 6th standard to Engineering"
+        },
+        {
+            icon: FaChartLine,
+            title: "Track Progress",
+            description: "Monitor your learning journey effectively"
+        },
+        {
+            icon: FaBook,
+            title: "Practice through Quizzes",
+            description: "Test your knowledge with interactive assessments"
+        }
+    ];
 
     return (
-        <section className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-29 pb-18">
-            <div className="container mx-auto px-4 text-center">
-                <h1 className="text-4xl md:text-5xl font-bold mb-4">Find the Perfect Course for You</h1>
-                <p className="text-xl mb-8 max-w-3xl mx-auto">
-                    Discover carefully curated and AI-recommended courses to accelerate your learning journey
-                </p>
-                
-                <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-4">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="Search by topic, instructor, or platform..."
-                            className="w-full py-4 px-6 rounded-full text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-lg border border-gray-300"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                        <button
-                            type="submit"
-                            className="absolute right-2 top-2 bg-indigo-700 hover:bg-indigo-800 text-white p-2 rounded-full"
+        <section className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-28 pb-16 relative overflow-hidden">
+            {/* Subtle background decoration */}
+            <div className="absolute inset-0 opacity-5">
+                <div className="absolute top-5 left-10 w-16 h-16 border border-white rounded-full"></div>
+                <div className="absolute top-10 right-20 w-12 h-12 border border-white rounded-full"></div>
+                <div className="absolute bottom-5 left-1/3 w-8 h-8 border border-white rounded-full"></div>
+            </div>
+            
+            <div className="container mx-auto px-4 relative z-10">
+                <div className="text-center mb-10">
+                    <motion.h1 
+                        className="text-3xl md:text-5xl font-bold mb-6 leading-tight"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6 }}
+                    >
+                        Find the Perfect Course for You
+                    </motion.h1>
+                    <motion.p 
+                        className="text-lg md:text-xl mb-8 max-w-2xl mx-auto opacity-90"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.2 }}
+                    >
+                        Choose your class and explore courses designed for your academic success
+                    </motion.p>
+                </div>
+
+                {/* Compact feature highlights */}
+                <motion.div 
+                    className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.4 }}
+                >
+                    {highlights.map((item, index) => (
+                        <div 
+                            key={index}
+                            className="text-center p-4 bg-white/10 backdrop-blur-sm rounded-lg hover:bg-white/20 transition-all duration-300"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </button>
-                    </div>
-                </form>
+                            <item.icon className="w-6 h-6 mx-auto mb-3 text-white" />
+                            <h3 className="text-sm font-semibold mb-2">{item.title}</h3>
+                            <p className="text-xs opacity-80 hidden md:block">{item.description}</p>
+                        </div>
+                    ))}
+                </motion.div>
             </div>
         </section>
     );
