@@ -10,6 +10,10 @@ import EngineeringCourseForm from './EngineeringCourseForm/index';
 import SchoolCourseForm from './SchoolCourseForm/index'; // Add this import
 
 const courseCategories = [
+  { level: '6th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
+  { level: '7th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
+  { level: '8th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
+  { level: '9th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
   { level: '10th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
   { level: '11th', boards: ['CBSE'] },
   { level: '12th', boards: ['CBSE'] },
@@ -23,6 +27,10 @@ const subjects = {
 
 const EDUCATION_LEVELS = [
   { id: 'engineering', label: 'Engineering' },
+  { id: '6th', label: 'Class 6' },
+  { id: '7th', label: 'Class 7' },
+  { id: '8th', label: 'Class 8' },
+  { id: '9th', label: 'Class 9' },
   { id: '10th', label: 'Class 10' },
   { id: '11th', label: 'Class 11' },
   { id: '12th', label: 'Class 12' }
