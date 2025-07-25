@@ -3,6 +3,7 @@ import { FaEnvelope, FaLock, FaArrowRight } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { useNavigate, Link } from 'react-router-dom';
+import authService from '../../services/authService';
 
 const AdminLogin = ({ onLoginSuccess }) => {
   const [credentials, setCredentials] = useState({
@@ -31,20 +32,9 @@ const AdminLogin = ({ onLoginSuccess }) => {
     setIsLoading(true);
     
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const data = await authService.adminLogin(credentials.email, credentials.password);
       
-      // Store admin authentication status with timestamp
-      const authData = {
-        isAuthenticated: true,
-        email: credentials.email,
-        timestamp: new Date().getTime(),
-        // You can add more secure data here later
-      };
-      
-      localStorage.setItem('adminAuth', JSON.stringify(authData));
-      
-      toast.success('Login successful');
+      toast.success(`Welcome back, ${data.user.first_name || data.user.username}!`);
       
       if (onLoginSuccess) {
         onLoginSuccess();
@@ -52,7 +42,15 @@ const AdminLogin = ({ onLoginSuccess }) => {
 
       navigate('/admin-p');
     } catch (error) {
-      toast.error('Login failed. Please try again.');
+      console.error('Admin login error:', error);
+      
+      if (error.message.includes('Access denied')) {
+        toast.error('Access denied. Only superusers can access the admin panel.');
+      } else if (error.message.includes('Invalid email')) {
+        toast.error('Invalid email or password');
+      } else {
+        toast.error(error.message || 'Login failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -66,7 +64,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
             Admin Login
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Enter your credentials to access the admin panel
+            Enter your superuser credentials to access the admin panel
           </p>
         </div>
         
@@ -95,7 +93,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
                   value={credentials.email}
                   onChange={handleChange}
                   className="pl-10 py-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter any email"
+                  placeholder="Enter your superuser email"
                 />
               </div>
             </div>
@@ -117,7 +115,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
                   value={credentials.password}
                   onChange={handleChange}
                   className="pl-10 py-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter any password"
+                  placeholder="Enter your superuser password"
                 />
               </div>
             </div>

@@ -9,6 +9,7 @@ import AdminSettings from '../Settings/AdminSettings';
 import CourseManagement from '../Courses/CourseManagement';
 import CourseForm from '../Courses/CourseForm';
 import AdminLogin from '../AdminLogin';
+import authService from '../../../services/authService';
 
 const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState('courses');
@@ -37,30 +38,26 @@ const AdminDashboard = () => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  const checkAdminAuth = () => {
+  const checkAdminAuth = async () => {
     try {
-      const authData = JSON.parse(localStorage.getItem('adminAuth'));
-      if (authData && authData.isAuthenticated) {
-        // Optional: Check if the authentication hasn't expired
-        const currentTime = new Date().getTime();
-        const authTime = authData.timestamp;
-        const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-
-        if (currentTime - authTime < TWENTY_FOUR_HOURS) {
-          setIsAuthenticated(true);
-          return;
-        }
+      // First check local authentication status
+      if (!authService.isAuthenticated()) {
+        setIsAuthenticated(false);
+        return;
       }
-      setIsAuthenticated(false);
-      localStorage.removeItem('adminAuth');
+
+      // Verify with server that the user is still a valid superuser
+      await authService.verifyAdminAccess();
+      setIsAuthenticated(true);
     } catch (error) {
+      console.error('Admin auth verification failed:', error);
       setIsAuthenticated(false);
-      localStorage.removeItem('adminAuth');
+      authService.logout();
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('adminAuth');
+    authService.logout();
     setIsAuthenticated(false);
     navigate('/admin-p');
   };
