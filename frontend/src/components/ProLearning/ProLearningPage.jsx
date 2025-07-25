@@ -140,6 +140,46 @@ const ProLearningPage = () => {
     initializeDefaultTopics();
   }, [courseTitle, courseId]); // Add courseId dependency
   
+  // Auto-select first topic when topics list is loaded
+  useEffect(() => {
+    if (topicsList.length > 0 && !topicParam) {
+      // If no topic is specified in URL and we have topics, select the first one
+      const firstTopic = topicsList[0];
+      if (firstTopic) {
+        console.log('🎯 Auto-selecting first topic:', firstTopic.name);
+        
+        // Set the first topic as active in the topics list
+        setTopicsList(prevTopics => 
+          prevTopics.map((topic, index) => ({
+            ...topic,
+            isActive: index === 0 // Only first topic is active
+          }))
+        );
+        
+        // Update URL to include the first topic
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.set("topic", firstTopic.name);
+        navigate(`/pro-learning/${courseId}?${newSearchParams.toString()}`, { replace: true });
+        
+        // Load content for the first topic if available
+        const currentCourseId = getCourseId();
+        if (currentCourseId) {
+          const storedContent = proContentManager.getStoredTopicContent(currentCourseId, firstTopic.name);
+          if (storedContent && storedContent.reading) {
+            console.log('✅ Loading stored content for first topic:', firstTopic.name);
+            setContent({
+              reading: storedContent.reading,
+              summary: storedContent.summary || 'Summary not available',
+              quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
+              videos: storedContent.videos || [],
+              resources: storedContent.resources || []
+            });
+          }
+        }
+      }
+    }
+  }, [topicsList.length, topicParam, courseId, navigate, searchParams]); // Trigger when topics are loaded
+  
   // Content state
   const [content, setContent] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
