@@ -27,7 +27,7 @@ const StandaloneQuizPage = () => {
     let defaultReturnPath;
     const currentPath = location.pathname;
     
-    if (currentPath.includes('/learning/') && currentPath.includes('/quiz')) {
+    if (currentPath.startsWith('/learning/') && currentPath.includes('/quiz')) {
       // AI Learning Plan path: /learning/:learningPlanId/quiz
       const learningPlanId = params.learningPlanId;
       defaultReturnPath = `/learning/${learningPlanId}`;
@@ -157,7 +157,27 @@ const StandaloneQuizPage = () => {
     setSubmitting(true);
     try {
       // Get the lesson ID from the quiz data or location state
-      const lessonId = location.state?.lessonId;
+      let lessonId = location.state?.lessonId;
+      
+      // If lessonId is still undefined, try to extract it from URL or create a fallback
+      if (!lessonId) {
+        const currentPath = location.pathname;
+        
+        // For school courses, try to extract from URL pattern or use a fallback
+        if (currentPath.startsWith('/courses/')) {
+          // For school courses, we can use a default lesson ID or get it from params
+          // Since school course quizzes might not have explicit lesson IDs,
+          // we'll use the courseId and a quiz identifier
+          const pathParts = currentPath.split('/');
+          const courseType = pathParts[2]; // '9th', '10th', etc.
+          const stateCode = pathParts[4]; // 'ap', etc.
+          const subject = pathParts[5]; // 'hindi', etc.
+          
+          // Create a unique identifier for this quiz
+          lessonId = `${courseType}_${stateCode}_${subject}_quiz`;
+          console.log('Generated fallback lesson ID for school course:', lessonId);
+        }
+      }
       
       console.log('Submitting quiz with lesson ID:', lessonId);
       console.log('Selected answers:', selectedAnswers);
@@ -173,14 +193,16 @@ const StandaloneQuizPage = () => {
       });
       
       if (!lessonId) {
-        toast.error('Lesson ID not found. Unable to submit quiz.');
+        toast.error('Unable to identify lesson. Please try navigating back and starting the quiz again.');
         setSubmitting(false);
         return;
       }
 
       // Determine if this is an AI learning plan based on URL pattern
+      // AI learning plans have pattern: /learning/:learningPlanId/quiz
+      // School courses have pattern: /courses/.../learning/quiz
       const currentPath = location.pathname;
-      const isAILearningPlan = currentPath.includes('/learning/') && currentPath.includes('/quiz');
+      const isAILearningPlan = currentPath.startsWith('/learning/') && currentPath.includes('/quiz');
       
       let response;
       
@@ -194,13 +216,29 @@ const StandaloneQuizPage = () => {
           { answers: selectedAnswers }
         );
       } else {
-        // Use regular course endpoint for integer lesson IDs
-        console.log('Submitting regular course quiz');
+        // Check if this is a school course (has generated lesson ID) or regular course
+        const isSchoolCourse = typeof lessonId === 'string' && lessonId.includes('_');
         
-        response = await axiosInstance.post(
-          `http://127.0.0.1:8000/api/quiz/submit/${lessonId}/`,
-          { answers: selectedAnswers }
-        );
+        if (isSchoolCourse) {
+          // Use school quiz endpoint for school courses
+          console.log('Submitting school course quiz:', { lessonId });
+          
+          response = await axiosInstance.post(
+            `http://127.0.0.1:8000/api/quiz/submit-school/${lessonId}/`,
+            { 
+              answers: selectedAnswers,
+              questions: quizData.questions // Send quiz questions for score calculation
+            }
+          );
+        } else {
+          // Use regular course endpoint for integer lesson IDs
+          console.log('Submitting regular course quiz');
+          
+          response = await axiosInstance.post(
+            `http://127.0.0.1:8000/api/quiz/submit/${lessonId}/`,
+            { answers: selectedAnswers }
+          );
+        }
       }
 
       const result = response.data;

@@ -814,6 +814,86 @@ def submit_quiz(request, lesson_id):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_school_quiz(request, quiz_id):
+    """
+    Submit quiz answers for school courses that don't have lesson objects
+    """
+    try:
+        user = request.user
+        data = request.data
+        
+        # Get user's answers from request data
+        user_answers = data.get('answers', {})
+        
+        # Since school courses don't have lesson objects with quiz questions,
+        # we'll calculate the score based on the answers provided
+        # The frontend should send the correct answers along with user answers
+        
+        quiz_questions = data.get('questions', [])
+        
+        if not quiz_questions:
+            return Response(
+                {"error": "No quiz questions provided"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Calculate score
+        total_questions = len(quiz_questions)
+        correct_answers = 0
+        
+        # Debug information
+        print(f"Processing school quiz submission for quiz_id: {quiz_id}")
+        print(f"User answers received: {user_answers}")
+        print(f"Quiz questions: {len(quiz_questions)}")
+        
+        for question in quiz_questions:
+            question_id = str(question.get('id'))
+            user_answer_index = user_answers.get(question_id)
+            correct_answer_index = question.get('correctAnswer')
+            
+            print(f"Question {question_id}: User answer index: {user_answer_index}, Correct index: {correct_answer_index}")
+            
+            if user_answer_index is not None and user_answer_index == correct_answer_index:
+                correct_answers += 1
+        
+        # Calculate percentage score
+        score = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
+        passed = score >= 80  # 80% passing score
+        
+        # For school courses, we can create a simple result without database storage
+        # or create a simplified quiz result entry
+        result_data = {
+            "quiz_id": quiz_id,
+            "score": score,
+            "passed": passed,
+            "correct_answers": correct_answers,
+            "total_questions": total_questions,
+            "user_id": user.id,
+            "answers": user_answers
+        }
+        
+        print(f"Quiz result: {result_data}")
+        
+        return Response({
+            "id": f"school_quiz_{quiz_id}_{user.id}",
+            "score": score,
+            "passed": passed,
+            "correct_answers": correct_answers,
+            "total_questions": total_questions,
+            "submitted_at": None  # We don't store this for school quizzes
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(['POST'])
 @permission_classes([AllowAny])
 def get_resources(request):
     """

@@ -15,6 +15,7 @@ urlpatterns = [
     
     # Quiz endpoints
     path('api/quiz/submit/<int:lesson_id>/', views.submit_quiz, name='submit-quiz'),
+    path('api/quiz/submit-school/<str:quiz_id>/', views.submit_school_quiz, name='submit-school-quiz'),
     
     # Resources endpoints
     path('api/resources/', views.get_resources, name='get-resources'),
