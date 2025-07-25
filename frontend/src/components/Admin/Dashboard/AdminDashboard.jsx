@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
-import { FaThLarge, FaPlus, FaUsers, FaLock } from 'react-icons/fa';
+import { FaThLarge, FaPlus, FaUsers, FaLock, FaBars } from 'react-icons/fa';
 import AdminNav from '../layout/AdminNav';
 import AdminSidebar from '../layout/AdminSidebar';
 import AdminCourses from '../Courses/AdminCourses';
@@ -14,9 +14,19 @@ const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState('courses');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    // Load sidebar state from localStorage, default to true
+    const saved = localStorage.getItem('adminSidebarOpen');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
   const [isDarkMode, setIsDarkMode] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Save sidebar state to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('adminSidebarOpen', JSON.stringify(isSidebarOpen));
+  }, [isSidebarOpen]);
 
   useEffect(() => {
     checkAdminAuth();
@@ -90,27 +100,43 @@ const AdminDashboard = () => {
         onLogout={handleLogout} 
         isLoginPage={false}
         onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        onSidebarToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         isDarkMode={isDarkMode}
       />
       
-      <div className="flex pt-16">
-        <AdminSidebar 
-          menuItems={menuItems}
-          currentView={currentView}
-          setCurrentView={setCurrentView}
-          isMobileOpen={isMobileMenuOpen}
-          setIsMobileOpen={setIsMobileMenuOpen}
-          isDarkMode={isDarkMode}
-        />
-          <main className={`flex-1 p-2 xs:p-3 sm:p-4 md:p-5 lg:p-6 lg:ml-64 transition-all duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'}`}>          <div className="max-w-7xl mx-auto">
-            <div className="mb-3 sm:mb-4 md:mb-5 flex justify-end">
-              <button 
-                onClick={() => setIsDarkMode(!isDarkMode)} 
-                className={`p-1.5 sm:p-2 text-sm sm:text-base rounded-md ${isDarkMode ? 'bg-gray-800 text-yellow-400' : 'bg-gray-200 text-gray-700'}`}
-              >
-                {isDarkMode ? '☀️ Light' : '🌙 Dark'}
-              </button>
-            </div>
+      <div className="pt-16">
+        <div className="lg:flex min-h-screen">
+          <AdminSidebar 
+            menuItems={menuItems}
+            currentView={currentView}
+            setCurrentView={setCurrentView}
+            isMobileOpen={isMobileMenuOpen}
+            setIsMobileOpen={setIsMobileMenuOpen}
+            isSidebarOpen={isSidebarOpen}
+            isDarkMode={isDarkMode}
+          />
+          
+          <main className={`flex-1 transition-all duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'} min-h-screen lg:min-h-0`}>
+            <div className="p-6 lg:p-8">
+              <div className="max-w-7xl mx-auto">
+                <div className="mb-6 flex justify-between items-center">
+                  {/* Show sidebar toggle info on desktop when sidebar is closed */}
+                  {!isSidebarOpen && (
+                    <div className={`hidden lg:flex items-center px-3 py-2 rounded-lg ${isDarkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-600 shadow-sm border'}`}>
+                      <FaBars className="h-4 w-4 mr-2" />
+                      <span className="text-sm">Sidebar hidden - click menu to show</span>
+                    </div>
+                  )}
+                  
+                  <div className={`ml-auto`}>
+                    <button 
+                      onClick={() => setIsDarkMode(!isDarkMode)} 
+                      className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${isDarkMode ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' : 'bg-white text-gray-700 hover:bg-gray-100 shadow-sm border'}`}
+                    >
+                      {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+                    </button>
+                  </div>
+                </div>
             <Routes>
               <Route index element={<Navigate to="/admin-p/courses" />} />
               <Route path="courses/*" element={<CourseManagement isDarkMode={isDarkMode} />} />
@@ -118,7 +144,10 @@ const AdminDashboard = () => {
               <Route path="users" element={<AdminUsers isDarkMode={isDarkMode} />} />
               <Route path="settings" element={<AdminSettings isDarkMode={isDarkMode} />} />
             </Routes>
-          </div></main>
+              </div>
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );
