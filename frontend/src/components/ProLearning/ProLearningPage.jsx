@@ -327,6 +327,13 @@ const ProLearningPage = () => {
             setBatchGenerationProgress
           );
           
+          // Ensure completion state is properly set
+          if (result && result.success) {
+            console.log('✅ Batch generation completed successfully');
+            setBatchGenerationProgress(100);
+            setIsBatchGenerating(false);
+            setAllTopicsGenerated(true);
+          }
         }, 500);
       }
     }
@@ -997,6 +1004,7 @@ const ProLearningPage = () => {
         // Mark generation as complete
         setIsBatchGenerating(false);
         setAllTopicsGenerated(true);
+        setBatchGenerationProgress(100); // Set progress to 100% when completed
         setBatchGenerationStatus('Course generation completed!');
         
         // Auto-load the first topic or topic from URL

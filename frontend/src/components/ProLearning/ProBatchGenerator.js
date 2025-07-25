@@ -134,13 +134,17 @@ export const batchGenerateAllTopics = async (
       setGenerationProgress(progressPercentage);
     }
     
-    // 5. Final progress check
+    // 5. Final progress check and completion
     const finalProgress = contentStorageService.getCourseProgress(courseId);
     
     if (finalProgress.isComplete) {
       setLoadingStatus('All topics are ready! Click on a topic to start learning.');
+      setGenerationProgress(100); // Ensure progress is set to 100% when complete
     } else {
       setLoadingStatus(`${finalProgress.generated}/${finalProgress.total} topics ready. Some content generation may have failed.`);
+      // Set progress based on actual completion percentage
+      const completionPercentage = Math.floor((finalProgress.generated / finalProgress.total) * 100);
+      setGenerationProgress(completionPercentage);
     }
     
     return { 
