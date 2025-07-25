@@ -1330,17 +1330,69 @@ const ProLearningPage = () => {
                             </button>
                           </div>
                           <SyntaxHighlighter
-                            style={oneLight}
+                            style={{
+                              'code[class*="language-"]': {
+                                color: '#f8f8f2',
+                                background: 'none',
+                                fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                                fontSize: '1rem',
+                                lineHeight: '1.5',
+                                whiteSpace: 'pre',
+                                wordSpacing: 'normal',
+                                wordBreak: 'normal',
+                                wordWrap: 'normal',
+                                tabSize: 4,
+                                hyphens: 'none'
+                              },
+                              'pre[class*="language-"]': {
+                                color: '#f8f8f2',
+                                background: '#23272f',
+                                overflow: 'auto'
+                              },
+                              comment: { color: '#6272a4', fontStyle: 'italic' },
+                              prolog: { color: '#6272a4' },
+                              doctype: { color: '#6272a4' },
+                              cdata: { color: '#6272a4' },
+                              punctuation: { color: '#f8f8f2' },
+                              property: { color: '#50fa7b' },
+                              tag: { color: '#ff79c6' },
+                              constant: { color: '#bd93f9' },
+                              symbol: { color: '#bd93f9' },
+                              deleted: { color: '#ff5555' },
+                              boolean: { color: '#bd93f9' },
+                              number: { color: '#bd93f9' },
+                              selector: { color: '#50fa7b' },
+                              'attr-name': { color: '#50fa7b' },
+                              string: { color: '#f1fa8c' },
+                              char: { color: '#f1fa8c' },
+                              builtin: { color: '#8be9fd' },
+                              inserted: { color: '#50fa7b' },
+                              operator: { color: '#ff79c6' },
+                              entity: { color: '#f8f8f2', cursor: 'help' },
+                              url: { color: '#f8f8f2' },
+                              variable: { color: '#f8f8f2' },
+                              atrule: { color: '#8be9fd' },
+                              'attr-value': { color: '#f1fa8c' },
+                              function: { color: '#50fa7b' },
+                              'class-name': { color: '#8be9fd' },
+                              keyword: { color: '#ff79c6' },
+                              regex: { color: '#f1fa8c' },
+                              important: { color: '#ff5555', fontWeight: 'bold' }
+                            }}
                             language={lang}
                             customStyle={{
                               borderRadius: "0 0 0.75rem 0.75rem",
                               fontSize: "1rem",
                               margin: 0,
                               background: "#23272f",
-                              border: "1px solid #222c37"
+                              border: "1px solid #222c37",
+                              color: "#f8f8f2"
                             }}
                             codeTagProps={{
-                              style: { fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace' },
+                              style: { 
+                                fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                                color: '#f8f8f2'
+                              },
                               className: 'custom-syntax-highlight'
                             }}
                             showLineNumbers={false}
@@ -1401,6 +1453,108 @@ const ProLearningPage = () => {
                           {children}
                         </p>
                       ),
+                      code({node, inline, className, children, ...props}) {
+                        const match = /language-(\w+)/.exec(className || "");
+                        const lang = match ? match[1] : "";
+                        if (inline) {
+                          return (
+                            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border" {...props}>{children}</code>
+                          );
+                        }
+                        // Use the code string as a unique id for this code block
+                        const codeString = String(children).replace(/\n$/, "");
+                        const blockId = codeString;
+                        return (
+                          <div className="relative my-6">
+                            <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
+                              <span className="text-xs text-gray-500 font-mono">{lang || "code"}</span>
+                              <button
+                                className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-100 bg-white ml-2 flex items-center gap-1 cursor-pointer"
+                                onClick={() => handleCopyCode(codeString, blockId)}
+                                type="button"
+                              >
+                                {copySuccessMap[blockId] ? (
+                                  <>
+                                    <FaCheck className="inline-block text-green-600" /> Copied!
+                                  </>
+                                ) : (
+                                  <>Copy</>
+                                )}
+                              </button>
+                            </div>
+                            <SyntaxHighlighter
+                              style={{
+                                'code[class*="language-"]': {
+                                  color: '#f8f8f2',
+                                  background: 'none',
+                                  fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                                  fontSize: '1rem',
+                                  lineHeight: '1.5',
+                                  whiteSpace: 'pre',
+                                  wordSpacing: 'normal',
+                                  wordBreak: 'normal',
+                                  wordWrap: 'normal',
+                                  tabSize: 4,
+                                  hyphens: 'none'
+                                },
+                                'pre[class*="language-"]': {
+                                  color: '#f8f8f2',
+                                  background: '#23272f',
+                                  overflow: 'auto'
+                                },
+                                comment: { color: '#6272a4', fontStyle: 'italic' },
+                                prolog: { color: '#6272a4' },
+                                doctype: { color: '#6272a4' },
+                                cdata: { color: '#6272a4' },
+                                punctuation: { color: '#f8f8f2' },
+                                property: { color: '#50fa7b' },
+                                tag: { color: '#ff79c6' },
+                                constant: { color: '#bd93f9' },
+                                symbol: { color: '#bd93f9' },
+                                deleted: { color: '#ff5555' },
+                                boolean: { color: '#bd93f9' },
+                                number: { color: '#bd93f9' },
+                                selector: { color: '#50fa7b' },
+                                'attr-name': { color: '#50fa7b' },
+                                string: { color: '#f1fa8c' },
+                                char: { color: '#f1fa8c' },
+                                builtin: { color: '#8be9fd' },
+                                inserted: { color: '#50fa7b' },
+                                operator: { color: '#ff79c6' },
+                                entity: { color: '#f8f8f2', cursor: 'help' },
+                                url: { color: '#f8f8f2' },
+                                variable: { color: '#f8f8f2' },
+                                atrule: { color: '#8be9fd' },
+                                'attr-value': { color: '#f1fa8c' },
+                                function: { color: '#50fa7b' },
+                                'class-name': { color: '#8be9fd' },
+                                keyword: { color: '#ff79c6' },
+                                regex: { color: '#f1fa8c' },
+                                important: { color: '#ff5555', fontWeight: 'bold' }
+                              }}
+                              language={lang}
+                              customStyle={{
+                                borderRadius: "0 0 0.75rem 0.75rem",
+                                fontSize: "1rem",
+                                margin: 0,
+                                background: "#23272f",
+                                border: "1px solid #222c37",
+                                color: "#f8f8f2"
+                              }}
+                              codeTagProps={{
+                                style: { 
+                                  fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                                  color: '#f8f8f2'
+                                },
+                                className: 'custom-syntax-highlight'
+                              }}
+                              showLineNumbers={false}
+                            >
+                              {codeString}
+                            </SyntaxHighlighter>
+                          </div>
+                        );
+                      },
                       pre: ({children}) => (
                         <div className="mb-6">
                           <pre className="text-sm">{children}</pre>
