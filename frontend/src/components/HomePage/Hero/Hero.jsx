@@ -15,9 +15,9 @@ const Hero = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative z-20">
         <div className="max-w-4xl mx-auto text-center">
           {/* AI badge with better mobile visibility */}
-          <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20 mb-6 sm:mb-8">
-            <span className="animate-pulse mr-2 h-2 sm:h-3 w-2 sm:w-3 rounded-full bg-green-400"></span>
-            <span className="text-white text-xs sm:text-sm font-medium">AI-Powered Learning</span>
+          <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white border border-gray-200 mb-6 sm:mb-8 shadow-lg">
+            <span className="animate-pulse mr-2 h-2 sm:h-3 w-2 sm:w-3 rounded-full bg-green-400 shadow-sm"></span>
+            <span className="text-black text-xs sm:text-sm font-semibold">AI-Powered Learning</span>
           </div>
           
           {/* Heading with improved readability on mobile */}
