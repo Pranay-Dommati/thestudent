@@ -13,7 +13,7 @@ const SUBJECT_ICONS = {
   'Biology': '🧬',
   'English': '📚',
   'Hindi': '📖',
-  'Social': '🌍',
+  'Social Science': '🌍',
   'Science': '🔬',
   'Computer Science': '💻',
   'General': '📘'
@@ -34,7 +34,7 @@ const boards = [
   }
 ];
 
-const TenthStandard = () => {
+const SeventhStandard = () => {
   const navigate = useNavigate();
   const { boardId, stateId } = useParams();
   const location = useLocation();
@@ -61,28 +61,22 @@ const TenthStandard = () => {
           let data;
 
           if (selectedBoard === 'state' || selectedBoard.startsWith('state-')) {
-            // For state boards, extract the state code
             const stateCode = selectedBoard.replace('state-', '') || stateId;
-            
-            // Map state codes to full state names as stored in database
             const stateValue = stateCode === 'ts' ? 'Telangana' : 
                              stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
             
-            console.log(`Fetching state board courses: class=10th, board=state, state=${stateValue}`);
-            data = await getSchoolCourses('10th', 'state', stateValue);
+            console.log(`Fetching state board courses: class=7th, board=state, state=${stateValue}`);
+            data = await getSchoolCourses('7th', 'state', stateValue);
           } else {
-            console.log(`Fetching courses: class=10th, board=${selectedBoard}`);
-            data = await getSchoolCourses('10th', selectedBoard);
+            console.log(`Fetching courses: class=7th, board=${selectedBoard}`);
+            data = await getSchoolCourses('7th', selectedBoard);
           }
 
           console.log('API returned courses:', data);
 
-          // Filter courses for exact matches but do not double-filter by board
-          // since the API should already return correct board courses
           const filteredCourses = data.filter(course => {
-            const classMatch = course.class_level === '10th';
+            const classMatch = course.class_level === '7th';
             
-            // For state boards, strictly match the state name
             let stateMatch = true;
             if (selectedBoard.startsWith('state-')) {
               const stateCode = selectedBoard.replace('state-', '') || stateId;
@@ -91,44 +85,32 @@ const TenthStandard = () => {
               stateMatch = course.state === stateValue;
             }
             
-            console.log(`Filtering course:`, {
-              course: course.title,
-              class: course.class_level,
-              board: course.board,
-              state: course.state,
-              matches: {
-                class: classMatch,
-                board: true, // We trust the API to return correct board
-                state: stateMatch
-              }
-            });
-
             return classMatch && stateMatch;
           });
 
-          console.log('Filtered courses:', filteredCourses);
           setCourses(filteredCourses);
         } catch (error) {
-          console.error("Error fetching courses:", error);
-        } finally {
-          setLoading(false);
+          console.error('Error fetching courses:', error);
+          setCourses([]);
         }
+        setLoading(false);
       };
 
       fetchCourses();
     }
   }, [selectedBoard, stateId]);
 
-  const handleBoardSelect = (board) => {
-    if (board === 'state') {
+  const handleBoardSelect = (boardId) => {
+    if (boardId === 'state') {
       setShowStateBoards(true);
     } else {
-      navigate(`/courses/10th/${board}`);
+      setSelectedBoard(boardId);
+      navigate(`/courses/7th/${boardId}`);
     }
   };
 
   const handleStateSelect = (stateId) => {
-    navigate(`/courses/10th/state/${stateId}`);
+    navigate(`/courses/7th/state/${stateId}`);
     setShowStateBoards(false);
   };
 
@@ -163,8 +145,8 @@ const TenthStandard = () => {
               {courses.map((course) => (
                 <Link 
                   to={selectedBoard.includes('state') 
-                    ? `/courses/10th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
-                    : `/courses/10th/${selectedBoard}/${course.subject.toLowerCase()}`} 
+                    ? `/courses/7th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
+                    : `/courses/7th/${selectedBoard}/${course.subject.toLowerCase()}`} 
                   key={course.id}
                 >
                   <motion.div 
@@ -203,36 +185,9 @@ const TenthStandard = () => {
       ) : showStateBoards ? (
         <>
           <BackButton 
-            title="Select Your Board" 
-            subtitle="Choose your education board to view relevant courses" 
-          />
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {boards.filter(board => board.available).map((board) => (
-                <motion.button
-                  key={board.id}
-                  onClick={() => handleBoardSelect(board.id)}
-                  className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
-                  whileHover={{ y: -5 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{board.name}</h3>
-                  <p className="text-gray-500 text-sm">{board.fullName}</p>
-                </motion.button>
-              ))}
-            </div>
-
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
-              <h3 className="text-lg font-semibold text-indigo-900 mb-2">More Boards Coming Soon!</h3>
-              <p className="text-indigo-700">We're working hard to bring you content for ICSE, NIOS, and other boards. Stay tuned for updates!</p>
-            </div>
-          </div>
-        </>
-      ) : showStateBoards ? (
-        <>
-          <BackButton 
             title="Select Your State" 
             subtitle="Choose your state board" 
+            onBack={handleBack}
           />
           <div className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -256,6 +211,7 @@ const TenthStandard = () => {
           <BackButton 
             title="Select Your Board" 
             subtitle="Choose your education board to view relevant courses" 
+            onBack={handleBack}
           />
           <div className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -284,4 +240,4 @@ const TenthStandard = () => {
   );
 };
 
-export default TenthStandard;
+export default SeventhStandard;

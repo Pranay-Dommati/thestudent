@@ -20,6 +20,10 @@ class BaseCourse(models.Model):
 
 class SchoolCourse(BaseCourse):
     LEVEL_CHOICES = (
+        ('6th', 'Class 6'),
+        ('7th', 'Class 7'),
+        ('8th', 'Class 8'),
+        ('9th', 'Class 9'),
         ('10th', 'Class 10'),
         ('11th', 'Class 11'),
         ('12th', 'Class 12'),

@@ -13,6 +13,30 @@ const Courses = () => {
 
     const educationLevels = [
         { 
+            id: '6th', 
+            name: '6th Standard', 
+            icon: FaBook,
+            description: 'Foundation courses for 6th grade students'
+        },
+        { 
+            id: '7th', 
+            name: '7th Standard', 
+            icon: FaBook,
+            description: 'Foundation courses for 7th grade students'
+        },
+        { 
+            id: '8th', 
+            name: '8th Standard', 
+            icon: FaBook,
+            description: 'Foundation courses for 8th grade students'
+        },
+        { 
+            id: '9th', 
+            name: '9th Standard', 
+            icon: FaGraduationCap,
+            description: 'Foundation courses for 9th grade students'
+        },
+        { 
             id: '10th', 
             name: '10th Standard', 
             icon: FaBook,
@@ -85,7 +109,7 @@ const Courses = () => {
                                     Select your education level to discover personalized learning resources
                                 </p>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                 {educationLevels.map((level) => (
                                     <motion.button
                                         key={level.id}

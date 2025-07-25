@@ -10,6 +10,10 @@ import CourseLearningPage from './components/CourseLearningPage/CourseLearningPa
 import LearningHubPage from './components/LearningHub/LearningHubPage';
 import FloatingChatButton from './components/Chatbot/FloatingChatButton';
 import AuthForm from './components/Auth/AuthForm';
+import SixthStandard from './components/Courses/categories/6th/SixthStandard';
+import SeventhStandard from './components/Courses/categories/7th/SeventhStandard';
+import EighthStandard from './components/Courses/categories/8th/EighthStandard';
+import NinthStandard from './components/Courses/categories/9th/NinthStandard';
 import TenthStandard from './components/Courses/categories/10th/TenthStandard';
 import EleventhStandard from './components/Courses/categories/11th/EleventhStandard';
 import TwelfthStandard from './components/Courses/categories/12th/TwelfthStandard';
@@ -38,7 +42,7 @@ const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
   
   const determineCourseType = (id) => {
-    return ['10th', '11th', '12th'].some(grade => id.startsWith(grade)) ? 'school' : 'engineering';
+    return ['6th', '7th', '8th', '9th', '10th', '11th', '12th'].some(grade => id.startsWith(grade)) ? 'school' : 'engineering';
   };
 
   const courseType = determineCourseType(courseId);
@@ -140,6 +144,18 @@ const App = () => {
             
             {/* Course Routes */}
             <Route path="/courses" element={<Courses />}>
+              <Route path="6th" element={<SixthStandard />} />
+              <Route path="6th/cbse" element={<SixthStandard />} />
+              <Route path="6th/state/:stateId" element={<SixthStandard />} />
+              <Route path="7th" element={<SeventhStandard />} />
+              <Route path="7th/cbse" element={<SeventhStandard />} />
+              <Route path="7th/state/:stateId" element={<SeventhStandard />} />
+              <Route path="8th" element={<EighthStandard />} />
+              <Route path="8th/cbse" element={<EighthStandard />} />
+              <Route path="8th/state/:stateId" element={<EighthStandard />} />
+              <Route path="9th" element={<NinthStandard />} />
+              <Route path="9th/cbse" element={<NinthStandard />} />
+              <Route path="9th/state/:stateId" element={<NinthStandard />} />
               <Route path="10th" element={<TenthStandard />} />
               <Route path="10th/cbse" element={<TenthStandard />} />
               <Route path="10th/state/:stateId" element={<TenthStandard />} />
@@ -173,6 +189,14 @@ const App = () => {
             <Route path="/auth" element={<AuthForm />} />
 
             {/* Course Detail Routes */}
+            <Route path="/courses/6th/cbse/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/6th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/7th/cbse/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/7th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/8th/cbse/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/8th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/9th/cbse/:subjectId" element={<SchoolCourseDetails />} />
+            <Route path="/courses/9th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
             <Route path="/courses/10th/cbse/:subjectId" element={<SchoolCourseDetails />} />
             <Route path="/courses/10th/state/:stateId/:subjectId" element={<SchoolCourseDetails />} />
             <Route path="/courses/11th/cbse/:subjectId" element={<SchoolCourseDetails />} />
@@ -184,6 +208,30 @@ const App = () => {
             {/* Engineering Course Routes */}
             <Route path="/courses/engineering/:courseId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/engineering/:courseId/learning/quiz" element={<StandaloneQuizPage />} />
+            
+            {/* 6th Class Routes */}
+            <Route path="/courses/6th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/6th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
+            <Route path="/courses/6th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/6th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
+            
+            {/* 7th Class Routes */}
+            <Route path="/courses/7th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/7th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
+            <Route path="/courses/7th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/7th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
+            
+            {/* 8th Class Routes */}
+            <Route path="/courses/8th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/8th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
+            <Route path="/courses/8th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/8th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
+            
+            {/* 9th Class Routes */}
+            <Route path="/courses/9th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/9th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
+            <Route path="/courses/9th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/9th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
             
             {/* 10th Class Routes */}
             <Route path="/courses/10th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
