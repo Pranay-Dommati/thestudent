@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Debug - English Course</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .lesson {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+            border-radius: 5px;
+        }
+        .resource-item {
+            background: #e9ecef;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        .error {
+            color: red;
+            background: #ffe6e6;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: green;
+            background: #e6ffe6;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .warning {
+            color: orange;
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .json-output {
+            background: #f1f1f1;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>English Course Resource Debug Tool</h1>
+        <p>This tool checks the 12th class AP state English course resources.</p>
+        
+        <button onclick="testEnglishCourse()">Test English Course Resources</button>
+        <button onclick="testResourcesPageComponent()">Test ResourcesPage Component Logic</button>
+        <button onclick="checkLearningPageStructure()">Check Learning Page Structure</button>
+        
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000/api';
+        
+        async function testEnglishCourse() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<div class="success">Testing English course...</div>';
+            
+            try {
+                // Step 1: Search for English course
+                const searchResponse = await fetch(`${API_BASE}/courses/school/?class=12th&board=state&subject=english`);
+                const searchData = await searchResponse.json();
+                
+                if (!searchData || searchData.length === 0) {
+                    output.innerHTML = '<div class="error">No English courses found for 12th class, state board!</div>';
+                    return;
+                }
+                
+                const englishCourse = searchData[0];
+                output.innerHTML += `<div class="success">Found English course: ${englishCourse.title} (ID: ${englishCourse.id})</div>`;
+                
+                // Step 2: Get detailed course data
+                const detailResponse = await fetch(`${API_BASE}/courses/school/${englishCourse.id}/`);
+                const courseData = await detailResponse.json();
+                
+                output.innerHTML += `
+                    <div class="container">
+                        <h2>Course: ${courseData.title}</h2>
+                        <p><strong>Class:</strong> ${courseData.className}</p>
+                        <p><strong>Board:</strong> ${courseData.board}</p>
+                        <p><strong>Subject:</strong> ${courseData.subject}</p>
+                        <p><strong>State:</strong> ${courseData.state}</p>
+                        <p><strong>Total Chapters:</strong> ${courseData.chapters.length}</p>
+                `;
+                
+                // Step 3: Analyze resources in each lesson
+                let totalLessons = 0;
+                let lessonsWithResources = 0;
+                let resourceDetails = '';
+                
+                courseData.chapters.forEach((chapter, chapterIndex) => {
+                    resourceDetails += `<h3>Chapter ${chapterIndex + 1}: ${chapter.title}</h3>`;
+                    
+                    chapter.lessons.forEach((lesson, lessonIndex) => {
+                        totalLessons++;
+                        const resources = lesson.resources || {};
+                        const downloadable = resources.downloadable || [];
+                        const internet = resources.internet || [];
+                        
+                        if (downloadable.length > 0 || internet.length > 0) {
+                            lessonsWithResources++;
+                            
+                            resourceDetails += `
+                                <div class="lesson">
+                                    <h4>Lesson ${lessonIndex + 1}: ${lesson.title}</h4>
+                                    <p><strong>Type:</strong> ${lesson.type}</p>
+                                    <p><strong>About Lesson:</strong> ${lesson.aboutLesson ? `${lesson.aboutLesson.length} characters` : 'No content'}</p>
+                                    
+                                    <div>
+                                        <strong>Resources Summary:</strong>
+                                        <ul>
+                                            <li>Downloadable Resources: ${downloadable.length}</li>
+                                            <li>Internet Resources: ${internet.length}</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    ${downloadable.length > 0 ? `
+                                        <div>
+                                            <strong>Downloadable Resources:</strong>
+                                            ${downloadable.map(res => `
+                                                <div class="resource-item">
+                                                    <strong>Name:</strong> ${res.name || 'No name'}<br>
+                                                    <strong>Description:</strong> ${res.description || 'No description'}<br>
+                                                    <strong>Link:</strong> ${res.link || 'No link'}
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${internet.length > 0 ? `
+                                        <div>
+                                            <strong>Internet Resources:</strong>
+                                            ${internet.map(res => `
+                                                <div class="resource-item">
+                                                    <strong>Name:</strong> ${res.name || 'No name'}<br>
+                                                    <strong>Description:</strong> ${res.description || 'No description'}<br>
+                                                    <strong>Link:</strong> ${res.link || 'No link'}
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        } else {
+                            // Show lessons without resources too
+                            resourceDetails += `
+                                <div class="lesson" style="background: #fff3cd;">
+                                    <h4>Lesson ${lessonIndex + 1}: ${lesson.title}</h4>
+                                    <p><strong>Type:</strong> ${lesson.type}</p>
+                                    <p><strong>About Lesson:</strong> ${lesson.aboutLesson ? `${lesson.aboutLesson.length} characters` : 'No content'}</p>
+                                    <div class="warning">No resources available for this lesson</div>
+                                </div>
+                            `;
+                        }
+                    });
+                });
+                
+                output.innerHTML += `
+                        <div class="success">
+                            <strong>Resource Summary:</strong>
+                            <ul>
+                                <li>Total Lessons: ${totalLessons}</li>
+                                <li>Lessons with Resources: ${lessonsWithResources}</li>
+                                <li>Lessons without Resources: ${totalLessons - lessonsWithResources}</li>
+                            </ul>
+                        </div>
+                        
+                        ${resourceDetails}
+                        
+                        <h3>Full Course Data Structure</h3>
+                        <div class="json-output">${JSON.stringify(courseData, null, 2)}</div>
+                    </div>
+                `;
+                
+            } catch (error) {
+                output.innerHTML += `<div class="error">Error: ${error.message}</div>`;
+                console.error('Error:', error);
+            }
+        }
+        
+        function testResourcesPageComponent() {
+            const output = document.getElementById('output');
+            
+            // Simulate ResourcesPage component logic
+            const mockLessonResources = {
+                downloadable: [
+                    {
+                        name: "Test Resource 1",
+                        description: "This is a test downloadable resource",
+                        link: "https://example.com/file.pdf"
+                    },
+                    {
+                        name: "Test Resource 2", 
+                        description: "Another test resource",
+                        link: "https://example.com/document.docx"
+                    }
+                ],
+                internet: [
+                    {
+                        name: "External Link 1",
+                        description: "Test external resource",
+                        link: "https://example.com/page1"
+                    }
+                ]
+            };
+            
+            // Apply ResourcesPage logic
+            const downloadableResources = mockLessonResources?.downloadable?.map((resource, index) => ({
+                id: `download-${index}`,
+                title: resource.name || 'Downloadable Resource',
+                description: resource.description || 'Resource for this lesson',
+                type: resource.link?.includes('.pdf') ? 'pdf' : 
+                      resource.link?.includes('.doc') ? 'doc' : 'file',
+                downloadUrl: resource.link || '#',
+                isDownloadable: true
+            })) || [];
+
+            const internetResources = mockLessonResources?.internet?.map((resource, index) => ({
+                id: `internet-${index}`,
+                title: resource.name || 'Internet Resource',
+                description: resource.description || 'External resource for this lesson',
+                type: 'link',
+                downloadUrl: resource.link || '#',
+                isDownloadable: false
+            })) || [];
+
+            const hasAnyResources = downloadableResources.length > 0 || internetResources.length > 0;
+            
+            output.innerHTML = `
+                <div class="container">
+                    <h2>ResourcesPage Component Test</h2>
+                    
+                    <h3>Input Data:</h3>
+                    <div class="json-output">${JSON.stringify(mockLessonResources, null, 2)}</div>
+                    
+                    <h3>Processed Data:</h3>
+                    <p><strong>Has Any Resources:</strong> ${hasAnyResources}</p>
+                    <p><strong>Downloadable Resources:</strong> ${downloadableResources.length}</p>
+                    <p><strong>Internet Resources:</strong> ${internetResources.length}</p>
+                    
+                    <div class="lesson">
+                        <h4>Downloadable Resources (${downloadableResources.length})</h4>
+                        ${downloadableResources.map(res => `
+                            <div class="resource-item">
+                                <strong>ID:</strong> ${res.id}<br>
+                                <strong>Title:</strong> ${res.title}<br>
+                                <strong>Description:</strong> ${res.description}<br>
+                                <strong>Type:</strong> ${res.type}<br>
+                                <strong>URL:</strong> ${res.downloadUrl}<br>
+                                <strong>Is Downloadable:</strong> ${res.isDownloadable}
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="lesson">
+                        <h4>Internet Resources (${internetResources.length})</h4>
+                        ${internetResources.map(res => `
+                            <div class="resource-item">
+                                <strong>ID:</strong> ${res.id}<br>
+                                <strong>Title:</strong> ${res.title}<br>
+                                <strong>Description:</strong> ${res.description}<br>
+                                <strong>Type:</strong> ${res.type}<br>
+                                <strong>URL:</strong> ${res.downloadUrl}<br>
+                                <strong>Is Downloadable:</strong> ${res.isDownloadable}
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    ${!hasAnyResources ? '<div class="warning">No resources message would be shown</div>' : ''}
+                </div>
+            `;
+        }
+        
+        function checkLearningPageStructure() {
+            const output = document.getElementById('output');
+            
+            output.innerHTML = `
+                <div class="container">
+                    <h2>Learning Page Structure Check</h2>
+                    
+                    <h3>Expected Flow:</h3>
+                    <ol>
+                        <li>User navigates to: <code>http://localhost:5173/courses/12th/state/ap/english/learning</code></li>
+                        <li>CourseLearning.jsx parses the URL:
+                            <ul>
+                                <li>courseId = "12th/state/ap/english"</li>
+                                <li>class = "12th"</li>
+                                <li>board = "state"</li>
+                                <li>state = "ap"</li>
+                                <li>subject = "english"</li>
+                            </ul>
+                        </li>
+                        <li>API call: <code>GET /api/courses/school/?class=12th&board=state&subject=english</code></li>
+                        <li>Get course ID from search results</li>
+                        <li>API call: <code>GET /api/courses/school/{courseId}/</code></li>
+                        <li>Transform course data</li>
+                        <li>Set currentLesson from first lesson</li>
+                        <li>Render tabs: "About This Lesson" and "Resources"</li>
+                        <li>ResourcesPage component receives: <code>lessonResources={currentLesson?.resources}</code></li>
+                    </ol>
+                    
+                    <h3>Potential Issues:</h3>
+                    <ul>
+                        <li><strong>Data Structure Mismatch:</strong> Resources might be stored differently than expected</li>
+                        <li><strong>Empty Resources:</strong> Lessons might have empty resources object</li>
+                        <li><strong>State Synchronization:</strong> activeTab or currentLesson state issues</li>
+                        <li><strong>Component Props:</strong> ResourcesPage not receiving proper data</li>
+                    </ul>
+                    
+                    <h3>Debug Steps:</h3>
+                    <ol>
+                        <li>Check if course exists in database</li>
+                        <li>Verify lessons have resources data</li>
+                        <li>Check currentLesson state in CourseLearning</li>
+                        <li>Verify ResourcesPage receives proper props</li>
+                        <li>Check ResourcesPage component rendering logic</li>
+                    </ol>
+                    
+                    <div class="warning">
+                        <strong>Next Action:</strong> Test the actual API endpoints and check browser console for errors.
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

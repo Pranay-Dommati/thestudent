@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { FaFileAlt, FaExternalLinkAlt, FaDownload, FaFilePdf, FaFileWord, FaFileCode, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { 
+  FaFileAlt, FaExternalLinkAlt, FaDownload, FaFilePdf, FaFileWord, 
+  FaFileCode, FaChevronDown, FaChevronUp, FaFileImage, FaFileVideo, 
+  FaFileAudio, FaFileArchive 
+} from 'react-icons/fa';
 
 const ResourcesPage = ({ lessonResources }) => {
   const [downloadableOpen, setDownloadableOpen] = useState(false);
@@ -8,34 +12,178 @@ const ResourcesPage = ({ lessonResources }) => {
   const toggleDownloadable = () => setDownloadableOpen(!downloadableOpen);
   const toggleInternet = () => setInternetOpen(!internetOpen);
 
+  // Simple debug log to verify resources are received
+  console.log('📋 ResourcesPage - Received resources:', lessonResources);
+
+  // Helper function to detect file type from URL or filename
+  const detectFileType = (url) => {
+    if (!url) return 'file';
+    
+    const urlLower = url.toLowerCase();
+    if (urlLower.includes('.pdf')) return 'pdf';
+    if (urlLower.includes('.doc') || urlLower.includes('.docx')) return 'doc';
+    if (urlLower.includes('.zip') || urlLower.includes('.rar')) return 'zip';
+    if (urlLower.includes('.js') || urlLower.includes('.py') || urlLower.includes('.html') || urlLower.includes('.css')) return 'code';
+    if (urlLower.includes('.jpg') || urlLower.includes('.jpeg') || urlLower.includes('.png') || urlLower.includes('.gif')) return 'image';
+    if (urlLower.includes('.mp4') || urlLower.includes('.avi') || urlLower.includes('.mov')) return 'video';
+    if (urlLower.includes('.mp3') || urlLower.includes('.wav') || urlLower.includes('.flac')) return 'audio';
+    return 'file';
+  };
+
   // Process resources only if they exist, no mock data
   const downloadableResources = lessonResources?.downloadable?.map((resource, index) => ({
-    id: `download-${index}`,
+    id: resource.id || `download-${index}`,
     title: resource.name || 'Downloadable Resource',
     description: resource.description || 'Resource for this lesson',
-    type: resource.link?.includes('.pdf') ? 'pdf' : 
-          resource.link?.includes('.doc') ? 'doc' : 'file',
+    type: detectFileType(resource.link),
     downloadUrl: resource.link || '#',
+    download_url: resource.download_url, // Include the backend download endpoint
     isDownloadable: true
   })) || [];
 
   const internetResources = lessonResources?.internet?.map((resource, index) => ({
-    id: `internet-${index}`,
+    id: resource.id || `internet-${index}`,
     title: resource.name || 'Internet Resource',
     description: resource.description || 'External resource for this lesson',
     type: 'link',
     downloadUrl: resource.link || '#',
+    download_url: resource.download_url,
     isDownloadable: false
   })) || [];
 
   const hasAnyResources = downloadableResources.length > 0 || internetResources.length > 0;
 
+  // Function to handle download with proper file handling
+  const handleDownload = async (resource) => {
+    try {
+      // Use the dedicated download endpoint if available
+      const downloadUrl = resource.download_url || resource.downloadUrl;
+      
+      // For resources with download_url (backend files), use the API endpoint
+      if (resource.download_url && resource.download_url.startsWith('/api/resources/download/')) {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+        const fullDownloadUrl = `${API_BASE_URL}${resource.download_url}`;
+        
+        const response = await fetch(fullDownloadUrl);
+        
+        if (!response.ok) {
+          throw new Error('Failed to download file');
+        }
+        
+        // Get the file content as blob
+        const blob = await response.blob();
+        
+        // Create a temporary URL for the blob
+        const url = window.URL.createObjectURL(blob);
+        
+        // Create a temporary anchor element for download
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        
+        // Extract filename from Content-Disposition header or use resource title
+        let filename = resource.title || 'download';
+        const contentDisposition = response.headers.get('content-disposition');
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+          }
+        } else {
+          // Add appropriate extension based on content type
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('pdf') && !filename.endsWith('.pdf')) {
+            filename += '.pdf';
+          } else if (contentType.includes('image/jpeg') && !filename.endsWith('.jpg')) {
+            filename += '.jpg';
+          } else if (contentType.includes('image/png') && !filename.endsWith('.png')) {
+            filename += '.png';
+          } else if (contentType.includes('word') && !filename.endsWith('.docx')) {
+            filename += '.docx';
+          }
+        }
+        
+        a.download = filename;
+        
+        // Append to body, click, and remove
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        // Clean up the URL
+        window.URL.revokeObjectURL(url);
+        
+      } else {
+        // For direct URLs, try fetch first, then fallback to window.open
+        const response = await fetch(downloadUrl);
+        
+        if (!response.ok) {
+          throw new Error('Failed to download file');
+        }
+        
+        // Get the file content as blob
+        const blob = await response.blob();
+        
+        // Create a temporary URL for the blob
+        const url = window.URL.createObjectURL(blob);
+        
+        // Create a temporary anchor element for download
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        
+        // Extract filename from URL or use resource title
+        let filename = resource.title;
+        const urlPath = downloadUrl.split('/').pop();
+        if (urlPath && urlPath.includes('.')) {
+          filename = urlPath;
+        } else {
+          // Add appropriate extension based on content type
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('pdf')) {
+            filename += '.pdf';
+          } else if (contentType.includes('image/jpeg')) {
+            filename += '.jpg';
+          } else if (contentType.includes('image/png')) {
+            filename += '.png';
+          } else if (contentType.includes('word')) {
+            filename += '.docx';
+          }
+        }
+        
+        a.download = filename;
+        
+        // Append to body, click, and remove
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        // Clean up the URL
+        window.URL.revokeObjectURL(url);
+      }
+      
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback to opening in new tab
+      const fallbackUrl = resource.download_url || resource.downloadUrl;
+      if (fallbackUrl.startsWith('/api/')) {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+        window.open(`${API_BASE_URL}${fallbackUrl}`, '_blank');
+      } else {
+        window.open(fallbackUrl, '_blank');
+      }
+    }
+  };
+
   const getResourceIcon = (type) => {
     switch(type) {
       case 'pdf': return <FaFilePdf className="text-red-500" />;
       case 'doc': return <FaFileWord className="text-blue-500" />;
-      case 'zip': return <FaFileAlt className="text-yellow-500" />;
+      case 'zip': return <FaFileArchive className="text-yellow-500" />;
       case 'code': return <FaFileCode className="text-green-500" />;
+      case 'image': return <FaFileImage className="text-purple-500" />;
+      case 'video': return <FaFileVideo className="text-red-400" />;
+      case 'audio': return <FaFileAudio className="text-green-400" />;
       case 'link': return <FaExternalLinkAlt className="text-indigo-500" />;
       default: return <FaFileAlt className="text-gray-500" />;
     }
@@ -73,13 +221,12 @@ const ResourcesPage = ({ lessonResources }) => {
             <FaExternalLinkAlt className="mr-2" /> Visit Resource
           </a>
         ) : (
-          <a 
-            href={resource.downloadUrl}
-            className="ml-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center whitespace-nowrap"
-            download
+          <button 
+            onClick={() => handleDownload(resource)}
+            className="ml-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center whitespace-nowrap cursor-pointer"
           >
             <FaDownload className="mr-2" /> Download
-          </a>
+          </button>
         )}
       </div>
     </div>

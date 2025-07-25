@@ -426,10 +426,10 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                   // Include quiz questions with both possible field names
                   quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
                   quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
-                  // Include resources
+                  // Include resources - they should now be properly grouped
                   resources: lesson.resources || { downloadable: [], internet: [] }
                 })),
-              })),
+              }))
         };
 
         setCourse(transformedCourse);
@@ -442,7 +442,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         
         // Also fetch AI-generated learning plans to display in sidebar
         fetchAILearningPlans();
-      } catch (error) {        console.error('❌ Error fetching course data:', error);
+      } catch (error) {
+        console.error('❌ Error fetching course data:', error);
         const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
         
         // Special handling for state board course errors
