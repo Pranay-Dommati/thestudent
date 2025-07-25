@@ -12,7 +12,12 @@ import { IoSparkles } from 'react-icons/io5';
  * @param {Function} props.onClose - Function to call when close button is clicked
  */
 const BatchGenerationStatus = ({ isGenerating, progress, status, onClose }) => {
-  if (!isGenerating && progress >= 100) return null;
+  // Don't show the component if:
+  // 1. Generation is not running AND progress is 100% (completed)
+  // 2. Progress is 0 and generation is not running (not started)
+  if ((!isGenerating && progress >= 100) || (!isGenerating && progress === 0)) {
+    return null;
+  }
   
   return (
     <div className="fixed bottom-4 left-4 right-4 md:left-auto md:w-96 bg-white border border-blue-200 rounded-lg shadow-lg z-50 p-4 animate-slide-up">

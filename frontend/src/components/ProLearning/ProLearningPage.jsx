@@ -311,8 +311,16 @@ const ProLearningPage = () => {
       // Check if we need to start batch generation using new storage system
       const progress = getGenerationProgress(currentCourseId);
       
+      // If all topics already have content, set completion state
+      if (progress.generated >= progress.total && progress.total > 0) {
+        console.log('🎉 Course already complete, setting completion state');
+        setAllTopicsGenerated(true);
+        setBatchGenerationProgress(100);
+        setBatchGenerationStatus('Course generation completed!');
+        setIsBatchGenerating(false);
+      }
       // If not all topics have content, start batch generation
-      if (progress.generated < progress.total) {
+      else if (progress.generated < progress.total) {
         setIsBatchGenerating(true);
         setBatchGenerationStatus('Starting content generation for all topics...');
         
@@ -677,6 +685,16 @@ const ProLearningPage = () => {
         
         // Get current generation progress using the storage service
         const progress = getGenerationProgress(courseTitle);
+        
+        // If all topics already have content, set completion state
+        if (progress.generated >= progress.total && progress.total > 0) {
+          console.log('🎉 Direct URL course already complete, setting completion state');
+          setAllTopicsGenerated(true);
+          setBatchGenerationProgress(100);
+          setBatchGenerationStatus('Course generation completed!');
+          setIsBatchGenerating(false);
+          return;
+        }
         
         // If not all topics have content, start batch generation
         if (progress.generated < progress.total) {
