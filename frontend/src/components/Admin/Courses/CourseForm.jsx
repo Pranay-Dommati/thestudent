@@ -140,6 +140,10 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
     switch(selectedLevel?.id) {
       case 'engineering':
         return <EngineeringCourseForm onCancel={onCancel} />;
+      case '6th':
+      case '7th':
+      case '8th':
+      case '9th':
       case '10th':
       case '11th':
       case '12th':
