@@ -268,10 +268,10 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         let apiUrl;
         let isSchoolCourse = false;
         
-        // Check if it's a school course (e.g., /courses/10th/cbse/math/learning)
-        if (pathParts.includes('10th') || pathParts.includes('11th') || pathParts.includes('12th')) {
+        // Check if it's a school course (e.g., /courses/6th/cbse/math/learning)
+        if (pathParts.includes('6th') || pathParts.includes('7th') || pathParts.includes('8th') || pathParts.includes('9th') || pathParts.includes('10th') || pathParts.includes('11th') || pathParts.includes('12th')) {
           isSchoolCourse = true;
-          const classLevel = pathParts.find(part => ['10th', '11th', '12th'].includes(part));          const board = pathParts.find(part => ['cbse', 'state'].includes(part));
+          const classLevel = pathParts.find(part => ['6th', '7th', '8th', '9th', '10th', '11th', '12th'].includes(part));          const board = pathParts.find(part => ['cbse', 'state'].includes(part));
           
           // Handle state board case which has an additional parameter
           if (board === 'state') {

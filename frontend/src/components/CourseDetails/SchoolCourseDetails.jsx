@@ -37,7 +37,11 @@ const SchoolCourseDetails = () => {
       setLoading(true);
       try {
         // Extract parameters from the URL
-        const classLevel = location.pathname.includes('/10th/') ? '10th' : 
+        const classLevel = location.pathname.includes('/6th/') ? '6th' :
+                          location.pathname.includes('/7th/') ? '7th' :
+                          location.pathname.includes('/8th/') ? '8th' :
+                          location.pathname.includes('/9th/') ? '9th' :
+                          location.pathname.includes('/10th/') ? '10th' : 
                           location.pathname.includes('/11th/') ? '11th' : '12th';
         const board = boardId || '';
         const subject = subjectId || '';
@@ -164,7 +168,11 @@ const SchoolCourseDetails = () => {
         toast.error('Failed to load course details');
         
         // Fallback to dummy data in case of error
-        const classLevel = location.pathname.includes('/10th/') ? '10th' : 
+        const classLevel = location.pathname.includes('/6th/') ? '6th' :
+                         location.pathname.includes('/7th/') ? '7th' :
+                         location.pathname.includes('/8th/') ? '8th' :
+                         location.pathname.includes('/9th/') ? '9th' :
+                         location.pathname.includes('/10th/') ? '10th' : 
                          location.pathname.includes('/11th/') ? '11th' : '12th';
         const board = boardId || '';
         const subject = subjectId || '';
