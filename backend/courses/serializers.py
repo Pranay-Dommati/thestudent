@@ -33,7 +33,7 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
         return data
 
 class LessonSerializer(serializers.ModelSerializer):
-    resources = LessonResourceSerializer(many=True, required=False)
+    resources = serializers.SerializerMethodField()
     quiz_questions = QuizQuestionSerializer(many=True, required=False)
     completed = serializers.SerializerMethodField()
     
@@ -43,6 +43,29 @@ class LessonSerializer(serializers.ModelSerializer):
             'id', 'title', 'type', 'video_url', 'description', 
             'about_lesson', 'order', 'resources', 'quiz_questions', 'completed'
         ]
+    
+    def get_resources(self, obj):
+        """Group resources by type for frontend compatibility"""
+        lesson_resources = obj.resources.all()
+        
+        resources_data = {
+            'downloadable': [],
+            'internet': []
+        }
+        
+        for resource in lesson_resources:
+            resource_data = {
+                'name': resource.title,
+                'description': resource.description,
+                'link': resource.url if resource.url else (resource.file.url if resource.file else '')
+            }
+            
+            if resource.type == 'downloadable':
+                resources_data['downloadable'].append(resource_data)
+            elif resource.type == 'internet':
+                resources_data['internet'].append(resource_data)
+        
+        return resources_data
     
     def get_completed(self, obj):
         request = self.context.get('request')
