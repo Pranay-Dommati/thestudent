@@ -632,101 +632,103 @@ const ChatbotPage = () => {
     const isProCard = message.isProCard || false;
 
     return (
-      <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"} mb-4 lg:mb-6`}>
-        <div className={`max-w-[75%] lg:max-w-[65%] ${message.type === "user" ? "ml-auto mr-4 lg:mr-8" : "mr-auto ml-4 lg:ml-8"}`}>
-          <div
-            className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 ${
-              message.type === "user"
-                ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg backdrop-blur-sm rounded-br-md"
-                : isLearningPlan || isProCard
-                  ? "bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl w-full max-w-none" 
-                  : "bg-white/90 backdrop-blur-sm text-gray-800 border border-white/30 shadow-lg rounded-bl-md"
-            }`}
-          >
-            {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
-              <div className="prose prose-sm lg:prose max-w-none dark:prose-invert">
-                <ReactMarkdown>
-                  {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
-                </ReactMarkdown>
-              </div>
-            )}
+      <div className="w-full max-w-5xl mx-auto px-6 lg:px-8 mb-4 lg:mb-6">
+        <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
+          <div className={`${message.type === "user" ? "max-w-[85%] lg:max-w-[75%]" : isLearningPlan || isProCard ? "w-full" : "max-w-[85%] lg:max-w-[75%]"}`}>
+            <div
+              className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 ${
+                message.type === "user"
+                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg backdrop-blur-sm rounded-br-md"
+                  : isLearningPlan || isProCard
+                    ? "bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl" 
+                    : "bg-white/90 backdrop-blur-sm text-gray-800 border border-white/30 shadow-lg rounded-bl-md"
+              }`}
+            >
+              {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
+                <div className="prose prose-sm lg:prose max-w-none dark:prose-invert">
+                  <ReactMarkdown>
+                    {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
+                  </ReactMarkdown>
+                </div>
+              )}
 
-            {message.type === "bot" && isCourseContent && !isLearningPlan && !isProCard && (
-              <div className="mt-2">
-                {sections.map((section, index) => (
-                  <CourseSection
-                    key={index}
-                    section={section.title}
-                    subsections={section.subsections}
-                  />
-                ))}
-              </div>
-            )}
+              {message.type === "bot" && isCourseContent && !isLearningPlan && !isProCard && (
+                <div className="mt-2">
+                  {sections.map((section, index) => (
+                    <CourseSection
+                      key={index}
+                      section={section.title}
+                      subsections={section.subsections}
+                    />
+                  ))}
+                </div>
+              )}
 
-            {message.type === "bot" && isLearningPlan && (
-              <div className="w-full">
-                <LearningPlanDisplay content={message.content} learningPlanId={message.learningPlanId} />
-              </div>
-            )}
+              {message.type === "bot" && isLearningPlan && (
+                <div className="w-full">
+                  <LearningPlanDisplay content={message.content} learningPlanId={message.learningPlanId} />
+                </div>
+              )}
 
-            {message.type === "bot" && isProCard && (
-              <div className="w-full">
-                <div className="bg-gradient-to-br from-purple-50/80 to-blue-50/80 backdrop-blur-sm border border-purple-200/50 rounded-xl p-4 mb-2">
-                  <div className="text-sm text-gray-700 mb-4">{message.content}</div>
-                  <Link 
-                    to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
-                    className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1 backdrop-blur-sm"
-                    onClick={() => {
-                      // Store the topics and course data for batch generation
-                      try {
-                        const batchGenerationData = {
-                          courseId: message.courseId,
-                          topics: message.extractedTopics || [],
-                          topicString: message.topic,
-                          triggerBatchGeneration: true,
-                          timestamp: Date.now()
-                        };
-                        
-                        localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
-                        console.log('🚀 Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
-                      } catch (error) {
-                        console.error('Failed to store batch generation data:', error);
-                      }
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-bold mb-1">🚀 Pro Learning Experience</h3>
-                        <p className="text-purple-100 text-sm">Complete study materials for: {message.topic}</p>
-                        <div className="flex items-center mt-2 text-xs text-purple-200">
-                          <span className="mr-4">📘 Reading</span>
-                          <span className="mr-4">🧠 Summary</span>
-                          <span className="mr-4">🎥 Videos</span>
-                          <span className="mr-4">✅ Quiz</span>
-                          <span>📚 Resources</span>
+              {message.type === "bot" && isProCard && (
+                <div className="w-full">
+                  <div className="bg-gradient-to-br from-purple-50/80 to-blue-50/80 backdrop-blur-sm border border-purple-200/50 rounded-xl p-4 mb-2">
+                    <div className="text-sm text-gray-700 mb-4">{message.content}</div>
+                    <Link 
+                      to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
+                      className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1 backdrop-blur-sm"
+                      onClick={() => {
+                        // Store the topics and course data for batch generation
+                        try {
+                          const batchGenerationData = {
+                            courseId: message.courseId,
+                            topics: message.extractedTopics || [],
+                            topicString: message.topic,
+                            triggerBatchGeneration: true,
+                            timestamp: Date.now()
+                          };
+                          
+                          localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
+                          console.log('🚀 Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
+                        } catch (error) {
+                          console.error('Failed to store batch generation data:', error);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold mb-1">🚀 Pro Learning Experience</h3>
+                          <p className="text-purple-100 text-sm">Complete study materials for: {message.topic}</p>
+                          <div className="flex items-center mt-2 text-xs text-purple-200">
+                            <span className="mr-4">📘 Reading</span>
+                            <span className="mr-4">🧠 Summary</span>
+                            <span className="mr-4">🎥 Videos</span>
+                            <span className="mr-4">✅ Quiz</span>
+                            <span>📚 Resources</span>
+                          </div>
+                        </div>
+                        <div className="bg-white/20 p-3 rounded-full">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                          </svg>
                         </div>
                       </div>
-                      <div className="bg-white/20 p-3 rounded-full">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                        </svg>
-                      </div>
-                    </div>
-                  </Link>
+                    </Link>
+                  </div>
                 </div>
+              )}
+
+              {message.type === "user" && <div className="text-sm lg:text-base">{message.content}</div>}
+
+              <div className={`text-[10px] lg:text-xs mt-2 ${
+                message.type === "user" 
+                  ? "text-blue-100/80" 
+                  : isLearningPlan || isProCard
+                    ? "text-gray-400 pl-2" 
+                    : "text-gray-500"
+              }`}>
+                {message.timestamp}
               </div>
-            )}
-
-            {message.type === "user" && <div className="text-sm lg:text-base">{message.content}</div>}
-
-            <div className={`text-[10px] lg:text-xs mt-2 ${
-              message.type === "user" 
-                ? "text-blue-100/80" 
-                : isLearningPlan || isProCard
-                  ? "text-gray-400 pl-2" 
-                  : "text-gray-500"
-            }`}>
-              {message.timestamp}
             </div>
           </div>
         </div>
@@ -859,107 +861,113 @@ const ChatbotPage = () => {
 
         {/* Chat messages */}
         <div className="flex-1 flex flex-col overflow-hidden relative">
-          <div className={`flex-1 p-3 lg:p-6 overflow-y-auto space-y-3 lg:space-y-4 scrollbar-glass ${
-            isMobile && isInputFocused ? 'pb-32' : ''
+          <div className={`flex-1 overflow-y-auto scrollbar-glass ${
+            isMobile && isInputFocused ? 'pb-32' : 'pb-4'
           }`}>
-            {chatHistory.map((chat) => (
-              <MessageBubble key={chat.id} message={chat} />
-            ))}
+            <div className="min-h-full py-4">
+              {chatHistory.map((chat) => (
+                <MessageBubble key={chat.id} message={chat} />
+              ))}
 
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="ml-4 lg:ml-8 mr-auto max-w-[75%] lg:max-w-[65%]">
-                  <div className="bg-white/90 backdrop-blur-sm text-gray-800 border border-white/30 shadow-lg rounded-2xl rounded-bl-md px-4 py-3 lg:px-5 lg:py-4">
-                    <div className="flex items-center">
-                      <div className="relative mr-3">
-                        <BiLoaderAlt className="animate-spin text-indigo-500 w-5 h-5" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full blur-sm opacity-30 animate-pulse"></div>
-                      </div>
-                      <span className="text-gray-700">Thinking...</span>
-                      <div className="ml-2 flex space-x-1">
-                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
-                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+              {isLoading && (
+                <div className="w-full max-w-5xl mx-auto px-6 lg:px-8 mb-4 lg:mb-6">
+                  <div className="flex justify-start">
+                    <div className="max-w-[85%] lg:max-w-[75%]">
+                      <div className="bg-white/90 backdrop-blur-sm text-gray-800 border border-white/30 shadow-lg rounded-2xl rounded-bl-md px-4 py-3 lg:px-5 lg:py-4">
+                        <div className="flex items-center">
+                          <div className="relative mr-3">
+                            <BiLoaderAlt className="animate-spin text-indigo-500 w-5 h-5" />
+                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full blur-sm opacity-30 animate-pulse"></div>
+                          </div>
+                          <span className="text-gray-700">Thinking...</span>
+                          <div className="ml-2 flex space-x-1">
+                            <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
+                            <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                            <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Topic Confirmation Dialog */}
-            {showTopicConfirmation && (
-              <div className="flex justify-start mb-4">
-                <div className="ml-4 lg:ml-8 mr-auto max-w-[85%] lg:max-w-[75%]">
-                  <div className="bg-gradient-to-br from-blue-50/90 to-purple-50/90 backdrop-blur-md border-2 border-blue-200/50 rounded-2xl rounded-bl-md p-4 shadow-xl">
-                    <div className="flex items-center mb-3">
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mr-3">
-                        <span className="text-white text-sm font-bold">✓</span>
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-800">Confirm Course Topics</h3>
-                    </div>
-                    
-                    <p className="text-sm text-gray-600 mb-4">
-                      I found <strong>{pendingTopics.length}</strong> topic(s) from your query: "<em>{originalPrompt}</em>". 
-                      You can edit, delete, or add topics before creating your course.
-                    </p>
-                    
-                    <div className="space-y-2 mb-4">
-                      {pendingTopics.map((topic, index) => (
-                        <div key={topic.id || index} className="flex items-center bg-white/80 backdrop-blur-sm rounded-lg p-2 border border-white/30">
-                          <span className="text-indigo-500 mr-2 font-bold">{index + 1}.</span>
-                          <input
-                            type="text"
-                            value={topic.name}
-                            onChange={(e) => handleTopicEdit(index, e.target.value)}
-                            className="flex-1 px-2 py-1 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                          />
+              {/* Topic Confirmation Dialog */}
+              {showTopicConfirmation && (
+                <div className="w-full max-w-5xl mx-auto px-6 lg:px-8 mb-4 lg:mb-6">
+                  <div className="flex justify-start">
+                    <div className="max-w-[90%] lg:max-w-[80%]">
+                      <div className="bg-gradient-to-br from-blue-50/90 to-purple-50/90 backdrop-blur-md border-2 border-blue-200/50 rounded-2xl rounded-bl-md p-4 shadow-xl">
+                        <div className="flex items-center mb-3">
+                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mr-3">
+                            <span className="text-white text-sm font-bold">✓</span>
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-800">Confirm Course Topics</h3>
+                        </div>
+                        
+                        <p className="text-sm text-gray-600 mb-4">
+                          I found <strong>{pendingTopics.length}</strong> topic(s) from your query: "<em>{originalPrompt}</em>". 
+                          You can edit, delete, or add topics before creating your course.
+                        </p>
+                        
+                        <div className="space-y-2 mb-4">
+                          {pendingTopics.map((topic, index) => (
+                            <div key={topic.id || index} className="flex items-center bg-white/80 backdrop-blur-sm rounded-lg p-2 border border-white/30">
+                              <span className="text-indigo-500 mr-2 font-bold">{index + 1}.</span>
+                              <input
+                                type="text"
+                                value={topic.name}
+                                onChange={(e) => handleTopicEdit(index, e.target.value)}
+                                className="flex-1 px-2 py-1 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                              />
+                              <button
+                                onClick={() => handleTopicDelete(index)}
+                                className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded transition-colors backdrop-blur-sm"
+                                title="Delete topic"
+                              >
+                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <button
+                          onClick={handleTopicAdd}
+                          className="w-full mb-4 p-2 border-2 border-dashed border-indigo-300/50 rounded-lg text-indigo-600 hover:bg-indigo-50/50 backdrop-blur-sm transition-colors text-sm"
+                        >
+                          + Add New Topic
+                        </button>
+                        
+                        <div className="flex gap-2">
                           <button
-                            onClick={() => handleTopicDelete(index)}
-                            className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded transition-colors backdrop-blur-sm"
-                            title="Delete topic"
+                            onClick={handleTopicConfirm}
+                            disabled={pendingTopics.length === 0}
+                            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 text-sm font-medium backdrop-blur-sm"
                           >
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                            </svg>
+                            ✓ Create Course ({pendingTopics.length} topic{pendingTopics.length !== 1 ? 's' : ''})
+                          </button>
+                          <button
+                            onClick={handleTopicCancel}
+                            className="flex-1 bg-gray-500/80 backdrop-blur-sm text-white py-2 px-4 rounded-lg hover:bg-gray-600/80 transition-colors text-sm font-medium"
+                          >
+                            ✗ Cancel
                           </button>
                         </div>
-                      ))}
-                    </div>
-                    
-                    <button
-                      onClick={handleTopicAdd}
-                      className="w-full mb-4 p-2 border-2 border-dashed border-indigo-300/50 rounded-lg text-indigo-600 hover:bg-indigo-50/50 backdrop-blur-sm transition-colors text-sm"
-                    >
-                      + Add New Topic
-                    </button>
-                    
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleTopicConfirm}
-                        disabled={pendingTopics.length === 0}
-                        className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 text-sm font-medium backdrop-blur-sm"
-                      >
-                        ✓ Create Course ({pendingTopics.length} topic{pendingTopics.length !== 1 ? 's' : ''})
-                      </button>
-                      <button
-                        onClick={handleTopicCancel}
-                        className="flex-1 bg-gray-500/80 backdrop-blur-sm text-white py-2 px-4 rounded-lg hover:bg-gray-600/80 transition-colors text-sm font-medium"
-                      >
-                        ✗ Cancel
-                      </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} />
+            </div>
           </div>
 
           {/* Input Section */}
           <div className="p-3 lg:p-6 bg-white/80 backdrop-blur-md border-t border-white/20 shadow-lg">
-            <div className="max-w-4xl mx-auto">
+            <div className="w-full max-w-5xl mx-auto px-6 lg:px-8">
               {/* Mode Toggle */}
               <div className="mb-4">
                 <div className="flex items-center justify-between bg-white/50 backdrop-blur-sm rounded-xl p-4 border border-white/30 shadow-sm">
