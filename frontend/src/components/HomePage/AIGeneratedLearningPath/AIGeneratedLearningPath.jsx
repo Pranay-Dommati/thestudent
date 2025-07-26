@@ -13,10 +13,12 @@ const AIGeneratedLearningPath = () => {
   const optionRefs = useRef([]);
   
   const examples = [
-    "Full Stack Web Development with React and Node.js",
-    "Machine Learning for Beginners",
-    "Data Structures and Algorithms Masterclass",
-    "UI/UX Design Fundamentals"
+    "Arrays and Strings in Data Structures",
+    "Different types of FETs - JFET and MOSFET",
+    "Photosynthesis and Plant Biology",
+    "Quadratic Equations and Polynomials",
+    "Chemical Bonding and Molecular Structure",
+    "World War II History and Timeline"
   ];
   
   // Handle click outside to close dropdown
@@ -169,7 +171,7 @@ const AIGeneratedLearningPath = () => {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onFocus={() => setShowExamples(true)}
-                placeholder="e.g., Full Stack Web Development, Machine Learning, Data Science..."
+                placeholder="e.g., Arrays and Strings, Types of FETs, Photosynthesis, Quadratic Equations..."
                 className="w-full px-6 sm:px-8 py-4 sm:py-5 pr-16 sm:pr-20 bg-transparent border-0 rounded-xl
                          text-base sm:text-lg placeholder-gray-500 focus:outline-none focus:ring-0
                          disabled:cursor-not-allowed font-medium"
