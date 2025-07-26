@@ -32,6 +32,32 @@ const callGeminiAPI = async (message) => {
   return data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
 };
 
+// Vector bot API call for general educational responses
+const callVectorBotAPI = async (message) => {
+  try {
+    const response = await fetch('http://localhost:8000/api/chatbot/chat/general/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: message
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Vector bot API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.response || 'Sorry, I could not generate a response.';
+  } catch (error) {
+    console.error('Vector bot API error:', error);
+    // Fallback to basic educational response
+    return "I'm here to help with your studies! I can assist with math, science, history, English, computer science, and study techniques. What would you like to learn about?";
+  }
+};
+
 // Add slide-up animation
 const style = document.createElement('style');
 style.textContent = `
@@ -469,10 +495,10 @@ const ChatbotPage = () => {
           setChatHistory((prev) => [...prev, errorResponse]);
         }
       } else {
-        // Regular chatbot response - just AI text
-        const response = await callGeminiAPI(messageToSend);
+        // Regular chatbot response using vector bot for educational topics
+        const response = await callVectorBotAPI(messageToSend);
         
-        console.log("Chat response received:");
+        console.log("Vector bot response received:");
         console.log("Response type:", typeof response);
         console.log("Response value:", response);
 
@@ -878,17 +904,35 @@ const ChatbotPage = () => {
           {/* Input Section */}
           <div className="p-3 lg:p-4 bg-white border-t border-gray-200">
             <div className="max-w-4xl mx-auto">
-              {/* Enable Pro Toggle */}
+              {/* Mode Toggle */}
               <div className="mb-3">
-                <div 
-                  onClick={() => setProMode(!proMode)}
-                  className={`inline-block cursor-pointer px-4 py-2 rounded-full text-sm lg:text-base text-center transition-colors ${
-                    proMode 
-                      ? 'bg-purple-100 text-purple-700 font-medium' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Enable Pro
+                <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                  <div className="flex items-center space-x-3">
+                    <div 
+                      onClick={() => setProMode(!proMode)}
+                      className={`inline-block cursor-pointer px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                        proMode 
+                          ? 'bg-purple-600 text-white shadow-lg' 
+                          : 'bg-blue-600 text-white shadow-lg'
+                      }`}
+                    >
+                      {proMode ? '🚀 Pro Mode: Course Creation' : '📚 Study Mode: Free Learning'}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {proMode 
+                        ? 'AI-powered course generation with Gemini' 
+                        : 'Educational assistance with vector bot'
+                      }
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setProMode(!proMode)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                  </button>
                 </div>
               </div>
               

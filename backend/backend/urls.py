@@ -8,6 +8,7 @@ urlpatterns = [
     # ... other URL patterns
     path('', include('courses.urls')),
     path('api/auth/', include('authentication.urls')),
+    path('api/chatbot/', include('chatbotcourse.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 urlpatterns += [
