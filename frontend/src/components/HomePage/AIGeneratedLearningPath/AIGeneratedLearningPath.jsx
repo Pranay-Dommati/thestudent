@@ -163,7 +163,7 @@ const AIGeneratedLearningPath = () => {
         <div className="relative max-w-4xl mx-auto mb-16 animate-fade-in-up delay-200 z-50">
           <div className="relative group">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
-            <div className="relative bg-white/80 backdrop-blur-sm border border-white/50 rounded-2xl p-2 shadow-2xl">
+            <div className="relative bg-white/80 backdrop-blur-sm border border-white/50 rounded-2xl p-2 shadow-lg">
               <input
                 ref={inputRef}
                 type="text"
