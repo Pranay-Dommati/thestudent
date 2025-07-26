@@ -58,7 +58,7 @@ const callVectorBotAPI = async (message) => {
   }
 };
 
-// Add slide-up animation
+// Add slide-up animation and glassmorphism styles
 const style = document.createElement('style');
 style.textContent = `
   @keyframes slide-up {
@@ -73,6 +73,37 @@ style.textContent = `
   }
   .animate-slide-up {
     animation: slide-up 0.3s ease-out forwards;
+  }
+  
+  /* Custom scrollbar styling */
+  .scrollbar-glass::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollbar-glass::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+  .scrollbar-glass::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.3);
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+  }
+  .scrollbar-glass::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.5);
+  }
+  
+  /* Background animation */
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    33% { transform: translateY(-10px) rotate(1deg); }
+    66% { transform: translateY(-5px) rotate(-1deg); }
+  }
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  .animate-float-delayed {
+    animation: float 6s ease-in-out infinite;
+    animation-delay: -2s;
   }
 `;
 document.head.appendChild(style);
@@ -601,100 +632,102 @@ const ChatbotPage = () => {
     const isProCard = message.isProCard || false;
 
     return (
-      <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"} mb-3 lg:mb-4 px-1`}>
-        <div
-          className={`rounded-lg py-2 px-3 lg:px-4 ${
-            message.type === "user"
-              ? "bg-blue-600 text-white rounded-br-none max-w-[85%] lg:max-w-[80%] ml-8 lg:ml-12"
-              : isLearningPlan || isProCard
-                ? "bg-white w-full lg:w-5/6" 
-                : "bg-gray-100 text-gray-800 rounded-bl-none max-w-[85%] lg:max-w-[80%] mr-8 lg:mr-12"
-          } shadow-sm`}
-        >
-          {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
-            <div className="prose prose-sm lg:prose max-w-none dark:prose-invert">
-              <ReactMarkdown>
-                {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
-              </ReactMarkdown>
-            </div>
-          )}
+      <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"} mb-4 lg:mb-6`}>
+        <div className={`max-w-[75%] lg:max-w-[65%] ${message.type === "user" ? "ml-auto mr-4 lg:mr-8" : "mr-auto ml-4 lg:ml-8"}`}>
+          <div
+            className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 ${
+              message.type === "user"
+                ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg backdrop-blur-sm rounded-br-md"
+                : isLearningPlan || isProCard
+                  ? "bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl w-full max-w-none" 
+                  : "bg-white/90 backdrop-blur-sm text-gray-800 border border-white/30 shadow-lg rounded-bl-md"
+            }`}
+          >
+            {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
+              <div className="prose prose-sm lg:prose max-w-none dark:prose-invert">
+                <ReactMarkdown>
+                  {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
+                </ReactMarkdown>
+              </div>
+            )}
 
-          {message.type === "bot" && isCourseContent && !isLearningPlan && !isProCard && (
-            <div className="mt-2">
-              {sections.map((section, index) => (
-                <CourseSection
-                  key={index}
-                  section={section.title}
-                  subsections={section.subsections}
-                />
-              ))}
-            </div>
-          )}
+            {message.type === "bot" && isCourseContent && !isLearningPlan && !isProCard && (
+              <div className="mt-2">
+                {sections.map((section, index) => (
+                  <CourseSection
+                    key={index}
+                    section={section.title}
+                    subsections={section.subsections}
+                  />
+                ))}
+              </div>
+            )}
 
-          {message.type === "bot" && isLearningPlan && (
-            <div className="w-full">
-              <LearningPlanDisplay content={message.content} learningPlanId={message.learningPlanId} />
-            </div>
-          )}
+            {message.type === "bot" && isLearningPlan && (
+              <div className="w-full">
+                <LearningPlanDisplay content={message.content} learningPlanId={message.learningPlanId} />
+              </div>
+            )}
 
-          {message.type === "bot" && isProCard && (
-            <div className="w-full">
-              <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 mb-2">
-                <div className="text-sm text-gray-700 mb-4">{message.content}</div>
-                <Link 
-                  to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
-                  className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
-                  onClick={() => {
-                    // Store the topics and course data for batch generation
-                    try {
-                      const batchGenerationData = {
-                        courseId: message.courseId,
-                        topics: message.extractedTopics || [],
-                        topicString: message.topic,
-                        triggerBatchGeneration: true,
-                        timestamp: Date.now()
-                      };
-                      
-                      localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
-                      console.log('🚀 Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
-                    } catch (error) {
-                      console.error('Failed to store batch generation data:', error);
-                    }
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-bold mb-1">🚀 Pro Learning Experience</h3>
-                      <p className="text-purple-100 text-sm">Complete study materials for: {message.topic}</p>
-                      <div className="flex items-center mt-2 text-xs text-purple-200">
-                        <span className="mr-4">📘 Reading</span>
-                        <span className="mr-4">🧠 Summary</span>
-                        <span className="mr-4">🎥 Videos</span>
-                        <span className="mr-4">✅ Quiz</span>
-                        <span>📚 Resources</span>
+            {message.type === "bot" && isProCard && (
+              <div className="w-full">
+                <div className="bg-gradient-to-br from-purple-50/80 to-blue-50/80 backdrop-blur-sm border border-purple-200/50 rounded-xl p-4 mb-2">
+                  <div className="text-sm text-gray-700 mb-4">{message.content}</div>
+                  <Link 
+                    to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
+                    className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1 backdrop-blur-sm"
+                    onClick={() => {
+                      // Store the topics and course data for batch generation
+                      try {
+                        const batchGenerationData = {
+                          courseId: message.courseId,
+                          topics: message.extractedTopics || [],
+                          topicString: message.topic,
+                          triggerBatchGeneration: true,
+                          timestamp: Date.now()
+                        };
+                        
+                        localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
+                        console.log('🚀 Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
+                      } catch (error) {
+                        console.error('Failed to store batch generation data:', error);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold mb-1">🚀 Pro Learning Experience</h3>
+                        <p className="text-purple-100 text-sm">Complete study materials for: {message.topic}</p>
+                        <div className="flex items-center mt-2 text-xs text-purple-200">
+                          <span className="mr-4">📘 Reading</span>
+                          <span className="mr-4">🧠 Summary</span>
+                          <span className="mr-4">🎥 Videos</span>
+                          <span className="mr-4">✅ Quiz</span>
+                          <span>📚 Resources</span>
+                        </div>
+                      </div>
+                      <div className="bg-white/20 p-3 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
                       </div>
                     </div>
-                    <div className="bg-white/20 p-3 rounded-full">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                      </svg>
-                    </div>
-                  </div>
-                </Link>
+                  </Link>
+                </div>
               </div>
+            )}
+
+            {message.type === "user" && <div className="text-sm lg:text-base">{message.content}</div>}
+
+            <div className={`text-[10px] lg:text-xs mt-2 ${
+              message.type === "user" 
+                ? "text-blue-100/80" 
+                : isLearningPlan || isProCard
+                  ? "text-gray-400 pl-2" 
+                  : "text-gray-500"
+            }`}>
+              {message.timestamp}
             </div>
-          )}
-
-          {message.type === "user" && <div className="text-sm lg:text-base">{message.content}</div>}
-
-          <div className={`text-[10px] lg:text-xs mt-1 ${
-            message.type === "user" 
-              ? "text-blue-200" 
-              : isLearningPlan || isProCard
-                ? "text-gray-400 pl-2" 
-                : "text-gray-500"
-          }`}>
-            {message.timestamp}
           </div>
         </div>
       </div>
@@ -705,7 +738,9 @@ const ChatbotPage = () => {
     "Learn Web Development in 30 days",
     "Create a Data Science learning plan",
     "Master Digital Marketing in 21 days",
-  ];  const handleSuggestion = async (topic) => {
+  ];
+  
+  const handleSuggestion = async (topic) => {
     // First set the message
     setMessage(topic);
 
@@ -724,29 +759,36 @@ const ChatbotPage = () => {
   };
 
   return (
-    <div className="h-screen flex overflow-hidden w-full">
+    <div className="h-screen flex overflow-hidden w-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative">
+      {/* Floating background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-gradient-to-br from-blue-300/20 to-indigo-400/20 rounded-full blur-xl animate-float"></div>
+        <div className="absolute top-1/2 right-1/4 w-48 h-48 bg-gradient-to-br from-purple-300/20 to-pink-400/20 rounded-full blur-xl animate-float-delayed"></div>
+        <div className="absolute bottom-1/4 left-1/3 w-40 h-40 bg-gradient-to-br from-indigo-300/20 to-purple-400/20 rounded-full blur-xl animate-float"></div>
+      </div>
+      
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 z-30 lg:relative lg:flex-shrink-0 ${
         isSidebarOpen ? "w-full lg:w-80" : "w-0"
-      } transition-all duration-300 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}>
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+      } transition-all duration-300 bg-white/90 backdrop-blur-md border-r border-white/20 shadow-lg flex flex-col overflow-hidden`}>
+        <div className="p-4 border-b border-white/20 bg-white/50 backdrop-blur-sm flex items-center justify-between">
           <h2 className="font-semibold text-gray-800 flex items-center">
-            <FaHistory className="mr-2" />
+            <FaHistory className="mr-2 text-indigo-600" />
             Chat History
           </h2>
           <button
             onClick={() => setIsSidebarOpen(false)}
-            className="p-2 hover:bg-blue-50 rounded-full text-gray-500 hover:text-blue-600 transition-all duration-200"
+            className="p-2 hover:bg-white/50 rounded-full text-gray-500 hover:text-indigo-600 transition-all duration-200"
             aria-label="Close sidebar"
           >
             <IoChevronBack size={20} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scrollbar-glass">
           {chatSessions.map((session) => (
             <button
               key={session.id}
-              className="w-full text-left p-4 hover:bg-gray-50 border-b border-gray-100 transition-colors"
+              className="w-full text-left p-4 hover:bg-white/30 backdrop-blur-sm border-b border-white/10 transition-all duration-200 hover:shadow-sm"
             >
               <div className="text-sm font-medium text-gray-800">{session.title}</div>
               <div className="text-xs text-gray-500 mt-1">{session.timestamp}</div>
@@ -755,24 +797,24 @@ const ChatbotPage = () => {
           ))}
         </div>
         {/* Back to Home Button */}
-        <div className="p-4 border-t border-gray-200 bg-gray-50">
+        <div className="p-4 border-t border-white/20 bg-white/30 backdrop-blur-sm">
           <Link
             to="/"
-            className="flex items-center justify-between p-3 rounded-lg hover:bg-white 
+            className="flex items-center justify-between p-3 rounded-xl hover:bg-white/50 
                       group transition-all duration-200 border border-transparent 
-                      hover:border-gray-200 hover:shadow-sm"
+                      hover:border-white/30 hover:shadow-md backdrop-blur-sm"
           >
             <div className="flex items-center">
-              <div className="p-2 rounded-full bg-blue-100 text-blue-600 group-hover:bg-blue-600 
+              <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 
                             group-hover:text-white transition-colors">
                 <IoHome size={18} />
               </div>
-              <span className="ml-3 font-medium text-gray-700 group-hover:text-blue-600">
+              <span className="ml-3 font-medium text-gray-700 group-hover:text-indigo-600">
                 Back to Home
               </span>
             </div>
             <svg
-              className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all"
+              className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transform group-hover:translate-x-1 transition-all"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -786,26 +828,28 @@ const ChatbotPage = () => {
       {/* Main chat container */}
       <div className="flex-1 flex flex-col h-screen w-full relative">
         {/* Custom Chat Navbar */}
-        <nav className="sticky top-0 z-20 bg-white shadow-sm px-4 py-3 flex justify-between items-center">
+        <nav className="sticky top-0 z-20 bg-white/80 backdrop-blur-md shadow-sm border-b border-white/20 px-4 py-3 flex justify-between items-center">
           <div className="flex items-center">
             {!isSidebarOpen && (
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="mr-3 lg:mr-4 p-2 -ml-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                className="mr-3 lg:mr-4 p-2 -ml-2 text-gray-600 hover:text-gray-800 hover:bg-white/50 rounded-lg transition-colors backdrop-blur-sm"
                 aria-label="Open sidebar"
               >
                 <IoMenu size={22} />
               </button>
             )}
             <div className="flex items-center">
-              <FaRobot className="text-blue-500 mr-2 w-5 h-5" />
-              <h2 className="text-lg lg:text-xl font-semibold text-gray-800">Learning Assistant</h2>
+              <div className="p-2 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white mr-3">
+                <FaRobot className="w-5 h-5" />
+              </div>
+              <h2 className="text-lg lg:text-xl font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Learning Assistant</h2>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Link
               to="/"
-              className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 hover:scale-105 transition-all duration-200"
+              className="p-2 rounded-lg text-indigo-600 hover:bg-white/50 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
               aria-label="Go to home"
             >
               <IoHome size={20} />
@@ -814,8 +858,8 @@ const ChatbotPage = () => {
         </nav>
 
         {/* Chat messages */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 relative">
-          <div className={`flex-1 p-3 lg:p-4 overflow-y-auto space-y-3 lg:space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 ${
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+          <div className={`flex-1 p-3 lg:p-6 overflow-y-auto space-y-3 lg:space-y-4 scrollbar-glass ${
             isMobile && isInputFocused ? 'pb-32' : ''
           }`}>
             {chatHistory.map((chat) => (
@@ -824,10 +868,20 @@ const ChatbotPage = () => {
 
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-white text-gray-800 border border-gray-200 rounded-lg rounded-bl-none p-3 max-w-[85%] lg:max-w-[80%] shadow-sm">
-                  <div className="flex items-center">
-                    <BiLoaderAlt className="animate-spin text-blue-500 mr-2" />
-                    <span>Thinking...</span>
+                <div className="ml-4 lg:ml-8 mr-auto max-w-[75%] lg:max-w-[65%]">
+                  <div className="bg-white/90 backdrop-blur-sm text-gray-800 border border-white/30 shadow-lg rounded-2xl rounded-bl-md px-4 py-3 lg:px-5 lg:py-4">
+                    <div className="flex items-center">
+                      <div className="relative mr-3">
+                        <BiLoaderAlt className="animate-spin text-indigo-500 w-5 h-5" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full blur-sm opacity-30 animate-pulse"></div>
+                      </div>
+                      <span className="text-gray-700">Thinking...</span>
+                      <div className="ml-2 flex space-x-1">
+                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
+                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -836,63 +890,65 @@ const ChatbotPage = () => {
             {/* Topic Confirmation Dialog */}
             {showTopicConfirmation && (
               <div className="flex justify-start mb-4">
-                <div className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg rounded-bl-none p-4 max-w-[90%] lg:max-w-[85%] shadow-lg">
-                  <div className="flex items-center mb-3">
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
-                      <span className="text-white text-sm font-bold">✓</span>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-800">Confirm Course Topics</h3>
-                  </div>
-                  
-                  <p className="text-sm text-gray-600 mb-4">
-                    I found <strong>{pendingTopics.length}</strong> topic(s) from your query: "<em>{originalPrompt}</em>". 
-                    You can edit, delete, or add topics before creating your course.
-                  </p>
-                  
-                  <div className="space-y-2 mb-4">
-                    {pendingTopics.map((topic, index) => (
-                      <div key={topic.id || index} className="flex items-center bg-white rounded-lg p-2 border border-gray-200">
-                        <span className="text-blue-500 mr-2 font-bold">{index + 1}.</span>
-                        <input
-                          type="text"
-                          value={topic.name}
-                          onChange={(e) => handleTopicEdit(index, e.target.value)}
-                          className="flex-1 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                        <button
-                          onClick={() => handleTopicDelete(index)}
-                          className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
-                          title="Delete topic"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                        </button>
+                <div className="ml-4 lg:ml-8 mr-auto max-w-[85%] lg:max-w-[75%]">
+                  <div className="bg-gradient-to-br from-blue-50/90 to-purple-50/90 backdrop-blur-md border-2 border-blue-200/50 rounded-2xl rounded-bl-md p-4 shadow-xl">
+                    <div className="flex items-center mb-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mr-3">
+                        <span className="text-white text-sm font-bold">✓</span>
                       </div>
-                    ))}
-                  </div>
-                  
-                  <button
-                    onClick={handleTopicAdd}
-                    className="w-full mb-4 p-2 border-2 border-dashed border-blue-300 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors text-sm"
-                  >
-                    + Add New Topic
-                  </button>
-                  
-                  <div className="flex gap-2">
+                      <h3 className="text-lg font-semibold text-gray-800">Confirm Course Topics</h3>
+                    </div>
+                    
+                    <p className="text-sm text-gray-600 mb-4">
+                      I found <strong>{pendingTopics.length}</strong> topic(s) from your query: "<em>{originalPrompt}</em>". 
+                      You can edit, delete, or add topics before creating your course.
+                    </p>
+                    
+                    <div className="space-y-2 mb-4">
+                      {pendingTopics.map((topic, index) => (
+                        <div key={topic.id || index} className="flex items-center bg-white/80 backdrop-blur-sm rounded-lg p-2 border border-white/30">
+                          <span className="text-indigo-500 mr-2 font-bold">{index + 1}.</span>
+                          <input
+                            type="text"
+                            value={topic.name}
+                            onChange={(e) => handleTopicEdit(index, e.target.value)}
+                            className="flex-1 px-2 py-1 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                          />
+                          <button
+                            onClick={() => handleTopicDelete(index)}
+                            className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded transition-colors backdrop-blur-sm"
+                            title="Delete topic"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    
                     <button
-                      onClick={handleTopicConfirm}
-                      disabled={pendingTopics.length === 0}
-                      className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                      onClick={handleTopicAdd}
+                      className="w-full mb-4 p-2 border-2 border-dashed border-indigo-300/50 rounded-lg text-indigo-600 hover:bg-indigo-50/50 backdrop-blur-sm transition-colors text-sm"
                     >
-                      ✓ Create Course ({pendingTopics.length} topic{pendingTopics.length !== 1 ? 's' : ''})
+                      + Add New Topic
                     </button>
-                    <button
-                      onClick={handleTopicCancel}
-                      className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
-                    >
-                      ✗ Cancel
-                    </button>
+                    
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleTopicConfirm}
+                        disabled={pendingTopics.length === 0}
+                        className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 text-sm font-medium backdrop-blur-sm"
+                      >
+                        ✓ Create Course ({pendingTopics.length} topic{pendingTopics.length !== 1 ? 's' : ''})
+                      </button>
+                      <button
+                        onClick={handleTopicCancel}
+                        className="flex-1 bg-gray-500/80 backdrop-blur-sm text-white py-2 px-4 rounded-lg hover:bg-gray-600/80 transition-colors text-sm font-medium"
+                      >
+                        ✗ Cancel
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -902,18 +958,18 @@ const ChatbotPage = () => {
           </div>
 
           {/* Input Section */}
-          <div className="p-3 lg:p-4 bg-white border-t border-gray-200">
+          <div className="p-3 lg:p-6 bg-white/80 backdrop-blur-md border-t border-white/20 shadow-lg">
             <div className="max-w-4xl mx-auto">
               {/* Mode Toggle */}
-              <div className="mb-3">
-                <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+              <div className="mb-4">
+                <div className="flex items-center justify-between bg-white/50 backdrop-blur-sm rounded-xl p-4 border border-white/30 shadow-sm">
                   <div className="flex items-center space-x-3">
                     <div 
                       onClick={() => setProMode(!proMode)}
-                      className={`inline-block cursor-pointer px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      className={`inline-block cursor-pointer px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 backdrop-blur-sm ${
                         proMode 
-                          ? 'bg-purple-600 text-white shadow-lg' 
-                          : 'bg-blue-600 text-white shadow-lg'
+                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg hover:shadow-xl' 
+                          : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg hover:shadow-xl'
                       }`}
                     >
                       {proMode ? '🚀 Pro Mode: Course Creation' : '📚 Study Mode: Free Learning'}
@@ -927,7 +983,7 @@ const ChatbotPage = () => {
                   </div>
                   <button
                     onClick={() => setProMode(!proMode)}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    className="text-gray-400 hover:text-indigo-600 transition-colors p-1 rounded-full hover:bg-white/50"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
@@ -936,7 +992,8 @@ const ChatbotPage = () => {
                 </div>
               </div>
               
-              <div className="relative">                <input
+              <div className="relative">
+                <input
                   type="text"
                   placeholder="Type your message here..."
                   value={message}
@@ -955,28 +1012,33 @@ const ChatbotPage = () => {
                     }
                   }}
                   disabled={isLoading}
-                  className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-800 placeholder-gray-500"
+                  className="w-full pl-5 pr-14 py-4 bg-white/80 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-gray-800 placeholder-gray-500 shadow-lg transition-all duration-200 hover:shadow-xl"
                 />
                 <button
                   onClick={() => handleSendMessage()}
                   disabled={!message.trim() || isLoading}
-                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md transition-colors ${
-                    message.trim() && !isLoading ? "text-blue-600 hover:bg-blue-50" : "text-gray-400"
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg transition-all duration-200 backdrop-blur-sm ${
+                    message.trim() && !isLoading 
+                      ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:scale-105" 
+                      : "bg-gray-200/50 text-gray-400"
                   }`}
                 >
-                  <IoSend size={20} />
+                  <IoSend size={18} />
                 </button>
-              </div>              {/* Topic suggestions - Show based on screen size and input focus */}
+              </div>
+              
+              {/* Topic suggestions - Show based on screen size and input focus */}
               {(!isMobile || (isMobile && isInputFocused)) && (
-                <div className={`flex flex-wrap gap-2 mt-3 ${
-                  isMobile ? 'fixed left-0 right-0 bottom-[72px] bg-white p-3 border-t border-gray-200 z-10 shadow-lg animate-slide-up' : ''
+                <div className={`flex flex-wrap gap-2 mt-4 ${
+                  isMobile ? 'fixed left-0 right-0 bottom-[72px] bg-white/90 backdrop-blur-md p-4 border-t border-white/20 z-10 shadow-lg animate-slide-up' : ''
                 }`}>
                   {suggestionTopics.map((suggestion, index) => (
                     <button
-                      key={index}                      onClick={() => {
+                      key={index}
+                      onClick={() => {
                         handleSuggestion(suggestion);
                       }}
-                      className="text-xs lg:text-sm bg-gray-100 text-gray-700 px-3 lg:px-4 py-1.5 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors active:bg-blue-100"
+                      className="text-xs lg:text-sm bg-white/60 backdrop-blur-sm text-gray-700 px-4 py-2 rounded-full hover:bg-indigo-50/80 hover:text-indigo-600 transition-all duration-200 active:bg-indigo-100/80 border border-white/30 shadow-sm hover:shadow-md"
                     >
                       {suggestion}
                     </button>
