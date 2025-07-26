@@ -889,13 +889,14 @@ const ChatbotPage = () => {
               <h2 className="text-lg lg:text-xl font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Learning Assistant</h2>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center mr-4">
             <Link
               to="/"
-              className="p-2 rounded-lg text-indigo-600 hover:bg-white/50 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-indigo-600 hover:bg-white/50 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
               aria-label="Go to home"
             >
               <IoHome size={20} />
+              <span className="font-medium">Home</span>
             </Link>
           </div>
         </nav>
