@@ -75,6 +75,20 @@ style.textContent = `
     animation: slide-up 0.3s ease-out forwards;
   }
   
+  @keyframes slide-down {
+    from {
+      transform: translateX(-50%) translateY(-20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  }
+  .animate-slide-down {
+    animation: slide-down 0.4s ease-out forwards;
+  }
+  
   /* Custom scrollbar styling */
   .scrollbar-glass::-webkit-scrollbar {
     width: 6px;
@@ -416,7 +430,7 @@ const ChatbotPage = () => {
   const messagesEndRef = useRef(null);
   const initialQueryProcessed = useRef(false);
   const { width } = useWindowSize();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(width >= 1024);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [chatSessions, setChatSessions] = useState([
     {
       id: 1,
@@ -433,6 +447,16 @@ const ChatbotPage = () => {
   ]);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
+
+  // Check if user has visited chat page before
+  useEffect(() => {
+    const hasVisitedChat = localStorage.getItem('hasVisitedChat');
+    if (!hasVisitedChat) {
+      setShowWelcomeMessage(true);
+      localStorage.setItem('hasVisitedChat', 'true');
+    }
+  }, []);
 
   // Scroll to the bottom of the chat when chat history updates
   useEffect(() => {
@@ -452,7 +476,7 @@ const ChatbotPage = () => {
   }, [initialQuery, navigate]);
 
   useEffect(() => {
-    setIsSidebarOpen(width >= 1024);
+    setIsSidebarOpen(false);
   }, [width]);
 
   // Add window resize listener
@@ -865,6 +889,41 @@ const ChatbotPage = () => {
             isMobile && isInputFocused ? 'pb-32' : 'pb-4'
           }`}>
             <div className="min-h-full py-4">
+              {/* Welcome Message Popup for First-time Users */}
+              {showWelcomeMessage && (
+                <>
+                  {/* Background Blur Overlay */}
+                  <div className="fixed inset-0 bg-black/30 backdrop-blur-md z-40"></div>
+                  
+                  {/* Top Positioned Welcome Message */}
+                  <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-lg mx-4">
+                    <div className="bg-white/95 backdrop-blur-lg border border-white/30 rounded-2xl p-6 shadow-2xl animate-slide-down">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mr-3">
+                            <IoSchoolOutline className="w-5 h-5 text-white" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-800">Welcome!</h3>
+                        </div>
+                        <button
+                          onClick={() => setShowWelcomeMessage(false)}
+                          className="text-gray-400 hover:text-gray-600 transition-all duration-200 p-2 hover:bg-gray-100 rounded-full hover:scale-110"
+                          aria-label="Close welcome message"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      
+                      <p className="text-gray-800 text-base leading-relaxed font-medium">
+                        Use our powerful tool to seamlessly create customized courses on any topic of your choice — just click the 'Create Course' button to begin.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {chatHistory.map((chat) => (
                 <MessageBubble key={chat.id} message={chat} />
               ))}
