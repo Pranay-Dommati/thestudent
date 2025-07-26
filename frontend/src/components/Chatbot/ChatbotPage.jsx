@@ -458,6 +458,23 @@ const ChatbotPage = () => {
     }
   }, []);
 
+  // Handle ESC key to close welcome message
+  useEffect(() => {
+    const handleEscKey = (event) => {
+      if (event.key === 'Escape' && showWelcomeMessage) {
+        setShowWelcomeMessage(false);
+      }
+    };
+
+    if (showWelcomeMessage) {
+      document.addEventListener('keydown', handleEscKey);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscKey);
+    };
+  }, [showWelcomeMessage]);
+
   // Scroll to the bottom of the chat when chat history updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -907,7 +924,7 @@ const ChatbotPage = () => {
                         </div>
                         <button
                           onClick={() => setShowWelcomeMessage(false)}
-                          className="text-gray-400 hover:text-gray-600 transition-all duration-200 p-2 hover:bg-gray-100 rounded-full hover:scale-110"
+                          className="text-gray-600 hover:text-gray-800 transition-all duration-200 p-2 hover:bg-gray-100 rounded-full hover:scale-110 cursor-pointer"
                           aria-label="Close welcome message"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
