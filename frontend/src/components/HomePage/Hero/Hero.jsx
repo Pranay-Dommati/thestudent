@@ -22,12 +22,12 @@ const Hero = () => {
           
           {/* Heading with improved readability on mobile */}
           <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-white mb-4 sm:mb-6 leading-tight px-2 sm:px-0">
-            Effortless Study Plans Tailored to Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-400">School Curriculum!</span>
+            Your Personal <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-400">AI Study Companion</span> and Expert-Crafted Courses
           </h1>
           
           {/* Description text with better spacing */}
           <p className="text-base sm:text-lg md:text-xl text-white/90 mb-8 sm:mb-10 max-w-2xl mx-auto px-4">
-            Leverage AI to create personalized, curriculum-aligned courses for Class 10-12. Access structured playlists, videos, and notes to master your school subjects.
+            Explore expertly crafted courses for Classes 6–12, aligned with your board syllabus — or use our AI Companion to generate personalized study materials like summaries, quizzes, videos, and more.
           </p>
           
           {/* Button container with improved mobile layout */}
@@ -41,7 +41,7 @@ const Hero = () => {
                        active:translate-y-0
                        focus:outline-none focus:ring-2 focus:ring-white/50"
             >
-              Start Learning Now
+              Browse Ready Courses
             </Link>
             <Link 
               to="/chat" 
@@ -63,7 +63,7 @@ const Hero = () => {
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                Ask AI for Help
+                Create Custom Course
               </span>
             </Link>
           </div>
