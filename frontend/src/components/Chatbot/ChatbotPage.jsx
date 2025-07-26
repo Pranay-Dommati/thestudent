@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle } from "react-icons/io5";
+import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle } from "react-icons/io5";
 import { FaRobot, FaHistory } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
@@ -737,9 +737,9 @@ const ChatbotPage = () => {
   };
 
   const suggestionTopics = [
-    "Learn Web Development in 30 days",
-    "Create a Data Science learning plan",
-    "Master Digital Marketing in 21 days",
+    "Create arrays and strings courses",
+    "Learn photosynthesis and water cycle",
+    "JavaScript functions and DOM manipulation",
   ];
   
   const handleSuggestion = async (topic) => {
@@ -968,34 +968,28 @@ const ChatbotPage = () => {
           {/* Input Section */}
           <div className="p-3 lg:p-6 bg-white/80 backdrop-blur-md border-t border-white/20 shadow-lg">
             <div className="w-full max-w-5xl mx-auto px-6 lg:px-8">
-              {/* Mode Toggle */}
+              {/* Create Course Button */}
               <div className="mb-4">
-                <div className="flex items-center justify-between bg-white/50 backdrop-blur-sm rounded-xl p-4 border border-white/30 shadow-sm">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      onClick={() => setProMode(!proMode)}
-                      className={`inline-block cursor-pointer px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 backdrop-blur-sm ${
-                        proMode 
-                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg hover:shadow-xl' 
-                          : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg hover:shadow-xl'
-                      }`}
-                    >
-                      {proMode ? '🚀 Pro Mode: Course Creation' : '📚 Study Mode: Free Learning'}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {proMode 
-                        ? 'AI-powered course generation with Gemini' 
-                        : 'Educational assistance with vector bot'
-                      }
-                    </div>
-                  </div>
-                  <button
+                <div className="flex items-center justify-start">
+                  <button 
                     onClick={() => setProMode(!proMode)}
-                    className="text-gray-400 hover:text-indigo-600 transition-colors p-1 rounded-full hover:bg-white/50"
+                    className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-105 ${
+                      proMode 
+                        ? 'bg-indigo-50/80 text-indigo-600 border-2 border-indigo-300/50' 
+                        : 'bg-white/80 text-gray-700 border-2 border-gray-200/50 hover:bg-gray-50/80 hover:text-gray-800 hover:border-gray-300/50'
+                    }`}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                    </svg>
+                    {proMode ? (
+                      <>
+                        <IoCheckmarkCircle size={18} />
+                        Course Creation Mode
+                      </>
+                    ) : (
+                      <>
+                        <IoSchoolOutline size={18} />
+                        Create Course
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
