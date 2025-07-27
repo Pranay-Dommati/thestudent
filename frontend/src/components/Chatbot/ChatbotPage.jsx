@@ -4,6 +4,8 @@ import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, I
 import { FaRobot, FaHistory } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
+import { toast } from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 import { classifyTopicsWithGemini } from "../ProLearning/topicclassifier";
 
 // Simple Gemini API call for regular chat
@@ -411,6 +413,7 @@ const parseMarkdownResponse = (content) => {
 const ChatbotPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user, isAuthenticated, isLoggedIn } = useAuth();
   const initialQuery = searchParams.get("q");
 
   const [message, setMessage] = useState("");
@@ -801,6 +804,77 @@ const ChatbotPage = () => {
     }
   };
 
+  // Handle Create Course button with authentication check
+  const handleCreateCourse = () => {
+    if (!isAuthenticated()) {
+      toast.error(
+        "Please sign in to create courses. Creating personalized courses requires an account to save your progress and preferences.",
+        {
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: '#FEF2F2',
+            color: '#DC2626',
+            border: '1px solid #FECACA',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: '500',
+            padding: '16px',
+            maxWidth: '400px',
+          },
+          icon: '🔒',
+        }
+      );
+      
+      // Show additional prompt after a short delay
+      setTimeout(() => {
+        toast(
+          <div className="flex flex-col space-y-2">
+            <span className="font-medium">Ready to get started?</span>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => {
+                  toast.dismiss();
+                  navigate('/auth?mode=login&returnTo=' + encodeURIComponent(window.location.pathname + window.location.search));
+                }}
+                className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => {
+                  toast.dismiss();
+                  navigate('/auth?mode=signup&returnTo=' + encodeURIComponent(window.location.pathname + window.location.search));
+                }}
+                className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Sign Up
+              </button>
+            </div>
+          </div>,
+          {
+            duration: 6000,
+            position: 'top-center',
+            style: {
+              background: '#F8FAFC',
+              color: '#374151',
+              border: '1px solid #E5E7EB',
+              borderRadius: '12px',
+              padding: '16px',
+              maxWidth: '350px',
+            },
+            icon: '✨',
+          }
+        );
+      }, 1000);
+      
+      return;
+    }
+    
+    // If user is authenticated, toggle pro mode as usual
+    setProMode(!proMode);
+  };
+
   return (
     <div className="h-screen flex overflow-hidden w-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative">
       {/* Floating background elements */}
@@ -1049,7 +1123,7 @@ const ChatbotPage = () => {
               <div className="mb-4">
                 <div className="flex items-center justify-start">
                   <button 
-                    onClick={() => setProMode(!proMode)}
+                    onClick={handleCreateCourse}
                     className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-105 ${
                       proMode 
                         ? 'bg-indigo-50/80 text-indigo-600 border-2 border-indigo-300/50' 
