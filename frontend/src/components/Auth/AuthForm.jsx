@@ -37,14 +37,22 @@ export default function AuthForm() {  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const toggleForm = () => {
     const newMode = !isSignUp;
-    setIsSignUp(newMode);
+    
+    // Clear form errors and data immediately for smooth transition
     setFormErrors({});
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      agreedToTerms: false,
+    });
     
     // Preserve the returnTo parameter if it exists
     const returnToParam = returnToPath ? `&returnTo=${encodeURIComponent(returnToPath)}` : '';
     
-    // Use navigate instead of window.history
-    navigate(`/auth?mode=${newMode ? 'signup' : 'login'}${returnToParam}`);
+    // Use replace to avoid adding to history and set state after navigation
+    navigate(`/auth?mode=${newMode ? 'signup' : 'login'}${returnToParam}`, { replace: true });
   };
 
   const handleChange = (e) => {
@@ -155,45 +163,77 @@ export default function AuthForm() {  const location = useLocation();
         </div>
 
         {/* Main card */}
-        <div className="relative w-full max-w-4xl bg-white shadow-2xl rounded-2xl overflow-hidden">          <div className="flex flex-col md:flex-row">
-            <AnimatePresence initial={false} mode="sync">
+        <div className="relative w-full max-w-4xl bg-white shadow-2xl rounded-2xl overflow-hidden">
+          <AnimatePresence initial={false} mode="wait">
+            <motion.div 
+              key={isSignUp ? "signup-layout" : "login-layout"}
+              className="flex flex-col md:flex-row"
+              initial={{ opacity: 0, x: isSignUp ? 50 : -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: isSignUp ? -50 : 50 }}
+              transition={{ 
+                type: "tween",
+                duration: 0.4,
+                ease: [0.4, 0.0, 0.2, 1]
+              }}
+            >
               {/* Welcome Panel - Always on top for mobile */}
-              <motion.div
-                key={isSignUp ? "welcome-signup" : "welcome-login"}
+              <div
                 className={`flex flex-col items-center justify-center p-6 sm:p-10 text-white 
                   bg-gradient-to-br ${isSignUp ? 'from-blue-600 to-indigo-700' : 'from-indigo-600 to-blue-700'}
                   w-full md:w-5/12 order-1 ${isSignUp ? 'md:order-2' : 'md:order-1'}`}
-                initial={{ 
-                  x: isSignUp ? '100%' : '-100%',
-                  opacity: 0
-                }}
-                animate={{ 
-                  x: 0,
-                  opacity: 1
-                }}
-                exit={{ 
-                  x: isSignUp ? '-100%' : '100%',
-                  opacity: 0
-                }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
               >
-                <div className="mb-6 p-4 bg-white/20 rounded-full">
+                <motion.div 
+                  className="mb-6 p-4 bg-white/20 rounded-full"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ 
+                    delay: 0.1,
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1]
+                  }}
+                >
                   <FaGraduationCap className="text-4xl sm:text-5xl" />
-                </div>
+                </motion.div>
                 
-                <h2 className="text-2xl sm:text-3xl font-bold mb-3 md:mb-4 text-center">
+                <motion.h2 
+                  className="text-2xl sm:text-3xl font-bold mb-3 md:mb-4 text-center"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    delay: 0.2,
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1]
+                  }}
+                >
                   {isSignUp ? 'Welcome to Students Hub!' : 'Welcome Back!'}
-                </h2>
+                </motion.h2>
                 
-                <p className="text-sm text-center mb-6 max-w-xs text-white/90">
+                <motion.p 
+                  className="text-sm text-center mb-6 max-w-xs text-white/90"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    delay: 0.3,
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1]
+                  }}
+                >
                   {isSignUp 
                     ? 'Join our community to access free courses, learning paths, and educational resources.' 
                     : 'Sign in to continue your learning journey and access your saved courses.'}
-                </p>
+                </motion.p>
                 
                 <motion.button 
                   onClick={toggleForm}
                   className="mt-2 px-6 py-2.5 border-2 border-white/80 text-white rounded-full transition-colors hover:bg-white hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    delay: 0.4,
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1]
+                  }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -203,38 +243,46 @@ export default function AuthForm() {  const location = useLocation();
                 {/* Decorative elements */}
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-              </motion.div>
+              </div>
               
               {/* Form Panel - Always on bottom for mobile */}
-              <motion.div 
-                key={isSignUp ? "form-signup" : "form-login"}
+              <div 
                 className={`flex w-full md:w-7/12 flex-col items-center justify-center px-6 sm:px-10 py-8 sm:py-12
                   order-2 ${isSignUp ? 'md:order-1' : 'md:order-2'}`}
-                initial={{ 
-                  x: isSignUp ? '-100%' : '100%',
-                  opacity: 0
-                }}
-                animate={{ 
-                  x: 0,
-                  opacity: 1
-                }}
-                exit={{ 
-                  x: isSignUp ? '100%' : '-100%',
-                  opacity: 0
-                }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              >                <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800">
+              >                <motion.h2 
+                  className="text-2xl sm:text-3xl font-bold mb-6 text-gray-800"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    delay: 0.2,
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1]
+                  }}
+                >
                   {isSignUp ? 'Create Account' : 'Login'}
-                </h2>
-                <form className="w-full max-w-sm space-y-4" onSubmit={handleSubmit}>
-                  <AnimatePresence>
+                </motion.h2>
+                <motion.form 
+                  className="w-full max-w-sm space-y-4" 
+                  onSubmit={handleSubmit}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    delay: 0.3,
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1]
+                  }}
+                >
+                  <AnimatePresence mode="wait">
                     {isSignUp && (
                       <motion.div 
                         className="space-y-4"
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
+                        transition={{ 
+                          duration: 0.25,
+                          ease: [0.4, 0.0, 0.2, 1]
+                        }}
                       >
                         {/* Full Name */}
                         <div className="relative">
@@ -308,14 +356,17 @@ export default function AuthForm() {  const location = useLocation();
                   {/* Ensure there's clear separation between sections */}
                   <div className="w-full h-px mt-1"></div>
                   
-                  <AnimatePresence>
+                  <AnimatePresence mode="wait">
                     {isSignUp && (
                       <motion.div 
                         className="space-y-4 mt-2"
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
+                        transition={{ 
+                          duration: 0.25,
+                          ease: [0.4, 0.0, 0.2, 1]
+                        }}
                       >
                         {/* Confirm Password */}
                         <div className="relative">
@@ -379,10 +430,19 @@ export default function AuthForm() {  const location = useLocation();
                   >
                     {isLoading ? "Processing..." : (isSignUp ? "Create Account" : "Login")}
                   </motion.button>
-                </form>
+                </motion.form>
 
                 {/* Social Login Section */}
-                <div className="mt-6">
+                <motion.div 
+                  className="mt-6"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    delay: 0.4,
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1]
+                  }}
+                >
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-gray-300"></div>
@@ -419,10 +479,19 @@ export default function AuthForm() {  const location = useLocation();
                       <span className="ml-2">Facebook</span>
                     </button>
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Toggle Form Link */}
-                <div className="mt-6 text-center">
+                <motion.div 
+                  className="mt-6 text-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ 
+                    delay: 0.5,
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1]
+                  }}
+                >
                   <button
                     type="button"
                     onClick={toggleForm}
@@ -430,10 +499,10 @@ export default function AuthForm() {  const location = useLocation();
                   >
                     {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
                   </button>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
       <AuthFooter />
