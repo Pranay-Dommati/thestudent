@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { FaFacebook, FaTwitter, FaLinkedin, FaYoutube } from "react-icons/fa";
+import { FaLinkedin, FaYoutube } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
 
 const Footer = () => {
   const [email, setEmail] = useState("");
@@ -145,10 +146,15 @@ const Footer = () => {
 
         {/* Social Media Icons */}
         <div className="flex justify-center space-x-6 text-xl mt-4">
-          <a href="#" className="hover:text-blue-500"><FaFacebook /></a>
-          <a href="#" className="hover:text-blue-400"><FaTwitter /></a>
-          <a href="#" className="hover:text-blue-600"><FaLinkedin /></a>
-          <a href="#" className="hover:text-red-600"><FaYoutube /></a>
+          <a href="#" className="hover:text-gray-300 transition-colors" title="X (Twitter)">
+            <FaXTwitter />
+          </a>
+          <a href="#" className="hover:text-blue-600 transition-colors" title="LinkedIn">
+            <FaLinkedin />
+          </a>
+          <a href="#" className="hover:text-red-600 transition-colors" title="YouTube">
+            <FaYoutube />
+          </a>
         </div>
 
         {/* Copyright */}
