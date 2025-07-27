@@ -36,6 +36,7 @@ import CollegeSeniors from './components/Mentoring/CollegeSeniors/CollegeSeniors
 import MentoringNavbar from './components/Mentoring/MentoringNavbar';
 import TermsAndConditions from './components/Legal/TermsAndConditions';
 import PrivacyPolicy from './components/Legal/PrivacyPolicy';
+import FeedbackPage from './components/Feedback/FeedbackPage';  // Add feedback import
 import './utils/axios';
 
 const CourseDetailsWrapper = () => {
@@ -172,7 +173,9 @@ const App = () => {
               <ProtectedRoute>
                 <ProfileLayout />
               </ProtectedRoute>
-            } />            <Route path="/help-center" element={<HelpCenter />} />            <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+            } />            <Route path="/help-center" element={<HelpCenter />} />
+            <Route path="/feedback" element={<FeedbackPage />} />  {/* Add feedback route */}
+            <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
             <Route path="/terms" element={<Navigate to="/terms-and-conditions" />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/privacy" element={<Navigate to="/privacy-policy" />} />

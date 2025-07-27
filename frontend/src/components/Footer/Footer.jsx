@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { FaFacebook, FaTwitter, FaLinkedin, FaYoutube } from "react-icons/fa";
 
 const Footer = () => {
@@ -20,10 +21,9 @@ const Footer = () => {
 
         {/* Navigation Links */}
         <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-300">
-          <a href="#about" className="hover:text-white">About Us</a>
-          <a href="#feedback" className="hover:text-white">Feedback</a>
-          <a href="#privacy" className="hover:text-white">Privacy Policy</a>
-          <a href="#terms" className="hover:text-white">Terms of Service</a>
+          <Link to="/feedback" className="hover:text-white">Feedback</Link>
+          <Link to="/privacy-policy" className="hover:text-white">Privacy Policy</Link>
+          <Link to="/terms-and-conditions" className="hover:text-white">Terms of Service</Link>
         </div>
 
         {/* Social Media Icons */}

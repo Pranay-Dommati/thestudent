@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'chatbotcourse',
     'corsheaders',  # Add this
     'courses',
+    'feedback',  # Add feedback app
     'rest_framework',
 ]
 

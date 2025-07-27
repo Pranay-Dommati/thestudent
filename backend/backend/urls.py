@@ -4,11 +4,12 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('admin/', admin.site.urls),  # Custom admin path as requested
     # ... other URL patterns
     path('', include('courses.urls')),
     path('api/auth/', include('authentication.urls')),
     path('api/chatbot/', include('chatbotcourse.urls')),
+    path('api/feedback/', include('feedback.urls')),  # Add feedback app
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 urlpatterns += [
