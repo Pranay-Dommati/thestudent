@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { classifyTopicsWithGemini } from "../ProLearning/topicclassifier";
+import AuthModal from '../Common/AuthModal';
 
 // Simple Gemini API call for regular chat
 const callGeminiAPI = async (message) => {
@@ -421,6 +422,7 @@ const ChatbotPage = () => {
   const [showTopicConfirmation, setShowTopicConfirmation] = useState(false);
   const [pendingTopics, setPendingTopics] = useState([]);
   const [originalPrompt, setOriginalPrompt] = useState("");
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [chatHistory, setChatHistory] = useState([
     {
       id: 1,
@@ -807,67 +809,7 @@ const ChatbotPage = () => {
   // Handle Create Course button with authentication check
   const handleCreateCourse = () => {
     if (!isAuthenticated()) {
-      toast.error(
-        "Please sign in to create courses. Creating personalized courses requires an account to save your progress and preferences.",
-        {
-          duration: 4000,
-          position: 'top-center',
-          style: {
-            background: '#FEF2F2',
-            color: '#DC2626',
-            border: '1px solid #FECACA',
-            borderRadius: '12px',
-            fontSize: '14px',
-            fontWeight: '500',
-            padding: '16px',
-            maxWidth: '400px',
-          },
-          icon: '🔒',
-        }
-      );
-      
-      // Show additional prompt after a short delay
-      setTimeout(() => {
-        toast(
-          <div className="flex flex-col space-y-2">
-            <span className="font-medium">Ready to get started?</span>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => {
-                  toast.dismiss();
-                  navigate('/auth?mode=login&returnTo=' + encodeURIComponent(window.location.pathname + window.location.search));
-                }}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Sign In
-              </button>
-              <button
-                onClick={() => {
-                  toast.dismiss();
-                  navigate('/auth?mode=signup&returnTo=' + encodeURIComponent(window.location.pathname + window.location.search));
-                }}
-                className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Sign Up
-              </button>
-            </div>
-          </div>,
-          {
-            duration: 6000,
-            position: 'top-center',
-            style: {
-              background: '#F8FAFC',
-              color: '#374151',
-              border: '1px solid #E5E7EB',
-              borderRadius: '12px',
-              padding: '16px',
-              maxWidth: '350px',
-            },
-            icon: '✨',
-          }
-        );
-      }, 1000);
-      
+      setShowAuthModal(true);
       return;
     }
     
@@ -1202,6 +1144,15 @@ const ChatbotPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title="Course Creation Requires Account"
+        message="Create personalized courses tailored to your learning goals. Save your progress and access advanced features."
+        feature="Create Custom Courses"
+      />
     </div>
   );
 };
