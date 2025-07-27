@@ -1,23 +1,140 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { FaFacebook, FaTwitter, FaLinkedin, FaYoutube } from "react-icons/fa";
 
 const Footer = () => {
+  const [email, setEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState(""); // "success" or "error"
+
+  // Email validation function
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleEmailChange = (e) => {
+    const value = e.target.value;
+    setEmail(value);
+    
+    // Clear messages when user starts typing
+    if (message) {
+      setMessage("");
+      setMessageType("");
+    }
+  };
+
+  const handleNewsletterSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validation - show messages when clicked
+    if (!email.trim()) {
+      setMessage("⚠️ Please enter your email address");
+      setMessageType("error");
+      return;
+    }
+
+    if (!isValidEmail(email.trim())) {
+      setMessage("⚠️ Please enter a valid email address");
+      setMessageType("error");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("");
+
+    try {
+      const response = await fetch('http://localhost:8000/api/newsletter/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.trim()
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage("🎉 Successfully subscribed to newsletter!");
+        setMessageType("success");
+        setEmail("");
+      } else {
+        setMessage(data.message || "Failed to subscribe. Please try again.");
+        setMessageType("error");
+      }
+    } catch (error) {
+      console.error("Error subscribing to newsletter:", error);
+      setMessage("Network error. Please check your connection and try again.");
+      setMessageType("error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Button is always enabled and looks good
+  const isButtonDisabled = isSubmitting;
+
   return (
     <footer className="bg-gray-900 text-white py-10 px-4">
       <div className="max-w-6xl mx-auto text-center space-y-6">
         {/* Subscribe Section */}
         <h3 className="text-2xl font-semibold">Start Learning Today!</h3>
-        <div className="flex flex-col items-center gap-3">
-          <input
-            type="email"
-            placeholder="Enter your email for updates"
-            className="p-3 border border-gray-500 rounded-md w-full md:w-1/3 bg-gray-800 text-white focus:outline-none text-left"
-          />
-          <button className="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-md font-medium transition w-32">
-            Subscribe
-          </button>
+        <div className="max-w-md mx-auto">
+          <form onSubmit={handleNewsletterSubmit} className="flex flex-col items-center gap-3">
+            <div className="w-full">
+              <input
+                type="email"
+                placeholder="Enter your email for updates"
+                value={email}
+                onChange={handleEmailChange}
+                className={`p-3 border rounded-md w-full bg-gray-800 text-white focus:outline-none focus:ring-2 transition-all duration-200 text-left ${
+                  messageType === "error" && message
+                    ? "border-red-500 focus:ring-red-500"
+                    : "border-gray-500 focus:ring-blue-500"
+                }`}
+                disabled={isSubmitting}
+              />
+            </div>
+            
+            <button 
+              type="submit"
+              disabled={isButtonDisabled}
+              className={`px-6 py-3 rounded-md font-medium transition-all duration-200 w-full sm:w-auto min-w-[140px] flex items-center justify-center ${
+                isSubmitting
+                  ? "bg-blue-500 text-white cursor-wait"
+                  : "bg-blue-600 hover:bg-blue-500 text-white hover:shadow-lg transform hover:scale-105"
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Subscribing...
+                </>
+              ) : (
+                <>
+                  Subscribe
+                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </>
+              )}
+            </button>
+          </form>
         </div>
+
+        {/* Message Display */}
+        {message && (
+          <div className={`max-w-md mx-auto p-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+            messageType === "success" 
+              ? "bg-green-100 text-green-800 border border-green-200" 
+              : "bg-red-100 text-red-800 border border-red-200"
+          }`}>
+            {message}
+          </div>
+        )}
 
         {/* Navigation Links */}
         <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-300">

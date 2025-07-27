@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'corsheaders',  # Add this
     'courses',
     'feedback',  # Add feedback app
+    'newsletter',  # Add newsletter app
     'rest_framework',
 ]
 

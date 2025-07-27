@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
-import { FaThLarge, FaPlus, FaUsers, FaLock, FaBars, FaCommentDots } from 'react-icons/fa';
+import { FaThLarge, FaPlus, FaUsers, FaLock, FaBars, FaCommentDots, FaEnvelope } from 'react-icons/fa';
 import AdminNav from '../layout/AdminNav';
 import AdminSidebar from '../layout/AdminSidebar';
 import AdminCourses from '../Courses/AdminCourses';
 import AdminUsers from '../Users/AdminUsers';
 import AdminSettings from '../Settings/AdminSettings';
 import AdminFeedbacks from '../Feedbacks/AdminFeedbacks';
+import AdminNewsletter from '../Newsletter/AdminNewsletter';
 import CourseManagement from '../Courses/CourseManagement';
 import CourseForm from '../Courses/CourseForm';
 import AdminLogin from '../AdminLogin';
@@ -89,6 +90,12 @@ const AdminDashboard = () => {
       path: '/admin-p/feedbacks' 
     },
     { 
+      id: 'newsletter',
+      label: 'Newsletter', 
+      icon: FaEnvelope, 
+      path: '/admin-p/newsletter' 
+    },
+    { 
       id: 'security',
       label: 'Security',
       icon: FaLock,
@@ -138,6 +145,7 @@ const AdminDashboard = () => {
               <Route path="add-course" element={<CourseForm onCancel={() => navigate('/admin-p/courses')} isDarkMode={isDarkMode} />} />
               <Route path="users" element={<AdminUsers isDarkMode={isDarkMode} />} />
               <Route path="feedbacks" element={<AdminFeedbacks isDarkMode={isDarkMode} />} />
+              <Route path="newsletter" element={<AdminNewsletter isDarkMode={isDarkMode} />} />
               <Route path="settings" element={<AdminSettings isDarkMode={isDarkMode} />} />
             </Routes>
               </div>

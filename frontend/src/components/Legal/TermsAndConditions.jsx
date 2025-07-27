@@ -168,13 +168,10 @@ const TermsAndConditions = () => {
           <section className="mt-6 md:mt-8 bg-gray-50 p-4 md:p-5 rounded-lg text-center">
             <h2 className="text-base md:text-lg font-semibold text-gray-800 mb-2">Questions About These Terms?</h2>
             <p className="text-gray-700 mb-2 md:mb-3">
-              Contact us at <strong>support@studentshub.com</strong>
+              Contact us at <strong>studentshub72@gmail.com</strong>
             </p>
             <p className="text-xs md:text-sm text-gray-500">
-              Phone: +91 12345 67890
-            </p>
-            <p className="text-xs md:text-sm text-gray-500">
-              Address: Students Hub, Educational District, India
+              Address: Hyderabad, Telangana, India
             </p>
           </section>
 

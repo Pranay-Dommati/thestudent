@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/auth/', include('authentication.urls')),
     path('api/chatbot/', include('chatbotcourse.urls')),
     path('api/feedback/', include('feedback.urls')),  # Add feedback app
+    path('api/newsletter/', include('newsletter.urls')),  # Add newsletter app
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 urlpatterns += [
