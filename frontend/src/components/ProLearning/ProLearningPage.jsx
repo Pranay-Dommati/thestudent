@@ -140,41 +140,65 @@ const ProLearningPage = () => {
     initializeDefaultTopics();
   }, [courseTitle, courseId]); // Add courseId dependency
   
-  // Auto-select first topic when topics list is loaded
+  // Auto-select first topic when topics list is loaded, or set active topic from URL
   useEffect(() => {
-    if (topicsList.length > 0 && !topicParam) {
-      // If no topic is specified in URL and we have topics, select the first one
-      const firstTopic = topicsList[0];
-      if (firstTopic) {
-        console.log('🎯 Auto-selecting first topic:', firstTopic.name);
+    if (topicsList.length > 0) {
+      if (topicParam) {
+        // If we have a topic from URL, find and activate the matching topic
+        // Handle case where topicParam might contain multiple topics (comma-separated)
+        const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
         
-        // Set the first topic as active in the topics list
-        setTopicsList(prevTopics => 
-          prevTopics.map((topic, index) => ({
-            ...topic,
-            isActive: index === 0 // Only first topic is active
-          }))
+        // Find the topic that matches the URL parameter
+        const matchingTopicIndex = topicsList.findIndex(topic => 
+          topic.name.toLowerCase().trim() === actualTopic.toLowerCase().trim()
         );
         
-        // Update URL to include the first topic
-        const newSearchParams = new URLSearchParams(searchParams);
-        newSearchParams.set("topic", firstTopic.name);
-        navigate(`/pro-learning/${courseId}?${newSearchParams.toString()}`, { replace: true });
-        
-        // Load content for the first topic if available
-        const currentCourseId = getCourseId();
-        if (currentCourseId) {
-          const storedContent = proContentManager.getStoredTopicContent(currentCourseId, firstTopic.name);
-          if (storedContent && storedContent.reading) {
-            console.log('✅ Loading stored content for first topic:', firstTopic.name);
-            setContent({
-              reading: storedContent.reading,
-              summary: storedContent.summary || 'Summary not available',
-              quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
-              videos: storedContent.videos || [],
-              resources: storedContent.resources || []
-            });
-          }
+        if (matchingTopicIndex !== -1) {
+          console.log('🎯 Setting active topic from URL:', actualTopic);
+          
+          // Set the matching topic as active in the topics list
+          setTopicsList(prevTopics => 
+            prevTopics.map((topic, index) => ({
+              ...topic,
+              isActive: index === matchingTopicIndex // Only matching topic is active
+            }))
+          );
+          
+          // Load content for the matching topic automatically
+          console.log('🔄 Auto-loading content for URL topic:', actualTopic);
+          loadTopicContent(actualTopic);
+        } else {
+          // If no matching topic found, activate the first topic as fallback
+          console.log('⚠️ Topic from URL not found in list, activating first topic:', actualTopic);
+          setTopicsList(prevTopics => 
+            prevTopics.map((topic, index) => ({
+              ...topic,
+              isActive: index === 0 // Only first topic is active
+            }))
+          );
+        }
+      } else {
+        // If no topic is specified in URL and we have topics, select the first one
+        const firstTopic = topicsList[0];
+        if (firstTopic) {
+          console.log('🎯 Auto-selecting first topic:', firstTopic.name);
+          
+          // Set the first topic as active in the topics list
+          setTopicsList(prevTopics => 
+            prevTopics.map((topic, index) => ({
+              ...topic,
+              isActive: index === 0 // Only first topic is active
+            }))
+          );
+          
+          // Update URL to include the first topic
+          const newSearchParams = new URLSearchParams(searchParams);
+          newSearchParams.set("topic", firstTopic.name);
+          navigate(`/pro-learning/${courseId}?${newSearchParams.toString()}`, { replace: true });
+          
+          // Load content for the first topic automatically
+          console.log('🔄 Auto-loading content for first topic:', firstTopic.name);
+          loadTopicContent(firstTopic.name);
         }
       }
     }
@@ -606,12 +630,26 @@ const ProLearningPage = () => {
           resources: storedContent.resources || []
         });
         
+        // Parse and set reading sections
+        if (storedContent.reading) {
+          const sections = parseReadingSections(storedContent.reading);
+          setReadingSections(sections);
+          setReadingSectionIndex(0);
+        }
+        
         console.log('✅ Loaded content from storage for:', topicName);
       } else {
         // Fallback to generating content if not in storage
         console.log('⚠️ No stored content found, generating for:', topicName);
         const result = await proContentManager.getTopicContent(topicName, generateProContent);
         setContent(result.content);
+        
+        // Parse and set reading sections for generated content
+        if (result.content && result.content.reading) {
+          const sections = parseReadingSections(result.content.reading);
+          setReadingSections(sections);
+          setReadingSectionIndex(0);
+        }
       }
     } catch (error) {
       console.error('❌ Failed to load topic content:', error);
@@ -769,7 +807,9 @@ const ProLearningPage = () => {
   useEffect(() => {
     const loadInitialTopicContent = async () => {
       if (topicParam && !isLoading && !content) {
-        console.log('🎯 Loading initial content for topic from URL:', topicParam);
+        // Handle case where topicParam might contain multiple topics (comma-separated)
+        const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
+        console.log('🎯 Loading initial content for topic from URL:', actualTopic);
         
         const currentCourseId = getCourseId();
         if (!currentCourseId) {
@@ -778,10 +818,10 @@ const ProLearningPage = () => {
         }
 
         // Check if we have stored content for this topic
-        const storedContent = proContentManager.getStoredTopicContent(currentCourseId, topicParam);
+        const storedContent = proContentManager.getStoredTopicContent(currentCourseId, actualTopic);
         
         if (storedContent && storedContent.reading) {
-          console.log('✅ Found stored content for topic:', topicParam);
+          console.log('✅ Found stored content for topic:', actualTopic);
           
           // Set content directly from storage
           setContent({
@@ -792,15 +832,9 @@ const ProLearningPage = () => {
             resources: storedContent.resources || []
           });
           
-          // Update topicsList to mark this topic as active if it exists
-          setTopicsList(topics => topics.map(topic => ({
-            ...topic,
-            isActive: topic.name === topicParam
-          })));
-          
-          console.log('✅ Initial content loaded successfully for:', topicParam);
+          console.log('✅ Initial content loaded successfully for:', actualTopic);
         } else {
-          console.log('⚠️ No stored content found for topic:', topicParam);
+          console.log('⚠️ No stored content found for topic:', actualTopic);
           // The existing logic will handle generating content
         }
       }
