@@ -58,9 +58,14 @@ import proContentManager from '../../services/ProContentManager';
 import Navbar from '../Navbar/Navbar';
 import { classifyTopicsWithGemini } from './topicclassifier';
 import BatchGenerationStatus from './BatchGenerationStatus';
+import { saveAIGeneratedPlan, fetchUserAIGeneratedPlans } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { toast } from 'react-hot-toast';
+import { saveAITopicContent, fetchAITopicContent } from '../../services/api';
 
 
 const ProLearningPage = () => {
+  const auth = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const params = useParams();
@@ -95,10 +100,19 @@ const ProLearningPage = () => {
         const batchData = localStorage.getItem('proLearning_batchGeneration');
         if (batchData) {
           try {
-            const { courseId: batchCourseId, topics } = JSON.parse(batchData);
+            const { courseId: batchCourseId, topics, topicString, originalQuery, triggerBatchGeneration } = JSON.parse(batchData);
             if (batchCourseId === currentCourseId && topics && topics.length > 0) {
               console.log('✅ Loading topics from batch generation data:', topics);
               setTopicsList(topics);
+              
+              // Set the query parameter from the original user input
+              if (originalQuery && !searchParams.get('query')) {
+                const params = new URLSearchParams(searchParams);
+                params.set('query', originalQuery);
+                setSearchParams(params);
+                console.log('✅ Set query parameter from batch generation:', originalQuery);
+              }
+              
               return; // Don't set default topics
             }
           } catch (error) {
@@ -1350,6 +1364,28 @@ const ProLearningPage = () => {
                   </button>
                 </div>
               </div>
+              {/* Add debug panel above Save to DB button in the reading tab */}
+              <div className="p-2 mb-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-gray-700">
+                <strong>Debug Info:</strong><br />
+                <span>courseTitle: {JSON.stringify(courseTitle)}</span><br />
+                <span>topicName: {JSON.stringify(getCurrentTopic())}</span><br />
+                <span>content: {content ? 'Loaded' : 'null'}</span><br />
+                <span>auth.user: {auth?.user ? 'Logged in' : 'Not logged in'}</span><br />
+                <span>auth.token: {auth?.getToken ? (auth.getToken() ? 'Present' : 'Missing') : 'Function not available'}</span><br />
+                <span>user.email: {auth?.user?.email || 'N/A'}</span><br />
+                <span>totalTopics: {topicsList.length}</span><br />
+                <span>topics: {topicsList.map(t => t.name).join(', ')}</span><br />
+                <span>completedTopics: {completedTopics.length}</span>
+              </div>
+              {topicsList.length > 0 && (
+                <button
+                  onClick={handleSaveToDB}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow transition-all duration-300 mt-4 mb-4"
+                  // Always enabled for debugging
+                >
+                  💾 Save All Topics to DB ({topicsList.length} topics)
+                </button>
+              )}
             </div>
             {/* Section Navigation */}
             {readingSections.length > 1 && (
@@ -2394,6 +2430,286 @@ const ProLearningPage = () => {
     setBatchGenerationProgress(0);
     setBatchGenerationStatus('');
   };
+
+  // Enhanced handler for saving ALL classified topics to DB
+  const handleSaveToDB = async () => {
+    try {
+      let title = courseTitle;
+      if (!title) {
+        // Create title from user input and classified topics
+        const userInput = searchParams.get('query') || '';
+        const topicNames = topicsList.map(topic => topic.name);
+        const defaultTitle = topicNames.length > 0 
+          ? userInput 
+            ? `${userInput} and ${topicNames.join(' and ')}`
+            : topicNames.join(' and ')
+          : userInput || 'AI Learning Course';
+        
+        title = window.prompt('Please enter a course title to save:', defaultTitle);
+        if (!title) {
+          toast.error('Course title is required!');
+          return;
+        }
+        
+        // Update the URL with the new courseTitle
+        const params = new URLSearchParams(window.location.search);
+        params.set('courseTitle', title);
+        window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+        
+        // Update the local state
+        setSearchParams(params);
+      }
+
+      const user = auth?.user;
+      const token = auth?.getToken ? auth.getToken() : auth?.token;
+      
+      console.log('🔐 Authentication check:', {
+        user: !!user,
+        token: !!token,
+        userEmail: user?.email,
+        tokenLength: token?.length
+      });
+      
+      if (!user) {
+        toast.error('Please log in to save content to your account!');
+        return;
+      }
+      
+      if (!token) {
+        // Try to refresh the token first
+        try {
+          await auth?.validateAuth();
+          const refreshedToken = auth?.getToken ? auth.getToken() : auth?.token;
+          if (refreshedToken) {
+            console.log('✅ Token refreshed successfully');
+          } else {
+            toast.error('Authentication token missing. Please log in again.');
+            return;
+          }
+        } catch (error) {
+          console.error('❌ Failed to refresh token:', error);
+          toast.error('Authentication token missing. Please log in again.');
+          return;
+        }
+      }
+
+      if (topicsList.length === 0) {
+        toast.error('No topics to save! Please generate some content first.');
+        return;
+      }
+
+      console.log('🚀 Starting comprehensive save to DB for course:', title);
+      console.log('📋 Topics to save:', topicsList);
+
+      // Check which topics have content before saving
+      const topicsWithContent = [];
+      const topicsWithoutContent = [];
+      
+      for (const topic of topicsList) {
+        const topicContent = proContentManager.getStoredTopicContent(getCourseId(), topic.name);
+        if (topicContent && (topicContent.reading || topicContent.summary || 
+            (topicContent.videos && topicContent.videos.length > 0) || 
+            (topicContent.resources && topicContent.resources.length > 0))) {
+          topicsWithContent.push(topic.name);
+        } else {
+          topicsWithoutContent.push(topic.name);
+        }
+      }
+
+      console.log('📊 Content analysis:', {
+        topicsWithContent,
+        topicsWithoutContent,
+        totalTopics: topicsList.length
+      });
+
+      if (topicsWithContent.length === 0) {
+        toast.error('No topics have content to save! Please generate content first.');
+        return;
+      }
+
+      // Save ALL classified topics to DB
+      const savedTopics = [];
+      const failedTopics = [];
+
+      // 1. Save each classified topic individually (Inner Level)
+      for (const topic of topicsList) {
+        try {
+          // Get content for this topic from local storage
+          const topicContent = proContentManager.getStoredTopicContent(getCourseId(), topic.name);
+          
+          if (topicContent) {
+            const topicData = {
+              course_title: title,
+              topic_name: topic.name, // Use actual topic name, not title
+              reading: topicContent.reading || '',
+              summary: topicContent.summary || '',
+              videos: topicContent.videos || [],
+              resources: topicContent.resources || []
+            };
+
+            console.log(`💾 Saving topic "${topic.name}" to DB:`, {
+              courseTitle: title,
+              topicName: topic.name,
+              contentTypes: {
+                reading: !!topicContent.reading,
+                summary: !!topicContent.summary,
+                videos: topicContent.videos?.length || 0,
+                resources: topicContent.resources?.length || 0
+              }
+            });
+
+            await saveAITopicContent(topicData, token);
+            savedTopics.push(topic.name);
+            console.log(`✅ Successfully saved topic: ${topic.name}`);
+          } else {
+            console.log(`⚠️ No content found for topic: ${topic.name}`);
+            failedTopics.push(topic.name);
+          }
+        } catch (error) {
+          console.error(`❌ Failed to save topic "${topic.name}":`, error);
+          failedTopics.push(topic.name);
+        }
+      }
+
+      // 2. Save overall learning plan with ALL topics (Outer Level)
+      if (topicsList.length > 0) {
+        const learningPlanData = {
+          title: title,
+          description: `AI-generated learning plan for ${title} with ${topicsList.length} classified topics`,
+          plan_data: {
+            goal: title,
+            days: topicsList.map((topic, index) => ({
+              day: index + 1,
+              topic: topic.name,
+              description: topic.description || `Topic: ${topic.name}`,
+              is_completed: completedTopics.includes(topic.id),
+              videos: [],
+              resources: []
+            })),
+            total_topics: topicsList.length,
+            saved_topics: savedTopics.length,
+            failed_topics: failedTopics.length
+          },
+          difficulty_level: 'beginner',
+          duration_days: topicsList.length,
+          category: 'AI Generated'
+        };
+        
+        try {
+          await saveAIGeneratedPlan(learningPlanData, token);
+          console.log('✅ Saved overall learning plan to DB with all topics');
+        } catch (planError) {
+          console.warn('⚠️ Failed to save learning plan:', planError);
+          // Don't fail the whole operation if plan save fails
+        }
+      }
+
+      // Show comprehensive success message
+      const successMessage = `Saved ${savedTopics.length} topics to your account!`;
+      let detailsMessage = '';
+      
+      if (topicsWithoutContent.length > 0) {
+        detailsMessage += ` (${topicsWithoutContent.length} topics had no content)`;
+      }
+      if (failedTopics.length > 0) {
+        detailsMessage += ` (${failedTopics.length} topics failed to save)`;
+      }
+      
+      toast.success(successMessage + detailsMessage);
+      console.log('🎉 Save to DB completed:', {
+        totalTopics: topicsList.length,
+        topicsWithContent: topicsWithContent.length,
+        topicsWithoutContent: topicsWithoutContent.length,
+        savedTopics,
+        failedTopics
+      });
+
+    } catch (err) {
+      console.error('❌ Save to DB failed:', err);
+      toast.error('Failed to save to DB: ' + (err.message || err));
+    }
+  };
+
+  useEffect(() => {
+    const tryLoadFromDB = async () => {
+      const token = auth?.getToken ? auth.getToken() : auth?.token;
+      if (!auth?.user || !token || !courseTitle) return;
+      try {
+        console.log('🔄 Loading from DB for course:', courseTitle);
+        
+        // Enhanced loading structure:
+        // 1. Try to load learning plan first to get all topics
+        try {
+          const plansResult = await fetchUserAIGeneratedPlans(token);
+          const matchingPlan = plansResult.find(plan => 
+            plan.title === courseTitle || plan.title.toLowerCase().includes(courseTitle.toLowerCase())
+          );
+          
+          if (matchingPlan && matchingPlan.plan_data && matchingPlan.plan_data.days && matchingPlan.plan_data.days.length > 0) {
+            console.log('📋 Found learning plan with topics:', matchingPlan.plan_data.days);
+            
+            // Update topics list from the plan
+            const planTopics = matchingPlan.plan_data.days.map((day, index) => ({
+              id: index + 1,
+              name: day.topic,
+              description: day.description || `Topic: ${day.topic}`,
+              isActive: index === 0 // First topic active by default
+            }));
+            
+            setTopicsList(planTopics);
+            
+            // Load content for the first topic
+            const firstTopic = matchingPlan.plan_data.days[0];
+            const topicResult = await fetchAITopicContent(token, courseTitle, firstTopic.topic);
+            if (topicResult && topicResult.results && topicResult.results.length > 0) {
+              const topicContent = topicResult.results[0];
+              setContent({
+                reading: topicContent.reading,
+                summary: topicContent.summary,
+                videos: topicContent.videos,
+                resources: topicContent.resources
+              });
+              toast.success(`Loaded learning plan with ${matchingPlan.plan_data.days.length} topics from your account!`);
+              return;
+            }
+          }
+        } catch (planError) {
+          console.warn('⚠️ Failed to load learning plan:', planError);
+        }
+        
+        // 2. Try to load specific topic content
+        const currentTopic = getCurrentTopic();
+        const topicName = currentTopic || courseTitle;
+        
+        console.log('🔍 Loading specific topic from DB:', { courseTitle, topicName });
+        
+        const result = await fetchAITopicContent(token, courseTitle, topicName);
+        if (result && result.results && result.results.length > 0) {
+          const topicContent = result.results[0];
+          setContent({
+            reading: topicContent.reading,
+            summary: topicContent.summary,
+            videos: topicContent.videos,
+            resources: topicContent.resources
+          });
+          toast.success('Loaded AI-generated content from your account!');
+          return;
+        }
+        
+        // 3. Fallback to local storage
+        const storedContent = proContentManager.getStoredTopicContent(getCourseId(), topicName);
+        if (storedContent) {
+          setContent(storedContent);
+          toast('Loaded content from local storage.');
+        }
+      } catch (err) {
+        console.error('❌ Failed to load from DB:', err);
+        toast.error('Failed to load from DB: ' + (err.message || err));
+      }
+    };
+    tryLoadFromDB();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth?.user, auth?.token, courseTitle]);
 
   return (
     <>

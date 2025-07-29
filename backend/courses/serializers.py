@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     SchoolCourse, EngineeringCourse, CourseChapter, 
-    CourseSection, Lesson, LessonResource, QuizQuestion, UserLessonProgress
+    CourseSection, Lesson, LessonResource, QuizQuestion, UserLessonProgress, AITopicContent
 )
 
 class LessonResourceSerializer(serializers.ModelSerializer):
@@ -113,3 +113,19 @@ class EngineeringCourseWithSectionsSerializer(serializers.ModelSerializer):
             'requirements', 'category', 'last_updated', 'is_published', 
             'sections'
         ]
+
+class AITopicContentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AITopicContent
+        fields = [
+            'id', 'user', 'course_title', 'topic_name',
+            'reading', 'summary', 'videos', 'resources',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'user', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['user'] = request.user
+        return super().create(validated_data)

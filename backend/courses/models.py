@@ -303,3 +303,25 @@ class AILearningPlan(models.Model):
         
         # Create the plan
         return cls.objects.create(user=user, title=title, **kwargs)
+
+class AITopicContent(models.Model):
+    """Model for storing AI-generated content for individual topics"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ai_topic_contents')
+    course_title = models.CharField(max_length=255)
+    topic_name = models.CharField(max_length=255)
+    reading = models.TextField(blank=True)
+    summary = models.TextField(blank=True)
+    videos = models.JSONField(default=list, blank=True, help_text="List of video objects")
+    resources = models.JSONField(default=list, blank=True, help_text="List of resource objects")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "course_title", "topic_name")
+        ordering = ["-created_at"]
+        verbose_name = "AI Topic Content"
+        verbose_name_plural = "AI Topic Contents"
+
+    def __str__(self):
+        return f"{self.course_title} - {self.topic_name} - {self.user.email if self.user else 'No User'}"

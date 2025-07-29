@@ -105,7 +105,9 @@ async function generateSingleTopicContent(topic) {
     
     if (!response.ok) {
       console.error(`❌ Backend AI reading endpoint failed with status: ${response.status}`);
-      throw new Error('Backend AI reading endpoint failed');
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error(`❌ Error details: ${errorText}`);
+      throw new Error(`Backend AI reading endpoint failed: ${response.status} - ${errorText}`);
     }
     
     const result = await response.json();

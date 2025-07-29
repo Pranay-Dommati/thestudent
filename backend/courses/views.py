@@ -1,12 +1,12 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, Http404
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, generics, permissions
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource
-from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer
+from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource, AITopicContent
+from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer, AITopicContentSerializer
 import json
 from django.conf import settings
 import os
@@ -1342,3 +1342,20 @@ def download_resource(request, resource_id):
             {'error': f'Failed to download file: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+class AITopicContentListCreateView(generics.ListCreateAPIView):
+    serializer_class = AITopicContentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = AITopicContent.objects.filter(user=self.request.user)
+        course_title = self.request.query_params.get('course_title')
+        topic_name = self.request.query_params.get('topic_name')
+        if course_title:
+            queryset = queryset.filter(course_title=course_title)
+        if topic_name:
+            queryset = queryset.filter(topic_name=topic_name)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

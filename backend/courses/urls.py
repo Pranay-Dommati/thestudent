@@ -1,6 +1,7 @@
 from django.urls import path, include
 from . import views
 from .urls_learning_plan import urlpatterns as learning_plan_urls
+from .views import AITopicContentListCreateView
 
 urlpatterns = [
     path('api/courses/create/', views.create_course, name='create-course'),
@@ -23,4 +24,8 @@ urlpatterns = [
     
     # Learning Plan URLs
     path('api/learning/', include('courses.urls_learning_plan')),
+]
+
+urlpatterns += [
+    path('api/courses/ai-topic-content/', AITopicContentListCreateView.as_view(), name='ai-topic-content-list-create'),
 ]

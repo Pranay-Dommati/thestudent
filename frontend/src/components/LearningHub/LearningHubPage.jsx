@@ -7,6 +7,7 @@ import SavedPlaylists from './SavedPlaylists/SavedPlaylists';
 import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
 import CourseRecommendations from './CourseRecommendations/CourseRecommendations';
 import AILearningPlans from './AILearningPlans/AILearningPlans';
+import AITopicContent from './AITopicContent/AITopicContent';
 
 const LearningHubPage = () => {
   // Mock user data - in a real app, this would come from authentication context
@@ -39,6 +40,7 @@ const LearningHubPage = () => {
                 <LearningAnalytics user={user} />
               </div>
               <ActiveCourses />
+              <AITopicContent />
               <AILearningPlans />
               <SavedPlaylists />
               <CourseRecommendations />

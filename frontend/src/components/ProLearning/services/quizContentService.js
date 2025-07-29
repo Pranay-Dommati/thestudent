@@ -55,7 +55,12 @@ async function generateAIQuizQuestions(topic, readingContent) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic, reading_content: readingContent })
     });
-    if (!response.ok) throw new Error('Backend AI quiz endpoint failed');
+    if (!response.ok) {
+      console.error(`❌ AI quiz endpoint failed with status: ${response.status}`);
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error(`❌ Quiz error details: ${errorText}`);
+      throw new Error(`Backend AI quiz endpoint failed: ${response.status} - ${errorText}`);
+    }
     const result = await response.json();
     // Parse backend AI response
     const quizText = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';

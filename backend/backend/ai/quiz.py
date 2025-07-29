@@ -111,9 +111,16 @@ Generate exactly 8-10 questions following the format above.
                 'stopSequences': []
             }
         }
-        response = requests.post(f'{GEMINI_API_URL}?key={GEMINI_API_KEY}', headers=headers, data=json.dumps(data))
+        response = requests.post(
+            f'{GEMINI_API_URL}?key={GEMINI_API_KEY}', 
+            headers=headers, 
+            data=json.dumps(data),
+            timeout=60  # Increased timeout for complex quiz generation
+        )
         if response.status_code != 200:
-            return JsonResponse({'error': f'Gemini API error: {response.status_code}'}, status=response.status_code)
+            print(f"❌ Gemini API error {response.status_code}: {response.text}")
+            return JsonResponse({'error': f'AI quiz generation failed: {response.status_code}'}, status=response.status_code)
         return JsonResponse(response.json(), safe=False)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500) 
+        print(f"❌ Error in quiz endpoint: {str(e)}")
+        return JsonResponse({'error': f'AI quiz generation failed: {str(e)}'}, status=500) 

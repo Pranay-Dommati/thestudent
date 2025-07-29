@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     SchoolCourse, EngineeringCourse, CourseChapter, 
-    CourseSection, Lesson, LessonResource, QuizQuestion, AILearningPlan
+    CourseSection, Lesson, LessonResource, QuizQuestion, AILearningPlan, AITopicContent
 )
 
 class LessonResourceInline(admin.TabularInline):
@@ -69,3 +69,24 @@ class AILearningPlanAdmin(admin.ModelAdmin):
     )
 
 admin.site.register(AILearningPlan, AILearningPlanAdmin)
+
+# Register AI Topic Content model
+class AITopicContentAdmin(admin.ModelAdmin):
+    list_display = ['course_title', 'topic_name', 'user', 'created_at', 'updated_at']
+    list_filter = ['created_at', 'updated_at', 'user']
+    search_fields = ['course_title', 'topic_name', 'user__email']
+    readonly_fields = ['id', 'created_at', 'updated_at']
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('id', 'user', 'course_title', 'topic_name')
+        }),
+        ('Content', {
+            'fields': ('reading', 'summary', 'videos', 'resources')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
+    )
+
+admin.site.register(AITopicContent, AITopicContentAdmin)

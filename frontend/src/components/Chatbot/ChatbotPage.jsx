@@ -730,6 +730,7 @@ const ChatbotPage = () => {
                             courseId: message.courseId,
                             topics: message.extractedTopics || [],
                             topicString: message.topic,
+                            originalQuery: originalPrompt, // Store the original user query
                             triggerBatchGeneration: true,
                             timestamp: Date.now()
                           };

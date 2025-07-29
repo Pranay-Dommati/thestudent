@@ -32,7 +32,7 @@ def call_gemini_api(prompt, max_retries=3):
                 f'{GEMINI_API_URL}?key={settings.GEMINI_API_KEY}', 
                 headers=headers, 
                 data=json.dumps(data),
-                timeout=30
+                timeout=60  # Increased timeout for complex content generation
             )
             
             if response.status_code == 200:

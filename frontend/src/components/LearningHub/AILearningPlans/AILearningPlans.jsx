@@ -10,7 +10,7 @@ const AILearningPlans = () => {
   useEffect(() => {
     const fetchPlans = async () => {
       try {
-        const response = await axiosInstance.get('/learning/user-plans/');
+        const response = await axiosInstance.get('/api/learning/user-plans/');
         setPlans(response.data.plans || []);
       } catch (error) {
         setError('Failed to load learning plans');

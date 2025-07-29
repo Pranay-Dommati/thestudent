@@ -137,4 +137,5 @@ Generate only the markdown content. Be comprehensive but concise.
         result = call_gemini_api(prompt)
         return JsonResponse(result, safe=False)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500) 
+        print(f"❌ Error in reading endpoint: {str(e)}")
+        return JsonResponse({'error': f'AI content generation failed: {str(e)}'}, status=500) 

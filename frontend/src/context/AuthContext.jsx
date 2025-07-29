@@ -204,6 +204,12 @@ export const AuthProvider = ({ children }) => {
   const isAuthenticated = () => {
     return isLoggedIn && !!localStorage.getItem('accessToken');
   };
+
+  // Get current token from localStorage
+  const getToken = () => {
+    return localStorage.getItem('accessToken');
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user,
@@ -213,7 +219,9 @@ export const AuthProvider = ({ children }) => {
       register,
       login,
       logout,
-      validateAuth // Export the validate function
+      validateAuth, // Export the validate function
+      token: getToken(), // Export the current token
+      getToken // Export the function to get token
     }}>
       {children}
     </AuthContext.Provider>
