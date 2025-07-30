@@ -39,30 +39,42 @@ export async function generateProContent({ topic, setIsLoading, setLoadingProgre
   setLoadingProgress(0);
   setShowSkeletons(true);
   
-  // Initialize content structure if not exists
-  if (!content) {
-    console.log('🔧 ProLearningLogic: Initializing empty content structure');
-    setContent({
-      reading: '',
-      summary: '',
-      videos: [],
-      quiz: [],
-      resources: [],
-      metadata: {}
-    });
-  } else {
-    console.log('🔧 ProLearningLogic: Content already exists:', {
-      readingLength: content?.reading?.length || 0,
-      hasReading: !!content?.reading
-    });
-  }
+  // Use local content variable to avoid calling setContent multiple times
+  let localContent = content || {
+    reading: '',
+    summary: '',
+    videos: [],
+    quiz: [],
+    resources: [],
+    metadata: {}
+  };
+  
+  console.log('🔧 ProLearningLogic: Starting content generation with local content structure');
   
   try {
     // Step 1: Generate Reading Content
     setLoadingStep('📘 Generating comprehensive reading material...');
     setLoadingProgress(10);
     console.log('🔧 ProLearningLogic: About to call generateReadingContent for topic:', topic);
-    await generateReadingContent(topic, setContent);
+    
+    // Create a wrapper setContent that updates local content properly
+    const localSetContent = (updater) => {
+      if (typeof updater === 'function') {
+        localContent = updater(localContent);
+      } else {
+        // Merge the new content with existing content
+        localContent = { ...localContent, ...updater };
+      }
+      console.log('🔧 ProLearningLogic: Local content updated:', {
+        hasReading: !!localContent.reading,
+        hasSummary: !!localContent.summary,
+        hasQuiz: localContent.quiz && localContent.quiz.length > 0,
+        hasVideos: localContent.videos && localContent.videos.length > 0,
+        hasResources: localContent.resources && localContent.resources.length > 0
+      });
+    };
+    
+    await generateReadingContent(topic, localSetContent);
     console.log('🔧 ProLearningLogic: generateReadingContent completed for topic:', topic);
     // Wait a bit to ensure content is updated
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -71,60 +83,73 @@ export async function generateProContent({ topic, setIsLoading, setLoadingProgre
     setLoadingStep('🧠 Creating summary and key points...');
     setLoadingProgress(30);
     // Get the latest content state
-    await new Promise((resolve) => {
-      setContent((prev) => {
-        const currentReading = prev.reading || '';
-        generateSummaryContent(setContent, topic, currentReading).then(resolve);
-        return prev;
-      });
-    });
+    const currentReading = localContent.reading || '';
+    await generateSummaryContent(localSetContent, topic, currentReading);
     
     // Step 3: Generate Videos
     setLoadingStep('🎥 Finding best educational videos...');
     setLoadingProgress(50);
-    await generateVideosContent(setContent, topic);
+    await generateVideosContent(localSetContent, topic);
     
     // Step 4: Generate Quiz
     setLoadingStep('✅ Designing interactive quiz questions...');
     setLoadingProgress(70);
-    await new Promise((resolve) => {
-      setContent((prev) => {
-        const currentReading = prev.reading || '';
-        generateQuizContent(setContent, topic, currentReading).then(resolve);
-        return prev;
-      });
-    });
+    const quizReading = localContent.reading || '';
+    await generateQuizContent(localSetContent, topic, quizReading);
     
     // Step 5: Generate Resources
     setLoadingStep('📚 Curating additional learning resources...');
     setLoadingProgress(85);
-    await generateResourcesContent(setContent, topic);
+    await generateResourcesContent(localSetContent, topic);
     
     // Step 6: Finalize and calculate stats
     setLoadingStep('✨ Finalizing your learning experience...');
     setLoadingProgress(95);
     
-    // Calculate stats with a small delay to ensure all content is loaded
-    setTimeout(() => {
-      setContent((prev) => {
-        const readingWordCount = prev.reading ? prev.reading.split(' ').length : 0;
-        setStats({
-          estimatedReadTime: Math.ceil(readingWordCount / 200),
-          totalQuestions: prev.quiz ? prev.quiz.length : 0,
-          totalVideos: prev.videos ? prev.videos.length : 0,
-          totalResources: prev.resources ? prev.resources.length : 0,
-          difficulty: readingWordCount > 1500 ? 'Advanced' : readingWordCount > 800 ? 'Intermediate' : 'Beginner',
-          completionRate: 0
-        });
-        return prev;
-      });
-    }, 200);
+    // Calculate stats
+    const readingWordCount = localContent.reading ? localContent.reading.split(' ').length : 0;
+    const stats = {
+      estimatedReadTime: Math.ceil(readingWordCount / 200),
+      totalQuestions: localContent.quiz ? localContent.quiz.length : 0,
+      totalVideos: localContent.videos ? localContent.videos.length : 0,
+      totalResources: localContent.resources ? localContent.resources.length : 0,
+      difficulty: readingWordCount > 1500 ? 'Advanced' : readingWordCount > 800 ? 'Intermediate' : 'Beginner',
+      completionRate: 0
+    };
+    
+    // Set stats if the function is provided
+    if (setStats) {
+      setStats(stats);
+    }
     
     setLoadingProgress(100);
+    
+    // Final setContent call with complete content - this resolves the Promise in ProContentManager
+    console.log('✅ ProLearningLogic: Content generation complete, calling setContent with final result');
+    console.log('🔧 ProLearningLogic: Final content structure:', {
+      hasReading: !!localContent.reading,
+      hasSummary: !!localContent.summary,
+      hasQuiz: localContent.quiz && localContent.quiz.length > 0,
+      hasVideos: localContent.videos && localContent.videos.length > 0,
+      hasResources: localContent.resources && localContent.resources.length > 0,
+      readingLength: localContent.reading ? localContent.reading.length : 0
+    });
+    setContent(localContent);
     
   } catch (error) {
     setLoadingStep('❌ Error loading content. Please refresh and try again.');
     console.error('ProContent generation error:', error);
+    
+    // Even on error, call setContent to prevent timeout in ProContentManager
+    console.log('❌ ProLearningLogic: Error occurred, calling setContent with current content');
+    setContent(localContent || {
+      reading: '',
+      summary: '',
+      videos: [],
+      quiz: [],
+      resources: [],
+      metadata: { error: error.message }
+    });
   } finally {
     setTimeout(() => {
       setIsLoading(false);

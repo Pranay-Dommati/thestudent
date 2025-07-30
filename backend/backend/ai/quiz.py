@@ -7,7 +7,7 @@ def handle_quiz(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     GEMINI_API_KEY = settings.GEMINI_API_KEY
-    GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+    GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent'
     try:
         body = json.loads(request.body.decode('utf-8'))
         topic = body.get('topic', '')
@@ -111,9 +111,44 @@ Generate exactly 8-10 questions following the format above.
                 'stopSequences': []
             }
         }
-        response = requests.post(f'{GEMINI_API_URL}?key={GEMINI_API_KEY}', headers=headers, data=json.dumps(data))
-        if response.status_code != 200:
-            return JsonResponse({'error': f'Gemini API error: {response.status_code}'}, status=response.status_code)
-        return JsonResponse(response.json(), safe=False)
+        
+        # Enhanced retry logic for 503/429 errors
+        import time
+        import random
+        max_retries = 5
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"🔑 Calling Gemini 1.5 Pro Quiz API (attempt {attempt + 1}/{max_retries})")
+                response = requests.post(f'{GEMINI_API_URL}?key={GEMINI_API_KEY}', headers=headers, data=json.dumps(data), timeout=30)
+                
+                if response.status_code == 200:
+                    print("✅ Gemini Quiz API call successful")
+                    return JsonResponse(response.json(), safe=False)
+                elif response.status_code in [429, 503]:
+                    # Exponential backoff with jitter
+                    base_delay = 2 ** attempt
+                    jitter = random.uniform(0.5, 1.5)
+                    delay = min(base_delay * jitter, 60)
+                    
+                    error_type = "Rate limit" if response.status_code == 429 else "Service overloaded"
+                    print(f"⏰ Quiz {error_type} ({response.status_code}), retrying in {delay:.1f} seconds...")
+                    
+                    if attempt < max_retries - 1:
+                        time.sleep(delay)
+                        continue
+                else:
+                    print(f"❌ Quiz API error {response.status_code}: {response.text}")
+                    if attempt < max_retries - 1:
+                        time.sleep(2)
+                        continue
+                    
+            except Exception as api_error:
+                print(f"❌ Quiz API exception: {str(api_error)}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                    continue
+        
+        return JsonResponse({'error': f'Quiz API failed after {max_retries} attempts'}, status=503)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500) 

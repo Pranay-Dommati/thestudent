@@ -65,16 +65,18 @@ class ProContentManager {
           return null;
         }
 
-        // Start content generation
         console.log('🚀 Starting content generation for:', topicName);
+        const generationStartTime = Date.now();
         const generatedContent = await new Promise((resolve, reject) => {
           let resolved = false;
           const timeout = setTimeout(() => {
             if (!resolved) {
               resolved = true;
+              const elapsed = (Date.now() - generationStartTime) / 1000;
+              console.error(`⏰ Content generation timeout after ${elapsed}s for topic: ${topicName}`);
               reject(new Error('Content generation timeout - this usually means the setContent callback was not called properly'));
             }
-          }, 60000); // Increased to 60 seconds for batch generation
+          }, 300000); // Increased to 5 minutes for AI content generation with retry logic
 
           generateCallback({
             topic: topicName,
@@ -83,6 +85,7 @@ class ProContentManager {
             setShowSkeletons: () => {},
             setLoadingStep: () => {},
             setContent: (newContent) => {
+              const elapsed = (Date.now() - generationStartTime) / 1000;
               if (!resolved) {
                 clearTimeout(timeout);
                 resolved = true;
@@ -90,8 +93,10 @@ class ProContentManager {
                 // Ensure we have a proper content object
                 const content = typeof newContent === 'function' ? newContent({}) : newContent;
                 
-                console.log('✅ Content generation completed, resolving with:', content);
+                console.log(`✅ Content generation completed after ${elapsed}s, resolving with:`, content);
                 resolve(content);
+              } else {
+                console.log(`⚠️ setContent called after Promise already resolved (${elapsed}s), ignoring`);
               }
             },
             setStats: () => {},
