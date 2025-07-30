@@ -248,6 +248,10 @@ const ProLearningPage = () => {
   // Copy code functionality
   const [copySuccessMap, setCopySuccessMap] = useState({});
   
+  // Save to Learning Hub functionality
+  const [isSavingToHub, setIsSavingToHub] = useState(false);
+  const [savedToHub, setSavedToHub] = useState(false);
+  
   // Completion tracking
   const [completedTopics, setCompletedTopics] = useState(() => {
     try {
@@ -798,6 +802,59 @@ const ProLearningPage = () => {
         setCopySuccessMap(prev => ({ ...prev, [blockId]: false }));
       }, 2000);
     });
+  };
+
+  // Save to Learning Hub functionality
+  const handleSaveToLearningHub = async () => {
+    try {
+      setIsSavingToHub(true);
+      
+      const currentCourseId = getCourseId();
+      if (!currentCourseId || !courseTitle) {
+        console.error('❌ Missing course ID or title');
+        return;
+      }
+
+      // Get all course content from local storage
+      const courseContent = proContentManager.getStoredCourseContent(currentCourseId);
+      if (!courseContent || !courseContent.topics) {
+        console.error('❌ No course content found in local storage');
+        return;
+      }
+
+      console.log('📤 Preparing to save course to database:', {
+        courseId: currentCourseId,
+        courseTitle,
+        topicsCount: Object.keys(courseContent.topics).length
+      });
+
+      // Prepare the data for the POST request
+      const courseData = {
+        course_id: currentCourseId,
+        title: courseTitle,
+        topics: courseContent.topics,
+        created_at: new Date().toISOString()
+      };
+
+      // TODO: Replace with actual API endpoint
+      console.log('🚀 Course data ready for API:', courseData);
+      
+      // Simulate API call for now
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setSavedToHub(true);
+      console.log('✅ Course saved to Learning Hub successfully!');
+      
+      // Reset success state after 3 seconds
+      setTimeout(() => {
+        setSavedToHub(false);
+      }, 3000);
+
+    } catch (error) {
+      console.error('❌ Failed to save course to Learning Hub:', error);
+    } finally {
+      setIsSavingToHub(false);
+    }
   };
 
   // Check for pending topics
@@ -2717,6 +2774,53 @@ const ProLearningPage = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Save to Learning Hub Button */}
+              {content && topicsList.length > 0 && (
+                <div className="mb-6">
+                  <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-xl flex items-center justify-center shadow-lg mr-3">
+                          <FaBookmark className="text-lg" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">Course Ready!</h3>
+                          <p className="text-sm text-gray-600">Save this AI-generated course to your Learning Hub</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleSaveToLearningHub}
+                        disabled={isSavingToHub || savedToHub}
+                        className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center space-x-2 ${
+                          savedToHub
+                            ? 'bg-green-500 text-white cursor-default'
+                            : isSavingToHub
+                            ? 'bg-gray-400 text-white cursor-not-allowed'
+                            : 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white hover:from-emerald-700 hover:to-teal-800 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                        }`}
+                      >
+                        {savedToHub ? (
+                          <>
+                            <FaCheck className="text-lg" />
+                            <span>Saved to Hub!</span>
+                          </>
+                        ) : isSavingToHub ? (
+                          <>
+                            <BiLoaderAlt className="text-lg animate-spin" />
+                            <span>Saving...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FaBookmark className="text-lg" />
+                            <span>Save to Learning Hub</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Tab Content */}
               <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border overflow-hidden">
