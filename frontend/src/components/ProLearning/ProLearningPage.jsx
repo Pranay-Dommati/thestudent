@@ -1431,11 +1431,39 @@ const ProLearningPage = () => {
                         {children}
                       </h3>
                     ),
-                    p: ({children}) => (
-                      <p className="text-gray-700 leading-relaxed mb-4 text-base">
-                        {children}
-                      </p>
-                    ),
+                    p: ({children}) => {
+                      // Check if children contains block-level elements like code blocks
+                      const hasBlockElements = React.Children.toArray(children).some(child => {
+                        if (React.isValidElement(child)) {
+                          // Check for div elements or elements with specific class patterns that indicate block content
+                          return child.type === 'div' || 
+                                 (child.props?.className && typeof child.props.className === 'string' && 
+                                  (child.props.className.includes('relative my-6') || 
+                                   child.props.className.includes('code-block') ||
+                                   child.props.className.includes('syntax-highlighter'))) ||
+                                 (child.props?.children && typeof child.props.children === 'object' &&
+                                  React.Children.toArray(child.props.children).some(grandchild =>
+                                    React.isValidElement(grandchild) && grandchild.type === 'div'
+                                  ));
+                        }
+                        return false;
+                      });
+                      
+                      if (hasBlockElements) {
+                        // Use div instead of p to avoid nesting block elements in p
+                        return (
+                          <div className="text-gray-700 leading-relaxed mb-4 text-base">
+                            {children}
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <p className="text-gray-700 leading-relaxed mb-4 text-base">
+                          {children}
+                        </p>
+                      );
+                    },
                     code({node, inline, className, children, ...props}) {
                       const match = /language-(\w+)/.exec(className || "");
                       const lang = match ? match[1] : "";
@@ -1586,11 +1614,39 @@ const ProLearningPage = () => {
                           {children}
                         </h3>
                       ),
-                      p: ({children}) => (
-                        <p className="text-gray-700 leading-relaxed mb-4 text-base">
-                          {children}
-                        </p>
-                      ),
+                      p: ({children}) => {
+                        // Check if children contains block-level elements like code blocks
+                        const hasBlockElements = React.Children.toArray(children).some(child => {
+                          if (React.isValidElement(child)) {
+                            // Check for div elements or elements with specific class patterns that indicate block content
+                            return child.type === 'div' || 
+                                   (child.props?.className && typeof child.props.className === 'string' && 
+                                    (child.props.className.includes('relative my-6') || 
+                                     child.props.className.includes('code-block') ||
+                                     child.props.className.includes('syntax-highlighter'))) ||
+                                   (child.props?.children && typeof child.props.children === 'object' &&
+                                    React.Children.toArray(child.props.children).some(grandchild =>
+                                      React.isValidElement(grandchild) && grandchild.type === 'div'
+                                    ));
+                          }
+                          return false;
+                        });
+                        
+                        if (hasBlockElements) {
+                          // Use div instead of p to avoid nesting block elements in p
+                          return (
+                            <div className="text-gray-700 leading-relaxed mb-4 text-base">
+                              {children}
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <p className="text-gray-700 leading-relaxed mb-4 text-base">
+                            {children}
+                          </p>
+                        );
+                      },
                       code({node, inline, className, children, ...props}) {
                         const match = /language-(\w+)/.exec(className || "");
                         const lang = match ? match[1] : "";
@@ -1829,11 +1885,39 @@ const ProLearningPage = () => {
                       {children}
                     </h3>
                   ),
-                  p: ({children}) => (
-                    <p className="text-gray-700 leading-relaxed mb-4">
-                      {children}
-                    </p>
-                  ),
+                  p: ({children}) => {
+                    // Check if children contains block-level elements like code blocks
+                    const hasBlockElements = React.Children.toArray(children).some(child => {
+                      if (React.isValidElement(child)) {
+                        // Check for div elements or elements with specific class patterns that indicate block content
+                        return child.type === 'div' || 
+                               (child.props?.className && typeof child.props.className === 'string' && 
+                                (child.props.className.includes('relative my-6') || 
+                                 child.props.className.includes('code-block') ||
+                                 child.props.className.includes('syntax-highlighter'))) ||
+                               (child.props?.children && typeof child.props.children === 'object' &&
+                                React.Children.toArray(child.props.children).some(grandchild =>
+                                  React.isValidElement(grandchild) && grandchild.type === 'div'
+                                ));
+                      }
+                      return false;
+                    });
+                    
+                    if (hasBlockElements) {
+                      // Use div instead of p to avoid nesting block elements in p
+                      return (
+                        <div className="text-gray-700 leading-relaxed mb-4">
+                          {children}
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <p className="text-gray-700 leading-relaxed mb-4">
+                        {children}
+                      </p>
+                    );
+                  },
                   ul: ({children}) => <ul className="space-y-3 mb-6 ml-6">{children}</ul>,
                   li: ({children}) => (
                     <li className="flex items-start text-gray-700">
