@@ -148,35 +148,50 @@ const ProLearningPage = () => {
         // Handle case where topicParam might contain multiple topics (comma-separated)
         const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
         
-        // Find the topic that matches the URL parameter
-        const matchingTopicIndex = topicsList.findIndex(topic => 
+        console.log('🔍 Looking for topic from URL:', actualTopic);
+        console.log('🔍 Available topics:', topicsList.map(t => t.name));
+        
+        // Find the topic that matches the URL parameter with multiple matching strategies
+        let matchingTopicIndex = -1;
+        
+        // Strategy 1: Exact match (case insensitive)
+        matchingTopicIndex = topicsList.findIndex(topic => 
           topic.name.toLowerCase().trim() === actualTopic.toLowerCase().trim()
         );
         
-        if (matchingTopicIndex !== -1) {
-          console.log('🎯 Setting active topic from URL:', actualTopic);
-          
-          // Set the matching topic as active in the topics list
-          setTopicsList(prevTopics => 
-            prevTopics.map((topic, index) => ({
-              ...topic,
-              isActive: index === matchingTopicIndex // Only matching topic is active
-            }))
-          );
-          
-          // Load content for the matching topic automatically
-          console.log('🔄 Auto-loading content for URL topic:', actualTopic);
-          loadTopicContent(actualTopic);
-        } else {
-          // If no matching topic found, activate the first topic as fallback
-          console.log('⚠️ Topic from URL not found in list, activating first topic:', actualTopic);
-          setTopicsList(prevTopics => 
-            prevTopics.map((topic, index) => ({
-              ...topic,
-              isActive: index === 0 // Only first topic is active
-            }))
+        // Strategy 2: Partial match - check if topic name contains the URL topic
+        if (matchingTopicIndex === -1) {
+          matchingTopicIndex = topicsList.findIndex(topic => 
+            topic.name.toLowerCase().includes(actualTopic.toLowerCase()) ||
+            actualTopic.toLowerCase().includes(topic.name.toLowerCase())
           );
         }
+        
+        // Strategy 3: If still not found, just use the first topic
+        if (matchingTopicIndex === -1) {
+          console.log('⚠️ Topic from URL not found, using first topic as fallback');
+          matchingTopicIndex = 0;
+        }
+        
+        const selectedTopicName = topicsList[matchingTopicIndex].name;
+        console.log('🎯 Selected topic:', selectedTopicName, 'at index:', matchingTopicIndex);
+        
+        // Set the matching topic as active in the topics list
+        setTopicsList(prevTopics => 
+          prevTopics.map((topic, index) => ({
+            ...topic,
+            isActive: index === matchingTopicIndex // Only matching topic is active
+          }))
+        );
+        
+        // Update URL to reflect the actual topic name (not the URL-encoded one)
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.set("topic", selectedTopicName);
+        navigate(`/pro-learning/${courseId}?${newSearchParams.toString()}`, { replace: true });
+        
+        // Load content for the selected topic automatically
+        console.log('🔄 Auto-loading content for selected topic:', selectedTopicName);
+        loadTopicContent(selectedTopicName);
       } else {
         // If no topic is specified in URL and we have topics, select the first one
         const firstTopic = topicsList[0];
@@ -618,9 +633,51 @@ const ProLearningPage = () => {
       setIsLoading(true);
       setLoadingStep(`Loading ${topicName} content...`);
 
-      const storedContent = proContentManager.getStoredTopicContent(currentCourseId, topicName);
+      console.log('🔍 Attempting to load content for:', topicName);
+      console.log('🔍 Course ID:', currentCourseId);
       
-      if (storedContent) {
+      // Try multiple ways to get stored content
+      let storedContent = null;
+      
+      // Method 1: Try the ProContentManager method
+      storedContent = proContentManager.getStoredTopicContent(currentCourseId, topicName);
+      console.log('🔍 Method 1 (ProContentManager):', storedContent ? 'Found' : 'Not found');
+      
+      // Method 2: Try direct storage access if Method 1 fails
+      if (!storedContent) {
+        try {
+          const courseContent = proContentManager.getStoredCourseContent(currentCourseId);
+          console.log('🔍 Course content structure:', courseContent);
+          
+          if (courseContent && courseContent.topics) {
+            storedContent = courseContent.topics[topicName]?.content;
+            console.log('🔍 Method 2 (Direct access):', storedContent ? 'Found' : 'Not found');
+          }
+        } catch (err) {
+          console.warn('🔍 Method 2 failed:', err);
+        }
+      }
+      
+      // Method 3: Try checking with different topic name formats if still not found
+      if (!storedContent && topicName) {
+        const courseContent = proContentManager.getStoredCourseContent(currentCourseId);
+        if (courseContent && courseContent.topics) {
+          // Try to find topic with similar names (case insensitive, trimmed)
+          const topicKeys = Object.keys(courseContent.topics);
+          const matchingKey = topicKeys.find(key => 
+            key.toLowerCase().trim() === topicName.toLowerCase().trim()
+          );
+          
+          if (matchingKey) {
+            storedContent = courseContent.topics[matchingKey]?.content;
+            console.log('🔍 Method 3 (Case insensitive):', storedContent ? `Found with key: ${matchingKey}` : 'Not found');
+          }
+        }
+      }
+      
+      if (storedContent && (storedContent.reading || storedContent.summary)) {
+        console.log('✅ Successfully found stored content for:', topicName);
+        
         // Transform stored content to the expected format
         setContent({
           reading: storedContent.reading || 'Content not available',
@@ -637,18 +694,26 @@ const ProLearningPage = () => {
           setReadingSectionIndex(0);
         }
         
-        console.log('✅ Loaded content from storage for:', topicName);
+        console.log('✅ Content loaded successfully from storage');
       } else {
         // Fallback to generating content if not in storage
-        console.log('⚠️ No stored content found, generating for:', topicName);
-        const result = await proContentManager.getTopicContent(topicName, generateProContent);
-        setContent(result.content);
+        console.log('⚠️ No stored content found, attempting generation for:', topicName);
+        console.log('⚠️ Available topic keys:', Object.keys(proContentManager.getStoredCourseContent(currentCourseId)?.topics || {}));
         
-        // Parse and set reading sections for generated content
-        if (result.content && result.content.reading) {
-          const sections = parseReadingSections(result.content.reading);
-          setReadingSections(sections);
-          setReadingSectionIndex(0);
+        const result = await proContentManager.getTopicContent(topicName, generateProContent);
+        
+        if (result && result.content) {
+          setContent(result.content);
+          
+          // Parse and set reading sections for generated content
+          if (result.content && result.content.reading) {
+            const sections = parseReadingSections(result.content.reading);
+            setReadingSections(sections);
+            setReadingSectionIndex(0);
+          }
+          console.log('✅ Content generated and loaded');
+        } else {
+          throw new Error('Failed to generate or retrieve content');
         }
       }
     } catch (error) {
@@ -662,6 +727,7 @@ const ProLearningPage = () => {
       });
     } finally {
       setIsLoading(false);
+      setLoadingStep('');
     }
   };
 
@@ -1121,6 +1187,60 @@ const ProLearningPage = () => {
     // Run the handler
     handleBatchGeneration();
   }, []); // Remove courseId dependency to prevent multiple triggers
+
+  // Auto-load first topic's content when all topics generation is completed
+  useEffect(() => {
+    // Only trigger when allTopicsGenerated becomes true and we don't have content loaded yet
+    if (allTopicsGenerated && !content && topicsList.length > 0) {
+      console.log('🎯 All topics generated! Auto-loading first topic content...');
+      console.log('🎯 Current loading states - isLoading:', isLoading, 'isBatchGenerating:', isBatchGenerating);
+      
+      // Determine which topic to load
+      const topicToLoad = topicParam || topicsList[0]?.name;
+      
+      if (topicToLoad) {
+        console.log('📖 Loading content for topic:', topicToLoad);
+        
+        // Set the first topic as active if no topic is currently active
+        if (!topicsList.some(t => t.isActive)) {
+          const topicIndex = topicsList.findIndex(t => t.name === topicToLoad);
+          if (topicIndex !== -1) {
+            setTopicsList(prevTopics => 
+              prevTopics.map((topic, index) => ({
+                ...topic,
+                isActive: index === topicIndex
+              }))
+            );
+          }
+        }
+        
+        // Ensure loading states are cleared first
+        setIsLoading(false);
+        setLoadingStep('');
+        
+        // Load the content
+        loadTopicContent(topicToLoad);
+        
+        // Update URL if needed (only if no topic param exists)
+        if (!topicParam && topicsList[0]?.name) {
+          const newSearchParams = new URLSearchParams(searchParams);
+          newSearchParams.set("topic", topicsList[0].name);
+          newSearchParams.set("tab", "reading"); // Default to reading tab
+          navigate(`/pro-learning/${courseId}?${newSearchParams.toString()}`, { replace: true });
+        }
+      }
+    }
+  }, [allTopicsGenerated, content, topicsList, topicParam, courseId, navigate, searchParams]);
+
+  // Safety mechanism: Clear loading states if content exists but loading states are still active
+  useEffect(() => {
+    if (content && (isLoading || loadingStep) && !isBatchGenerating) {
+      console.log('🛠️ Safety mechanism: Clearing stuck loading states');
+      console.log('🛠️ Content exists:', !!content, 'isLoading:', isLoading, 'loadingStep:', loadingStep);
+      setIsLoading(false);
+      setLoadingStep('');
+    }
+  }, [content, isLoading, loadingStep, isBatchGenerating]);
 
   // ...existing code...
 
