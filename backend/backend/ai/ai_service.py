@@ -3,8 +3,8 @@ import json
 from django.conf import settings
 
 def call_gemini_api(prompt, max_retries=3):
-    """Call Gemini API with simple retry logic"""
-    GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+    """Call Gemini API with simple retry logic - using Pro model temporarily"""
+    GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent'
     
     if not settings.GEMINI_API_KEY:
         raise Exception("Gemini API key not configured")

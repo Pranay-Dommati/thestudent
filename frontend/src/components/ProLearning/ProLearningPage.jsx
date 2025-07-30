@@ -1395,11 +1395,29 @@ const ProLearningPage = () => {
                         {children}
                       </h3>
                     ),
-                    p: ({children}) => (
-                      <p className="text-gray-700 leading-relaxed mb-4 text-base">
-                        {children}
-                      </p>
-                    ),
+                    p: ({children}) => {
+                      // Check if children contains code blocks (pre elements)
+                      const hasCodeBlock = React.Children.toArray(children).some(child => 
+                        React.isValidElement(child) && 
+                        (child.type === 'pre' || 
+                         (child.props && child.props.className && child.props.className.includes('language-')))
+                      );
+                      
+                      // Use div for paragraphs containing code blocks to avoid nesting issues
+                      if (hasCodeBlock) {
+                        return (
+                          <div className="text-gray-700 leading-relaxed mb-4 text-base">
+                            {children}
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <p className="text-gray-700 leading-relaxed mb-4 text-base">
+                          {children}
+                        </p>
+                      );
+                    },
                     code({node, inline, className, children, ...props}) {
                       const match = /language-(\w+)/.exec(className || "");
                       const lang = match ? match[1] : "";
@@ -1550,11 +1568,29 @@ const ProLearningPage = () => {
                           {children}
                         </h3>
                       ),
-                      p: ({children}) => (
-                        <p className="text-gray-700 leading-relaxed mb-4 text-base">
-                          {children}
-                        </p>
-                      ),
+                      p: ({children}) => {
+                        // Check if children contains code blocks (pre elements)
+                        const hasCodeBlock = React.Children.toArray(children).some(child => 
+                          React.isValidElement(child) && 
+                          (child.type === 'pre' || 
+                           (child.props && child.props.className && child.props.className.includes('language-')))
+                        );
+                        
+                        // Use div for paragraphs containing code blocks to avoid nesting issues
+                        if (hasCodeBlock) {
+                          return (
+                            <div className="text-gray-700 leading-relaxed mb-4 text-base">
+                              {children}
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <p className="text-gray-700 leading-relaxed mb-4 text-base">
+                            {children}
+                          </p>
+                        );
+                      },
                       code({node, inline, className, children, ...props}) {
                         const match = /language-(\w+)/.exec(className || "");
                         const lang = match ? match[1] : "";
@@ -1793,11 +1829,29 @@ const ProLearningPage = () => {
                       {children}
                     </h3>
                   ),
-                  p: ({children}) => (
-                    <p className="text-gray-700 leading-relaxed mb-4">
-                      {children}
-                    </p>
-                  ),
+                  p: ({children}) => {
+                    // Check if children contains code blocks (pre elements)
+                    const hasCodeBlock = React.Children.toArray(children).some(child => 
+                      React.isValidElement(child) && 
+                      (child.type === 'pre' || 
+                       (child.props && child.props.className && child.props.className.includes('language-')))
+                    );
+                    
+                    // Use div for paragraphs containing code blocks to avoid nesting issues
+                    if (hasCodeBlock) {
+                      return (
+                        <div className="text-gray-700 leading-relaxed mb-4">
+                          {children}
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <p className="text-gray-700 leading-relaxed mb-4">
+                        {children}
+                      </p>
+                    );
+                  },
                   ul: ({children}) => <ul className="space-y-3 mb-6 ml-6">{children}</ul>,
                   li: ({children}) => (
                     <li className="flex items-start text-gray-700">
