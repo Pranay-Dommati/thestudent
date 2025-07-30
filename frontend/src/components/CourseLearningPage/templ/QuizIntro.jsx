@@ -19,11 +19,7 @@ const QuizIntro = ({ quizData, lessonId, onStart }) => {
     
     console.log('Building quiz path from current path:', currentPath);
     
-    if (currentPath.includes('/learning/') && currentPath.split('/').length === 3) {
-      // AI Learning Plan path: /learning/:learningPlanId
-      const learningPlanId = params.learningPlanId;
-      quizPath = `/learning/${learningPlanId}/quiz`;
-    } else if (currentPath.includes('/engineering/')) {
+    if (currentPath.includes('/engineering/')) {
       // Engineering course path
       quizPath = `/courses/engineering/${params.courseId}/learning/quiz`;
     } else if (currentPath.includes('/10th/')) {

@@ -17,7 +17,6 @@ import { useAuth } from '../../context/AuthContext';
 // Update the function signature to accept the new props
 const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [course, setCourse] = useState(null);
-  const [learningPlans, setLearningPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeChapter, setActiveChapter] = useState(0);
@@ -31,8 +30,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [savingProgress, setSavingProgress] = useState(false);
   const [internetResourcesOpen, setInternetResourcesOpen] = useState(false);
   const [downloadResourcesOpen, setDownloadResourcesOpen] = useState(false);
-  const [isAIGeneratedPlan, setIsAIGeneratedPlan] = useState(false);
-  const [lastCreatedPlanId, setLastCreatedPlanId] = useState(null);
   const videoRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -42,11 +39,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     // Extract URL path to determine course type and proper API endpoint
     const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
     
-    // Check if this is a direct learning plan route (/learning/:id)
-    const isDirectLearningPlanRoute = pathParts[0] === 'learning' && pathParts.length > 1;
-    const learningPlanId = isDirectLearningPlanRoute ? pathParts[1] : null;
-    
-    // Only treat as AI learning plan if it's a direct learning route or we have a lastCreatedPlanId
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -61,7 +53,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       }
     };
     
-    const fetchRegularCourse = async (pathParts = pathname ? pathname.split('/').filter(Boolean) : [], isLearningPlanIdParam = false) => {
+    const fetchRegularCourse = async (pathParts = pathname ? pathname.split('/').filter(Boolean) : []) => {
       try {
         const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
         
@@ -234,7 +226,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         };
 
         setCourse(transformedCourse);
-        setIsAIGeneratedPlan(false);
         
         // Expand the first chapter by default
         if (transformedCourse.chapters.length > 0) {
@@ -264,12 +255,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         setCourse(null);
         
         // Standard error handling for course loading
-        if (error.response?.data?.isLearningPlanId) {
-          setError('This learning plan is not available. It may have been deleted or you may not have permission to access it.');
-        } else {
-          setError('Unable to load the course. Please check if the URL is correct.');
-          setContentType('notFound');
-        }
+        setError('Unable to load the course. Please check if the URL is correct.');
+        setContentType('notFound');
       }
     };
 
@@ -280,7 +267,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   useEffect(() => {
     // Only fetch progress if the user is logged in and we have a course
     const fetchUserProgress = async () => {
-      if (!isLoggedIn || !course || !course.id || isAIGeneratedPlan) return;
+      if (!isLoggedIn || !course || !course.id) return;
       
       try {        // Call the backend API to get the user's progress for this course
         const response = await axiosInstance.get(`/courses/progress/${course.id}/`);
@@ -335,7 +322,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     };
     
     fetchUserProgress();
-  }, [course?.id, isLoggedIn, isAIGeneratedPlan]);
+  }, [course?.id, isLoggedIn]);
 
   // Handle chapter toggling
   const toggleChapter = (index) => {
@@ -367,7 +354,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     try {
       const currentLesson = course.chapters[activeChapter].lessons[activeLesson];
       
-      if (currentLesson.id && !isAIGeneratedPlan) {
+      if (currentLesson.id) {
         // Handle regular course progress
         await axiosInstance.post(`/lessons/toggle-completion/${currentLesson.id}/`);
       }
@@ -393,7 +380,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
       const newCompletionState = !lesson.completed;
       
-      if (lesson.id && !isAIGeneratedPlan) {
+      if (lesson.id) {
         // Handle regular course progress
         const response = await axiosInstance.post(`/lessons/toggle-completion/${lesson.id}/`);
         console.log('Lesson completion toggled:', response.data);
@@ -642,22 +629,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       );
     }
 
-    // Add a special header for AI-generated learning plans
-    const aiLearningPlanHeader = isAIGeneratedPlan && (
-      <div className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 p-4 rounded-lg border border-indigo-100">
-        <div className="flex items-center">
-          <div className="bg-white p-3 rounded-full mr-4 border border-indigo-200">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-indigo-900">AI-Generated Learning Plan</h2>
-            <p className="text-gray-600">This personalized learning journey was created based on your interests and learning goals.</p>
-          </div>
-        </div>
-      </div>
-    );    switch (contentType) {
+    switch (contentType) {
       case 'resources':
         return <ResourcesPage lessonResources={currentLesson?.resources} />; 
 
@@ -688,8 +660,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       default:
         return (
           <>
-            {aiLearningPlanHeader}
-            
             {/* Video Container */}
             <div className="mb-8">
               <div ref={videoRef} className="mb-6">
@@ -797,22 +767,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                         <h3 className="text-lg font-semibold mb-4">About This Lesson</h3>
                         <p className="text-gray-700 mb-4">{currentLesson.description}</p>
                         
-                        {isAIGeneratedPlan ? (
-                          <div className="mt-6 p-4 border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-md">
-                            <h4 className="font-semibold text-indigo-800 flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                              </svg>
-                              Learning Tips
-                            </h4>
-                            <ul className="list-disc pl-5 space-y-2 mt-2 text-gray-700">
-                              <li>Take notes on key concepts as you watch</li>
-                              <li>Try to implement what you learn right away</li>
-                              <li>Revisit challenging sections multiple times</li>
-                              <li>Continue to the next video once you understand the material</li>
-                            </ul>
-                          </div>
-                        ) : (
                           <div className="mt-4">
                             <h4 className="font-medium mb-2">What you'll learn:</h4>
                             <ul className="list-disc pl-5 space-y-2 text-gray-700">
@@ -822,7 +776,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                               <li>Key takeaways for your learning journey</li>
                             </ul>
                           </div>
-                        )}
                       </div>                    ) : (                      // Simple message when no content is provided
                       <div>
                         <h3 className="text-lg font-semibold mb-4">About This Lesson</h3>
@@ -962,8 +915,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           toggleChapter={toggleChapter}
           toggleSidebar={() => setSidebarVisible(!sidebarVisible)}
           toggleLessonCompletion={toggleLessonCompletion}
-          learningPlans={learningPlans}
-          isAIGeneratedPlan={isAIGeneratedPlan}
           navigate={navigate}
         />
       </div>

@@ -27,11 +27,7 @@ const StandaloneQuizPage = () => {
     let defaultReturnPath;
     const currentPath = location.pathname;
     
-    if (currentPath.startsWith('/learning/') && currentPath.includes('/quiz')) {
-      // AI Learning Plan path: /learning/:learningPlanId/quiz
-      const learningPlanId = params.learningPlanId;
-      defaultReturnPath = `/learning/${learningPlanId}`;
-    } else if (currentPath.includes('/engineering/')) {
+    if (currentPath.includes('/engineering/')) {
       // Engineering course path
       defaultReturnPath = `/courses/engineering/${params.courseId}/learning`;
     } else {
@@ -198,54 +194,33 @@ const StandaloneQuizPage = () => {
         return;
       }
 
-      // Determine if this is an AI learning plan based on URL pattern
-      // AI learning plans have pattern: /learning/:learningPlanId/quiz
-      // School courses have pattern: /courses/.../learning/quiz
+      // Handle quiz submission based on lesson type
       const currentPath = location.pathname;
-      const isAILearningPlan = currentPath.startsWith('/learning/') && currentPath.includes('/quiz');
       
       let response;
       
-      if (isAILearningPlan) {
-        // For AI learning plans, we no longer use database storage
-        // Quiz results are handled locally by the Pro Learning system
-        console.log('Quiz completed for AI learning plan - handling locally');
+      // Check if this is a school course (has generated lesson ID) or regular course
+      const isSchoolCourse = typeof lessonId === 'string' && lessonId.includes('_');
+      
+      if (isSchoolCourse) {
+        // Use school quiz endpoint for school courses
+        console.log('Submitting school course quiz:', { lessonId });
         
-        // Create local quiz result
-        const localResult = {
-          score: (correctAnswers / totalQuestions) * 100,
-          passed: (correctAnswers / totalQuestions) >= 0.8,
-          correctAnswers,
-          totalQuestions,
-          answers: selectedAnswers,
-          timestamp: new Date().toISOString()
-        };
-        
-        response = { data: localResult };
+        response = await axiosInstance.post(
+          `http://127.0.0.1:8000/api/quiz/submit-school/${lessonId}/`,
+          { 
+            answers: selectedAnswers,
+            questions: quizData.questions // Send quiz questions for score calculation
+          }
+        );
       } else {
-        // Check if this is a school course (has generated lesson ID) or regular course
-        const isSchoolCourse = typeof lessonId === 'string' && lessonId.includes('_');
+        // Use regular course endpoint for integer lesson IDs
+        console.log('Submitting regular course quiz');
         
-        if (isSchoolCourse) {
-          // Use school quiz endpoint for school courses
-          console.log('Submitting school course quiz:', { lessonId });
-          
-          response = await axiosInstance.post(
-            `http://127.0.0.1:8000/api/quiz/submit-school/${lessonId}/`,
-            { 
-              answers: selectedAnswers,
-              questions: quizData.questions // Send quiz questions for score calculation
-            }
-          );
-        } else {
-          // Use regular course endpoint for integer lesson IDs
-          console.log('Submitting regular course quiz');
-          
-          response = await axiosInstance.post(
+        response = await axiosInstance.post(
             `http://127.0.0.1:8000/api/quiz/submit/${lessonId}/`,
             { answers: selectedAnswers }
           );
-        }
       }
 
       const result = response.data;
@@ -266,7 +241,8 @@ const StandaloneQuizPage = () => {
         });
       }
       
-    } catch (error) {      console.error('Error submitting quiz:', error);
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
       toast('Failed to submit quiz. Please try again.', {
         icon: '❌',
         style: {

@@ -6,15 +6,12 @@ import CourseLearning from './CourseLearning';
 
 const CourseLearningPage = () => {
   // Get all possible URL params from the different route patterns
-  const { courseId, subjectId, stateId, learningPlanId } = useParams();
+  const { courseId, subjectId, stateId } = useParams();
   const location = useLocation();
   const [sidebarVisible, setSidebarVisible] = useState(true);
 
   // Determine the actual course ID based on URL pattern
   const determineCourseId = () => {
-    // First check for learning plan ID from the dedicated route
-    if (learningPlanId) return learningPlanId;
-    
     // If we have a direct courseId (like in engineering courses), use it
     if (courseId) return courseId;
     
@@ -23,11 +20,6 @@ const CourseLearningPage = () => {
     
     // Extract from pathname as fallback
     const pathParts = location.pathname.split('/');
-    
-    // Check if this is a learning plan in the /learning/:id format
-    if (pathParts[1] === 'learning' && pathParts[2]) {
-      return pathParts[2];
-    }
     
     // Return the last non-empty part before 'learning'
     const learningIndex = pathParts.indexOf('learning');

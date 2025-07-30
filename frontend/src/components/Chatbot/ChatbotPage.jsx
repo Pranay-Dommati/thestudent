@@ -350,13 +350,13 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
           {/* Learning path card */}
           <div className="mt-4 lg:mt-6 pt-4 border-t border-gray-200">
             <Link 
-              to={`/learning/${extractedPlanId || learningPlanId || '40f897b9-1f2e-4db4-932e-78a8d3a033b4'}`}
+              to="/pro-learning"
               className="block w-full p-3 lg:p-4 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
             >
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base lg:text-lg font-bold mb-1">Continue Your Learning Journey</h3>
-                  <p className="text-blue-100 text-xs lg:text-sm">Access your full learning path with interactive videos</p>
+                  <p className="text-blue-100 text-xs lg:text-sm">Access Pro Learning with interactive content</p>
                 </div>
                 <div className="bg-white/20 p-2 lg:p-3 rounded-full">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
