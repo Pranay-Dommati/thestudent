@@ -52,7 +52,7 @@ export async function generateVideosContent(setContent, topic = '') {
 // Generate curated video recommendations based on topic
 async function generateCuratedVideos(topic) {
   try {
-    const response = await fetch('/ai/videos/', {
+    const response = await fetch('http://localhost:8000/ai/videos/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic })

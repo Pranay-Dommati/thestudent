@@ -11,7 +11,7 @@ const AILearningPlans = () => {
     const fetchPlans = async () => {
       try {
         const response = await axiosInstance.get('/api/learning/user-plans/');
-        setPlans(response.data.plans || []);
+        setPlans(response.data || []);
       } catch (error) {
         setError('Failed to load learning plans');
         console.error('Error fetching learning plans:', error);
@@ -86,7 +86,10 @@ const AILearningPlans = () => {
             key={plan.id}
             className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
           >
-            <Link to={`/learning/${plan.id}`} className="block">
+            <Link 
+              to={`/pro-learning?courseTitle=${encodeURIComponent(plan.title)}&topic=${encodeURIComponent(plan.plan_data?.days?.[0]?.topic || plan.title)}&tab=reading`} 
+              className="block"
+            >
               <h3 className="font-medium text-gray-900 mb-1">{plan.title}</h3>
               <p className="text-sm text-gray-600 mb-2">
                 {plan.description || 'AI-generated learning plan'}
@@ -96,11 +99,11 @@ const AILearningPlans = () => {
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
                   </svg>
-                  {plan.days?.length || 0} days
+                  {plan.plan_data?.days?.length || 0} days
                 </span>
                 <span className="mx-2">•</span>
-                <span className={`${plan.is_completed ? 'text-green-600' : 'text-blue-600'}`}>
-                  {plan.is_completed ? 'Completed' : 'In Progress'}
+                <span className="text-blue-600">
+                  Available
                 </span>
               </div>
             </Link>

@@ -18,13 +18,13 @@ const SavedPlaylists = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axiosInstance.get('/learning/user-plans/');
+      const response = await axiosInstance.get('/api/learning/user-plans/');
       
       // Handle the response format from backend API
-      if (response.data && Array.isArray(response.data.plans)) {
-        setLearningPlans(response.data.plans);
-      } else if (Array.isArray(response.data)) {
+      if (Array.isArray(response.data)) {
         setLearningPlans(response.data);
+      } else if (response.data && Array.isArray(response.data.plans)) {
+        setLearningPlans(response.data.plans);
       } else {
         throw new Error('Invalid data format received from server');
       }
@@ -101,6 +101,9 @@ const SavedPlaylists = () => {
       progressPercentage = 100;
     }
     
+    // Get the first topic for URL construction
+    const firstTopic = plan.plan_data?.days?.[0]?.topic || plan.title;
+    
     return {
       id: plan.id,
       title: plan.title,
@@ -111,7 +114,9 @@ const SavedPlaylists = () => {
       difficulty: plan.difficulty_level,
       category: plan.category,
       totalVideos: plan.total_videos,
-      daysCount: plan.days_count
+      daysCount: plan.days_count,
+      firstTopic: firstTopic, // Add first topic for URL construction
+      originalPlan: plan // Keep reference to original plan for URL construction
     };
   }) : [];
 
@@ -325,7 +330,7 @@ const SavedPlaylists = () => {
                             </div>
                           </div>
                           <Link 
-                            to={`/learning/${course.id}`}
+                            to={`/pro-learning?courseTitle=${encodeURIComponent(course.title)}&topic=${encodeURIComponent(course.firstTopic)}&tab=reading`}
                             className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg 
                             hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center"
                           >
@@ -391,7 +396,7 @@ const SavedPlaylists = () => {
               {courses.filter(course => course.progress === 100).map((course) => (
                 <div key={course.id} className="border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                   <div className="flex flex-col sm:flex-row h-full">
-                    <Link to={`/learning/${course.id}`} className="w-full sm:w-1/3 h-32 sm:h-auto">
+                    <Link to={`/pro-learning?courseTitle=${encodeURIComponent(course.title)}&topic=${encodeURIComponent(course.firstTopic)}&tab=reading`} className="w-full sm:w-1/3 h-32 sm:h-auto">
                       <img
                         src={course.thumbnail}
                         alt={course.title}
@@ -399,7 +404,7 @@ const SavedPlaylists = () => {
                       />
                     </Link>
                     <div className="p-4 flex-1 flex flex-col">
-                      <Link to={`/learning/${course.id}`} className="hover:text-indigo-600">
+                      <Link to={`/pro-learning?courseTitle=${encodeURIComponent(course.title)}&topic=${encodeURIComponent(course.firstTopic)}&tab=reading`} className="hover:text-indigo-600">
                         <h3 className="font-bold text-sm sm:text-base mb-1 line-clamp-2">{course.title}</h3>
                       </Link>
                       <div className="flex items-center flex-wrap gap-2 text-xs sm:text-sm text-gray-600 mb-2">
@@ -421,7 +426,7 @@ const SavedPlaylists = () => {
                           <span>{course.totalVideos} videos</span>
                         </div>
                         <Link 
-                          to={`/learning/${course.id}`}
+                          to={`/pro-learning?courseTitle=${encodeURIComponent(course.title)}&topic=${encodeURIComponent(course.firstTopic)}&tab=reading`}
                           className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                         >
                           Review

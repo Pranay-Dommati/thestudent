@@ -2544,7 +2544,9 @@ const ProLearningPage = () => {
               reading: topicContent.reading || '',
               summary: topicContent.summary || '',
               videos: topicContent.videos || [],
-              resources: topicContent.resources || []
+              resources: topicContent.resources || [],
+              quiz: topicContent.quiz || [],
+              projects: topicContent.projects || []
             };
 
             console.log(`💾 Saving topic "${topic.name}" to DB:`, {
@@ -2554,7 +2556,9 @@ const ProLearningPage = () => {
                 reading: !!topicContent.reading,
                 summary: !!topicContent.summary,
                 videos: topicContent.videos?.length || 0,
-                resources: topicContent.resources?.length || 0
+                resources: topicContent.resources?.length || 0,
+                quiz: topicContent.quiz?.length || 0,
+                projects: topicContent.projects?.length || 0
               }
             });
 
@@ -2571,7 +2575,9 @@ const ProLearningPage = () => {
         }
       }
 
-      // 2. Save overall learning plan with ALL topics (Outer Level)
+      // 2. Skip saving overall learning plan since individual topics are already saved
+      // The learning plans are generated from individual topics in the backend
+      /*
       if (topicsList.length > 0) {
         const learningPlanData = {
           title: title,
@@ -2603,6 +2609,7 @@ const ProLearningPage = () => {
           // Don't fail the whole operation if plan save fails
         }
       }
+      */
 
       // Show comprehensive success message
       const successMessage = `Saved ${savedTopics.length} topics to your account!`;

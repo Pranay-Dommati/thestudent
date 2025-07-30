@@ -97,7 +97,7 @@ async function enforceRateLimit() {
 async function generateSingleTopicContent(topic) {
   try {
     console.log(`🚀 Generating AI content for topic: ${topic}`);
-    const response = await fetch('/ai/reading/', {
+    const response = await fetch('http://localhost:8000/ai/reading/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic })

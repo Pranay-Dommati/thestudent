@@ -16,6 +16,34 @@ class AIContentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Override retrieve to return learning plan format"""
+        instance = self.get_object()
+        
+        # Convert to learning plan format for frontend compatibility
+        learning_plan_data = {
+            'id': str(instance.id),
+            'title': instance.course_title,
+            'type': 'ai_learning_plan',
+            'created_at': instance.created_at,
+            'updated_at': instance.updated_at,
+            'plan_data': {
+                'goal': instance.course_title,
+                'days': [{
+                    'day': 1,
+                    'topic': instance.topic_name,
+                    'reading': instance.reading,
+                    'summary': instance.summary,
+                    'videos': instance.videos if isinstance(instance.videos, list) else [],
+                    'resources': instance.resources if isinstance(instance.resources, list) else [],
+                    'quiz': instance.quiz if isinstance(instance.quiz, list) else [],
+                    'projects': instance.projects if isinstance(instance.projects, list) else [],
+                }]
+            }
+        }
+        
+        return Response(learning_plan_data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -31,37 +59,100 @@ def get_user_ai_content(request):
             course_title = content.course_title
             if course_title not in plans:
                 plans[course_title] = {
-                    'id': content.id,
+                    'id': str(content.id),  # Use the content ID as plan ID
                     'title': course_title,
-                    'type': 'ai_topic_content',
+                    'type': 'ai_learning_plan',
                     'created_at': content.created_at,
                     'updated_at': content.updated_at,
-                    'topics': []
+                    'plan_data': {
+                        'goal': course_title,
+                        'days': []
+                    }
                 }
             
-            # Add topic to the plan
-            plans[course_title]['topics'].append({
-                'id': content.id,
-                'topic_name': content.topic_name,
+            # Add topic as a day in the plan
+            plans[course_title]['plan_data']['days'].append({
+                'day': len(plans[course_title]['plan_data']['days']) + 1,
+                'topic': content.topic_name,
                 'reading': content.reading,
                 'summary': content.summary,
-                'videos': content.videos,
-                'resources': content.resources,
-                'created_at': content.created_at,
-                'updated_at': content.updated_at,
+                'videos': content.videos if isinstance(content.videos, list) else [],
+                'resources': content.resources if isinstance(content.resources, list) else [],
+                'quiz': content.quiz if isinstance(content.quiz, list) else [],
+                'projects': content.projects if isinstance(content.projects, list) else [],
             })
         
-        # Convert to list format
+        # Convert to list format expected by frontend
         plans_list = list(plans.values())
         
-        return Response({
-            'plans': plans_list,
-            'count': len(plans_list)
-        }, status=status.HTTP_200_OK)
+        return Response(plans_list, status=status.HTTP_200_OK)
         
     except Exception as e:
         return Response(
             {'error': f'Failed to fetch AI content: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_ai_learning_plan(request, plan_id):
+    """Get a specific AI learning plan by ID"""
+    try:
+        # Find the first AI content with this ID for this user
+        ai_content = AITopicContent.objects.filter(user=request.user, id=plan_id).first()
+        
+        if not ai_content:
+            # If not found by ID, try to find by course title
+            ai_contents = AITopicContent.objects.filter(user=request.user)
+            
+            # Group by course title and find the one that matches the plan_id as title
+            for content in ai_contents:
+                if str(content.id) == str(plan_id):
+                    ai_content = content
+                    break
+            
+            if not ai_content:
+                return Response(
+                    {'error': 'Learning plan not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        # Get all topics for this course
+        course_title = ai_content.course_title
+        all_topics = AITopicContent.objects.filter(user=request.user, course_title=course_title)
+        
+        # Create the learning plan structure
+        plan_data = {
+            'id': str(ai_content.id),
+            'title': course_title,
+            'type': 'ai_learning_plan',
+            'created_at': ai_content.created_at,
+            'updated_at': ai_content.updated_at,
+            'plan_data': {
+                'goal': course_title,
+                'days': []
+            }
+        }
+        
+        # Add all topics as days
+        for i, topic in enumerate(all_topics, 1):
+            plan_data['plan_data']['days'].append({
+                'day': i,
+                'topic': topic.topic_name,
+                'reading': topic.reading,
+                'summary': topic.summary,
+                'videos': topic.videos if isinstance(topic.videos, list) else [],
+                'resources': topic.resources if isinstance(topic.resources, list) else [],
+                'quiz': topic.quiz if isinstance(topic.quiz, list) else [],
+                'projects': topic.projects if isinstance(topic.projects, list) else [],
+            })
+        
+        return Response(plan_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch learning plan: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
