@@ -20,6 +20,9 @@ urlpatterns = [
     # Resources endpoints
     path('api/resources/', views.get_resources, name='get-resources'),
     path('api/resources/download/<int:resource_id>/', views.download_resource, name='download-resource'),
+    
+    # AI Learning Content URLs (replacement for deprecated AI Learning Plans)
+    path('api/learning/', include('courses.urls_ai_content')),
 ]
 
 urlpatterns += [

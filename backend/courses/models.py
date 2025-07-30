@@ -186,6 +186,8 @@ class AITopicContent(models.Model):
     summary = models.TextField(blank=True)
     videos = models.JSONField(default=list, blank=True, help_text="List of video objects")
     resources = models.JSONField(default=list, blank=True, help_text="List of resource objects")
+    quiz = models.JSONField(default=list, blank=True, help_text="List of quiz questions")
+    projects = models.JSONField(default=list, blank=True, help_text="List of project objects")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -194,6 +196,53 @@ class AITopicContent(models.Model):
         ordering = ["-created_at"]
         verbose_name = "AI Topic Content"
         verbose_name_plural = "AI Topic Contents"
+        indexes = [
+            models.Index(fields=['user', 'course_title'], name='idx_user_course_title'),
+            models.Index(fields=['created_at'], name='idx_ai_content_created_at'),
+        ]
+
+    def clean(self):
+        """Validate the model before saving"""
+        super().clean()
+        
+        # Ensure JSON fields are lists
+        if not isinstance(self.videos, list):
+            self.videos = []
+        if not isinstance(self.resources, list):
+            self.resources = []
+        if not isinstance(self.quiz, list):
+            self.quiz = []
+        if not isinstance(self.projects, list):
+            self.projects = []
+
+    def save(self, *args, **kwargs):
+        """Override save to run validation"""
+        self.clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def has_content(self):
+        """Check if the topic has any content"""
+        return bool(
+            self.reading or 
+            self.summary or 
+            self.videos or 
+            self.resources or 
+            self.quiz or 
+            self.projects
+        )
+
+    @property
+    def content_summary(self):
+        """Get a summary of available content"""
+        return {
+            'has_reading': bool(self.reading),
+            'has_summary': bool(self.summary),
+            'video_count': len(self.videos) if isinstance(self.videos, list) else 0,
+            'resource_count': len(self.resources) if isinstance(self.resources, list) else 0,
+            'quiz_count': len(self.quiz) if isinstance(self.quiz, list) else 0,
+            'project_count': len(self.projects) if isinstance(self.projects, list) else 0,
+        }
 
     def __str__(self):
         return f"{self.course_title} - {self.topic_name} - {self.user.email if self.user else 'No User'}"

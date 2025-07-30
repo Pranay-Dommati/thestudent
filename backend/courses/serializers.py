@@ -3,6 +3,7 @@ from .models import (
     SchoolCourse, EngineeringCourse, CourseChapter, 
     CourseSection, Lesson, LessonResource, QuizQuestion, UserLessonProgress, AITopicContent
 )
+import json
 
 class LessonResourceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -115,17 +116,87 @@ class EngineeringCourseWithSectionsSerializer(serializers.ModelSerializer):
         ]
 
 class AITopicContentSerializer(serializers.ModelSerializer):
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    has_content = serializers.BooleanField(read_only=True)
+    content_summary = serializers.DictField(read_only=True)
+    
     class Meta:
         model = AITopicContent
         fields = [
-            'id', 'user', 'course_title', 'topic_name',
-            'reading', 'summary', 'videos', 'resources',
-            'created_at', 'updated_at'
+            'id', 'user', 'user_email', 'course_title', 'topic_name',
+            'reading', 'summary', 'videos', 'resources', 'quiz', 'projects',
+            'created_at', 'updated_at', 'has_content', 'content_summary'
         ]
-        read_only_fields = ['id', 'user', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'user', 'user_email', 'created_at', 'updated_at', 'has_content', 'content_summary']
+
+    def to_internal_value(self, data):
+        # Accept both camelCase and snake_case from frontend
+        data = dict(data)
+        if 'courseTitle' in data:
+            data['course_title'] = data.pop('courseTitle')
+        if 'topicName' in data:
+            data['topic_name'] = data.pop('topicName')
+        # Accept both direct and stringified lists for JSON fields
+        for field in ['videos', 'resources', 'quiz', 'projects']:
+            value = data.get(field)
+            if value is not None and not isinstance(value, list):
+                try:
+                    data[field] = json.loads(value) if isinstance(value, str) else []
+                except Exception:
+                    data[field] = []
+        return super().to_internal_value(data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Always output lists for JSON fields
+        for field in ['videos', 'resources', 'quiz', 'projects']:
+            if isinstance(data.get(field), str):
+                try:
+                    data[field] = json.loads(data[field])
+                except Exception:
+                    data[field] = []
+            elif not isinstance(data.get(field), list):
+                data[field] = []
+        return data
 
     def create(self, validated_data):
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
             validated_data['user'] = request.user
         return super().create(validated_data)
+
+# Compatibility serializer for AI Learning Plan format
+class AIContentPlanSerializer(serializers.Serializer):
+    """Serializer to format AI content in the expected learning plan structure"""
+    id = serializers.UUIDField(read_only=True)
+    title = serializers.CharField()
+    type = serializers.CharField(default='ai_topic_content')
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
+    topics = serializers.ListField(child=serializers.DictField(), read_only=True)
+    plan_data = serializers.DictField(read_only=True)
+    
+    def to_representation(self, instance):
+        """Convert AITopicContent instances to learning plan format"""
+        if isinstance(instance, dict):
+            return instance
+            
+        # If it's an AITopicContent instance, convert it
+        return {
+            'id': instance.id,
+            'title': instance.course_title,
+            'type': 'ai_topic_content',
+            'created_at': instance.created_at,
+            'updated_at': instance.updated_at,
+            'plan_data': {
+                'goal': instance.course_title,
+                'days': [{
+                    'day': 1,
+                    'topic': instance.topic_name,
+                    'reading': instance.reading,
+                    'summary': instance.summary,
+                    'videos': instance.videos if isinstance(instance.videos, list) else [],
+                    'resources': instance.resources if isinstance(instance.resources, list) else [],
+                }]
+            }
+        }
