@@ -1516,12 +1516,16 @@ const ProLearningPage = () => {
                       </h3>
                     ),
                     p: ({children}) => {
-                      // Check if children contains code blocks (pre elements)
-                      const hasCodeBlock = React.Children.toArray(children).some(child => 
-                        React.isValidElement(child) && 
-                        (child.type === 'pre' || 
-                         (child.props && child.props.className && child.props.className.includes('language-')))
-                      );
+                      // Check if children contains code blocks or SyntaxHighlighter components
+                      const hasCodeBlock = React.Children.toArray(children).some(child => {
+                        if (React.isValidElement(child)) {
+                          // Check for pre elements, code elements with language classes, or SyntaxHighlighter
+                          return child.type === 'pre' || 
+                                 (child.props && child.props.className && child.props.className.includes('language-')) ||
+                                 (child.type && child.type.displayName === 'SyntaxHighlighter');
+                        }
+                        return false;
+                      });
                       
                       // Use div for paragraphs containing code blocks to avoid nesting issues
                       if (hasCodeBlock) {
@@ -1536,6 +1540,14 @@ const ProLearningPage = () => {
                         <p className="text-gray-700 leading-relaxed mb-4 text-base">
                           {children}
                         </p>
+                      );
+                    },
+                    pre: ({children}) => {
+                      // Ensure pre elements are not wrapped in paragraphs
+                      return (
+                        <div className="my-4">
+                          {children}
+                        </div>
                       );
                     },
                     code({node, inline, className, children, ...props}) {
@@ -1689,12 +1701,16 @@ const ProLearningPage = () => {
                         </h3>
                       ),
                       p: ({children}) => {
-                        // Check if children contains code blocks (pre elements)
-                        const hasCodeBlock = React.Children.toArray(children).some(child => 
-                          React.isValidElement(child) && 
-                          (child.type === 'pre' || 
-                           (child.props && child.props.className && child.props.className.includes('language-')))
-                        );
+                        // Check if children contains code blocks or SyntaxHighlighter components
+                        const hasCodeBlock = React.Children.toArray(children).some(child => {
+                          if (React.isValidElement(child)) {
+                            // Check for pre elements, code elements with language classes, or SyntaxHighlighter
+                            return child.type === 'pre' || 
+                                   (child.props && child.props.className && child.props.className.includes('language-')) ||
+                                   (child.type && child.type.displayName === 'SyntaxHighlighter');
+                          }
+                          return false;
+                        });
                         
                         // Use div for paragraphs containing code blocks to avoid nesting issues
                         if (hasCodeBlock) {
@@ -1709,6 +1725,14 @@ const ProLearningPage = () => {
                           <p className="text-gray-700 leading-relaxed mb-4 text-base">
                             {children}
                           </p>
+                        );
+                      },
+                      pre: ({children}) => {
+                        // Ensure pre elements are not wrapped in paragraphs
+                        return (
+                          <div className="my-4">
+                            {children}
+                          </div>
                         );
                       },
                       code({node, inline, className, children, ...props}) {
@@ -1950,12 +1974,16 @@ const ProLearningPage = () => {
                     </h3>
                   ),
                   p: ({children}) => {
-                    // Check if children contains code blocks (pre elements)
-                    const hasCodeBlock = React.Children.toArray(children).some(child => 
-                      React.isValidElement(child) && 
-                      (child.type === 'pre' || 
-                       (child.props && child.props.className && child.props.className.includes('language-')))
-                    );
+                    // Check if children contains code blocks or SyntaxHighlighter components
+                    const hasCodeBlock = React.Children.toArray(children).some(child => {
+                      if (React.isValidElement(child)) {
+                        // Check for pre elements, code elements with language classes, or SyntaxHighlighter
+                        return child.type === 'pre' || 
+                               (child.props && child.props.className && child.props.className.includes('language-')) ||
+                               (child.type && child.type.displayName === 'SyntaxHighlighter');
+                      }
+                      return false;
+                    });
                     
                     // Use div for paragraphs containing code blocks to avoid nesting issues
                     if (hasCodeBlock) {
@@ -1970,6 +1998,14 @@ const ProLearningPage = () => {
                       <p className="text-gray-700 leading-relaxed mb-4">
                         {children}
                       </p>
+                    );
+                  },
+                  pre: ({children}) => {
+                    // Ensure pre elements are not wrapped in paragraphs
+                    return (
+                      <div className="my-4">
+                        {children}
+                      </div>
                     );
                   },
                   ul: ({children}) => <ul className="space-y-3 mb-6 ml-6">{children}</ul>,
