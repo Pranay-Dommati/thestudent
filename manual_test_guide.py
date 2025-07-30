@@ -64,20 +64,18 @@ TECHNICAL DETAILS:
 =================
 
 Frontend Flow:
-1. generateLearningPlan() creates plan with uuid4()
-2. saveLearningPlanToDatabase() saves to backend
-3. Backend returns: {id: "backend-uuid", type: "ai_learning_plan", plan: {...}}
-4. Frontend updates: learningPlan.id = savedPlan.id
-5. formatLearningPlanResponse() uses correct ID for navigation
+1. Course creation and navigation flows
+2. Backend handles course data and user progress
+3. Frontend updates course state and navigation
 
 Backend Response Structure:
 {
-    "id": "05540ca4-f4e5-40cc-9cfc-095d1e24d57b",  // <- This ID is now used
-    "type": "ai_learning_plan",
-    "plan": {
+    "id": "05540ca4-f4e5-40cc-9cfc-095d1e24d57b",  
+    "type": "course",
+    "data": {
         "id": "05540ca4-f4e5-40cc-9cfc-095d1e24d57b",
-        "title": "Learn Python in 7 days",
-        "plan_data": { "days": [...] }
+        "title": "Course Title",
+        "content": { "sections": [...] }
     }
 }
 

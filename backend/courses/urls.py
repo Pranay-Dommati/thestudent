@@ -1,6 +1,5 @@
 from django.urls import path, include
 from . import views
-from .urls_learning_plan import urlpatterns as learning_plan_urls
 from .views import AITopicContentListCreateView
 
 urlpatterns = [
@@ -21,9 +20,6 @@ urlpatterns = [
     # Resources endpoints
     path('api/resources/', views.get_resources, name='get-resources'),
     path('api/resources/download/<int:resource_id>/', views.download_resource, name='download-resource'),
-    
-    # Learning Plan URLs
-    path('api/learning/', include('courses.urls_learning_plan')),
 ]
 
 urlpatterns += [

@@ -12,9 +12,9 @@ def test_quiz_submission_logic():
     current_path = "/courses/9th/state/ap/hindi/learning/quiz"
     
     # Test URL pattern detection
-    is_ai_learning_plan = current_path.startswith('/learning/') and '/quiz' in current_path
+    is_school_course_quiz = current_path.startswith('/courses/') and '/quiz' in current_path
     print(f"Current path: {current_path}")
-    print(f"Is AI learning plan: {is_ai_learning_plan}")
+    print(f"Is school course quiz: {is_school_course_quiz}")
     
     # Test lesson ID generation for school course
     path_parts = current_path.split('/')
