@@ -169,7 +169,23 @@ function generateThumbnailUrl(topic, index) {
   const colors = ['4A90E2', 'F5A623', '7ED321', 'D0021B', 'BD10E0', '50E3C2'];
   const color = colors[index % colors.length];
   const encodedTopic = encodeURIComponent(topic);
-  return `https://via.placeholder.com/320x180/${color}/ffffff?text=${encodedTopic}+Tutorial`;
+  // Use a data URL placeholder instead of external service
+  const canvas = document.createElement('canvas');
+  canvas.width = 320;
+  canvas.height = 180;
+  const ctx = canvas.getContext('2d');
+  
+  // Set background color
+  ctx.fillStyle = `#${color}`;
+  ctx.fillRect(0, 0, 320, 180);
+  
+  // Add text
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '16px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${topic} Tutorial`, 160, 90);
+  
+  return canvas.toDataURL('image/png');
 }
 
 // Generate placeholder video URL (in real implementation, these would be actual video URLs)
