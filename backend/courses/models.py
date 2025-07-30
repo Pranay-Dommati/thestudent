@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 import uuid
 from django.core.exceptions import ValidationError
 import json
@@ -175,3 +176,198 @@ class UserLessonProgress(models.Model):
     
     def __str__(self):
         return f"{self.user} - {self.lesson.title} - {self.completed_at.strftime('%Y-%m-%d')}"
+
+
+# ==================== PRO LEARNING MODELS ====================
+
+class ProLearningCourse(models.Model):
+    """
+    Model to store AI-generated Pro Learning courses
+    Each course belongs to a specific user and can have multiple topics
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='pro_courses'
+    )
+    course_name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_completed = models.BooleanField(default=False)
+    completion_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Pro Learning Course'
+        verbose_name_plural = 'Pro Learning Courses'
+    
+    def __str__(self):
+        return f"{self.course_name} - {self.user.username}"
+    
+    def get_total_topics(self):
+        """Get total number of topics in this course"""
+        return self.topics.count()
+    
+    def get_completed_topics(self):
+        """Get number of completed topics in this course"""
+        return self.topics.filter(is_completed=True).count()
+    
+    def update_completion_percentage(self):
+        """Update course completion percentage based on completed topics"""
+        total_topics = self.get_total_topics()
+        if total_topics > 0:
+            completed_topics = self.get_completed_topics()
+            self.completion_percentage = (completed_topics / total_topics) * 100
+            self.is_completed = self.completion_percentage == 100
+            self.save(update_fields=['completion_percentage', 'is_completed'])
+
+
+class ProLearningTopic(models.Model):
+    """
+    Model to store individual topics within a Pro Learning course
+    Each topic contains 5 tabs of content: reading_material, summary, videos, quiz, resources
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(
+        ProLearningCourse, 
+        on_delete=models.CASCADE, 
+        related_name='topics'
+    )
+    topic_name = models.CharField(max_length=255)
+    order = models.PositiveIntegerField(default=0)  # For ordering topics within a course
+    
+    # Content for the 5 tabs
+    reading_material = models.TextField(blank=True, null=True)
+    summary = models.TextField(blank=True, null=True)
+    
+    # Completion tracking
+    is_completed = models.BooleanField(default=False)
+    progress_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['course', 'order']
+        unique_together = ['course', 'order']  # Ensure unique ordering within course
+        verbose_name = 'Pro Learning Topic'
+        verbose_name_plural = 'Pro Learning Topics'
+    
+    def __str__(self):
+        return f"{self.course.course_name} - {self.topic_name}"
+    
+    def mark_completed(self):
+        """Mark this topic as completed and update course progress"""
+        if not self.is_completed:
+            self.is_completed = True
+            self.completed_at = timezone.now()
+            self.progress_percentage = 100.00
+            self.save(update_fields=['is_completed', 'completed_at', 'progress_percentage'])
+            
+            # Update parent course completion
+            self.course.update_completion_percentage()
+
+
+class ProLearningVideo(models.Model):
+    """
+    Model to store video content for each topic
+    Each topic can have multiple videos
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    topic = models.ForeignKey(
+        ProLearningTopic, 
+        on_delete=models.CASCADE, 
+        related_name='videos'
+    )
+    title = models.CharField(max_length=255)
+    video_url = models.URLField()  # YouTube or other video URLs
+    description = models.TextField(blank=True, null=True)
+    duration = models.CharField(max_length=20, blank=True, null=True)  # e.g., "10:30"
+    order = models.PositiveIntegerField(default=0)
+    is_watched = models.BooleanField(default=False)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['topic', 'order']
+        verbose_name = 'Pro Learning Video'
+        verbose_name_plural = 'Pro Learning Videos'
+    
+    def __str__(self):
+        return f"{self.topic.topic_name} - {self.title}"
+
+
+class ProLearningQuizQuestion(models.Model):
+    """
+    Model to store quiz questions for each topic
+    Each topic can have multiple quiz questions
+    """
+    QUESTION_TYPES = (
+        ('mcq', 'Multiple Choice'),
+        ('true_false', 'True/False'),
+        ('short_answer', 'Short Answer'),
+    )
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    topic = models.ForeignKey(
+        ProLearningTopic, 
+        on_delete=models.CASCADE, 
+        related_name='quiz_questions'
+    )
+    question_text = models.TextField()
+    question_type = models.CharField(max_length=20, choices=QUESTION_TYPES, default='mcq')
+    options = models.JSONField(default=list)  # Store multiple choice options as JSON list
+    correct_answer = models.CharField(max_length=255)
+    explanation = models.TextField(blank=True, null=True)
+    points = models.PositiveIntegerField(default=1)
+    order = models.PositiveIntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['topic', 'order']
+        verbose_name = 'Pro Learning Quiz Question'
+        verbose_name_plural = 'Pro Learning Quiz Questions'
+    
+    def __str__(self):
+        return f"{self.topic.topic_name} - Q{self.order}: {self.question_text[:50]}..."
+
+
+class ProLearningResource(models.Model):
+    """
+    Model to store additional resources for each topic
+    Each topic can have multiple resources (links, documents, etc.)
+    """
+    RESOURCE_TYPES = (
+        ('link', 'External Link'),
+        ('document', 'Document'),
+        ('article', 'Article'),
+        ('tool', 'Online Tool'),
+        ('reference', 'Reference Material'),
+    )
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    topic = models.ForeignKey(
+        ProLearningTopic, 
+        on_delete=models.CASCADE, 
+        related_name='resources'
+    )
+    title = models.CharField(max_length=255)
+    resource_type = models.CharField(max_length=20, choices=RESOURCE_TYPES, default='link')
+    url = models.URLField()
+    description = models.TextField(blank=True, null=True)
+    order = models.PositiveIntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['topic', 'order']
+        verbose_name = 'Pro Learning Resource'
+        verbose_name_plural = 'Pro Learning Resources'
+    
+    def __str__(self):
+        return f"{self.topic.topic_name} - {self.title}"
