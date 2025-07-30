@@ -1,51 +1,49 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCheck, FaSync } from 'react-icons/fa';
-import axiosInstance from '../../../utils/axios';
-
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000; // 2 seconds
+import proContentManager from '../../../services/ProContentManager.js';
 
 const SavedPlaylists = () => {
   const [activeTab, setActiveTab] = useState('courses');
   const [learningPlans, setLearningPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
 
-  // Fetch user's learning plans with retry mechanism
-  const fetchUserLearningPlans = useCallback(async (retryAttempt = 0) => {
+  // Fetch stored Pro Learning courses from localStorage
+  const fetchStoredCourses = useCallback(() => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axiosInstance.get('/learning/user-plans/');
       
-      // Handle the response format from backend API
-      if (response.data && Array.isArray(response.data.plans)) {
-        setLearningPlans(response.data.plans);
-      } else if (Array.isArray(response.data)) {
-        setLearningPlans(response.data);
-      } else {
-        throw new Error('Invalid data format received from server');
+      // Get all stored course content from localStorage
+      const storedCourses = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('course_content_')) {
+          try {
+            const courseData = JSON.parse(localStorage.getItem(key));
+            if (courseData && courseData.metadata) {
+              storedCourses.push({
+                id: courseData.courseId,
+                title: key.replace('course_content_', '').replace(/_/g, ' '),
+                description: `Pro Learning course with ${Object.keys(courseData.topics || {}).length} topics`,
+                created_at: courseData.metadata.generatedAt,
+                metadata: courseData.metadata,
+                topics: courseData.topics,
+                is_completed: courseData.metadata.status === 'completed'
+              });
+            }
+          } catch (parseError) {
+            console.warn('Failed to parse stored course:', key, parseError);
+          }
+        }
       }
       
-      // Reset retry count on successful fetch
-      setRetryCount(0);
+      setLearningPlans(storedCourses);
     } catch (err) {
-      console.error('Error fetching learning plans:', err);
-      
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to load learning plans';
-      
-      if (retryAttempt < MAX_RETRIES) {
-        setError(`${errorMessage} - Retrying... (Attempt ${retryAttempt + 1}/${MAX_RETRIES})`);
-        setTimeout(() => {
-          fetchUserLearningPlans(retryAttempt + 1);
-        }, RETRY_DELAY);
-        setRetryCount(retryAttempt + 1);
-      } else {
-        setError(`${errorMessage} - Please try again later.`);
-        setLearningPlans([]);
-      }
+      console.error('Error loading stored courses:', err);
+      setError('Failed to load stored courses');
+      setLearningPlans([]);
     } finally {
       setLoading(false);
     }
@@ -53,53 +51,45 @@ const SavedPlaylists = () => {
 
   // Initial fetch on component mount
   useEffect(() => {
-    let mounted = true;
-    
-    if (mounted) {
-      fetchUserLearningPlans();
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, [fetchUserLearningPlans]);
+    fetchStoredCourses();
+  }, [fetchStoredCourses]);
 
   // Manual retry handler
   const handleRetry = () => {
-    setRetryCount(0);
-    fetchUserLearningPlans();
+    fetchStoredCourses();
   };
 
-  // Transform learning plans to course format for display
+  // Transform stored courses to display format
   const courses = Array.isArray(learningPlans) ? learningPlans.map(plan => {
-    // Calculate actual progress based on completed lessons
+    // Calculate progress based on topics with content
     let progressPercentage = 0;
     
-    if (plan.plan_data && plan.plan_data.days && plan.plan_data.progress) {
-      const progress = plan.plan_data.progress;
-      let totalLessons = 0;
-      let completedLessons = 0;
+    if (plan.topics) {
+      const topicNames = Object.keys(plan.topics);
+      const totalTopics = topicNames.length;
+      let completedTopics = 0;
       
-      // Count total lessons and completed lessons
-      plan.plan_data.days.forEach((day, dayIndex) => {
-        if (day.videos) {
-          day.videos.forEach((video, videoIndex) => {
-            totalLessons++;
-            const lessonKey = `day_${day.day}_video_${videoIndex}`;
-            if (progress[lessonKey]) {
-              completedLessons++;
-            }
-          });
+      // Count topics that have complete content
+      topicNames.forEach(topicName => {
+        const topic = plan.topics[topicName];
+        if (topic.content && 
+            topic.content.reading && 
+            topic.content.summary && 
+            topic.content.quiz && 
+            topic.content.videos && 
+            topic.content.resources) {
+          completedTopics++;
         }
       });
       
-      if (totalLessons > 0) {
-        progressPercentage = Math.round((completedLessons / totalLessons) * 100);
+      if (totalTopics > 0) {
+        progressPercentage = Math.round((completedTopics / totalTopics) * 100);
       }
     } else if (plan.is_completed) {
-      // Fallback to simple binary progress if no detailed progress data
       progressPercentage = 100;
     }
+    
+    const topicCount = plan.topics ? Object.keys(plan.topics).length : 0;
     
     return {
       id: plan.id,
@@ -107,11 +97,11 @@ const SavedPlaylists = () => {
       instructor: 'AI Generated',
       progress: progressPercentage,
       thumbnail: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop',
-      duration: `${plan.duration_days} days`,
-      difficulty: plan.difficulty_level,
-      category: plan.category,
-      totalVideos: plan.total_videos,
-      daysCount: plan.days_count
+      duration: `${topicCount} topics`,
+      difficulty: 'Beginner', // Default since we don't store this
+      category: 'Pro Learning',
+      totalVideos: topicCount * 2, // Estimate based on topics
+      daysCount: Math.ceil(topicCount / 2) // Estimate study days
     };
   }) : [];
 
@@ -325,7 +315,7 @@ const SavedPlaylists = () => {
                             </div>
                           </div>
                           <Link 
-                            to={`/learning/${course.id}`}
+                            to={`/learning-hub/pro-learning?courseId=${course.id}`}
                             className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg 
                             hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center"
                           >
@@ -391,7 +381,7 @@ const SavedPlaylists = () => {
               {courses.filter(course => course.progress === 100).map((course) => (
                 <div key={course.id} className="border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                   <div className="flex flex-col sm:flex-row h-full">
-                    <Link to={`/learning/${course.id}`} className="w-full sm:w-1/3 h-32 sm:h-auto">
+                    <Link to={`/learning-hub/pro-learning?courseId=${course.id}`} className="w-full sm:w-1/3 h-32 sm:h-auto">
                       <img
                         src={course.thumbnail}
                         alt={course.title}
@@ -399,7 +389,7 @@ const SavedPlaylists = () => {
                       />
                     </Link>
                     <div className="p-4 flex-1 flex flex-col">
-                      <Link to={`/learning/${course.id}`} className="hover:text-indigo-600">
+                      <Link to={`/learning-hub/pro-learning?courseId=${course.id}`} className="hover:text-indigo-600">
                         <h3 className="font-bold text-sm sm:text-base mb-1 line-clamp-2">{course.title}</h3>
                       </Link>
                       <div className="flex items-center flex-wrap gap-2 text-xs sm:text-sm text-gray-600 mb-2">
@@ -421,7 +411,7 @@ const SavedPlaylists = () => {
                           <span>{course.totalVideos} videos</span>
                         </div>
                         <Link 
-                          to={`/learning/${course.id}`}
+                          to={`/learning-hub/pro-learning?courseId=${course.id}`}
                           className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                         >
                           Review

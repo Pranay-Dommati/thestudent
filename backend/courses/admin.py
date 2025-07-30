@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     SchoolCourse, EngineeringCourse, CourseChapter, 
-    CourseSection, Lesson, LessonResource, QuizQuestion, AILearningPlan
+    CourseSection, Lesson, LessonResource, QuizQuestion
 )
 
 class LessonResourceInline(admin.TabularInline):
@@ -40,32 +40,3 @@ admin.site.register(CourseSection, SectionAdmin)
 admin.site.register(Lesson)
 admin.site.register(LessonResource)
 admin.site.register(QuizQuestion)
-
-# Register AI Learning Plan model
-class AILearningPlanAdmin(admin.ModelAdmin):
-    list_display = ['title', 'user', 'difficulty_level', 'duration_days', 'is_completed', 'created_at']
-    list_filter = ['difficulty_level', 'is_completed', 'category', 'created_at', 'user']
-    search_fields = ['title', 'user__email', 'description']
-    readonly_fields = ['id', 'created_at', 'updated_at', 'days_count', 'total_videos']
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('id', 'user', 'title', 'description')
-        }),
-        ('Plan Details', {
-            'fields': ('difficulty_level', 'duration_days', 'category', 'is_completed')
-        }),
-        ('Plan Data', {
-            'fields': ('plan_data',),
-            'classes': ('collapse',)
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-        ('Statistics', {
-            'fields': ('days_count', 'total_videos'),
-            'classes': ('collapse',)
-        })
-    )
-
-admin.site.register(AILearningPlan, AILearningPlanAdmin)

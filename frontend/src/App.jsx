@@ -251,9 +251,7 @@ const App = () => {
             <Route path="/courses/12th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
             <Route path="/courses/12th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
             <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
-            <Route path="/courses/12th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />              {/* AI Learning Plans Route */}
-            <Route path="/learning/:learningPlanId" element={<CourseLearningPage />} />
-            <Route path="/learning/:learningPlanId/quiz" element={<StandaloneQuizPage />} />
+            <Route path="/courses/12th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
 
             {/* Mentoring Routes */}
             {/* <Route path="/mentoring" element={<MentoringHome />} />

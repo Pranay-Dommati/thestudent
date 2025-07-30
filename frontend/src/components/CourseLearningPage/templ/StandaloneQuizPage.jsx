@@ -207,14 +207,21 @@ const StandaloneQuizPage = () => {
       let response;
       
       if (isAILearningPlan) {
-        // Use AI learning plan endpoint for string-based lesson IDs
-        const learningPlanId = params.learningPlanId;
-        console.log('Submitting AI learning plan quiz:', { learningPlanId, lessonId });
+        // For AI learning plans, we no longer use database storage
+        // Quiz results are handled locally by the Pro Learning system
+        console.log('Quiz completed for AI learning plan - handling locally');
         
-        response = await axiosInstance.post(
-          `http://127.0.0.1:8000/api/learning/submit-quiz/${learningPlanId}/${lessonId}/`,
-          { answers: selectedAnswers }
-        );
+        // Create local quiz result
+        const localResult = {
+          score: (correctAnswers / totalQuestions) * 100,
+          passed: (correctAnswers / totalQuestions) >= 0.8,
+          correctAnswers,
+          totalQuestions,
+          answers: selectedAnswers,
+          timestamp: new Date().toISOString()
+        };
+        
+        response = { data: localResult };
       } else {
         // Check if this is a school course (has generated lesson ID) or regular course
         const isSchoolCourse = typeof lessonId === 'string' && lessonId.includes('_');

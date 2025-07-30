@@ -38,185 +38,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const location = useLocation();
   const { isLoggedIn } = useAuth();
 
-  // Helper function to update AI learning plan progress
-  const updateAILearningPlanProgress = async (planId, lessonId, isCompleted) => {
-    try {
-      // Get current progress data
-      const currentPlan = await axiosInstance.get(`/learning/plans/${planId}/`);
-      const currentProgress = currentPlan.data.plan_data.progress || {};
-      
-      // Update the specific lesson progress
-      const updatedProgress = {
-        ...currentProgress,
-        [lessonId]: isCompleted
-      };
-      
-      // Calculate overall completion
-      const allLessons = course.chapters.reduce((acc, chapter) => {
-        return acc.concat(chapter.lessons.map(lesson => lesson.id));
-      }, []);
-      
-      const completedLessonsCount = allLessons.filter(lessonKey => updatedProgress[lessonKey]).length;
-      const totalLessonsCount = allLessons.length;
-      const isOverallCompleted = totalLessonsCount > 0 && completedLessonsCount === totalLessonsCount;
-      
-      // Send progress update to backend
-      await axiosInstance.patch(`/learning/update-progress/${planId}/`, {
-        plan_data: {
-          progress: updatedProgress
-        },
-        is_completed: isOverallCompleted
-      });
-      
-      console.log(`Updated AI learning plan progress: ${completedLessonsCount}/${totalLessonsCount} lessons completed`);
-      
-    } catch (error) {
-      console.error('Error updating AI learning plan progress:', error);
-      throw error;
-    }
-  };
-
-  // Helper to fetch a learning plan by ID
-  const fetchLearningPlanById = async (planId) => {
-    try {
-      setLoading(true);
-      console.log('🔍 Fetching learning plan with ID:', planId);
-      const response = await axiosInstance.get(`/learning/plans/${planId}/`);
-      const planData = response.data;
-      console.log('📦 Received plan data:', JSON.stringify(planData, null, 2));
-      
-      // Check if planData has the expected structure
-      if (!planData || !planData.plan_data) {
-        throw new Error('Learning plan data is missing or invalid');
-      }
-      
-      // Ensure days is an array (can be empty)
-      if (!Array.isArray(planData.plan_data.days)) {
-        throw new Error('Learning plan days data is invalid');
-      }
-      
-      // Load existing progress data if available
-      const existingProgress = planData.plan_data.progress || {};
-      
-      // Transform days into chapters with progress loading
-      const transformedPlan = {
-        id: planData.id,
-        title: planData.title,
-        description: planData.description || "AI-generated learning plan",
-        chapters: planData.plan_data.days.map((day, dayIndex) => {
-          // DEBUG: Log quiz questions for each day
-          console.log(`🧩 Day ${day.day} (${day.topic}) quiz questions:`, day.quizQuestions);
-          console.log(`🧩 Quiz questions length:`, day.quizQuestions ? day.quizQuestions.length : 0);
-          
-          // Create video lessons from day.videos
-          const videoLessons = (day.videos || []).map((video, videoIndex) => {
-            // Create unique lesson identifier for AI learning plans
-            const lessonKey = `day_${day.day}_video_${videoIndex}`;
-            const isCompleted = existingProgress[lessonKey] || false;
-            
-            return {
-              id: lessonKey,
-              title: video.title,
-              type: 'video',
-              videoUrl: video.video_id ? `https://www.youtube.com/embed/${video.video_id}` : 
-                (video.url && video.url.includes('youtube.com/watch?v=') ? 
-                  `https://www.youtube.com/embed/${video.url.split('v=')[1].split('&')[0]}` : 
-                  video.url || ''),
-              description: video.description || "",
-              completed: isCompleted,
-              isAIGenerated: true,
-              aiLearningPlanId: planData.id,
-              dayIndex: dayIndex,
-              videoIndex: videoIndex
-            };
-          });
-
-          // Create quiz lesson if quiz questions exist
-          const quizLessons = [];
-          if (day.quizQuestions && day.quizQuestions.length > 0) {
-            console.log(`✅ Creating quiz lesson for Day ${day.day}: ${day.topic}`);
-            const quizLessonKey = `day_${day.day}_quiz`;
-            const isQuizCompleted = existingProgress[quizLessonKey] || false;
-            
-            quizLessons.push({
-              id: quizLessonKey,
-              title: `${day.topic} - Knowledge Check`,
-              type: 'quiz',
-              description: `Test your understanding of ${day.topic} concepts`,
-              completed: isQuizCompleted,
-              isAIGenerated: true,
-              aiLearningPlanId: planData.id,
-              dayIndex: dayIndex,
-              quiz_questions: day.quizQuestions,
-              quizQuestions: day.quizQuestions
-            });
-          } else {
-            console.log(`❌ No quiz questions found for Day ${day.day}: ${day.topic}`);
-          }
-
-          console.log(`📊 Day ${day.day} final lessons:`, {
-            videoLessons: videoLessons.length,
-            quizLessons: quizLessons.length,
-            totalLessons: videoLessons.length + quizLessons.length
-          });
-
-          return {
-            title: `Day ${day.day}: ${day.topic}`,
-            lessons: [...videoLessons, ...quizLessons]
-          };
-        }),
-      };
-      setCourse(transformedPlan);
-      setIsAIGeneratedPlan(true);
-      if (transformedPlan.chapters.length > 0) {
-        setExpandedChapters({ 0: true });
-      }
-    } catch (error) {
-      console.error('Error fetching learning plan by ID:', error);
-      let errorMessage = 'Failed to load learning plan';
-      
-      if (error.response) {
-        if (error.response.status === 404) {
-          errorMessage = 'Learning plan not found. It may have been deleted or is unavailable.';
-          setContentType('notFound');
-        } else if (error.response.status === 500) {
-          errorMessage = 'Server error occurred while loading the learning plan. Please try again later.';
-        } else if (error.response.data && error.response.data.error) {
-          errorMessage = error.response.data.error;
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      setError(errorMessage);
-      setCourse(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Helper to generate a new AI learning plan and fetch it immediately
-  const generateAndFetchLearningPlan = async (goal, days=null) => {
-    try {
-      setLoading(true);
-      const response = await axiosInstance.post('/learning/generate-learning-plan/', { goal, days });
-      const newPlan = response.data;
-      if (newPlan && newPlan.id) {
-        setLastCreatedPlanId(newPlan.id);
-        // Immediately fetch the new plan by its ID
-        await fetchLearningPlanById(newPlan.id);
-      } else {
-        console.error('No plan ID returned after creation:', newPlan);
-      }
-    } catch (error) {
-      console.error('Error creating new AI learning plan:', error);
-      setError(error.message || 'Failed to generate learning plan');
-      setCourse(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     // Extract URL path to determine course type and proper API endpoint
     const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
@@ -226,35 +47,15 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const learningPlanId = isDirectLearningPlanRoute ? pathParts[1] : null;
     
     // Only treat as AI learning plan if it's a direct learning route or we have a lastCreatedPlanId
-    const isLearningPlanId = learningPlanId !== null || lastCreatedPlanId !== null;
-
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Check first if this is an AI-generated learning plan
-        if (isLearningPlanId) {
-          try {
-            // Use the last created plan ID if available, otherwise use the learningPlanId from URL
-            const planId = lastCreatedPlanId || learningPlanId;
-            console.log(`🔍 Fetching AI learning plan with ID: ${planId}`);
-            await fetchLearningPlanById(planId);
-            console.log("✅ Learning plan loaded successfully!");
-            return; // Exit early since we successfully loaded the plan
-          } catch (error) {
-            const errorMessage = error.response?.data?.detail || error.message || 'Failed to load AI learning plan';
-            console.error('❌ Error fetching AI learning plan:', errorMessage);
-            setError(errorMessage);
-            setContentType('notFound');
-          }        } else {
-          try {
-            // Fetch regular course data
-            await fetchRegularCourse(pathParts);
-          } catch (error) {
-            console.error('❌ Error fetching course data:', error);
-            setError(error.message || 'Failed to load course data');
-            setContentType('notFound'); 
-          }
-        }
+        // Fetch regular course data
+        await fetchRegularCourse(pathParts);
+      } catch (error) {
+        console.error('❌ Error fetching course data:', error);
+        setError(error.message || 'Failed to load course data');
+        setContentType('notFound');
       } finally {
         setLoading(false);
       }
@@ -440,8 +241,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           setExpandedChapters({ 0: true });
         }
         
-        // Also fetch AI-generated learning plans to display in sidebar
-        fetchAILearningPlans();
       } catch (error) {
         console.error('❌ Error fetching course data:', error);
         const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
@@ -464,34 +263,13 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         
         setCourse(null);
         
-        // Check if error response indicates ID belongs to a learning plan
+        // Standard error handling for course loading
         if (error.response?.data?.isLearningPlanId) {
           setError('This learning plan is not available. It may have been deleted or you may not have permission to access it.');
-        } else if (isLearningPlanId) {
-          setError('Unable to load the learning plan. Please check if the ID is correct.');
+        } else {
+          setError('Unable to load the course. Please check if the URL is correct.');
           setContentType('notFound');
         }
-      }
-    };
-    
-    const fetchAILearningPlans = async () => {
-      try {
-        const response = await axiosInstance.get('/learning/plans/');
-        
-        // Check if response is valid
-        if (response.status === 200 && Array.isArray(response.data)) {
-          const plans = response.data;
-          console.log("Fetched AI Learning Plans:", plans);
-          setLearningPlans(plans);
-        } else {
-          console.warn("Unexpected learning plans response format:", response.data);
-          setLearningPlans([]);
-        }
-      } catch (error) {
-        console.error('Error fetching AI learning plans:', error);
-        const errorMessage = error.response?.data?.detail || error.message || 'Failed to load learning plans';
-        console.warn('AI Learning Plans Error:', errorMessage);
-        setLearningPlans([]);
       }
     };
 
@@ -589,10 +367,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     try {
       const currentLesson = course.chapters[activeChapter].lessons[activeLesson];
       
-      if (isAIGeneratedPlan && currentLesson.aiLearningPlanId) {
-        // Handle AI learning plan progress
-        await updateAILearningPlanProgress(currentLesson.aiLearningPlanId, currentLesson.id, true);
-      } else if (currentLesson.id && !isAIGeneratedPlan) {
+      if (currentLesson.id && !isAIGeneratedPlan) {
         // Handle regular course progress
         await axiosInstance.post(`/lessons/toggle-completion/${currentLesson.id}/`);
       }
@@ -618,10 +393,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
       const newCompletionState = !lesson.completed;
       
-      if (isAIGeneratedPlan && lesson.aiLearningPlanId) {
-        // Handle AI learning plan progress
-        await updateAILearningPlanProgress(lesson.aiLearningPlanId, lesson.id, newCompletionState);
-      } else if (lesson.id && !isAIGeneratedPlan) {
+      if (lesson.id && !isAIGeneratedPlan) {
         // Handle regular course progress
         const response = await axiosInstance.post(`/lessons/toggle-completion/${lesson.id}/`);
         console.log('Lesson completion toggled:', response.data);
@@ -847,21 +619,18 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           <h2 className="text-xl font-bold text-gray-800 mb-2">Content Not Found</h2>
           <p className="text-gray-600 mb-6">{error || "The content you're looking for could not be found. It may have been deleted or is unavailable."}</p>
           <div className="flex justify-center space-x-4">
-            {isLearningPlanId ? (
-              <button
-                onClick={() => navigate('/chat')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Create a New Learning Plan
-              </button>
-            ) : (
-              <button
-                onClick={() => navigate('/courses')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Browse Courses
-              </button>
-            )}
+            <button
+              onClick={() => navigate('/learning-hub')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Go to Learning Hub
+            </button>
+            <button
+              onClick={() => navigate('/courses')}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
+            >
+              Browse Courses
+            </button>
             <button
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
