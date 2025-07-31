@@ -967,6 +967,31 @@ const ProLearningPage = () => {
   };
 
   // Save to Learning Hub functionality
+  const generateSmartCourseName = (topicsData, fallbackTitle) => {
+    if (fallbackTitle && fallbackTitle !== 'AI Generated Course') {
+      return fallbackTitle;
+    }
+    
+    if (!topicsData || Object.keys(topicsData).length === 0) {
+      return 'AI Generated Course';
+    }
+    
+    const topicNames = Object.keys(topicsData);
+    
+    // Option 1: Single topic - use topic name
+    if (topicNames.length === 1) {
+      return `AI Course: ${topicNames[0]}`;
+    }
+    
+    // Option 2: Multiple topics - create summary
+    if (topicNames.length <= 3) {
+      return `AI Course: ${topicNames.join(' + ')}`;
+    }
+    
+    // Option 3: Many topics - show first 3 + ellipsis
+    return `AI Course: ${topicNames.slice(0, 3).join(' + ')} + ...`;
+  };
+
   const handleSaveToLearningHub = async () => {
     try {
       setIsSavingToHub(true);
@@ -989,17 +1014,22 @@ const ProLearningPage = () => {
       // Generate a unique course ID for database storage (different from session ID)
       const uniqueDbCourseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
+      // Generate smart course name based on topics
+      const smartCourseName = generateSmartCourseName(courseContent.topics, courseTitle);
+      
       console.log('📤 Preparing to save course to database:', {
         sessionCourseId: currentCourseId,
         dbCourseId: uniqueDbCourseId,
-        courseTitle,
-        topicsCount: Object.keys(courseContent.topics).length
+        originalTitle: courseTitle,
+        smartCourseName,
+        topicsCount: Object.keys(courseContent.topics).length,
+        topics: Object.keys(courseContent.topics)
       });
 
       // Prepare the data for the POST request
       const courseData = {
         course_id: uniqueDbCourseId, // Use unique ID for database
-        title: courseTitle || 'AI Generated Course',
+        title: smartCourseName,
         topics: courseContent.topics
       };
 

@@ -6,11 +6,14 @@ import ActiveCourses from './ActiveCourses/ActiveCourses';
 import SavedPlaylists from './SavedPlaylists/SavedPlaylists';
 import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
 import CourseRecommendations from './CourseRecommendations/CourseRecommendations';
+import { useAuth } from '../../context/AuthContext';
 
 const LearningHubPage = () => {
-  // Mock user data - in a real app, this would come from authentication context
+  const { user: authUser } = useAuth();
+  
+  // Create user object with actual authenticated user data
   const user = {
-    name: "Alex",
+    name: authUser?.full_name || authUser?.first_name || authUser?.username || "Student",
     lastCourse: {
       id: "course-123",
       title: "Advanced React Patterns",
