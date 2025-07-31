@@ -1452,46 +1452,94 @@ def get_user_enrolled_courses(request):
         
         user = request.user
         
-        enrollments = UserStartedPredefinedCourse.objects.filter(user=user).order_by('-started_at')
+        enrollments = UserStartedPredefinedCourse.objects.filter(user=user).select_related(
+            'school_course', 'engineering_course'
+        ).order_by('-started_at')
         
-        enrolled_courses = []
+        courses = []
         for enrollment in enrollments:
-            course = enrollment.get_course()
-            if course:
-                course_data = {
-                    'enrollment_id': enrollment.id,
-                    'course_type': enrollment.course_type,
-                    'course_id': course.id,
-                    'course_title': course.title,
-                    'progress_percentage': float(enrollment.progress_percentage),
-                    'is_completed': enrollment.is_completed,
-                    'started_at': enrollment.started_at,
-                    'last_activity': enrollment.last_activity,
-                    'completed_at': enrollment.completed_at,
+            # Build enrollment data with full course details
+            enrollment_data = {
+                'id': enrollment.id,
+                'course_type': enrollment.course_type,
+                'class_level': enrollment.class_level,
+                'board': enrollment.board,
+                'subject': enrollment.subject,
+                'progress_percentage': float(enrollment.progress_percentage),
+                'is_completed': enrollment.is_completed,
+                'started_at': enrollment.started_at.isoformat() if enrollment.started_at else None,
+                'last_activity': enrollment.last_activity.isoformat() if enrollment.last_activity else None,
+                'completed_at': enrollment.completed_at.isoformat() if enrollment.completed_at else None,
+                'school_course': None,
+                'engineering_course': None
+            }
+            
+            # Add full course details
+            if enrollment.school_course:
+                # Safely handle all string fields
+                def safe_field(obj, field_name, default=""):
+                    try:
+                        value = getattr(obj, field_name, default)
+                        if value is None:
+                            return default
+                        if isinstance(value, bytes):
+                            return value.decode('utf-8', errors='ignore')
+                        return str(value)
+                    except (UnicodeDecodeError, AttributeError):
+                        return default
+                
+                enrollment_data['school_course'] = {
+                    'id': enrollment.school_course.id,
+                    'title': safe_field(enrollment.school_course, 'title'),
+                    'subject': safe_field(enrollment.school_course, 'subject'),
+                    'class_level': safe_field(enrollment.school_course, 'class_level'),
+                    'board': safe_field(enrollment.school_course, 'board'),
+                    'state': safe_field(enrollment.school_course, 'state'),
+                    'thumbnail': safe_field(enrollment.school_course, 'thumbnail') or "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
+                    'duration': safe_field(enrollment.school_course, 'duration'),
+                    'sources': safe_field(enrollment.school_course, 'sources'),
+                    'description': safe_field(enrollment.school_course, 'description'),
                 }
+            elif enrollment.engineering_course:
+                # Safely handle all string fields
+                def safe_field(obj, field_name, default=""):
+                    try:
+                        value = getattr(obj, field_name, default)
+                        if value is None:
+                            return default
+                        if isinstance(value, bytes):
+                            return value.decode('utf-8', errors='ignore')
+                        return str(value)
+                    except (UnicodeDecodeError, AttributeError):
+                        return default
                 
-                # Add course-specific data
-                if enrollment.course_type == 'school':
-                    course_data.update({
-                        'class_level': enrollment.class_level,
-                        'board': enrollment.board,
-                        'subject': enrollment.subject,
-                    })
-                
-                enrolled_courses.append(course_data)
+                enrollment_data['engineering_course'] = {
+                    'id': enrollment.engineering_course.id,
+                    'title': safe_field(enrollment.engineering_course, 'title'),
+                    'subject': safe_field(enrollment.engineering_course, 'subject'),
+                    'proficiency': safe_field(enrollment.engineering_course, 'proficiency'),
+                    'category': safe_field(enrollment.engineering_course, 'category'),
+                    'thumbnail': safe_field(enrollment.engineering_course, 'thumbnail') or "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
+                    'duration': safe_field(enrollment.engineering_course, 'duration'),
+                    'sources': safe_field(enrollment.engineering_course, 'sources'),
+                    'description': safe_field(enrollment.engineering_course, 'description'),
+                }
+            
+            courses.append(enrollment_data)
         
         return Response({
-            'enrolled_courses': enrolled_courses,
-            'total_count': len(enrolled_courses)
+            'success': True,
+            'courses': courses,
+            'total_count': len(courses)
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
         print(f"Error in get_user_enrolled_courses: {str(e)}")
         traceback.print_exc()
-        return Response(
-            {'error': f'Failed to get enrolled courses: {str(e)}'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({
+            'success': False,
+            'error': f'Failed to get enrolled courses: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])

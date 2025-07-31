@@ -3,8 +3,11 @@ import React, { useState } from 'react';
 const LearningAnalytics = ({ user }) => {
   const [timePeriod, setTimePeriod] = useState('week');
   
+  // Set default weekly goal if not provided
+  const weeklyGoalHours = user.weeklyGoalHours || 15;
+  
   // Calculate weekly goal percentage
-  const weeklyGoalPercentage = (user.hoursThisWeek / user.weeklyGoalHours) * 100;
+  const weeklyGoalPercentage = (user.hoursThisWeek / weeklyGoalHours) * 100;
 
   // Mock data for different time periods
   const timeData = {
@@ -108,7 +111,7 @@ const LearningAnalytics = ({ user }) => {
       <div className="border-t border-gray-100 pt-5 mb-6">
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-sm font-medium text-gray-700">Weekly Learning Goal</h3>
-          <span className="text-sm text-gray-500">{user.hoursThisWeek} / {user.weeklyGoalHours} hours</span>
+          <span className="text-sm text-gray-500">{user.hoursThisWeek} / {weeklyGoalHours} hours</span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
           <div 

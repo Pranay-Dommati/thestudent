@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '../Navbar/Navbar';
 import Footer from '../Footer/Footer';
 import HeroSection from './HeroSection/HeroSection';
@@ -7,9 +7,37 @@ import SavedPlaylists from './SavedPlaylists/SavedPlaylists';
 import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
 import CourseRecommendations from './CourseRecommendations/CourseRecommendations';
 import { useAuth } from '../../context/AuthContext';
+import axios from 'axios';
+
+const API_URL = 'http://localhost:8000';
 
 const LearningHubPage = () => {
-  const { user: authUser } = useAuth();
+  const { user: authUser, isLoggedIn } = useAuth();
+  const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(0);
+  
+  useEffect(() => {
+    const fetchEnrolledCoursesCount = async () => {
+      if (!isLoggedIn) return;
+
+      try {
+        const token = localStorage.getItem('accessToken');
+        const response = await axios.get(`${API_URL}/api/courses/enrolled/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.data.success) {
+          setEnrolledCoursesCount(response.data.courses.length);
+        }
+      } catch (error) {
+        console.error('Error fetching enrolled courses count:', error);
+      }
+    };
+
+    fetchEnrolledCoursesCount();
+  }, [isLoggedIn]);
   
   // Create user object with actual authenticated user data
   const user = {
@@ -20,9 +48,11 @@ const LearningHubPage = () => {
       thumbnail: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&auto=format&fit=crop",
       progress: 45
     },
-    totalCoursesEnrolled: 8,
+    totalCoursesEnrolled: enrolledCoursesCount,
     hoursThisWeek: 12.5,
-    certificatesEarned: 3
+    weeklyGoalHours: 15,
+    certificatesEarned: 3,
+    currentStreak: 5
   };
 
   return (

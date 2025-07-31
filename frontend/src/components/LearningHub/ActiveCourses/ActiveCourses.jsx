@@ -1,41 +1,97 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../../context/AuthContext';
+import axios from 'axios';
+import { toast } from 'react-hot-toast';
+
+const API_URL = 'http://localhost:8000';
 
 const ActiveCourses = () => {
-  // Mock data - would come from API in real app
-  const activeCourses = [
-    {
-      id: "course-123",
-      title: "Advanced React Patterns",
-      instructor: "Sarah Johnson",
-      thumbnail: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&auto=format&fit=crop",
-      progress: 45,
-      timeLeft: "3 hours",
-      lastAccessed: "2 days ago"
-    },
-    {
-      id: "course-456",
-      title: "Data Science Fundamentals",
-      instructor: "Michael Chen",
-      thumbnail: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop",
-      progress: 72,
-      timeLeft: "1.5 hours",
-      lastAccessed: "Yesterday"
-    },
-    {
-      id: "course-789",
-      title: "UI/UX Design Principles",
-      instructor: "Emma Peterson",
-      thumbnail: "https://images.unsplash.com/photo-1558655146-d09347e92766?w=800&auto=format&fit=crop",
-      progress: 18,
-      timeLeft: "5 hours",
-      lastAccessed: "4 days ago"
-    }
-  ];
+  const [enrolledCourses, setEnrolledCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { isLoggedIn } = useAuth();
 
-  return (    <section className="bg-white rounded-xl shadow-md p-4 sm:p-6">
+  useEffect(() => {
+    const fetchEnrolledCourses = async () => {
+      if (!isLoggedIn) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('accessToken');
+        const response = await axios.get(`${API_URL}/api/courses/enrolled/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('Enrolled courses response:', response.data);
+
+        if (response.data.success) {
+          // Format the courses for display
+          const formattedCourses = response.data.courses.map(enrollment => {
+            const course = enrollment.school_course || enrollment.engineering_course;
+            const courseType = enrollment.school_course ? 'school' : 'engineering';
+            
+            // Calculate time since enrollment for "last accessed"
+            const startedDate = new Date(enrollment.started_at);
+            const now = new Date();
+            const daysDiff = Math.floor((now - startedDate) / (1000 * 60 * 60 * 24));
+            const lastAccessed = daysDiff === 0 ? 'Today' : 
+                               daysDiff === 1 ? 'Yesterday' : 
+                               `${daysDiff} days ago`;
+
+            // Build course URL based on type
+            let courseUrl = '';
+            if (courseType === 'school') {
+              const classLevel = enrollment.class_level;
+              const board = enrollment.board;
+              const subject = enrollment.subject;
+              courseUrl = `/courses/${classLevel}/${board}/${subject}`;
+            } else {
+              courseUrl = `/courses/engineering/${course.category}/${course.proficiency}`;
+            }
+
+            return {
+              id: course.id,
+              enrollmentId: enrollment.id,
+              title: course.title,
+              subject: course.subject,
+              board: courseType === 'school' ? enrollment.board : course.category,
+              class: courseType === 'school' ? enrollment.class_level : `${course.proficiency} Level`,
+              thumbnail: course.thumbnail || "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
+              progress: enrollment.progress_percentage || 0,
+              timeLeft: "Not calculated",
+              lastAccessed: lastAccessed,
+              courseType: courseType,
+              courseUrl: courseUrl,
+              learningUrl: `${courseUrl}/learning`
+            };
+          });
+
+          setEnrolledCourses(formattedCourses);
+        }
+      } catch (error) {
+        console.error('Error fetching enrolled courses:', error);
+        if (error.response?.status !== 401) {
+          toast.error('Failed to load enrolled courses');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEnrolledCourses();
+  }, [isLoggedIn]);
+
+  const activeCourses = enrolledCourses;
+
+  return (
+    <section className="bg-white rounded-xl shadow-md p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Active Courses</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-800">My Enrolled Courses</h2>
         <div className="flex items-center gap-2 text-sm">
           <div className="relative group">
             <button className="font-medium text-gray-500 hover:text-indigo-600 flex items-center">
@@ -51,25 +107,53 @@ const ActiveCourses = () => {
           </button>
         </div>
       </div>
-        {activeCourses.length > 0 ? (
+
+      {loading ? (
+        <div className="text-center p-6 sm:p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="text-gray-600 mt-2">Loading your courses...</p>
+        </div>
+      ) : !isLoggedIn ? (
+        <div className="text-center p-6 sm:p-8 bg-gray-50 rounded-xl">
+          <div className="max-w-md mx-auto">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">Please Login</h3>
+            <p className="text-base text-gray-600 mb-6">Login to see your enrolled courses and continue learning.</p>
+            <Link 
+              to="/auth?mode=login" 
+              className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 
+              transition-all duration-200 hover:shadow-lg active:transform active:scale-95"
+            >
+              Login Now
+            </Link>
+          </div>
+        </div>
+      ) : activeCourses.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {activeCourses.map((course) => (
-            <div key={course.id} className="group border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-all duration-200">
+            <div key={course.enrollmentId} className="group border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-all duration-200">
               <div className="flex flex-col sm:flex-row">
-                <Link to={`/courses/${course.id}`} className="block sm:w-1/3 relative overflow-hidden">
+                <Link to={course.courseUrl} className="block sm:w-1/3 relative overflow-hidden">
                   <img 
                     src={course.thumbnail} 
                     alt={course.title}
                     className="h-48 sm:h-full w-full object-cover transform transition-transform duration-300 group-hover:scale-105"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://images.unsplash.com/photo-1635070041078-e363dbe005cb";
+                    }}
                   />
                   <div className="absolute inset-0 bg-black/5 group-hover:bg-black/0 transition-colors"></div>
                 </Link>
                 <div className="flex-1 flex flex-col p-4 sm:p-5">
                   <div>
-                    <Link to={`/courses/${course.id}`} className="group-hover:text-indigo-600 transition-colors">
+                    <Link to={course.courseUrl} className="group-hover:text-indigo-600 transition-colors">
                       <h3 className="font-bold text-base sm:text-lg line-clamp-2 mb-1">{course.title}</h3>
                     </Link>
-                    <p className="text-gray-600 text-sm mb-3">By {course.instructor}</p>
+                    <p className="text-gray-600 text-sm mb-1">{course.board} • {course.class}</p>
+                    <p className="text-gray-500 text-xs mb-3">{course.subject}</p>
                   </div>
                   
                   <div className="mt-auto space-y-3">
@@ -91,17 +175,16 @@ const ActiveCourses = () => {
                     </div>
                     <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-4">
                       <div className="text-sm text-gray-500 flex flex-wrap gap-x-2">
-                        <span>{course.timeLeft} left</span>
-                        <span className="hidden sm:inline">•</span>
-                        <span>Accessed {course.lastAccessed}</span>
+                        <span>Enrolled {course.lastAccessed}</span>
                       </div>
                       <Link 
-                        to={`/courses/${course.id}/learning`}
+                        to={course.learningUrl}
                         className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 
                         transition-colors flex items-center justify-center sm:justify-start group-hover:shadow-md"
                       >
-                        Resume Course
-                      </Link>                    </div>
+                        {course.progress > 0 ? 'Continue Learning' : 'Start Learning'}
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -113,14 +196,14 @@ const ActiveCourses = () => {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400 mb-4 transform transition-transform hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">No Active Courses Yet</h3>
-            <p className="text-base text-gray-600 mb-6">Ready to start your learning journey? Explore our courses and find the perfect one for you.</p>
+            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">No Enrolled Courses Yet</h3>
+            <p className="text-base text-gray-600 mb-6">Ready to start your learning journey? Browse our courses and enroll in the ones that interest you.</p>
             <Link 
               to="/courses" 
               className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 
               transition-all duration-200 hover:shadow-lg active:transform active:scale-95"
             >
-              <span>Start Learning Today</span>
+              <span>Browse Courses</span>
               <svg className="w-4 h-4 ml-2" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
