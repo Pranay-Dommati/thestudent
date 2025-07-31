@@ -43,7 +43,7 @@ class ProContentManager {
       reading: dbTopic.reading_material || null,
       summary: dbTopic.summary || null,
       videos: this.transformVideos(dbTopic.videos || []),
-      quiz: this.transformQuizQuestions(dbTopic.quiz_questions || []),
+      quiz: this.transformQuizQuestions(dbTopic.quiz_questions || []), // This will return [] if no quiz data
       resources: this.transformResources(dbTopic.resources || [])
     };
     
@@ -99,25 +99,22 @@ class ProContentManager {
   /**
    * Transform database quiz questions to localStorage format
    * @param {Array} dbQuizQuestions - Database quiz questions
-   * @returns {Object} - Transformed quiz object
+   * @returns {Array} - Transformed quiz array (not object!)
    */
   transformQuizQuestions(dbQuizQuestions) {
-    if (!dbQuizQuestions || dbQuizQuestions.length === 0) return null;
+    if (!dbQuizQuestions || dbQuizQuestions.length === 0) return [];
     
-    return {
-      questions: dbQuizQuestions.map(q => ({
-        id: q.id,
-        question: q.question_text,
-        type: q.question_type || 'multiple_choice',
-        options: q.options || [],
-        correct_answer: q.correct_answer,
-        explanation: q.explanation || '',
-        points: q.points || 1,
-        order: q.order || 0
-      })),
-      currentQuestion: 0,
-      totalQuestions: dbQuizQuestions.length
-    };
+    return dbQuizQuestions.map(q => ({
+      id: q.id,
+      question: q.question_text,
+      type: q.question_type || 'multiple_choice',
+      options: q.options || [],
+      correct: q.correct_answer,
+      explanation: q.explanation || '',
+      points: q.points || 1,
+      order: q.order || 0,
+      userAnswer: null // Initialize as null for quiz functionality
+    }));
   }
 
   /**
