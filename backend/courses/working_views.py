@@ -140,10 +140,16 @@ def save_pro_learning_course(request):
 
         # Create course with transaction
         with transaction.atomic():
+            # Generate a more descriptive course name using the first topic
+            first_topic_name = list(topics_data.keys())[0] if topics_data else "AI Course"
+            descriptive_course_name = f"{first_topic_name} Course" if title == f'AI Generated Course - {course_name}' else title
+            
+            print(f"📝 Using course name: '{descriptive_course_name}' (from first topic: '{first_topic_name}')")
+            
             # Create the course using correct field names
             course = ProLearningCourse.objects.create(
-                course_name=title,  # Use course_name instead of course_id
-                description=f'AI-generated course: {title}',
+                course_name=descriptive_course_name,  # Use descriptive name instead of generic title
+                description=f'AI-generated course covering {len(topics_data)} topics: {", ".join(list(topics_data.keys())[:3])}{"..." if len(topics_data) > 3 else ""}',
                 user=user
             )
             
