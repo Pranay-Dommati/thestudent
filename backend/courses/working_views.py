@@ -126,7 +126,9 @@ def save_pro_learning_course(request):
 
         # Debug: Print topic structure to understand data format
         for topic_name, topic_content in topics_data.items():
-            print(f"📚 Topic '{topic_name}' contains keys: {list(topic_content.keys())}")
+            print(f"\n==== DEBUG TOPIC '{topic_name}' FULL CONTENT ====")
+            print(json.dumps(topic_content, indent=2))
+            print(f"==== END DEBUG TOPIC '{topic_name}' ====")
             if 'readingMaterial' in topic_content:
                 print(f"   📖 Reading material: {len(topic_content['readingMaterial'])} chars")
             if 'reading_material' in topic_content:
@@ -147,13 +149,31 @@ def save_pro_learning_course(request):
             
             # Create topics, videos, quizzes, resources, reading material, and summary
             for topic_name, topic_content in topics_data.items():
-                # Extract reading material and summary from topic content
-                reading_material = topic_content.get('readingMaterial', '') or topic_content.get('reading_material', '')
-                summary = topic_content.get('summary', '') or topic_content.get('topicSummary', '')
+                # Handle different data structures from frontend
+                # Frontend sends: { content: { reading: "...", summary: "..." } }
+                # Or direct format: { readingMaterial: "...", summary: "..." }
+                if 'content' in topic_content:
+                    # Frontend format with nested content
+                    content_data = topic_content['content']
+                    reading_material = content_data.get('reading', '') or content_data.get('readingMaterial', '')
+                    summary = content_data.get('summary', '') or content_data.get('topicSummary', '')
+                    videos = content_data.get('videos', [])
+                    quiz_questions = content_data.get('quiz', []) or content_data.get('quizQuestions', [])
+                    resources = content_data.get('resources', [])
+                else:
+                    # Direct format (legacy support)
+                    reading_material = topic_content.get('readingMaterial', '') or topic_content.get('reading_material', '')
+                    summary = topic_content.get('summary', '') or topic_content.get('topicSummary', '')
+                    videos = topic_content.get('videos', [])
+                    quiz_questions = topic_content.get('quiz', []) or topic_content.get('quizQuestions', [])
+                    resources = topic_content.get('resources', [])
                 
                 print(f"📚 Topic: {topic_name}")
                 print(f"📖 Reading material length: {len(reading_material)} chars")
                 print(f"📝 Summary length: {len(summary)} chars")
+                print(f"🎥 Videos count: {len(videos)}")
+                print(f"❓ Quiz questions count: {len(quiz_questions)}")
+                print(f"📎 Resources count: {len(resources)}")
                 
                 topic = ProLearningTopic.objects.create(
                     course=course,
@@ -164,7 +184,6 @@ def save_pro_learning_course(request):
                 )
                 
                 # Create videos
-                videos = topic_content.get('videos', [])
                 for i, video_data in enumerate(videos):
                     ProLearningVideo.objects.create(
                         topic=topic,
@@ -174,7 +193,6 @@ def save_pro_learning_course(request):
                     )
                 
                 # Create quiz questions
-                quiz_questions = topic_content.get('quiz', []) or topic_content.get('quizQuestions', [])
                 for i, quiz_data in enumerate(quiz_questions):
                     ProLearningQuizQuestion.objects.create(
                         topic=topic,
@@ -185,7 +203,6 @@ def save_pro_learning_course(request):
                     )
                 
                 # Create resources
-                resources = topic_content.get('resources', [])
                 for i, resource_data in enumerate(resources):
                     ProLearningResource.objects.create(
                         topic=topic,
