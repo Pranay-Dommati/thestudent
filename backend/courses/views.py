@@ -8,10 +8,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource
 from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer
 import json
+import traceback
+import requests
+import time
 from django.conf import settings
 import os
 import mimetypes
-import os
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
@@ -297,7 +299,6 @@ def create_course(request):
             )
             
     except Exception as e:
-        import traceback
         print(traceback.format_exc())  # Debug print
         return Response(
             {'error': str(e)}, 
@@ -1340,5 +1341,248 @@ def download_resource(request, resource_id):
     except Exception as e:
         return Response(
             {'error': f'Failed to download file: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# ==================== COURSE ENROLLMENT ENDPOINTS ====================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def start_predefined_course(request):
+    """
+    Endpoint to enroll a user in a predefined course (School or Engineering)
+    Expected data:
+    {
+        "course_type": "school" or "engineering",
+        "course_id": course_id,
+        "class_level": "6th" (for school courses),
+        "board": "cbse" (for school courses),
+        "subject": "english" (for school courses)
+    }
+    """
+    try:
+        from .models import UserStartedPredefinedCourse, SchoolCourse, EngineeringCourse
+        
+        user = request.user
+        data = request.data
+        
+        course_type = data.get('course_type')
+        course_id = data.get('course_id')
+        
+        if not course_type or not course_id:
+            return Response(
+                {'error': 'course_type and course_id are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if course_type not in ['school', 'engineering']:
+            return Response(
+                {'error': 'course_type must be either "school" or "engineering"'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate course exists
+        if course_type == 'school':
+            try:
+                course = SchoolCourse.objects.get(id=course_id)
+            except SchoolCourse.DoesNotExist:
+                return Response(
+                    {'error': 'School course not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:  # engineering
+            try:
+                course = EngineeringCourse.objects.get(id=course_id)
+            except EngineeringCourse.DoesNotExist:
+                return Response(
+                    {'error': 'Engineering course not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        # Prepare enrollment data
+        course_data = {
+            'course_id': course_id,
+            'class_level': data.get('class_level'),
+            'board': data.get('board'),
+            'subject': data.get('subject'),
+        }
+        
+        # Create or get enrollment
+        enrollment, created = UserStartedPredefinedCourse.start_course(
+            user=user,
+            course_type=course_type,
+            **course_data
+        )
+        
+        # Prepare response data
+        response_data = {
+            'success': True,
+            'enrollment_id': enrollment.id,
+            'course_title': enrollment.get_course_title(),
+            'progress_percentage': float(enrollment.progress_percentage),
+            'started_at': enrollment.started_at,
+            'created': created
+        }
+        
+        if created:
+            response_data['message'] = 'Successfully enrolled in course'
+        else:
+            response_data['message'] = 'Already enrolled in this course'
+        
+        return Response(response_data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in start_predefined_course: {str(e)}")
+        traceback.print_exc()
+        return Response(
+            {'error': f'Failed to start course: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_enrolled_courses(request):
+    """
+    Get all courses the user has enrolled in
+    """
+    try:
+        from .models import UserStartedPredefinedCourse
+        
+        user = request.user
+        
+        enrollments = UserStartedPredefinedCourse.objects.filter(user=user).order_by('-started_at')
+        
+        enrolled_courses = []
+        for enrollment in enrollments:
+            course = enrollment.get_course()
+            if course:
+                course_data = {
+                    'enrollment_id': enrollment.id,
+                    'course_type': enrollment.course_type,
+                    'course_id': course.id,
+                    'course_title': course.title,
+                    'progress_percentage': float(enrollment.progress_percentage),
+                    'is_completed': enrollment.is_completed,
+                    'started_at': enrollment.started_at,
+                    'last_activity': enrollment.last_activity,
+                    'completed_at': enrollment.completed_at,
+                }
+                
+                # Add course-specific data
+                if enrollment.course_type == 'school':
+                    course_data.update({
+                        'class_level': enrollment.class_level,
+                        'board': enrollment.board,
+                        'subject': enrollment.subject,
+                    })
+                
+                enrolled_courses.append(course_data)
+        
+        return Response({
+            'enrolled_courses': enrolled_courses,
+            'total_count': len(enrolled_courses)
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in get_user_enrolled_courses: {str(e)}")
+        traceback.print_exc()
+        return Response(
+            {'error': f'Failed to get enrolled courses: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_course_enrollment(request, course_type, course_id):
+    """
+    Check if user is enrolled in a specific course
+    """
+    try:
+        from .models import UserStartedPredefinedCourse
+        
+        user = request.user
+        
+        filter_params = {'user': user, 'course_type': course_type}
+        
+        if course_type == 'school':
+            filter_params['school_course_id'] = course_id
+        elif course_type == 'engineering':
+            filter_params['engineering_course_id'] = course_id
+        else:
+            return Response(
+                {'error': 'Invalid course_type'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            enrollment = UserStartedPredefinedCourse.objects.get(**filter_params)
+            return Response({
+                'enrolled': True,
+                'enrollment_id': enrollment.id,
+                'progress_percentage': float(enrollment.progress_percentage),
+                'started_at': enrollment.started_at,
+                'last_activity': enrollment.last_activity,
+                'is_completed': enrollment.is_completed
+            }, status=status.HTTP_200_OK)
+        except UserStartedPredefinedCourse.DoesNotExist:
+            return Response({
+                'enrolled': False
+            }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in check_course_enrollment: {str(e)}")
+        traceback.print_exc()
+        return Response(
+            {'error': f'Failed to check enrollment: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_course_progress(request, enrollment_id):
+    """
+    Update course progress when user completes a lesson
+    """
+    try:
+        from .models import UserStartedPredefinedCourse
+        
+        user = request.user
+        
+        try:
+            enrollment = UserStartedPredefinedCourse.objects.get(id=enrollment_id, user=user)
+        except UserStartedPredefinedCourse.DoesNotExist:
+            return Response(
+                {'error': 'Enrollment not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Update progress
+        enrollment.update_progress()
+        
+        # Get next lesson
+        next_lesson = enrollment.get_next_lesson()
+        
+        response_data = {
+            'success': True,
+            'progress_percentage': float(enrollment.progress_percentage),
+            'is_completed': enrollment.is_completed,
+            'next_lesson': {
+                'id': next_lesson.id,
+                'title': next_lesson.title,
+                'type': next_lesson.type
+            } if next_lesson else None
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in update_course_progress: {str(e)}")
+        traceback.print_exc()
+        return Response(
+            {'error': f'Failed to update progress: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

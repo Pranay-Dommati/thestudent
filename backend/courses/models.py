@@ -371,3 +371,197 @@ class ProLearningResource(models.Model):
     
     def __str__(self):
         return f"{self.topic.topic_name} - {self.title}"
+
+
+# ==================== USER COURSE TRACKING MODELS ====================
+
+class UserStartedPredefinedCourse(models.Model):
+    """
+    Model to track when users start learning predefined courses (School/Engineering)
+    Provides one-to-many relationship from User to course tracking
+    """
+    COURSE_TYPE_CHOICES = (
+        ('school', 'School Course'),
+        ('engineering', 'Engineering Course'),
+    )
+    
+    BOARD_CHOICES = (
+        ('cbse', 'CBSE'),
+        ('icse', 'ICSE'),
+        ('state', 'State Board'),
+        ('ib', 'International Baccalaureate'),
+    )
+    
+    CLASS_CHOICES = (
+        ('6th', '6th Grade'),
+        ('7th', '7th Grade'), 
+        ('8th', '8th Grade'),
+        ('9th', '9th Grade'),
+        ('10th', '10th Grade'),
+        ('11th', '11th Grade'),
+        ('12th', '12th Grade'),
+    )
+    
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='started_predefined_courses'
+    )
+    course_type = models.CharField(max_length=20, choices=COURSE_TYPE_CHOICES)
+    
+    # For School Courses
+    school_course = models.ForeignKey(
+        SchoolCourse, 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True,
+        related_name='enrolled_users'
+    )
+    class_level = models.CharField(max_length=10, choices=CLASS_CHOICES, null=True, blank=True)
+    board = models.CharField(max_length=20, choices=BOARD_CHOICES, null=True, blank=True)
+    subject = models.CharField(max_length=100, null=True, blank=True)
+    
+    # For Engineering Courses
+    engineering_course = models.ForeignKey(
+        EngineeringCourse, 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True,
+        related_name='enrolled_users'
+    )
+    
+    # Progress tracking
+    progress_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    is_completed = models.BooleanField(default=False)
+    last_accessed_lesson = models.ForeignKey(
+        Lesson, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='last_accessed_by_users'
+    )
+    
+    # Timestamps
+    started_at = models.DateTimeField(auto_now_add=True)
+    last_activity = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-started_at']
+        unique_together = [
+            ['user', 'school_course'],
+            ['user', 'engineering_course']
+        ]
+        verbose_name = 'User Started Predefined Course'
+        verbose_name_plural = 'User Started Predefined Courses'
+        indexes = [
+            models.Index(fields=['user', 'course_type'], name='idx_user_course_type'),
+            models.Index(fields=['started_at'], name='idx_course_started_at'),
+            models.Index(fields=['progress_percentage'], name='idx_course_progress'),
+        ]
+    
+    def __str__(self):
+        if self.course_type == 'school':
+            return f"{self.user.username} - {self.school_course.title} ({self.class_level} {self.board})"
+        else:
+            return f"{self.user.username} - {self.engineering_course.title}"
+    
+    def get_course(self):
+        """Get the actual course object based on course type"""
+        if self.course_type == 'school':
+            return self.school_course
+        elif self.course_type == 'engineering':
+            return self.engineering_course
+        return None
+    
+    def get_course_title(self):
+        """Get the course title regardless of course type"""
+        course = self.get_course()
+        return course.title if course else "Unknown Course"
+    
+    def update_progress(self):
+        """Calculate and update progress based on completed lessons"""
+        course = self.get_course()
+        if not course:
+            return
+        
+        if self.course_type == 'school':
+            total_lessons = Lesson.objects.filter(chapter__school_course=course).count()
+            completed_lessons = UserLessonProgress.objects.filter(
+                user=self.user,
+                lesson__chapter__school_course=course
+            ).count()
+        else:  # engineering
+            total_lessons = Lesson.objects.filter(section__engineering_course=course).count()
+            completed_lessons = UserLessonProgress.objects.filter(
+                user=self.user,
+                lesson__section__engineering_course=course
+            ).count()
+        
+        if total_lessons > 0:
+            self.progress_percentage = (completed_lessons / total_lessons) * 100
+            self.is_completed = self.progress_percentage == 100
+            
+            if self.is_completed and not self.completed_at:
+                self.completed_at = timezone.now()
+            
+            self.save(update_fields=['progress_percentage', 'is_completed', 'completed_at'])
+    
+    def get_next_lesson(self):
+        """Get the next lesson to be completed in this course"""
+        course = self.get_course()
+        if not course:
+            return None
+        
+        if self.course_type == 'school':
+            completed_lesson_ids = UserLessonProgress.objects.filter(
+                user=self.user,
+                lesson__chapter__school_course=course
+            ).values_list('lesson_id', flat=True)
+            
+            next_lesson = Lesson.objects.filter(
+                chapter__school_course=course
+            ).exclude(id__in=completed_lesson_ids).order_by('order').first()
+        else:  # engineering
+            completed_lesson_ids = UserLessonProgress.objects.filter(
+                user=self.user,
+                lesson__section__engineering_course=course
+            ).values_list('lesson_id', flat=True)
+            
+            next_lesson = Lesson.objects.filter(
+                section__engineering_course=course
+            ).exclude(id__in=completed_lesson_ids).order_by('order').first()
+        
+        return next_lesson
+    
+    @classmethod
+    def start_course(cls, user, course_type, **course_data):
+        """
+        Helper method to start a course for a user
+        
+        Args:
+            user: User instance
+            course_type: 'school' or 'engineering'
+            **course_data: Course-specific data (course_id, class_level, board, subject, etc.)
+        """
+        enrollment_data = {
+            'user': user,
+            'course_type': course_type,
+        }
+        
+        if course_type == 'school':
+            enrollment_data.update({
+                'school_course_id': course_data.get('course_id'),
+                'class_level': course_data.get('class_level'),
+                'board': course_data.get('board'),
+                'subject': course_data.get('subject'),
+            })
+        elif course_type == 'engineering':
+            enrollment_data.update({
+                'engineering_course_id': course_data.get('course_id'),
+            })
+        
+        # Create or get existing enrollment
+        enrollment, created = cls.objects.get_or_create(**enrollment_data)
+        
+        return enrollment, created
