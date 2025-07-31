@@ -1,6 +1,20 @@
 """
 Complete Django view replacement for Pro Learning save functionality
-This bypasses Django REST Framework completely
+This bypasses Django                   print(f"👤 Using user: {user.username} (ID: {user.id})")
+        
+        print(f"✅ Proceeding with course creation...")
+        
+        # Debug: Print topic structure to understand data formatsing user: {user.username} (ID: {user.id})")
+        
+        print(f"✅ Proceeding with course creation...")
+        
+        # Debug: Print topic structure to understand data format Using user: {user.username} (ID: {user.id})")
+        
+        print(f"✅ Proceeding with course creation...") Using user: {user.username} (ID: {user.id})")
+        
+        print(f"✅ Proceeding with course creation...")
+        
+        # Debug: Print topic structure to understand data formatompletely
 """
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -53,24 +67,24 @@ def save_pro_learning_course(request):
         # Parse JSON data
         data = json.loads(request.body)
         
-        course_id = data.get('course_id')
+        course_name = data.get('course_name')
         title = data.get('title')
         topics_data = data.get('topics', {})
-        
-        print(f"🔍 Received data: course_id={course_id}, title='{title}', topics_count={len(topics_data)}")
+
+        print(f"🔍 Received data: course_name={course_name}, title='{title}', topics_count={len(topics_data)}")
         print(f"🔑 Authorization header: {request.META.get('HTTP_AUTHORIZATION', 'None')[:50]}...")
-        
-        # Validate required fields
-        if not course_id:
+
+        # Validate required fields first
+        if not course_name:
             return JsonResponse({
-                'error': 'course_id is required'
+                'error': 'course_name is required'
             }, status=400)
-            
+
         if not title or title.strip() == '':
-            title = f'AI Generated Course - {course_id}'
+            title = f'AI Generated Course - {course_name}'
             print(f"📝 Empty title provided, using default: {title}")
-        
-        # Get user from token (more flexible for testing)
+
+        # Get user from token BEFORE any other operations
         user = get_user_from_token(request)
         if not user:
             print("⚠️ No valid user from token, trying fallback...")
@@ -93,14 +107,34 @@ def save_pro_learning_course(request):
                     'error': 'Authentication required. Please log in.',
                     'debug': str(e)
                 }, status=401)
-        
-        # Check if course already exists (using course_name instead of course_id)
-        if ProLearningCourse.objects.filter(course_name=title, user=user).exists():
+
+        print(f"👤 Using user: {user.username} (ID: {user.id})")
+
+        # Check for existing course AFTER user is validated
+        existing_course = ProLearningCourse.objects.filter(course_name=course_name, user=user).first()
+        if existing_course:
+            print(f"❌ Duplicate course found: {existing_course.course_name} created at {existing_course.created_at}")
             return JsonResponse({
                 'error': 'Course already exists in your Learning Hub',
-                'course_name': title
+                'course_name': title,
+                'existing_course_name': course_name,
+                'created_at': existing_course.created_at
             }, status=409)
-        
+
+        print(f"✅ No duplicate found, proceeding with course creation...")
+
+        # Debug: Print topic structure to understand data format
+        for topic_name, topic_content in topics_data.items():
+            print(f"📚 Topic '{topic_name}' contains keys: {list(topic_content.keys())}")
+            if 'readingMaterial' in topic_content:
+                print(f"   📖 Reading material: {len(topic_content['readingMaterial'])} chars")
+            if 'reading_material' in topic_content:
+                print(f"   📖 Reading material (alt): {len(topic_content['reading_material'])} chars")
+            if 'summary' in topic_content:
+                print(f"   📝 Summary: {len(topic_content['summary'])} chars")
+            if 'topicSummary' in topic_content:
+                print(f"   📝 Topic summary: {len(topic_content['topicSummary'])} chars")
+
         # Create course with transaction
         with transaction.atomic():
             # Create the course using correct field names
@@ -110,11 +144,21 @@ def save_pro_learning_course(request):
                 user=user
             )
             
-            # Create topics, videos, quizzes, and resources
+            # Create topics, videos, quizzes, resources, reading material, and summary
             for topic_name, topic_content in topics_data.items():
+                # Extract reading material and summary from topic content
+                reading_material = topic_content.get('readingMaterial', '') or topic_content.get('reading_material', '')
+                summary = topic_content.get('summary', '') or topic_content.get('topicSummary', '')
+                
+                print(f"📚 Topic: {topic_name}")
+                print(f"📖 Reading material length: {len(reading_material)} chars")
+                print(f"📝 Summary length: {len(summary)} chars")
+                
                 topic = ProLearningTopic.objects.create(
                     course=course,
                     topic_name=topic_name,  # Use topic_name instead of title
+                    reading_material=reading_material,  # Store reading material
+                    summary=summary,  # Store summary
                     order=len(course.topics.all()) + 1
                 )
                 
@@ -129,7 +173,7 @@ def save_pro_learning_course(request):
                     )
                 
                 # Create quiz questions
-                quiz_questions = topic_content.get('quizQuestions', [])
+                quiz_questions = topic_content.get('quiz', []) or topic_content.get('quizQuestions', [])
                 for i, quiz_data in enumerate(quiz_questions):
                     ProLearningQuizQuestion.objects.create(
                         topic=topic,

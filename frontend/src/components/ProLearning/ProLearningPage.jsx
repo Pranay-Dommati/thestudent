@@ -824,15 +824,19 @@ const ProLearningPage = () => {
         return;
       }
 
+      // Generate a unique course ID for database storage (different from session ID)
+      const uniqueDbCourseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       console.log('📤 Preparing to save course to database:', {
-        courseId: currentCourseId,
+        sessionCourseId: currentCourseId,
+        dbCourseId: uniqueDbCourseId,
         courseTitle,
         topicsCount: Object.keys(courseContent.topics).length
       });
 
       // Prepare the data for the POST request
       const courseData = {
-        course_id: currentCourseId,
+        course_id: uniqueDbCourseId, // Use unique ID for database
         title: courseTitle || 'AI Generated Course',
         topics: courseContent.topics
       };
