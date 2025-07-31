@@ -810,8 +810,9 @@ const ProLearningPage = () => {
       setIsSavingToHub(true);
       
       const currentCourseId = getCourseId();
-      if (!currentCourseId || !courseTitle) {
-        console.error('❌ Missing course ID or title');
+      if (!currentCourseId) {
+        console.error('❌ Missing course ID');
+        alert('Error: Course ID not found. Please refresh and try again.');
         return;
       }
 
@@ -819,6 +820,7 @@ const ProLearningPage = () => {
       const courseContent = proContentManager.getStoredCourseContent(currentCourseId);
       if (!courseContent || !courseContent.topics) {
         console.error('❌ No course content found in local storage');
+        alert('Error: No course content found. Please generate content first.');
         return;
       }
 
@@ -831,27 +833,53 @@ const ProLearningPage = () => {
       // Prepare the data for the POST request
       const courseData = {
         course_id: currentCourseId,
-        title: courseTitle,
-        topics: courseContent.topics,
-        created_at: new Date().toISOString()
+        title: courseTitle || 'AI Generated Course',
+        topics: courseContent.topics
       };
 
-      // TODO: Replace with actual API endpoint
-      console.log('🚀 Course data ready for API:', courseData);
-      
-      // Simulate API call for now
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      setSavedToHub(true);
-      console.log('✅ Course saved to Learning Hub successfully!');
-      
-      // Reset success state after 3 seconds
-      setTimeout(() => {
-        setSavedToHub(false);
-      }, 3000);
+      // Get auth token (using the correct key from AuthContext)
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        console.error('❌ No authentication token found');
+        alert('Please log in to save courses to your Learning Hub.');
+        return;
+      }
+
+      // Make API call to save course - Using direct endpoint that bypasses DRF
+      const response = await fetch('http://localhost:8000/api/courses/pro-learning-direct/save/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(courseData)
+      });
+
+      const responseData = await response.json();
+
+      if (response.ok) {
+        setSavedToHub(true);
+        console.log('✅ Course saved to Learning Hub successfully!', responseData);
+        alert('✅ Course saved to your Learning Hub successfully!');
+        
+        // Reset success state after 5 seconds
+        setTimeout(() => {
+          setSavedToHub(false);
+        }, 5000);
+      } else {
+        console.error('❌ Failed to save course:', responseData);
+        if (response.status === 401) {
+          alert('Authentication failed. Please log in again.');
+        } else if (response.status === 409) {
+          alert('This course already exists in your Learning Hub.');
+        } else {
+          alert(`Failed to save course: ${responseData.error || 'Unknown error'}`);
+        }
+      }
 
     } catch (error) {
       console.error('❌ Failed to save course to Learning Hub:', error);
+      alert('Network error. Please check your connection and try again.');
     } finally {
       setIsSavingToHub(false);
     }
