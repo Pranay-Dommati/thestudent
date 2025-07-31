@@ -2992,8 +2992,18 @@ const ProLearningPage = () => {
                 </div>
               </div>
 
-              {/* Save to Learning Hub Button */}
-              {content && topicsList.length > 0 && (
+              {/* Save to Learning Hub Button - Only show for locally generated courses, not database courses */}
+              {(() => {
+                const isFromDatabase = topicsList.some(t => t.dbTopic);
+                const shouldShowSaveButton = content && topicsList.length > 0 && !isFromDatabase;
+                console.log('🔍 Save button visibility check:', {
+                  hasContent: !!content,
+                  topicsCount: topicsList.length,
+                  isFromDatabase,
+                  shouldShowSaveButton
+                });
+                return shouldShowSaveButton;
+              })() && (
                 <div className="mb-6">
                   <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 shadow-lg">
                     <div className="flex items-center justify-between">
