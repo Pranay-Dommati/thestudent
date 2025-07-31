@@ -24,12 +24,40 @@ class ProLearningCourseListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        return ProLearningCourse.objects.filter(user=self.request.user).order_by('-created_at')
+        try:
+            queryset = ProLearningCourse.objects.filter(user=self.request.user).order_by('-created_at')
+            print(f"🔍 Debug - User: {self.request.user}")
+            print(f"🔍 Debug - Queryset count: {queryset.count()}")
+            for course in queryset:
+                print(f"🔍 Debug - Course: {course.course_name}, ID: {course.id}")
+                print(f"🔍 Debug - Topics count: {course.topics.count()}")
+            return queryset
+        except Exception as e:
+            print(f"❌ Error in get_queryset: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
     
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return ProLearningCourseCreateSerializer
         return ProLearningCourseSerializer
+    
+    def list(self, request, *args, **kwargs):
+        """Override list method to add debugging"""
+        try:
+            queryset = self.get_queryset()
+            serializer = self.get_serializer(queryset, many=True)
+            print(f"🔍 Debug - Serializer data: {serializer.data}")
+            return Response(serializer.data)
+        except Exception as e:
+            print(f"❌ Error in list method: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': f'Internal server error: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     def create(self, request, *args, **kwargs):
         """Create a new Pro Learning course from localStorage data"""
@@ -46,13 +74,13 @@ class ProLearningCourseListCreateView(generics.ListCreateAPIView):
 
 class ProLearningCourseDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
-    GET /api/courses/pro-learning/{course_id}/ - Get specific course details
-    PUT /api/courses/pro-learning/{course_id}/ - Update course
-    DELETE /api/courses/pro-learning/{course_id}/ - Delete course
+    GET /api/courses/pro-learning/{id}/ - Get specific course details
+    PUT /api/courses/pro-learning/{id}/ - Update course
+    DELETE /api/courses/pro-learning/{id}/ - Delete course
     """
     serializer_class = ProLearningCourseSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field = 'course_id'
+    lookup_field = 'id'
     
     def get_queryset(self):
         return ProLearningCourse.objects.filter(user=self.request.user)
@@ -66,10 +94,10 @@ class ProLearningTopicListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        course_id = self.kwargs['course_id']
+        course_id = self.kwargs['id']
         course = get_object_or_404(
             ProLearningCourse,
-            course_id=course_id,
+            id=course_id,
             user=self.request.user
         )
         return course.topics.all().order_by('order')
@@ -84,12 +112,12 @@ class ProLearningTopicDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     
     def get_object(self):
-        course_id = self.kwargs['course_id']
+        course_id = self.kwargs['id']
         topic_id = self.kwargs['topic_id']
         
         course = get_object_or_404(
             ProLearningCourse,
-            course_id=course_id,
+            id=course_id,
             user=self.request.user
         )
         
@@ -104,12 +132,12 @@ class ProLearningTopicDetailView(generics.RetrieveUpdateAPIView):
 @permission_classes([IsAuthenticated])
 def mark_topic_complete(request, course_id, topic_id):
     """
-    PATCH /api/courses/pro-learning/{course_id}/topics/{topic_id}/complete/
+    PATCH /api/courses/pro-learning/{id}/topics/{topic_id}/complete/
     Mark a topic as completed/uncompleted
     """
     course = get_object_or_404(
         ProLearningCourse,
-        course_id=course_id,
+        id=course_id,
         user=request.user
     )
     
@@ -145,12 +173,12 @@ def mark_topic_complete(request, course_id, topic_id):
 @permission_classes([IsAuthenticated])
 def get_course_progress(request, course_id):
     """
-    GET /api/courses/pro-learning/{course_id}/progress/
+    GET /api/courses/pro-learning/{id}/progress/
     Get course progress statistics
     """
     course = get_object_or_404(
         ProLearningCourse,
-        course_id=course_id,
+        id=course_id,
         user=request.user
     )
     
@@ -159,7 +187,7 @@ def get_course_progress(request, course_id):
     completion_percentage = (completed_topics / total_topics * 100) if total_topics > 0 else 0
     
     progress_data = {
-        'course_id': course.course_id,
+        'course_id': course.id,
         'title': course.title,
         'total_topics': total_topics,
         'completed_topics': completed_topics,

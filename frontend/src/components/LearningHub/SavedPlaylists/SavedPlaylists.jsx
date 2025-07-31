@@ -8,23 +8,65 @@ const SavedPlaylists = () => {
   const [learningPlans, setLearningPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  
+  const MAX_RETRIES = 3;
 
-  // No courses to fetch - removed localStorage-based courses
-  const fetchStoredCourses = useCallback(() => {
+  // Fetch Pro Learning courses from database for current user
+  const fetchStoredCourses = useCallback(async (currentRetry = 0) => {
     try {
       setLoading(true);
       setError(null);
+      setRetryCount(currentRetry);
       
-      // No courses to load - starting with clean slate
-      setLearningPlans([]);
+      // Get auth token
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        setError('Please log in to view your courses');
+        setLearningPlans([]);
+        return;
+      }
+
+      // Fetch courses from database API
+      const response = await fetch('http://localhost:8000/api/courses/pro-learning/', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const coursesData = await response.json();
+        console.log('📊 Fetched Pro Learning courses:', coursesData);
+        setLearningPlans(coursesData);
+        setRetryCount(0); // Reset retry count on success
+      } else if (response.status === 401) {
+        setError('Authentication failed. Please log in again.');
+        setLearningPlans([]);
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        setError(`Failed to load courses: ${errorData.detail || 'Server error'}`);
+        setLearningPlans([]);
+      }
+      
     } catch (err) {
-      console.error('Error loading courses:', err);
-      setError('Failed to load courses');
-      setLearningPlans([]);
+      console.error('❌ Error loading Pro Learning courses:', err);
+      
+      // Retry logic
+      if (currentRetry < MAX_RETRIES) {
+        console.log(`🔄 Retrying... Attempt ${currentRetry + 1}/${MAX_RETRIES}`);
+        setTimeout(() => {
+          fetchStoredCourses(currentRetry + 1);
+        }, 1000 * (currentRetry + 1)); // Exponential backoff
+      } else {
+        setError('Failed to load courses. Please check your connection.');
+        setLearningPlans([]);
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [MAX_RETRIES]);
 
   // Initial fetch on component mount
   useEffect(() => {
@@ -33,52 +75,28 @@ const SavedPlaylists = () => {
 
   // Manual retry handler
   const handleRetry = () => {
-    fetchStoredCourses();
+    setRetryCount(0);
+    fetchStoredCourses(0);
   };
 
-  // Transform stored courses to display format
-  const courses = Array.isArray(learningPlans) ? learningPlans.map(plan => {
-    // Calculate progress based on topics with content
-    let progressPercentage = 0;
-    
-    if (plan.topics) {
-      const topicNames = Object.keys(plan.topics);
-      const totalTopics = topicNames.length;
-      let completedTopics = 0;
-      
-      // Count topics that have complete content
-      topicNames.forEach(topicName => {
-        const topic = plan.topics[topicName];
-        if (topic.content && 
-            topic.content.reading && 
-            topic.content.summary && 
-            topic.content.quiz && 
-            topic.content.videos && 
-            topic.content.resources) {
-          completedTopics++;
-        }
-      });
-      
-      if (totalTopics > 0) {
-        progressPercentage = Math.round((completedTopics / totalTopics) * 100);
-      }
-    } else if (plan.is_completed) {
-      progressPercentage = 100;
-    }
-    
-    const topicCount = plan.topics ? Object.keys(plan.topics).length : 0;
+  // Transform database courses to display format
+  const courses = Array.isArray(learningPlans) ? learningPlans.map(course => {
+    // Use database fields directly
+    const topicsCount = course.topics_count || 0;
+    const progressPercentage = course.completion_percentage || 0;
     
     return {
-      id: plan.id,
-      title: plan.title,
+      id: course.id,
+      title: course.course_name,
       instructor: 'AI Generated',
-      progress: progressPercentage,
+      progress: Math.round(progressPercentage),
       thumbnail: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop',
-      duration: `${topicCount} topics`,
-      difficulty: 'Beginner', // Default since we don't store this
+      duration: `${topicsCount} topics`,
+      difficulty: 'Beginner',
       category: 'Pro Learning',
-      totalVideos: topicCount * 2, // Estimate based on topics
-      daysCount: Math.ceil(topicCount / 2) // Estimate study days
+      totalVideos: topicsCount * 2, // Estimate based on topics
+      daysCount: Math.ceil(topicsCount / 2), // Estimate study days
+      rawCourse: course // Keep reference to original course data
     };
   }) : [];
 
@@ -221,7 +239,7 @@ const SavedPlaylists = () => {
                       Please check your internet connection and try again.
                     </p>
                   </div>
-                  {retryCount >= MAX_RETRIES && (
+                  {error && (
                     <button
                       onClick={handleRetry}
                       className="ml-4 inline-flex items-center px-3 py-2 border border-red-600 text-red-600 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"

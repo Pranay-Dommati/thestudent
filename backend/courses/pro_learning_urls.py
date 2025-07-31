@@ -17,13 +17,13 @@ app_name = 'pro_learning'
 urlpatterns = [
     # Course management
     path('', ProLearningCourseListCreateView.as_view(), name='course-list-create'),
-    path('<str:course_id>/', ProLearningCourseDetailView.as_view(), name='course-detail'),
-    path('<str:course_id>/progress/', get_course_progress, name='course-progress'),
+    path('<str:id>/', ProLearningCourseDetailView.as_view(), name='course-detail'),
+    path('<str:id>/progress/', get_course_progress, name='course-progress'),
     
     # Topic management
-    path('<str:course_id>/topics/', ProLearningTopicListView.as_view(), name='topic-list'),
-    path('<str:course_id>/topics/<int:topic_id>/', ProLearningTopicDetailView.as_view(), name='topic-detail'),
-    path('<str:course_id>/topics/<int:topic_id>/complete/', mark_topic_complete, name='topic-complete'),
+    path('<str:id>/topics/', ProLearningTopicListView.as_view(), name='topic-list'),
+    path('<str:id>/topics/<int:topic_id>/', ProLearningTopicDetailView.as_view(), name='topic-detail'),
+    path('<str:id>/topics/<int:topic_id>/complete/', mark_topic_complete, name='topic-complete'),
     
     # Special endpoint for saving from localStorage
     path('save-from-storage/', save_course_from_localStorage, name='save-from-storage'),

@@ -126,9 +126,9 @@ class ProLearningResourceSerializer(serializers.ModelSerializer):
         model = ProLearningResource
         fields = [
             'id', 'title', 'url', 'resource_type', 'description', 
-            'created_at', 'updated_at'
+            'order', 'created_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at']
 
 
 class ProLearningQuizQuestionSerializer(serializers.ModelSerializer):
@@ -137,10 +137,10 @@ class ProLearningQuizQuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProLearningQuizQuestion
         fields = [
-            'id', 'question', 'options', 'correct_answer', 'explanation',
-            'difficulty_level', 'created_at', 'updated_at'
+            'id', 'question_text', 'question_type', 'options', 'correct_answer', 
+            'explanation', 'points', 'order', 'created_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at']
 
 
 class ProLearningVideoSerializer(serializers.ModelSerializer):
@@ -149,10 +149,10 @@ class ProLearningVideoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProLearningVideo
         fields = [
-            'id', 'title', 'video_id', 'platform', 'duration', 
-            'thumbnail_url', 'description', 'created_at', 'updated_at'
+            'id', 'title', 'video_url', 'description', 'duration', 
+            'order', 'is_watched', 'created_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at']
 
 
 class ProLearningTopicSerializer(serializers.ModelSerializer):
@@ -164,8 +164,8 @@ class ProLearningTopicSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProLearningTopic
         fields = [
-            'id', 'name', 'description', 'reading_content', 'summary_content',
-            'order', 'is_completed', 'videos', 'quiz_questions', 'resources',
+            'id', 'topic_name', 'order', 'is_completed', 'progress_percentage',
+            'reading_material', 'summary', 'videos', 'quiz_questions', 'resources',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -182,7 +182,7 @@ class ProLearningCourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProLearningCourse
         fields = [
-            'id', 'course_id', 'title', 'description', 'user', 'topics',
+            'id', 'course_name', 'description', 'user', 'topics',
             'topics_count', 'completed_topics_count', 'completion_percentage',
             'is_completed', 'created_at', 'updated_at'
         ]
@@ -190,19 +190,38 @@ class ProLearningCourseSerializer(serializers.ModelSerializer):
     
     def get_topics_count(self, obj):
         """Get total number of topics in the course"""
-        return obj.topics.count()
+        try:
+            count = obj.topics.count()
+            print(f"🔍 Debug - Topics count for {obj.course_name}: {count}")
+            return count
+        except Exception as e:
+            print(f"❌ Error in get_topics_count: {str(e)}")
+            return 0
     
     def get_completed_topics_count(self, obj):
         """Get number of completed topics"""
-        return obj.topics.filter(is_completed=True).count()
+        try:
+            count = obj.topics.filter(is_completed=True).count()
+            print(f"🔍 Debug - Completed topics count for {obj.course_name}: {count}")
+            return count
+        except Exception as e:
+            print(f"❌ Error in get_completed_topics_count: {str(e)}")
+            return 0
     
     def get_completion_percentage(self, obj):
         """Calculate completion percentage"""
-        total = obj.topics.count()
-        if total == 0:
+        try:
+            total = obj.topics.count()
+            if total == 0:
+                print(f"🔍 Debug - No topics for {obj.course_name}, returning 0%")
+                return 0
+            completed = obj.topics.filter(is_completed=True).count()
+            percentage = round((completed / total) * 100, 2)
+            print(f"🔍 Debug - Completion for {obj.course_name}: {completed}/{total} = {percentage}%")
+            return percentage
+        except Exception as e:
+            print(f"❌ Error in get_completion_percentage: {str(e)}")
             return 0
-        completed = obj.topics.filter(is_completed=True).count()
-        return round((completed / total) * 100, 2)
 
 
 class ProLearningCourseCreateSerializer(serializers.ModelSerializer):
