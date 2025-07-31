@@ -112,13 +112,47 @@ const CourseDetails = () => {
     fetchCourseDetails();
   }, [courseId]);
 
-  const handleStartLearning = () => {
+  const handleStartLearning = async () => {
     if (!isLoggedIn) {
       toast.error('Please log in to start learning');
       navigate('/auth?mode=login');
       return;
     }
-    navigate(`/courses/engineering/${courseId}/learning`);
+
+    try {
+      const enrollmentData = {
+        course_type: 'engineering',
+        course_id: courseId
+      };
+
+      console.log('Enrolling in engineering course with data:', enrollmentData);
+
+      const token = localStorage.getItem('accessToken');
+      const response = await axios.post(`${API_URL}/api/courses/enroll/`, enrollmentData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data.success) {
+        if (response.data.created) {
+          toast.success('Successfully enrolled in course!');
+        } else {
+          toast.info('Welcome back! Continuing your learning journey.');
+        }
+        
+        // Navigate to the learning page
+        navigate(`/courses/engineering/${courseId}/learning`);
+      }
+    } catch (error) {
+      console.error('Error enrolling in engineering course:', error);
+      if (error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else {
+        toast.error('Failed to start learning. Please try again.');
+      }
+    }
   };
 
   const toggleSection = (index) => {

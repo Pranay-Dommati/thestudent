@@ -210,13 +210,60 @@ const SchoolCourseDetails = () => {
     fetchCourseData();
   }, [location.pathname, boardId, stateId, subjectId]);
 
-  const handleStartLearning = () => {
+  const handleStartLearning = async () => {
     if (!isLoggedIn) {
       toast.error('Please log in to start learning');
       navigate('/auth?mode=login');
       return;
     }
-    navigate(`${location.pathname}/learning`);
+
+    try {
+      // Extract course parameters from URL
+      const classLevel = location.pathname.includes('/6th/') ? '6th' :
+                        location.pathname.includes('/7th/') ? '7th' :
+                        location.pathname.includes('/8th/') ? '8th' :
+                        location.pathname.includes('/9th/') ? '9th' :
+                        location.pathname.includes('/10th/') ? '10th' : 
+                        location.pathname.includes('/11th/') ? '11th' : '12th';
+      const board = boardId || 'cbse';
+      const subject = subjectId || course?.subject?.toLowerCase();
+
+      const enrollmentData = {
+        course_type: 'school',
+        course_id: course?.id,
+        class_level: classLevel,
+        board: board,
+        subject: subject
+      };
+
+      console.log('Enrolling in course with data:', enrollmentData);
+
+      const token = localStorage.getItem('accessToken');
+      const response = await axios.post(`${API_URL}/api/courses/enroll/`, enrollmentData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data.success) {
+        if (response.data.created) {
+          toast.success('Successfully enrolled in course!');
+        } else {
+          toast.info('Welcome back! Continuing your learning journey.');
+        }
+        
+        // Navigate to the learning page
+        navigate(`${location.pathname}/learning`);
+      }
+    } catch (error) {
+      console.error('Error enrolling in course:', error);
+      if (error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else {
+        toast.error('Failed to start learning. Please try again.');
+      }
+    }
   };
 
   if (loading) return <LoadingSpinner />;
