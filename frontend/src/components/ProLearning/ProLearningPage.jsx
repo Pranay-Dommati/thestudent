@@ -160,10 +160,22 @@ const ProLearningPage = () => {
           const transformedTopics = databaseCourse.topics.map((topic, index) => ({
             id: index + 1,
             name: topic.topic_name,
-            dbTopic: topic // Keep reference to original database topic
+            dbTopic: topic, // Keep reference to original database topic
+            isActive: topic.topic_name === topicParam // Set active based on URL parameter
           }));
           
+          console.log('🎯 Database topics transformed with active state:', 
+            transformedTopics.map(t => ({ name: t.name, isActive: t.isActive }))
+          );
+          
           setTopicsList(transformedTopics);
+          
+          // Set selectedTopic immediately if we have an active topic
+          const activeTopic = transformedTopics.find(t => t.isActive);
+          if (activeTopic) {
+            setSelectedTopic(activeTopic);
+            console.log('✅ Selected topic set immediately:', activeTopic.name);
+          }
           
           // CRITICAL: Set course context in ProContentManager for database-loaded courses
           proContentManager.setCourse(databaseCourse.course_name, currentCourseId);
@@ -205,10 +217,43 @@ const ProLearningPage = () => {
     };
 
     initializeCourseData();
-  }, [courseTitle, courseId]); // Add courseId dependency
+  }, [courseTitle, courseId, topicParam]); // Add topicParam dependency for immediate sync
+  
+  // Robust useEffect to sync URL topic with internal state (runs after topics are loaded)
+  useEffect(() => {
+    console.log('🔄 URL-topic sync useEffect triggered:', {
+      topicsListLength: topicsList.length,
+      topicParam,
+      currentSelectedTopic: selectedTopic?.name
+    });
+    
+    if (topicsList.length > 0 && topicParam) {
+      const matched = topicsList.find(t => t.name === topicParam || t.name.toLowerCase() === topicParam.toLowerCase());
+      if (matched && (!selectedTopic || selectedTopic.name !== matched.name)) {
+        console.log('🎯 Syncing selected topic with URL:', matched.name);
+        setSelectedTopic(matched);
+        
+        // Ensure the matched topic is marked as active
+        setTopicsList(prev =>
+          prev.map(t => ({
+            ...t,
+            isActive: t.name === topicParam || t.name.toLowerCase() === topicParam.toLowerCase()
+          }))
+        );
+        
+        console.log('✅ Topic state synchronized with URL parameter');
+      }
+    }
+  }, [topicsList, topicParam, selectedTopic]);
   
   // Auto-select first topic when topics list is loaded, or set active topic from URL
   useEffect(() => {
+    console.log('🔍 Topic matching useEffect triggered:', {
+      topicsListLength: topicsList.length,
+      topicParam,
+      topics: topicsList.map(t => ({ name: t.name, isActive: t.isActive }))
+    });
+    
     if (topicsList.length > 0) {
       if (topicParam) {
         // If we have a topic from URL, find and activate the matching topic
@@ -244,12 +289,18 @@ const ProLearningPage = () => {
         console.log('🎯 Selected topic:', selectedTopicName, 'at index:', matchingTopicIndex);
         
         // Set the matching topic as active in the topics list
-        setTopicsList(prevTopics => 
-          prevTopics.map((topic, index) => ({
+        setTopicsList(prevTopics => {
+          const updatedTopics = prevTopics.map((topic, index) => ({
             ...topic,
             isActive: index === matchingTopicIndex // Only matching topic is active
-          }))
-        );
+          }));
+          
+          console.log('✅ Updated topics with active state:', 
+            updatedTopics.map(t => ({ name: t.name, isActive: t.isActive }))
+          );
+          
+          return updatedTopics;
+        });
         
         // Update URL to reflect the actual topic name (not the URL-encoded one)
         const newSearchParams = new URLSearchParams(searchParams);
@@ -266,12 +317,18 @@ const ProLearningPage = () => {
           console.log('🎯 Auto-selecting first topic:', firstTopic.name);
           
           // Set the first topic as active in the topics list
-          setTopicsList(prevTopics => 
-            prevTopics.map((topic, index) => ({
+          setTopicsList(prevTopics => {
+            const updatedTopics = prevTopics.map((topic, index) => ({
               ...topic,
               isActive: index === 0 // Only first topic is active
-            }))
-          );
+            }));
+            
+            console.log('✅ Updated topics with first topic active:', 
+              updatedTopics.map(t => ({ name: t.name, isActive: t.isActive }))
+            );
+            
+            return updatedTopics;
+          });
           
           // Update URL to include the first topic
           const newSearchParams = new URLSearchParams(searchParams);
@@ -1529,7 +1586,21 @@ const ProLearningPage = () => {
     }
 
     // If no content and course not generated, show Pro Learning Experience button
-    if (!content && !allTopicsGenerated) {
+    // BUT skip this if we have an active topic from database (content should load automatically)
+    const hasActiveTopic = topicsList.some(t => t.isActive);
+    const isTopicFromDatabase = topicsList.some(t => t.dbTopic); // Check if any topic has database data
+    const contentAlreadyLoaded = !!content;
+    
+    console.log('🔍 Start Experience check:', {
+      hasContent: !!content,
+      allTopicsGenerated,
+      hasActiveTopic,
+      isTopicFromDatabase,
+      contentAlreadyLoaded,
+      shouldShowStartButton: !content && !allTopicsGenerated && !hasActiveTopic && !isTopicFromDatabase && !contentAlreadyLoaded
+    });
+    
+    if (!content && !allTopicsGenerated && !hasActiveTopic && !isTopicFromDatabase && !contentAlreadyLoaded) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
           <div className="w-full max-w-2xl text-center">
@@ -2798,6 +2869,15 @@ const ProLearningPage = () => {
     setBatchGenerationProgress(0);
     setBatchGenerationStatus('');
   };
+
+  // 🔍 Debug logging before render
+  console.log('🔍 Topic active status before render:', {
+    topicsCount: topicsList.length,
+    topics: topicsList.map(t => ({ name: t.name, isActive: t.isActive })),
+    selectedTopic: selectedTopic?.name,
+    topicParam,
+    hasContent: !!content
+  });
 
   return (
     <>
