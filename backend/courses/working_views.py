@@ -67,7 +67,8 @@ def save_pro_learning_course(request):
         # Parse JSON data
         data = json.loads(request.body)
         
-        course_name = data.get('course_name')
+        # Accept both course_id and course_name for backward compatibility
+        course_name = data.get('course_name') or data.get('course_id')
         title = data.get('title')
         topics_data = data.get('topics', {})
 
@@ -77,7 +78,7 @@ def save_pro_learning_course(request):
         # Validate required fields first
         if not course_name:
             return JsonResponse({
-                'error': 'course_name is required'
+                'error': 'course_name or course_id is required'
             }, status=400)
 
         if not title or title.strip() == '':
