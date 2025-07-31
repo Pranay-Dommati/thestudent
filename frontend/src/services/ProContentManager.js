@@ -28,12 +28,106 @@ class ProContentManager {
   }
 
   /**
+   * Transform database topic content to localStorage format
+   * @param {Object} dbTopic - Database topic object
+   * @returns {Object} - Transformed content object
+   */
+  transformDatabaseContent(dbTopic) {
+    if (!dbTopic) return null;
+    
+    console.log('🔄 Transforming database content for topic:', dbTopic.topic_name);
+    console.log('🔄 Raw database topic data:', dbTopic);
+    
+    // Transform database format to localStorage format
+    const transformedContent = {
+      reading: dbTopic.reading_material || null,
+      summary: dbTopic.summary || null,
+      videos: this.transformVideos(dbTopic.videos || []),
+      quiz: this.transformQuizQuestions(dbTopic.quiz_questions || []),
+      resources: this.transformResources(dbTopic.resources || [])
+    };
+    
+    console.log('✅ Database content transformed:', {
+      hasReading: !!transformedContent.reading,
+      readingLength: transformedContent.reading?.length || 0,
+      hasSummary: !!transformedContent.summary,
+      videosCount: transformedContent.videos?.length || 0,
+      quizQuestions: transformedContent.quiz?.questions?.length || 0,
+      resourcesCount: transformedContent.resources?.length || 0
+    });
+    
+    return transformedContent;
+  }
+
+  /**
+   * Transform database videos to localStorage format
+   * @param {Array} dbVideos - Database videos array
+   * @returns {Array} - Transformed videos array
+   */
+  transformVideos(dbVideos) {
+    if (!dbVideos || dbVideos.length === 0) return [];
+    
+    return dbVideos.map(video => ({
+      id: video.id,
+      title: video.title,
+      url: video.video_url,
+      description: video.description || '',
+      duration: video.duration || '',
+      is_watched: video.is_watched || false,
+      order: video.order || 0
+    }));
+  }
+
+  /**
+   * Transform database resources to localStorage format
+   * @param {Array} dbResources - Database resources array
+   * @returns {Array} - Transformed resources array
+   */
+  transformResources(dbResources) {
+    if (!dbResources || dbResources.length === 0) return [];
+    
+    return dbResources.map(resource => ({
+      id: resource.id,
+      title: resource.title,
+      url: resource.url,
+      type: resource.resource_type || 'link',
+      description: resource.description || '',
+      order: resource.order || 0
+    }));
+  }
+
+  /**
+   * Transform database quiz questions to localStorage format
+   * @param {Array} dbQuizQuestions - Database quiz questions
+   * @returns {Object} - Transformed quiz object
+   */
+  transformQuizQuestions(dbQuizQuestions) {
+    if (!dbQuizQuestions || dbQuizQuestions.length === 0) return null;
+    
+    return {
+      questions: dbQuizQuestions.map(q => ({
+        id: q.id,
+        question: q.question_text,
+        type: q.question_type || 'multiple_choice',
+        options: q.options || [],
+        correct_answer: q.correct_answer,
+        explanation: q.explanation || '',
+        points: q.points || 1,
+        order: q.order || 0
+      })),
+      currentQuestion: 0,
+      totalQuestions: dbQuizQuestions.length
+    };
+  }
+
+  /**
    * Get content for a topic, prioritizing stored content over generation
    * @param {String} topicName - Topic name
    * @param {Function} generateCallback - Fallback generation function
+   * @param {Object} dbTopic - Optional database topic object for content extraction
    * @returns {Promise<Object>} - Content object
    */
-  async getTopicContent(topicName, generateCallback = null) {
+  async getTopicContent(topicName, generateCallback = null, dbTopic = null) {
     if (!this.currentCourse || !this.currentCourseId) {
       throw new Error('No course context set. Call setCourse() first.');
     }
@@ -49,10 +143,10 @@ class ProContentManager {
     // Create a new promise for this generation request
     const contentPromise = (async () => {
       try {
-        // Check for valid stored content first
+        // Step 1: Check for valid stored content first (localStorage)
         const storedContent = contentStorageService.getContentByTopicName(topicName, this.currentCourseId);
         if (storedContent?.reading?.length > 0) {
-          console.log('📦 Using stored content for:', topicName);
+          console.log('📦 Using localStorage content for:', topicName);
           return {
             source: 'storage',
             content: storedContent,
@@ -60,7 +154,31 @@ class ProContentManager {
           };
         }
 
-        // If no valid content and no generator, return null
+        // Step 2: Check for database content if dbTopic is provided
+        if (dbTopic && (dbTopic.reading_material || dbTopic.summary || dbTopic.videos?.length > 0 || dbTopic.quiz_questions?.length > 0 || dbTopic.resources?.length > 0)) {
+          console.log('🗄️ Using database content for:', topicName);
+          console.log('🗄️ Database topic structure:', {
+            hasReadingMaterial: !!dbTopic.reading_material,
+            readingLength: dbTopic.reading_material?.length || 0,
+            hasSummary: !!dbTopic.summary,
+            videosCount: dbTopic.videos?.length || 0,
+            quizQuestionsCount: dbTopic.quiz_questions?.length || 0,
+            resourcesCount: dbTopic.resources?.length || 0
+          });
+          
+          const transformedContent = this.transformDatabaseContent(dbTopic);
+          
+          if (transformedContent) {
+            console.log('✅ Successfully transformed database content:', transformedContent);
+            return {
+              source: 'database',
+              content: transformedContent,
+              fromCache: true
+            };
+          }
+        }
+
+        // Step 3: If no valid content and no generator, return null
         if (!generateCallback) {
           return null;
         }

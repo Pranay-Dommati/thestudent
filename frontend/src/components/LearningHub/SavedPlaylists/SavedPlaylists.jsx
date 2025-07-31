@@ -79,6 +79,24 @@ const SavedPlaylists = () => {
     fetchStoredCourses(0);
   };
 
+  // Helper function to generate course URL with first topic
+  const generateCourseUrl = (course) => {
+    const rawCourse = course.rawCourse;
+    
+    // Check if course has topics and get the first one
+    if (rawCourse && rawCourse.topics && rawCourse.topics.length > 0) {
+      // Sort topics by order and get the first one
+      const sortedTopics = rawCourse.topics.sort((a, b) => (a.order || 0) - (b.order || 0));
+      const firstTopic = sortedTopics[0];
+      const topicName = encodeURIComponent(firstTopic.topic_name);
+      
+      return `/pro-learning/${course.id}?topic=${topicName}&tab=reading`;
+    }
+    
+    // Fallback if no topics found
+    return `/pro-learning/${course.id}`;
+  };
+
   // Transform database courses to display format
   const courses = Array.isArray(learningPlans) ? learningPlans.map(course => {
     // Use database fields directly
@@ -318,7 +336,7 @@ const SavedPlaylists = () => {
                             </div>
                           </div>
                           <Link 
-                            to={`/learning-hub/pro-learning?courseId=${course.id}`}
+                            to={generateCourseUrl(course)}
                             className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg 
                             hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center"
                           >

@@ -77,38 +77,111 @@ const ProLearningPage = () => {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [topicsList, setTopicsList] = useState([]);
   
+  // Function to fetch course data from database
+  const fetchCourseFromDB = async (courseId) => {
+    try {
+      console.log('🔄 Attempting to fetch course from database:', courseId);
+      
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        console.log('❌ No access token found');
+        return null;
+      }
+
+      const response = await fetch(`http://localhost:8000/api/courses/pro-learning/${courseId}/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const courseData = await response.json();
+        console.log('✅ Successfully fetched course from database:', courseData);
+        return courseData;
+      } else if (response.status === 404) {
+        console.log('📭 Course not found in database');
+        return null;
+      } else {
+        console.error('❌ Failed to fetch course from database:', response.status);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Error fetching course from database:', error);
+      return null;
+    }
+  };
+  
   // Set default topics and initialize with consistent course ID
   useEffect(() => {
-    const initializeDefaultTopics = async () => {
+    const initializeCourseData = async () => {
       const currentCourseId = getCourseId();
       
-      // First check if we have stored topics for this course
-      if (currentCourseId) {
-        const storedTopics = proContentManager.getStoredTopics(currentCourseId);
-        if (storedTopics.length > 0) {
-          console.log('✅ Loading stored topics for course:', currentCourseId, storedTopics);
-          setTopicsList(storedTopics);
-          return; // Don't set default topics
-        }
-        
-        // Also check if there's batch generation data with topics
-        const batchData = localStorage.getItem('proLearning_batchGeneration');
-        if (batchData) {
-          try {
-            const { courseId: batchCourseId, topics } = JSON.parse(batchData);
-            if (batchCourseId === currentCourseId && topics && topics.length > 0) {
-              console.log('✅ Loading topics from batch generation data:', topics);
-              setTopicsList(topics);
-              return; // Don't set default topics
-            }
-          } catch (error) {
-            console.warn('Failed to parse batch generation data:', error);
+      if (!currentCourseId) {
+        console.log('⚠️ No course ID found');
+        return;
+      }
+
+      console.log('🔍 Initializing course data for:', currentCourseId);
+
+      // Step 1: Check localStorage for course data
+      const storedTopics = proContentManager.getStoredTopics(currentCourseId);
+      if (storedTopics.length > 0) {
+        console.log('✅ Found localStorage data - loading topics:', storedTopics);
+        setTopicsList(storedTopics);
+        return;
+      }
+      
+      // Step 2: Check batch generation data in localStorage
+      const batchData = localStorage.getItem('proLearning_batchGeneration');
+      if (batchData) {
+        try {
+          const { courseId: batchCourseId, topics } = JSON.parse(batchData);
+          if (batchCourseId === currentCourseId && topics && topics.length > 0) {
+            console.log('✅ Found batch generation data - loading topics:', topics);
+            setTopicsList(topics);
+            return;
           }
+        } catch (error) {
+          console.warn('Failed to parse batch generation data:', error);
+        }
+      }
+
+      // Step 3: Try to fetch from database
+      console.log('🔄 No localStorage data found, trying database...');
+      const databaseCourse = await fetchCourseFromDB(currentCourseId);
+      
+      if (databaseCourse) {
+        console.log('✅ Found database course - loading data:', databaseCourse);
+        
+        // Transform database course data to the format expected by the UI
+        if (databaseCourse.topics && databaseCourse.topics.length > 0) {
+          const transformedTopics = databaseCourse.topics.map((topic, index) => ({
+            id: index + 1,
+            name: topic.topic_name,
+            dbTopic: topic // Keep reference to original database topic
+          }));
+          
+          setTopicsList(transformedTopics);
+          
+          // CRITICAL: Set course context in ProContentManager for database-loaded courses
+          proContentManager.setCourse(databaseCourse.course_name, currentCourseId);
+          console.log('✅ ProContentManager initialized for database course:', databaseCourse.course_name);
+          
+          // Set course title if not already set
+          if (!courseTitle && databaseCourse.course_name) {
+            // We might need to set the course title state if it exists
+            console.log('📝 Setting course title:', databaseCourse.course_name);
+          }
+          
+          return;
         }
       }
       
-      // Only set default topics if no courseTitle AND no stored topics found
+      // Step 4: Fallback - show course not found or create default topics
       if (!courseTitle) {
+        console.log('🆕 No data found, creating default topics');
         const defaultTopics = [
           { id: 1, name: "Introduction" },
           { id: 2, name: "Getting Started" },
@@ -118,26 +191,20 @@ const ProLearningPage = () => {
         ];
         setTopicsList(defaultTopics);
         
-        // Get or generate a consistent course ID
-        const existingCourseId = getCourseId();
-        const finalCourseId = existingCourseId || generateCourseId();
-        
-        if (!existingCourseId) {
-          // Only navigate if we generated a new ID
-          setAndNavigateToCourseId(finalCourseId);
-        }
-
         try {
-          proContentManager.setCourse("Default Course", finalCourseId);
-          await proContentManager.storeTopics(defaultTopics, finalCourseId);
-          console.log('✅ Default topics stored successfully for course:', finalCourseId);
+          proContentManager.setCourse("Default Course", currentCourseId);
+          await proContentManager.storeTopics(defaultTopics, currentCourseId);
+          console.log('✅ Default topics created and stored');
         } catch (error) {
           console.error('❌ Failed to store default topics:', error);
         }
-      };
+      } else {
+        console.log('⚠️ Course not found in localStorage or database');
+        // Could show error message to user here
+      }
     };
 
-    initializeDefaultTopics();
+    initializeCourseData();
   }, [courseTitle, courseId]); // Add courseId dependency
   
   // Auto-select first topic when topics list is loaded, or set active topic from URL
@@ -487,7 +554,10 @@ const ProLearningPage = () => {
           setIsLoading(true);
           setShowSkeletons(true);
           
-          proContentManager.getTopicContent(activeTopic.name, generateProContent)
+          // Pass database topic data if available
+          const dbTopic = activeTopic?.dbTopic || null;
+          
+          proContentManager.getTopicContent(activeTopic.name, generateProContent, dbTopic)
             .then(result => {
               if (result && result.content) {
                 setContent(result.content);
@@ -507,6 +577,7 @@ const ProLearningPage = () => {
               setShowSkeletons(false);
             })
             .catch(error => {
+              console.error('❌ Failed to load content:', error);
               setIsLoading(false);
               setShowSkeletons(false);
             });
@@ -522,16 +593,39 @@ const ProLearningPage = () => {
         setShowSkeletons(true);
         setLoadingStep(`Loading content for ${actualTopic}...`);
         
+        // First try to get database topic data
+        const getDatabaseTopicData = async () => {
+          const databaseCourse = await fetchCourseFromDB(currentCourseId);
+          if (databaseCourse?.topics) {
+            // Set course context with database course name if courseTitle is empty
+            const courseName = courseTitle || databaseCourse.course_name || "Database Course";
+            proContentManager.setCourse(courseName, currentCourseId);
+            console.log('✅ ProContentManager initialized for direct URL with course:', courseName);
+            
+            return {
+              dbTopic: databaseCourse.topics.find(topic => topic.topic_name === actualTopic),
+              courseName: databaseCourse.course_name
+            };
+          }
+          return null;
+        };
+        
         // Use ProContentManager to handle content retrieval/generation
-        proContentManager.setCourse(courseTitle, currentCourseId);
-        proContentManager.getTopicContent(actualTopic, generateProContent)
+        if (courseTitle) {
+          proContentManager.setCourse(courseTitle, currentCourseId);
+        }
+        
+        getDatabaseTopicData().then(result => {
+          const dbTopic = result?.dbTopic || null;
+          return proContentManager.getTopicContent(actualTopic, generateProContent, dbTopic);
+        })
           .then(result => {
             if (result?.content?.reading) {
               setContent(result.content);
               const sections = parseReadingSections(result.content.reading);
               setReadingSections(sections);
               setReadingSectionIndex(0);
-              console.log('✅ Content ready:', result.source === 'storage' ? 'from storage' : 'newly generated');
+              console.log('✅ Content ready:', result.source === 'storage' ? 'from storage' : result.source === 'database' ? 'from database' : 'newly generated');
             } else {
               throw new Error('Invalid content received');
             }
@@ -701,10 +795,21 @@ const ProLearningPage = () => {
         console.log('✅ Content loaded successfully from storage');
       } else {
         // Fallback to generating content if not in storage
-        console.log('⚠️ No stored content found, attempting generation for:', topicName);
+        console.log('⚠️ No stored content found, attempting database then generation for:', topicName);
         console.log('⚠️ Available topic keys:', Object.keys(proContentManager.getStoredCourseContent(currentCourseId)?.topics || {}));
         
-        const result = await proContentManager.getTopicContent(topicName, generateProContent);
+        // CRITICAL: Set course context in ProContentManager before calling getTopicContent
+        proContentManager.setCourse(courseTitle || "Database Course", currentCourseId);
+        
+        // Try to get database topic data first
+        const databaseCourse = await fetchCourseFromDB(currentCourseId);
+        let dbTopic = null;
+        if (databaseCourse?.topics) {
+          dbTopic = databaseCourse.topics.find(topic => topic.topic_name === topicName);
+          console.log('🗄️ Found database topic:', dbTopic);
+        }
+        
+        const result = await proContentManager.getTopicContent(topicName, generateProContent, dbTopic);
         
         if (result && result.content) {
           setContent(result.content);
