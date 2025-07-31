@@ -9,40 +9,17 @@ const SavedPlaylists = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch stored Pro Learning courses from localStorage
+  // No courses to fetch - removed localStorage-based courses
   const fetchStoredCourses = useCallback(() => {
     try {
       setLoading(true);
       setError(null);
       
-      // Get all stored course content from localStorage
-      const storedCourses = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('course_content_')) {
-          try {
-            const courseData = JSON.parse(localStorage.getItem(key));
-            if (courseData && courseData.metadata) {
-              storedCourses.push({
-                id: courseData.courseId,
-                title: key.replace('course_content_', '').replace(/_/g, ' '),
-                description: `Pro Learning course with ${Object.keys(courseData.topics || {}).length} topics`,
-                created_at: courseData.metadata.generatedAt,
-                metadata: courseData.metadata,
-                topics: courseData.topics,
-                is_completed: courseData.metadata.status === 'completed'
-              });
-            }
-          } catch (parseError) {
-            console.warn('Failed to parse stored course:', key, parseError);
-          }
-        }
-      }
-      
-      setLearningPlans(storedCourses);
+      // No courses to load - starting with clean slate
+      setLearningPlans([]);
     } catch (err) {
-      console.error('Error loading stored courses:', err);
-      setError('Failed to load stored courses');
+      console.error('Error loading courses:', err);
+      setError('Failed to load courses');
       setLearningPlans([]);
     } finally {
       setLoading(false);
