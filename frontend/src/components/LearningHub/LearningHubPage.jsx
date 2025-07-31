@@ -5,7 +5,7 @@ import HeroSection from './HeroSection/HeroSection';
 import ActiveCourses from './ActiveCourses/ActiveCourses';
 import SavedPlaylists from './SavedPlaylists/SavedPlaylists';
 import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
-import CourseRecommendations from './CourseRecommendations/CourseRecommendations';
+import LearningInsights from './LearningInsights/LearningInsights';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
@@ -72,7 +72,7 @@ const LearningHubPage = () => {
               </div>
               <ActiveCourses />
               <SavedPlaylists />
-              <CourseRecommendations />
+              <LearningInsights />
             </div>
             
             {/* Sidebar - Hidden on mobile, shown at top of main content */}
