@@ -386,7 +386,22 @@ const ProLearningPage = () => {
   
   // Save to Learning Hub functionality
   const [isSavingToHub, setIsSavingToHub] = useState(false);
-  const [savedToHub, setSavedToHub] = useState(false);
+  const [savedToHub, setSavedToHub] = useState(() => {
+    // Check if this course has already been saved to Learning Hub
+    if (courseId) {
+      const savedCourses = JSON.parse(localStorage.getItem('savedToLearningHub') || '[]');
+      return savedCourses.includes(courseId);
+    }
+    return false;
+  });
+  const [hideSaveButton, setHideSaveButton] = useState(() => {
+    // Hide button if course is already saved
+    if (courseId) {
+      const savedCourses = JSON.parse(localStorage.getItem('savedToLearningHub') || '[]');
+      return savedCourses.includes(courseId);
+    }
+    return false;
+  });
   
   // Completion tracking
   const [completedTopics, setCompletedTopics] = useState(() => {
@@ -464,6 +479,22 @@ const ProLearningPage = () => {
       proContentManager.setCourse(courseTitle, currentCourseId);
     }
   }, [courseTitle, courseId]);
+
+  // Check if course is already saved when courseId changes
+  useEffect(() => {
+    if (courseId) {
+      const savedCourses = JSON.parse(localStorage.getItem('savedToLearningHub') || '[]');
+      const isAlreadySaved = savedCourses.includes(courseId);
+      setSavedToHub(isAlreadySaved);
+      setHideSaveButton(isAlreadySaved);
+      
+      console.log('🔍 Checking if course is already saved:', {
+        courseId,
+        savedCourses,
+        isAlreadySaved
+      });
+    }
+  }, [courseId]);
 
   // Use environment variable for Gemini API key
   const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -1067,13 +1098,23 @@ const ProLearningPage = () => {
 
       if (response.ok) {
         setSavedToHub(true);
+        
+        // Persist the saved state in localStorage
+        const savedCourses = JSON.parse(localStorage.getItem('savedToLearningHub') || '[]');
+        if (!savedCourses.includes(courseId)) {
+          savedCourses.push(courseId);
+          localStorage.setItem('savedToLearningHub', JSON.stringify(savedCourses));
+        }
+        
         console.log('✅ Course saved to Learning Hub successfully!', responseData);
+        console.log('💾 Course ID saved to localStorage:', courseId);
         alert('✅ Course saved to your Learning Hub successfully!');
         
-        // Reset success state after 5 seconds
+        // Hide the entire save button after showing success state for 3 seconds
         setTimeout(() => {
-          setSavedToHub(false);
-        }, 5000);
+          setHideSaveButton(true);
+          console.log('🫥 Save button hidden after success display');
+        }, 3000);
       } else {
         console.error('❌ Failed to save course:', responseData);
         if (response.status === 401) {
@@ -1092,6 +1133,22 @@ const ProLearningPage = () => {
       setIsSavingToHub(false);
     }
   };
+
+  // Debug utility to clear saved courses (for testing)
+  const clearSavedCoursesDebug = () => {
+    localStorage.removeItem('savedToLearningHub');
+    setSavedToHub(false);
+    setHideSaveButton(false);
+    console.log('🗑️ Cleared all saved courses from localStorage');
+  };
+
+  // Add to window for debugging in console
+  useEffect(() => {
+    window.clearSavedCoursesDebug = clearSavedCoursesDebug;
+    return () => {
+      delete window.clearSavedCoursesDebug;
+    };
+  }, []);
 
   // Check for pending topics
   useEffect(() => {
@@ -1277,18 +1334,18 @@ const ProLearningPage = () => {
     setCompletedTopics([]);
   };
 
-  // Reading section navigation handlers
-  const handlePrevSection = () => {
-    if (readingSectionIndex > 0) {
-      setReadingSectionIndex(readingSectionIndex - 1);
-    }
-  };
+  // Reading section navigation handlers - REMOVED: No longer needed since all content shows as one
+  // const handlePrevSection = () => {
+  //   if (readingSectionIndex > 0) {
+  //     setReadingSectionIndex(readingSectionIndex - 1);
+  //   }
+  // };
 
-  const handleNextSection = () => {
-    if (readingSectionIndex < readingSections.length - 1) {
-      setReadingSectionIndex(readingSectionIndex + 1);
-    }
-  };
+  // const handleNextSection = () => {
+  //   if (readingSectionIndex < readingSections.length - 1) {
+  //     setReadingSectionIndex(readingSectionIndex + 1);
+  //   }
+  // };
 
   // Parse reading content into sections
   const parseReadingSections = (readingContent) => {
@@ -1296,24 +1353,9 @@ const ProLearningPage = () => {
       return [{ header: 'Reading Material', content: readingContent || '' }];
     }
 
-    // Split by ## headers (markdown H2)
-    const sections = readingContent.split(/^## /m).filter(section => section.trim());
-    
-    if (sections.length <= 1) {
-      // No clear sections, return as single section
-      return [{ header: 'Reading Material', content: readingContent }];
-    }
-
-    return sections.map((section, index) => {
-      const lines = section.trim().split('\n');
-      const header = index === 0 ? 'Introduction' : lines[0].trim();
-      const content = index === 0 ? section : lines.slice(1).join('\n').trim();
-      
-      return {
-        header: header || `Section ${index + 1}`,
-        content: content || ''
-      };
-    });
+    // Return all content as one continuous section instead of splitting by headers
+    // This ensures all reading material appears in the main Reading tab
+    return [{ header: 'Reading Material', content: readingContent }];
   };
 
   // Map icon names to actual React components
@@ -1778,29 +1820,8 @@ const ProLearningPage = () => {
                 </div>
               </div>
             </div>
-            {/* Section Navigation */}
-            {readingSections.length > 1 && (
-              <div className="flex justify-between items-center mb-4">
-                <button
-                  onClick={handlePrevSection}
-                  disabled={readingSectionIndex === 0}
-                  className={`px-4 py-2 rounded bg-blue-100 text-blue-700 font-semibold mr-2 ${readingSectionIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-200'}`}
-                >
-                  Previous
-                </button>
-                <span className="text-gray-600 font-medium">
-                  Section {readingSectionIndex + 1} of {readingSections.length}
-                </span>
-                <button
-                  onClick={handleNextSection}
-                  disabled={readingSectionIndex === readingSections.length - 1}
-                  className={`px-4 py-2 rounded bg-blue-100 text-blue-700 font-semibold ml-2 ${readingSectionIndex === readingSections.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-200'}`}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-            {/* Enhanced Content with better typography, one section at a time */}
+            {/* Section Navigation - REMOVED: All content now shows as one continuous section */}
+            {/* Enhanced Content with better typography, all content at once */}
             <div className="prose prose-lg max-w-none">
               {readingSections.length > 0 ? (
                 <ReactMarkdown
@@ -1983,7 +2004,7 @@ const ProLearningPage = () => {
                     )
                   }}
                 >
-                  {`${readingSections[readingSectionIndex].header}\n${readingSections[readingSectionIndex].content}`}
+                  {readingSections.length > 0 ? readingSections[0].content : ''}
                 </ReactMarkdown>
               ) : (
                 // Fallback: render raw content if sections are empty
@@ -3034,14 +3055,16 @@ const ProLearningPage = () => {
                 </div>
               </div>
 
-              {/* Save to Learning Hub Button - Only show for locally generated courses, not database courses */}
+              {/* Save to Learning Hub Button - Only show for locally generated courses that haven't been saved yet */}
               {(() => {
                 const isFromDatabase = topicsList.some(t => t.dbTopic);
-                const shouldShowSaveButton = content && topicsList.length > 0 && !isFromDatabase;
+                const shouldShowSaveButton = content && topicsList.length > 0 && !isFromDatabase && !hideSaveButton;
                 console.log('🔍 Save button visibility check:', {
                   hasContent: !!content,
                   topicsCount: topicsList.length,
                   isFromDatabase,
+                  savedToHub,
+                  hideSaveButton,
                   shouldShowSaveButton
                 });
                 return shouldShowSaveButton;
@@ -3259,30 +3282,8 @@ const ProLearningPage = () => {
           <div className="flex-1 overflow-y-auto min-h-0 p-4">
             <div className="space-y-4">
 
-              {/* Reading Section Navigation */}
-              {activeTab === 'reading' && !isLoading && readingSections.length > 1 && (
-                <div className="border-t pt-4 mt-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Reading Sections</h4>
-                  <div className="space-y-2">
-                    {readingSections.map((section, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setReadingSectionIndex(index)}
-                        className={`w-full text-left p-2 rounded-lg transition-colors text-sm ${
-                          readingSectionIndex === index
-                            ? 'bg-blue-100 text-blue-800 border-l-4 border-blue-600'
-                            : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                      >
-                        <div className="font-medium">{section.header || `Section ${index + 1}`}</div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {section.content.substring(0, 60)}...
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Reading Section Navigation - REMOVED: All content now shows in main Reading tab */}
+              {/* No more reading sections navigation in sidebar */}
 
               {/* Removed Learning Tips section from sidebar */}
             </div>

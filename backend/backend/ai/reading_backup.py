@@ -4,113 +4,108 @@ import json
 import re
 from .ai_service import call_gemini_api
 
-def classify_topic_with_ai(topic):
-    """
-    Use AI to classify the topic into the most appropriate category
-    """
-    classification_prompt = f"""
-You are an expert educational content classifier. Your job is to analyze a topic and classify it into one of these exact categories:
-
-**Available Categories:**
-1. **technical** - Programming, software development, frameworks, system design, computer science, technology
-2. **academic** - History, physics, chemistry, biology, mathematics, science, literature, philosophy, psychology, geography
-3. **skills** - Soft skills, personal development, communication, leadership, time management, emotional intelligence
-4. **business_finance** - Business concepts, finance, investing, accounting, financial planning, budgeting, economics
-5. **creative** - Arts, writing, storytelling, design, photography, music, filmmaking, creative writing
-6. **entrepreneurship** - Startups, business models, marketing, sales, growth strategies, venture capital
-7. **general** - Topics that don't clearly fit into other categories or are too broad/vague
-
-**Topic to classify:** {topic}
-
-**Instructions:**
-- Analyze the topic carefully
-- Consider the primary focus and learning objectives
-- Choose the MOST appropriate single category
-- Respond with ONLY the category name (one word)
-
-**Examples:**
-- "React Hooks" → technical
-- "Photosynthesis" → academic
-- "Public Speaking" → skills
-- "Stock Market" → business_finance
-- "Portrait Photography" → creative
-- "Startup Funding" → entrepreneurship
-- "Life Skills" → general
-
-**Your classification:**
-"""
-    
-    try:
-        print(f"🤖 Using AI to classify topic: '{topic}'")
-        result = call_gemini_api(classification_prompt)
-        
-        # Extract the classification from the AI response
-        if isinstance(result, dict) and 'candidates' in result:
-            classification = result['candidates'][0]['content']['parts'][0]['text'].strip().lower()
-        else:
-            classification = str(result).strip().lower()
-        
-        # Clean up the response to get just the category
-        classification = re.sub(r'[^a-z_]', '', classification)
-        
-        # Validate the classification
-        valid_categories = ['technical', 'academic', 'skills', 'business_finance', 'creative', 'entrepreneurship', 'general']
-        
-        if classification in valid_categories:
-            print(f"✅ AI classified '{topic}' as: '{classification}'")
-            return classification
-        else:
-            print(f"⚠️ AI returned invalid category '{classification}', using fallback logic")
-            return classify_topic_fallback(topic)
-            
-    except Exception as e:
-        print(f"❌ AI classification failed: {e}, using fallback logic")
-        return classify_topic_fallback(topic)
-
-def classify_topic_fallback(topic):
-    """
-    Fallback keyword-based classification if AI fails
-    """
-    print(f"🔧 Using FALLBACK classification for: '{topic}'")
-    topic_lower = topic.lower()
-    
-    # Quick keyword matching for fallback
-    if any(word in topic_lower for word in ['programming', 'code', 'react', 'python', 'javascript', 'api', 'software']):
-        print(f"🎯 FALLBACK: Found technical keywords, classifying as 'technical'")
-        return 'technical'
-    elif any(word in topic_lower for word in ['history', 'physics', 'chemistry', 'biology', 'math', 'science', 'photosynthesis']):
-        print(f"🎯 FALLBACK: Found academic keywords, classifying as 'academic'")
-        return 'academic'
-    elif any(word in topic_lower for word in ['communication', 'leadership', 'management', 'skills']):
-        print(f"🎯 FALLBACK: Found skills keywords, classifying as 'skills'")
-        return 'skills'
-    elif any(word in topic_lower for word in ['business', 'finance', 'investing', 'money', 'budget']):
-        print(f"🎯 FALLBACK: Found business/finance keywords, classifying as 'business_finance'")
-        return 'business_finance'
-    elif any(word in topic_lower for word in ['art', 'design', 'photography', 'writing', 'creative']):
-        print(f"🎯 FALLBACK: Found creative keywords, classifying as 'creative'")
-        return 'creative'
-    elif any(word in topic_lower for word in ['startup', 'entrepreneur', 'marketing', 'sales']):
-        print(f"🎯 FALLBACK: Found entrepreneurship keywords, classifying as 'entrepreneurship'")
-        return 'entrepreneurship'
-    else:
-        print(f"🎯 FALLBACK: No specific keywords found, using 'general' category")
-        return 'general'
-
 def classify_topic(topic):
     """
-    Main classification function - tries AI first, falls back to keywords
+    Classify the topic into appropriate category for prompt selection
     """
-    return classify_topic_with_ai(topic)
+    topic_lower = topic.lower()
+    
+    # Technical Topics Keywords
+    technical_keywords = [
+        'programming', 'code', 'coding', 'python', 'javascript', 'java', 'c++', 'html', 'css',
+        'react', 'angular', 'vue', 'nodejs', 'django', 'flask', 'api', 'database', 'sql',
+        'mongodb', 'algorithm', 'data structure', 'machine learning', 'ai', 'artificial intelligence',
+        'deep learning', 'neural network', 'framework', 'library', 'git', 'github', 'docker',
+        'kubernetes', 'aws', 'cloud', 'server', 'backend', 'frontend', 'fullstack', 'devops',
+        'cybersecurity', 'blockchain', 'cryptocurrency', 'web development', 'mobile development',
+        'software', 'hardware', 'network', 'system design', 'architecture', 'microservices',
+        'debugging', 'testing', 'deployment', 'version control', 'agile', 'scrum'
+    ]
+    
+    # Academic & Knowledge Keywords
+    academic_keywords = [
+        'history', 'physics', 'chemistry', 'biology', 'mathematics', 'math', 'science',
+        'geography', 'literature', 'philosophy', 'psychology', 'sociology', 'anthropology',
+        'economics', 'political science', 'law', 'medicine', 'anatomy', 'physiology',
+        'astronomy', 'geology', 'ecology', 'evolution', 'genetics', 'quantum', 'relativity',
+        'theory', 'research', 'study', 'academic', 'scholarly', 'scientific method',
+        'hypothesis', 'experiment', 'analysis', 'statistics', 'probability',
+        # Biology/Science keywords
+        'photosynthesis', 'cell', 'dna', 'protein', 'enzyme', 'metabolism', 'organism',
+        'ecosystem', 'biodiversity', 'species', 'classification', 'taxonomy',
+        # History keywords
+        'war', 'civilization', 'empire', 'revolution', 'ancient', 'medieval', 'renaissance',
+        'world war', 'battle', 'treaty', 'historical', 'timeline', 'era', 'period',
+        # Physics/Chemistry keywords
+        'atom', 'molecule', 'energy', 'force', 'motion', 'thermodynamics', 'optics',
+        'mechanics', 'electricity', 'magnetism', 'waves', 'particle', 'nuclear'
+    ]
+    
+    # Skills & Personal Development Keywords
+    skills_keywords = [
+        'communication', 'leadership', 'time management', 'productivity', 'confidence',
+        'emotional intelligence', 'teamwork', 'collaboration', 'presentation', 'public speaking',
+        'negotiation', 'conflict resolution', 'problem solving', 'critical thinking',
+        'creativity', 'innovation', 'motivation', 'goal setting', 'habit', 'mindset',
+        'stress management', 'work-life balance', 'networking', 'mentoring', 'coaching',
+        'personal development', 'self improvement', 'career development', 'interview skills'
+    ]
+    
+    # Business & Finance Keywords
+    business_finance_keywords = [
+        'business', 'finance', 'investing', 'investment', 'stock', 'market', 'trading',
+        'cryptocurrency', 'bitcoin', 'portfolio', 'budget', 'budgeting', 'accounting',
+        'financial planning', 'retirement', 'insurance', 'loan', 'mortgage', 'credit',
+        'debt', 'savings', 'profit', 'revenue', 'roi', 'startup', 'entrepreneur',
+        'venture capital', 'funding', 'ipo', 'valuation', 'cash flow', 'balance sheet',
+        'income statement', 'financial analysis', 'risk management', 'wealth building'
+    ]
+    
+    # Creative Arts & Media Keywords
+    creative_keywords = [
+        'writing', 'storytelling', 'creative writing', 'screenplay', 'novel', 'poetry',
+        'journalism', 'copywriting', 'content creation', 'blogging', 'photography',
+        'filmmaking', 'video editing', 'graphic design', 'ui design', 'ux design',
+        'illustration', 'animation', 'music', 'singing', 'acting', 'theater', 'drama',
+        'art', 'painting', 'drawing', 'sculpture', 'digital art', 'media production',
+        'social media', 'marketing content', 'brand storytelling', 'visual design',
+        'creative', 'artistic', 'design', 'visual', 'audio', 'video production'
+    ]
+    
+    # Entrepreneurship Keywords
+    entrepreneurship_keywords = [
+        'entrepreneurship', 'startup', 'business model', 'marketing', 'sales', 'growth',
+        'scaling', 'pivot', 'mvp', 'minimum viable product', 'lean startup', 'fundraising',
+        'pitch deck', 'business plan', 'market research', 'customer acquisition',
+        'revenue model', 'monetization', 'branding', 'digital marketing', 'seo',
+        'social media marketing', 'email marketing', 'content marketing', 'affiliate marketing',
+        'e-commerce', 'dropshipping', 'freelancing', 'consulting', 'coaching business',
+        'startup funding', 'venture capital', 'angel investor', 'seed funding', 'series a'
+    ]
+    
+    # Check each category with priority order (most specific first)
+    # Check entrepreneurship before business_finance to avoid overlap
+    if any(keyword in topic_lower for keyword in entrepreneurship_keywords):
+        return 'entrepreneurship'
+    elif any(keyword in topic_lower for keyword in technical_keywords):
+        return 'technical'
+    elif any(keyword in topic_lower for keyword in academic_keywords):
+        return 'academic'
+    elif any(keyword in topic_lower for keyword in skills_keywords):
+        return 'skills'
+    elif any(keyword in topic_lower for keyword in business_finance_keywords):
+        return 'business_finance'
+    elif any(keyword in topic_lower for keyword in creative_keywords):
+        return 'creative'
+    else:
+        return 'general'
 
 def get_prompt_by_category(topic, category):
     """
     Return the appropriate prompt based on topic category
     """
-    print(f"🎯 Selecting prompt for topic: '{topic}' with category: '{category}'")
     
     if category == 'technical':
-        print(f"📝 Using TECHNICAL prompt for '{topic}' - Focusing on programming/software development content")
         return f"""You are an expert AI tutor designed to generate complete, clear, and deeply engaging educational content on **technical topics** such as programming concepts, software development practices, frameworks, system design, and computer science fundamentals.
 
 Given any technical topic by the user, your task is to generate a detailed **Reading Section** using **Markdown syntax**. Your explanation must be **self-contained**, **visually structured**, and suitable for beginners and intermediate learners aiming for deep understanding.
@@ -150,7 +145,6 @@ Given any technical topic by the user, your task is to generate a detailed **Rea
 Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
 
     elif category == 'academic':
-        print(f"📚 Using ACADEMIC prompt for '{topic}' - Focusing on scholarly/educational subjects")
         return f"""You are an expert AI tutor trained to explain **academic or general knowledge subjects** such as History, Physics, Economics, Psychology, Biology, etc.
 
 Given a topic by the user, generate a **detailed, easy-to-understand Reading Section** using **Markdown format**. The content should be self-contained and suitable for students and lifelong learners aiming to understand the topic deeply.
@@ -190,7 +184,6 @@ Given a topic by the user, generate a **detailed, easy-to-understand Reading Sec
 Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
 
     elif category == 'skills':
-        print(f"💪 Using SKILLS prompt for '{topic}' - Focusing on personal development and soft skills")
         return f"""You are a professional coach and educator skilled in teaching **soft skills and personal development topics** like communication, confidence, time management, emotional intelligence, leadership, etc.
 
 Given a topic by the user, generate a clear and structured **Reading Section** in **Markdown format** that helps individuals learn and grow in this area—whether for career, personal life, or relationships.
@@ -231,7 +224,6 @@ Given a topic by the user, generate a clear and structured **Reading Section** i
 Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
 
     elif category == 'business_finance':
-        print(f"💰 Using BUSINESS_FINANCE prompt for '{topic}' - Focusing on finance, business, and economics")
         return f"""You are an expert AI tutor designed to generate complete, clear, and deeply engaging educational content on **business and finance** topics—such as entrepreneurship, marketing, investing, financial literacy, personal finance, business models, and startups.
 
 When a user provides a topic, generate a full *Reading Section* that feels like a high-quality self-paced learning resource for students, early professionals, founders, and finance enthusiasts.
@@ -263,7 +255,6 @@ Start directly with the markdown content, using a format like:
 - Tips, Mistakes to Avoid, or Best Practices"""
 
     elif category == 'creative':
-        print(f"🎨 Using CREATIVE prompt for '{topic}' - Focusing on arts, design, and creative expression")
         return f"""You are a creative mentor AI that helps learners master topics related to **creative arts, writing, storytelling, filmmaking, design, photography, content creation, and media production**.
 
 Your job is to generate a *Reading Section* that feels like a personal guide from a creative industry expert — full of insight, examples, and inspiration.
@@ -296,7 +287,6 @@ Start with markdown output like this:
 - Common Blocks and How to Overcome Them"""
 
     elif category == 'entrepreneurship':
-        print(f"🚀 Using ENTREPRENEURSHIP prompt for '{topic}' - Focusing on startups, business strategy, and growth")
         return f"""You are an AI financial & business mentor who helps people deeply understand topics related to **investing, business strategy, startups, marketing, budgeting, accounting, freelancing, economics, and personal finance**.
 
 Your goal is to produce a *Reading Section* that is clear, practical, and filled with real-world analogies — something a smart entrepreneur or financial expert would explain to a curious beginner.
@@ -327,7 +317,6 @@ Start with markdown output like this:
 - Pitfalls to Avoid"""
 
     else:  # general/fallback
-        print(f"🔄 Using GENERAL/FALLBACK prompt for '{topic}' - Adaptive content based on topic nature")
         return f"""You are a world-class educator and expert communicator. Generate a **deep, clear, and adaptive markdown learning guide** for the topic: **{topic}**.
 
 Your job is to teach the topic like a personal tutor. The learner should fully understand it just by reading this — no other websites, videos, or resources needed.
@@ -395,24 +384,14 @@ def handle_reading(request):
     try:
         body = json.loads(request.body.decode('utf-8'))
         topic = body.get('topic', '')
-        print(f"\n🚀 READING CONTENT GENERATION STARTED")
-        print(f"📥 Received topic: '{topic}'")
         
         # Classify the topic and get appropriate prompt
-        print(f"\n🔍 CLASSIFICATION PHASE:")
         category = classify_topic(topic)
-        
-        print(f"\n📝 PROMPT SELECTION PHASE:")
         prompt = get_prompt_by_category(topic, category)
         
-        print(f"\n📊 FINAL CLASSIFICATION RESULT:")
-        print(f"   Topic: '{topic}'")
-        print(f"   Category: '{category}'")
-        print(f"   Prompt Length: {len(prompt)} characters")
+        print(f"📊 Topic: '{topic}' classified as: '{category}'")
         
-        print(f"\n🤖 CALLING GEMINI API...")
         result = call_gemini_api(prompt)
-        print(f"✅ Gemini API call completed successfully")
         
         # Add category to the response for debugging/frontend usage
         if isinstance(result, dict):
@@ -426,13 +405,10 @@ def handle_reading(request):
                 'topic_analyzed': topic
             }
         
-        print(f"📤 Returning response with category metadata")
-        print(f"🎉 READING CONTENT GENERATION COMPLETED SUCCESSFULLY\n")
-        
         return JsonResponse(result, safe=False)
     except Exception as e:
         return JsonResponse({
             'error': str(e),
             'topic_category': category if 'category' in locals() else 'unknown',
             'topic_analyzed': topic if 'topic' in locals() else 'unknown'
-        }, status=500)
+        }, status=500) 
