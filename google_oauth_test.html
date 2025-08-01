@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google OAuth Test</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <h1>Google OAuth Configuration Test</h1>
+    
+    <div id="test-results">
+        <h2>Test Results:</h2>
+        <ul id="results-list">
+            <li>Loading...</li>
+        </ul>
+    </div>
+    
+    <button id="test-google-signin" onclick="testGoogleSignIn()">Test Google Sign-In</button>
+    
+    <script>
+        const GOOGLE_CLIENT_ID = "687560214105-crh52mqf0nt8f1dauvrhog8vko33rimq.apps.googleusercontent.com";
+        const results = [];
+        
+        function addResult(message, success = true) {
+            results.push({ message, success });
+            updateResults();
+        }
+        
+        function updateResults() {
+            const list = document.getElementById('results-list');
+            list.innerHTML = '';
+            results.forEach(result => {
+                const li = document.createElement('li');
+                li.textContent = result.message;
+                li.style.color = result.success ? 'green' : 'red';
+                list.appendChild(li);
+            });
+        }
+        
+        function testGoogleSignIn() {
+            if (window.google) {
+                try {
+                    addResult('✓ Google API loaded successfully');
+                    
+                    window.google.accounts.id.initialize({
+                        client_id: GOOGLE_CLIENT_ID,
+                        callback: (response) => {
+                            addResult('✓ Google Sign-In callback received');
+                            console.log('Google response:', response);
+                            testBackendAuth(response.credential);
+                        },
+                        auto_select: false,
+                        cancel_on_tap_outside: true,
+                        use_fedcm_for_prompt: false,
+                        ux_mode: 'popup'
+                    });
+                    
+                    addResult('✓ Google Sign-In initialized');
+                    
+                    window.google.accounts.id.prompt((notification) => {
+                        if (notification.isNotDisplayed()) {
+                            addResult('✗ Google Sign-In prompt not displayed: ' + notification.getNotDisplayedReason(), false);
+                        } else if (notification.isSkippedMoment()) {
+                            addResult('✗ Google Sign-In prompt skipped: ' + notification.getSkippedReason(), false);
+                        } else {
+                            addResult('✓ Google Sign-In prompt displayed');
+                        }
+                    });
+                    
+                } catch (error) {
+                    addResult('✗ Google Sign-In initialization failed: ' + error.message, false);
+                }
+            } else {
+                addResult('✗ Google API not loaded', false);
+            }
+        }
+        
+        async function testBackendAuth(credential) {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/auth/google/token/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        id_token: credential
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult('✓ Backend authentication successful');
+                    console.log('Backend response:', data);
+                } else {
+                    const errorData = await response.text();
+                    addResult('✗ Backend authentication failed: ' + errorData, false);
+                }
+            } catch (error) {
+                addResult('✗ Backend request failed: ' + error.message, false);
+            }
+        }
+        
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            addResult('Page loaded');
+            
+            // Check if Google API is available
+            const checkGoogleAPI = setInterval(() => {
+                if (window.google) {
+                    addResult('✓ Google API available');
+                    clearInterval(checkGoogleAPI);
+                }
+            }, 500);
+            
+            // Stop checking after 10 seconds
+            setTimeout(() => {
+                clearInterval(checkGoogleAPI);
+                if (!window.google) {
+                    addResult('✗ Google API failed to load after 10 seconds', false);
+                }
+            }, 10000);
+        });
+    </script>
+</body>
+</html>
