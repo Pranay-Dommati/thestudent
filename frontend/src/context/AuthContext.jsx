@@ -200,6 +200,38 @@ export const AuthProvider = ({ children }) => {
     toast.success('Logged out successfully');
   };
 
+  // Google Sign-In function
+  const googleLogin = async (googleToken) => {
+    try {
+      const response = await axiosInstance.post('/auth/google/token/', {
+        id_token: googleToken
+      });
+      
+      const { user, access, refresh } = response.data;
+      
+      localStorage.setItem('accessToken', access);
+      localStorage.setItem('refreshToken', refresh);
+      
+      setUser(user);
+      setIsLoggedIn(true);
+      setLastChecked(Date.now());
+      
+      toast.success('Google login successful!');
+      return true;
+    } catch (error) {
+      console.error('Google login error:', error.response?.data);
+      
+      if (error.response?.status === 400) {
+        toast.error('Google authentication failed. Please try again.');
+      } else if (error.response?.status === 500) {
+        toast.error('Server error. Please try again later.');
+      } else {
+        toast.error('Google login failed. Please try again.');
+      }
+      return false;
+    }
+  };
+
   // Export isAuthenticated as a function to always check current state
   const isAuthenticated = () => {
     return isLoggedIn && !!localStorage.getItem('accessToken');
@@ -212,6 +244,7 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated, // Export the function as well
       register,
       login,
+      googleLogin,
       logout,
       validateAuth // Export the validate function
     }}>

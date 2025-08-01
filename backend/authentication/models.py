@@ -32,6 +32,18 @@ class User(AbstractUser):
     email = models.EmailField(_('email address'), unique=True)
     full_name = models.CharField(max_length=255)
     
+    # Authentication method tracking
+    AUTH_METHOD_CHOICES = [
+        ('email', 'Email/Password'),
+        ('google', 'Google OAuth'),
+    ]
+    auth_method = models.CharField(
+        max_length=20, 
+        choices=AUTH_METHOD_CHOICES, 
+        default='email',
+        help_text='Method used for initial registration'
+    )
+    
     # Terms and Conditions
     agreed_to_terms = models.BooleanField(default=False)
     

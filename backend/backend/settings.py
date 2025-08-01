@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'feedback',  # Add feedback app
     'newsletter',  # Add newsletter app
     'rest_framework',
+    'social_django',  # Add social-auth-app-django
 ]
 
 MIDDLEWARE = [
@@ -63,6 +64,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'social_django.middleware.SocialAuthExceptionMiddleware',  # Add social auth middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -148,6 +150,7 @@ if DEBUG:
 
 # Authentication settings
 AUTHENTICATION_BACKENDS = [
+    'social_core.backends.google.GoogleOAuth2',  # Add Google OAuth2 backend
     'django.contrib.auth.backends.ModelBackend',
     'authentication.backends.EmailBackend',
 ]
@@ -203,3 +206,50 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCoZJC3kzWosQEJpbb0Q2Qmo
 # Google Programmable Search API for Resources
 GOOGLE_SEARCH_API_KEY = os.environ.get('GOOGLE_SEARCH_API_KEY', 'AIzaSyCoZJC3kzWosQEJpbb0Q2QmoQpMUuBpVlI')
 GOOGLE_SEARCH_ENGINE_ID = os.environ.get('GOOGLE_SEARCH_ENGINE_ID', '2593cd20d7e52429f')
+
+# Google OAuth2 Settings
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.environ.get('GOOGLE_OAUTH2_CLIENT_ID', '')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.environ.get('GOOGLE_OAUTH2_CLIENT_SECRET', '')
+
+# Social Auth Configuration
+SOCIAL_AUTH_URL_NAMESPACE = 'social'
+SOCIAL_AUTH_LOGIN_REDIRECT_URL = 'http://localhost:5173/'
+SOCIAL_AUTH_LOGIN_URL = '/auth/login/'
+
+# Google OAuth2 specific settings
+SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = [
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+]
+SOCIAL_AUTH_GOOGLE_OAUTH2_USE_DEPRECATED_API = False
+
+# Social Auth Pipeline - customize to work with our User model
+SOCIAL_AUTH_PIPELINE = (
+    'social_core.pipeline.social_auth.social_details',
+    'social_core.pipeline.social_auth.social_uid',
+    'social_core.pipeline.social_auth.auth_allowed',
+    'social_core.pipeline.social_auth.social_user',
+    'authentication.pipeline.associate_by_email',  # Associate with existing users by email
+    'authentication.pipeline.create_user',  # Custom pipeline function
+    'social_core.pipeline.social_auth.associate_user',
+    'social_core.pipeline.social_auth.load_extra_data',
+    'social_core.pipeline.user.user_details',
+)
+
+# Social Auth User Fields
+SOCIAL_AUTH_USER_FIELDS = ['email', 'full_name']
+
+# Social Auth Admin
+SOCIAL_AUTH_ADMIN_USER_SEARCH_FIELDS = ['email', 'full_name']
+
+# Disconnect redirect URL
+SOCIAL_AUTH_DISCONNECT_REDIRECT_URL = '/auth/login/'
+
+# Social Auth Protected User Fields
+SOCIAL_AUTH_PROTECTED_USER_FIELDS = ['email']
+
+# Social Auth User Model
+SOCIAL_AUTH_USER_MODEL = 'authentication.User'
+
+# Social Auth UID Length (for compatibility with your User model)
+SOCIAL_AUTH_UID_LENGTH = 255

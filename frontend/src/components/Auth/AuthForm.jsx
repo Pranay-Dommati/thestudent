@@ -66,7 +66,84 @@ export default function AuthForm() {
     });
   };
 
-  const { register, login } = useAuth();
+  const { register, login, googleLogin } = useAuth();
+  
+  // Google Sign-In configuration
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "687560214105-crh52mqf0nt8f1dauvrhog8vko33rimq.apps.googleusercontent.com";
+  
+  // Initialize Google Sign-In
+  useEffect(() => {
+    if (window.google) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          use_fedcm_for_prompt: false,  // Disable FedCM to avoid domain issues
+          allowed_parent_origin: [window.location.origin],  // Add current origin
+          ux_mode: 'popup',  // Use popup mode to avoid redirect issues
+        });
+      } catch (error) {
+        console.error('Google Sign-In initialization error:', error);
+      }
+    }
+  }, []);
+
+  // Handle Google Sign-In response
+  const handleGoogleResponse = async (response) => {
+    try {
+      setIsLoading(true);
+      const success = await googleLogin(response.credential);
+      if (success) {
+        navigate(returnToPath || '/');
+      }
+    } catch (error) {
+      console.error('Google Sign-In error:', error);
+      toast.error('Google Sign-In failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Google Sign-In button click
+  const handleGoogleSignIn = () => {
+    if (window.google) {
+      try {
+        // Try using the newer renderButton method if available
+        if (window.google.accounts.id.renderButton) {
+          const googleButtonContainer = document.createElement('div');
+          googleButtonContainer.style.position = 'absolute';
+          googleButtonContainer.style.top = '-9999px';
+          document.body.appendChild(googleButtonContainer);
+          
+          window.google.accounts.id.renderButton(googleButtonContainer, {
+            theme: 'outline',
+            size: 'medium',
+            type: 'standard',
+            text: 'signin_with'
+          });
+          
+          // Trigger click on the rendered button
+          setTimeout(() => {
+            const googleBtn = googleButtonContainer.querySelector('div[role="button"]');
+            if (googleBtn) {
+              googleBtn.click();
+            }
+            document.body.removeChild(googleButtonContainer);
+          }, 100);
+        } else {
+          // Fallback to prompt
+          window.google.accounts.id.prompt();
+        }
+      } catch (error) {
+        console.error('Google Sign-In error:', error);
+        toast.error('Google Sign-In temporarily unavailable. Please try manual registration.');
+      }
+    } else {
+      toast.error('Google Sign-In not loaded. Please try refreshing the page.');
+    }
+  };
   
   const validateForm = () => {
     const errors = {};
@@ -402,11 +479,12 @@ export default function AuthForm() {
                   <div className="mt-6 grid grid-cols-2 gap-4">
                     <button
                       type="button"
-                      onClick={() => toast("Social login coming soon!", { icon: '🔗', style: { backgroundColor: '#3b82f6', color: 'white' }})}
-                      className="w-full flex justify-center items-center py-3 px-4 border-2 border-gray-200 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                      onClick={handleGoogleSignIn}
+                      disabled={isLoading}
+                      className="w-full flex justify-center items-center py-3 px-4 border-2 border-gray-200 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                     >
                       <FaGoogle className="h-5 w-5 text-red-500 mr-3" />
-                      Google
+                      {isLoading ? 'Signing in...' : 'Google'}
                     </button>
                     <button
                       type="button"
@@ -686,11 +764,12 @@ export default function AuthForm() {
                     <div className="mt-6 grid grid-cols-2 gap-3">
                       <button
                         type="button"
-                        onClick={() => toast("Social login coming soon!", { icon: '🔗', style: { backgroundColor: '#3b82f6', color: 'white' }})}
-                        className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                        onClick={handleGoogleSignIn}
+                        disabled={isLoading}
+                        className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                       >
                         <FaGoogle className="h-5 w-5 text-red-500" />
-                        <span className="ml-2">Google</span>
+                        <span className="ml-2">{isLoading ? 'Signing in...' : 'Google'}</span>
                       </button>
                       <button
                         type="button"
