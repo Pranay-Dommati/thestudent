@@ -243,7 +243,19 @@ const CourseRecommendations = () => {
         
         {/* View all link */}
         <div className="mt-4 text-center">
-          <Link to="/courses" className="text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center">
+          <Link 
+            to="/courses" 
+            className="btn-clickable text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center"
+            style={{ 
+              cursor: 'pointer',
+              pointerEvents: 'auto',
+              zIndex: 10,
+              position: 'relative'
+            }}
+            onClick={() => {
+              console.log('🔥 [VIEW ALL] Course recommendations link clicked - navigating to /courses');
+            }}
+          >
             View all recommendations
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />

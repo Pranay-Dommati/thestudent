@@ -188,6 +188,12 @@ const AILearningPlans = () => {
 
   const coursesToDisplay = showMore ? proCourses : proCourses.slice(0, COURSES_TO_SHOW);
 
+  // Debug logging for Load More functionality
+  console.log('🔥 [LOAD MORE] Show more state:', showMore);
+  console.log('🔥 [LOAD MORE] Total courses available:', proCourses.length);
+  console.log('🔥 [LOAD MORE] Courses to display:', coursesToDisplay.length);
+  console.log('🔥 [LOAD MORE] Should show Load More button:', proCourses.length > COURSES_TO_SHOW);
+
   return (
     <>
       {/* Course Grid */}
@@ -280,8 +286,20 @@ const AILearningPlans = () => {
       {proCourses.length > COURSES_TO_SHOW && (
         <div className="text-center mt-6">
           <button
-            onClick={() => setShowMore(!showMore)}
-            className="px-6 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all duration-300 font-medium text-sm shadow-sm hover:shadow-md"
+            onClick={() => {
+              console.log('🔥 [LOAD MORE] Button clicked. Current showMore:', showMore);
+              console.log('🔥 [LOAD MORE] Total courses:', proCourses.length);
+              console.log('🔥 [LOAD MORE] Courses to show initially:', COURSES_TO_SHOW);
+              setShowMore(!showMore);
+              console.log('🔥 [LOAD MORE] New showMore will be:', !showMore);
+            }}
+            className="btn-clickable px-6 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all duration-300 font-medium text-sm shadow-sm hover:shadow-md"
+            style={{ 
+              cursor: 'pointer',
+              pointerEvents: 'auto',
+              zIndex: 10,
+              position: 'relative'
+            }}
           >
             {showMore ? 'Show Less' : `Load More (${proCourses.length - COURSES_TO_SHOW} more)`}
           </button>
