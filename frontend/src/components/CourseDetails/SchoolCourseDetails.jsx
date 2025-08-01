@@ -14,6 +14,8 @@ const API_URL = 'http://localhost:8000';
 const SchoolCourseDetails = () => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [checkingEnrollment, setCheckingEnrollment] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { boardId, stateId, subjectId } = useParams();
@@ -226,6 +228,68 @@ const SchoolCourseDetails = () => {
     };
   }, [isLoggedIn]);
 
+  // Check enrollment status
+  useEffect(() => {
+    const checkEnrollmentStatus = async () => {
+      if (!isLoggedIn || !course) {
+        setIsEnrolled(false);
+        return;
+      }
+
+      setCheckingEnrollment(true);
+      try {
+        const token = localStorage.getItem('accessToken');
+        const response = await axios.get(`${API_URL}/api/courses/enrolled/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.data.success) {
+          // Extract course parameters to match with enrolled courses
+          const classLevel = location.pathname.includes('/6th/') ? '6th' :
+                            location.pathname.includes('/7th/') ? '7th' :
+                            location.pathname.includes('/8th/') ? '8th' :
+                            location.pathname.includes('/9th/') ? '9th' :
+                            location.pathname.includes('/10th/') ? '10th' : 
+                            location.pathname.includes('/11th/') ? '11th' : '12th';
+          const board = boardId || 'cbse';
+          const subject = subjectId || course?.subject?.toLowerCase();
+
+          // Check if user is enrolled in this specific course
+          const enrolled = response.data.courses.some(enrollment => {
+            const isSameClass = enrollment.class_level === classLevel;
+            const isSameBoard = enrollment.board?.toLowerCase() === board.toLowerCase();
+            const isSameSubject = enrollment.subject?.toLowerCase() === subject.toLowerCase();
+            
+            console.log('🔍 Checking enrollment:', {
+              enrollmentClass: enrollment.class_level,
+              enrollmentBoard: enrollment.board,
+              enrollmentSubject: enrollment.subject,
+              currentClass: classLevel,
+              currentBoard: board,
+              currentSubject: subject,
+              matches: isSameClass && isSameBoard && isSameSubject
+            });
+
+            return isSameClass && isSameBoard && isSameSubject;
+          });
+
+          setIsEnrolled(enrolled);
+          console.log('📚 Enrollment status:', enrolled);
+        }
+      } catch (error) {
+        console.error('Error checking enrollment status:', error);
+        setIsEnrolled(false);
+      } finally {
+        setCheckingEnrollment(false);
+      }
+    };
+
+    checkEnrollmentStatus();
+  }, [isLoggedIn, course, location.pathname, boardId, subjectId]);
+
   const handleStartLearning = async () => {
     if (!isLoggedIn) {
       toast.error('Please log in to start learning');
@@ -233,6 +297,15 @@ const SchoolCourseDetails = () => {
       return;
     }
 
+    // If already enrolled, navigate directly to learning page
+    if (isEnrolled) {
+      console.log('✅ User already enrolled, navigating directly to learning page');
+      toast.success('Welcome back! Continuing your learning journey.');
+      navigate(`${location.pathname}/learning`);
+      return;
+    }
+
+    // If not enrolled, proceed with enrollment
     try {
       // Extract course parameters from URL
       const classLevel = location.pathname.includes('/6th/') ? '6th' :
@@ -252,7 +325,7 @@ const SchoolCourseDetails = () => {
         subject: subject
       };
 
-      console.log('Enrolling in course with data:', enrollmentData);
+      console.log('📝 Enrolling in course with data:', enrollmentData);
 
       const token = localStorage.getItem('accessToken');
       const response = await axios.post(`${API_URL}/api/courses/enroll/`, enrollmentData, {
@@ -265,15 +338,16 @@ const SchoolCourseDetails = () => {
       if (response.data.success) {
         if (response.data.created) {
           toast.success('Successfully enrolled in course!');
+          setIsEnrolled(true); // Update enrollment status
         } else {
-          toast.info('Welcome back! Continuing your learning journey.');
+          toast.success('Welcome back! Continuing your learning journey.');
         }
         
         // Navigate to the learning page
         navigate(`${location.pathname}/learning`);
       }
     } catch (error) {
-      console.error('Error enrolling in course:', error);
+      console.error('❌ Error enrolling in course:', error);
       if (error.response?.data?.error) {
         toast.error(error.response.data.error);
       } else {
@@ -333,11 +407,32 @@ const SchoolCourseDetails = () => {
 
               <button 
                 onClick={handleStartLearning}
-                className="w-full sm:w-auto bg-indigo-500 hover:bg-indigo-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium text-sm sm:text-base
-                         flex items-center justify-center sm:justify-start space-x-2 transform transition hover:scale-105"
+                disabled={checkingEnrollment}
+                className={`w-full sm:w-auto text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium text-sm sm:text-base
+                         flex items-center justify-center sm:justify-start space-x-2 transform transition hover:scale-105
+                         ${checkingEnrollment 
+                           ? 'bg-gray-400 cursor-not-allowed' 
+                           : isEnrolled 
+                             ? 'bg-blue-600 hover:bg-blue-700' 
+                             : 'bg-indigo-500 hover:bg-indigo-600'
+                         }`}
               >
-                <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span>Start Learning Now</span>
+                {checkingEnrollment ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+                    <span>Checking...</span>
+                  </>
+                ) : isEnrolled ? (
+                  <>
+                    <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Continue Learning</span>
+                  </>
+                ) : (
+                  <>
+                    <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Start Learning Now</span>
+                  </>
+                )}
               </button>
             </div>
 
