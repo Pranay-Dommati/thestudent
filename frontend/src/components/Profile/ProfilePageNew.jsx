@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FaUser, FaLock, FaRegUser, FaRegEnvelope, FaEye, FaEyeSlash,
   FaEdit, FaCheck, FaTimes, FaSpinner, FaSignOutAlt, FaHome,
-  FaGoogle, FaFacebook, FaUnlink, FaCamera, FaGraduationCap,
+  FaGoogle, FaUnlink, FaCamera, FaGraduationCap,
   FaBookOpen, FaCertificate
 } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
@@ -44,13 +44,7 @@ const ProfilePage = () => {
   const [socialAccounts, setSocialAccounts] = useState({
     google: {
       connected: true,
-      email: 'john.doe@gmail.com',
-      connectedAt: '2024-01-15'
-    },
-    facebook: {
-      connected: false,
-      email: null,
-      connectedAt: null
+      email: user?.email || 'john.doe@gmail.com'
     }
   });
 
@@ -74,6 +68,14 @@ const ProfilePage = () => {
         country: user.country || ''
       });
       setProfileImageUrl(user.profile_image_url || 'https://via.placeholder.com/150');
+      
+      // Update social accounts with user's actual email
+      setSocialAccounts({
+        google: {
+          connected: true,
+          email: user.email || 'john.doe@gmail.com'
+        }
+      });
     }
   }, [user]);
 
@@ -555,8 +557,7 @@ const ProfilePage = () => {
               </div>
               <div className="space-y-4">
                 {Object.entries({
-                  google: { icon: FaGoogle, color: 'red', bgColor: 'bg-red-50', borderColor: 'border-red-100', hoverBg: 'hover:bg-red-50' },
-                  facebook: { icon: FaFacebook, color: 'blue', bgColor: 'bg-blue-50', borderColor: 'border-blue-100', hoverBg: 'hover:bg-blue-50' }
+                  google: { icon: FaGoogle, color: 'red', bgColor: 'bg-red-50', borderColor: 'border-red-100', hoverBg: 'hover:bg-red-50' }
                 }).map(([provider, { icon: Icon, color, bgColor, borderColor, hoverBg }]) => (
                   <motion.div
                     key={provider}
@@ -572,12 +573,7 @@ const ProfilePage = () => {
                           <p className="font-semibold text-gray-900 capitalize">{provider}</p>
                           <p className="text-sm text-gray-500">
                             {socialAccounts[provider].connected ? (
-                              <>
-                                <span>{socialAccounts[provider].email}</span>
-                                <span className="text-xs ml-2 text-gray-400">
-                                  Connected since {socialAccounts[provider].connectedAt}
-                                </span>
-                              </>
+                              <span>{socialAccounts[provider].email}</span>
                             ) : (
                               'Not connected'
                             )}
