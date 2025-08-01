@@ -6,7 +6,8 @@ import { toast } from 'react-hot-toast';
 import LoadingSpinner from './LoadingSpinner';
 import Navbar from '../Navbar/Navbar';
 import Footer from '../Footer/Footer';
-import { useAuth } from '../../context/AuthContext'; // Import useAuth
+import { useAuth } from '../../context/AuthContext';
+import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 
 const API_URL = 'http://localhost:8000';
 
@@ -209,6 +210,21 @@ const SchoolCourseDetails = () => {
 
     fetchCourseData();
   }, [location.pathname, boardId, stateId, subjectId]);
+
+  // Activity tracking for learning time
+  useEffect(() => {
+    if (isLoggedIn) {
+      console.log('🎯 Starting activity tracking for School Course Details page');
+      startLearningTracking();
+    }
+
+    return () => {
+      if (isLoggedIn) {
+        console.log('🛑 Stopping activity tracking for School Course Details page');
+        stopLearningTracking();
+      }
+    };
+  }, [isLoggedIn]);
 
   const handleStartLearning = async () => {
     if (!isLoggedIn) {
