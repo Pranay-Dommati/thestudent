@@ -386,7 +386,14 @@ const ProLearningPage = () => {
   
   // Save to Learning Hub functionality
   const [isSavingToHub, setIsSavingToHub] = useState(false);
-  const [savedToHub, setSavedToHub] = useState(false);
+  const [savedToHub, setSavedToHub] = useState(() => {
+    // Check if this course has already been saved to Learning Hub
+    if (courseId) {
+      const savedCourses = JSON.parse(localStorage.getItem('savedToLearningHub') || '[]');
+      return savedCourses.includes(courseId);
+    }
+    return false;
+  });
   
   // Completion tracking
   const [completedTopics, setCompletedTopics] = useState(() => {
@@ -464,6 +471,21 @@ const ProLearningPage = () => {
       proContentManager.setCourse(courseTitle, currentCourseId);
     }
   }, [courseTitle, courseId]);
+
+  // Check if course is already saved when courseId changes
+  useEffect(() => {
+    if (courseId) {
+      const savedCourses = JSON.parse(localStorage.getItem('savedToLearningHub') || '[]');
+      const isAlreadySaved = savedCourses.includes(courseId);
+      setSavedToHub(isAlreadySaved);
+      
+      console.log('🔍 Checking if course is already saved:', {
+        courseId,
+        savedCourses,
+        isAlreadySaved
+      });
+    }
+  }, [courseId]);
 
   // Use environment variable for Gemini API key
   const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -1067,13 +1089,19 @@ const ProLearningPage = () => {
 
       if (response.ok) {
         setSavedToHub(true);
+        
+        // Persist the saved state in localStorage
+        const savedCourses = JSON.parse(localStorage.getItem('savedToLearningHub') || '[]');
+        if (!savedCourses.includes(courseId)) {
+          savedCourses.push(courseId);
+          localStorage.setItem('savedToLearningHub', JSON.stringify(savedCourses));
+        }
+        
         console.log('✅ Course saved to Learning Hub successfully!', responseData);
+        console.log('💾 Course ID saved to localStorage:', courseId);
         alert('✅ Course saved to your Learning Hub successfully!');
         
-        // Reset success state after 5 seconds
-        setTimeout(() => {
-          setSavedToHub(false);
-        }, 5000);
+        // Do NOT reset the saved state - keep it permanently saved
       } else {
         console.error('❌ Failed to save course:', responseData);
         if (response.status === 401) {
@@ -1092,6 +1120,21 @@ const ProLearningPage = () => {
       setIsSavingToHub(false);
     }
   };
+
+  // Debug utility to clear saved courses (for testing)
+  const clearSavedCoursesDebug = () => {
+    localStorage.removeItem('savedToLearningHub');
+    setSavedToHub(false);
+    console.log('🗑️ Cleared all saved courses from localStorage');
+  };
+
+  // Add to window for debugging in console
+  useEffect(() => {
+    window.clearSavedCoursesDebug = clearSavedCoursesDebug;
+    return () => {
+      delete window.clearSavedCoursesDebug;
+    };
+  }, []);
 
   // Check for pending topics
   useEffect(() => {
@@ -2998,14 +3041,15 @@ const ProLearningPage = () => {
                 </div>
               </div>
 
-              {/* Save to Learning Hub Button - Only show for locally generated courses, not database courses */}
+              {/* Save to Learning Hub Button - Only show for locally generated courses that haven't been saved yet */}
               {(() => {
                 const isFromDatabase = topicsList.some(t => t.dbTopic);
-                const shouldShowSaveButton = content && topicsList.length > 0 && !isFromDatabase;
+                const shouldShowSaveButton = content && topicsList.length > 0 && !isFromDatabase && !savedToHub;
                 console.log('🔍 Save button visibility check:', {
                   hasContent: !!content,
                   topicsCount: topicsList.length,
                   isFromDatabase,
+                  savedToHub,
                   shouldShowSaveButton
                 });
                 return shouldShowSaveButton;
