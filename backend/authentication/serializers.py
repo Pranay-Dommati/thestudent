@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'full_name', 'agreed_to_terms')
+        fields = ('id', 'email', 'full_name', 'auth_method', 'agreed_to_terms')
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])

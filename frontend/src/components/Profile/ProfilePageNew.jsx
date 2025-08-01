@@ -40,13 +40,8 @@ const ProfilePage = () => {
     newPassword: '',
     confirmPassword: ''
   });
-  // Social accounts state
-  const [socialAccounts, setSocialAccounts] = useState({
-    google: {
-      connected: true,
-      email: user?.email || 'john.doe@gmail.com'
-    }
-  });
+  // Social accounts state - dynamically set based on user's auth method
+  const [socialAccounts, setSocialAccounts] = useState({});
 
   const [errors, setErrors] = useState({});
 
@@ -69,13 +64,17 @@ const ProfilePage = () => {
       });
       setProfileImageUrl(user.profile_image_url || 'https://via.placeholder.com/150');
       
-      // Update social accounts with user's actual email
-      setSocialAccounts({
-        google: {
+      // Set social accounts based on user's authentication method
+      const accounts = {};
+      if (user.auth_method === 'google') {
+        accounts.google = {
           connected: true,
-          email: user.email || 'john.doe@gmail.com'
-        }
-      });
+          email: user.email
+        };
+      }
+      // You can add more auth methods here (facebook, etc.)
+      
+      setSocialAccounts(accounts);
     }
   }, [user]);
 
@@ -556,60 +555,80 @@ const ProfilePage = () => {
                 </div>
               </div>
               <div className="space-y-4">
-                {Object.entries({
-                  google: { icon: FaGoogle, color: 'red', bgColor: 'bg-red-50', borderColor: 'border-red-100', hoverBg: 'hover:bg-red-50' }
-                }).map(([provider, { icon: Icon, color, bgColor, borderColor, hoverBg }]) => (
-                  <motion.div
-                    key={provider}
-                    whileHover={{ scale: 1.01 }}
-                    className={`relative overflow-hidden border ${borderColor} rounded-xl p-6 transition-all duration-200 ${hoverBg}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className={`w-12 h-12 ${bgColor} rounded-xl flex items-center justify-center transform transition-transform group-hover:scale-110`}>
-                          <Icon className={`w-6 h-6 text-${color}-500`} />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-900 capitalize">{provider}</p>
-                          <p className="text-sm text-gray-500">
-                            {socialAccounts[provider].connected ? (
-                              <span>{socialAccounts[provider].email}</span>
+                {Object.keys(socialAccounts).length > 0 ? (
+                  Object.entries(socialAccounts).map(([provider, accountData]) => {
+                    const providerConfig = {
+                      google: { icon: FaGoogle, color: 'red', bgColor: 'bg-red-50', borderColor: 'border-red-100', hoverBg: 'hover:bg-red-50' }
+                    };
+                    
+                    const { icon: Icon, color, bgColor, borderColor, hoverBg } = providerConfig[provider];
+                    
+                    return (
+                      <motion.div
+                        key={provider}
+                        whileHover={{ scale: 1.01 }}
+                        className={`relative overflow-hidden border ${borderColor} rounded-xl p-6 transition-all duration-200 ${hoverBg}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className={`w-12 h-12 ${bgColor} rounded-xl flex items-center justify-center transform transition-transform group-hover:scale-110`}>
+                              <Icon className={`w-6 h-6 text-${color}-500`} />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900 capitalize">{provider}</p>
+                              <p className="text-sm text-gray-500">
+                                {accountData.connected ? (
+                                  <span>{accountData.email}</span>
+                                ) : (
+                                  'Not connected'
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <div>
+                            {accountData.connected ? (
+                              <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => handleDisconnectSocialAccount(provider)}
+                                className={`group px-4 py-2 text-sm font-medium border rounded-xl transition-all duration-200
+                                  text-${color}-600 border-${color}-200 ${hoverBg} hover:border-${color}-300
+                                  flex items-center space-x-2`}
+                              >
+                                <FaUnlink className={`w-4 h-4 text-${color}-500 group-hover:rotate-12 transition-transform`} />
+                                <span>Disconnect</span>
+                              </motion.button>
                             ) : (
-                              'Not connected'
+                              <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => handleConnectSocialAccount(provider)}
+                                className={`px-4 py-2 text-sm font-medium text-white bg-${color}-500 
+                                  hover:bg-${color}-600 rounded-xl transition-colors flex items-center space-x-2 
+                                  shadow-sm`}
+                              >
+                                <Icon className="w-4 h-4" />
+                                <span>Connect</span>
+                              </motion.button>
                             )}
-                          </p>
+                          </div>
                         </div>
-                      </div>
-                      <div>
-                        {socialAccounts[provider].connected ? (
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => handleDisconnectSocialAccount(provider)}
-                            className={`group px-4 py-2 text-sm font-medium border rounded-xl transition-all duration-200
-                              text-${color}-600 border-${color}-200 ${hoverBg} hover:border-${color}-300
-                              flex items-center space-x-2`}
-                          >
-                            <FaUnlink className={`w-4 h-4 text-${color}-500 group-hover:rotate-12 transition-transform`} />
-                            <span>Disconnect</span>
-                          </motion.button>
-                        ) : (
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => handleConnectSocialAccount(provider)}
-                            className={`px-4 py-2 text-sm font-medium text-white bg-${color}-500 
-                              hover:bg-${color}-600 rounded-xl transition-colors flex items-center space-x-2 
-                              shadow-sm`}
-                          >
-                            <Icon className="w-4 h-4" />
-                            <span>Connect</span>
-                          </motion.button>
-                        )}
-                      </div>
+                      </motion.div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <FaUser className="w-8 h-8 text-gray-400" />
                     </div>
-                  </motion.div>
-                ))}
+                    <p className="text-gray-500 text-sm">
+                      You signed up with email and password. No social accounts connected.
+                    </p>
+                    <p className="text-gray-400 text-xs mt-2">
+                      Connect with Google or other providers to link your accounts.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>

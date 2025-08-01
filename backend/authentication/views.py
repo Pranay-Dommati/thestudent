@@ -471,6 +471,7 @@ def google_auth_token(request):
                 user = User.objects.create_user(
                     email=email,
                     full_name=full_name,
+                    auth_method='google',  # Set auth method for Google users
                     agreed_to_terms=True  # Google users implicitly agree
                 )
                 created = True
