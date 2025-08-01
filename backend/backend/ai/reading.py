@@ -380,11 +380,23 @@ def handle_reading(request):
         print(f"📊 Topic: '{topic}' classified as: '{category}'")
         
         result = call_gemini_api(prompt)
-        return JsonResponse(result, safe=False)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
         
-        result = call_gemini_api(prompt)
+        # Add category to the response for debugging/frontend usage
+        if isinstance(result, dict):
+            result['topic_category'] = category
+            result['topic_analyzed'] = topic
+        else:
+            # If result is not a dict, wrap it with metadata
+            result = {
+                'content': result,
+                'topic_category': category,
+                'topic_analyzed': topic
+            }
+        
         return JsonResponse(result, safe=False)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500) 
+        return JsonResponse({
+            'error': str(e),
+            'topic_category': category if 'category' in locals() else 'unknown',
+            'topic_analyzed': topic if 'topic' in locals() else 'unknown'
+        }, status=500) 
