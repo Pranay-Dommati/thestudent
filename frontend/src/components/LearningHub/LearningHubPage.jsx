@@ -142,7 +142,11 @@ const LearningHubPage = () => {
   return (
     <>
       <Navbar initialStyle="gradient" />
-      <div className="min-h-screen bg-gray-50 pt-16">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/30 to-indigo-50/50 pt-16 relative">
+        {/* Subtle background pattern */}
+        <div className="absolute inset-0 opacity-[0.02]" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.4'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        }}></div>
         {/* Final user object that will be passed to HeroSection */}
         {(() => {
           const finalUserObject = {
@@ -180,86 +184,122 @@ const LearningHubPage = () => {
         )}
         
         {/* Main Content */}
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
             
             {/* Main Learning Content */}
-            <div className="xl:col-span-3 space-y-8">
+            <div className="xl:col-span-3 space-y-10">
               
               {/* Expert-Crafted Enrolled Courses Section */}
-              <section>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                    <FaGraduationCap className="mr-3 text-indigo-600" />
-                    My Enrolled Courses
-                  </h2>
-                  <span className="text-sm text-gray-500">Expert-crafted curriculum</span>
+              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center">
+                    <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-3 rounded-xl mr-4 shadow-lg">
+                      <FaGraduationCap className="text-white text-xl" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-800">My Enrolled Courses</h2>
+                      <p className="text-sm text-gray-500 mt-1">Expert-crafted curriculum designed for excellence</p>
+                    </div>
+                  </div>
+                  <span className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-full text-sm font-medium">
+                    Professional
+                  </span>
                 </div>
                 <ActiveCourses />
               </section>
               
               {/* AI-Created Courses Section */}
-              <section>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                    <FaBrain className="mr-3 text-purple-600" />
-                    My AI-Created Courses
-                  </h2>
-                  <span className="text-sm text-gray-500">Personalized learning paths</span>
+              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center">
+                    <div className="bg-gradient-to-r from-purple-500 to-pink-600 p-3 rounded-xl mr-4 shadow-lg">
+                      <FaBrain className="text-white text-xl" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-800">My AI-Created Courses</h2>
+                      <p className="text-sm text-gray-500 mt-1">Personalized learning paths tailored for you</p>
+                    </div>
+                  </div>
+                  <span className="bg-purple-50 text-purple-700 px-4 py-2 rounded-full text-sm font-medium">
+                    AI-Powered
+                  </span>
                 </div>
                 <AILearningPlans />
               </section>
               
-              {/* Call-to-Action Buttons Section */}
-              <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Enhanced Call-to-Action Buttons Section */}
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 
                 {/* Create Custom Course with AI */}
-                <div className="bg-gradient-to-r from-purple-600 to-indigo-700 rounded-xl p-6 text-white">
-                  <div className="flex items-center mb-4">
-                    <FaRocket className="text-2xl mr-3" />
-                    <div>
-                      <h3 className="text-xl font-bold">Create Custom Course</h3>
-                      <p className="text-purple-100 text-sm">AI-powered personalized learning</p>
+                <div className="group relative bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 rounded-2xl p-8 text-white overflow-hidden shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-[1.02]">
+                  {/* Decorative elements */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-xl -translate-y-1/2 translate-x-1/2"></div>
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full blur-lg translate-y-1/2 -translate-x-1/2"></div>
+                  
+                  <div className="relative z-10">
+                    <div className="flex items-center mb-6">
+                      <div className="bg-white/20 p-3 rounded-xl mr-4 backdrop-blur-sm">
+                        <FaRocket className="text-2xl" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold">Create Custom Course</h3>
+                        <p className="text-purple-100 text-sm">AI-powered personalized learning</p>
+                      </div>
                     </div>
+                    <p className="text-purple-100 mb-6 text-sm leading-relaxed">
+                      Let our advanced AI create a personalized course tailored to your specific learning goals, interests, and skill level.
+                    </p>
+                    <Link 
+                      to="/chat"
+                      className="inline-flex items-center px-6 py-3 bg-white text-purple-700 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-300 hover:shadow-lg group-hover:scale-105"
+                    >
+                      <FaBrain className="mr-2" />
+                      Start Creating
+                      <svg className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </Link>
                   </div>
-                  <p className="text-purple-100 mb-4 text-sm">
-                    Let our AI create a personalized course tailored to your specific learning goals and interests.
-                  </p>
-                  <Link 
-                    to="/chat"
-                    className="inline-flex items-center px-4 py-2 bg-white text-purple-700 rounded-lg font-medium hover:bg-purple-50 transition-colors"
-                  >
-                    <FaBrain className="mr-2" />
-                    Start Creating
-                  </Link>
                 </div>
 
                 {/* Explore Expert Courses */}
-                <div className="bg-gradient-to-r from-indigo-600 to-blue-700 rounded-xl p-6 text-white">
-                  <div className="flex items-center mb-4">
-                    <FaBookOpen className="text-2xl mr-3" />
-                    <div>
-                      <h3 className="text-xl font-bold">Explore Expert Courses</h3>
-                      <p className="text-indigo-100 text-sm">Professionally crafted curriculum</p>
+                <div className="group relative bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-700 rounded-2xl p-8 text-white overflow-hidden shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-[1.02]">
+                  {/* Decorative elements */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-xl -translate-y-1/2 translate-x-1/2"></div>
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full blur-lg translate-y-1/2 -translate-x-1/2"></div>
+                  
+                  <div className="relative z-10">
+                    <div className="flex items-center mb-6">
+                      <div className="bg-white/20 p-3 rounded-xl mr-4 backdrop-blur-sm">
+                        <FaBookOpen className="text-2xl" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold">Explore Expert Courses</h3>
+                        <p className="text-indigo-100 text-sm">Professionally crafted curriculum</p>
+                      </div>
                     </div>
+                    <p className="text-indigo-100 mb-6 text-sm leading-relaxed">
+                      Browse our extensive library of courses created by education experts and industry professionals.
+                    </p>
+                    <Link 
+                      to="/courses"
+                      className="inline-flex items-center px-6 py-3 bg-white text-indigo-700 rounded-xl font-semibold hover:bg-indigo-50 transition-all duration-300 hover:shadow-lg group-hover:scale-105"
+                    >
+                      <FaGraduationCap className="mr-2" />
+                      Browse Courses
+                      <svg className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </Link>
                   </div>
-                  <p className="text-indigo-100 mb-4 text-sm">
-                    Browse our extensive library of courses created by education experts and industry professionals.
-                  </p>
-                  <Link 
-                    to="/courses"
-                    className="inline-flex items-center px-4 py-2 bg-white text-indigo-700 rounded-lg font-medium hover:bg-indigo-50 transition-colors"
-                  >
-                    <FaGraduationCap className="mr-2" />
-                    Browse Courses
-                  </Link>
                 </div>
 
               </section>
 
             </div>
 
-            {/* Sidebar - Learning Analytics */}
+            {/* Enhanced Sidebar - Learning Analytics */}
             <div className="xl:col-span-1">
               <div className="sticky top-24">
                 <LearningAnalytics 
