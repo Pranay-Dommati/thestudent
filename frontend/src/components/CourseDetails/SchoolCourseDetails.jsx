@@ -362,40 +362,37 @@ const SchoolCourseDetails = () => {
 
   return (
     <>
-    <Navbar />
-    
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white">
-        <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-12">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-center">
-            <div className="space-y-4 sm:space-y-6">
+      {/* Hero Section with integrated navbar */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white relative overflow-hidden">
+        <Navbar initialStyle="transparent" />
+        {/* Background Pattern */}
+        <div className="absolute inset-0 bg-black opacity-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-purple-500/10 to-indigo-900/20"></div>
+        
+        <div className="container mx-auto px-4 sm:px-6 pt-20 pb-12 sm:pb-16 md:pb-20 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 items-center">
+            <div className="space-y-6 sm:space-y-8">
               <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4">{course.title}</h1>
-                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-gray-200 mb-4 sm:mb-6 text-xs sm:text-sm">
-                  <span>{course.board}</span>
-                  <span className="hidden sm:inline">•</span>
-                  <span>{course.class} Standard</span>
-                  <span className="hidden sm:inline">•</span>
-                  <span>{course.subject}</span>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 leading-tight">{course.title}</h1>
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-indigo-100 mb-6 sm:mb-8 text-sm sm:text-base">
+                  <span className="bg-white/20 px-3 py-1 rounded-full font-medium">{course.board}</span>
+                  <span className="hidden sm:inline text-indigo-200">•</span>
+                  <span className="bg-white/20 px-3 py-1 rounded-full font-medium">{course.class} Standard</span>
+                  <span className="hidden sm:inline text-indigo-200">•</span>
+                  <span className="bg-white/20 px-3 py-1 rounded-full font-medium">{course.subject}</span>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm">
-                <span className="flex items-center">
-                  <FaChalkboardTeacher className="mr-1.5 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                  Expert Teachers
-                </span>
-                <span className="hidden sm:inline">•</span>
-                <span className="flex items-center">
-                  <FaClock className="mr-1.5 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                  {course.duration}+ hours
-                </span>
-                <span className="hidden sm:inline">•</span>
-                <span className="flex items-center">
-                  <FaBook className="mr-1.5 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                  {course.chapters} chapters
-                </span>
+              <div className="flex flex-wrap gap-4 sm:gap-6 text-sm sm:text-base">
+                <div className="flex items-center bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm">
+                  <FaChalkboardTeacher className="mr-2 sm:mr-3 h-4 w-4 sm:h-5 sm:w-5 text-indigo-200" />
+                  <span className="font-medium">Expert Crafted</span>
+                </div>
+                <div className="flex items-center bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm">
+                  <FaClock className="mr-2 sm:mr-3 h-4 w-4 sm:h-5 sm:w-5 text-indigo-200" />
+                  <span className="font-medium">{course.duration}+ hours</span>
+                </div>
               </div>
 
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 sm:p-3 md:p-4 mb-4 sm:mb-6">
@@ -408,44 +405,50 @@ const SchoolCourseDetails = () => {
               <button 
                 onClick={handleStartLearning}
                 disabled={checkingEnrollment}
-                className={`w-full sm:w-auto text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium text-sm sm:text-base
-                         flex items-center justify-center sm:justify-start space-x-2 transform transition hover:scale-105
+                className={`w-full sm:w-auto text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-semibold text-base sm:text-lg
+                         flex items-center justify-center sm:justify-start space-x-3 transform transition-all duration-200 
+                         hover:scale-105 hover:shadow-xl backdrop-blur-sm
                          ${checkingEnrollment 
                            ? 'bg-gray-400 cursor-not-allowed' 
                            : isEnrolled 
-                             ? 'bg-blue-600 hover:bg-blue-700' 
-                             : 'bg-indigo-500 hover:bg-indigo-600'
+                             ? 'bg-white/20 hover:bg-white/30 border-2 border-white/30' 
+                             : 'bg-white text-indigo-600 hover:bg-indigo-50 shadow-lg'
                          }`}
               >
                 {checkingEnrollment ? (
                   <>
-                    <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
                     <span>Checking...</span>
                   </>
                 ) : isEnrolled ? (
                   <>
-                    <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <FaPlay className="h-4 w-4 sm:h-5 sm:w-5" />
                     <span>Continue Learning</span>
                   </>
                 ) : (
                   <>
-                    <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <FaPlay className="h-4 w-4 sm:h-5 sm:w-5" />
                     <span>Start Learning Now</span>
                   </>
                 )}
               </button>
             </div>
 
-            <div className="rounded-lg overflow-hidden shadow-xl mt-4 sm:mt-0">
-              <img 
-                src={course.thumbnail} 
-                alt={course.title} 
-                className="w-full h-[180px] sm:h-[250px] md:h-[300px] object-cover"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = "https://images.unsplash.com/photo-1635070041078-e363dbe005cb";
-                }}
-              />
+            <div className="relative mt-8 lg:mt-0">
+              <div className="rounded-2xl overflow-hidden shadow-2xl border-4 border-white/20 backdrop-blur-sm">
+                <img 
+                  src={course.thumbnail} 
+                  alt={course.title} 
+                  className="w-full h-[220px] sm:h-[280px] md:h-[350px] lg:h-[400px] object-cover transition-transform duration-300 hover:scale-105"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "https://images.unsplash.com/photo-1635070041078-e363dbe005cb";
+                  }}
+                />
+              </div>
+              {/* Decorative elements */}
+              <div className="absolute -top-4 -right-4 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
+              <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-indigo-300/20 rounded-full blur-xl"></div>
             </div>
           </div>
         </div>
