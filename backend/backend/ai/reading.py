@@ -1,7 +1,369 @@
 from django.http import JsonResponse
 from django.conf import settings
 import json
+import re
 from .ai_service import call_gemini_api
+
+def classify_topic(topic):
+    """
+    Classify the topic into appropriate category for prompt selection
+    """
+    topic_lower = topic.lower()
+    
+    # Technical Topics Keywords
+    technical_keywords = [
+        'programming', 'code', 'coding', 'python', 'javascript', 'java', 'c++', 'html', 'css',
+        'react', 'angular', 'vue', 'nodejs', 'django', 'flask', 'api', 'database', 'sql',
+        'mongodb', 'algorithm', 'data structure', 'machine learning', 'ai', 'artificial intelligence',
+        'deep learning', 'neural network', 'framework', 'library', 'git', 'github', 'docker',
+        'kubernetes', 'aws', 'cloud', 'server', 'backend', 'frontend', 'fullstack', 'devops',
+        'cybersecurity', 'blockchain', 'cryptocurrency', 'web development', 'mobile development',
+        'software', 'hardware', 'network', 'system design', 'architecture', 'microservices',
+        'debugging', 'testing', 'deployment', 'version control', 'agile', 'scrum'
+    ]
+    
+    # Academic & Knowledge Keywords
+    academic_keywords = [
+        'history', 'physics', 'chemistry', 'biology', 'mathematics', 'math', 'science',
+        'geography', 'literature', 'philosophy', 'psychology', 'sociology', 'anthropology',
+        'economics', 'political science', 'law', 'medicine', 'anatomy', 'physiology',
+        'astronomy', 'geology', 'ecology', 'evolution', 'genetics', 'quantum', 'relativity',
+        'theory', 'research', 'study', 'academic', 'scholarly', 'scientific method',
+        'hypothesis', 'experiment', 'analysis', 'statistics', 'probability'
+    ]
+    
+    # Skills & Personal Development Keywords
+    skills_keywords = [
+        'communication', 'leadership', 'time management', 'productivity', 'confidence',
+        'emotional intelligence', 'teamwork', 'collaboration', 'presentation', 'public speaking',
+        'negotiation', 'conflict resolution', 'problem solving', 'critical thinking',
+        'creativity', 'innovation', 'motivation', 'goal setting', 'habit', 'mindset',
+        'stress management', 'work-life balance', 'networking', 'mentoring', 'coaching',
+        'personal development', 'self improvement', 'career development', 'interview skills'
+    ]
+    
+    # Business & Finance Keywords
+    business_finance_keywords = [
+        'business', 'finance', 'investing', 'investment', 'stock', 'market', 'trading',
+        'cryptocurrency', 'bitcoin', 'portfolio', 'budget', 'budgeting', 'accounting',
+        'financial planning', 'retirement', 'insurance', 'loan', 'mortgage', 'credit',
+        'debt', 'savings', 'profit', 'revenue', 'roi', 'startup', 'entrepreneur',
+        'venture capital', 'funding', 'ipo', 'valuation', 'cash flow', 'balance sheet',
+        'income statement', 'financial analysis', 'risk management', 'wealth building'
+    ]
+    
+    # Creative Arts & Media Keywords
+    creative_keywords = [
+        'writing', 'storytelling', 'creative writing', 'screenplay', 'novel', 'poetry',
+        'journalism', 'copywriting', 'content creation', 'blogging', 'photography',
+        'filmmaking', 'video editing', 'graphic design', 'ui design', 'ux design',
+        'illustration', 'animation', 'music', 'singing', 'acting', 'theater', 'drama',
+        'art', 'painting', 'drawing', 'sculpture', 'digital art', 'media production',
+        'social media', 'marketing content', 'brand storytelling', 'visual design'
+    ]
+    
+    # Entrepreneurship Keywords
+    entrepreneurship_keywords = [
+        'entrepreneurship', 'startup', 'business model', 'marketing', 'sales', 'growth',
+        'scaling', 'pivot', 'mvp', 'minimum viable product', 'lean startup', 'fundraising',
+        'pitch deck', 'business plan', 'market research', 'customer acquisition',
+        'revenue model', 'monetization', 'branding', 'digital marketing', 'seo',
+        'social media marketing', 'email marketing', 'content marketing', 'affiliate marketing',
+        'e-commerce', 'dropshipping', 'freelancing', 'consulting', 'coaching business'
+    ]
+    
+    # Check each category
+    if any(keyword in topic_lower for keyword in technical_keywords):
+        return 'technical'
+    elif any(keyword in topic_lower for keyword in academic_keywords):
+        return 'academic'
+    elif any(keyword in topic_lower for keyword in skills_keywords):
+        return 'skills'
+    elif any(keyword in topic_lower for keyword in business_finance_keywords):
+        return 'business_finance'
+    elif any(keyword in topic_lower for keyword in creative_keywords):
+        return 'creative'
+    elif any(keyword in topic_lower for keyword in entrepreneurship_keywords):
+        return 'entrepreneurship'
+    else:
+        return 'general'
+
+def get_prompt_by_category(topic, category):
+    """
+    Return the appropriate prompt based on topic category
+    """
+    
+    if category == 'technical':
+        return f"""You are an expert AI tutor designed to generate complete, clear, and deeply engaging educational content on **technical topics** such as programming concepts, software development practices, frameworks, system design, and computer science fundamentals.
+
+Given any technical topic by the user, your task is to generate a detailed **Reading Section** using **Markdown syntax**. Your explanation must be **self-contained**, **visually structured**, and suitable for beginners and intermediate learners aiming for deep understanding.
+
+🎯 **Tone & Style Guidelines**:
+- Friendly, direct, and semi-formal — like ChatGPT guiding a curious developer.
+- Use analogies or real-world scenarios to enhance memory and relatability.
+- Explain clearly — not like documentation, but like a great technical mentor.
+
+📘 **Content Must Include**:
+- ✅ A proper explanation of the topic: what it is, why it matters, and how it works.
+- ✅ Break the topic into key sections using Markdown headers:
+  - `## Introduction`
+  - `## Why it Matters`
+  - `## How it Works`
+  - `## Key Concepts / Components`
+  - `## Code Examples` (with inline comments or explanations)
+  - `## Common Use Cases`
+  - `## Tips or Best Practices`
+- ✅ Use formatting:
+  - `**bold**` for key terms
+  - Bullet points (`-`) for lists
+  - Numbered steps (`1.`, `2.`) for procedures
+  - Backticks (```) for code blocks
+
+🚫 **Do NOT include**:
+- Summary
+- Quiz
+- External resources or links
+
+---
+
+## INPUT FORMAT:
+{topic}
+
+## OUTPUT FORMAT:
+Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
+
+    elif category == 'academic':
+        return f"""You are an expert AI tutor trained to explain **academic or general knowledge subjects** such as History, Physics, Economics, Psychology, Biology, etc.
+
+Given a topic by the user, generate a **detailed, easy-to-understand Reading Section** using **Markdown format**. The content should be self-contained and suitable for students and lifelong learners aiming to understand the topic deeply.
+
+🎯 **Tone & Style Guidelines**:
+- Clear, engaging, and student-friendly.
+- Avoid jargon unless explained.
+- Think like a passionate teacher who wants the learner to genuinely understand.
+
+📘 **Content Must Include**:
+- ✅ Explanation of the topic from basics.
+- ✅ Organize content using these Markdown headers:
+  - `## Introduction`
+  - `## Historical/Scientific Background` *(use only if relevant)*
+  - `## Core Concepts`
+  - `## Real-World Relevance`
+  - `## Diagrams or Visual Description` *(describe if real images can't be embedded)*
+  - `## Examples or Case Studies`
+  - `## Interesting Facts` *(optional)*
+- ✅ Use formatting:
+  - `**bold**` for key terms
+  - Bullet points for breakdowns
+  - Numbered steps for logical processes
+  - Backticks (```) only for formatting, not for code
+
+🚫 **Do NOT include**:
+- Summary
+- Quiz
+- Links to sources
+
+---
+
+## INPUT FORMAT:
+{topic}
+
+## OUTPUT FORMAT:
+Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
+
+    elif category == 'skills':
+        return f"""You are a professional coach and educator skilled in teaching **soft skills and personal development topics** like communication, confidence, time management, emotional intelligence, leadership, etc.
+
+Given a topic by the user, generate a clear and structured **Reading Section** in **Markdown format** that helps individuals learn and grow in this area—whether for career, personal life, or relationships.
+
+🎯 **Tone & Style Guidelines**:
+- Friendly, motivational, and practical.
+- Easy to understand for beginners.
+- Include real-life applications wherever possible.
+
+📘 **Content Must Include**:
+- ✅ Explanation of the topic with depth
+- ✅ Organize content using these Markdown headers:
+  - `## Introduction`
+  - `## Why It Matters`
+  - `## Core Principles or Techniques`
+  - `## Real-Life Applications`
+  - `## Common Mistakes`
+  - `## Practical Tips or Exercises`
+  - `## Inspirational Examples` *(optional)*
+
+- ✅ Use formatting:
+  - `**bold**` for key terms
+  - Bullet points for strategies and lists
+  - Use direct, actionable language
+  - Avoid fluff and vague ideas
+
+🚫 **Do NOT include**:
+- Summary
+- Quiz
+- Links to sources
+
+---
+
+## INPUT FORMAT:
+{topic}
+
+## OUTPUT FORMAT:
+Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
+
+    elif category == 'business_finance':
+        return f"""You are an expert AI tutor designed to generate complete, clear, and deeply engaging educational content on **business and finance** topics—such as entrepreneurship, marketing, investing, financial literacy, personal finance, business models, and startups.
+
+When a user provides a topic, generate a full *Reading Section* that feels like a high-quality self-paced learning resource for students, early professionals, founders, and finance enthusiasts.
+
+✅ Guidelines to follow:
+
+- Explain the **fundamentals**: What it is, why it matters, and its relevance in real-world business or finance contexts.
+- Include sections like **strategies, frameworks, examples**, and if applicable, **simple calculations or models**.
+- Use a **clear, semi-formal tone** — professional but friendly — like a mentor explaining to a motivated learner.
+- Break content using visual structure: subheadings (`##`, `###`), bullet points, numbered lists, callouts, and bold keywords.
+- Relate the topic to **real-world examples** like companies, case studies, market scenarios, or personal finance cases.
+- Avoid robotic definitions. Focus on **storytelling, intuition, and clarity**.
+- You may include simplified **formulas or charts (as markdown)** where needed, to enhance clarity.
+- Do **not generate a quiz, summary, or external resources** — only the *reading section*.
+
+You are encouraged to take creative freedom to deeply explain and contextualize the topic for maximum learning and retention.
+
+## INPUT FORMAT:
+{topic}
+
+## OUTPUT FORMAT:
+Start directly with the markdown content, using a format like:
+
+- Introduction  
+- Real-World Importance  
+- How it Works / Core Concepts  
+- Frameworks or Techniques  
+- Practical Examples or Case Studies  
+- Tips, Mistakes to Avoid, or Best Practices"""
+
+    elif category == 'creative':
+        return f"""You are a creative mentor AI that helps learners master topics related to **creative arts, writing, storytelling, filmmaking, design, photography, content creation, and media production**.
+
+Your job is to generate a *Reading Section* that feels like a personal guide from a creative industry expert — full of insight, examples, and inspiration.
+
+✅ Guidelines to follow:
+
+- Start with a **motivating introduction** that captures the soul of the topic.
+- Offer **conceptual clarity + practical insights** — help learners understand both the *art and craft* behind the topic.
+- Include techniques, frameworks, and tips followed by real creators or used in the industry.
+- Use a friendly, inspiring tone — like a mentor guiding a passionate beginner.
+- Structure the content in markdown: use `##` for sections, **bold** for emphasis, bullet points, numbered steps.
+- Add **mini case studies, analogies, creative challenges, or examples** from books, films, or art if possible.
+- Balance emotion with technique — speak to the heart *and* the hands of the learner.
+- Don't include summary, quiz, or further reading links — this is *only* the reading module.
+
+Make the learner *feel* like they're stepping into a world of imagination with structure.
+
+## INPUT FORMAT:
+{topic}
+
+## OUTPUT FORMAT:
+Start with markdown output like this:
+
+- Introduction  
+- Why It's Powerful or Important  
+- Core Techniques / Creative Principles  
+- Real-Life Creative Process Examples  
+- Challenges & Practice Advice  
+- Tips from Artists or Creators  
+- Common Blocks and How to Overcome Them"""
+
+    elif category == 'entrepreneurship':
+        return f"""You are an AI financial & business mentor who helps people deeply understand topics related to **investing, business strategy, startups, marketing, budgeting, accounting, freelancing, economics, and personal finance**.
+
+Your goal is to produce a *Reading Section* that is clear, practical, and filled with real-world analogies — something a smart entrepreneur or financial expert would explain to a curious beginner.
+
+✅ Guidelines to follow:
+
+- Start with a **compelling intro** that shows why the topic matters in real life or in business.
+- Use **simple but accurate financial/business terms** — make the learner *feel smarter* as they read.
+- Explain with **real-life examples** (e.g., from startups, companies, investors, markets, etc.).
+- Include **frameworks, tips, models, and mental tools** people use in the field.
+- Use markdown formatting: `##` for headers, **bold** key points, bullet points for lists, `1.` for ordered steps.
+- Ensure everything flows logically: concept → why it matters → how to apply it.
+- Use analogies from daily life or case studies (e.g., Starbucks pricing, Tesla business model).
+- Don't include summary, quiz, or links — just this *self-contained* reading module.
+
+## INPUT FORMAT:
+{topic}
+
+## OUTPUT FORMAT:
+Start with markdown output like this:
+
+- Introduction  
+- Real-World Relevance  
+- Core Concepts and Frameworks  
+- Case Study or Analogy  
+- Application Steps  
+- Industry Insights / Expert Tips  
+- Pitfalls to Avoid"""
+
+    else:  # general/fallback
+        return f"""You are a world-class educator and expert communicator. Generate a **deep, clear, and adaptive markdown learning guide** for the topic: **{topic}**.
+
+Your job is to teach the topic like a personal tutor. The learner should fully understand it just by reading this — no other websites, videos, or resources needed.
+
+Adapt your style based on the topic type:
+- If the topic is **technical**, include clean code blocks, syntax, walkthroughs, real examples.
+- If the topic is **non-technical**, focus on intuitive breakdowns, visuals (via analogy), examples, and real-life connections.
+- Don't force irrelevant sections — adapt naturally to the topic's nature.
+
+---
+
+### 🧠 Structure (Use only what fits the topic):
+
+## 📘 {topic}: Full Learning Guide
+
+### 🔹 1. Introduction
+- What is it?
+- Why is it important?
+- Where is it used or seen in real life?
+
+### 🔹 2. Deep Explanation
+- Explain the core ideas in simple terms.
+- Use analogies, metaphors, and visuals.
+- Include friendly notes like:
+  > 💡 Did you know?  
+  > ✅ Tip  
+  > 🚫 Common mistake  
+
+### 🔹 3. If Applicable:
+- How it works / The process
+- Types / Classifications
+- Real-World Use Cases
+- Related Concepts or Fields
+
+### 🔹 4. If Technical:
+- Use properly formatted code blocks with language identifiers (like ```python)
+- Add inline comments and explain each block
+- Show expected output in a separate code block
+- Include a mini use case or demo
+
+```python
+# Example: Greeting Function
+def greet(name):
+    print(f"Hello, {{name}}!")
+
+greet("Charan")
+```
+
+**Expected output:**
+```
+Hello, Charan!
+```
+
+### 🔹 5. Final Takeaways
+- Key points to remember
+- How to apply this knowledge
+- Next steps for learning
+
+Generate only the markdown content. Be comprehensive but concise."""
 
 def handle_reading(request):
     if request.method != 'POST':
@@ -11,128 +373,16 @@ def handle_reading(request):
         body = json.loads(request.body.decode('utf-8'))
         topic = body.get('topic', '')
         
-        prompt = f"""
-You are an expert educational content creator specializing in technical topics. Generate comprehensive, engaging learning material.
-
-**Topic**: {topic}
-
-**Requirements**: Create a detailed markdown guide that follows this exact structure:
-
-## 📘 {topic}: Complete Learning Guide
-
-### 🔹 What is {topic}?
-- Provide a clear, beginner-friendly definition
-- Explain why this topic is important
-- Give context about where it fits in the broader field
-
-### 🔹 Core Concepts & Components  
-- Break down the main ideas or parts with detailed explanations
-- Use bullet points and sub-bullets for clarity with examples
-- Include any fundamental principles with practical context
-- Explain the relationship between different components
-- Provide visual analogies or metaphors where helpful
-- Detail the hierarchy or structure of concepts
-- Include prerequisites or foundational knowledge needed
-- Explain how each component contributes to the whole system
-- Add sub-sections for complex topics:
-  * **Primary Components**: Essential building blocks
-  * **Secondary Elements**: Supporting features or advanced concepts
-  * **Integration Points**: How components work together
-  * **Dependencies**: What relies on what
-- Use numbered lists for sequential concepts
-- Include brief code snippets or examples for each major concept
-- Explain common terminology and jargon
-- Add "Deep Dive" sub-sections for complex components
-
-### 🔹 Technical Details & Syntax
-- Show relevant syntax, commands, or structures with detailed examples and explanations
-- Use clean, professional code blocks with proper language labels
-- Include multiple code examples with clear section headers and descriptions
-- Add comprehensive comments within code for better understanding
-- Show both basic and advanced syntax variations with clean formatting
-- Provide step-by-step syntax breakdown with line-by-line explanations
-- Include parameter descriptions and return value explanations
-- Add error handling examples and common pitfalls to avoid
-- Show alternative syntax approaches and when to use each
-- Include interactive examples with "Try this:" sections
-- Show different syntax approaches using bullet points and descriptions
-- Provide debugging examples and troubleshooting tips
-- Include performance considerations for different syntax choices
-- Add IDE/editor configuration tips for better syntax highlighting
-- Show integration examples with popular frameworks or libraries
-- Include command-line usage examples where applicable
-- Add configuration file examples and setup instructions
-- Provide cross-platform syntax differences if applicable
-- Include version-specific syntax variations and compatibility notes
-- Add code optimization examples and best practices
-
-### 🔹 Real-World Applications
-- Describe practical uses in industry
-- Give specific examples of implementations
-- Mention popular tools or platforms that use this
-
-### 🔹 Types & Variations
-- Explain different types or variations using clear bullet points
-- Describe when to use each variation with detailed descriptions and use cases
-- Include pros and cons for each type with specific examples
-- Add performance comparisons between different types where applicable
-- Include scalability considerations for each variation
-- Provide cost-benefit analysis for different approaches
-- Add compatibility information with different systems or frameworks
-- Include learning curve difficulty for each type
-- Show code examples or syntax differences for each variation
-- Add industry adoption rates and popularity metrics where relevant
-- Include historical evolution of different types
-- Provide decision-making criteria to help choose between variations
-- Add migration paths between different types if applicable
-- Include maintenance requirements for each variation
-- Show resource requirements (memory, CPU, storage) for different types
-- Add security considerations specific to each variation
-- Include version compatibility and support lifecycle information
-- Provide community support and documentation quality for each type
-
-### 🔹 Practical Example
-- Provide multiple detailed, working code examples with clear titles
-- Include step-by-step explanation with line-by-line comments
-- Show expected output or results in separate code blocks
-- Add "Try this:" sections with interactive examples
-- Include both beginner and advanced code samples
-
-### 🔹 Common Challenges & Solutions
-- List frequent problems beginners encounter
-- Provide solutions and best practices
-- Include debugging tips
-
-### ✅ Hands-On Practice
-- Design a practical exercise
-- Include clear instructions and expected outcomes
-- Provide hints for completion
-
-**Formatting Rules**:
-- Use `##` and `###` for all headers
-- Code blocks must specify language: ```python, ```javascript, etc.
-- Use **bold** for important terms
-- Use bullet points and sub-bullets for structured content
-- Keep tone professional and educational
-- No apologies, disclaimers, or meta-commentary
-- For code examples, always include:
-  * Clear descriptive titles before each code block
-  * Detailed inline comments explaining each line
-  * Expected output in separate clean ``` blocks (no special formatting)
-  * Multiple examples showing different use cases
-  * Copy-paste ready code that actually works
-
-**Code Block Enhancement Rules**:
-- Start each code section with clear, descriptive titles
-- Add comprehensive comments within code for clarity
-- Show input and output separately with clean formatting
-- Include error handling examples where relevant
-- Provide multiple difficulty levels with clean progression
-- Use consistent indentation and professional code style
-- Keep code examples practical and immediately usable
-
-Generate only the markdown content. Be comprehensive but concise.
-"""
+        # Classify the topic and get appropriate prompt
+        category = classify_topic(topic)
+        prompt = get_prompt_by_category(topic, category)
+        
+        print(f"📊 Topic: '{topic}' classified as: '{category}'")
+        
+        result = call_gemini_api(prompt)
+        return JsonResponse(result, safe=False)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
         
         result = call_gemini_api(prompt)
         return JsonResponse(result, safe=False)
