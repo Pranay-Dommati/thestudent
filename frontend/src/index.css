@@ -210,4 +210,38 @@
       transform: scale(1);
     }
   }
+
+  /* Button Click Fix */
+  .btn-clickable {
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 10;
+  }
+  
+  /* Ensure all buttons and links are clickable */
+  button, a, [role="button"] {
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    position: relative !important;
+    z-index: 5 !important;
+  }
+
+  /* Learning Hub specific fixes */
+  .learning-hub-container button,
+  .learning-hub-container a {
+    z-index: 20 !important;
+    position: relative !important;
+    pointer-events: auto !important;
+  }
+
+  /* Prevent overlay interference */
+  .modal-overlay {
+    pointer-events: auto !important;
+  }
+
+  /* Override any pointer-events: none */
+  * {
+    pointer-events: inherit;
+  }
 }
