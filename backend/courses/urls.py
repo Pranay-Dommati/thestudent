@@ -34,4 +34,8 @@ urlpatterns = [
     path('api/courses/enrolled/', views.get_user_enrolled_courses, name='get-user-enrolled-courses'),
     path('api/courses/enrollment-check/<str:course_type>/<str:course_id>/', views.check_course_enrollment, name='check-course-enrollment'),
     path('api/courses/enrollment-progress/<int:enrollment_id>/', views.update_course_progress, name='update-course-progress'),
+    
+    # Learning activity tracking endpoints
+    path('api/courses/track-activity/', views.track_learning_activity, name='track-learning-activity'),
+    path('api/courses/learning-stats/', views.get_learning_stats, name='get-learning-stats'),
 ]

@@ -565,3 +565,94 @@ class UserStartedPredefinedCourse(models.Model):
         enrollment, created = cls.objects.get_or_create(**enrollment_data)
         
         return enrollment, created
+
+
+class LearningActivity(models.Model):
+    """
+    Tracks daily learning activity for each user.
+    Used to calculate learning streaks and weekly time spent.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='learning_activities')
+    date = models.DateField(default=timezone.now)  # One record per day
+    time_spent_minutes = models.PositiveIntegerField(default=0)  # Accumulated minutes for the day
+    sessions_count = models.PositiveIntegerField(default=0)  # Number of learning sessions
+    last_activity = models.DateTimeField(auto_now=True)  # Last time activity was recorded
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('user', 'date')  # One record per user per day
+        verbose_name = "Learning Activity"
+        verbose_name_plural = "Learning Activities"
+        ordering = ['-date']
+    
+    def __str__(self):
+        hours = self.time_spent_minutes / 60
+        return f"{self.user.username} - {self.date} - {hours:.1f}h ({self.time_spent_minutes}m)"
+    
+    @property
+    def time_spent_hours(self):
+        """Convert minutes to hours for display"""
+        return round(self.time_spent_minutes / 60, 1)
+    
+    @classmethod
+    def add_learning_time(cls, user, minutes):
+        """
+        Add learning time for the current day.
+        Creates new record if none exists for today.
+        """
+        today = timezone.now().date()
+        activity, created = cls.objects.get_or_create(
+            user=user,
+            date=today,
+            defaults={'time_spent_minutes': 0, 'sessions_count': 0}
+        )
+        
+        activity.time_spent_minutes += minutes
+        activity.sessions_count += 1
+        activity.save()
+        
+        return activity
+    
+    @classmethod
+    def get_weekly_hours(cls, user):
+        """Get total hours spent learning this week"""
+        from datetime import timedelta
+        today = timezone.now().date()
+        start_of_week = today - timedelta(days=today.weekday())
+        
+        week_activities = cls.objects.filter(
+            user=user,
+            date__gte=start_of_week,
+            date__lte=today
+        )
+        
+        total_minutes = sum(activity.time_spent_minutes for activity in week_activities)
+        return round(total_minutes / 60, 1)
+    
+    @classmethod
+    def get_current_streak(cls, user):
+        """Calculate current learning streak (consecutive days)"""
+        from datetime import timedelta
+        
+        streak = 0
+        current_date = timezone.now().date()
+        
+        # Check if user has activity today or yesterday (allow for different time zones)
+        has_recent_activity = cls.objects.filter(
+            user=user,
+            date__in=[current_date, current_date - timedelta(days=1)]
+        ).exists()
+        
+        if not has_recent_activity:
+            return 0
+        
+        # Count consecutive days backwards
+        check_date = current_date
+        while True:
+            if cls.objects.filter(user=user, date=check_date).exists():
+                streak += 1
+                check_date -= timedelta(days=1)
+            else:
+                break
+                
+        return streak

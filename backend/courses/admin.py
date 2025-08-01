@@ -4,7 +4,7 @@ from .models import (
     CourseSection, Lesson, LessonResource, QuizQuestion,
     ProLearningCourse, ProLearningTopic, ProLearningVideo,
     ProLearningQuizQuestion, ProLearningResource,
-    UserStartedPredefinedCourse
+    UserStartedPredefinedCourse, LearningActivity
 )
 
 class LessonResourceInline(admin.TabularInline):
@@ -233,3 +233,38 @@ class UserStartedPredefinedCourseAdmin(admin.ModelAdmin):
         updated = queryset.update(last_activity=timezone.now())
         self.message_user(request, f'{updated} enrollments had their last activity time updated.')
     update_last_activity.short_description = 'Update last activity time to now'
+
+
+# ==================== LEARNING ACTIVITY ADMIN ====================
+
+@admin.register(LearningActivity)
+class LearningActivityAdmin(admin.ModelAdmin):
+    list_display = [
+        'user', 'date', 'time_spent_hours', 'time_spent_minutes', 
+        'sessions_count', 'last_activity'
+    ]
+    list_filter = ['date', 'last_activity']
+    search_fields = ['user__username', 'user__email']
+    readonly_fields = ['created_at', 'last_activity']
+    date_hierarchy = 'date'
+    ordering = ['-date', '-last_activity']
+    
+    def time_spent_hours(self, obj):
+        return f"{obj.time_spent_hours}h"
+    time_spent_hours.short_description = 'Hours'
+    
+    fieldsets = (
+        ('User & Date', {
+            'fields': ('user', 'date')
+        }),
+        ('Activity Details', {
+            'fields': ('time_spent_minutes', 'sessions_count')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'last_activity'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('user')

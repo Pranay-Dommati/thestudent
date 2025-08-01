@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view, parser_classes, permission_class
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource
+from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource, LearningActivity
 from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer
 import json
 import traceback
@@ -1634,3 +1634,123 @@ def update_course_progress(request, enrollment_id):
             {'error': f'Failed to update progress: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+# ==================== LEARNING ACTIVITY TRACKING API ====================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def track_learning_activity(request):
+    """
+    Track learning activity for the current user.
+    Call this endpoint to log time spent learning.
+    
+    Expected payload:
+    {
+        "minutes": 5  // Number of minutes to add
+    }
+    """
+    try:
+        user = request.user
+        minutes = int(request.data.get('minutes', 0))
+        
+        if minutes <= 0:
+            return Response({
+                'error': 'Minutes must be a positive number'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Add learning time for today
+        activity = LearningActivity.add_learning_time(user, minutes)
+        
+        return Response({
+            'success': True,
+            'message': f'Added {minutes} minutes of learning time',
+            'data': {
+                'total_today_minutes': activity.time_spent_minutes,
+                'total_today_hours': activity.time_spent_hours,
+                'sessions_today': activity.sessions_count,
+                'date': activity.date
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except ValueError:
+        return Response({
+            'error': 'Invalid minutes value'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print(f"Error in track_learning_activity: {str(e)}")
+        return Response({
+            'error': f'Failed to track activity: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_learning_stats(request):
+    """
+    Get learning statistics for the current user.
+    Returns weekly hours, current streak, and today's activity.
+    """
+    try:
+        user = request.user
+        
+        # Get weekly hours
+        weekly_hours = LearningActivity.get_weekly_hours(user)
+        
+        # Get current streak
+        current_streak = LearningActivity.get_current_streak(user)
+        
+        # Get today's activity
+        from django.utils import timezone
+        today = timezone.now().date()
+        try:
+            today_activity = LearningActivity.objects.get(user=user, date=today)
+            today_minutes = today_activity.time_spent_minutes
+            today_hours = today_activity.time_spent_hours
+            today_sessions = today_activity.sessions_count
+        except LearningActivity.DoesNotExist:
+            today_minutes = 0
+            today_hours = 0
+            today_sessions = 0
+        
+        # Get this week's daily breakdown
+        from datetime import timedelta
+        start_of_week = today - timedelta(days=today.weekday())
+        week_activities = LearningActivity.objects.filter(
+            user=user,
+            date__gte=start_of_week,
+            date__lte=today
+        ).order_by('date')
+        
+        daily_breakdown = []
+        for i in range(7):  # Monday to Sunday
+            check_date = start_of_week + timedelta(days=i)
+            day_activity = week_activities.filter(date=check_date).first()
+            daily_breakdown.append({
+                'date': check_date,
+                'day_name': check_date.strftime('%A')[:3],  # Mon, Tue, etc.
+                'minutes': day_activity.time_spent_minutes if day_activity else 0,
+                'hours': day_activity.time_spent_hours if day_activity else 0,
+                'sessions': day_activity.sessions_count if day_activity else 0,
+                'has_activity': bool(day_activity)
+            })
+        
+        return Response({
+            'success': True,
+            'data': {
+                'weekly_hours': weekly_hours,
+                'current_streak': current_streak,
+                'today': {
+                    'minutes': today_minutes,
+                    'hours': today_hours,
+                    'sessions': today_sessions
+                },
+                'weekly_breakdown': daily_breakdown
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in get_learning_stats: {str(e)}")
+        return Response({
+            'error': f'Failed to get learning stats: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
