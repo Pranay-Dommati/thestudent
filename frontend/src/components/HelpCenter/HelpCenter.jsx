@@ -314,18 +314,18 @@ const HelpCenter = () => {
         <div className="bg-gray-100 rounded-xl p-6">
           <h3 className="text-xl font-semibold mb-4 text-gray-800">Additional Resources</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            <a href="/tutorials" className="block p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+            <Link to="/tutorials" className="block p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
               <h4 className="font-medium text-indigo-600 mb-2">Video Tutorials</h4>
               <p className="text-sm text-gray-600">Step-by-step guides to help you navigate the platform</p>
-            </a>
-            <a href="/community" className="block p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+            </Link>
+            <Link to="/community" className="block p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
               <h4 className="font-medium text-indigo-600 mb-2">Community Forum</h4>
               <p className="text-sm text-gray-600">Connect with other students and share your experiences</p>
-            </a>
-            <a href="/blog" className="block p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+            </Link>
+            <Link to="/blog" className="block p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
               <h4 className="font-medium text-indigo-600 mb-2">Learning Blog</h4>
               <p className="text-sm text-gray-600">Tips and advice to enhance your learning journey</p>
-            </a>
+            </Link>
           </div>
         </div>
       </div>

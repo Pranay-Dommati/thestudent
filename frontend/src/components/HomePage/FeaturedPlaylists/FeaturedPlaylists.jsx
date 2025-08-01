@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getSchoolCourses, getAllCourses } from '../../../services/courseApi';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const categories = [
   { id: 'all', name: 'All Courses' },
@@ -216,12 +216,12 @@ const FeaturedPlaylists = () => {
           </div>
           
           <div className="mt-4 md:mt-0 text-center md:text-left">
-            <a href="/courses" className="inline-flex items-center text-blue-600 font-medium hover:underline text-sm sm:text-base">
+            <Link to="/courses" className="inline-flex items-center text-blue-600 font-medium hover:underline text-sm sm:text-base">
               View All Courses
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
-            </a>
+            </Link>
           </div>
         </div>
         

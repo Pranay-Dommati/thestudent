@@ -159,9 +159,9 @@ const AdminLogin = ({ onLoginSuccess }) => {
         </motion.form>
         
         <div className="text-center mt-4">
-          <a href="/" className="text-sm text-gray-600 hover:text-blue-500">
+          <Link to="/" className="text-sm text-gray-600 hover:text-blue-500">
             Return to main website
-          </a>
+          </Link>
         </div>
       </div>
     </div>
