@@ -97,7 +97,6 @@ const LearningHubPage = () => {
     currentStreak: learningStats?.current_streak ?? 0
   };
 
-  // Enhanced debug logging
   console.log('🔥 [USER OBJECT] ========== USER OBJECT CREATION ==========');
   console.log('🔥 [USER OBJECT] Auth user (authUser):', authUser);
   console.log('🔥 [USER OBJECT] 🚨 Does authUser contain hoursThisWeek?:', authUser?.hoursThisWeek);
@@ -116,33 +115,10 @@ const LearningHubPage = () => {
   console.log('🔥 [USER OBJECT] 🎯 FINAL USER OBJECT (this goes to HeroSection):', user);
   console.log('🔥 [USER OBJECT] ===================================================');
 
-  // Debug function to manually test activity tracking
-  const testActivityTracking = async () => {
-    try {
-      const { trackLearningMinutes } = await import('../../services/activityTracker');
-      console.log('🧪 Testing manual activity tracking...');
-      const success = await trackLearningMinutes(5);
-      if (success) {
-        console.log('✅ Successfully tracked 5 minutes');
-        // Refresh stats
-        const { getLearningStats } = await import('../../services/activityTracker');
-        const newStats = await getLearningStats();
-        if (newStats) {
-          setLearningStats(newStats);
-          console.log('🔄 Stats refreshed:', newStats);
-        }
-      } else {
-        console.log('❌ Failed to track activity');
-      }
-    } catch (error) {
-      console.error('❌ Error testing activity tracking:', error);
-    }
-  };
-
   return (
     <>
       <Navbar initialStyle="gradient" />
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/30 to-indigo-50/50 pt-16 relative">
+      <div className="learning-hub-container min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/30 to-indigo-50/50 pt-16 relative">
         {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-[0.02]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.4'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
@@ -171,17 +147,7 @@ const LearningHubPage = () => {
           }} 
         />
         
-        {/* Debug Button - Remove in production */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <button
-              onClick={testActivityTracking}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm"
-            >
-              🧪 Test Activity Tracking (+5 min)
-            </button>
-          </div>
-        )}
+
         
         {/* Main Content */}
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -228,69 +194,55 @@ const LearningHubPage = () => {
                 <AILearningPlans />
               </section>
               
-              {/* Enhanced Call-to-Action Buttons Section */}
-              <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Minimalistic Call-to-Action Buttons Section */}
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 {/* Create Custom Course with AI */}
-                <div className="group relative bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 rounded-2xl p-8 text-white overflow-hidden shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-[1.02]">
-                  {/* Decorative elements */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-xl -translate-y-1/2 translate-x-1/2"></div>
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full blur-lg translate-y-1/2 -translate-x-1/2"></div>
-                  
-                  <div className="relative z-10">
-                    <div className="flex items-center mb-6">
-                      <div className="bg-white/20 p-3 rounded-xl mr-4 backdrop-blur-sm">
-                        <FaRocket className="text-2xl" />
+                <div className="group bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl p-5 text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="bg-white/20 p-2 rounded-lg mr-3">
+                        <FaRocket className="text-lg" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold">Create Custom Course</h3>
-                        <p className="text-purple-100 text-sm">AI-powered personalized learning</p>
+                        <h3 className="text-lg font-semibold">Create Custom Course</h3>
+                        <p className="text-purple-100 text-xs">AI-powered learning paths</p>
                       </div>
                     </div>
-                    <p className="text-purple-100 mb-6 text-sm leading-relaxed">
-                      Let our advanced AI create a personalized course tailored to your specific learning goals, interests, and skill level.
-                    </p>
                     <Link 
                       to="/chat"
-                      className="inline-flex items-center px-6 py-3 bg-white text-purple-700 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-300 hover:shadow-lg group-hover:scale-105"
+                      className="bg-white text-purple-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-50 transition-colors cursor-pointer relative z-10"
+                      style={{ pointerEvents: 'auto' }}
+                      onClick={(e) => {
+                        console.log('Start button clicked - navigating to /chat');
+                      }}
                     >
-                      <FaBrain className="mr-2" />
-                      Start Creating
-                      <svg className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                      </svg>
+                      Start
                     </Link>
                   </div>
                 </div>
 
                 {/* Explore Expert Courses */}
-                <div className="group relative bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-700 rounded-2xl p-8 text-white overflow-hidden shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-[1.02]">
-                  {/* Decorative elements */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-xl -translate-y-1/2 translate-x-1/2"></div>
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full blur-lg translate-y-1/2 -translate-x-1/2"></div>
-                  
-                  <div className="relative z-10">
-                    <div className="flex items-center mb-6">
-                      <div className="bg-white/20 p-3 rounded-xl mr-4 backdrop-blur-sm">
-                        <FaBookOpen className="text-2xl" />
+                <div className="group bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl p-5 text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="bg-white/20 p-2 rounded-lg mr-3">
+                        <FaBookOpen className="text-lg" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold">Explore Expert Courses</h3>
-                        <p className="text-indigo-100 text-sm">Professionally crafted curriculum</p>
+                        <h3 className="text-lg font-semibold">Explore Expert Courses</h3>
+                        <p className="text-indigo-100 text-xs">Professional curriculum</p>
                       </div>
                     </div>
-                    <p className="text-indigo-100 mb-6 text-sm leading-relaxed">
-                      Browse our extensive library of courses created by education experts and industry professionals.
-                    </p>
                     <Link 
                       to="/courses"
-                      className="inline-flex items-center px-6 py-3 bg-white text-indigo-700 rounded-xl font-semibold hover:bg-indigo-50 transition-all duration-300 hover:shadow-lg group-hover:scale-105"
+                      className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors cursor-pointer relative z-10"
+                      style={{ pointerEvents: 'auto' }}
+                      onClick={(e) => {
+                        console.log('Browse button clicked - navigating to /courses');
+                      }}
                     >
-                      <FaGraduationCap className="mr-2" />
-                      Browse Courses
-                      <svg className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                      </svg>
+                      Browse
                     </Link>
                   </div>
                 </div>

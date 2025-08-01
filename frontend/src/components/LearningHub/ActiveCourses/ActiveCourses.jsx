@@ -9,6 +9,8 @@ const API_URL = 'http://localhost:8000';
 const ActiveCourses = () => {
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState('recent');
+  const [showAll, setShowAll] = useState(false);
   const { isLoggedIn } = useAuth();
 
   useEffect(() => {
@@ -86,7 +88,41 @@ const ActiveCourses = () => {
     fetchEnrolledCourses();
   }, [isLoggedIn]);
 
-  const activeCourses = enrolledCourses;
+  const handleSortChange = () => {
+    console.log('🔄 Sort button clicked! Current sort:', sortBy);
+    const newSort = sortBy === 'recent' ? 'alphabetical' : 'recent';
+    setSortBy(newSort);
+    console.log('🔄 New sort applied:', newSort);
+    toast.success(`Sorted by ${newSort === 'recent' ? 'Recent' : 'Alphabetical'}`);
+  };
+
+  const handleViewAll = () => {
+    console.log('👁️ View all button clicked! Current showAll:', showAll);
+    setShowAll(!showAll);
+    console.log('👁️ New showAll state:', !showAll);
+    toast.success(`${showAll ? 'Showing limited courses' : 'Showing all courses'}`);
+  };
+
+  // Apply sorting and filtering
+  const processedCourses = React.useMemo(() => {
+    let courses = [...enrolledCourses];
+    
+    // Sort courses
+    if (sortBy === 'alphabetical') {
+      courses.sort((a, b) => a.course_name.localeCompare(b.course_name));
+    } else {
+      courses.sort((a, b) => new Date(b.enrolled_at) - new Date(a.enrolled_at));
+    }
+    
+    // Limit courses if not showing all
+    if (!showAll && courses.length > 3) {
+      courses = courses.slice(0, 3);
+    }
+    
+    return courses;
+  }, [enrolledCourses, sortBy, showAll]);
+
+  const activeCourses = processedCourses;
 
   return (
     <section className="bg-white rounded-xl shadow-md p-4 sm:p-6">
@@ -94,16 +130,26 @@ const ActiveCourses = () => {
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800">My Enrolled Courses</h2>
         <div className="flex items-center gap-2 text-sm">
           <div className="relative group">
-            <button className="font-medium text-gray-500 hover:text-indigo-600 flex items-center">
-              <span>Sort by: Recent</span>
+            <button 
+              onClick={handleSortChange}
+              className="font-medium text-gray-500 hover:text-indigo-600 flex items-center transition-colors cursor-pointer relative z-10"
+              style={{ pointerEvents: 'auto' }}
+              type="button"
+            >
+              <span>Sort by: {sortBy === 'recent' ? 'Recent' : 'Alphabetical'}</span>
               <svg className="w-4 h-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </button>
           </div>
           <span className="hidden sm:inline text-gray-300">|</span>
-          <button className="font-medium text-gray-500 hover:text-indigo-600">
-            View all
+          <button 
+            onClick={handleViewAll}
+            className="font-medium text-gray-500 hover:text-indigo-600 transition-colors cursor-pointer relative z-10"
+            style={{ pointerEvents: 'auto' }}
+            type="button"
+          >
+            {showAll ? 'Show less' : 'View all'}
           </button>
         </div>
       </div>
@@ -180,7 +226,11 @@ const ActiveCourses = () => {
                       <Link 
                         to={course.learningUrl}
                         className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 
-                        transition-colors flex items-center justify-center sm:justify-start group-hover:shadow-md"
+                        transition-colors flex items-center justify-center sm:justify-start group-hover:shadow-md cursor-pointer relative z-10"
+                        style={{ pointerEvents: 'auto' }}
+                        onClick={(e) => {
+                          console.log('Start/Continue Learning clicked for:', course.course_name, 'URL:', course.learningUrl);
+                        }}
                       >
                         {course.progress > 0 ? 'Continue Learning' : 'Start Learning'}
                       </Link>
