@@ -47,16 +47,16 @@ const Navbar = ({ initialStyle = "transparent" }) => {
         <div className="flex justify-between items-center">
           {/* Logo section */}
           <div className="flex items-center w-[200px]">
-            <a href="/" className="flex items-center space-x-2">
+            <Link to="/" className="flex items-center space-x-2">
               <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">S</div>
               <span className={`font-bold text-xl ${isScrolled || initialStyle === 'light' ? 'text-gray-800' : 'text-white'}`}>Students Hub</span>
-            </a>
+            </Link>
           </div>
           
           {/* Center the navigation items */}
           <div className="hidden md:flex items-center justify-center flex-1 max-w-[600px]">
             <div className="flex items-center space-x-8">
-              <a href="/" className={`font-medium transition-colors ${textColor}`}>Home</a>
+              <Link to="/" className={`font-medium transition-colors ${textColor}`}>Home</Link>
               <Link 
                 to="/courses" 
                 className={`font-medium transition-colors ${textColor}`}
@@ -101,14 +101,14 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               </div>
             ) : (
               <div className="hidden md:flex items-center space-x-4">
-                <a href="/auth?mode=login" 
+                <Link to="/auth?mode=login" 
                   className={`px-4 py-2 rounded-full font-medium transition-all duration-300 
                     ${isScrolled || initialStyle === 'light' 
                       ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' 
                       : 'text-white border border-white hover:bg-white/20'}`}
                 >
                   Log In
-                </a>
+                </Link>
                 <Link 
                   to="/auth?mode=signup" 
                   className="px-4 py-2 rounded-full font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-shadow"
@@ -142,18 +142,18 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 <Link to="/profile" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                   Profile
                 </Link>
-                <a href="/" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                <Link to="/" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                   Home
-                </a>
-                <a href="/courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                </Link>
+                <Link to="/courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                   Courses
-                </a>
-                <a href="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                </Link>
+                <Link to="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                   AI Chatbot
-                </a>                {isLoggedIn && (
-                  <a href="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                </Link>                {isLoggedIn && (
+                  <Link to="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                     Learning Hub
-                  </a>
+                  </Link>
                 )}
                 <button
                   onClick={handleLogout}
@@ -164,13 +164,13 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 </button>
               </>            ) : (
               <>
-                <a href="/" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Home</a>
-                <a href="/courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Courses</a>
-                <a href="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">AI Chatbot</a>
+                <Link to="/" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Home</Link>
+                <Link to="/courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Courses</Link>
+                <Link to="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">AI Chatbot</Link>
                 <div className="mt-4 flex flex-col space-y-2 px-4">
-                  <a href="/auth?mode=login" className="px-4 py-2 rounded-full text-blue-600 border border-blue-600 font-medium text-center">
+                  <Link to="/auth?mode=login" className="px-4 py-2 rounded-full text-blue-600 border border-blue-600 font-medium text-center">
                     Log In
-                  </a>
+                  </Link>
                   <Link 
                     to="/auth?mode=signup" 
                     className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium text-center"
