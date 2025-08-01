@@ -394,6 +394,14 @@ const ProLearningPage = () => {
     }
     return false;
   });
+  const [hideSaveButton, setHideSaveButton] = useState(() => {
+    // Hide button if course is already saved
+    if (courseId) {
+      const savedCourses = JSON.parse(localStorage.getItem('savedToLearningHub') || '[]');
+      return savedCourses.includes(courseId);
+    }
+    return false;
+  });
   
   // Completion tracking
   const [completedTopics, setCompletedTopics] = useState(() => {
@@ -478,6 +486,7 @@ const ProLearningPage = () => {
       const savedCourses = JSON.parse(localStorage.getItem('savedToLearningHub') || '[]');
       const isAlreadySaved = savedCourses.includes(courseId);
       setSavedToHub(isAlreadySaved);
+      setHideSaveButton(isAlreadySaved);
       
       console.log('🔍 Checking if course is already saved:', {
         courseId,
@@ -1101,7 +1110,11 @@ const ProLearningPage = () => {
         console.log('💾 Course ID saved to localStorage:', courseId);
         alert('✅ Course saved to your Learning Hub successfully!');
         
-        // Do NOT reset the saved state - keep it permanently saved
+        // Hide the entire save button after showing success state for 3 seconds
+        setTimeout(() => {
+          setHideSaveButton(true);
+          console.log('🫥 Save button hidden after success display');
+        }, 3000);
       } else {
         console.error('❌ Failed to save course:', responseData);
         if (response.status === 401) {
@@ -1125,6 +1138,7 @@ const ProLearningPage = () => {
   const clearSavedCoursesDebug = () => {
     localStorage.removeItem('savedToLearningHub');
     setSavedToHub(false);
+    setHideSaveButton(false);
     console.log('🗑️ Cleared all saved courses from localStorage');
   };
 
@@ -3044,12 +3058,13 @@ const ProLearningPage = () => {
               {/* Save to Learning Hub Button - Only show for locally generated courses that haven't been saved yet */}
               {(() => {
                 const isFromDatabase = topicsList.some(t => t.dbTopic);
-                const shouldShowSaveButton = content && topicsList.length > 0 && !isFromDatabase && !savedToHub;
+                const shouldShowSaveButton = content && topicsList.length > 0 && !isFromDatabase && !hideSaveButton;
                 console.log('🔍 Save button visibility check:', {
                   hasContent: !!content,
                   topicsCount: topicsList.length,
                   isFromDatabase,
                   savedToHub,
+                  hideSaveButton,
                   shouldShowSaveButton
                 });
                 return shouldShowSaveButton;
