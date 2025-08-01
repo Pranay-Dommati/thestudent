@@ -4,6 +4,7 @@ import { FaPlay, FaClock, FaUserGraduate, FaChartLine, FaCode, FaChevronDown, Fa
 import LoadingSpinner from './LoadingSpinner';
 import Footer from '../Footer/Footer';
 import { getEngineeringCourseById } from '../../services/courseApi';
+import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext'; // Import useAuth
 
@@ -111,6 +112,19 @@ const CourseDetails = () => {
 
     fetchCourseDetails();
   }, [courseId]);
+
+  // Activity tracking useEffect - Start tracking when viewing course details
+  useEffect(() => {
+    if (isLoggedIn) {
+      console.log('🎯 Starting learning activity tracking for CourseDetails page');
+      startLearningTracking();
+      
+      return () => {
+        console.log('⏹️ Stopping learning activity tracking for CourseDetails page');
+        stopLearningTracking();
+      };
+    }
+  }, [isLoggedIn]); // Track when user is logged in
 
   const handleStartLearning = async () => {
     if (!isLoggedIn) {

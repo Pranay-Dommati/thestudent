@@ -55,6 +55,7 @@ import {
   initializeCourseStorage
 } from './ProBatchGenerator';
 import proContentManager from '../../services/ProContentManager';
+import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 import Navbar from '../Navbar/Navbar';
 import { classifyTopicsWithGemini } from './topicclassifier';
 import BatchGenerationStatus from './BatchGenerationStatus';
@@ -113,6 +114,17 @@ const ProLearningPage = () => {
     }
   };
   
+  // Activity tracking useEffect - Start tracking when component mounts
+  useEffect(() => {
+    console.log('🎯 Starting learning activity tracking for ProLearning page');
+    startLearningTracking();
+    
+    return () => {
+      console.log('⏹️ Stopping learning activity tracking for ProLearning page');
+      stopLearningTracking();
+    };
+  }, []); // Empty dependency array - run once on mount/unmount
+
   // Set default topics and initialize with consistent course ID
   useEffect(() => {
     const initializeCourseData = async () => {

@@ -3,6 +3,15 @@ import { Link } from 'react-router-dom';
 import { FaRocket, FaBookOpen } from 'react-icons/fa';
 
 const HeroSection = ({ user }) => {
+  // Add comprehensive logging
+  console.log('🚀 [HERO SECTION] Props received - user object:', user);
+  console.log('🚀 [HERO SECTION] user.name:', user?.name);
+  console.log('🚀 [HERO SECTION] user.totalCoursesEnrolled:', user?.totalCoursesEnrolled);
+  console.log('🚀 [HERO SECTION] user.hoursThisWeek:', user?.hoursThisWeek);
+  console.log('🚀 [HERO SECTION] user.currentStreak:', user?.currentStreak);
+  console.log('🚀 [HERO SECTION] Type of hoursThisWeek:', typeof user?.hoursThisWeek);
+  console.log('🚀 [HERO SECTION] Type of currentStreak:', typeof user?.currentStreak);
+  
   return (
     <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-16 pb-16 relative overflow-hidden">
       {/* Decorative elements */}

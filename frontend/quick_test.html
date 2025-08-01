@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quick Login Test</title>
+</head>
+<body>
+    <h1>Quick Login and Test Learning Stats</h1>
+    
+    <h2>Step 1: Login</h2>
+    <input type="email" id="email" value="example20@gmail.com" placeholder="Email">
+    <input type="password" id="password" value="testpassword123" placeholder="Password">
+    <button onclick="login()">Login</button>
+    
+    <h2>Step 2: Test Learning Stats</h2>
+    <button onclick="testLearningStats()">Get Learning Stats</button>
+    
+    <div id="output"></div>
+
+    <script>
+        async function login() {
+            try {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                const response = await fetch('http://localhost:8000/api/auth/login/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                console.log('Login response:', data);
+                
+                if (data.access) {
+                    localStorage.setItem('accessToken', data.access);
+                    document.getElementById('output').innerHTML = '✅ Login successful! Token stored.';
+                } else {
+                    document.getElementById('output').innerHTML = `❌ Login failed: ${JSON.stringify(data)}`;
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                document.getElementById('output').innerHTML = `❌ Login error: ${error.message}`;
+            }
+        }
+        
+        async function testLearningStats() {
+            try {
+                const token = localStorage.getItem('accessToken');
+                if (!token) {
+                    document.getElementById('output').innerHTML = '❌ No token found. Please login first.';
+                    return;
+                }
+                
+                const response = await fetch('http://localhost:8000/api/courses/learning-stats/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                console.log('Learning stats response:', data);
+                
+                document.getElementById('output').innerHTML = `
+                    <h3>Learning Stats Response:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('Learning stats error:', error);
+                document.getElementById('output').innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

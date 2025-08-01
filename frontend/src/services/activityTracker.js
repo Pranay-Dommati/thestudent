@@ -123,8 +123,16 @@ class ActivityTracker {
   static async getLearningStats() {
     try {
       const token = localStorage.getItem('accessToken');
-      if (!token) return null;
+      console.log('🔥 [LEARNING STATS] Token available:', !!token);
+      console.log('🔥 [LEARNING STATS] Token preview:', token ? `${token.substring(0, 20)}...` : 'null');
+      console.log('🔥 [LEARNING STATS] All localStorage keys:', Object.keys(localStorage));
+      
+      if (!token) {
+        console.error('🔥 [LEARNING STATS] ❌ No access token found in localStorage');
+        return null;
+      }
 
+      console.log('🔥 [LEARNING STATS] Making request to:', `${API_URL}/api/courses/learning-stats/`);
       const response = await axios.get(`${API_URL}/api/courses/learning-stats/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -132,9 +140,28 @@ class ActivityTracker {
         }
       });
 
-      return response.data.success ? response.data.data : null;
+      console.log('🔥 [LEARNING STATS] API Response status:', response.status);
+      console.log('🔥 [LEARNING STATS] API Response data (full):', response.data);
+      console.log('🔥 [LEARNING STATS] response.data.success:', response.data.success);
+      console.log('🔥 [LEARNING STATS] response.data.data:', response.data.data);
+      console.log('🔥 [LEARNING STATS] Type of response.data.data:', typeof response.data.data);
+      
+      if (response.data.success && response.data.data) {
+        console.log('🔥 [LEARNING STATS] ✅ Success response - extracting data');
+        console.log('🔥 [LEARNING STATS] response.data.data.weekly_hours:', response.data.data.weekly_hours);
+        console.log('🔥 [LEARNING STATS] response.data.data.current_streak:', response.data.data.current_streak);
+        console.log('🔥 [LEARNING STATS] Type of weekly_hours:', typeof response.data.data.weekly_hours);
+        console.log('🔥 [LEARNING STATS] Type of current_streak:', typeof response.data.data.current_streak);
+      }
+      
+      const finalData = response.data.success ? response.data.data : null;
+      console.log('🔥 [LEARNING STATS] Final data to return:', finalData);
+      console.log('🔥 [LEARNING STATS] Final data type:', typeof finalData);
+      return finalData;
     } catch (error) {
-      console.error('Error fetching learning stats:', error);
+      console.error('🔥 [LEARNING STATS] ❌ Error fetching learning stats:', error);
+      console.error('🔥 [LEARNING STATS] ❌ Error response status:', error.response?.status);
+      console.error('🔥 [LEARNING STATS] ❌ Error response data:', error.response?.data);
       return null;
     }
   }
