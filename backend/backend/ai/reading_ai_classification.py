@@ -71,30 +71,22 @@ def classify_topic_fallback(topic):
     """
     Fallback keyword-based classification if AI fails
     """
-    print(f"🔧 Using FALLBACK classification for: '{topic}'")
     topic_lower = topic.lower()
     
     # Quick keyword matching for fallback
     if any(word in topic_lower for word in ['programming', 'code', 'react', 'python', 'javascript', 'api', 'software']):
-        print(f"🎯 FALLBACK: Found technical keywords, classifying as 'technical'")
         return 'technical'
     elif any(word in topic_lower for word in ['history', 'physics', 'chemistry', 'biology', 'math', 'science', 'photosynthesis']):
-        print(f"🎯 FALLBACK: Found academic keywords, classifying as 'academic'")
         return 'academic'
     elif any(word in topic_lower for word in ['communication', 'leadership', 'management', 'skills']):
-        print(f"🎯 FALLBACK: Found skills keywords, classifying as 'skills'")
         return 'skills'
     elif any(word in topic_lower for word in ['business', 'finance', 'investing', 'money', 'budget']):
-        print(f"🎯 FALLBACK: Found business/finance keywords, classifying as 'business_finance'")
         return 'business_finance'
     elif any(word in topic_lower for word in ['art', 'design', 'photography', 'writing', 'creative']):
-        print(f"🎯 FALLBACK: Found creative keywords, classifying as 'creative'")
         return 'creative'
     elif any(word in topic_lower for word in ['startup', 'entrepreneur', 'marketing', 'sales']):
-        print(f"🎯 FALLBACK: Found entrepreneurship keywords, classifying as 'entrepreneurship'")
         return 'entrepreneurship'
     else:
-        print(f"🎯 FALLBACK: No specific keywords found, using 'general' category")
         return 'general'
 
 def classify_topic(topic):
@@ -107,10 +99,8 @@ def get_prompt_by_category(topic, category):
     """
     Return the appropriate prompt based on topic category
     """
-    print(f"🎯 Selecting prompt for topic: '{topic}' with category: '{category}'")
     
     if category == 'technical':
-        print(f"📝 Using TECHNICAL prompt for '{topic}' - Focusing on programming/software development content")
         return f"""You are an expert AI tutor designed to generate complete, clear, and deeply engaging educational content on **technical topics** such as programming concepts, software development practices, frameworks, system design, and computer science fundamentals.
 
 Given any technical topic by the user, your task is to generate a detailed **Reading Section** using **Markdown syntax**. Your explanation must be **self-contained**, **visually structured**, and suitable for beginners and intermediate learners aiming for deep understanding.
@@ -150,7 +140,6 @@ Given any technical topic by the user, your task is to generate a detailed **Rea
 Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
 
     elif category == 'academic':
-        print(f"📚 Using ACADEMIC prompt for '{topic}' - Focusing on scholarly/educational subjects")
         return f"""You are an expert AI tutor trained to explain **academic or general knowledge subjects** such as History, Physics, Economics, Psychology, Biology, etc.
 
 Given a topic by the user, generate a **detailed, easy-to-understand Reading Section** using **Markdown format**. The content should be self-contained and suitable for students and lifelong learners aiming to understand the topic deeply.
@@ -190,7 +179,6 @@ Given a topic by the user, generate a **detailed, easy-to-understand Reading Sec
 Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
 
     elif category == 'skills':
-        print(f"💪 Using SKILLS prompt for '{topic}' - Focusing on personal development and soft skills")
         return f"""You are a professional coach and educator skilled in teaching **soft skills and personal development topics** like communication, confidence, time management, emotional intelligence, leadership, etc.
 
 Given a topic by the user, generate a clear and structured **Reading Section** in **Markdown format** that helps individuals learn and grow in this area—whether for career, personal life, or relationships.
@@ -231,7 +219,6 @@ Given a topic by the user, generate a clear and structured **Reading Section** i
 Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
 
     elif category == 'business_finance':
-        print(f"💰 Using BUSINESS_FINANCE prompt for '{topic}' - Focusing on finance, business, and economics")
         return f"""You are an expert AI tutor designed to generate complete, clear, and deeply engaging educational content on **business and finance** topics—such as entrepreneurship, marketing, investing, financial literacy, personal finance, business models, and startups.
 
 When a user provides a topic, generate a full *Reading Section* that feels like a high-quality self-paced learning resource for students, early professionals, founders, and finance enthusiasts.
@@ -263,7 +250,6 @@ Start directly with the markdown content, using a format like:
 - Tips, Mistakes to Avoid, or Best Practices"""
 
     elif category == 'creative':
-        print(f"🎨 Using CREATIVE prompt for '{topic}' - Focusing on arts, design, and creative expression")
         return f"""You are a creative mentor AI that helps learners master topics related to **creative arts, writing, storytelling, filmmaking, design, photography, content creation, and media production**.
 
 Your job is to generate a *Reading Section* that feels like a personal guide from a creative industry expert — full of insight, examples, and inspiration.
@@ -296,7 +282,6 @@ Start with markdown output like this:
 - Common Blocks and How to Overcome Them"""
 
     elif category == 'entrepreneurship':
-        print(f"🚀 Using ENTREPRENEURSHIP prompt for '{topic}' - Focusing on startups, business strategy, and growth")
         return f"""You are an AI financial & business mentor who helps people deeply understand topics related to **investing, business strategy, startups, marketing, budgeting, accounting, freelancing, economics, and personal finance**.
 
 Your goal is to produce a *Reading Section* that is clear, practical, and filled with real-world analogies — something a smart entrepreneur or financial expert would explain to a curious beginner.
@@ -327,7 +312,6 @@ Start with markdown output like this:
 - Pitfalls to Avoid"""
 
     else:  # general/fallback
-        print(f"🔄 Using GENERAL/FALLBACK prompt for '{topic}' - Adaptive content based on topic nature")
         return f"""You are a world-class educator and expert communicator. Generate a **deep, clear, and adaptive markdown learning guide** for the topic: **{topic}**.
 
 Your job is to teach the topic like a personal tutor. The learner should fully understand it just by reading this — no other websites, videos, or resources needed.
@@ -395,24 +379,14 @@ def handle_reading(request):
     try:
         body = json.loads(request.body.decode('utf-8'))
         topic = body.get('topic', '')
-        print(f"\n🚀 READING CONTENT GENERATION STARTED")
-        print(f"📥 Received topic: '{topic}'")
         
         # Classify the topic and get appropriate prompt
-        print(f"\n🔍 CLASSIFICATION PHASE:")
         category = classify_topic(topic)
-        
-        print(f"\n📝 PROMPT SELECTION PHASE:")
         prompt = get_prompt_by_category(topic, category)
         
-        print(f"\n📊 FINAL CLASSIFICATION RESULT:")
-        print(f"   Topic: '{topic}'")
-        print(f"   Category: '{category}'")
-        print(f"   Prompt Length: {len(prompt)} characters")
+        print(f"📊 Topic: '{topic}' classified as: '{category}'")
         
-        print(f"\n🤖 CALLING GEMINI API...")
         result = call_gemini_api(prompt)
-        print(f"✅ Gemini API call completed successfully")
         
         # Add category to the response for debugging/frontend usage
         if isinstance(result, dict):
@@ -425,9 +399,6 @@ def handle_reading(request):
                 'topic_category': category,
                 'topic_analyzed': topic
             }
-        
-        print(f"📤 Returning response with category metadata")
-        print(f"🎉 READING CONTENT GENERATION COMPLETED SUCCESSFULLY\n")
         
         return JsonResponse(result, safe=False)
     except Exception as e:
