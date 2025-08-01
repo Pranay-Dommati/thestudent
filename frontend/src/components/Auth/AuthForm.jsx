@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaGoogle, FaFacebook, FaGraduationCap, FaRegUser, FaRegEnvelope, FaLock } from "react-icons/fa";
+import { FaGoogle, FaGraduationCap, FaRegUser, FaRegEnvelope, FaLock } from "react-icons/fa";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
@@ -476,23 +476,15 @@ export default function AuthForm() {
                     </div>
                   </div>
                   
-                  <div className="mt-6 grid grid-cols-2 gap-4">
+                  <div className="mt-6 flex justify-center">
                     <button
                       type="button"
                       onClick={handleGoogleSignIn}
                       disabled={isLoading}
-                      className="w-full flex justify-center items-center py-3 px-4 border-2 border-gray-200 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      className="w-full max-w-xs flex justify-center items-center py-3 px-4 border-2 border-gray-200 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                     >
                       <FaGoogle className="h-5 w-5 text-red-500 mr-3" />
                       {isLoading ? 'Signing in...' : 'Google'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toast("Social login coming soon!", { icon: '🔗', style: { backgroundColor: '#3b82f6', color: 'white' }})}
-                      className="w-full flex justify-center items-center py-3 px-4 border-2 border-gray-200 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <FaFacebook className="h-5 w-5 text-blue-600 mr-3" />
-                      Facebook
                     </button>
                   </div>
                 </motion.div>
@@ -761,23 +753,15 @@ export default function AuthForm() {
                       </div>
                     </div>
                     
-                    <div className="mt-6 grid grid-cols-2 gap-3">
+                    <div className="mt-6 flex justify-center">
                       <button
                         type="button"
                         onClick={handleGoogleSignIn}
                         disabled={isLoading}
-                        className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                        className="w-full max-w-xs inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                       >
                         <FaGoogle className="h-5 w-5 text-red-500" />
                         <span className="ml-2">{isLoading ? 'Signing in...' : 'Google'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toast("Social login coming soon!", { icon: '🔗', style: { backgroundColor: '#3b82f6', color: 'white' }})}
-                        className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                      >
-                        <FaFacebook className="h-5 w-5 text-blue-600" />
-                        <span className="ml-2">Facebook</span>
                       </button>
                     </div>
                   </motion.div>

@@ -541,22 +541,24 @@ const ProfilePage = () => {
                 ))}
               </div>
             </div>
-          </motion.div>          {/* Social Connections Card - Improved Version */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100"
-          >
-            <div className="p-6 sm:p-8">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Connected Accounts</h3>
-                  <p className="text-sm text-gray-500 mt-1">Manage your connected social accounts</p>
+          </motion.div>
+          
+          {/* Social Connections Card - Only show if user has social accounts */}
+          {Object.keys(socialAccounts).length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100"
+            >
+              <div className="p-6 sm:p-8">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800">Connected Accounts</h3>
+                    <p className="text-sm text-gray-500 mt-1">Manage your connected social accounts</p>
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-4">
-                {Object.keys(socialAccounts).length > 0 ? (
-                  Object.entries(socialAccounts).map(([provider, accountData]) => {
+                <div className="space-y-4">
+                  {Object.entries(socialAccounts).map(([provider, accountData]) => {
                     const providerConfig = {
                       google: { icon: FaGoogle, color: 'red', bgColor: 'bg-red-50', borderColor: 'border-red-100', hoverBg: 'hover:bg-red-50' }
                     };
@@ -615,23 +617,11 @@ const ProfilePage = () => {
                         </div>
                       </motion.div>
                     );
-                  })
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FaUser className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <p className="text-gray-500 text-sm">
-                      You signed up with email and password. No social accounts connected.
-                    </p>
-                    <p className="text-gray-400 text-xs mt-2">
-                      Connect with Google or other providers to link your accounts.
-                    </p>
-                  </div>
-                )}
+                  })}
+                </div>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          )}
         </div>
       </div>
     </div>
