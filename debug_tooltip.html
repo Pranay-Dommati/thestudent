@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Rate Limiting Tooltip</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        
+        .debug-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        .test-button {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .tooltip-button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .tooltip-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+        
+        .tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 8px;
+            background: #2d3748;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 4px solid transparent;
+            border-top-color: #2d3748;
+        }
+        
+        .test-button:hover .tooltip {
+            opacity: 1;
+        }
+        
+        .debug-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-success { background: #28a745; }
+        .status-warning { background: #ffc107; }
+        .status-error { background: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Rate Limiting Tooltip Debug</h1>
+    
+    <div class="debug-section">
+        <h2>Troubleshooting Steps</h2>
+        
+        <h3>1. Test Basic Tooltip Functionality</h3>
+        <div class="test-button">
+            <button class="tooltip-button">
+                Hover for Tooltip Test
+            </button>
+            <div class="tooltip">
+                🎯 Tooltip working! Daily: 8/16 • Remaining: 8 • Max 4/request
+            </div>
+        </div>
+        
+        <div class="debug-info">
+            <strong>Expected Behavior:</strong><br>
+            - Hover over button should show tooltip<br>
+            - Tooltip should appear above the button<br>
+            - Should have smooth fade in/out animation
+        </div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Possible Issues & Solutions</h2>
+        
+        <h3><span class="status-indicator status-error"></span>Issue 1: Usage Stats Not Loading</h3>
+        <div class="debug-info">
+            <strong>Problem:</strong> usageStats is null/undefined<br>
+            <strong>Check:</strong> Open browser DevTools → Console<br>
+            <strong>Look for:</strong> Errors when fetching usage stats<br>
+            <strong>Solution:</strong> Backend API might not be responding
+        </div>
+        
+        <h3><span class="status-indicator status-warning"></span>Issue 2: Not in Pro Mode</h3>
+        <div class="debug-info">
+            <strong>Problem:</strong> Tooltip only shows when proMode = true<br>
+            <strong>Check:</strong> Click "Create Course" button first<br>
+            <strong>Look for:</strong> Button text should change to "Course Creation Mode"<br>
+            <strong>Solution:</strong> Make sure you're authenticated and in Pro Mode
+        </div>
+        
+        <h3><span class="status-indicator status-warning"></span>Issue 3: CSS Z-Index Problems</h3>
+        <div class="debug-info">
+            <strong>Problem:</strong> Tooltip hidden behind other elements<br>
+            <strong>Check:</strong> Right-click → Inspect Element on button<br>
+            <strong>Look for:</strong> z-index: 50 on tooltip container<br>
+            <strong>Solution:</strong> Increase z-index or check parent containers
+        </div>
+        
+        <h3><span class="status-indicator status-success"></span>Issue 4: Backend API Connection</h3>
+        <div class="debug-info">
+            <strong>Check:</strong> Network tab in DevTools<br>
+            <strong>Look for:</strong> POST requests to /api/ai/classify_topics/<br>
+            <strong>Expected:</strong> 200 OK with usage_stats in response<br>
+            <strong>If 404/500:</strong> Backend server might be down
+        </div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Manual Testing Instructions</h2>
+        <ol>
+            <li><strong>Open your app:</strong> Go to <code>http://localhost:5173</code></li>
+            <li><strong>Navigate to chat:</strong> Make sure you're on the chat page</li>
+            <li><strong>Enter Pro Mode:</strong> Click "Create Course" button</li>
+            <li><strong>Check button text:</strong> Should change to "Course Creation Mode"</li>
+            <li><strong>Look for badge:</strong> Should show "X left" on the button</li>
+            <li><strong>Test hover:</strong> Hover over the button for 2-3 seconds</li>
+            <li><strong>Check DevTools:</strong> Look for console errors</li>
+        </ol>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Quick Fix Options</h2>
+        
+        <button onclick="testBackendConnection()" class="tooltip-button">
+            Test Backend Connection
+        </button>
+        
+        <button onclick="checkLocalStorage()" class="tooltip-button">
+            Check Authentication
+        </button>
+        
+        <button onclick="simulateTooltip()" class="tooltip-button">
+            Simulate Tooltip
+        </button>
+        
+        <div id="test-results" class="debug-info" style="margin-top: 15px;">
+            Click buttons above to run diagnostics...
+        </div>
+    </div>
+    
+    <script>
+        function testBackendConnection() {
+            const results = document.getElementById('test-results');
+            results.innerHTML = 'Testing backend connection...';
+            
+            fetch('http://localhost:8000/api/ai/classify_topics/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: "test", expected_topics: 0 })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            })
+            .then(data => {
+                results.innerHTML = `<span class="status-indicator status-success"></span>Backend connected! Usage stats: ${JSON.stringify(data.usage_stats, null, 2)}`;
+            })
+            .catch(error => {
+                results.innerHTML = `<span class="status-indicator status-error"></span>Backend error: ${error.message}<br>Make sure Django server is running on port 8000`;
+            });
+        }
+        
+        function checkLocalStorage() {
+            const results = document.getElementById('test-results');
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            
+            if (token) {
+                results.innerHTML = `<span class="status-indicator status-success"></span>Authenticated! Token exists, User: ${user || 'Unknown'}`;
+            } else {
+                results.innerHTML = `<span class="status-indicator status-warning"></span>Not authenticated. Token missing. Try logging in first.`;
+            }
+        }
+        
+        function simulateTooltip() {
+            const results = document.getElementById('test-results');
+            results.innerHTML = `
+                <span class="status-indicator status-success"></span>Tooltip should show these values:<br>
+                <strong>Today's Usage:</strong> 0/16<br>
+                <strong>Remaining:</strong> 16 topics<br>
+                <strong>Per Request:</strong> Max 4<br>
+                <strong>Status:</strong> Ready to create topics
+            `;
+        }
+    </script>
+</body>
+</html>

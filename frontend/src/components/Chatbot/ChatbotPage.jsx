@@ -6,8 +6,10 @@ import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
-import { classifyTopicsWithGemini } from "../ProLearning/topicclassifier";
+import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclassifier";
 import AuthModal from '../Common/AuthModal';
+import RateLimitStatus from './RateLimitStatus';
+import CompactRateLimitStatus from './CompactRateLimitStatus';
 
 // Simple Gemini API call for regular chat
 const callGeminiAPI = async (message) => {
@@ -423,6 +425,7 @@ const ChatbotPage = () => {
   const [pendingTopics, setPendingTopics] = useState([]);
   const [originalPrompt, setOriginalPrompt] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [usageStats, setUsageStats] = useState(null); // Track rate limit usage stats
   const [chatHistory, setChatHistory] = useState([
     {
       id: 1,
@@ -531,11 +534,18 @@ const ChatbotPage = () => {
       console.log('Message:', messageToSend);
 
       if (proMode) {
-        // Pro mode - extract topics using AI first
+        // Pro mode - extract topics using AI first with rate limiting
         try {
           console.log('🚀 Starting topic extraction for:', messageToSend);
-          const extractedTopics = await classifyTopicsWithGemini(messageToSend);
-          console.log('✅ AI Extracted Topics:', extractedTopics);
+          const result = await classifyTopics(messageToSend);
+          console.log('✅ AI Extracted Topics:', result);
+          
+          // Update usage stats from the response
+          if (result.usage_stats) {
+            setUsageStats(result.usage_stats);
+          }
+          
+          const extractedTopics = result.topics || [];
           
           if (extractedTopics && extractedTopics.length > 0) {
             // Store topics for confirmation and show confirmation dialog
@@ -563,13 +573,34 @@ const ChatbotPage = () => {
           }
         } catch (error) {
           console.error('❌ Topic extraction failed:', error);
-          const errorResponse = {
-            id: chatHistory.length + 2,
-            type: "bot",
-            content: `❌ Topic extraction failed: ${error.message}. Please try again with a clearer learning query.`,
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          };
-          setChatHistory((prev) => [...prev, errorResponse]);
+          
+          // Handle rate limiting specifically
+          if (error.isRateLimit) {
+            const rateLimitMessage = formatRateLimitMessage(error);
+            const rateLimitResponse = {
+              id: chatHistory.length + 2,
+              type: "bot",
+              content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 16 topics per day\n\nPlease try again later or contact support if you need higher limits.`,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              isRateLimitError: true,
+            };
+            setChatHistory((prev) => [...prev, rateLimitResponse]);
+            
+            // Show toast notification
+            toast.error('Daily topic creation limit reached', {
+              duration: 5000,
+              position: 'top-center',
+            });
+          } else {
+            // Generic error handling
+            const errorResponse = {
+              id: chatHistory.length + 2,
+              type: "bot",
+              content: `❌ Topic extraction failed: ${error.message}. Please try again with a clearer learning query.`,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+            setChatHistory((prev) => [...prev, errorResponse]);
+          }
         }
       } else {
         // Regular chatbot response using vector bot for educational topics
@@ -615,6 +646,11 @@ const ChatbotPage = () => {
   };
 
   const handleTopicAdd = () => {
+    // Enforce 4-topic limit
+    if (pendingTopics.length >= 4) {
+      return;
+    }
+    
     const newTopic = {
       id: Date.now(),
       name: "New Topic",
@@ -629,32 +665,92 @@ const ChatbotPage = () => {
       return;
     }
 
-    // Generate a unique course ID
-    const courseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    try {
+      // Call the new backend endpoint to actually create the course with rate limiting
+      const token = localStorage.getItem('token');
+      const response = await fetch('/ai/create-course-topics/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify({
+          topics: pendingTopics
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.status === 429) {
+        // Rate limit exceeded
+        const botResponse = {
+          id: chatHistory.length + 1,
+          type: "bot",
+          message: `🚫 ${result.message}`,
+          timestamp: new Date().toLocaleTimeString(),
+          isRateLimit: true
+        };
+        setChatHistory(prev => [...prev, botResponse]);
+        setShowTopicModal(false);
+        setPendingTopics([]);
+        setOriginalPrompt("");
+        
+        // Update usage stats if provided
+        if (result.usage_stats) {
+          setUsageStats(result.usage_stats);
+        }
+        return;
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create course');
+      }
+
+      // Update usage stats from successful creation
+      if (result.usage_stats) {
+        setUsageStats(result.usage_stats);
+      }
+
+      // Generate a unique course ID
+      const courseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Create the topic string for URL - extract just the names from objects
+      const topicNames = pendingTopics.map(topic => topic.name);
+      const topicString = topicNames.join(', ');
+      console.log('📝 Confirmed topic names:', topicNames);
+      console.log('📝 Generated course ID:', courseId);
+      console.log('📝 Topic string for URL:', topicString);
     
-    // Create the topic string for URL - extract just the names from objects
-    const topicNames = pendingTopics.map(topic => topic.name);
-    const topicString = topicNames.join(', ');
-    console.log('📝 Confirmed topic names:', topicNames);
-    console.log('📝 Generated course ID:', courseId);
-    console.log('📝 Topic string for URL:', topicString);
-    
-    const proResponse = {
-      id: chatHistory.length + 1,
-      type: "bot",
-      content: `🎓 Perfect! I'll create a comprehensive course on: **${topicNames.join(', ')}**. Click the card below to access your customized course materials. Content generation will begin automatically and you'll see a loading screen until all materials are ready.`,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      isProCard: true,
-      topic: topicString,
-      extractedTopics: pendingTopics,
-      courseId: courseId, // Include the generated course ID
-    };
-    
-    // Update chat history and close confirmation dialog
-    setChatHistory((prev) => [...prev, proResponse]);
-    setShowTopicConfirmation(false);
-    setPendingTopics([]);
-    setOriginalPrompt("");
+      const proResponse = {
+        id: chatHistory.length + 1,
+        type: "bot",
+        content: `🎓 Perfect! I'll create a comprehensive course on: **${topicNames.join(', ')}**. Click the card below to access your customized course materials. Content generation will begin automatically and you'll see a loading screen until all materials are ready.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        isProCard: true,
+        topic: topicString,
+        extractedTopics: pendingTopics,
+        courseId: courseId, // Include the generated course ID
+      };
+      
+      // Update chat history and close confirmation dialog
+      setChatHistory((prev) => [...prev, proResponse]);
+      setShowTopicConfirmation(false);
+      setPendingTopics([]);
+      setOriginalPrompt("");
+      
+    } catch (error) {
+      console.error('Error creating course:', error);
+      const errorResponse = {
+        id: chatHistory.length + 1,
+        type: "bot",
+        message: `❌ Failed to create course: ${error.message}`,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      setChatHistory(prev => [...prev, errorResponse]);
+      setShowTopicModal(false);
+      setPendingTopics([]);
+      setOriginalPrompt("");
+    }
   };
 
   const handleTopicCancel = () => {
@@ -806,15 +902,42 @@ const ChatbotPage = () => {
     }
   };
 
+  // Fetch usage stats for rate limiting display
+  const fetchUsageStats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/ai/rate-limit-status/', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (result.rate_limit_info) {
+        setUsageStats(result.rate_limit_info);
+      }
+    } catch (error) {
+      console.error('Failed to fetch usage stats:', error);
+    }
+  };
+
   // Handle Create Course button with authentication check
-  const handleCreateCourse = () => {
+  const handleCreateCourse = async () => {
     if (!isAuthenticated()) {
       setShowAuthModal(true);
       return;
     }
     
-    // If user is authenticated, toggle pro mode as usual
-    setProMode(!proMode);
+    const newProMode = !proMode;
+    setProMode(newProMode);
+    
+    // Fetch usage stats when entering pro mode
+    if (newProMode) {
+      await fetchUsageStats();
+    }
   };
 
   return (
@@ -1000,7 +1123,7 @@ const ChatbotPage = () => {
                         
                         <p className="text-sm text-gray-600 mb-4">
                           I found <strong>{pendingTopics.length}</strong> topic(s) from your query: "<em>{originalPrompt}</em>". 
-                          You can edit, delete, or add topics before creating your course.
+                          You can edit, delete, or add topics before creating your course. <strong>Maximum 4 topics per course.</strong>
                         </p>
                         
                         <div className="space-y-2 mb-4">
@@ -1028,9 +1151,17 @@ const ChatbotPage = () => {
                         
                         <button
                           onClick={handleTopicAdd}
-                          className="w-full mb-4 p-2 border-2 border-dashed border-indigo-300/50 rounded-lg text-indigo-600 hover:bg-indigo-50/50 backdrop-blur-sm transition-colors text-sm"
+                          disabled={pendingTopics.length >= 4}
+                          className={`w-full mb-4 p-2 border-2 border-dashed rounded-lg transition-colors text-sm ${
+                            pendingTopics.length >= 4 
+                              ? 'border-gray-300/50 text-gray-400 bg-gray-50/50 cursor-not-allowed'
+                              : 'border-indigo-300/50 text-indigo-600 hover:bg-indigo-50/50 backdrop-blur-sm'
+                          }`}
                         >
-                          + Add New Topic
+                          {pendingTopics.length >= 4 
+                            ? `Maximum 4 topics reached` 
+                            : `+ Add New Topic (${pendingTopics.length}/4)`
+                          }
                         </button>
                         
                         <div className="flex gap-2">
@@ -1063,27 +1194,41 @@ const ChatbotPage = () => {
             <div className="w-full max-w-5xl mx-auto px-6 lg:px-8">
               {/* Create Course Button */}
               <div className="mb-4">
-                <div className="flex items-center justify-start">
-                  <button 
-                    onClick={handleCreateCourse}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-105 ${
-                      proMode 
-                        ? 'bg-indigo-50/80 text-indigo-600 border-2 border-indigo-300/50' 
-                        : 'bg-white/80 text-gray-700 border-2 border-gray-200/50 hover:bg-gray-50/80 hover:text-gray-800 hover:border-gray-300/50'
-                    }`}
-                  >
-                    {proMode ? (
-                      <>
-                        <IoCheckmarkCircle size={18} />
-                        Course Creation Mode
-                      </>
-                    ) : (
-                      <>
-                        <IoSchoolOutline size={18} />
-                        Create Course
-                      </>
-                    )}
-                  </button>
+                <div className="flex items-center justify-between gap-2">
+                  {/* Button Section */}
+                  <div className="relative group">
+                    <button 
+                      onClick={handleCreateCourse}
+                      className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-105 ${
+                        proMode 
+                          ? 'bg-indigo-50/80 text-indigo-600 border-2 border-indigo-300/50' 
+                          : 'bg-white/80 text-gray-700 border-2 border-gray-200/50 hover:bg-gray-50/80 hover:text-gray-800 hover:border-gray-300/50'
+                      }`}
+                    >
+                      {proMode ? (
+                        <>
+                          <IoCheckmarkCircle size={18} />
+                          Course Creation Mode
+                        </>
+                      ) : (
+                        <>
+                          <IoSchoolOutline size={18} />
+                          Create Course
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  
+                  {/* Compact Rate Limit Status beside the button */}
+                  {proMode && usageStats && (
+                    <CompactRateLimitStatus 
+                      usageStats={usageStats} 
+                      className="shrink-0"
+                    />
+                  )}
+                  {proMode && !usageStats && (
+                    <div className="text-xs text-gray-500 px-2">Loading stats...</div>
+                  )}
                 </div>
               </div>
               
