@@ -228,69 +228,47 @@ const LearningHubPage = () => {
                 <AILearningPlans />
               </section>
               
-              {/* Enhanced Call-to-Action Buttons Section */}
-              <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Minimalistic Call-to-Action Buttons Section */}
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 {/* Create Custom Course with AI */}
-                <div className="group relative bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 rounded-2xl p-8 text-white overflow-hidden shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-[1.02]">
-                  {/* Decorative elements */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-xl -translate-y-1/2 translate-x-1/2"></div>
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full blur-lg translate-y-1/2 -translate-x-1/2"></div>
-                  
-                  <div className="relative z-10">
-                    <div className="flex items-center mb-6">
-                      <div className="bg-white/20 p-3 rounded-xl mr-4 backdrop-blur-sm">
-                        <FaRocket className="text-2xl" />
+                <div className="group bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl p-5 text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="bg-white/20 p-2 rounded-lg mr-3">
+                        <FaRocket className="text-lg" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold">Create Custom Course</h3>
-                        <p className="text-purple-100 text-sm">AI-powered personalized learning</p>
+                        <h3 className="text-lg font-semibold">Create Custom Course</h3>
+                        <p className="text-purple-100 text-xs">AI-powered learning paths</p>
                       </div>
                     </div>
-                    <p className="text-purple-100 mb-6 text-sm leading-relaxed">
-                      Let our advanced AI create a personalized course tailored to your specific learning goals, interests, and skill level.
-                    </p>
                     <Link 
                       to="/chat"
-                      className="inline-flex items-center px-6 py-3 bg-white text-purple-700 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-300 hover:shadow-lg group-hover:scale-105"
+                      className="bg-white text-purple-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-50 transition-colors"
                     >
-                      <FaBrain className="mr-2" />
-                      Start Creating
-                      <svg className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                      </svg>
+                      Start
                     </Link>
                   </div>
                 </div>
 
                 {/* Explore Expert Courses */}
-                <div className="group relative bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-700 rounded-2xl p-8 text-white overflow-hidden shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-[1.02]">
-                  {/* Decorative elements */}
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-xl -translate-y-1/2 translate-x-1/2"></div>
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full blur-lg translate-y-1/2 -translate-x-1/2"></div>
-                  
-                  <div className="relative z-10">
-                    <div className="flex items-center mb-6">
-                      <div className="bg-white/20 p-3 rounded-xl mr-4 backdrop-blur-sm">
-                        <FaBookOpen className="text-2xl" />
+                <div className="group bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl p-5 text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="bg-white/20 p-2 rounded-lg mr-3">
+                        <FaBookOpen className="text-lg" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold">Explore Expert Courses</h3>
-                        <p className="text-indigo-100 text-sm">Professionally crafted curriculum</p>
+                        <h3 className="text-lg font-semibold">Explore Expert Courses</h3>
+                        <p className="text-indigo-100 text-xs">Professional curriculum</p>
                       </div>
                     </div>
-                    <p className="text-indigo-100 mb-6 text-sm leading-relaxed">
-                      Browse our extensive library of courses created by education experts and industry professionals.
-                    </p>
                     <Link 
                       to="/courses"
-                      className="inline-flex items-center px-6 py-3 bg-white text-indigo-700 rounded-xl font-semibold hover:bg-indigo-50 transition-all duration-300 hover:shadow-lg group-hover:scale-105"
+                      className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors"
                     >
-                      <FaGraduationCap className="mr-2" />
-                      Browse Courses
-                      <svg className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                      </svg>
+                      Browse
                     </Link>
                   </div>
                 </div>

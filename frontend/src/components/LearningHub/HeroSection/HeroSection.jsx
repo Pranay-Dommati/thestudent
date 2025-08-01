@@ -34,7 +34,7 @@ const HeroSection = ({ user }) => {
               </div>
               <div>
                 <div className="text-2xl font-bold">
-                  {typeof user.hoursThisWeek === 'number' ? user.hoursThisWeek.toFixed(5) : (user.hoursThisWeek || 0)}h
+                  {typeof user.hoursThisWeek === 'number' ? user.hoursThisWeek.toFixed(1) : (user.hoursThisWeek || 0)}h
                 </div>
                 <div className="text-white/70 text-sm">This Week</div>
               </div>
