@@ -148,30 +148,57 @@ const LearningAnalytics = ({ user }) => {
           </span>
         </div>
         <div className="flex justify-between">
-          {Array(7).fill(0).map((_, i) => {
-            const day = new Date();
-            day.setDate(day.getDate() - 6 + i);
-            const dayName = day.toLocaleDateString('en-US', { weekday: 'short' });
-            // Mock data: active days pattern - you would replace with real data
-            const isActive = i === 0 || i === 2 || i === 3 || i === 4 || i === 6; 
-            
-            return (
-              <div key={i} className="flex flex-col items-center">
-                <div 
-                  className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
-                    isActive 
-                      ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-sm' 
-                      : 'bg-gray-200 text-gray-400'
-                  }`}
-                >
-                  <span className="text-xs font-medium">{day.getDate()}</span>
+          {user.weeklyBreakdown && user.weeklyBreakdown.length > 0 ? (
+            // Use real data from backend API
+            user.weeklyBreakdown.map((dayData, i) => {
+              const dayDate = new Date(dayData.date);
+              const dayName = dayData.day_name;
+              const isActive = dayData.has_activity; // Real activity data from backend
+              
+              return (
+                <div key={i} className="flex flex-col items-center">
+                  <div 
+                    className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
+                      isActive 
+                        ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-sm' 
+                        : 'bg-gray-200 text-gray-400'
+                    }`}
+                  >
+                    <span className="text-xs font-medium">{dayDate.getDate()}</span>
+                  </div>
+                  <span className={`text-xs ${isActive ? 'text-indigo-600 font-medium' : 'text-gray-400'}`}>
+                    {dayName}
+                  </span>
                 </div>
-                <span className={`text-xs ${isActive ? 'text-indigo-600 font-medium' : 'text-gray-400'}`}>
-                  {dayName.substring(0, 3)}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            // Fallback to 7-day pattern if no real data available
+            Array(7).fill(0).map((_, i) => {
+              const day = new Date();
+              day.setDate(day.getDate() - 6 + i);
+              const dayName = day.toLocaleDateString('en-US', { weekday: 'short' });
+              // Mock data: active days pattern - you would replace with real data
+              const isActive = i === 0 || i === 2 || i === 3 || i === 4 || i === 6; 
+              
+              return (
+                <div key={i} className="flex flex-col items-center">
+                  <div 
+                    className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
+                      isActive 
+                        ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-sm' 
+                        : 'bg-gray-200 text-gray-400'
+                    }`}
+                  >
+                    <span className="text-xs font-medium">{day.getDate()}</span>
+                  </div>
+                  <span className={`text-xs ${isActive ? 'text-indigo-600 font-medium' : 'text-gray-400'}`}>
+                    {dayName.substring(0, 3)}
+                  </span>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </section>

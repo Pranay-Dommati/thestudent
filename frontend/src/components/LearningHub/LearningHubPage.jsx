@@ -262,7 +262,15 @@ const LearningHubPage = () => {
             {/* Sidebar - Learning Analytics */}
             <div className="xl:col-span-1">
               <div className="sticky top-24">
-                <LearningAnalytics user={user} />
+                <LearningAnalytics 
+                  user={{
+                    ...user,
+                    // Add real learning data for analytics
+                    hoursThisWeek: learningStats?.weekly_hours ?? 0,
+                    currentStreak: learningStats?.current_streak ?? 0,
+                    weeklyBreakdown: learningStats?.weekly_breakdown ?? []
+                  }} 
+                />
               </div>
             </div>
 
