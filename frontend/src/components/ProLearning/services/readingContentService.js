@@ -113,10 +113,9 @@ async function generateSingleTopicContent(topic) {
     
     // Log the topic classification from our enhanced backend
     if (result.topic_category) {
-      console.log(`🎯 🤖 AI Backend classified "${topic}" as: "${result.topic_category}"`);
-      console.log(`📊 Topic analyzed by AI: "${result.topic_analyzed}"`);
+      console.log(`🎯 Backend classified "${topic}" as: "${result.topic_category}"`);
     } else {
-      console.log(`⚠️ No topic_category in response - backend may not be updated or AI classification failed`);
+      console.log(`⚠️ No topic_category in response - backend may not be updated`);
     }
     
     const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
