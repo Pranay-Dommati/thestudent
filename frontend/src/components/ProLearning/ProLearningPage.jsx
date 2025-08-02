@@ -1070,10 +1070,25 @@ const ProLearningPage = () => {
         console.log('✅ Course saved to Learning Hub successfully!', responseData);
         alert('✅ Course saved to your Learning Hub successfully!');
         
-        // Reset success state after 5 seconds
-        setTimeout(() => {
-          setSavedToHub(false);
-        }, 5000);
+        // Update localStorage to track saved courses permanently
+        const courseKey = `${currentCourseId}_${smartCourseName}`;
+        const savedStatus = localStorage.getItem('coursesSavedToHub');
+        let savedCourses = [];
+        
+        if (savedStatus) {
+          try {
+            savedCourses = JSON.parse(savedStatus);
+          } catch (error) {
+            console.error('Error parsing saved courses:', error);
+          }
+        }
+        
+        if (!savedCourses.includes(courseKey)) {
+          savedCourses.push(courseKey);
+          localStorage.setItem('coursesSavedToHub', JSON.stringify(savedCourses));
+        }
+        
+        // No timeout reset - button stays hidden permanently after successful save
       } else {
         console.error('❌ Failed to save course:', responseData);
         if (response.status === 401) {
@@ -1398,6 +1413,28 @@ const ProLearningPage = () => {
   useEffect(() => {
     const id = getCourseId();
   }, []);
+
+  // Check if current course was previously saved to Learning Hub
+  useEffect(() => {
+    const checkSavedStatus = () => {
+      const currentCourseId = getCourseId();
+      if (!currentCourseId) return;
+      
+      const savedStatus = localStorage.getItem('coursesSavedToHub');
+      if (savedStatus) {
+        try {
+          const savedCourses = JSON.parse(savedStatus);
+          // Check if any saved course key contains current course ID
+          const isSaved = savedCourses.some(courseKey => courseKey.includes(currentCourseId));
+          setSavedToHub(isSaved);
+        } catch (error) {
+          console.error('Error parsing saved courses from localStorage:', error);
+        }
+      }
+    };
+    
+    checkSavedStatus();
+  }, [courseId]); // Recheck when courseId changes
 
   // Handle batch generation from ChatbotPage
   useEffect(() => {
