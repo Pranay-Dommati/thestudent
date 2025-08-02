@@ -840,12 +840,64 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
   // In the return statement, remove the footer and adjust the layout:
   return (
-    <div className="min-h-screen flex">
-      {/* Main Content Area - Adjust width to fill available space */}
+    <div className="min-h-screen flex bg-white">
+      {/* Main Content Area - Professional Layout */}
       <div className="flex-1 flex flex-col">
-        {/* Content Container - Fixed right margin to match sidebar exactly */}
+        {/* Course Header - Clean and Professional */}
+        {course && (
+          <div className="bg-white border-b border-gray-200 sticky top-14 z-20">
+            <div className={`transition-all duration-300 ${sidebarVisible ? 'mr-[400px]' : ''}`}>
+              <div className="px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center text-sm text-gray-500 mb-2">
+                      <span>{course.subject || 'Course'}</span>
+                      <span className="mx-2">•</span>
+                      <span>{course.class_level || course.level}</span>
+                      <span className="mx-2">•</span>
+                      <span>{course.board || 'General'}</span>
+                    </div>
+                    <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                      {course.title || course.subject}
+                    </h1>
+                    {course.chapters && course.chapters[activeChapter] && (
+                      <p className="text-gray-600">
+                        <span className="font-medium">Chapter {activeChapter + 1}:</span> {course.chapters[activeChapter].title}
+                        {currentLesson && (
+                          <>
+                            <span className="mx-2">→</span>
+                            <span>{currentLesson.title}</span>
+                          </>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm text-gray-500 mb-1">Progress</div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-32 bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                          style={{ width: `${totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-sm font-medium text-gray-700">
+                        {Math.round((completedLessons / totalLessons) * 100) || 0}%
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {completedLessons} of {totalLessons} lessons completed
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Content Container - Clean spacing */}
         <div className={`transition-all duration-300 ${sidebarVisible ? 'mr-[400px]' : ''}`}>
-          <div className="p-5 w-full">
+          <div className="p-6 w-full">
             {loading ? (
               <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
@@ -856,19 +908,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               </div>
             ) : course ? (
               <>
-                {/* Video content navigation */}
-                {contentType === 'video' && course.chapters && course.chapters[activeChapter] && (
-                  <div className="mb-6">
-                    <nav className="flex items-center text-sm text-gray-600">
-                      <span>Course</span>
-                      <span className="mx-2">•</span>
-                      <span>{course.chapters[activeChapter].title}</span>
-                      <span className="mx-2">•</span>
-                      <span>{currentLesson?.title || 'Loading...'}</span>
-                    </nav>
-                  </div>
-                )}
-
                 {/* Dynamic Content */}
                 {renderContent()}
               </>
@@ -881,23 +920,23 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         </div>
       </div>
 
-      {/* Always visible sidebar toggle button positioned at the top of sidebar */}
+      {/* Sidebar toggle button - positioned correctly */}
       <button
         onClick={() => setSidebarVisible(!sidebarVisible)}
-        className={`fixed top-17 transition-all duration-300 ${
+        className={`fixed transition-all duration-300 ${
           sidebarVisible ? 'right-[400px]' : 'right-0'
-        } transform bg-white p-3 shadow-md rounded-l-lg z-40 hover:bg-gray-50`}
+        } top-32 bg-white p-3 shadow-lg rounded-l-lg z-40 hover:bg-gray-50 border border-r-0 border-gray-200`}
         aria-label={sidebarVisible ? "Close sidebar" : "Open sidebar"}
       >
         {sidebarVisible ? 
-          <FaChevronRight className="w-5 h-5 text-gray-600" /> : 
-          <FaChevronLeft className="w-5 h-5 text-gray-600" />
+          <FaChevronRight className="w-4 h-4 text-gray-600" /> : 
+          <FaChevronLeft className="w-4 h-4 text-gray-600" />
         }
       </button>
 
-      {/* Sidebar - Keep fixed width */}
+      {/* Sidebar - Professional design */}
       <div 
-        className={`fixed top-0 right-0 h-screen w-[400px] bg-white shadow-lg border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 ${
+        className={`fixed top-14 right-0 h-[calc(100vh-3.5rem)] w-[400px] bg-white shadow-xl border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 ${
           sidebarVisible ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

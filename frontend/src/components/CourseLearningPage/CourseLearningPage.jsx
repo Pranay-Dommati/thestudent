@@ -54,7 +54,7 @@ const CourseLearningPage = () => {
   return (
     <>
       <Navbar initialStyle="light" />
-      <div className="pt-16 min-h-screen bg-gray-50">
+      <div className="pt-14 min-h-screen bg-white">
         <CourseLearning 
           courseId={determineCourseId()}
           pathname={location.pathname}
