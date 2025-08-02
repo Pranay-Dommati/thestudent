@@ -134,6 +134,35 @@ style.textContent = `
     animation: float 6s ease-in-out infinite;
     animation-delay: -2s;
   }
+  
+  /* Ordered list counter styling */
+  .counter-reset-list {
+    counter-reset: list-counter;
+  }
+  
+  .counter-reset-list li {
+    counter-increment: list-counter;
+    position: relative;
+    padding-left: 0;
+  }
+  
+  .counter-reset-list li::before {
+    content: counter(list-counter) ".";
+    font-weight: 600;
+    color: #3b82f6;
+    margin-right: 8px;
+    min-width: 20px;
+    display: inline-block;
+  }
+  
+  /* Enhanced code block styling */
+  .markdown-code-block {
+    position: relative;
+  }
+  
+  .markdown-code-block:hover .copy-button {
+    opacity: 1;
+  }
 `;
 document.head.appendChild(style);
 
@@ -941,54 +970,122 @@ const ChatbotPage = () => {
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      // Custom code block styling
+                      // Custom code block styling with copy functionality
                       code({node, inline, className, children, ...props}) {
-                        return inline ? (
-                          <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
-                            {children}
-                          </code>
-                        ) : (
-                          <pre className="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto">
-                            <code className="text-sm font-mono" {...props}>
+                        const codeString = String(children).replace(/\n$/, '');
+                        
+                        if (inline) {
+                          return (
+                            <code className="bg-blue-50 text-blue-800 px-2 py-1 rounded-md text-sm font-mono border border-blue-200" {...props}>
                               {children}
                             </code>
-                          </pre>
+                          );
+                        }
+                        
+                        return (
+                          <div className="relative group my-4">
+                            <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto border border-gray-700">
+                              <code className="text-sm font-mono" {...props}>
+                                {children}
+                              </code>
+                            </pre>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(codeString);
+                                toast.success('Code copied to clipboard!', { duration: 2000 });
+                              }}
+                              className="absolute top-2 right-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-3 py-1.5 rounded-md text-xs font-medium opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1.5"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </button>
+                          </div>
                         );
                       },
-                      // Custom list styling
+                      // Improved list styling with proper alignment
                       ul({children}) {
-                        return <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>;
+                        return (
+                          <ul className="space-y-2 my-3 pl-0">
+                            {children}
+                          </ul>
+                        );
+                      },
+                      li({children, ...props}) {
+                        const parentTag = props.node?.parent?.tagName;
+                        
+                        if (parentTag === 'ol') {
+                          return (
+                            <li className="flex items-start text-gray-800 pl-0" {...props}>
+                              <div className="flex-1">{children}</div>
+                            </li>
+                          );
+                        }
+                        
+                        return (
+                          <li className="flex items-start text-gray-800 pl-0" {...props}>
+                            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2.5 mr-3 flex-shrink-0"></span>
+                            <div className="flex-1">{children}</div>
+                          </li>
+                        );
                       },
                       ol({children}) {
-                        return <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>;
+                        return (
+                          <ol className="space-y-2 my-3 counter-reset-list pl-0">
+                            {children}
+                          </ol>
+                        );
                       },
-                      // Custom heading styling
+                      // Custom heading styling with better spacing
                       h1({children}) {
-                        return <h1 className="text-xl font-bold text-gray-900 mb-2 mt-4">{children}</h1>;
+                        return <h1 className="text-2xl font-bold text-gray-900 mb-3 mt-6 border-b border-gray-200 pb-2">{children}</h1>;
                       },
                       h2({children}) {
-                        return <h2 className="text-lg font-semibold text-gray-900 mb-2 mt-3">{children}</h2>;
+                        return <h2 className="text-xl font-semibold text-gray-900 mb-3 mt-5">{children}</h2>;
                       },
                       h3({children}) {
-                        return <h3 className="text-base font-semibold text-gray-900 mb-1 mt-2">{children}</h3>;
+                        return <h3 className="text-lg font-semibold text-gray-900 mb-2 mt-4">{children}</h3>;
                       },
-                      // Custom paragraph styling
+                      h4({children}) {
+                        return <h4 className="text-base font-semibold text-gray-900 mb-2 mt-3">{children}</h4>;
+                      },
+                      // Enhanced paragraph styling
                       p({children}) {
-                        return <p className="text-gray-800 leading-relaxed mb-2">{children}</p>;
+                        return <p className="text-gray-800 leading-relaxed mb-3 text-sm lg:text-base">{children}</p>;
                       },
-                      // Custom blockquote styling
+                      // Enhanced blockquote styling
                       blockquote({children}) {
-                        return <blockquote className="border-l-4 border-blue-400 pl-4 py-2 bg-blue-50 text-gray-700 italic my-3">{children}</blockquote>;
+                        return (
+                          <blockquote className="border-l-4 border-blue-400 pl-4 py-3 bg-blue-50 text-gray-700 italic my-4 rounded-r-lg">
+                            {children}
+                          </blockquote>
+                        );
                       },
-                      // Custom table styling
+                      // Enhanced table styling
                       table({children}) {
-                        return <div className="overflow-x-auto my-3"><table className="min-w-full border border-gray-300">{children}</table></div>;
+                        return (
+                          <div className="overflow-x-auto my-4 rounded-lg border border-gray-200">
+                            <table className="min-w-full">{children}</table>
+                          </div>
+                        );
+                      },
+                      thead({children}) {
+                        return <thead className="bg-gray-50">{children}</thead>;
                       },
                       th({children}) {
-                        return <th className="border border-gray-300 px-3 py-2 bg-gray-100 font-semibold text-left">{children}</th>;
+                        return <th className="border-b border-gray-200 px-4 py-3 text-left font-semibold text-gray-900 text-sm">{children}</th>;
                       },
                       td({children}) {
-                        return <td className="border border-gray-300 px-3 py-2">{children}</td>;
+                        return <td className="border-b border-gray-100 px-4 py-3 text-gray-800 text-sm">{children}</td>;
+                      },
+                      // Enhanced strong/bold styling
+                      strong({children}) {
+                        return <strong className="font-semibold text-gray-900">{children}</strong>;
+                      },
+                      // Enhanced emphasis/italic styling
+                      em({children}) {
+                        return <em className="italic text-gray-700">{children}</em>;
                       },
                     }}
                   >
