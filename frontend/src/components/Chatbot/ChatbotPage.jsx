@@ -1031,7 +1031,7 @@ const ChatbotPage = () => {
                         
                         return (
                           <li className="flex items-start text-gray-800 pl-0" {...props}>
-                            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2.5 mr-3 flex-shrink-0"></span>
+                            <span className="w-2 h-2 bg-blue-600 rounded-full mt-2 mr-3 flex-shrink-0"></span>
                             <div className="flex-1">{children}</div>
                           </li>
                         );
