@@ -201,38 +201,69 @@ const FeaturedPlaylists = () => {
     }
   };
   
-  const filteredCourses = activeCategory === 'all' 
-    ? courses.slice(0, 12) // Show max 12 courses for 'all'
-    : courses.filter(course => course.category === activeCategory).slice(0, 4); // Show max 4 per category
+  const [showAllOnMobile, setShowAllOnMobile] = useState(false);
+
+  // Filter courses with mobile-specific display logic
+  const allFilteredCourses = activeCategory === 'all' 
+    ? courses 
+    : courses.filter(course => course.category === activeCategory);
+  
+  // For mobile: show 4 initially, then all when "Load More" is clicked
+  // For desktop: show normal limits
+  const getDisplayedCourses = () => {
+    if (window.innerWidth < 768) { // Mobile
+      if (showAllOnMobile) {
+        return allFilteredCourses;
+      } else {
+        return allFilteredCourses.slice(0, 4);
+      }
+    } else { // Desktop/Tablet
+      return activeCategory === 'all' 
+        ? allFilteredCourses.slice(0, 12)
+        : allFilteredCourses.slice(0, 8);
+    }
+  };
+
+  const displayedCourses = getDisplayedCourses();
+  const hasMoreCourses = allFilteredCourses.length > displayedCourses.length;
 
   return (
-    <section className="py-8 sm:py-12 md:pt-0 md:pb-16 px-4 bg-[#F9FAFB]">
+    <section className="py-6 sm:py-8 lg:py-12 xl:pt-0 xl:pb-16 px-3 sm:px-4 bg-[#F9FAFB]">
       <div className="container mx-auto">
-        {/* Header section with improved mobile layout */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 sm:mb-10">
-          <div className="text-center md:text-left">
-            <h5 className="text-blue-600 font-semibold text-sm sm:text-base mb-2">FEATURED COLLECTIONS</h5>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">Recently Launched</h2>
+        {/* Header section - mobile vs desktop optimized */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4 sm:mb-6 lg:mb-10">
+          <div className="text-center lg:text-left">
+            {/* Mobile header - more compact */}
+            <div className="block sm:hidden">
+              <h5 className="text-blue-600 font-semibold text-xs mb-1">FEATURED</h5>
+              <h2 className="text-lg font-bold text-gray-900">Recently Launched</h2>
+            </div>
+            
+            {/* Desktop header - preserved original */}
+            <div className="hidden sm:block">
+              <h5 className="text-blue-600 font-semibold text-sm lg:text-base mb-2">FEATURED COLLECTIONS</h5>
+              <h2 className="text-2xl lg:text-3xl xl:text-4xl font-bold text-gray-900">Recently Launched</h2>
+            </div>
           </div>
           
-          <div className="mt-4 md:mt-0 text-center md:text-left">
-            <Link to="/courses" className="inline-flex items-center text-blue-600 font-medium hover:underline text-sm sm:text-base">
+          <div className="mt-3 lg:mt-0 text-center lg:text-left">
+            <Link to="/courses" className="inline-flex items-center text-blue-600 font-medium hover:underline text-xs sm:text-sm lg:text-base">
               View All Courses
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
             </Link>
           </div>
         </div>
         
-        {/* Category filters with improved scrolling on mobile */}
-        <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 mb-6 sm:mb-8">
-          <div className="flex items-center gap-2 min-w-max pb-2">
+        {/* Category filters - improved mobile experience */}
+        <div className="overflow-x-auto scrollbar-hide -mx-3 px-3 sm:-mx-4 sm:px-4 mb-4 sm:mb-6 lg:mb-8">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-max pb-2">
             {categories.map(category => (
               <button
                 key={category.id}
                 onClick={() => setActiveCategory(category.id)}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+                className={`px-2.5 sm:px-3 lg:px-4 py-1 sm:py-1.5 lg:py-2 rounded-full text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
                   activeCategory === category.id
                     ? 'bg-blue-600 text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
@@ -244,69 +275,86 @@ const FeaturedPlaylists = () => {
           </div>
         </div>
 
-        {/* Course grid with responsive layout */}
+        {/* Course grid with enhanced mobile layout */}
         {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">Loading new courses...</span>
+          <div className="flex justify-center items-center py-8 sm:py-12">
+            <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-2 sm:ml-3 text-gray-600 text-sm sm:text-base">Loading new courses...</span>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {filteredCourses.length > 0 ? (
-              filteredCourses.map(course => (
-                <div 
-                  key={course.id} 
-                  onClick={() => handleCourseClick(course)}
-                  className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden cursor-pointer"
-                >
-                  {/* Course thumbnail with aspect ratio lock */}
-                  <div className="relative pb-[56.25%]">
-                    <img 
-                      src={course.image} 
-                      alt={course.title}
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  </div>
-                  
-                  {/* Course info with improved spacing */}
-                  <div className="p-4 sm:p-5">
-                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm sm:text-base">
-                      {course.title}
-                    </h3>
-                    
-                    <div className="flex items-center text-sm text-gray-500 mb-3">
-                      <span>{course.duration}</span>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+              {displayedCourses.length > 0 ? (
+                displayedCourses.map(course => (
+                  <div 
+                    key={course.id} 
+                    onClick={() => handleCourseClick(course)}
+                    className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden cursor-pointer"
+                  >
+                    {/* Course thumbnail with aspect ratio lock */}
+                    <div className="relative pb-[56.25%]">
+                      <img 
+                        src={course.image} 
+                        alt={course.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
-                          {course.author[0]}
-                        </div>
-                        <span className="ml-2 text-xs sm:text-sm text-gray-600">{course.author}</span>
+                    {/* Course info with responsive spacing */}
+                    <div className="p-3 sm:p-4 lg:p-5">
+                      <h3 className="font-semibold text-gray-900 mb-1.5 sm:mb-2 line-clamp-2 text-sm sm:text-base">
+                        {course.title}
+                      </h3>
+                      
+                      <div className="flex items-center text-xs sm:text-sm text-gray-500 mb-2 sm:mb-3">
+                        <span>{course.duration}</span>
                       </div>
                       
-                      <div className="flex items-center">
-                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">
-                          {course.board}
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
+                            {course.author[0]}
+                          </div>
+                          <span className="ml-1.5 sm:ml-2 text-xs sm:text-sm text-gray-600 truncate">{course.author}</span>
+                        </div>
+                        
+                        <div className="flex items-center">
+                          <span className="bg-blue-100 text-blue-800 text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium">
+                            {course.board}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-8 sm:py-12">
+                  <div className="text-gray-400 mb-3 sm:mb-4">
+                    <svg className="w-12 h-12 sm:w-16 sm:h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">No courses found</h3>
+                  <p className="text-sm sm:text-base text-gray-600">New courses will appear here once they're added.</p>
                 </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-12">
-                <div className="text-gray-400 mb-4">
-                  <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              )}
+            </div>
+            
+            {/* Load More button for mobile */}
+            {hasMoreCourses && (
+              <div className="flex justify-center mt-6 sm:hidden">
+                <button
+                  onClick={() => setShowAllOnMobile(true)}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors duration-200 flex items-center"
+                >
+                  Load More Courses
+                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No courses found</h3>
-                <p className="text-gray-600">New courses will appear here once they're added.</p>
+                </button>
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </section>
