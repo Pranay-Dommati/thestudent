@@ -38,10 +38,8 @@ const AIGeneratedLearningPath = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  // Modify the handleKeyDown function
   const handleKeyDown = (e) => {
     if (showExamples && inputValue.length === 0) {
-      // Dropdown navigation logic
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         const newIndex = selectedIndex < examples.length - 1 ? selectedIndex + 1 : 0;
@@ -87,10 +85,7 @@ const AIGeneratedLearningPath = () => {
     setIsGenerating(true);
     
     try {
-      // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Navigate to learning page with the topic
       navigate(`/learning-path?topic=${encodeURIComponent(inputValue.trim())}`);
     } catch (error) {
       console.error('Error generating learning path:', error);
@@ -103,7 +98,6 @@ const AIGeneratedLearningPath = () => {
     const value = e.target.value;
     setInputValue(value);
     
-    // Show examples only when input is empty
     if (value.length === 0) {
       setShowExamples(true);
       setSelectedIndex(-1);
@@ -356,23 +350,6 @@ const AIGeneratedLearningPath = () => {
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes fade-in-down {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-fade-in-down {
-          animation: fade-in-down 0.3s ease-out forwards;
-        }
-      `}</style>
     </section>
   );
 };
