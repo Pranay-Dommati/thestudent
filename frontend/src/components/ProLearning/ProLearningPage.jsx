@@ -1088,7 +1088,10 @@ const ProLearningPage = () => {
           localStorage.setItem('coursesSavedToHub', JSON.stringify(savedCourses));
         }
         
-        // No timeout reset - button stays hidden permanently after successful save
+        // Hide the entire save section after 3 seconds
+        setTimeout(() => {
+          setSavedToHub('hidden');
+        }, 3000);
       } else {
         console.error('❌ Failed to save course:', responseData);
         if (response.status === 401) {
@@ -1426,7 +1429,7 @@ const ProLearningPage = () => {
           const savedCourses = JSON.parse(savedStatus);
           // Check if any saved course key contains current course ID
           const isSaved = savedCourses.some(courseKey => courseKey.includes(currentCourseId));
-          setSavedToHub(isSaved);
+          setSavedToHub(isSaved ? 'hidden' : false);
         } catch (error) {
           console.error('Error parsing saved courses from localStorage:', error);
         }
@@ -3052,11 +3055,12 @@ const ProLearningPage = () => {
               {/* Save to Learning Hub Button - Only show for locally generated courses, not database courses */}
               {(() => {
                 const isFromDatabase = topicsList.some(t => t.dbTopic);
-                const shouldShowSaveButton = content && topicsList.length > 0 && !isFromDatabase;
+                const shouldShowSaveButton = content && topicsList.length > 0 && !isFromDatabase && savedToHub !== 'hidden';
                 console.log('🔍 Save button visibility check:', {
                   hasContent: !!content,
                   topicsCount: topicsList.length,
                   isFromDatabase,
+                  savedToHub,
                   shouldShowSaveButton
                 });
                 return shouldShowSaveButton;
@@ -3075,16 +3079,16 @@ const ProLearningPage = () => {
                       </div>
                       <button
                         onClick={handleSaveToLearningHub}
-                        disabled={isSavingToHub || savedToHub}
+                        disabled={isSavingToHub || savedToHub === true}
                         className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center space-x-2 ${
-                          savedToHub
+                          savedToHub === true
                             ? 'bg-green-500 text-white cursor-default'
                             : isSavingToHub
                             ? 'bg-gray-400 text-white cursor-not-allowed'
                             : 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white hover:from-emerald-700 hover:to-teal-800 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
                         }`}
                       >
-                        {savedToHub ? (
+                        {savedToHub === true ? (
                           <>
                             <FaCheck className="text-lg" />
                             <span>Saved to Hub!</span>
