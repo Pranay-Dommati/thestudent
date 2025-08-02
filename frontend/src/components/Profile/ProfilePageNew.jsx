@@ -264,6 +264,21 @@ const ProfilePage = () => {
     try {
       toast.loading(`Disconnecting from ${provider}...`);
       
+      // Check if user authenticated via this provider
+      if (user && user.auth_method === provider) {
+        // If user authenticated via this social provider, disconnecting means logging out
+        toast.dismiss();
+        toast.success(`Disconnected from ${provider.charAt(0).toUpperCase() + provider.slice(1)}. Logging out...`);
+        
+        // Add a small delay to show the message before logout
+        setTimeout(() => {
+          logout();
+          navigate('/');
+        }, 1500);
+        return;
+      }
+      
+      // For other cases (secondary social accounts), just disconnect the link
       // Simulate API call for disconnection
       await new Promise(resolve => setTimeout(resolve, 1500));
       
@@ -596,9 +611,10 @@ const ProfilePage = () => {
                                 className={`group px-4 py-2 text-sm font-medium border rounded-xl transition-all duration-200
                                   text-${color}-600 border-${color}-200 ${hoverBg} hover:border-${color}-300
                                   flex items-center space-x-2`}
+                                title={user?.auth_method === provider ? `Disconnecting will log you out` : `Disconnect from ${provider}`}
                               >
                                 <FaUnlink className={`w-4 h-4 text-${color}-500 group-hover:rotate-12 transition-transform`} />
-                                <span>Disconnect</span>
+                                <span>{user?.auth_method === provider ? 'Disconnect & Logout' : 'Disconnect'}</span>
                               </motion.button>
                             ) : (
                               <motion.button
