@@ -4,6 +4,65 @@ import json
 import re
 from .ai_service import call_gemini_api
 
+from .ai_service import call_gemini_api, call_gemini_flash_api
+
+def classify_topic_with_ai(topic):
+    """
+    Use Gemini 1.5 Flash to intelligently classify topic and select best prompt
+    """
+    print(f"🤖 Analyzing topic with AI: {topic}")
+    
+    # Create a prompt for AI to analyze the topic and choose the best category
+    analysis_prompt = f"""You are an expert educational content categorizer. Analyze the given topic and determine which category it best fits into for educational content generation.
+
+Available Categories:
+1. **technical** - Programming languages, software development, frameworks, APIs, databases, system design, computer science fundamentals, coding concepts, development tools
+2. **academic** - History, Physics, Mathematics, Chemistry, Biology, Economics, Psychology, Geography, Literature, Sciences, traditional academic subjects
+3. **skills** - Communication, leadership, time management, emotional intelligence, confidence, personal development, soft skills, interpersonal skills
+4. **business_finance** - Finance, investing, accounting, budgeting, financial literacy, personal finance, business concepts (general business topics)
+5. **creative** - Writing, storytelling, design, photography, filmmaking, content creation, media production, artistic skills
+6. **entrepreneurship** - Startups, business models, marketing strategies, entrepreneurship, business strategy, launching businesses
+7. **general** - Topics that don't clearly fit into any of the above categories
+
+Topic to analyze: "{topic}"
+
+Instructions:
+- Analyze the topic carefully considering its primary focus and learning objectives
+- Choose the SINGLE most appropriate category from the list above
+- If the topic could fit multiple categories, choose the one that would provide the best educational experience
+- Only use "general" if the topic truly doesn't fit any other category well
+
+Respond with ONLY the category name (technical, academic, skills, business_finance, creative, entrepreneurship, or general). No explanation needed."""
+
+    try:
+        print(f"🎯 Sending topic analysis request to Gemini Flash...")
+        response_data = call_gemini_flash_api(analysis_prompt)
+        
+        # Extract the response text from Gemini's response format
+        if 'candidates' in response_data and len(response_data['candidates']) > 0:
+            candidate = response_data['candidates'][0]
+            if 'content' in candidate and 'parts' in candidate['content']:
+                category = candidate['content']['parts'][0]['text'].strip().lower()
+                
+                # Validate the category
+                valid_categories = ['technical', 'academic', 'skills', 'business_finance', 'creative', 'entrepreneurship', 'general']
+                if category in valid_categories:
+                    print(f"✅ AI classified '{topic}' as: {category}")
+                    return category
+                else:
+                    print(f"⚠️ AI returned invalid category '{category}', falling back to keyword classification")
+                    # Fall back to keyword-based classification if AI returns invalid category
+                    return classify_topic(topic)
+        
+        print("❌ Invalid response format from Gemini Flash, falling back to keyword classification")
+        return classify_topic(topic)
+        
+    except Exception as e:
+        print(f"❌ AI classification failed: {e}")
+        print("🔄 Falling back to keyword-based classification")
+        # Fall back to the original keyword-based classification
+        return classify_topic(topic)
+
 def classify_topic(topic):
     """
     Classify the topic into appropriate category for prompt selection
@@ -373,17 +432,20 @@ def handle_reading(request):
         body = json.loads(request.body.decode('utf-8'))
         topic = body.get('topic', '')
         
-        # Classify the topic and get appropriate prompt
-        category = classify_topic(topic)
+        # Classify the topic using AI and get appropriate prompt
+        print(f"🚀 Starting AI-powered topic classification for: '{topic}'")
+        category = classify_topic_with_ai(topic)
         prompt = get_prompt_by_category(topic, category)
         
-        print(f"📊 Topic: '{topic}' classified as: '{category}'")
+        print(f"📊 Topic: '{topic}' classified as: '{category}' by AI")
+        print(f"🎯 Selected prompt type: {category}")
         
         result = call_gemini_api(prompt)
         
         # Add category to the response for debugging/frontend usage
         if isinstance(result, dict):
             result['topic_category'] = category
+            result['classification_method'] = 'ai_powered'
             result['topic_analyzed'] = topic
         else:
             # If result is not a dict, wrap it with metadata
