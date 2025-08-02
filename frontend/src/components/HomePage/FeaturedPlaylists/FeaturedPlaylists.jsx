@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSchoolCourses, getAllCourses } from '../../../services/courseApi';
+import { getSchoolCourses, getAllCourses, getEngineeringCourses } from '../../../services/courseApi';
 import { useNavigate, Link } from 'react-router-dom';
 
 const categories = [
@@ -25,15 +25,18 @@ const FeaturedPlaylists = () => {
     const fetchRealCourses = async () => {
       setLoading(true);
       try {
-        // Get all school courses from database using the correct API that returns all fields
-        // We'll fetch courses without specific filters to get all courses
-        const allCourses = await getSchoolCourses('', '', ''); // Empty filters to get all
-        console.log('Fetched real courses:', allCourses);
-        console.log('Sample course fields:', allCourses[0]); // Log first course to see all fields
+        // Fetch both school courses and engineering courses
+        const [schoolCourses, engineeringCourses] = await Promise.all([
+          getSchoolCourses('', '', ''), // Empty filters to get all school courses
+          getEngineeringCourses('all') // Get all engineering courses
+        ]);
         
-        // Transform courses to match our display format
-        const transformedCourses = allCourses.map(course => {
-          console.log('Raw course data:', course); // Debug log
+        console.log('Fetched school courses:', schoolCourses);
+        console.log('Fetched engineering courses:', engineeringCourses);
+        
+        // Transform school courses to match our display format
+        const transformedSchoolCourses = schoolCourses.map(course => {
+          console.log('Raw school course data:', course); // Debug log
           
           // Determine category based on class_level
           let category = 'other';
@@ -103,11 +106,41 @@ const FeaturedPlaylists = () => {
             state: course.state, // Store state data for navigation
             subject: course.subject || 'General',
             class_level: course.class_level, // Store class level for navigation
-            image: course.thumbnail || 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3'
+            image: course.thumbnail || 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3',
+            courseType: 'school'
           };
         });
 
-        setCourses(transformedCourses);
+        // Transform engineering courses to match our display format
+        const transformedEngineeringCourses = Array.isArray(engineeringCourses) ? engineeringCourses.map(course => {
+          console.log('Raw engineering course data:', course); // Debug log
+          
+          // Handle duration
+          let duration = 'Duration TBA';
+          if (course.duration) {
+            duration = course.duration.includes('hour') ? course.duration : `${course.duration} hours`;
+          }
+
+          return {
+            id: course.id,
+            title: course.title,
+            duration: duration,
+            category: 'engineering', // All engineering courses get 'engineering' category
+            author: course.sources || course.category || 'Engineering', // Use sources or category as author
+            board: 'Engineering',
+            board_raw: 'engineering',
+            subject: course.category || 'Engineering',
+            image: course.thumbnail || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?ixlib=rb-4.0.3',
+            courseType: 'engineering'
+          };
+        }) : [];
+
+        // Combine both types of courses
+        const allCourses = [...transformedSchoolCourses, ...transformedEngineeringCourses];
+        console.log('Combined courses:', allCourses);
+        console.log('Engineering courses count:', transformedEngineeringCourses.length);
+        
+        setCourses(allCourses);
       } catch (error) {
         console.error('Error fetching courses:', error);
         // Fallback to a few sample courses if API fails
@@ -120,7 +153,8 @@ const FeaturedPlaylists = () => {
             author: 'StudentsHub',
             board: 'CBSE',
             subject: 'Mathematics',
-            image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3'
+            image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3',
+            courseType: 'school'
           }
         ]);
       } finally {
@@ -135,6 +169,15 @@ const FeaturedPlaylists = () => {
   const handleCourseClick = (course) => {
     console.log('Course clicked:', course); // Debug log
     
+    // Handle engineering courses differently
+    if (course.courseType === 'engineering') {
+      const navigationPath = `/courses/engineering/${course.id}`;
+      console.log('Engineering course navigation path:', navigationPath);
+      navigate(navigationPath);
+      return;
+    }
+    
+    // Handle school courses
     // Extract class level from course data - handle different formats
     let classPath = '';
     if (course.class_level) {
@@ -191,7 +234,7 @@ const FeaturedPlaylists = () => {
       navigationPath = `/courses/${classPath}/${boardPath}/${subjectPath}`;
     }
     
-    console.log('Navigation path:', navigationPath); // Debug log
+    console.log('School course navigation path:', navigationPath); // Debug log
     
     // Navigate to course page
     if (classPath) {

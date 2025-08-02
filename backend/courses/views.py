@@ -1495,7 +1495,7 @@ def get_user_enrolled_courses(request):
                     'class_level': safe_field(enrollment.school_course, 'class_level'),
                     'board': safe_field(enrollment.school_course, 'board'),
                     'state': safe_field(enrollment.school_course, 'state'),
-                    'thumbnail': safe_field(enrollment.school_course, 'thumbnail') or "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
+                    'thumbnail': request.build_absolute_uri(enrollment.school_course.thumbnail.url) if enrollment.school_course.thumbnail else "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
                     'duration': safe_field(enrollment.school_course, 'duration'),
                     'sources': safe_field(enrollment.school_course, 'sources'),
                     'description': safe_field(enrollment.school_course, 'description'),
@@ -1519,7 +1519,7 @@ def get_user_enrolled_courses(request):
                     'subject': safe_field(enrollment.engineering_course, 'subject'),
                     'proficiency': safe_field(enrollment.engineering_course, 'proficiency'),
                     'category': safe_field(enrollment.engineering_course, 'category'),
-                    'thumbnail': safe_field(enrollment.engineering_course, 'thumbnail') or "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
+                    'thumbnail': request.build_absolute_uri(enrollment.engineering_course.thumbnail.url) if enrollment.engineering_course.thumbnail else "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
                     'duration': safe_field(enrollment.engineering_course, 'duration'),
                     'sources': safe_field(enrollment.engineering_course, 'sources'),
                     'description': safe_field(enrollment.engineering_course, 'description'),
@@ -1539,6 +1539,53 @@ def get_user_enrolled_courses(request):
         return Response({
             'success': False,
             'error': f'Failed to get enrolled courses: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_course_enrollment(request, enrollment_id):
+    """
+    Delete a course enrollment for the authenticated user
+    """
+    try:
+        from .models import UserStartedPredefinedCourse
+        
+        user = request.user
+        
+        # Get the enrollment record
+        try:
+            enrollment = UserStartedPredefinedCourse.objects.get(
+                id=enrollment_id,
+                user=user
+            )
+        except UserStartedPredefinedCourse.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Enrollment not found or you do not have permission to delete it'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Store course info for response
+        course_info = {
+            'course_type': enrollment.course_type,
+            'course_id': enrollment.school_course_id if enrollment.course_type == 'school' else enrollment.engineering_course_id
+        }
+        
+        # Delete the enrollment
+        enrollment.delete()
+        
+        return Response({
+            'success': True,
+            'message': 'Course enrollment removed successfully',
+            'course_info': course_info
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in delete_course_enrollment: {str(e)}")
+        traceback.print_exc()
+        return Response({
+            'success': False,
+            'error': f'Failed to remove course enrollment: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

@@ -177,7 +177,18 @@ const AILearningPlans = () => {
         </p>
         <Link 
           to="/chat"
-          className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+          className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium shadow-sm border border-purple-700"
+          style={{ 
+            pointerEvents: 'auto',
+            cursor: 'pointer',
+            position: 'relative',
+            zIndex: 50
+          }}
+          onClick={(e) => {
+            console.log('Create Your First AI Course button clicked - navigating to /chat');
+            // Ensure navigation happens
+            e.stopPropagation();
+          }}
         >
           <FaBrain className="mr-2" />
           Create Your First AI Course

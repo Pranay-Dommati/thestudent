@@ -3,14 +3,17 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import { FaTrash, FaTimes } from 'react-icons/fa';
 
 const API_URL = 'http://localhost:8000';
+const COURSES_PER_PAGE = 4; // Show 4 courses initially
 
 const ActiveCourses = () => {
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('recent');
   const [showAll, setShowAll] = useState(false);
+  const [removingCourseId, setRemovingCourseId] = useState(null);
   const { isLoggedIn } = useAuth();
 
   useEffect(() => {
@@ -37,6 +40,10 @@ const ActiveCourses = () => {
             const course = enrollment.school_course || enrollment.engineering_course;
             const courseType = enrollment.school_course ? 'school' : 'engineering';
             
+            // Debug course data
+            console.log('🖼️ [COURSE IMAGE] Processing course:', course.title);
+            console.log('🖼️ [COURSE IMAGE] Course thumbnail from API:', course.thumbnail);
+            
             // Calculate time since enrollment for "last accessed"
             const startedDate = new Date(enrollment.started_at);
             const now = new Date();
@@ -53,8 +60,14 @@ const ActiveCourses = () => {
               const subject = enrollment.subject;
               courseUrl = `/courses/${classLevel}/${board}/${subject}`;
             } else {
-              courseUrl = `/courses/engineering/${course.category}/${course.proficiency}`;
+              // Engineering courses use course ID
+              courseUrl = `/courses/engineering/${course.id}`;
             }
+
+            // Use the thumbnail URL directly from the API (backend should handle absolute URLs)
+            const imageUrl = course.thumbnail || "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80";
+            
+            console.log('🖼️ [COURSE IMAGE] Final image URL for', course.title, ':', imageUrl);
 
             return {
               id: course.id,
@@ -63,7 +76,7 @@ const ActiveCourses = () => {
               subject: course.subject,
               board: courseType === 'school' ? enrollment.board : course.category,
               class: courseType === 'school' ? enrollment.class_level : `${course.proficiency} Level`,
-              thumbnail: course.thumbnail || "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
+              thumbnail: imageUrl,
               progress: enrollment.progress_percentage || 0,
               timeLeft: "Not calculated",
               lastAccessed: lastAccessed,
@@ -103,26 +116,57 @@ const ActiveCourses = () => {
     toast.success(`${showAll ? 'Showing limited courses' : 'Showing all courses'}`);
   };
 
+  const handleRemoveCourse = async (enrollmentId, courseTitle) => {
+    if (!window.confirm(`Are you sure you want to remove "${courseTitle}" from your enrolled courses?`)) {
+      return;
+    }
+
+    setRemovingCourseId(enrollmentId);
+    
+    try {
+      const token = localStorage.getItem('accessToken');
+      await axios.delete(`${API_URL}/api/courses/enrollment/${enrollmentId}/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // Remove the course from the local state
+      setEnrolledCourses(prev => prev.filter(course => course.enrollmentId !== enrollmentId));
+      toast.success(`Successfully removed "${courseTitle}" from your courses`);
+    } catch (error) {
+      console.error('Error removing course:', error);
+      if (error.response?.status === 404) {
+        toast.error('Course enrollment not found');
+      } else {
+        toast.error('Failed to remove course. Please try again.');
+      }
+    } finally {
+      setRemovingCourseId(null);
+    }
+  };
+
   // Apply sorting and filtering
   const processedCourses = React.useMemo(() => {
     let courses = [...enrolledCourses];
     
     // Sort courses
     if (sortBy === 'alphabetical') {
-      courses.sort((a, b) => a.course_name.localeCompare(b.course_name));
+      courses.sort((a, b) => a.title.localeCompare(b.title));
     } else {
-      courses.sort((a, b) => new Date(b.enrolled_at) - new Date(a.enrolled_at));
-    }
-    
-    // Limit courses if not showing all
-    if (!showAll && courses.length > 3) {
-      courses = courses.slice(0, 3);
+      // Sort by recent (newest enrollments first)
+      courses.sort((a, b) => new Date(b.lastAccessed) - new Date(a.lastAccessed));
     }
     
     return courses;
-  }, [enrolledCourses, sortBy, showAll]);
+  }, [enrolledCourses, sortBy]);
 
-  const activeCourses = processedCourses;
+  // Get courses to display (with pagination)
+  const coursesToDisplay = showAll ? processedCourses : processedCourses.slice(0, COURSES_PER_PAGE);
+  const hasMoreCourses = processedCourses.length > COURSES_PER_PAGE;
+
+  const activeCourses = coursesToDisplay;
 
   return (
     <section className="bg-white rounded-xl shadow-md p-4 sm:p-6">
@@ -177,40 +221,87 @@ const ActiveCourses = () => {
           </div>
         </div>
       ) : activeCourses.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {activeCourses.map((course) => (
-            <div key={course.enrollmentId} className="group border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-all duration-200">
-              <div className="flex flex-col sm:flex-row">
-                <Link to={course.courseUrl} className="block sm:w-1/3 relative overflow-hidden">
-                  <img 
-                    src={course.thumbnail} 
-                    alt={course.title}
-                    className="h-48 sm:h-full w-full object-cover transform transition-transform duration-300 group-hover:scale-105"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = "https://images.unsplash.com/photo-1635070041078-e363dbe005cb";
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-black/5 group-hover:bg-black/0 transition-colors"></div>
+        <>
+          {/* Course Grid with Properly Sized Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
+            {activeCourses.map((course) => (
+              <div key={course.enrollmentId} className="group bg-white border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 relative flex flex-col h-80">
+                
+                {/* Remove Button */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleRemoveCourse(course.enrollmentId, course.title);
+                  }}
+                  className="absolute top-2 right-2 z-20 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-sm"
+                  title="Remove from enrolled courses"
+                  disabled={removingCourseId === course.enrollmentId}
+                >
+                  {removingCourseId === course.enrollmentId ? (
+                    <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <FaTimes className="text-xs" />
+                  )}
+                </button>
+
+                {/* Course Image - Increased Height */}
+                <Link to={course.courseUrl} className="block relative overflow-hidden flex-shrink-0">
+                  <div className="h-40 bg-gray-100">
+                    <img 
+                      src={course.thumbnail} 
+                      alt={course.title}
+                      className="w-full h-full object-cover transform transition-transform duration-300 group-hover:scale-105"
+                      onError={(e) => {
+                        console.log('🖼️ [IMAGE ERROR] Failed to load image:', e.target.src, 'for course:', course.title);
+                        e.target.onerror = null;
+                        
+                        const fallbackImages = [
+                          "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
+                          "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+                          "https://via.placeholder.com/400x240/6366f1/ffffff?text=Course+Image"
+                        ];
+                        
+                        const currentIndex = fallbackImages.indexOf(e.target.src);
+                        const nextIndex = currentIndex + 1;
+                        
+                        if (nextIndex < fallbackImages.length) {
+                          e.target.src = fallbackImages[nextIndex];
+                        } else {
+                          e.target.src = fallbackImages[fallbackImages.length - 1];
+                        }
+                      }}
+                      onLoad={() => {
+                        console.log('🖼️ [IMAGE SUCCESS] Successfully loaded image for course:', course.title);
+                      }}
+                    />
+                  </div>
+                  <div className="absolute inset-0 bg-black/5 group-hover:bg-black/10 transition-colors"></div>
                 </Link>
-                <div className="flex-1 flex flex-col p-4 sm:p-5">
-                  <div>
+
+                {/* Course Content - Reduced Spacing */}
+                <div className="p-3 flex-1 flex flex-col justify-between">
+                  <div className="flex-1">
                     <Link to={course.courseUrl} className="group-hover:text-indigo-600 transition-colors">
-                      <h3 className="font-bold text-base sm:text-lg line-clamp-2 mb-1">{course.title}</h3>
+                      <h3 className="font-semibold text-base line-clamp-2 mb-1">{course.title}</h3>
                     </Link>
-                    <p className="text-gray-600 text-sm mb-1">{course.board} • {course.class}</p>
-                    <p className="text-gray-500 text-xs mb-3">{course.subject}</p>
+                    <div className="flex items-center text-sm text-gray-600">
+                      <span className="truncate">{course.board}</span>
+                      <span className="mx-1">•</span>
+                      <span className="truncate">{course.class}</span>
+                    </div>
                   </div>
                   
-                  <div className="mt-auto space-y-3">
+                  <div className="space-y-0">
+                    {/* Progress Bar */}
                     <div>
-                      <div className="flex justify-between text-sm text-gray-600 mb-1.5">
+                      <div className="flex justify-between text-xs text-gray-600 mb-0.5">
                         <span>Progress</span>
                         <span className="font-medium">{course.progress}%</span>
                       </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div className="w-full bg-gray-100 rounded-full h-1.5">
                         <div 
-                          className={`rounded-full h-2 transition-all duration-300 ${
+                          className={`rounded-full h-1.5 transition-all duration-300 ${
                             course.progress < 30 ? 'bg-blue-500' : 
                             course.progress < 70 ? 'bg-indigo-500' : 
                             'bg-green-500'
@@ -219,28 +310,53 @@ const ActiveCourses = () => {
                         ></div>
                       </div>
                     </div>
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-4">
-                      <div className="text-sm text-gray-500 flex flex-wrap gap-x-2">
-                        <span>Enrolled {course.lastAccessed}</span>
-                      </div>
+
+                    {/* Action Button */}
+                    <div className="flex justify-between items-center pt-1">
+                      <span className="text-xs text-gray-500 truncate">Enrolled {course.lastAccessed}</span>
                       <Link 
                         to={course.learningUrl}
-                        className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 
-                        transition-colors flex items-center justify-center sm:justify-start group-hover:shadow-md cursor-pointer relative z-10"
+                        className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 
+                        transition-colors flex items-center justify-center group-hover:shadow-md cursor-pointer relative z-10 flex-shrink-0"
                         style={{ pointerEvents: 'auto' }}
                         onClick={(e) => {
                           console.log('Start/Continue Learning clicked for:', course.course_name, 'URL:', course.learningUrl);
                         }}
                       >
-                        {course.progress > 0 ? 'Continue Learning' : 'Start Learning'}
+                        {course.progress > 0 ? 'Continue' : 'Start'}
                       </Link>
                     </div>
                   </div>
                 </div>
               </div>
+            ))}
+          </div>
+
+          {/* Load More Button */}
+          {hasMoreCourses && !showAll && (
+            <div className="text-center mt-6">
+              <button
+                onClick={handleViewAll}
+                className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-sm hover:shadow-md text-sm"
+              >
+                Load More Courses ({processedCourses.length - COURSES_PER_PAGE} remaining)
+              </button>
             </div>
-          ))}
-        </div>      ) : (
+          )}
+
+          {/* Show Less Button */}
+          {showAll && hasMoreCourses && (
+            <div className="text-center mt-6">
+              <button
+                onClick={handleViewAll}
+                className="px-5 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium shadow-sm hover:shadow-md text-sm"
+              >
+                Show Less
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
         <div className="text-center p-6 sm:p-8 bg-gray-50 rounded-xl">
           <div className="max-w-md mx-auto">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400 mb-4 transform transition-transform hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -251,7 +367,18 @@ const ActiveCourses = () => {
             <Link 
               to="/courses" 
               className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 
-              transition-all duration-200 hover:shadow-lg active:transform active:scale-95"
+              transition-all duration-200 hover:shadow-lg active:transform active:scale-95 border border-indigo-700"
+              style={{ 
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                position: 'relative',
+                zIndex: 50
+              }}
+              onClick={(e) => {
+                console.log('Browse Courses button clicked - navigating to /courses');
+                // Ensure navigation happens
+                e.stopPropagation();
+              }}
             >
               <span>Browse Courses</span>
               <svg className="w-4 h-4 ml-2" viewBox="0 0 20 20" fill="currentColor">

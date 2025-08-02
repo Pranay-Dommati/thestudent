@@ -49,7 +49,17 @@ const HeroSection = ({ user }) => {
           <div className="flex flex-wrap gap-4">
             <Link 
               to="/chat"
-              className="group relative px-6 py-3 bg-white text-indigo-700 font-medium rounded-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:bg-opacity-95 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600"
+              className="group relative px-6 py-3 bg-white text-indigo-700 font-medium rounded-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:bg-opacity-95 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 border border-gray-200"
+              style={{ 
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                position: 'relative',
+                zIndex: 50
+              }}
+              onClick={(e) => {
+                console.log('Create Custom Course button clicked - navigating to /chat');
+                e.stopPropagation();
+              }}
             >
               <span className="relative z-10 flex items-center">
                 <FaRocket className="mr-2" />
@@ -59,6 +69,16 @@ const HeroSection = ({ user }) => {
             <Link 
               to="/courses"
               className="group relative px-6 py-3 bg-indigo-500 bg-opacity-30 text-white font-medium rounded-lg border border-white/30 transition-all duration-300 hover:bg-opacity-40 hover:border-white/50 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white/50"
+              style={{ 
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                position: 'relative',
+                zIndex: 50
+              }}
+              onClick={(e) => {
+                console.log('Explore Expert Courses button clicked - navigating to /courses');
+                e.stopPropagation();
+              }}
             >
               <span className="relative z-10 flex items-center">
                 <FaBookOpen className="mr-2" />

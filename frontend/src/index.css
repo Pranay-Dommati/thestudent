@@ -235,13 +235,41 @@
     pointer-events: auto !important;
   }
 
+  /* Ensure all buttons and links in Learning Hub are clickable */
+  .btn-clickable,
+  a[href],
+  button {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    position: relative !important;
+    z-index: 10 !important;
+  }
+
+  /* Force interactive elements to be clickable */
+  [role="button"],
+  .clickable {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+  }
+
   /* Prevent overlay interference */
   .modal-overlay {
     pointer-events: auto !important;
   }
 
-  /* Override any pointer-events: none */
-  * {
-    pointer-events: inherit;
+  /* Fix for Learning Hub specific buttons */
+  .learning-hub button,
+  .learning-hub a,
+  .learning-hub-page button,
+  .learning-hub-page a {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    z-index: 50 !important;
+    position: relative !important;
+  }
+
+  /* Override any pointer-events: none - but be more specific */
+  .pointer-events-auto {
+    pointer-events: auto !important;
   }
 }

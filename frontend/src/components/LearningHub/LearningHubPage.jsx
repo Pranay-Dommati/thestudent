@@ -118,7 +118,7 @@ const LearningHubPage = () => {
   return (
     <>
       <Navbar initialStyle="gradient" />
-      <div className="learning-hub-container min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/30 to-indigo-50/50 pt-16 relative">
+      <div className="learning-hub-container learning-hub-page min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/30 to-indigo-50/50 pt-16 relative">
         {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-[0.02]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.4'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
@@ -195,7 +195,7 @@ const LearningHubPage = () => {
               </section>
               
               {/* Minimalistic Call-to-Action Buttons Section */}
-              <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-4 learning-hub">
                 
                 {/* Create Custom Course with AI */}
                 <div className="group bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl p-5 text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
@@ -211,10 +211,17 @@ const LearningHubPage = () => {
                     </div>
                     <Link 
                       to="/chat"
-                      className="bg-white text-purple-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-50 transition-colors cursor-pointer relative z-10"
-                      style={{ pointerEvents: 'auto' }}
+                      className="btn-clickable pointer-events-auto bg-white text-purple-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-50 transition-colors cursor-pointer relative z-50 shadow-sm border border-gray-200"
+                      style={{ 
+                        pointerEvents: 'auto',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        zIndex: 50
+                      }}
                       onClick={(e) => {
                         console.log('Start button clicked - navigating to /chat');
+                        // Ensure navigation happens
+                        e.stopPropagation();
                       }}
                     >
                       Start
@@ -236,10 +243,17 @@ const LearningHubPage = () => {
                     </div>
                     <Link 
                       to="/courses"
-                      className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors cursor-pointer relative z-10"
-                      style={{ pointerEvents: 'auto' }}
+                      className="btn-clickable pointer-events-auto bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors cursor-pointer relative z-50 shadow-sm border border-gray-200"
+                      style={{ 
+                        pointerEvents: 'auto',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        zIndex: 50
+                      }}
                       onClick={(e) => {
                         console.log('Browse button clicked - navigating to /courses');
+                        // Ensure navigation happens
+                        e.stopPropagation();
                       }}
                     >
                       Browse

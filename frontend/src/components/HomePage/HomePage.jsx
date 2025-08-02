@@ -1,6 +1,6 @@
 import Hero from "./Hero/Hero";
 import FeaturedPlaylists from "./FeaturedPlaylists/FeaturedPlaylists";
-import AIGeneratedLearningPath from "./AIGeneratedLearningPath/AIGeneratedLearningPath";
+import AIGeneratedLearningPath from "./AIGeneratedLearningPath/AIGeneratedLearningPathComponent";
 import TrustSection from "./TrustSection/TrustSection";
 // import Testimonials from "./Testimonials/Testimonials";
 import Footer from "../Footer/Footer";
