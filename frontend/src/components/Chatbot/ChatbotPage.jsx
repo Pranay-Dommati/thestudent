@@ -1583,7 +1583,7 @@ const ChatbotPage = () => {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Type your message here..."
+                  placeholder={proMode ? "Create arrays and strings course..." : "Type your message here..."}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
