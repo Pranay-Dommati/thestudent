@@ -14,6 +14,8 @@ const API_URL = 'http://localhost:8000';
 const SchoolCourseDetails = () => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [checkingEnrollment, setCheckingEnrollment] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { boardId, stateId, subjectId } = useParams();
@@ -31,6 +33,45 @@ const SchoolCourseDetails = () => {
     'Science': '🔬',
     'Computer Science': '💻',
     'General': '📘'
+  };
+
+  // Function to check if user is already enrolled
+  const checkEnrollmentStatus = async (courseId) => {
+    if (!isLoggedIn) {
+      setIsEnrolled(false);
+      return;
+    }
+
+    setCheckingEnrollment(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        setIsEnrolled(false);
+        return;
+      }
+
+      const response = await axios.get(
+        `${API_URL}/api/courses/enrollment-status/${courseId}/`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      setIsEnrolled(response.data.is_enrolled || false);
+    } catch (error) {
+      console.error('Error checking enrollment status:', error);
+      // If the enrollment status endpoint doesn't exist yet, assume not enrolled
+      if (error.response?.status === 404 || error.response?.status === 401) {
+        console.log('Enrollment status endpoint not available, assuming not enrolled');
+        setIsEnrolled(false);
+      } else {
+        setIsEnrolled(false);
+      }
+    } finally {
+      setCheckingEnrollment(false);
+    }
   };
 
   useEffect(() => {
@@ -164,26 +205,31 @@ const SchoolCourseDetails = () => {
         console.log('Processed Learning Points:', formattedCourse.whatYouLearn);
         
         setCourse(formattedCourse);
+        
+        // Check enrollment status if user is logged in
+        if (isLoggedIn) {
+          checkEnrollmentStatus(formattedCourse.id);
+        }
       } catch (error) {
         console.error('Error fetching course:', error);
         toast.error('Failed to load course details');
         
         // Fallback to dummy data in case of error
-        const classLevel = location.pathname.includes('/6th/') ? '6th' :
+        const fallbackClassLevel = location.pathname.includes('/6th/') ? '6th' :
                          location.pathname.includes('/7th/') ? '7th' :
                          location.pathname.includes('/8th/') ? '8th' :
                          location.pathname.includes('/9th/') ? '9th' :
                          location.pathname.includes('/10th/') ? '10th' : 
                          location.pathname.includes('/11th/') ? '11th' : '12th';
-        const board = boardId || '';
-        const subject = subjectId || '';
+        const fallbackBoard = boardId || '';
+        const fallbackSubject = subjectId || '';
         
         setCourse({
           id: 1,
-          title: `${classLevel.toUpperCase()} ${board.toUpperCase()} ${subject}`,
-          subject: subject,
-          board: board.toUpperCase(),
-          class: classLevel,
+          title: `${fallbackClassLevel.toUpperCase()} ${fallbackBoard.toUpperCase()} ${fallbackSubject}`,
+          subject: fallbackSubject,
+          board: fallbackBoard.toUpperCase(),
+          class: fallbackClassLevel,
           lastUpdated: "April 2025",
           features: [
             { icon: <FaChalkboardTeacher />, title: "Expert Teachers", desc: "Learn from experienced educators" },
@@ -201,7 +247,7 @@ const SchoolCourseDetails = () => {
           chapters: 15,
           sources: "YouTube",
           thumbnail: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
-          icon: SUBJECT_ICONS[subject] || '📚'
+          icon: SUBJECT_ICONS[fallbackSubject] || '📚'
         });
       } finally {
         setLoading(false);
@@ -209,7 +255,7 @@ const SchoolCourseDetails = () => {
     };
 
     fetchCourseData();
-  }, [location.pathname, boardId, stateId, subjectId]);
+  }, [location.pathname, boardId, stateId, subjectId, isLoggedIn]);
 
   // Activity tracking for learning time
   useEffect(() => {
@@ -234,7 +280,15 @@ const SchoolCourseDetails = () => {
     }
 
     try {
-      // Extract course parameters from URL
+      // If user is already enrolled, navigate directly to learning page
+      if (isEnrolled) {
+        console.log('User already enrolled, navigating directly to learning page');
+        toast.success('Welcome back! Continuing your learning journey.');
+        navigate(`${location.pathname}/learning`);
+        return;
+      }
+
+      // Extract course parameters from URL for new enrollment
       const classLevel = location.pathname.includes('/6th/') ? '6th' :
                         location.pathname.includes('/7th/') ? '7th' :
                         location.pathname.includes('/8th/') ? '8th' :
@@ -265,8 +319,9 @@ const SchoolCourseDetails = () => {
       if (response.data.success) {
         if (response.data.created) {
           toast.success('Successfully enrolled in course!');
+          setIsEnrolled(true); // Update enrollment status
         } else {
-          toast.info('Welcome back! Continuing your learning journey.');
+          toast.success('Welcome back! Continuing your learning journey.');
         }
         
         // Navigate to the learning page
@@ -292,18 +347,24 @@ const SchoolCourseDetails = () => {
     
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white">
-        <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-12">
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-20">
+        <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-center">
             <div className="space-y-4 sm:space-y-6">
+              {/* Course Badge */}
+              <div className="inline-flex items-center bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 text-sm">
+                <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
+                <span className="text-green-200">Live Course Available</span>
+              </div>
+              
               <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4">{course.title}</h1>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 sm:mb-4">{course.title}</h1>
+                <p className="text-lg sm:text-xl text-blue-200 font-medium mb-4">Complete Mastery Course</p>
+                
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-gray-200 mb-4 sm:mb-6 text-xs sm:text-sm">
-                  <span>{course.board}</span>
-                  <span className="hidden sm:inline">•</span>
-                  <span>{course.class} Standard</span>
-                  <span className="hidden sm:inline">•</span>
-                  <span>{course.subject}</span>
+                  <span className="bg-white/10 backdrop-blur-sm rounded px-3 py-1">{course.board}</span>
+                  <span className="bg-white/10 backdrop-blur-sm rounded px-3 py-1">{course.class} Standard</span>
+                  <span className="bg-white/10 backdrop-blur-sm rounded px-3 py-1">{course.subject}</span>
                 </div>
               </div>
 
@@ -324,33 +385,57 @@ const SchoolCourseDetails = () => {
                 </span>
               </div>
 
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2 sm:p-3 md:p-4 mb-4 sm:mb-6">
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
                 <div className="flex items-center gap-2">
                   <FaGlobe className="text-base sm:text-lg" />
-                  <span className="text-xs sm:text-sm md:text-base">Sources : {course.sources}</span>
+                  <span className="text-xs sm:text-sm md:text-base">Sources: {course.sources}</span>
                 </div>
               </div>
 
               <button 
                 onClick={handleStartLearning}
-                className="w-full sm:w-auto bg-indigo-500 hover:bg-indigo-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium text-sm sm:text-base
-                         flex items-center justify-center sm:justify-start space-x-2 transform transition hover:scale-105"
+                disabled={checkingEnrollment}
+                className={`w-full sm:w-auto ${
+                  isEnrolled 
+                    ? 'bg-green-500 hover:bg-green-600' 
+                    : 'bg-indigo-500 hover:bg-indigo-600'
+                } text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-medium text-sm sm:text-base
+                         flex items-center justify-center sm:justify-start space-x-2 transform transition hover:scale-105
+                         ${checkingEnrollment ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span>Start Learning Now</span>
+                <span>
+                  {checkingEnrollment 
+                    ? 'Checking...' 
+                    : isEnrolled 
+                      ? 'Continue Learning' 
+                      : 'Start Learning Now'}
+                </span>
               </button>
             </div>
 
-            <div className="rounded-lg overflow-hidden shadow-xl mt-4 sm:mt-0">
-              <img 
-                src={course.thumbnail} 
-                alt={course.title} 
-                className="w-full h-[180px] sm:h-[250px] md:h-[300px] object-cover"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = "https://images.unsplash.com/photo-1635070041078-e363dbe005cb";
-                }}
-              />
+            {/* Course Image with Elegant Frame */}
+            <div className="relative mt-4 sm:mt-0">
+              <div className="relative">
+                {/* Subtle Background Glow */}
+                <div className="absolute -inset-2 bg-white/10 rounded-2xl blur-sm"></div>
+                
+                {/* Main Image Container with Thin Transparent Border */}
+                <div className="relative bg-transparent border border-white/20 rounded-2xl overflow-hidden shadow-lg backdrop-blur-sm">
+                  <img 
+                    src={course.thumbnail} 
+                    alt={course.title} 
+                    className="w-full h-[280px] sm:h-[320px] md:h-[360px] lg:h-[400px] object-cover transition-all duration-300 hover:scale-105"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://images.unsplash.com/photo-1635070041078-e363dbe005cb";
+                    }}
+                  />
+                  
+                  {/* Subtle Inner Glow */}
+                  <div className="absolute inset-0 ring-1 ring-white/10 rounded-2xl pointer-events-none"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
