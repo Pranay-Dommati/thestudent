@@ -955,7 +955,13 @@ const ChatbotPage = () => {
     return (
       <div className="w-full max-w-5xl mx-auto px-6 lg:px-8 mb-4 lg:mb-6">
         <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
-          <div className={`${message.type === "user" ? "max-w-[85%] lg:max-w-[75%]" : isLearningPlan || isProCard ? "w-full" : "max-w-[85%] lg:max-w-[75%]"}`}>
+          <div className={`${
+            message.type === "user" 
+              ? "max-w-[75%] lg:max-w-[65%]" // User messages - more constrained width
+              : isLearningPlan || isProCard 
+                ? "w-full" 
+                : "max-w-[95%] lg:max-w-[90%] w-full" // Bot messages - much wider
+          }`}>
             <div
               className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 ${
                 message.type === "user"
