@@ -960,7 +960,7 @@ const ChatbotPage = () => {
               ? "max-w-[75%] lg:max-w-[65%]" // User messages - more constrained width
               : isLearningPlan || isProCard 
                 ? "w-full" 
-                : "max-w-[95%] lg:max-w-[85%]" // Bot messages - wider but content-dependent
+                : "w-full" // Bot messages - full width like input bar
           }`}>
             <div
               className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 ${
@@ -1182,30 +1182,6 @@ const ChatbotPage = () => {
         </div>
       </div>
     );
-  };
-
-  const suggestionTopics = [
-    "Create arrays and strings courses",
-    "Learn photosynthesis and water cycle",
-    "JavaScript functions and DOM manipulation",
-  ];
-  
-  const handleSuggestion = async (topic) => {
-    // First set the message
-    setMessage(topic);
-
-    // Handle the send
-    await handleSendMessage(topic);
-
-    // Clear the input and remove focus
-    setMessage("");
-    setIsInputFocused(false);
-
-    // On mobile, ensure the input field is properly updated
-    const input = document.querySelector('input[type="text"]');
-    if (input && isMobile) {
-      input.blur();
-    }
   };
 
   // Fetch usage stats for rate limiting display
@@ -1639,24 +1615,6 @@ const ChatbotPage = () => {
                 </button>
               </div>
               
-              {/* Topic suggestions - Show based on screen size and input focus */}
-              {(!isMobile || (isMobile && isInputFocused)) && (
-                <div className={`flex flex-wrap gap-2 mt-4 ${
-                  isMobile ? 'fixed left-0 right-0 bottom-[72px] bg-white/90 backdrop-blur-md p-4 border-t border-white/20 z-10 shadow-lg animate-slide-up' : ''
-                }`}>
-                  {suggestionTopics.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        handleSuggestion(suggestion);
-                      }}
-                      className="text-xs lg:text-sm bg-white/60 backdrop-blur-sm text-gray-700 px-4 py-2 rounded-full hover:bg-indigo-50/80 hover:text-indigo-600 transition-all duration-200 active:bg-indigo-100/80 border border-white/30 shadow-sm hover:shadow-md"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>
