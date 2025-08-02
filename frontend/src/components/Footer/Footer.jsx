@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { FaLinkedin, FaYoutube } from "react-icons/fa";
+import { FaLinkedin } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 
 const Footer = () => {
@@ -145,21 +145,18 @@ const Footer = () => {
         </div>
 
         {/* Social Media Icons */}
-        <div className="flex justify-center space-x-6 text-xl mt-4">
+        <div className="flex justify-center space-x-8 text-xl mt-4">
           <a href="#" className="hover:text-gray-300 transition-colors" title="X (Twitter)">
             <FaXTwitter />
           </a>
           <a href="#" className="hover:text-blue-600 transition-colors" title="LinkedIn">
             <FaLinkedin />
           </a>
-          <a href="#" className="hover:text-red-600 transition-colors" title="YouTube">
-            <FaYoutube />
-          </a>
         </div>
 
         {/* Copyright */}
         <p className="text-gray-400 text-sm mt-4">
-          © {new Date().getFullYear()} Students Hub. Powered by AI + YouTube.
+          © {new Date().getFullYear()} Students Hub. Empowering learners worldwide.
         </p>
       </div>
     </footer>
