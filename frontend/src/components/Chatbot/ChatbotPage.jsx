@@ -960,10 +960,10 @@ const ChatbotPage = () => {
               ? "max-w-[75%] lg:max-w-[65%]" // User messages - more constrained width
               : isLearningPlan || isProCard 
                 ? "w-full" 
-                : "w-full" // Bot messages - full width like input bar
+                : "max-w-[90%] lg:max-w-[85%] min-w-0" // Bot messages - content-dependent width
           }`}>
             <div
-              className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 ${
+              className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 w-fit ${
                 message.type === "user"
                   ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg backdrop-blur-sm rounded-br-md"
                   : isLearningPlan || isProCard
