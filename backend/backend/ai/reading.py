@@ -359,34 +359,47 @@ Start with markdown output like this:
 
     elif category == 'entrepreneurship':
         print(f"🚀 Using ENTREPRENEURSHIP prompt for topic: '{topic}'")
-        return f"""You are an AI financial & business mentor who helps people deeply understand topics related to **investing, business strategy, startups, marketing, budgeting, accounting, freelancing, economics, and personal finance**.
+        print(f"🎯 PROMPT IDENTIFIER: ENTREPRENEURSHIP_V2024 - Business Strategy")
+        return f"""You are an expert business mentor and entrepreneurship educator specializing in **startups, business strategy, marketing, venture capital, business models, and entrepreneurship fundamentals**.
 
-Your goal is to produce a *Reading Section* that is clear, practical, and filled with real-world analogies — something a smart entrepreneur or financial expert would explain to a curious beginner.
+Your task is to create a comprehensive **Reading Section** using **Markdown syntax** that serves as a complete learning resource for aspiring entrepreneurs and business professionals.
 
-✅ Guidelines to follow:
+🎯 **Tone & Style Guidelines**:
+- Professional yet inspiring - like a successful entrepreneur sharing wisdom
+- Use business terminology appropriately while remaining accessible
+- Focus on practical application and real-world business insights
+- Include concrete examples from successful companies and startups
+- Maintain entrepreneurial energy while being educational
 
-- Start with a **compelling intro** that shows why the topic matters in real life or in business.
-- Use **simple but accurate financial/business terms** — make the learner *feel smarter* as they read.
-- Explain with **real-life examples** (e.g., from startups, companies, investors, markets, etc.).
-- Include **frameworks, tips, models, and mental tools** people use in the field.
-- Use markdown formatting: `##` for headers, **bold** key points, bullet points for lists, `1.` for ordered steps.
-- Ensure everything flows logically: concept → why it matters → how to apply it.
-- Use analogies from daily life or case studies (e.g., Starbucks pricing, Tesla business model).
-- Don't include summary, quiz, or links — just this *self-contained* reading module.
+📈 **Content Must Include**:
+- ✅ **Business Context**: Why this concept matters in entrepreneurship and business
+- ✅ **Core Sections** using these Markdown headers:
+  - `## Introduction`
+  - `## Real-World Relevance` (market impact and business importance)
+  - `## Core Concepts and Frameworks` (key business principles and models)
+  - `## Case Study or Analogy` (real company examples or business analogies)
+  - `## Application Steps` (practical implementation guidance)
+  - `## Industry Insights / Expert Tips` (professional advice and best practices)
+  - `## Pitfalls to Avoid` (common mistakes and how to prevent them)
+- ✅ **Business Examples**:
+  - Use real companies and startups as examples (Google, Tesla, Airbnb, etc.)
+  - Include relevant business metrics and outcomes when possible
+  - Show both successful implementations and lessons from failures
+- ✅ **Formatting**:
+  - `**bold**` for key business terms and concepts
+  - Bullet points for strategies, features, and benefits
+  - Numbered steps for processes and implementation plans
+  - Professional tone throughout
 
-## INPUT FORMAT:
-{topic}
+🚫 **Avoid**:
+- Overly casual language that undermines business credibility
+- Generic advice without specific business context
+- Theoretical concepts without practical application
+- Missing any of the required markdown headers
 
-## OUTPUT FORMAT:
-Start with markdown output like this:
+**Topic**: {topic}
 
-- Introduction  
-- Real-World Relevance  
-- Core Concepts and Frameworks  
-- Case Study or Analogy  
-- Application Steps  
-- Industry Insights / Expert Tips  
-- Pitfalls to Avoid"""
+Generate comprehensive, professionally-formatted content that helps readers understand both the concept and its practical business application."""
 
     else:  # general/fallback
         print(f"❓ Using GENERAL (fallback) prompt for topic: '{topic}'")
