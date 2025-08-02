@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 const AIGeneratedLearningPath = () => {
   const [inputValue, setInputValue] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -25,7 +26,19 @@ const AIGeneratedLearningPath = () => {
 
   const handleInputChange = (e) => {
     setInputValue(e.target.value);
+    setShowDropdown(true);
   };
+
+  const handleDropdownSelect = (value) => {
+    setInputValue(value);
+    setShowDropdown(false);
+  };
+
+  const predefinedTopics = [
+    "Machine Learning",
+    "Digital Marketing",
+    "Data Science"
+  ];
 
   return (
     <section className="relative py-8 sm:py-20 xl:py-24 overflow-visible">
@@ -55,26 +68,43 @@ const AIGeneratedLearningPath = () => {
                   type="text"
                   value={inputValue}
                   onChange={handleInputChange}
-                  placeholder="Type any topic..."
+                  placeholder="Type any topic or select..."
                   className="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
                   disabled={isGenerating}
+                  onFocus={() => setShowDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                 />
+                {showDropdown && (
+                  <ul className="absolute left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-40 overflow-y-auto z-20">
+                    {predefinedTopics.map((topic, index) => (
+                      <li
+                        key={index}
+                        onClick={() => handleDropdownSelect(topic)}
+                        className="px-4 py-2 text-sm text-gray-700 hover:bg-purple-100 cursor-pointer"
+                      >
+                        {topic}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
-              <button
-                type="submit"
-                disabled={!inputValue.trim() || isGenerating}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg text-sm"
-              >
-                {isGenerating ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                    Creating...
-                  </div>
-                ) : (
-                  'Generate Course'
-                )}
-              </button>
+              <div className={`transition-all duration-300 ${showDropdown ? 'mt-30' : 'mt-4'}`}>
+                <button
+                  type="submit"
+                  disabled={!inputValue.trim() || isGenerating}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg text-sm"
+                >
+                  {isGenerating ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                      Creating...
+                    </div>
+                  ) : (
+                    'Generate Course'
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -132,6 +162,7 @@ const AIGeneratedLearningPath = () => {
                     placeholder="What would you like to learn today? (e.g., Machine Learning, React.js, Digital Marketing)"
                     className="w-full px-8 py-6 text-lg bg-white/80 backdrop-blur-sm border-2 border-gray-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 shadow-lg placeholder-gray-400"
                     disabled={isGenerating}
+                    list="topics"
                   />
                   <div className="absolute right-6 top-1/2 transform -translate-y-1/2">
                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
