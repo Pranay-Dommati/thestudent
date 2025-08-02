@@ -49,10 +49,18 @@ def chat_general(request):
 4. Offer practical examples and real-world applications
 5. Be supportive and encouraging
 6. If the question is not educational, gently redirect to learning topics
+7. Format your response using proper Markdown syntax for better readability:
+   - Use **bold** for important terms and concepts
+   - Use *italics* for emphasis
+   - Use `code blocks` for technical terms, formulas, or code
+   - Use numbered lists (1., 2., 3.) for step-by-step explanations
+   - Use bullet points (-) for key points or features
+   - Use ## headings for main sections when explaining complex topics
+   - Use > blockquotes for important notes or tips
 
 Student's question: {message}
 
-Please provide a helpful, educational response:"""
+Please provide a helpful, educational response formatted in Markdown:"""
 
         # Call Gemini 1.5 Flash API
         try:

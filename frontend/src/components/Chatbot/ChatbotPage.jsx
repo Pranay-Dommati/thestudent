@@ -4,6 +4,7 @@ import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, I
 import { FaRobot, FaGraduationCap, FaBook, FaRegUser } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclassifier";
@@ -40,6 +41,7 @@ const callGeminiAPI = async (message) => {
 // Vector bot API call for general educational responses
 const callVectorBotAPI = async (message) => {
   try {
+    console.log('📤 Sending request to vector bot API:', message);
     const response = await fetch('http://localhost:8000/api/chatbot/chat/general/', {
       method: 'POST',
       headers: {
@@ -50,14 +52,22 @@ const callVectorBotAPI = async (message) => {
       }),
     });
 
+    console.log('📥 API Response status:', response.status);
+    console.log('📥 API Response ok:', response.ok);
+
     if (!response.ok) {
       throw new Error(`Vector bot API error: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('📥 Full API response data:', data);
+    console.log('📥 Extracted response:', data.response);
+    console.log('📥 Response type:', typeof data.response);
+    console.log('📥 Response length:', data.response ? data.response.length : 0);
+    
     return data.response || 'Sorry, I could not generate a response.';
   } catch (error) {
-    console.error('Vector bot API error:', error);
+    console.error('❌ Vector bot API error:', error);
     // Fallback to basic educational response
     return "I'm here to help with your studies! I can assist with math, science, history, English, computer science, and study techniques. What would you like to learn about?";
   }
@@ -707,11 +717,14 @@ const ChatbotPage = () => {
         }
       } else {
         // Regular chatbot response using vector bot for educational topics
+        console.log('🔄 Calling vector bot API...');
         const response = await callVectorBotAPI(messageToSend);
         
-        console.log("Vector bot response received:");
-        console.log("Response type:", typeof response);
-        console.log("Response value:", response);
+        console.log("📨 Vector bot response received:");
+        console.log("📨 Response type:", typeof response);
+        console.log("📨 Response value:", response);
+        console.log("📨 Response length:", response ? response.length : 0);
+        console.log("📨 Is response truthy:", !!response);
 
         const botResponse = {
           id: chatHistory.length + 2,
@@ -720,7 +733,15 @@ const ChatbotPage = () => {
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         };
 
-        setChatHistory((prev) => [...prev, botResponse]);
+        console.log("📨 Bot response object:", botResponse);
+        console.log("📨 Bot response content:", botResponse.content);
+        console.log("📨 Bot response content length:", botResponse.content.length);
+
+        setChatHistory((prev) => {
+          const newHistory = [...prev, botResponse];
+          console.log("📨 New chat history:", newHistory);
+          return newHistory;
+        });
       }
     } catch (error) {
       console.error("Error in chat:", error);
@@ -878,10 +899,29 @@ const ChatbotPage = () => {
   };
 
   const MessageBubble = ({ message }) => {
-    const isCourseContent = message.content.includes("# ") && message.content.includes("## ");
+    // More specific detection for course content - look for multiple sections with specific course structure
+    const isCourseContent = (
+      message.content.includes("# ") && 
+      message.content.includes("## ") && 
+      (message.content.includes("### Reading Materials") || 
+       message.content.includes("### Summary") || 
+       message.content.includes("### Videos") ||
+       message.content.includes("### Quiz") ||
+       message.content.includes("### Resources"))
+    );
     const sections = isCourseContent ? parseMarkdownResponse(message.content) : [];
     const isLearningPlan = message.isLearningPlan || (message.content.includes("Learning Plan") && message.content.includes("Day "));
     const isProCard = message.isProCard || false;
+
+    // Debug logging
+    console.log("🔍 MessageBubble render:", {
+      messageType: message.type,
+      content: message.content ? message.content.substring(0, 100) + "..." : "empty",
+      contentLength: message.content ? message.content.length : 0,
+      isCourseContent,
+      isLearningPlan,
+      isProCard
+    });
 
     return (
       <div className="w-full max-w-5xl mx-auto px-6 lg:px-8 mb-4 lg:mb-6">
@@ -897,8 +937,61 @@ const ChatbotPage = () => {
               }`}
             >
               {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
-                <div className="prose prose-sm lg:prose max-w-none dark:prose-invert">
-                  <ReactMarkdown>
+                <div className="prose prose-sm lg:prose max-w-none dark:prose-invert prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-code:bg-gray-100 prose-code:text-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-strong:text-gray-900 prose-headings:text-gray-900">
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      // Custom code block styling
+                      code({node, inline, className, children, ...props}) {
+                        return inline ? (
+                          <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                            {children}
+                          </code>
+                        ) : (
+                          <pre className="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto">
+                            <code className="text-sm font-mono" {...props}>
+                              {children}
+                            </code>
+                          </pre>
+                        );
+                      },
+                      // Custom list styling
+                      ul({children}) {
+                        return <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>;
+                      },
+                      ol({children}) {
+                        return <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>;
+                      },
+                      // Custom heading styling
+                      h1({children}) {
+                        return <h1 className="text-xl font-bold text-gray-900 mb-2 mt-4">{children}</h1>;
+                      },
+                      h2({children}) {
+                        return <h2 className="text-lg font-semibold text-gray-900 mb-2 mt-3">{children}</h2>;
+                      },
+                      h3({children}) {
+                        return <h3 className="text-base font-semibold text-gray-900 mb-1 mt-2">{children}</h3>;
+                      },
+                      // Custom paragraph styling
+                      p({children}) {
+                        return <p className="text-gray-800 leading-relaxed mb-2">{children}</p>;
+                      },
+                      // Custom blockquote styling
+                      blockquote({children}) {
+                        return <blockquote className="border-l-4 border-blue-400 pl-4 py-2 bg-blue-50 text-gray-700 italic my-3">{children}</blockquote>;
+                      },
+                      // Custom table styling
+                      table({children}) {
+                        return <div className="overflow-x-auto my-3"><table className="min-w-full border border-gray-300">{children}</table></div>;
+                      },
+                      th({children}) {
+                        return <th className="border border-gray-300 px-3 py-2 bg-gray-100 font-semibold text-left">{children}</th>;
+                      },
+                      td({children}) {
+                        return <td className="border border-gray-300 px-3 py-2">{children}</td>;
+                      },
+                    }}
+                  >
                     {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
                   </ReactMarkdown>
                 </div>
