@@ -4,6 +4,7 @@ import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, I
 import { FaRobot, FaGraduationCap, FaBook, FaRegUser } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclassifier";
@@ -40,6 +41,7 @@ const callGeminiAPI = async (message) => {
 // Vector bot API call for general educational responses
 const callVectorBotAPI = async (message) => {
   try {
+    console.log('📤 Sending request to vector bot API:', message);
     const response = await fetch('http://localhost:8000/api/chatbot/chat/general/', {
       method: 'POST',
       headers: {
@@ -50,14 +52,22 @@ const callVectorBotAPI = async (message) => {
       }),
     });
 
+    console.log('📥 API Response status:', response.status);
+    console.log('📥 API Response ok:', response.ok);
+
     if (!response.ok) {
       throw new Error(`Vector bot API error: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('📥 Full API response data:', data);
+    console.log('📥 Extracted response:', data.response);
+    console.log('📥 Response type:', typeof data.response);
+    console.log('📥 Response length:', data.response ? data.response.length : 0);
+    
     return data.response || 'Sorry, I could not generate a response.';
   } catch (error) {
-    console.error('Vector bot API error:', error);
+    console.error('❌ Vector bot API error:', error);
     // Fallback to basic educational response
     return "I'm here to help with your studies! I can assist with math, science, history, English, computer science, and study techniques. What would you like to learn about?";
   }
@@ -123,6 +133,35 @@ style.textContent = `
   .animate-float-delayed {
     animation: float 6s ease-in-out infinite;
     animation-delay: -2s;
+  }
+  
+  /* Ordered list counter styling */
+  .counter-reset-list {
+    counter-reset: list-counter;
+  }
+  
+  .counter-reset-list li {
+    counter-increment: list-counter;
+    position: relative;
+    padding-left: 0;
+  }
+  
+  .counter-reset-list li::before {
+    content: counter(list-counter) ".";
+    font-weight: 600;
+    color: #3b82f6;
+    margin-right: 8px;
+    min-width: 20px;
+    display: inline-block;
+  }
+  
+  /* Enhanced code block styling */
+  .markdown-code-block {
+    position: relative;
+  }
+  
+  .markdown-code-block:hover .copy-button {
+    opacity: 1;
   }
 `;
 document.head.appendChild(style);
@@ -707,11 +746,14 @@ const ChatbotPage = () => {
         }
       } else {
         // Regular chatbot response using vector bot for educational topics
+        console.log('🔄 Calling vector bot API...');
         const response = await callVectorBotAPI(messageToSend);
         
-        console.log("Vector bot response received:");
-        console.log("Response type:", typeof response);
-        console.log("Response value:", response);
+        console.log("📨 Vector bot response received:");
+        console.log("📨 Response type:", typeof response);
+        console.log("📨 Response value:", response);
+        console.log("📨 Response length:", response ? response.length : 0);
+        console.log("📨 Is response truthy:", !!response);
 
         const botResponse = {
           id: chatHistory.length + 2,
@@ -720,7 +762,15 @@ const ChatbotPage = () => {
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         };
 
-        setChatHistory((prev) => [...prev, botResponse]);
+        console.log("📨 Bot response object:", botResponse);
+        console.log("📨 Bot response content:", botResponse.content);
+        console.log("📨 Bot response content length:", botResponse.content.length);
+
+        setChatHistory((prev) => {
+          const newHistory = [...prev, botResponse];
+          console.log("📨 New chat history:", newHistory);
+          return newHistory;
+        });
       }
     } catch (error) {
       console.error("Error in chat:", error);
@@ -878,27 +928,173 @@ const ChatbotPage = () => {
   };
 
   const MessageBubble = ({ message }) => {
-    const isCourseContent = message.content.includes("# ") && message.content.includes("## ");
+    // More specific detection for course content - look for multiple sections with specific course structure
+    const isCourseContent = (
+      message.content.includes("# ") && 
+      message.content.includes("## ") && 
+      (message.content.includes("### Reading Materials") || 
+       message.content.includes("### Summary") || 
+       message.content.includes("### Videos") ||
+       message.content.includes("### Quiz") ||
+       message.content.includes("### Resources"))
+    );
     const sections = isCourseContent ? parseMarkdownResponse(message.content) : [];
     const isLearningPlan = message.isLearningPlan || (message.content.includes("Learning Plan") && message.content.includes("Day "));
     const isProCard = message.isProCard || false;
 
+    // Debug logging
+    console.log("🔍 MessageBubble render:", {
+      messageType: message.type,
+      content: message.content ? message.content.substring(0, 100) + "..." : "empty",
+      contentLength: message.content ? message.content.length : 0,
+      isCourseContent,
+      isLearningPlan,
+      isProCard
+    });
+
     return (
       <div className="w-full max-w-5xl mx-auto px-6 lg:px-8 mb-4 lg:mb-6">
         <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
-          <div className={`${message.type === "user" ? "max-w-[85%] lg:max-w-[75%]" : isLearningPlan || isProCard ? "w-full" : "max-w-[85%] lg:max-w-[75%]"}`}>
+          <div className={`${
+            message.type === "user" 
+              ? "max-w-[75%] lg:max-w-[65%]" // User messages - more constrained width
+              : isLearningPlan || isProCard 
+                ? "w-full" 
+                : "max-w-[90%] lg:max-w-[85%] min-w-0" // Bot messages - content-dependent width
+          }`}>
             <div
-              className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 ${
+              className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 w-fit ${
                 message.type === "user"
                   ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg backdrop-blur-sm rounded-br-md"
                   : isLearningPlan || isProCard
                     ? "bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl" 
-                    : "bg-white/90 backdrop-blur-sm text-gray-800 border border-white/30 shadow-lg rounded-bl-md"
+                    : "bg-white/70 backdrop-blur-md text-gray-800 border border-white/30 shadow-sm rounded-bl-md hover:bg-white/80 transition-all duration-200"
               }`}
             >
               {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
-                <div className="prose prose-sm lg:prose max-w-none dark:prose-invert">
-                  <ReactMarkdown>
+                <div className="prose prose-sm lg:prose max-w-none dark:prose-invert prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-code:bg-gray-100 prose-code:text-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-strong:text-gray-900 prose-headings:text-gray-900">
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      // Custom code block styling with copy functionality
+                      code({node, inline, className, children, ...props}) {
+                        const codeString = String(children).replace(/\n$/, '');
+                        
+                        if (inline) {
+                          return (
+                            <code className="bg-blue-50 text-blue-800 px-2 py-1 rounded-md text-sm font-mono border border-blue-200" {...props}>
+                              {children}
+                            </code>
+                          );
+                        }
+                        
+                        return (
+                          <div className="relative group my-4">
+                            <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto border border-gray-700">
+                              <code className="text-sm font-mono" {...props}>
+                                {children}
+                              </code>
+                            </pre>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(codeString);
+                                toast.success('Code copied to clipboard!', { duration: 2000 });
+                              }}
+                              className="absolute top-2 right-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-3 py-1.5 rounded-md text-xs font-medium opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1.5"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </button>
+                          </div>
+                        );
+                      },
+                      // Improved list styling with proper alignment
+                      ul({children}) {
+                        return (
+                          <ul className="space-y-2 my-3 pl-0">
+                            {children}
+                          </ul>
+                        );
+                      },
+                      li({children, ...props}) {
+                        const parentTag = props.node?.parent?.tagName;
+                        
+                        if (parentTag === 'ol') {
+                          return (
+                            <li className="flex items-start text-gray-800 pl-0" {...props}>
+                              <div className="flex-1">{children}</div>
+                            </li>
+                          );
+                        }
+                        
+                        return (
+                          <li className="flex items-start text-gray-800 pl-0" {...props}>
+                            <span className="w-2 h-2 bg-blue-600 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                            <div className="flex-1">{children}</div>
+                          </li>
+                        );
+                      },
+                      ol({children}) {
+                        return (
+                          <ol className="space-y-2 my-3 counter-reset-list pl-0">
+                            {children}
+                          </ol>
+                        );
+                      },
+                      // Custom heading styling with better spacing
+                      h1({children}) {
+                        return <h1 className="text-2xl font-bold text-gray-900 mb-3 mt-6 border-b border-gray-200 pb-2">{children}</h1>;
+                      },
+                      h2({children}) {
+                        return <h2 className="text-xl font-semibold text-gray-900 mb-3 mt-5">{children}</h2>;
+                      },
+                      h3({children}) {
+                        return <h3 className="text-lg font-semibold text-gray-900 mb-2 mt-4">{children}</h3>;
+                      },
+                      h4({children}) {
+                        return <h4 className="text-base font-semibold text-gray-900 mb-2 mt-3">{children}</h4>;
+                      },
+                      // Enhanced paragraph styling
+                      p({children}) {
+                        return <p className="text-gray-800 leading-relaxed mb-3 text-sm lg:text-base">{children}</p>;
+                      },
+                      // Enhanced blockquote styling
+                      blockquote({children}) {
+                        return (
+                          <blockquote className="border-l-4 border-blue-400 pl-4 py-3 bg-blue-50 text-gray-700 italic my-4 rounded-r-lg">
+                            {children}
+                          </blockquote>
+                        );
+                      },
+                      // Enhanced table styling
+                      table({children}) {
+                        return (
+                          <div className="overflow-x-auto my-4 rounded-lg border border-gray-200">
+                            <table className="min-w-full">{children}</table>
+                          </div>
+                        );
+                      },
+                      thead({children}) {
+                        return <thead className="bg-gray-50">{children}</thead>;
+                      },
+                      th({children}) {
+                        return <th className="border-b border-gray-200 px-4 py-3 text-left font-semibold text-gray-900 text-sm">{children}</th>;
+                      },
+                      td({children}) {
+                        return <td className="border-b border-gray-100 px-4 py-3 text-gray-800 text-sm">{children}</td>;
+                      },
+                      // Enhanced strong/bold styling
+                      strong({children}) {
+                        return <strong className="font-semibold text-gray-900">{children}</strong>;
+                      },
+                      // Enhanced emphasis/italic styling
+                      em({children}) {
+                        return <em className="italic text-gray-700">{children}</em>;
+                      },
+                    }}
+                  >
                     {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
                   </ReactMarkdown>
                 </div>
@@ -986,30 +1182,6 @@ const ChatbotPage = () => {
         </div>
       </div>
     );
-  };
-
-  const suggestionTopics = [
-    "Create arrays and strings courses",
-    "Learn photosynthesis and water cycle",
-    "JavaScript functions and DOM manipulation",
-  ];
-  
-  const handleSuggestion = async (topic) => {
-    // First set the message
-    setMessage(topic);
-
-    // Handle the send
-    await handleSendMessage(topic);
-
-    // Clear the input and remove focus
-    setMessage("");
-    setIsInputFocused(false);
-
-    // On mobile, ensure the input field is properly updated
-    const input = document.querySelector('input[type="text"]');
-    if (input && isMobile) {
-      input.blur();
-    }
   };
 
   // Fetch usage stats for rate limiting display
@@ -1411,7 +1583,7 @@ const ChatbotPage = () => {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Type your message here..."
+                  placeholder={proMode ? "Create arrays and strings course..." : "Type your message here..."}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
@@ -1443,24 +1615,6 @@ const ChatbotPage = () => {
                 </button>
               </div>
               
-              {/* Topic suggestions - Show based on screen size and input focus */}
-              {(!isMobile || (isMobile && isInputFocused)) && (
-                <div className={`flex flex-wrap gap-2 mt-4 ${
-                  isMobile ? 'fixed left-0 right-0 bottom-[72px] bg-white/90 backdrop-blur-md p-4 border-t border-white/20 z-10 shadow-lg animate-slide-up' : ''
-                }`}>
-                  {suggestionTopics.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        handleSuggestion(suggestion);
-                      }}
-                      className="text-xs lg:text-sm bg-white/60 backdrop-blur-sm text-gray-700 px-4 py-2 rounded-full hover:bg-indigo-50/80 hover:text-indigo-600 transition-all duration-200 active:bg-indigo-100/80 border border-white/30 shadow-sm hover:shadow-md"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>
