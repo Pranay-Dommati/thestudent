@@ -843,58 +843,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     <div className="min-h-screen flex bg-white">
       {/* Main Content Area - Professional Layout */}
       <div className="flex-1 flex flex-col">
-        {/* Course Header - Clean and Professional */}
-        {course && (
-          <div className="bg-white border-b border-gray-200 sticky top-14 z-20">
-            <div className={`transition-all duration-300 ${sidebarVisible ? 'mr-[400px]' : ''}`}>
-              <div className="px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center text-sm text-gray-500 mb-2">
-                      <span>{course.subject || 'Course'}</span>
-                      <span className="mx-2">•</span>
-                      <span>{course.class_level || course.level}</span>
-                      <span className="mx-2">•</span>
-                      <span>{course.board || 'General'}</span>
-                    </div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-1">
-                      {course.title || course.subject}
-                    </h1>
-                    {course.chapters && course.chapters[activeChapter] && (
-                      <p className="text-gray-600">
-                        <span className="font-medium">Chapter {activeChapter + 1}:</span> {course.chapters[activeChapter].title}
-                        {currentLesson && (
-                          <>
-                            <span className="mx-2">→</span>
-                            <span>{currentLesson.title}</span>
-                          </>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-500 mb-1">Progress</div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                          style={{ width: `${totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-sm font-medium text-gray-700">
-                        {Math.round((completedLessons / totalLessons) * 100) || 0}%
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {completedLessons} of {totalLessons} lessons completed
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Content Container - Clean spacing */}
         <div className={`transition-all duration-300 ${sidebarVisible ? 'mr-[400px]' : ''}`}>
           <div className="p-6 w-full">
