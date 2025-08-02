@@ -351,12 +351,6 @@ const SchoolCourseDetails = () => {
         <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-center">
             <div className="space-y-4 sm:space-y-6">
-              {/* Course Badge */}
-              <div className="inline-flex items-center bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 text-sm">
-                <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></span>
-                <span className="text-green-200">Live Course Available</span>
-              </div>
-              
               <div>
                 <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 sm:mb-4">{course.title}</h1>
                 <p className="text-lg sm:text-xl text-blue-200 font-medium mb-4">Complete Mastery Course</p>
@@ -377,11 +371,6 @@ const SchoolCourseDetails = () => {
                 <span className="flex items-center">
                   <FaClock className="mr-1.5 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                   {course.duration}+ hours
-                </span>
-                <span className="hidden sm:inline">•</span>
-                <span className="flex items-center">
-                  <FaBook className="mr-1.5 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                  {course.chapters} chapters
                 </span>
               </div>
 
