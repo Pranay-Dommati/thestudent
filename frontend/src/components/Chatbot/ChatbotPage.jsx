@@ -960,7 +960,7 @@ const ChatbotPage = () => {
               ? "max-w-[75%] lg:max-w-[65%]" // User messages - more constrained width
               : isLearningPlan || isProCard 
                 ? "w-full" 
-                : "max-w-[95%] lg:max-w-[90%] w-full" // Bot messages - much wider
+                : "max-w-[95%] lg:max-w-[85%]" // Bot messages - wider but content-dependent
           }`}>
             <div
               className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 ${
@@ -968,7 +968,7 @@ const ChatbotPage = () => {
                   ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg backdrop-blur-sm rounded-br-md"
                   : isLearningPlan || isProCard
                     ? "bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl" 
-                    : "bg-white/90 backdrop-blur-sm text-gray-800 border border-white/30 shadow-lg rounded-bl-md"
+                    : "bg-white/70 backdrop-blur-md text-gray-800 border border-white/30 shadow-sm rounded-bl-md hover:bg-white/80 transition-all duration-200"
               }`}
             >
               {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
