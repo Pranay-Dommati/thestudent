@@ -1,58 +1,28 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 const LearningAnalytics = ({ user }) => {
-  const [timePeriod, setTimePeriod] = useState('week');
-  
   // Set default weekly goal if not provided
   const weeklyGoalHours = user.weeklyGoalHours || 15;
   
   // Calculate weekly goal percentage
   const weeklyGoalPercentage = (user.hoursThisWeek / weeklyGoalHours) * 100;
 
-  // Mock data for different time periods
-  const timeData = {
-    week: { 
-      enrolled: user.totalCoursesEnrolled, 
-      hours: user.hoursThisWeek, 
-      change: '+2 courses', 
-      hoursChange: '+3.5 hrs' 
-    },
-    month: { 
-      enrolled: user.totalCoursesEnrolled, 
-      hours: user.hoursThisWeek * 4, 
-      change: '+5 courses', 
-      hoursChange: '+12.5 hrs' 
-    },
-    year: { 
-      enrolled: user.totalCoursesEnrolled, 
-      hours: user.hoursThisWeek * 48, 
-      change: '+18 courses', 
-      hoursChange: '+120 hrs' 
-    }
+  // Use only weekly data
+  const currentData = { 
+    enrolled: user.totalCoursesEnrolled, 
+    hours: user.hoursThisWeek
   };
-
-  // Get current period data
-  const currentData = timeData[timePeriod];
   
   return (
     <section className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
       {/* Header with gradient accent */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="mb-8">
         <div>
           <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
             Learning Analytics
           </h2>
           <p className="text-sm text-gray-500 mt-1">Track your progress</p>
         </div>
-        <select 
-          className="text-sm border-2 rounded-xl border-gray-200 px-4 py-2 text-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-gray-50 hover:bg-white transition-colors"
-          value={timePeriod}
-          onChange={(e) => setTimePeriod(e.target.value)}
-        >
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-          <option value="year">This Year</option>
-        </select>
       </div>
       
       <div className="space-y-6 mb-8">
@@ -70,12 +40,6 @@ const LearningAnalytics = ({ user }) => {
                 {currentData.enrolled}
               </p>
             </div>
-            <div className="text-sm text-emerald-600 flex items-center bg-emerald-50 px-3 py-1 rounded-full">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-              </svg>
-              <span className="font-medium">{currentData.change}</span>
-            </div>
           </div>
         </div>
         
@@ -88,16 +52,10 @@ const LearningAnalytics = ({ user }) => {
               </svg>
             </div>
             <div className="flex-1">
-              <p className="text-gray-600 text-sm font-medium">Hours This {timePeriod.charAt(0).toUpperCase() + timePeriod.slice(1)}</p>
+              <p className="text-gray-600 text-sm font-medium">Hours This Week</p>
               <p className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                 {typeof currentData.hours === 'number' ? currentData.hours.toFixed(1) : currentData.hours}
               </p>
-            </div>
-            <div className="text-sm text-emerald-600 flex items-center bg-emerald-50 px-3 py-1 rounded-full">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-              </svg>
-              <span className="font-medium">{currentData.hoursChange}</span>
             </div>
           </div>
         </div>
