@@ -41,22 +41,9 @@ export const handleClassificationSuccess = (result) => {
   const topics = result.topics || [];
   const usageStats = result.usage_stats;
   
-  if (usageStats) {
-    const remainingDaily = usageStats.daily_limit - usageStats.daily_count;
-    const usedToday = usageStats.daily_count;
-    
-    if (topics.length > 0) {
-      toast.success(
-        `${topics.length} topic${topics.length !== 1 ? 's' : ''} created! ${remainingDaily} remaining today (${usedToday}/${usageStats.daily_limit} used)`,
-        { duration: 4000, icon: '✅' }
-      );
-    }
-  } else if (topics.length > 0) {
-    toast.success(
-      `${topics.length} topic${topics.length !== 1 ? 's' : ''} created successfully!`,
-      { duration: 3000, icon: '✅' }
-    );
-  }
+  // Don't show success toast for classification - only show it for actual topic creation
+  // This function is called when topics are extracted/classified, not when they're actually created
+  return result;
   
   return result;
 };

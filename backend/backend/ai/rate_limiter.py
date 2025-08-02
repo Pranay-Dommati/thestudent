@@ -1,49 +1,132 @@
 """
 Rate limiting system for ProLearning topic creation
-Implements daily and per-request limits for topic generation
+Implements daily and per-request limits for topic generation with enhanced security
 """
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.utils import timezone
+from django.conf import settings
 from datetime import datetime, timedelta
 import json
+import re
+import logging
+
+# Configure logging for rate limiting
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
-# Rate limiting constants
-MAX_TOPICS_PER_DAY = 16
-MAX_TOPICS_PER_REQUEST = 4
+# Rate limiting constants - configurable via environment
+MAX_TOPICS_PER_DAY = int(getattr(settings, 'MAX_TOPICS_PER_DAY', 16))
+MAX_TOPICS_PER_REQUEST = int(getattr(settings, 'MAX_TOPICS_PER_REQUEST', 4))
+
+# Security constants
+MAX_CACHE_KEY_LENGTH = 250  # Memcached limit
+MAX_TOPIC_NAME_LENGTH = 200
+ALLOWED_TOPIC_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9\s\-\+\#\.\(\)]+$')
+
+def validate_topic_input(topics):
+    """Validate topic input for security"""
+    if not isinstance(topics, list):
+        raise ValueError("Topics must be a list")
+    
+    if len(topics) > MAX_TOPICS_PER_REQUEST:
+        raise ValueError(f"Too many topics: maximum {MAX_TOPICS_PER_REQUEST} allowed")
+    
+    for topic in topics:
+        if isinstance(topic, dict):
+            name = topic.get('name', '')
+        elif isinstance(topic, str):
+            name = topic
+        else:
+            raise ValueError("Invalid topic format")
+        
+        if not name or len(name) > MAX_TOPIC_NAME_LENGTH:
+            raise ValueError(f"Topic name must be 1-{MAX_TOPIC_NAME_LENGTH} characters")
+        
+        if not ALLOWED_TOPIC_NAME_PATTERN.match(name):
+            raise ValueError("Topic name contains invalid characters")
+    
+    return True
+
+def sanitize_cache_key(key):
+    """Sanitize cache key to prevent injection attacks"""
+    if len(key) > MAX_CACHE_KEY_LENGTH:
+        key = key[:MAX_CACHE_KEY_LENGTH]
+    
+    # Remove any potentially dangerous characters
+    key = re.sub(r'[^\w\-\.\:]', '_', key)
+    return key
 
 class TopicRateLimiter:
-    """Rate limiter for topic creation in ProLearning"""
+    """Rate limiter for topic creation in ProLearning with enhanced security"""
     
     def __init__(self, user=None, user_ip=None):
         self.user = user
-        self.user_ip = user_ip
+        self.user_ip = user_ip or '127.0.0.1'
         self.cache_key_prefix = "topic_rate_limit"
+        
+        # Validate inputs
+        if user_ip and not self._is_valid_ip(user_ip):
+            logger.warning(f"Invalid IP address provided: {user_ip}")
+            self.user_ip = '127.0.0.1'
+    
+    def _is_valid_ip(self, ip):
+        """Validate IP address format"""
+        import ipaddress
+        try:
+            ipaddress.ip_address(ip)
+            return True
+        except ValueError:
+            return False
     
     def get_cache_key(self, suffix=""):
-        """Generate cache key for rate limiting"""
+        """Generate secure cache key for rate limiting"""
         if self.user and self.user.is_authenticated:
             identifier = f"user_{self.user.id}"
         else:
             identifier = f"ip_{self.user_ip}"
         
         today = timezone.now().strftime('%Y-%m-%d')
-        return f"{self.cache_key_prefix}_{identifier}_{today}{suffix}"
+        cache_key = f"{self.cache_key_prefix}_{identifier}_{today}{suffix}"
+        
+        # Sanitize the cache key
+        return sanitize_cache_key(cache_key)
     
     def get_daily_usage(self):
         """Get current daily usage for the user/IP"""
         cache_key = self.get_cache_key("_daily")
-        usage_data = cache.get(cache_key, {
-            'count': 0,
-            'requests': [],
-            'first_request': None
-        })
-        return usage_data
+        
+        try:
+            usage_data = cache.get(cache_key, {
+                'count': 0,
+                'requests': [],
+                'first_request': None
+            })
+            
+            # Validate cached data structure
+            if not isinstance(usage_data, dict):
+                logger.warning(f"Invalid cache data structure for key {cache_key}")
+                usage_data = {'count': 0, 'requests': [], 'first_request': None}
+            
+            # Ensure required fields exist
+            usage_data.setdefault('count', 0)
+            usage_data.setdefault('requests', [])
+            usage_data.setdefault('first_request', None)
+            
+            return usage_data
+            
+        except Exception as e:
+            logger.error(f"Error retrieving usage data: {e}")
+            return {'count': 0, 'requests': [], 'first_request': None}
     
     def check_request_limit(self, requested_topics):
         """Check if the current request exceeds per-request limit"""
+        try:
+            validate_topic_input(requested_topics)
+        except ValueError as e:
+            return False, str(e)
+        
         if len(requested_topics) > MAX_TOPICS_PER_REQUEST:
             return False, f"Maximum {MAX_TOPICS_PER_REQUEST} topics allowed per request. You requested {len(requested_topics)} topics."
         return True, ""
@@ -51,11 +134,11 @@ class TopicRateLimiter:
     def check_daily_limit(self, requested_topics):
         """Check if the request would exceed daily limit"""
         usage_data = self.get_daily_usage()
-        current_count = usage_data['count']
+        current_count = max(0, int(usage_data.get('count', 0)))  # Ensure non-negative
         new_total = current_count + len(requested_topics)
         
         if new_total > MAX_TOPICS_PER_DAY:
-            remaining = MAX_TOPICS_PER_DAY - current_count
+            remaining = max(0, MAX_TOPICS_PER_DAY - current_count)
             return False, f"Daily limit exceeded. You have {remaining} topics remaining today. You requested {len(requested_topics)} topics."
         
         return True, ""
@@ -65,27 +148,49 @@ class TopicRateLimiter:
         # Check per-request limit
         allowed, message = self.check_request_limit(requested_topics)
         if not allowed:
+            logger.warning(f"Request limit exceeded for {self.get_cache_key()}: {message}")
             return False, message, self.get_daily_usage()
         
         # Check daily limit
         allowed, message = self.check_daily_limit(requested_topics)
         if not allowed:
+            logger.warning(f"Daily limit exceeded for {self.get_cache_key()}: {message}")
             return False, message, self.get_daily_usage()
         
         return True, "", self.get_daily_usage()
     
     def record_usage(self, topics_created):
-        """Record topic creation usage"""
+        """Record topic creation usage with enhanced security"""
+        try:
+            validate_topic_input(topics_created)
+        except ValueError as e:
+            logger.error(f"Invalid topics in record_usage: {e}")
+            raise
+        
         cache_key = self.get_cache_key("_daily")
         usage_data = self.get_daily_usage()
         
         # Update usage data
         now = timezone.now()
-        usage_data['count'] += len(topics_created)
+        topics_count = len(topics_created)
+        
+        # Ensure count doesn't go negative or exceed limits
+        new_count = max(0, int(usage_data.get('count', 0)) + topics_count)
+        usage_data['count'] = min(new_count, MAX_TOPICS_PER_DAY)  # Cap at daily limit
+        
+        # Sanitize topic names for storage
+        sanitized_topics = []
+        for topic in topics_created:
+            if isinstance(topic, dict):
+                name = str(topic.get('name', 'Unknown'))[:MAX_TOPIC_NAME_LENGTH]
+            else:
+                name = str(topic)[:MAX_TOPIC_NAME_LENGTH]
+            sanitized_topics.append(name)
+        
         usage_data['requests'].append({
             'timestamp': now.isoformat(),
-            'topics': len(topics_created),
-            'topic_names': [topic.get('name', '') for topic in topics_created]
+            'topics': topics_count,
+            'topic_names': sanitized_topics
         })
         
         if not usage_data['first_request']:
@@ -99,7 +204,11 @@ class TopicRateLimiter:
         tomorrow = now.replace(hour=1, minute=0, second=0, microsecond=0) + timedelta(days=1)
         cache_timeout = int((tomorrow - now).total_seconds())
         
-        cache.set(cache_key, usage_data, timeout=cache_timeout)
+        try:
+            cache.set(cache_key, usage_data, timeout=cache_timeout)
+            logger.info(f"Recorded usage for {self.get_cache_key()}: {topics_count} topics")
+        except Exception as e:
+            logger.error(f"Failed to cache usage data: {e}")
         
         return usage_data
     
@@ -124,38 +233,60 @@ class TopicRateLimiter:
         return tomorrow.isoformat()
 
 def get_user_ip(request):
-    """Extract user IP address from request"""
+    """Extract user IP address from request with security validation"""
+    # Check for forwarded IP (behind proxy/load balancer)
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
+        # Take the first IP in the chain (client IP)
         ip = x_forwarded_for.split(',')[0].strip()
     else:
         ip = request.META.get('REMOTE_ADDR', '127.0.0.1')
-    return ip
+    
+    # Validate IP address
+    import ipaddress
+    try:
+        ipaddress.ip_address(ip)
+        return ip
+    except ValueError:
+        logger.warning(f"Invalid IP address detected: {ip}")
+        return '127.0.0.1'  # Fallback to localhost
 
 def check_topic_rate_limit(request, requested_topics):
     """
-    Convenience function to check rate limits
+    Convenience function to check rate limits with enhanced security
     Returns (allowed: bool, message: str, usage_stats: dict)
     """
-    user = getattr(request, 'user', None)
-    user_ip = get_user_ip(request)
-    
-    limiter = TopicRateLimiter(user=user, user_ip=user_ip)
-    allowed, message, usage_data = limiter.is_request_allowed(requested_topics)
-    
-    usage_stats = limiter.get_usage_stats()
-    
-    return allowed, message, usage_stats
+    try:
+        user = getattr(request, 'user', None)
+        user_ip = get_user_ip(request)
+        
+        limiter = TopicRateLimiter(user=user, user_ip=user_ip)
+        allowed, message, usage_data = limiter.is_request_allowed(requested_topics)
+        
+        usage_stats = limiter.get_usage_stats()
+        
+        return allowed, message, usage_stats
+        
+    except Exception as e:
+        logger.error(f"Error checking rate limits: {e}")
+        # Fail closed - deny request on error
+        return False, "Rate limiting error occurred", {}
 
 def record_topic_creation(request, topics_created):
     """
-    Convenience function to record topic creation
+    Convenience function to record topic creation with enhanced security
     Returns updated usage stats
     """
-    user = getattr(request, 'user', None)
-    user_ip = get_user_ip(request)
-    
-    limiter = TopicRateLimiter(user=user, user_ip=user_ip)
-    usage_data = limiter.record_usage(topics_created)
-    
-    return limiter.get_usage_stats()
+    try:
+        user = getattr(request, 'user', None)
+        user_ip = get_user_ip(request)
+        
+        limiter = TopicRateLimiter(user=user, user_ip=user_ip)
+        usage_data = limiter.record_usage(topics_created)
+        
+        return limiter.get_usage_stats()
+        
+    except Exception as e:
+        logger.error(f"Error recording topic creation: {e}")
+        # Return empty stats on error
+        return {}

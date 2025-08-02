@@ -547,16 +547,119 @@ const ChatbotPage = () => {
           
           const extractedTopics = result.topics || [];
           
+          // Show toast notification IMMEDIATELY if more than 4 topics were extracted
+          const maxPerRequest = 4; // Default max per request
+          if (extractedTopics.length > maxPerRequest) {
+            toast.info(
+              `📝 Maximum ${maxPerRequest} topics per request. Found ${extractedTopics.length} topics, showing first ${maxPerRequest}.`,
+              { 
+                duration: 4000,
+                position: 'top-center',
+                icon: '📝'
+              }
+            );
+          }
+          
           if (extractedTopics && extractedTopics.length > 0) {
-            // Store topics for confirmation and show confirmation dialog
-            setPendingTopics(extractedTopics);
+            // Check current rate limit status to determine how many topics user can actually create
+            let availableTopics = extractedTopics;
+            let limitMessage = "";
+            
+            if (usageStats) {
+              const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
+              const maxPerRequestFromStats = usageStats.per_request_limit || 4;
+              
+              // Limit topics to the smaller of: remaining daily limit or max per request
+              const maxAllowedTopics = Math.min(remainingToday, maxPerRequestFromStats);
+              
+              if (extractedTopics.length > maxAllowedTopics) {
+                // Limit the topics to what user can actually create
+                availableTopics = extractedTopics.slice(0, maxAllowedTopics);
+                
+                if (remainingToday <= 0) {
+                  limitMessage = `⚠️ You've reached your daily limit of ${usageStats.daily_limit || 16} topics. Please try again tomorrow.`;
+                  // Show toast for daily limit reached
+                  toast.error(`🚫 Daily limit reached (${usageStats.daily_used || 0}/${usageStats.daily_limit || 16} used)`, {
+                    duration: 4000
+                  });
+                } else if (remainingToday < extractedTopics.length && extractedTopics.length <= maxPerRequestFromStats) {
+                  limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you only have ${remainingToday} topic(s) remaining today. Showing first ${availableTopics.length} topic(s).`;
+                  // Show informational toast for daily quota limiting
+                  toast(`📊 Limited to ${availableTopics.length} topics due to daily quota`, {
+                    icon: '⚠️',
+                    style: {
+                      background: '#fff3cd',
+                      color: '#856404',
+                      border: '1px solid #ffeaa7'
+                    },
+                    duration: 4000
+                  });
+                } else if (extractedTopics.length > maxPerRequestFromStats && remainingToday >= maxPerRequestFromStats) {
+                  limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you can create maximum ${maxPerRequestFromStats} topics at a time. Showing first ${availableTopics.length} topic(s).`;
+                  // Show informational toast for per-request limiting
+                  toast(`🔢 Limited to ${maxPerRequestFromStats} topics per request`, {
+                    icon: 'ℹ️',
+                    style: {
+                      background: '#d1ecf1',
+                      color: '#0c5460',
+                      border: '1px solid #bee5eb'
+                    },
+                    duration: 4000
+                  });
+                } else if (extractedTopics.length > maxPerRequestFromStats && remainingToday < maxPerRequestFromStats) {
+                  limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you can only create maximum ${maxPerRequestFromStats} topics at a time and have ${remainingToday} topic(s) remaining today. Showing first ${availableTopics.length} topic(s).`;
+                  // Show informational toast for combined limiting
+                  toast(`📊 Limited by daily quota (${remainingToday} left) and per-request limit (${maxPerRequestFromStats} max)`, {
+                    icon: '⚠️',
+                    style: {
+                      background: '#fff3cd',
+                      color: '#856404',
+                      border: '1px solid #ffeaa7'
+                    },
+                    duration: 5000
+                  });
+                }
+              }
+            } else {
+              // If no usage stats, just limit to 4 topics max
+              if (extractedTopics.length > maxPerRequest) {
+                availableTopics = extractedTopics.slice(0, maxPerRequest);
+                limitMessage = `⚠️ Showing first ${maxPerRequest} topics. You can create maximum ${maxPerRequest} topics at a time.`;
+                // Show informational toast for general per-request limiting
+                toast(`🔢 Limited to ${maxPerRequest} topics per request`, {
+                  icon: 'ℹ️',
+                  style: {
+                    background: '#d1ecf1',
+                    color: '#0c5460',
+                    border: '1px solid #bee5eb'
+                  },
+                  duration: 4000
+                });
+              }
+            }
+            
+            // If no topics available due to limits, don't show confirmation
+            if (availableTopics.length === 0) {
+              const limitResponse = {
+                id: chatHistory.length + 2,
+                type: "bot",
+                content: limitMessage || "❌ You've reached your daily topic creation limit. Please try again tomorrow.",
+                timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              };
+              setChatHistory((prev) => [...prev, limitResponse]);
+              setIsLoading(false);
+              return;
+            }
+            
+            // Store limited topics for confirmation and show confirmation dialog
+            setPendingTopics(availableTopics);
             setOriginalPrompt(messageToSend);
             setShowTopicConfirmation(true);
             
             const confirmationResponse = {
               id: chatHistory.length + 2,
               type: "bot",
-              content: `🤔 I've analyzed your query "${messageToSend}" and extracted ${extractedTopics.length} learning topic(s). Please review and confirm the topics you'd like to include in your course.`,
+              content: `🤔 I've analyzed your query "${messageToSend}" and extracted ${availableTopics.length} learning topic(s). ${limitMessage} Please review and confirm the topics you'd like to include in your course.`,
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
               isTopicConfirmation: true,
             };
@@ -710,6 +813,13 @@ const ChatbotPage = () => {
       if (result.usage_stats) {
         setUsageStats(result.usage_stats);
       }
+
+      // Show success toast with just the topic count (no rate limit details)
+      const actualTopicCount = pendingTopics.length;
+      toast.success(
+        `✅ ${actualTopicCount} topic${actualTopicCount !== 1 ? 's' : ''} created successfully!`,
+        { duration: 3000 }
+      );
 
       // Generate a unique course ID
       const courseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
