@@ -6,11 +6,26 @@ const AIGeneratedLearningPath = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const navigate = useNavigate();
   
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
   const optionRefs = useRef([]);
+  
+  // Calculate dropdown position for fixed positioning
+  const updateDropdownPosition = () => {
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      const newPosition = {
+        top: rect.bottom + window.scrollY + 4, // 4px gap
+        left: rect.left + window.scrollX,
+        width: rect.width
+      };
+      setDropdownPosition(newPosition);
+      console.log('Updated dropdown position:', newPosition);
+    }
+  };
   
   const examples = [
     "Arrays and Strings in Data Structures",
@@ -31,13 +46,14 @@ const AIGeneratedLearningPath = () => {
         !inputRef.current.contains(event.target)
       ) {
         setShowExamples(false);
+        setSelectedIndex(-1);
       }
     };
     
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  
+
   const handleKeyDown = (e) => {
     if (showExamples && inputValue.length === 0) {
       if (e.key === 'ArrowDown') {
@@ -60,6 +76,7 @@ const AIGeneratedLearningPath = () => {
       } else if (e.key === 'Escape') {
         setShowExamples(false);
         setSelectedIndex(-1);
+        inputRef.current?.blur();
       }
     } else if (e.key === 'Enter' && inputValue.trim()) {
       handleSubmit(e);
@@ -70,14 +87,13 @@ const AIGeneratedLearningPath = () => {
     setInputValue(example);
     setShowExamples(false);
     setSelectedIndex(-1);
+    // Keep focus on input after selection
     setTimeout(() => {
       if (inputRef.current) {
         inputRef.current.focus();
       }
-    }, 100);
-  };
-
-  const handleSubmit = async (e) => {
+    }, 50);
+  };  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!inputValue.trim()) return;
@@ -97,10 +113,11 @@ const AIGeneratedLearningPath = () => {
   const handleInputChange = (e) => {
     const value = e.target.value;
     setInputValue(value);
+    setSelectedIndex(-1); // Reset selection when typing
     
     if (value.length === 0) {
+      updateDropdownPosition();
       setShowExamples(true);
-      setSelectedIndex(-1);
     } else {
       setShowExamples(false);
     }
@@ -108,12 +125,54 @@ const AIGeneratedLearningPath = () => {
 
   const handleInputFocus = () => {
     if (inputValue.length === 0) {
+      updateDropdownPosition();
       setShowExamples(true);
+      setSelectedIndex(-1);
+      console.log('Setting showExamples to true, dropdownPosition:', dropdownPosition);
     }
   };
 
+  const handleInputBlur = (e) => {
+    // Only hide if not clicking on dropdown
+    if (!dropdownRef.current?.contains(e.relatedTarget)) {
+      // Delay hiding to allow click events to fire
+      setTimeout(() => {
+        setShowExamples(false);
+        setSelectedIndex(-1);
+      }, 150);
+    }
+  };
+
+  // Update position on scroll or resize
+  useEffect(() => {
+    const handleScroll = () => {
+      if (showExamples) {
+        updateDropdownPosition();
+      }
+    };
+    
+    const handleResize = () => {
+      if (showExamples) {
+        updateDropdownPosition();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [showExamples]);
+
+  // Debug showExamples state changes
+  useEffect(() => {
+    console.log('showExamples changed to:', showExamples, 'inputValue length:', inputValue.length);
+  }, [showExamples, inputValue]);
+
   return (
-    <section className="relative py-8 sm:py-20 xl:py-24 overflow-hidden">
+    <section className="relative py-8 sm:py-20 xl:py-24 overflow-visible">
       {/* Mobile version - compact and simplified */}
       <div className="block sm:hidden">
         <div className="container mx-auto max-w-lg px-4 relative z-10">
@@ -136,7 +195,7 @@ const AIGeneratedLearningPath = () => {
           </div>
           
           {/* Mobile form - simplified */}
-          <div className="relative">
+          <div className="relative z-[10000]">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="relative">
                 <input
@@ -145,24 +204,33 @@ const AIGeneratedLearningPath = () => {
                   value={inputValue}
                   onChange={handleInputChange}
                   onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
                   onKeyDown={handleKeyDown}
                   placeholder="Type any topic..."
                   className="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
                   disabled={isGenerating}
                 />
                 
-                {/* Mobile dropdown */}
+                {/* Mobile dropdown - Fixed positioning to appear above all content */}
                 {showExamples && inputValue.length === 0 && (
                   <div 
                     ref={dropdownRef}
-                    className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto"
+                    className="fixed bg-white border-2 border-purple-200 rounded-xl shadow-2xl z-[99999] max-h-48 overflow-y-auto"
+                    style={{ 
+                      top: dropdownPosition.top > 0 ? `${dropdownPosition.top}px` : '100px',
+                      left: dropdownPosition.left > 0 ? `${dropdownPosition.left}px` : '50px',
+                      width: dropdownPosition.width > 0 ? `${dropdownPosition.width}px` : '300px',
+                      zIndex: 99999,
+                      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(147, 51, 234, 0.1)'
+                    }}
                   >
                     {examples.map((example, index) => (
                       <div
                         key={index}
                         ref={el => optionRefs.current[index] = el}
                         onClick={() => handleExampleClick(example)}
-                        className={`px-3 py-2.5 text-xs cursor-pointer transition-colors ${
+                        onMouseDown={(e) => e.preventDefault()} // Prevent input blur
+                        className={`px-3 py-2.5 text-xs cursor-pointer transition-colors select-none ${
                           selectedIndex === index 
                             ? 'bg-purple-50 text-purple-700' 
                             : 'text-gray-700 hover:bg-gray-50'
@@ -240,7 +308,7 @@ const AIGeneratedLearningPath = () => {
           </div>
 
           {/* Main form */}
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-4xl mx-auto relative z-[10000]">
             <form onSubmit={handleSubmit} className="space-y-8">
               <div className="relative">
                 <div className="relative">
@@ -250,6 +318,7 @@ const AIGeneratedLearningPath = () => {
                     value={inputValue}
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                     onKeyDown={handleKeyDown}
                     placeholder="What would you like to learn today? (e.g., Machine Learning, React.js, Digital Marketing)"
                     className="w-full px-8 py-6 text-lg bg-white/80 backdrop-blur-sm border-2 border-gray-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 shadow-lg placeholder-gray-400"
@@ -262,11 +331,18 @@ const AIGeneratedLearningPath = () => {
                   </div>
                 </div>
                 
-                {/* Examples dropdown */}
+                {/* Examples dropdown - Fixed positioning to appear above all content */}
                 {showExamples && inputValue.length === 0 && (
                   <div 
                     ref={dropdownRef}
-                    className="absolute top-full left-0 right-0 mt-4 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-2xl shadow-xl z-50 max-h-80 overflow-y-auto"
+                    className="fixed bg-white border-2 border-purple-200 rounded-2xl shadow-2xl z-[99999] max-h-80 overflow-y-auto backdrop-blur-sm"
+                    style={{ 
+                      top: dropdownPosition.top > 0 ? `${dropdownPosition.top}px` : '200px',
+                      left: dropdownPosition.left > 0 ? `${dropdownPosition.left}px` : '50px',
+                      width: dropdownPosition.width > 0 ? `${dropdownPosition.width}px` : '600px',
+                      zIndex: 99999,
+                      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(147, 51, 234, 0.1)'
+                    }}
                   >
                     <div className="p-4 border-b border-gray-100">
                       <h4 className="text-sm font-semibold text-gray-700 mb-1">Popular Learning Topics</h4>
@@ -277,7 +353,8 @@ const AIGeneratedLearningPath = () => {
                         key={index}
                         ref={el => optionRefs.current[index] = el}
                         onClick={() => handleExampleClick(example)}
-                        className={`px-6 py-4 cursor-pointer transition-all duration-200 ${
+                        onMouseDown={(e) => e.preventDefault()} // Prevent input blur
+                        className={`px-6 py-4 cursor-pointer transition-all duration-200 select-none ${
                           selectedIndex === index 
                             ? 'bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 border-l-4 border-purple-500' 
                             : 'text-gray-700 hover:bg-gray-50'
