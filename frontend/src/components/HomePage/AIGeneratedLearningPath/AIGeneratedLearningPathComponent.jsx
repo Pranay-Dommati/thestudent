@@ -81,22 +81,29 @@ const AIGeneratedLearningPath = () => {
                 <input
                   type="text"
                   value={inputValue}
-                  onChange={handleInputChange}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onFocus={() => setShowDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
                   placeholder="Type any topic or select..."
                   className="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
                   disabled={isGenerating}
-                  onFocus={() => setShowDropdown(true)}
+                  autoComplete="off"
                 />
                 {showDropdown && (
                   <ul
                     ref={dropdownRef}
-                    className="absolute left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-40 overflow-y-auto z-20"
+                    className="absolute left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto z-[9999]"
+                    onMouseDown={(e) => e.preventDefault()}
                   >
                     {predefinedTopics.map((topic, index) => (
                       <li
                         key={index}
-                        onClick={() => handleDropdownSelect(topic)}
-                        className="px-4 py-2 text-sm text-gray-700 hover:bg-purple-100 cursor-pointer"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setInputValue(topic);
+                          setShowDropdown(false);
+                        }}
+                        className="px-4 py-3 text-sm text-gray-700 hover:bg-purple-100 active:bg-purple-200 cursor-pointer border-b border-gray-100 last:border-b-0"
                       >
                         {topic}
                       </li>
@@ -178,8 +185,24 @@ const AIGeneratedLearningPath = () => {
                     placeholder="What would you like to learn today? (e.g., Machine Learning, React.js, Digital Marketing)"
                     className="w-full px-8 py-6 text-lg bg-white/80 backdrop-blur-sm border-2 border-gray-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 shadow-lg placeholder-gray-400"
                     disabled={isGenerating}
-                    list="topics"
+                    onFocus={() => setShowDropdown(true)}
                   />
+                  {showDropdown && (
+                    <ul
+                      ref={dropdownRef}
+                      className="absolute left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-60 overflow-y-auto z-20"
+                    >
+                      {predefinedTopics.map((topic, index) => (
+                        <li
+                          key={index}
+                          onClick={() => handleDropdownSelect(topic)}
+                          className="px-6 py-3 text-gray-700 hover:bg-purple-50 cursor-pointer transition-colors duration-200"
+                        >
+                          {topic}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <div className="absolute right-6 top-1/2 transform -translate-y-1/2">
                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
