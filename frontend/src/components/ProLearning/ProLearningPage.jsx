@@ -1778,31 +1778,9 @@ const ProLearningPage = () => {
                 </div>
               </div>
             </div>
-            {/* Section Navigation */}
-            {readingSections.length > 1 && (
-              <div className="flex justify-between items-center mb-4">
-                <button
-                  onClick={handlePrevSection}
-                  disabled={readingSectionIndex === 0}
-                  className={`px-4 py-2 rounded bg-blue-100 text-blue-700 font-semibold mr-2 ${readingSectionIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-200'}`}
-                >
-                  Previous
-                </button>
-                <span className="text-gray-600 font-medium">
-                  Section {readingSectionIndex + 1} of {readingSections.length}
-                </span>
-                <button
-                  onClick={handleNextSection}
-                  disabled={readingSectionIndex === readingSections.length - 1}
-                  className={`px-4 py-2 rounded bg-blue-100 text-blue-700 font-semibold ml-2 ${readingSectionIndex === readingSections.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-200'}`}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-            {/* Enhanced Content with better typography, one section at a time */}
+            {/* Enhanced Content with better typography, all content together */}
             <div className="prose prose-lg max-w-none">
-              {readingSections.length > 0 ? (
+              {content && content.reading ? (
                 <ReactMarkdown
                   components={{
                     h1: ({children}) => (
@@ -1983,7 +1961,7 @@ const ProLearningPage = () => {
                     )
                   }}
                 >
-                  {`${readingSections[readingSectionIndex].header}\n${readingSections[readingSectionIndex].content}`}
+                  {content.reading}
                 </ReactMarkdown>
               ) : (
                 // Fallback: render raw content if sections are empty
@@ -3258,33 +3236,8 @@ const ProLearningPage = () => {
           {/* Sidebar Content */}
           <div className="flex-1 overflow-y-auto min-h-0 p-4">
             <div className="space-y-4">
-
-              {/* Reading Section Navigation */}
-              {activeTab === 'reading' && !isLoading && readingSections.length > 1 && (
-                <div className="border-t pt-4 mt-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Reading Sections</h4>
-                  <div className="space-y-2">
-                    {readingSections.map((section, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setReadingSectionIndex(index)}
-                        className={`w-full text-left p-2 rounded-lg transition-colors text-sm ${
-                          readingSectionIndex === index
-                            ? 'bg-blue-100 text-blue-800 border-l-4 border-blue-600'
-                            : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                      >
-                        <div className="font-medium">{section.header || `Section ${index + 1}`}</div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {section.content.substring(0, 60)}...
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Removed Learning Tips section from sidebar */}
+              {/* Reading material now displays as a single, unified content block */}
+              {/* Removed Reading Sections navigation - content is no longer split into sections */}
             </div>
           </div>
         </div>

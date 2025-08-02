@@ -96,7 +96,15 @@ async function enforceRateLimit() {
 // Generate content for a single topic with enhanced error handling
 async function generateSingleTopicContent(topic) {
   try {
-    console.log(`🚀 Generating AI content for topic: ${topic}`);
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`🚀 FRONTEND: Starting AI content generation for topic: "${topic}"`);
+    console.log(`🎯 Frontend Request Details:`);
+    console.log(`   • Topic: "${topic}"`);
+    console.log(`   • API Endpoint: http://localhost:8000/ai/reading/`);
+    console.log(`   • Method: POST`);
+    console.log(`   • Expected: AI classification + prompt selection + content generation`);
+    console.log(`${'='.repeat(80)}`);
+    
     const response = await fetch('http://localhost:8000/ai/reading/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -109,17 +117,99 @@ async function generateSingleTopicContent(topic) {
     }
     
     const result = await response.json();
-    console.log(`📋 Raw AI response for ${topic}:`, result);
     
-    // Log the topic classification from our enhanced backend
+    console.log(`\n📋 FRONTEND: Received AI response for "${topic}"`);
+    console.log(`🔍 Response Analysis:`);
+    
+    // Enhanced logging for AI prompt selection verification
     if (result.topic_category) {
-      console.log(`🎯 Backend classified "${topic}" as: "${result.topic_category}"`);
+      console.log(`   ✅ Topic Classification: "${result.topic_category.toUpperCase()}"`);
+      console.log(`   🎯 Backend Classification Method: "${result.classification_method || 'unknown'}"`);
+      console.log(`   📊 Topic Analyzed: "${result.topic_analyzed || topic}"`);
+      
+      // Log detailed prompt information if available
+      if (result.prompt_info) {
+        console.log(`\n🎯 DETAILED PROMPT INFORMATION:`);
+        console.log(`   • Prompt ID: ${result.prompt_info.prompt_id}`);
+        console.log(`   • Description: ${result.prompt_info.prompt_description}`);
+        console.log(`   • Expected Content: ${result.prompt_info.expected_content_type}`);
+      }
+      
+      // Log backend analysis if available
+      if (result.backend_analysis) {
+        console.log(`\n📊 BACKEND ANALYSIS RESULTS:`);
+        console.log(`   • Content Length: ${result.backend_analysis.content_length} characters`);
+        console.log(`   • Word Count: ~${result.backend_analysis.word_count_estimate} words`);
+        if (result.backend_analysis.technical_indicators_found !== null) {
+          console.log(`   • Technical Indicators: ${result.backend_analysis.technical_indicators_found} found`);
+        }
+        console.log(`   • Verification Status: ${result.backend_analysis.verification_status.toUpperCase()}`);
+      }
+      
+      // Visual classification indicators
+      const categoryEmojis = {
+        'technical': '🔧',
+        'academic': '📚',
+        'skills': '💪',
+        'business_finance': '💰',
+        'creative': '🎨',
+        'entrepreneurship': '🚀',
+        'general': '❓'
+      };
+      
+      const emoji = categoryEmojis[result.topic_category] || '❓';
+      console.log(`\n   ${emoji} PROMPT TYPE SELECTED: ${result.topic_category.toUpperCase()} PROMPT`);
+      
+      // Determine expected prompt characteristics
+      if (result.topic_category === 'technical') {
+        console.log(`   🎯 Expected Content Type: Programming/Development focus with code examples`);
+        console.log(`   📝 Expected Sections: Introduction, Why it Matters, How it Works, Code Examples, etc.`);
+      } else if (result.topic_category === 'academic') {
+        console.log(`   🎯 Expected Content Type: Educational/Academic content`);
+        console.log(`   📝 Expected Sections: Introduction, Core Concepts, Real-World Relevance, etc.`);
+      } else if (result.topic_category === 'skills') {
+        console.log(`   🎯 Expected Content Type: Personal development/soft skills`);
+        console.log(`   📝 Expected Sections: Introduction, Why It Matters, Practical Tips, etc.`);
+      } else if (result.topic_category === 'general') {
+        console.log(`   ⚠️ FALLBACK PROMPT USED: Topic didn't match specific categories`);
+        console.log(`   🎯 Expected Content Type: Adaptive general content`);
+      }
+      
     } else {
-      console.log(`⚠️ No topic_category in response - backend may not be updated`);
+      console.log(`   ⚠️ No topic_category in response - backend classification may have failed`);
+      console.log(`   🔄 Likely using fallback classification or older backend version`);
     }
     
-    const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-    console.log(`📝 Extracted text length for ${topic}: ${generatedText.length} characters`);
+    // Extract and analyze the generated content
+    const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 
+                         result?.content?.trim() || '';
+    
+    console.log(`\n📝 Content Generation Results:`);
+    console.log(`   • Generated Content Length: ${generatedText.length} characters`);
+    console.log(`   • Generated Word Count: ~${Math.ceil(generatedText.length / 5)} words`);
+    console.log(`   • Content Preview: "${generatedText.substring(0, 100)}..."`);
+    
+    // Analyze if content matches expected prompt type
+    if (result.topic_category === 'technical' && generatedText) {
+      const technicalIndicators = [
+        'code', 'programming', 'function', 'syntax', 'algorithm', 
+        'development', '```', 'coding', 'technical', 'software'
+      ];
+      const foundTechIndicators = technicalIndicators.filter(indicator => 
+        generatedText.toLowerCase().includes(indicator.toLowerCase())
+      );
+      
+      console.log(`\n🔍 TECHNICAL PROMPT VERIFICATION:`);
+      console.log(`   • Technical indicators found: [${foundTechIndicators.join(', ')}]`);
+      console.log(`   • Code blocks detected: ${(generatedText.match(/```/g) || []).length / 2} blocks`);
+      
+      if (foundTechIndicators.length >= 2) {
+        console.log(`   ✅ VERIFICATION PASSED: Content appears to use TECHNICAL prompt`);
+      } else {
+        console.log(`   ⚠️ VERIFICATION WARNING: Content may NOT be using technical prompt`);
+        console.log(`   🔄 Possible fallback to general prompt occurred`);
+      }
+    }
     
     if (!generatedText || generatedText.length === 0) {
       console.error(`❌ Empty content generated for topic: ${topic}`);
@@ -127,10 +217,20 @@ async function generateSingleTopicContent(topic) {
     }
     
     validateGeneratedContent(generatedText, topic);
-    console.log(`✅ Successfully generated and validated content for: ${topic}`);
+    
+    console.log(`\n✅ FRONTEND: Successfully processed AI response for "${topic}"`);
+    console.log(`🎉 Classification: ${result.topic_category?.toUpperCase() || 'UNKNOWN'}`);
+    console.log(`📊 Content: ${generatedText.length} chars generated`);
+    console.log(`${'='.repeat(80)}\n`);
+    
     return generatedText;
   } catch (error) {
-    console.error(`❌ Error generating content for ${topic}:`, error);
+    console.error(`\n❌ FRONTEND ERROR: Content generation failed for "${topic}":`, error);
+    console.log(`🚨 Error Details:`);
+    console.log(`   • Topic: "${topic}"`);
+    console.log(`   • Error Message: ${error.message}`);
+    console.log(`   • Error Type: ${error.name || 'Unknown'}`);
+    console.log(`${'='.repeat(80)}\n`);
     throw new Error(`Reading content generation failed for ${topic}: ${error.message}`);
   }
 }

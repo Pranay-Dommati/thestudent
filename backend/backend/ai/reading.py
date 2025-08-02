@@ -67,6 +67,7 @@ def classify_topic(topic):
     """
     Classify the topic into appropriate category for prompt selection
     """
+    print(f"🔄 Using keyword-based classification for: '{topic}'")
     topic_lower = topic.lower()
     
     # Technical Topics Keywords
@@ -131,28 +132,38 @@ def classify_topic(topic):
         'e-commerce', 'dropshipping', 'freelancing', 'consulting', 'coaching business'
     ]
     
-    # Check each category
+    # Check each category and log the result
     if any(keyword in topic_lower for keyword in technical_keywords):
+        print(f"🔧 Keyword classification result: '{topic}' → 'technical'")
         return 'technical'
     elif any(keyword in topic_lower for keyword in academic_keywords):
+        print(f"📚 Keyword classification result: '{topic}' → 'academic'")
         return 'academic'
     elif any(keyword in topic_lower for keyword in skills_keywords):
+        print(f"💪 Keyword classification result: '{topic}' → 'skills'")
         return 'skills'
     elif any(keyword in topic_lower for keyword in business_finance_keywords):
+        print(f"💰 Keyword classification result: '{topic}' → 'business_finance'")
         return 'business_finance'
     elif any(keyword in topic_lower for keyword in creative_keywords):
+        print(f"🎨 Keyword classification result: '{topic}' → 'creative'")
         return 'creative'
     elif any(keyword in topic_lower for keyword in entrepreneurship_keywords):
+        print(f"🚀 Keyword classification result: '{topic}' → 'entrepreneurship'")
         return 'entrepreneurship'
     else:
+        print(f"❓ Keyword classification result: '{topic}' → 'general' (no keywords matched)")
         return 'general'
 
 def get_prompt_by_category(topic, category):
     """
     Return the appropriate prompt based on topic category
     """
+    print(f"📝 Selecting prompt for category: '{category}' and topic: '{topic}'")
     
     if category == 'technical':
+        print(f"🔧 Using TECHNICAL prompt for topic: '{topic}'")
+        print(f"🎯 PROMPT IDENTIFIER: TECHNICAL_PROMPT_V2024 - Programming/Development Focus")
         return f"""You are an expert AI tutor designed to generate complete, clear, and deeply engaging educational content on **technical topics** such as programming concepts, software development practices, frameworks, system design, and computer science fundamentals.
 
 Given any technical topic by the user, your task is to generate a detailed **Reading Section** using **Markdown syntax**. Your explanation must be **self-contained**, **visually structured**, and suitable for beginners and intermediate learners aiming for deep understanding.
@@ -192,6 +203,7 @@ Given any technical topic by the user, your task is to generate a detailed **Rea
 Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
 
     elif category == 'academic':
+        print(f"📚 Using ACADEMIC prompt for topic: '{topic}'")
         return f"""You are an expert AI tutor trained to explain **academic or general knowledge subjects** such as History, Physics, Economics, Psychology, Biology, etc.
 
 Given a topic by the user, generate a **detailed, easy-to-understand Reading Section** using **Markdown format**. The content should be self-contained and suitable for students and lifelong learners aiming to understand the topic deeply.
@@ -231,6 +243,7 @@ Given a topic by the user, generate a **detailed, easy-to-understand Reading Sec
 Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
 
     elif category == 'skills':
+        print(f"💪 Using SKILLS prompt for topic: '{topic}'")
         return f"""You are a professional coach and educator skilled in teaching **soft skills and personal development topics** like communication, confidence, time management, emotional intelligence, leadership, etc.
 
 Given a topic by the user, generate a clear and structured **Reading Section** in **Markdown format** that helps individuals learn and grow in this area—whether for career, personal life, or relationships.
@@ -271,6 +284,7 @@ Given a topic by the user, generate a clear and structured **Reading Section** i
 Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
 
     elif category == 'business_finance':
+        print(f"💰 Using BUSINESS_FINANCE prompt for topic: '{topic}'")
         return f"""You are an expert AI tutor designed to generate complete, clear, and deeply engaging educational content on **business and finance** topics—such as entrepreneurship, marketing, investing, financial literacy, personal finance, business models, and startups.
 
 When a user provides a topic, generate a full *Reading Section* that feels like a high-quality self-paced learning resource for students, early professionals, founders, and finance enthusiasts.
@@ -302,6 +316,7 @@ Start directly with the markdown content, using a format like:
 - Tips, Mistakes to Avoid, or Best Practices"""
 
     elif category == 'creative':
+        print(f"🎨 Using CREATIVE prompt for topic: '{topic}'")
         return f"""You are a creative mentor AI that helps learners master topics related to **creative arts, writing, storytelling, filmmaking, design, photography, content creation, and media production**.
 
 Your job is to generate a *Reading Section* that feels like a personal guide from a creative industry expert — full of insight, examples, and inspiration.
@@ -334,6 +349,7 @@ Start with markdown output like this:
 - Common Blocks and How to Overcome Them"""
 
     elif category == 'entrepreneurship':
+        print(f"🚀 Using ENTREPRENEURSHIP prompt for topic: '{topic}'")
         return f"""You are an AI financial & business mentor who helps people deeply understand topics related to **investing, business strategy, startups, marketing, budgeting, accounting, freelancing, economics, and personal finance**.
 
 Your goal is to produce a *Reading Section* that is clear, practical, and filled with real-world analogies — something a smart entrepreneur or financial expert would explain to a curious beginner.
@@ -364,6 +380,8 @@ Start with markdown output like this:
 - Pitfalls to Avoid"""
 
     else:  # general/fallback
+        print(f"❓ Using GENERAL (fallback) prompt for topic: '{topic}'")
+        print(f"🎯 PROMPT IDENTIFIER: GENERAL_FALLBACK_V2024 - Adaptive Content")
         return f"""You are a world-class educator and expert communicator. Generate a **deep, clear, and adaptive markdown learning guide** for the topic: **{topic}**.
 
 Your job is to teach the topic like a personal tutor. The learner should fully understand it just by reading this — no other websites, videos, or resources needed.
@@ -432,33 +450,222 @@ def handle_reading(request):
         body = json.loads(request.body.decode('utf-8'))
         topic = body.get('topic', '')
         
+        print(f"\n{'='*60}")
+        print(f"🚀 STARTING AI PROMPT SELECTION PROCESS")
+        print(f"{'='*60}")
+        print(f"📥 Input Topic: '{topic}'")
+        print(f"🤖 Method: AI-Powered Classification (Primary) + Keyword Fallback (Backup)")
+        
         # Classify the topic using AI and get appropriate prompt
-        print(f"🚀 Starting AI-powered topic classification for: '{topic}'")
         category = classify_topic_with_ai(topic)
+        
+        print(f"🎯 FINAL CATEGORY SELECTED: '{category.upper()}'")
+        
+        # Get the appropriate prompt
         prompt = get_prompt_by_category(topic, category)
         
-        print(f"📊 Topic: '{topic}' classified as: '{category}' by AI")
-        print(f"🎯 Selected prompt type: {category}")
+        print(f"� ACTUAL PROMPT BEING USED:")
+        print(f"{'='*40}")
+        print(prompt[:500] + "..." if len(prompt) > 500 else prompt)
+        print(f"{'='*40}")
+        
+        print(f"�📤 Sending to Gemini API with {category.upper()} prompt...")
+        print(f"{'='*60}")
         
         result = call_gemini_api(prompt)
+        
+        print(f"✅ Content generated successfully!")
+        
+        # Analyze if the response matches the expected prompt format
+        if isinstance(result, dict) and 'content' in result:
+            content_text = result['content']
+        elif isinstance(result, str):
+            content_text = result
+        else:
+            content_text = str(result)
+            
+        print(f"🔍 RESPONSE ANALYSIS:")
+        print(f"   • Content length: {len(content_text)} characters")
+        
+        # Check for technical prompt indicators
+        if category == 'technical':
+            tech_indicators = ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function']
+            found_indicators = [indicator for indicator in tech_indicators if indicator.lower() in content_text.lower()]
+            print(f"   • Technical indicators found: {found_indicators}")
+            if len(found_indicators) >= 2:
+                print(f"   ✅ Response appears to match TECHNICAL prompt")
+            else:
+                print(f"   ⚠️ Response may NOT match TECHNICAL prompt (few technical indicators)")
+        
+        print(f"📊 CLASSIFICATION SUMMARY:")
+        print(f"   • Topic: '{topic}'")
+        print(f"   • Category: '{category}'")
+        print(f"   • Method: AI-Powered")
+        print(f"   • Status: Success")
+        print(f"{'='*60}\n")
         
         # Add category to the response for debugging/frontend usage
         if isinstance(result, dict):
             result['topic_category'] = category
             result['classification_method'] = 'ai_powered'
             result['topic_analyzed'] = topic
+            result['prompt_info'] = {
+                'category': category,
+                'prompt_id': f"{category.upper()}_PROMPT_V2024" if category != 'general' else 'GENERAL_FALLBACK_V2024',
+                'prompt_description': get_prompt_description(category),
+                'expected_content_type': get_expected_content_type(category)
+            }
+            result['backend_analysis'] = {
+                'content_length': len(content_text),
+                'word_count_estimate': len(content_text.split()),
+                'technical_indicators_found': len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) if category == 'technical' else None,
+                'verification_status': 'passed' if category != 'technical' or len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) >= 2 else 'warning'
+            }
         else:
             # If result is not a dict, wrap it with metadata
             result = {
                 'content': result,
                 'topic_category': category,
-                'topic_analyzed': topic
+                'classification_method': 'ai_powered',
+                'topic_analyzed': topic,
+                'prompt_info': {
+                    'category': category,
+                    'prompt_id': f"{category.upper()}_PROMPT_V2024" if category != 'general' else 'GENERAL_FALLBACK_V2024',
+                    'prompt_description': get_prompt_description(category),
+                    'expected_content_type': get_expected_content_type(category)
+                },
+                'backend_analysis': {
+                    'content_length': len(content_text),
+                    'word_count_estimate': len(content_text.split()),
+                    'technical_indicators_found': len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) if category == 'technical' else None,
+                    'verification_status': 'passed' if category != 'technical' or len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) >= 2 else 'warning'
+                }
             }
         
         return JsonResponse(result, safe=False)
     except Exception as e:
+        print(f"❌ ERROR in handle_reading:")
+        print(f"   • Topic: '{topic if 'topic' in locals() else 'unknown'}'")
+        print(f"   • Category: '{category if 'category' in locals() else 'unknown'}'")
+        print(f"   • Error: {str(e)}")
+        print(f"{'='*60}\n")
+        
         return JsonResponse({
             'error': str(e),
             'topic_category': category if 'category' in locals() else 'unknown',
             'topic_analyzed': topic if 'topic' in locals() else 'unknown'
-        }, status=500) 
+        }, status=500)
+
+def get_prompt_description(category):
+    """Return user-friendly description of the prompt category"""
+    descriptions = {
+        'technical': 'Programming/Development Focus - Code examples, syntax, algorithms',
+        'academic': 'Educational Content - Academic subjects, research-based knowledge',
+        'skills': 'Personal Development - Soft skills, communication, leadership',
+        'business_finance': 'Business/Finance - Investing, accounting, business strategy',
+        'creative': 'Creative Arts - Writing, design, media production',
+        'entrepreneurship': 'Business Strategy - Startups, marketing, business models',
+        'general': 'Adaptive Content - General topics, fallback prompt'
+    }
+    return descriptions.get(category, 'Unknown category')
+
+def get_expected_content_type(category):
+    """Return expected content characteristics for the category"""
+    content_types = {
+        'technical': 'Code blocks, technical concepts, implementation details',
+        'academic': 'Research-based content, academic explanations, historical context',
+        'skills': 'Practical tips, real-life applications, behavioral guidance',
+        'business_finance': 'Financial concepts, business examples, practical applications',
+        'creative': 'Creative techniques, artistic principles, production guidance',
+        'entrepreneurship': 'Business strategies, market insights, startup advice',
+        'general': 'Adaptive to topic nature, flexible structure'
+    }
+    return content_types.get(category, 'Unknown content type')
+
+def test_ai_classification_console():
+    """
+    Test function to verify AI classification in console
+    Run this in Django shell: python manage.py shell
+    Then: from backend.ai.reading import test_ai_classification_console; test_ai_classification_console()
+    """
+    test_topics = [
+        "Regular Expressions",
+        "React Hooks", 
+        "Python Machine Learning",
+        "JavaScript Promises",
+        "World War 2",
+        "Quantum Physics",
+        "Public Speaking",
+        "Leadership Skills",
+        "Stock Market Investing",
+        "Personal Finance",
+        "Photography Techniques",
+        "Creative Writing",
+        "Startup Strategy",
+        "Business Plan",
+        "Machine Learning for Marketing",  # Edge case
+        "Financial Modeling in Python",   # Edge case
+    ]
+    
+    print(f"\n{'='*80}")
+    print(f"🧪 AI CLASSIFICATION CONSOLE TEST")
+    print(f"{'='*80}")
+    
+    for i, topic in enumerate(test_topics, 1):
+        print(f"\n🔬 TEST {i}: '{topic}'")
+        print(f"{'─'*50}")
+        
+        # Test AI classification
+        category = classify_topic_with_ai(topic)
+        
+        # Get prompt info (without full prompt)
+        print(f"📝 Selecting prompt for category: '{category}' and topic: '{topic}'")
+        
+        if category == 'technical':
+            print(f"🔧 Using TECHNICAL prompt for topic: '{topic}'")
+            print(f"🎯 PROMPT IDENTIFIER: TECHNICAL_PROMPT_V2024 - Programming/Development Focus")
+        elif category == 'academic':
+            print(f"📚 Using ACADEMIC prompt for topic: '{topic}'")
+            print(f"🎯 PROMPT IDENTIFIER: ACADEMIC_PROMPT_V2024 - Educational Content")
+        elif category == 'skills':
+            print(f"💪 Using SKILLS prompt for topic: '{topic}'")
+            print(f"🎯 PROMPT IDENTIFIER: SKILLS_PROMPT_V2024 - Personal Development")
+        elif category == 'business_finance':
+            print(f"💰 Using BUSINESS_FINANCE prompt for topic: '{topic}'")
+            print(f"🎯 PROMPT IDENTIFIER: BUSINESS_FINANCE_V2024 - Finance/Business")
+        elif category == 'creative':
+            print(f"🎨 Using CREATIVE prompt for topic: '{topic}'")
+            print(f"🎯 PROMPT IDENTIFIER: CREATIVE_PROMPT_V2024 - Arts/Media")
+        elif category == 'entrepreneurship':
+            print(f"🚀 Using ENTREPRENEURSHIP prompt for topic: '{topic}'")
+            print(f"🎯 PROMPT IDENTIFIER: ENTREPRENEURSHIP_V2024 - Business Strategy")
+        else:
+            print(f"❓ Using GENERAL (fallback) prompt for topic: '{topic}'")
+            print(f"🎯 PROMPT IDENTIFIER: GENERAL_FALLBACK_V2024 - Adaptive Content")
+            
+        print(f"✅ Classification complete for: '{topic}' → '{category.upper()}'")
+        
+        # Brief pause for readability
+        import time
+        time.sleep(0.5)
+    
+    print(f"\n{'='*80}")
+    print(f"🎉 All {len(test_topics)} tests completed!")
+    print(f"{'='*80}")
+
+# Quick single topic test function
+def test_single_topic(topic):
+    """
+    Test a single topic classification
+    Usage: from backend.ai.reading import test_single_topic; test_single_topic("Your Topic")
+    """
+    print(f"\n{'='*60}")
+    print(f"🔬 SINGLE TOPIC TEST: '{topic}'")
+    print(f"{'='*60}")
+    
+    category = classify_topic_with_ai(topic)
+    
+    print(f"🎯 FINAL RESULT: '{topic}' → '{category.upper()}'")
+    print(f"{'='*60}\n")
+    
+    return category 
