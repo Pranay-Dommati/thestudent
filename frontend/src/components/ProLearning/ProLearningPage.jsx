@@ -1976,11 +1976,6 @@ const ProLearningPage = () => {
                         </div>
                       );
                     },
-                    pre: ({children}) => (
-                      <div className="mb-6">
-                        <pre className="text-sm">{children}</pre>
-                      </div>
-                    ),
                     ul: ({children}) => <ul className="space-y-2 mb-6 ml-6">{children}</ul>,
                     li: ({children}) => (
                       <li className="flex items-start text-gray-700">
@@ -2161,11 +2156,6 @@ const ProLearningPage = () => {
                           </div>
                         );
                       },
-                      pre: ({children}) => (
-                        <div className="mb-6">
-                          <pre className="text-sm">{children}</pre>
-                        </div>
-                      ),
                       ul: ({children}) => <ul className="space-y-2 mb-6 ml-6">{children}</ul>,
                       li: ({children}) => (
                         <li className="flex items-start text-gray-700">
