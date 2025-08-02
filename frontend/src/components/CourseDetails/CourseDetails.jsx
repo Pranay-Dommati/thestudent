@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { FaPlay, FaClock, FaUserGraduate, FaChartLine, FaCode, FaChevronDown, FaChevronUp, FaGlobe, FaCheck, FaVideo, FaDownload, FaMobile } from 'react-icons/fa';
+import axios from 'axios';
 import LoadingSpinner from './LoadingSpinner';
 import Footer from '../Footer/Footer';
 import { getEngineeringCourseById } from '../../services/courseApi';
@@ -15,6 +16,8 @@ const formatDate = (dateString) => {
 };
 
 const CourseDetails = () => {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+  
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
