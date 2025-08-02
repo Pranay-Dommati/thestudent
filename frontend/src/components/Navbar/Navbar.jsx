@@ -42,7 +42,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   };
 
   return (
-    <nav className={`fixed w-full z-50 transition-all duration-300 ${backgroundClass} ${isScrolled ? 'py-2' : 'py-3'}`}>
+    <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${backgroundClass} ${isScrolled ? 'py-2' : 'py-3'}`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center">
           {/* Logo section */}

@@ -294,7 +294,7 @@ const MobileFirstCourses = () => {
     if (selectedLevel) {
         return (
             <>
-                <Navbar initialStyle="gradient"/>
+                <Navbar initialStyle="transparent"/>
                 <Outlet />
                 <Footer />
             </>
@@ -303,7 +303,7 @@ const MobileFirstCourses = () => {
 
     return (
         <>
-            <Navbar initialStyle="gradient"/>
+            <Navbar initialStyle="transparent"/>
             <MobileHero />
             <SearchSection />
             

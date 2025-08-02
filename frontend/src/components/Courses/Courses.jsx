@@ -89,7 +89,7 @@ const Courses = () => {
 
     return (
         <>
-            <Navbar initialStyle="gradient"/>
+            <Navbar initialStyle="transparent"/>
             <CourseHero />
             <div className="bg-gray-50 pb-16 pt-7">
                 <div className="container mx-auto px-4 py-12">

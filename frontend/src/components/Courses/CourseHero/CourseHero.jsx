@@ -22,7 +22,7 @@ const CourseHero = () => {
     ];
 
     return (
-        <section className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-28 pb-16 relative overflow-hidden">
+        <section className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-16 md:pt-20 pb-16 relative overflow-hidden">
             {/* Subtle background decoration */}
             <div className="absolute inset-0 opacity-5">
                 <div className="absolute top-5 left-10 w-16 h-16 border border-white rounded-full"></div>
