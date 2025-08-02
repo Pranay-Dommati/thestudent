@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, useParams, useLocation, Navigate } from '
 import { useState, useEffect } from 'react';
 import HomePage from './components/HomePage/HomePage';
 import Courses from './components/Courses/Courses';
-import MobileFirstCourses from './components/Courses/MobileFirstCourses';
+import CoursesWrapper from './components/Courses/CoursesWrapper';
 import ChatBotPage from './components/Chatbot/ChatbotPage';
 import ProLearningPage from './components/ProLearning/ProLearningPage';
 import CourseDetailsPage from './components/CourseDetails/CourseDetailsPage/CourseDetailsPage';
@@ -145,7 +145,7 @@ const App = () => {
             <Route path="/admin-p/forgot-password" element={<AdminForgotPassword />} />
             
             {/* Course Routes */}
-            <Route path="/courses" element={<MobileFirstCourses />}>
+            <Route path="/courses" element={<CoursesWrapper />}>
               <Route path="6th" element={<SixthStandard />} />
               <Route path="6th/cbse" element={<SixthStandard />} />
               <Route path="6th/state/:stateId" element={<SixthStandard />} />
