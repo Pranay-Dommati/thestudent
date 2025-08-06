@@ -1,0 +1,34 @@
+/* Custom styles for mobile chat interface */
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* Smooth transition for action buttons */
+button {
+  transition: all 0.2s ease;
+}
+
+/* Additional styling to make buttons look more like the DeepSeek UI */
+.rounded-full {
+  border-radius: 9999px;
+}
+
+/* Gradient backgrounds for emphasis */
+.gradient-button {
+  background-image: linear-gradient(to right, #4366f8, #6c47ff);
+  color: white;
+}
+
+/* Blue accent color similar to DeepSeek whale logo */
+.accent-blue {
+  color: #4366f8;
+}
+
+.bg-accent-blue {
+  background-color: #4366f8;
+}
