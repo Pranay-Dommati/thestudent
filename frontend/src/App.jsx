@@ -8,7 +8,7 @@ import ChatBotPage from './components/Chatbot/ChatbotPage';
 import ProLearningPage from './components/ProLearning/ProLearningPage';
 import CourseDetailsPage from './components/CourseDetails/CourseDetailsPage/CourseDetailsPage';
 import CourseLearningPage from './components/CourseLearningPage/CourseLearningPage';
-import LearningHubPage from './components/LearningHub/LearningHubPage';
+import LearningHubWrapper from './components/LearningHub/LearningHubWrapper';
 import FloatingChatButton from './components/Chatbot/FloatingChatButton';
 import AuthForm from './components/Auth/AuthForm';
 import SixthStandard from './components/Courses/categories/6th/SixthStandard';
@@ -187,7 +187,7 @@ const App = () => {
             <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
             <Route path="/learning-hub" element={
               <ProtectedRoute>
-                <LearningHubPage />
+                <LearningHubWrapper />
               </ProtectedRoute>
             } />
             <Route path="/auth" element={<AuthForm />} />
