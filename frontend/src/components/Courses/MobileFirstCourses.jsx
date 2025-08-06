@@ -317,7 +317,6 @@ const MobileFirstCourses = () => {
         <>
             <Navbar initialStyle="transparent"/>
             <MobileHero />
-            <SearchSection />
             
             <div className="bg-gray-50 min-h-screen pb-6">
                 <div className="container mx-auto px-4 py-6">
@@ -364,23 +363,6 @@ const MobileFirstCourses = () => {
                                 </button>
                             </motion.div>
                         )}
-
-                        {/* Quick Actions */}
-                        <div className="mt-8 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                            <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h3>
-                            <div className="grid grid-cols-2 gap-3">
-                                <button className="p-3 bg-indigo-50 rounded-lg flex flex-col items-center 
-                                                 space-y-2 hover:bg-indigo-100 transition-colors">
-                                    <FaBook className="w-5 h-5 text-indigo-600" />
-                                    <span className="text-sm font-medium text-indigo-900">My Courses</span>
-                                </button>
-                                <button className="p-3 bg-indigo-50 rounded-lg flex flex-col items-center 
-                                                 space-y-2 hover:bg-indigo-100 transition-colors">
-                                    <FaGraduationCap className="w-5 h-5 text-indigo-600" />
-                                    <span className="text-sm font-medium text-indigo-900">Progress</span>
-                                </button>
-                            </div>
-                        </div>
                     </motion.div>
                 </div>
             </div>
