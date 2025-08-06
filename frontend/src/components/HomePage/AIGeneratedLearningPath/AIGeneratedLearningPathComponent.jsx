@@ -30,7 +30,10 @@ const AIGeneratedLearningPath = () => {
 
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
-      navigate(`/learning-path?topic=${encodeURIComponent(inputValue.trim())}`);
+      // Navigate to chat page with complete formatted message using SPA navigation
+      const fullPrompt = `Create a comprehensive course for: ${inputValue.trim()}`;
+      const encodedMessage = encodeURIComponent(fullPrompt);
+      navigate(`/chat?mode=createCourse&message=${encodedMessage}&prefill=true`);
     } catch (error) {
       console.error('Error generating learning path:', error);
     } finally {

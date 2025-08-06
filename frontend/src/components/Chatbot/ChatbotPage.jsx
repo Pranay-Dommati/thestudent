@@ -529,7 +529,27 @@ const ChatbotPage = () => {
 
   // Handle initial query from URL parameter
   useEffect(() => {
-    if (initialQuery && !initialQueryProcessed.current) {
+    // Check for both old query parameter and new message parameter
+    const messageParam = searchParams.get("message");
+    const modeParam = searchParams.get("mode");
+    const prefillParam = searchParams.get("prefill");
+    
+    // Handle new format for generated course
+    if (messageParam && prefillParam === 'true') {
+      const decodedMessage = decodeURIComponent(messageParam);
+      setMessage(decodedMessage);
+      initialQueryProcessed.current = true;
+      
+      // If we want to automatically send it, uncomment below
+      // setTimeout(() => {
+      //   handleSendMessage(decodedMessage);
+      // }, 100);
+      
+      // Replace URL without parameters for cleaner history
+      navigate("/chat", { replace: true });
+    }
+    // Handle older query parameter format
+    else if (initialQuery && !initialQueryProcessed.current) {
       initialQueryProcessed.current = true;
       setMessage(initialQuery);
       setTimeout(() => {
@@ -537,7 +557,7 @@ const ChatbotPage = () => {
       }, 100);
       navigate("/chat", { replace: true });
     }
-  }, [initialQuery, navigate]);
+  }, [initialQuery, navigate, searchParams]);
 
   useEffect(() => {
     setIsSidebarOpen(false);
