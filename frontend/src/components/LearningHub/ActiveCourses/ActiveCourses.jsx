@@ -226,24 +226,6 @@ const ActiveCourses = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
             {activeCourses.map((course) => (
               <div key={course.enrollmentId} className="group bg-white border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 relative flex flex-col h-80">
-                
-                {/* Remove Button */}
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleRemoveCourse(course.enrollmentId, course.title);
-                  }}
-                  className="absolute top-2 right-2 z-20 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-sm"
-                  title="Remove from enrolled courses"
-                  disabled={removingCourseId === course.enrollmentId}
-                >
-                  {removingCourseId === course.enrollmentId ? (
-                    <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <FaTimes className="text-xs" />
-                  )}
-                </button>
 
                 {/* Course Image - Increased Height */}
                 <Link to={course.courseUrl} className="block relative overflow-hidden flex-shrink-0">
@@ -311,20 +293,41 @@ const ActiveCourses = () => {
                       </div>
                     </div>
 
-                    {/* Action Button */}
+                    {/* Action Buttons */}
                     <div className="flex justify-between items-center pt-1">
                       <span className="text-xs text-gray-500 truncate">Enrolled {course.lastAccessed}</span>
-                      <Link 
-                        to={course.learningUrl}
-                        className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 
-                        transition-colors flex items-center justify-center group-hover:shadow-md cursor-pointer relative z-10 flex-shrink-0"
-                        style={{ pointerEvents: 'auto' }}
-                        onClick={(e) => {
-                          console.log('Start/Continue Learning clicked for:', course.course_name, 'URL:', course.learningUrl);
-                        }}
-                      >
-                        {course.progress > 0 ? 'Continue' : 'Start'}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        {/* Remove Button */}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveCourse(course.enrollmentId, course.title);
+                          }}
+                          className="w-7 h-7 bg-gray-100 hover:bg-red-50 border border-gray-200 hover:border-red-200 text-gray-500 hover:text-red-500 rounded-md flex items-center justify-center transition-all duration-200 shadow-sm"
+                          title="Remove from enrolled courses"
+                          disabled={removingCourseId === course.enrollmentId}
+                        >
+                          {removingCourseId === course.enrollmentId ? (
+                            <div className="w-2.5 h-2.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <FaTrash className="text-xs" />
+                          )}
+                        </button>
+                        
+                        {/* Start/Continue Button */}
+                        <Link 
+                          to={course.learningUrl}
+                          className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 
+                          transition-colors flex items-center justify-center group-hover:shadow-md cursor-pointer relative z-10 flex-shrink-0"
+                          style={{ pointerEvents: 'auto' }}
+                          onClick={(e) => {
+                            console.log('Start/Continue Learning clicked for:', course.course_name, 'URL:', course.learningUrl);
+                          }}
+                        >
+                          {course.progress > 0 ? 'Continue' : 'Start'}
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </div>
