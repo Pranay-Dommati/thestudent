@@ -963,11 +963,6 @@ const MobileChatbotPage = () => {
                 <IoSend size={14} />
               </button>
             </div>
-            
-            {/* Bottom disclaimer text exactly like ChatGPT */}
-            <div className="text-center mt-2 mb-1">
-              <span className="text-xs text-gray-500">Learning Assistant may make mistakes. Verify important info.</span>
-            </div>
           </div>
         </div>
       </div>
