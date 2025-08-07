@@ -59,6 +59,7 @@ import { startLearningTracking, stopLearningTracking } from '../../services/acti
 import Navbar from '../Navbar/Navbar';
 import { classifyTopicsWithGemini } from './topicclassifier';
 import BatchGenerationStatus from './BatchGenerationStatus';
+import ProLearningMobile from './ProLearningMobile';
 
 
 const ProLearningPage = () => {
@@ -68,7 +69,6 @@ const ProLearningPage = () => {
   
   // UI state
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Course and topic management with enhanced URL structure
   const courseId = params.courseId; // Get courseId from URL path
@@ -448,7 +448,6 @@ const ProLearningPage = () => {
         setSidebarVisible(true);
       } else {
         setSidebarVisible(false);
-        setIsMobileMenuOpen(false);
       }
     };
 
@@ -964,10 +963,6 @@ const ProLearningPage = () => {
     setSidebarVisible(isVisible);
   };
 
-  const handleMobileMenuToggle = (isOpen) => {
-    setIsMobileMenuOpen(isOpen);
-  };
-
   // Copy code functionality
   const handleCopyCode = (codeString, blockId) => {
     navigator.clipboard.writeText(codeString).then(() => {
@@ -1357,11 +1352,11 @@ const ProLearningPage = () => {
   
   // Define tabs array with icons and labels - MOVED ABOVE LoadingComponent
   const tabs = [
-    { id: 'reading', label: 'Reading', icon: FaBookOpen },
-    { id: 'summary', label: 'Summary', icon: FaBrain },
-    { id: 'videos', label: 'Videos', icon: FaVideo },
-    { id: 'quiz', label: 'Quiz', icon: FaQuestionCircle },
-    { id: 'resources', label: 'Resources', icon: FaLink }
+    { id: 'reading', label: 'Reading', icon: FaBookOpen, description: 'Comprehensive study content' },
+    { id: 'summary', label: 'Summary', icon: FaBrain, description: 'Key points and overview' },
+    { id: 'videos', label: 'Videos', icon: FaVideo, description: 'Visual learning resources' },
+    { id: 'quiz', label: 'Quiz', icon: FaQuestionCircle, description: 'Test your knowledge' },
+    { id: 'resources', label: 'Resources', icon: FaLink, description: 'Additional materials' }
   ];
   
   
@@ -2982,8 +2977,8 @@ const ProLearningPage = () => {
             : ''
         }`}>
           <div className="w-full px-2 sm:px-4 lg:px-6 py-4 max-w-full overflow-x-hidden">
-              {/* Enhanced Tab Navigation */}
-              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border mb-6 hidden md:block overflow-hidden">
+              {/* Enhanced Tab Navigation - Desktop Only */}
+              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border mb-6 hidden lg:block overflow-hidden">
                 <div className="p-2">
                   <nav className="flex space-x-2 overflow-x-auto scrollbar-hide" aria-label="Tabs">
                     {tabs.map((tab) => {
@@ -3017,45 +3012,31 @@ const ProLearningPage = () => {
                 </div>
               </div>
 
-              {/* Mobile Tab Indicator */}
-              <div className="md:hidden mb-4">
-                <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      {React.createElement(tabs.find(tab => tab.id === activeTab)?.icon, { 
-                        className: "mr-2 text-lg text-blue-600" 
-                      })}
-                      <div>
-                        <div className="font-semibold text-gray-900">
-                          {tabs.find(tab => tab.id === activeTab)?.label}
-                        </div>
-                        {/* Removed tab.description here */}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleMobileMenuToggle(true)}
-                      className="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
-                    >
-                      <IoChevronDown />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              {/* Mobile Version */}
+              <ProLearningMobile
+                activeTab={activeTab}
+                setActiveTab={updateActiveTab}
+                content={content}
+                topicsList={topicsList}
+                completedTopics={completedTopics}
+                toggleTopicCompletion={toggleTopicCompletion}
+                handleTopicSelect={handleTopicSelect}
+                handleSaveToLearningHub={handleSaveToLearningHub}
+                isSavingToHub={isSavingToHub}
+                savedToHub={savedToHub}
+                tabs={tabs}
+                renderTabContent={renderTabContent}
+                courseTitle={courseTitle}
+                isLoading={isLoading}
+              />
 
-              {/* Save to Learning Hub Button - Only show for locally generated courses, not database courses */}
+              {/* Save to Learning Hub Button - Desktop Version */}
               {(() => {
                 const isFromDatabase = topicsList.some(t => t.dbTopic);
                 const shouldShowSaveButton = content && topicsList.length > 0 && !isFromDatabase && savedToHub !== 'hidden';
-                console.log('🔍 Save button visibility check:', {
-                  hasContent: !!content,
-                  topicsCount: topicsList.length,
-                  isFromDatabase,
-                  savedToHub,
-                  shouldShowSaveButton
-                });
                 return shouldShowSaveButton;
               })() && (
-                <div className="mb-6">
+                <div className="mb-6 hidden lg:block">
                   <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 shadow-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
@@ -3100,8 +3081,8 @@ const ProLearningPage = () => {
                 </div>
               )}
 
-              {/* Tab Content */}
-              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border overflow-hidden">
+              {/* Desktop Tab Content */}
+              <div className="hidden lg:block bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border overflow-hidden">
                 <div className="p-4 lg:p-6 max-w-full overflow-x-hidden">
                   {renderTabContent()}
                 </div>

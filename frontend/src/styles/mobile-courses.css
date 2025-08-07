@@ -166,3 +166,74 @@ html {
   opacity: 0;
   transition: opacity 300ms;
 }
+
+/* ProLearning Mobile Specific Styles */
+.pro-learning-mobile {
+  padding: 1rem;
+}
+
+.pro-learning-mobile .mobile-tab-selector {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.pro-learning-mobile .mobile-content-area {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  min-height: 60vh;
+}
+
+.pro-learning-mobile .mobile-modal {
+  animation: slideUpModal 0.3s ease-out;
+}
+
+@keyframes slideUpModal {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.pro-learning-mobile .mobile-topic-progress {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Mobile typography adjustments */
+@media (max-width: 768px) {
+  .pro-learning-mobile h1 {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+  
+  .pro-learning-mobile h2 {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+  
+  .pro-learning-mobile h3 {
+    font-size: 1.125rem;
+    line-height: 1.5rem;
+  }
+  
+  .pro-learning-mobile p {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+}
+
+/* Enhanced touch targets for mobile */
+.pro-learning-mobile button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Smooth scrolling for mobile content */
+.pro-learning-mobile .content-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}

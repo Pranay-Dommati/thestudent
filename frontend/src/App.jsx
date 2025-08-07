@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import HomePage from './components/HomePage/HomePage';
 import Courses from './components/Courses/Courses';
 import CoursesWrapper from './components/Courses/CoursesWrapper';
-import ChatBotPage from './components/Chatbot/ChatbotPage';
+import ChatbotWrapper from './components/Chatbot/ChatbotWrapper';
 import ProLearningPage from './components/ProLearning/ProLearningPage';
 import CourseDetailsPage from './components/CourseDetails/CourseDetailsPage/CourseDetailsPage';
 import CourseLearningPage from './components/CourseLearningPage/CourseLearningPage';
-import LearningHubPage from './components/LearningHub/LearningHubPage';
+import LearningHubWrapper from './components/LearningHub/LearningHubWrapper';
 import FloatingChatButton from './components/Chatbot/FloatingChatButton';
 import AuthForm from './components/Auth/AuthForm';
 import SixthStandard from './components/Courses/categories/6th/SixthStandard';
@@ -180,14 +180,14 @@ const App = () => {
             <Route path="/terms" element={<Navigate to="/terms-and-conditions" />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/privacy" element={<Navigate to="/privacy-policy" />} />
-            <Route path="/chat" element={<ChatBotPage />} />
+            <Route path="/chat" element={<ChatbotWrapper />} />
             <Route path="/pro-learning" element={<ProLearningPage />} />
             <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
             <Route path="/learning-hub" element={
               <ProtectedRoute>
-                <LearningHubPage />
+                <LearningHubWrapper />
               </ProtectedRoute>
             } />
             <Route path="/auth" element={<AuthForm />} />
