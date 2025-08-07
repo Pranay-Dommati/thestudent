@@ -651,7 +651,7 @@ const MobileChatbotPage = () => {
     
     // Setting pro mode
     setProMode(true);
-    setMessage("Create a course about "); // Pre-fill the input for better UX
+    setMessage(""); // Keep input clean without pre-filled text
     
     // No message is added to the chat history
   };

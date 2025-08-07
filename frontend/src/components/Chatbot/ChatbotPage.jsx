@@ -460,6 +460,7 @@ const ChatbotPage = () => {
 
   const [message, setMessage] = useState("");
   const [proMode, setProMode] = useState(false);
+  const [coursePlaceholder, setCoursePlaceholder] = useState("Create arrays and strings course...");
   const [showTopicConfirmation, setShowTopicConfirmation] = useState(false);
   const [pendingTopics, setPendingTopics] = useState([]);
   const [originalPrompt, setOriginalPrompt] = useState("");
@@ -495,6 +496,34 @@ const ChatbotPage = () => {
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
+
+  // Random course placeholder texts - Topic focused
+  const coursePlaceholders = [
+    "Create course on arrays and strings",
+    "Create course about photosynthesis and water cycle",
+    "Create course on Newton's laws of motion",
+    "Create course about acids, bases, and salts",
+    "Create course on basic algebra and equations",
+    "Create course about ecosystem and food chain",
+    "Create course on React components and props",
+    "Create course on electric circuits and Ohm's law",
+    "Create course about cell structure and function",
+    "Create course on data structures like linked lists and stacks",
+    "Create course about solar system and planets",
+    "Create course on basic trigonometry",
+    "Create course on photosynthesis and transpiration",
+    "Create course about world war history (WWI & WWII)",
+    "Create course on cybersecurity and ethical hacking basics",
+    "Create course about types of reproduction in biology",
+    "Create course on financial literacy",
+    "Create course about AI and machine learning basics"
+  ];
+
+  // Function to get random placeholder
+  const getRandomPlaceholder = () => {
+    const randomIndex = Math.floor(Math.random() * coursePlaceholders.length);
+    return coursePlaceholders[randomIndex];
+  };
 
   // Check if user has visited chat page before
   useEffect(() => {
@@ -1236,8 +1265,9 @@ const ChatbotPage = () => {
     const newProMode = !proMode;
     setProMode(newProMode);
     
-    // Fetch usage stats when entering pro mode
+    // Set random placeholder when entering pro mode
     if (newProMode) {
+      setCoursePlaceholder(getRandomPlaceholder());
       await fetchUsageStats();
     }
   };
@@ -1603,7 +1633,7 @@ const ChatbotPage = () => {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder={proMode ? "Create arrays and strings course..." : "Type your message here..."}
+                  placeholder={proMode ? coursePlaceholder : "Type your message here..."}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
