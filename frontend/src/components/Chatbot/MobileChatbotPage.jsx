@@ -157,6 +157,51 @@ const MobileChatbotPage = () => {
     }
   }, []);
 
+  // Fetch usage stats when component mounts or when pro mode is enabled
+  const fetchUsageStats = async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      console.log('📊 Fetching usage stats...');
+      const response = await fetch('http://localhost:8000/api/chatbot/usage-stats/', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUsageStats(data);
+        console.log('📊 Usage stats fetched:', data);
+      } else {
+        console.log('📊 Failed to fetch usage stats, using defaults');
+        // Set default stats if API fails
+        setUsageStats({
+          daily_used: 0,
+          daily_limit: 16,
+          per_request_limit: 4
+        });
+      }
+    } catch (error) {
+      console.error('📊 Error fetching usage stats:', error);
+      // Set default stats if fetch fails
+      setUsageStats({
+        daily_used: 0,
+        daily_limit: 16,
+        per_request_limit: 4
+      });
+    }
+  };
+
+  // Fetch usage stats when component mounts and when pro mode changes
+  useEffect(() => {
+    if (proMode && isAuthenticated) {
+      fetchUsageStats();
+    }
+  }, [proMode, isAuthenticated]);
+
   // Handle ESC key to close welcome message
   useEffect(() => {
     const handleEscKey = (event) => {
@@ -683,6 +728,16 @@ const MobileChatbotPage = () => {
           </Link>
         </div>
       </header>
+
+      {/* Remaining Topics Display - Show when in pro mode or when user is authenticated */}
+      {(proMode || isAuthenticated) && (
+        <div className="px-4 py-1.5 bg-white border-b border-gray-100">
+          <CompactRateLimitStatus 
+            usageStats={usageStats || { daily_used: 0, daily_limit: 16, per_request_limit: 4 }} 
+            className="w-full justify-center"
+          />
+        </div>
+      )}
 
       {/* Mobile Sidebar */}
       <div 
