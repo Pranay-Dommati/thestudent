@@ -1592,30 +1592,28 @@ const ChatbotPage = () => {
             <div className="w-full max-w-5xl mx-auto px-6 lg:px-8">
               {/* Create Course Button */}
               <div className="mb-4">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-4">
                   {/* Button Section */}
-                  <div className="relative group">
-                    <button 
-                      onClick={handleCreateCourse}
-                      className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-105 ${
-                        proMode 
-                          ? 'bg-indigo-50/80 text-indigo-600 border-2 border-indigo-300/50' 
-                          : 'bg-white/80 text-gray-700 border-2 border-gray-200/50 hover:bg-gray-50/80 hover:text-gray-800 hover:border-gray-300/50'
-                      }`}
-                    >
-                      {proMode ? (
-                        <>
-                          <IoCheckmarkCircle size={18} />
-                          Course Creation Mode
-                        </>
-                      ) : (
-                        <>
-                          <IoSchoolOutline size={18} />
-                          Create Course
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  <button 
+                    onClick={handleCreateCourse}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-105 ${
+                      proMode 
+                        ? 'bg-indigo-50/80 text-indigo-600 border-2 border-indigo-300/50' 
+                        : 'bg-white/80 text-gray-700 border-2 border-gray-200/50 hover:bg-gray-50/80 hover:text-gray-800 hover:border-gray-300/50'
+                    }`}
+                  >
+                    {proMode ? (
+                      <>
+                        <IoCheckmarkCircle size={18} />
+                        Course Creation Mode
+                      </>
+                    ) : (
+                      <>
+                        <IoSchoolOutline size={18} />
+                        Create Course
+                      </>
+                    )}
+                  </button>
                   
                   {/* Compact Rate Limit Status beside the button */}
                   {proMode && usageStats && (
@@ -1625,7 +1623,7 @@ const ChatbotPage = () => {
                     />
                   )}
                   {proMode && !usageStats && (
-                    <div className="text-xs text-gray-500 px-2">Loading stats...</div>
+                    <div className="text-xs text-gray-500">Loading stats...</div>
                   )}
                 </div>
               </div>
