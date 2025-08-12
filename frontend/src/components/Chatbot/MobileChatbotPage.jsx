@@ -157,6 +157,34 @@ const MobileChatbotPage = () => {
     }
   }, []);
 
+  // Random course placeholder texts - Topic focused (same as desktop)
+  const coursePlaceholders = [
+    "Create course on arrays and strings",
+    "Create course about photosynthesis and water cycle",
+    "Create course on Newton's laws of motion",
+    "Create course about acids, bases, and salts",
+    "Create course on basic algebra and equations",
+    "Create course about ecosystem and food chain",
+    "Create course on React components and props",
+    "Create course on electric circuits and Ohm's law",
+    "Create course about cell structure and function",
+    "Create course on data structures like linked lists and stacks",
+    "Create course about solar system and planets",
+    "Create course on basic trigonometry",
+    "Create course on photosynthesis and transpiration",
+    "Create course about world war history (WWI & WWII)",
+    "Create course on cybersecurity and ethical hacking basics",
+    "Create course about types of reproduction in biology",
+    "Create course on financial literacy",
+    "Create course about AI and machine learning basics"
+  ];
+
+  // Function to get random placeholder (same as desktop)
+  const getRandomPlaceholder = () => {
+    const randomIndex = Math.floor(Math.random() * coursePlaceholders.length);
+    return coursePlaceholders[randomIndex];
+  };
+
   // Fetch usage stats when component mounts or when pro mode is enabled
   const fetchUsageStats = async () => {
     if (!isAuthenticated) return;
@@ -769,6 +797,23 @@ const MobileChatbotPage = () => {
                     <Link 
                       to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
                       className="block w-full p-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg"
+                      onClick={() => {
+                        // Store the topics and course data for batch generation (same as desktop)
+                        try {
+                          const batchGenerationData = {
+                            courseId: message.courseId,
+                            topics: message.extractedTopics || [],
+                            topicString: message.topic,
+                            triggerBatchGeneration: true,
+                            timestamp: Date.now()
+                          };
+                          
+                          localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
+                          console.log('🚀 Mobile Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
+                        } catch (error) {
+                          console.error('Failed to store batch generation data:', error);
+                        }
+                      }}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -806,19 +851,14 @@ const MobileChatbotPage = () => {
       return;
     }
     
-    // Toggle between normal mode and pro mode
-    if (proMode) {
-      setProMode(false);
-      // Just toggle mode without adding chat message
-      setMessage(""); // Clear any pre-filled message
-      return;
+    const newProMode = !proMode;
+    setProMode(newProMode);
+    
+    // Set random placeholder when entering pro mode (same as desktop)
+    if (newProMode) {
+      setCoursePlaceholder(getRandomPlaceholder());
+      await fetchUsageStats();
     }
-    
-    // Setting pro mode
-    setProMode(true);
-    setMessage(""); // Keep input clean without pre-filled text
-    
-    // No message is added to the chat history
   };
 
   return (
