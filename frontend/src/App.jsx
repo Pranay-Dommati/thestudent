@@ -18,7 +18,7 @@ import NinthStandard from './components/Courses/categories/9th/NinthStandard';
 import TenthStandard from './components/Courses/categories/10th/TenthStandard';
 import EleventhStandard from './components/Courses/categories/11th/EleventhStandard';
 import TwelfthStandard from './components/Courses/categories/12th/TwelfthStandard';
-import Undergraduate from './components/Courses/categories/engineering/Engineering';
+import Undergraduate from './components/Courses/categories/engineering/ResponsiveEngineeringCourses';
 import ProfileLayout from './components/Profile/ProfilePageNew';
 import CourseDetails from './components/CourseDetails/CourseDetails';
 import SchoolCourseDetails from './components/CourseDetails/SchoolCourseDetails';
@@ -136,7 +136,7 @@ const App = () => {
           },
         }} 
       />      <BrowserRouter>
-        <Layout excludePaths={['/chat', '/profile']}>
+        <Layout excludePaths={['/chat', '/profile', '/courses']}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             
