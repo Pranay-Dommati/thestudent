@@ -80,9 +80,9 @@ const ProLearningMobile = ({
         </div>
       </div>
 
-      {/* Progress Bar - Under Header */}
+      {/* Progress Bar - Full Width */}
       {topicsList.length > 0 && (
-        <div className="bg-white/80 backdrop-blur-sm px-4 py-2 border-b border-gray-100">
+        <div className="bg-white/80 backdrop-blur-sm px-4 py-3 border-b border-gray-100">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">Course Progress</span>
             <span className="text-sm font-bold text-indigo-600">
@@ -100,12 +100,12 @@ const ProLearningMobile = ({
         </div>
       )}
 
-      {/* Floating Tab Selector - Modern iOS Style */}
-      <div className="sticky top-[73px] z-30 px-4 py-3 bg-gradient-to-b from-blue-50/80 to-transparent">
-        <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-white/50 p-1">
+      {/* Tab Selector - Completely Edge-to-Edge */}
+      <div className="sticky top-[73px] z-30 bg-white border-b border-gray-200">
+        <div className="px-4 py-3">
           <button
             onClick={() => setIsMobileMenuOpen(true)}
-            className="w-full flex items-center justify-between p-4 touch-target"
+            className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-2xl touch-target"
           >
             <div className="flex items-center">
               {React.createElement(currentTab?.icon, { 
@@ -130,11 +130,11 @@ const ProLearningMobile = ({
         </div>
       </div>
 
-      <div className="px-4 pb-6">
-        {/* Save to Hub - Redesigned */}
+      <div className="px-0 pb-6">{/* Remove horizontal padding for edge-to-edge design */}
+        {/* Save to Hub - Edge-to-Edge Design */}
         {content && topicsList.length > 0 && !topicsList.some(t => t.dbTopic) && savedToHub !== 'hidden' && (
-          <div className="mb-6">
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl p-4 shadow-xl text-white relative overflow-hidden">
+          <div className="mb-0">
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-4 shadow-xl text-white relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
               <div className="relative z-10">
                 <div className="flex items-center justify-between">
@@ -176,26 +176,26 @@ const ProLearningMobile = ({
           </div>
         )}
 
-        {/* Enhanced Mobile Content Display */}
-        <div className="space-y-4 mb-6">
+        {/* Enhanced Mobile Content Display - Edge-to-Edge */}
+        <div className="space-y-0 mb-0">
           {isLoading ? (
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 text-center">
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-8 text-center">
               <BiLoaderAlt className="text-4xl text-indigo-600 animate-spin mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading content...</h3>
               <p className="text-sm text-gray-600">Please wait while we prepare your materials</p>
             </div>
           ) : (
-            /* Clean Content Display - No Duplicates */
-            <div className="space-y-3">
-              {/* Content in clean white card */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            /* Clean Content Display - Edge-to-Edge */
+            <div className="space-y-0">
+              {/* Content in full-width white section */}
+              <div className="bg-white p-6 border-b border-gray-100">
                 <div className="mobile-content-display prose prose-sm max-w-none mobile-hide-duplicate-headers">
                   {renderTabContent()}
                 </div>
               </div>
 
-              {/* Interactive Elements */}
-              <div className="flex flex-wrap gap-2">
+              {/* Interactive Elements - Full Width */}
+              <div className="bg-gray-50 p-4 flex flex-wrap gap-2">
                 <button className="flex items-center px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium">
                   <FaBookmark className="mr-2" />
                   Bookmark
@@ -209,9 +209,9 @@ const ProLearningMobile = ({
           )}
         </div>
 
-        {/* Topics Grid - Redesigned */}
+        {/* Topics Grid - Edge-to-Edge */}
         {topicsList.length > 0 && (
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-white/50 overflow-hidden">
+          <div className="bg-white border-t border-gray-200 overflow-hidden">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-lg text-gray-900">Learning Topics</h3>
