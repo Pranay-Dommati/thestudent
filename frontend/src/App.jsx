@@ -7,7 +7,7 @@ import CoursesWrapper from './components/Courses/CoursesWrapper';
 import ChatbotWrapper from './components/Chatbot/ChatbotWrapper';
 import ProLearningPage from './components/ProLearning/ProLearningPage';
 import CourseDetailsPage from './components/CourseDetails/CourseDetailsPage/CourseDetailsPage';
-import CourseLearningPage from './components/CourseLearningPage/CourseLearningPage';
+import ResponsiveCourseLearningPage from './components/CourseLearningPage/ResponsiveCourseLearningPage';
 import LearningHubWrapper from './components/LearningHub/LearningHubWrapper';
 import FloatingChatButton from './components/Chatbot/FloatingChatButton';
 import AuthForm from './components/Auth/AuthForm';
@@ -184,7 +184,7 @@ const App = () => {
             <Route path="/pro-learning" element={<ProLearningPage />} />
             <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
-            <Route path="/courses/:courseId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/learning-hub" element={
               <ProtectedRoute>
                 <LearningHubWrapper />
@@ -210,48 +210,48 @@ const App = () => {
             
             {/* Learning Routes */}
             {/* Engineering Course Routes */}
-            <Route path="/courses/engineering/:courseId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/engineering/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/engineering/:courseId/learning/quiz" element={<StandaloneQuizPage />} />
             
             {/* 6th Class Routes */}
-            <Route path="/courses/6th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/6th/cbse/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/6th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
-            <Route path="/courses/6th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/6th/state/:stateId/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/6th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
             
             {/* 7th Class Routes */}
-            <Route path="/courses/7th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/7th/cbse/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/7th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
-            <Route path="/courses/7th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/7th/state/:stateId/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/7th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
             
             {/* 8th Class Routes */}
-            <Route path="/courses/8th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/8th/cbse/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/8th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
-            <Route path="/courses/8th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/8th/state/:stateId/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/8th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
             
             {/* 9th Class Routes */}
-            <Route path="/courses/9th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/9th/cbse/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/9th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
-            <Route path="/courses/9th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/9th/state/:stateId/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/9th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
             
             {/* 10th Class Routes */}
-            <Route path="/courses/10th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/10th/cbse/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/10th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
-            <Route path="/courses/10th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/10th/state/:stateId/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/10th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
             
             {/* 11th Class Routes */}
-            <Route path="/courses/11th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/11th/cbse/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/11th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
-            <Route path="/courses/11th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/11th/state/:stateId/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/11th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
               {/* 12th Class Routes */}
-            <Route path="/courses/12th/cbse/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/12th/cbse/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/12th/cbse/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
-            <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<CourseLearningPage />} />
+            <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/12th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
 
             {/* Mentoring Routes */}
