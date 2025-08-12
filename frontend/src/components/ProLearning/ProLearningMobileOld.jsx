@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { 
   IoChevronDown, IoClose, IoCheckmarkCircle, IoBookmark, IoArrowBack, IoMenu,
-  IoHome, IoShare, IoBookmarkOutline, IoEllipsisVertical, IoListOutline
+  IoHome, IoShare, IoBookmarkOutline, IoEllipsisVertical
 } from "react-icons/io5";
 import { 
   FaBookOpen, FaBrain, FaVideo, FaQuestionCircle, FaLink, 
-  FaCheck, FaTrophy, FaRobot, FaBookmark, FaTimes
+  FaCheck, FaTrophy, FaRobot, FaBookmark
 } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import { Link } from "react-router-dom";
@@ -33,7 +33,6 @@ const ProLearningMobile = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTopicId, setActiveTopicId] = useState(null);
   const [showTopicsList, setShowTopicsList] = useState(true);
-  const [showTopicsDrawer, setShowTopicsDrawer] = useState(false);
 
   // Handle mobile tab selection
   const handleTabSelect = (tabId) => {
@@ -46,7 +45,6 @@ const ProLearningMobile = ({
     setActiveTopicId(topicId);
     handleTopicSelect(topicId);
     setShowTopicsList(false);
-    setShowTopicsDrawer(false);
   };
 
   // Get current tab info
@@ -176,37 +174,21 @@ const ProLearningMobile = ({
           </div>
         )}
 
-        {/* Enhanced Mobile Content Display */}
-        <div className="space-y-4 mb-6">
-          {isLoading ? (
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 text-center">
-              <BiLoaderAlt className="text-4xl text-indigo-600 animate-spin mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading content...</h3>
-              <p className="text-sm text-gray-600">Please wait while we prepare your materials</p>
-            </div>
-          ) : (
-            /* Clean Content Display - No Duplicates */
-            <div className="space-y-3">
-              {/* Content in clean white card */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="mobile-content-display prose prose-sm max-w-none mobile-hide-duplicate-headers">
-                  {renderTabContent()}
-                </div>
+        {/* Main Content - Card Style */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-white/50 overflow-hidden mb-6">
+          <div className="p-6">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <BiLoaderAlt className="text-4xl text-indigo-600 animate-spin mb-4" />
+                <p className="text-gray-600 font-medium">Loading content...</p>
+                <p className="text-sm text-gray-500 mt-1">Please wait while we prepare your materials</p>
               </div>
-
-              {/* Interactive Elements */}
-              <div className="flex flex-wrap gap-2">
-                <button className="flex items-center px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium">
-                  <FaBookmark className="mr-2" />
-                  Bookmark
-                </button>
-                <button className="flex items-center px-3 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium">
-                  <IoShare className="mr-2" />
-                  Share
-                </button>
+            ) : (
+              <div className="content-scroll">
+                {renderTabContent()}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Topics Grid - Redesigned */}
