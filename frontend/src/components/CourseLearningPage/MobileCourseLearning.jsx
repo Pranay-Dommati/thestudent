@@ -504,9 +504,9 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Mobile Header - Compact */}
+      {/* Mobile Header - Compact without progress bar */}
       <div className="sticky top-14 z-40 bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between px-3 py-2">
+        <div className="flex items-center justify-between px-3 py-3">
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-semibold text-gray-900 truncate">{currentLesson?.title || 'Course Learning'}</h1>
             <p className="text-xs text-gray-500 truncate">{currentChapter?.title}</p>
@@ -517,20 +517,6 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           >
             <FaList className="w-3 h-3" />
           </button>
-        </div>
-        
-        {/* Compact Progress bar */}
-        <div className="px-3 pb-2">
-          <div className="flex justify-between text-xs mb-1">
-            <span className="font-medium text-gray-600">Progress</span>
-            <span className="text-indigo-600 font-medium">{Math.round((completedLessons / totalLessons) * 100)}%</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-1">
-            <div
-              className="bg-indigo-600 h-1 rounded-full transition-all duration-300"
-              style={{ width: `${(completedLessons / totalLessons) * 100}%` }}
-            ></div>
-          </div>
         </div>
       </div>
 
@@ -590,37 +576,90 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       {showMobileMenu && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50" onClick={() => setShowMobileMenu(false)}>
           <div className="fixed inset-y-0 right-0 w-80 bg-white shadow-xl transform transition-transform duration-300">
-            {/* Menu Header - Compact */}
-            <div className="flex items-center justify-between p-3 border-b border-gray-200">
-              <h2 className="text-base font-bold">Course Content</h2>
+            {/* Menu Header - Enhanced */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Course Content</h2>
+                <p className="text-sm text-gray-600">{course?.title}</p>
+              </div>
               <button
                 onClick={() => setShowMobileMenu(false)}
-                className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-2 rounded-lg hover:bg-white hover:bg-opacity-50 transition-colors"
               >
-                <FaTimes className="w-4 h-4" />
+                <FaTimes className="w-5 h-5 text-gray-600" />
               </button>
+            </div>
+
+            {/* Progress Summary */}
+            <div className="p-4 bg-gray-50 border-b border-gray-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">Your Progress</span>
+                <span className="text-sm font-bold text-indigo-600">
+                  {Math.round((completedLessons / totalLessons) * 100)}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                <div
+                  className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(completedLessons / totalLessons) * 100}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>{completedLessons} of {totalLessons} lessons completed</span>
+                <span>{course?.chapters?.length || 0} chapters</span>
+              </div>
             </div>
             
             {/* Course chapters list */}
-            <div className="overflow-y-auto h-full pb-16">
+            <div className="overflow-y-auto h-full pb-20">
+              {course?.chapters?.length === 0 && (
+                <div className="p-6 text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                    <FaBook className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Content Available</h3>
+                  <p className="text-sm text-gray-500">This course doesn't have any chapters or lessons yet.</p>
+                </div>
+              )}
+
               {course?.chapters?.map((chapter, chapterIndex) => (
-                <div key={chapterIndex} className="border-b border-gray-100">
+                <div key={chapterIndex} className="border-b border-gray-100 last:border-b-0">
                   <button 
-                    className="w-full p-3 flex justify-between items-center hover:bg-gray-50 transition-colors text-left"
+                    className="w-full p-4 flex justify-between items-center hover:bg-gray-50 transition-colors text-left group"
                     onClick={() => toggleChapter(chapterIndex)}
                   >
-                    <div className="flex items-center">
-                      <span className="w-5 h-5 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs mr-2 flex-shrink-0">
-                        {chapterIndex + 1}
-                      </span>
-                      <span className="font-medium text-sm">{chapter.title}</span>
+                    <div className="flex items-center flex-1 min-w-0">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs mr-3 flex-shrink-0 ${
+                        chapter.lessons.every(l => l.completed) 
+                          ? 'bg-green-100 text-green-700' 
+                          : chapter.lessons.some(l => l.completed)
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {chapter.lessons.every(l => l.completed) ? (
+                          <FaCheck className="w-3 h-3" />
+                        ) : (
+                          chapterIndex + 1
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
+                          {chapter.title}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {chapter.lessons.length} lesson{chapter.lessons.length !== 1 ? 's' : ''}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center">
-                      <span className="text-xs text-gray-500 mr-2">
-                        {chapter.lessons.filter(l => l.completed).length}/{chapter.lessons.length}
-                      </span>
+                    <div className="flex items-center ml-2">
+                      <div className="text-right mr-3">
+                        <div className="text-xs font-medium text-gray-900">
+                          {chapter.lessons.filter(l => l.completed).length}/{chapter.lessons.length}
+                        </div>
+                        <div className="text-xs text-gray-500">completed</div>
+                      </div>
                       <svg 
-                        className={`h-3 w-3 text-gray-500 transform transition-transform ${
+                        className={`h-4 w-4 text-gray-400 transform transition-transform ${
                           expandedChapters[chapterIndex] ? 'rotate-180' : ''
                         }`}
                         fill="none" 
@@ -638,16 +677,24 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                       {chapter.lessons.map((lesson, lessonIndex) => (
                         <button
                           key={lessonIndex}
-                          className={`w-full p-2 pl-10 flex items-center justify-between hover:bg-gray-100 transition-colors text-left ${
+                          className={`w-full p-3 pl-12 flex items-center justify-between hover:bg-gray-100 transition-colors text-left group ${
                             activeChapter === chapterIndex && activeLesson === lessonIndex
-                              ? 'bg-indigo-50 border-r-2 border-indigo-500'
+                              ? 'bg-indigo-50 border-r-4 border-indigo-500'
                               : ''
                           }`}
                           onClick={() => handleLessonClick(chapterIndex, lessonIndex)}
                         >
-                          <div className="flex items-center">
-                            <div className="mr-2">
-                              {lesson.type === 'quiz' ? (
+                          <div className="flex items-center flex-1 min-w-0">
+                            <div className={`mr-3 p-1.5 rounded-full ${
+                              lesson.completed 
+                                ? 'bg-green-100' 
+                                : activeChapter === chapterIndex && activeLesson === lessonIndex
+                                ? 'bg-indigo-100'
+                                : 'bg-gray-100'
+                            }`}>
+                              {lesson.completed ? (
+                                <FaCheck className="w-3 h-3 text-green-600" />
+                              ) : lesson.type === 'quiz' ? (
                                 <FaQuestionCircle className="w-3 h-3 text-orange-500" />
                               ) : lesson.type === 'reading' || lesson.type === 'instructions' ? (
                                 <FaBook className="w-3 h-3 text-blue-500" />
@@ -655,11 +702,22 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                                 <FaPlay className="w-3 h-3 text-indigo-500" />
                               )}
                             </div>
-                            <span className="text-sm">{lesson.title}</span>
+                            <div className="flex-1 min-w-0">
+                              <h4 className={`text-sm font-medium truncate ${
+                                activeChapter === chapterIndex && activeLesson === lessonIndex
+                                  ? 'text-indigo-700'
+                                  : 'text-gray-900 group-hover:text-indigo-600'
+                              }`}>
+                                {lesson.title}
+                              </h4>
+                              <p className="text-xs text-gray-500 capitalize">
+                                {lesson.type || 'video'} lesson
+                              </p>
+                            </div>
                           </div>
-                          <div className="flex items-center">
-                            {lesson.completed && (
-                              <FaCheck className="w-3 h-3 text-green-500" />
+                          <div className="flex items-center ml-2">
+                            {activeChapter === chapterIndex && activeLesson === lessonIndex && (
+                              <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
                             )}
                           </div>
                         </button>
