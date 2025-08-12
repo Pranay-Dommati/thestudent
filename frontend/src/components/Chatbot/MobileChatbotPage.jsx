@@ -587,7 +587,7 @@ const MobileChatbotPage = () => {
     const isProCard = message.isProCard || false;
 
     return (
-      <div className={`w-full px-3 mb-3 ${message.type === "user" ? "bg-gray-100" : "bg-white"}`}>
+      <div className="w-full px-3 mb-3 bg-white">
         <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"} py-2`}>
           <div className={`${
             message.type === "user" 
@@ -728,16 +728,6 @@ const MobileChatbotPage = () => {
           </Link>
         </div>
       </header>
-
-      {/* Remaining Topics Display - Show when in pro mode or when user is authenticated */}
-      {(proMode || isAuthenticated) && (
-        <div className="px-4 py-1.5 bg-white border-b border-gray-100">
-          <CompactRateLimitStatus 
-            usageStats={usageStats || { daily_used: 0, daily_limit: 16, per_request_limit: 4 }} 
-            className="w-full justify-center"
-          />
-        </div>
-      )}
 
       {/* Mobile Sidebar */}
       <div 
@@ -967,10 +957,10 @@ const MobileChatbotPage = () => {
           {/* Bottom input area */}
           <div className="px-3 py-2 border-t border-gray-200">
             {/* Quick action button - Course Creator */}
-            <div className="flex mb-2 px-1 overflow-x-auto hide-scrollbar">
+            <div className="flex items-start gap-3 mb-2 px-1">
               <button
                 onClick={handleCreateCourse}
-                className={`flex items-center px-4 py-2 rounded-full text-sm border shadow-sm transition-all ${
+                className={`flex items-center px-4 py-2 rounded-full text-sm border shadow-sm transition-all whitespace-nowrap flex-shrink-0 ${
                   proMode 
                   ? "bg-accent-blue text-white border-transparent"
                   : "bg-white text-gray-700 border-gray-300"
@@ -980,6 +970,16 @@ const MobileChatbotPage = () => {
                 <span>{proMode ? "Course Mode" : "Course Creator"}</span>
                 {proMode && <IoCheckmarkCircle size={14} className="ml-1.5 text-white" />}
               </button>
+              
+              {/* Rate limit status beside the button - only when in proMode */}
+              {proMode && usageStats && (
+                <div className="flex-1 min-w-0">
+                  <CompactRateLimitStatus 
+                    usageStats={usageStats} 
+                    className="text-xs leading-tight"
+                  />
+                </div>
+              )}
             </div>
             
             {/* Input container with proper spacing */}
