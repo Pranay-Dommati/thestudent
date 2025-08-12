@@ -609,6 +609,126 @@ const MobileChatbotPage = () => {
                 <div className="prose prose-sm max-w-none dark:prose-invert prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-code:bg-gray-100 prose-code:text-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-strong:text-gray-900 prose-headings:text-gray-900">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
+                    components={{
+                      // Custom code block styling with copy functionality
+                      code({node, inline, className, children, ...props}) {
+                        const codeString = String(children).replace(/\n$/, '');
+                        
+                        if (inline) {
+                          return (
+                            <code className="bg-blue-50 text-blue-800 px-2 py-1 rounded-md text-sm font-mono border border-blue-200" {...props}>
+                              {children}
+                            </code>
+                          );
+                        }
+                        
+                        return (
+                          <div className="relative group my-4">
+                            <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto border border-gray-700">
+                              <code className="text-sm font-mono" {...props}>
+                                {children}
+                              </code>
+                            </pre>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(codeString);
+                                // Note: toast may need to be imported if not available
+                                console.log('Code copied to clipboard!');
+                              }}
+                              className="absolute top-2 right-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-3 py-1.5 rounded-md text-xs font-medium opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1.5"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              Copy
+                            </button>
+                          </div>
+                        );
+                      },
+                      // Improved list styling with proper alignment
+                      ul({children}) {
+                        return (
+                          <ul className="space-y-2 my-3 pl-0">
+                            {children}
+                          </ul>
+                        );
+                      },
+                      li({children, ...props}) {
+                        const parentTag = props.node?.parent?.tagName;
+                        
+                        if (parentTag === 'ol') {
+                          return (
+                            <li className="flex items-start text-gray-800 pl-0" {...props}>
+                              <div className="flex-1">{children}</div>
+                            </li>
+                          );
+                        }
+                        
+                        return (
+                          <li className="flex items-start text-gray-800 pl-0" {...props}>
+                            <span className="w-2 h-2 bg-blue-600 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                            <div className="flex-1">{children}</div>
+                          </li>
+                        );
+                      },
+                      ol({children}) {
+                        return (
+                          <ol className="space-y-2 my-3 counter-reset-list pl-0">
+                            {children}
+                          </ol>
+                        );
+                      },
+                      // Custom heading styling with better spacing
+                      h1({children}) {
+                        return <h1 className="text-xl font-bold text-gray-900 mb-3 mt-4 border-b border-gray-200 pb-2">{children}</h1>;
+                      },
+                      h2({children}) {
+                        return <h2 className="text-lg font-semibold text-gray-900 mb-2 mt-4">{children}</h2>;
+                      },
+                      h3({children}) {
+                        return <h3 className="text-base font-semibold text-gray-900 mb-2 mt-3">{children}</h3>;
+                      },
+                      h4({children}) {
+                        return <h4 className="text-sm font-semibold text-gray-900 mb-2 mt-3">{children}</h4>;
+                      },
+                      // Enhanced paragraph styling
+                      p({children}) {
+                        return <p className="text-gray-800 leading-relaxed mb-2 text-sm">{children}</p>;
+                      },
+                      // Enhanced blockquote styling
+                      blockquote({children}) {
+                        return (
+                          <blockquote className="border-l-4 border-blue-400 pl-3 py-2 bg-blue-50 text-gray-700 italic my-3 rounded-r-lg">
+                            {children}
+                          </blockquote>
+                        );
+                      },
+                      // Enhanced table styling
+                      table({children}) {
+                        return (
+                          <div className="overflow-x-auto my-3 rounded-lg border border-gray-200">
+                            <table className="min-w-full">{children}</table>
+                          </div>
+                        );
+                      },
+                      thead({children}) {
+                        return <thead className="bg-gray-50">{children}</thead>;
+                      },
+                      th({children}) {
+                        return <th className="border-b border-gray-200 px-3 py-2 text-left font-semibold text-gray-900 text-xs">{children}</th>;
+                      },
+                      td({children}) {
+                        return <td className="border-b border-gray-100 px-3 py-2 text-gray-800 text-xs">{children}</td>;
+                      },
+                      // Enhanced strong/bold styling
+                      strong({children}) {
+                        return <strong className="font-semibold text-gray-900">{children}</strong>;
+                      },
+                      // Enhanced emphasis/italic styling
+                      em({children}) {
+                        return <em className="italic text-gray-700">{children}</em>;
+                      },
+                    }}
                   >
                     {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
                   </ReactMarkdown>
