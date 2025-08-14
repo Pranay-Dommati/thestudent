@@ -68,16 +68,13 @@ const ResponsiveCourseLearningPage = () => {
   // For mobile, don't show navbar and footer in learning mode
   if (isMobile) {
     return (
-      <>
-        <Navbar initialStyle="light" />
-        <div className="pt-14 min-h-screen bg-white">
-          <MobileCourseLearning 
-            courseId={determineCourseId()}
-            pathname={location.pathname}
-            onSidebarToggle={handleSidebarToggle}
-          />
-        </div>
-      </>
+      <div className="fixed inset-0 bg-white overflow-y-auto">
+        <MobileCourseLearning 
+          courseId={determineCourseId()}
+          pathname={location.pathname}
+          onSidebarToggle={handleSidebarToggle}
+        />
+      </div>
     );
   }
 

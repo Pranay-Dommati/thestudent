@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FaChevronLeft, FaChevronRight, FaList, FaTimes, FaPlay, FaCheck, FaBook, FaQuestionCircle, FaDownload, FaGlobe } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaList, FaTimes, FaPlay, FaCheck, FaBook, FaQuestionCircle, FaDownload, FaGlobe, FaArrowLeft } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import LessonVideo from './LessonVideo';
@@ -503,30 +503,38 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Mobile Header - Compact without progress bar */}
-      <div className="sticky top-14 z-40 bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between px-3 py-3">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-base font-semibold text-gray-900 truncate">{currentLesson?.title || 'Course Learning'}</h1>
-            <p className="text-xs text-gray-500 truncate">{currentChapter?.title}</p>
+    <div className="h-full bg-white flex flex-col">
+      {/* Mobile Header - Ultra Compact */}
+      <div className="flex-shrink-0 bg-white border-b border-gray-200">
+        <div className="flex items-center justify-between px-2 py-1.5">
+          <div className="flex items-center space-x-1.5 flex-1 min-w-0">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-1 bg-gray-50 rounded hover:bg-gray-100 transition-colors flex-shrink-0 flex items-center justify-center"
+            >
+              <FaArrowLeft className="w-2.5 h-2.5 text-gray-600" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xs font-semibold text-gray-900 truncate leading-tight">{currentLesson?.title || 'Course Learning'}</h1>
+              <p className="text-xs text-gray-500 truncate leading-tight">{currentChapter?.title}</p>
+            </div>
           </div>
           <button
             onClick={() => setShowMobileMenu(true)}
-            className="ml-2 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex-shrink-0"
+            className="ml-1.5 p-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors flex-shrink-0 flex items-center justify-center"
           >
-            <FaList className="w-3 h-3" />
+            <FaList className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="pb-32"> {/* Increased bottom padding for both lesson nav and unified nav */}
+      <div className="flex-1 overflow-y-auto pb-20"> {/* Reduced bottom padding since we only have lesson nav now */}
         {renderContent()}
       </div>
 
       {/* Mobile Navigation - Fixed Bottom - Compact */}
-      <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 p-2 z-30 shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-2 z-30 shadow-lg">
         <div className="flex items-center justify-between max-w-sm mx-auto">
           <button 
             onClick={() => navigateToLesson('prev')}
@@ -575,16 +583,19 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       {/* Mobile Course Menu Overlay */}
       {showMobileMenu && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-50" onClick={() => setShowMobileMenu(false)}>
-          <div className="fixed inset-y-0 right-0 w-80 bg-white shadow-xl transform transition-transform duration-300">
+          <div 
+            className="fixed inset-y-0 right-0 w-full max-w-sm bg-white shadow-xl transform transition-transform duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Menu Header - Enhanced */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
-              <div>
-                <h2 className="text-lg font-bold text-gray-900">Course Content</h2>
-                <p className="text-sm text-gray-600">{course?.title}</p>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-gray-900 truncate">Course Content</h2>
+                <p className="text-sm text-gray-600 truncate">{course?.title}</p>
               </div>
               <button
                 onClick={() => setShowMobileMenu(false)}
-                className="p-2 rounded-lg hover:bg-white hover:bg-opacity-50 transition-colors"
+                className="p-2 rounded-lg hover:bg-white hover:bg-opacity-50 transition-colors flex-shrink-0"
               >
                 <FaTimes className="w-5 h-5 text-gray-600" />
               </button>
