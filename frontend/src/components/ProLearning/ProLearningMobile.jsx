@@ -275,11 +275,20 @@ const ProLearningMobile = ({
                     </div>
 
                     {/* Completion Toggle */}
-                    <button
-                      className="ml-3 p-2"
+                    <div
+                      className="ml-3 p-2 cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleTopicCompletion(topicItem.id, e);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleTopicCompletion(topicItem.id, e);
+                        }
                       }}
                     >
                       <div
@@ -295,7 +304,7 @@ const ProLearningMobile = ({
                           <IoCheckmarkCircle className="text-white text-sm" />
                         )}
                       </div>
-                    </button>
+                    </div>
                   </button>
                 ))}
               </div>

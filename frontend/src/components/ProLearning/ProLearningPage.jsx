@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link, useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { 
   IoHome, IoChevronBack, IoPlayCircle, IoBookmark, IoDownload, 
@@ -1668,16 +1668,22 @@ const ProLearningPage = () => {
     const isTopicFromDatabase = topicsList.some(t => t.dbTopic); // Check if any topic has database data
     const contentAlreadyLoaded = !!content;
     
-    console.log('🔍 Start Experience check:', {
-      hasContent: !!content,
-      allTopicsGenerated,
-      hasActiveTopic,
-      isTopicFromDatabase,
-      contentAlreadyLoaded,
-      shouldShowStartButton: !content && !allTopicsGenerated && !hasActiveTopic && !isTopicFromDatabase && !contentAlreadyLoaded
-    });
+    // Only log when conditions change (not on every render)
+    const shouldShowStartButton = !content && !allTopicsGenerated && !hasActiveTopic && !isTopicFromDatabase && !contentAlreadyLoaded;
     
-    if (!content && !allTopicsGenerated && !hasActiveTopic && !isTopicFromDatabase && !contentAlreadyLoaded) {
+    // Reduced logging - only when showing start button
+    if (shouldShowStartButton) {
+      console.log('🔍 Start Experience check:', {
+        hasContent: !!content,
+        allTopicsGenerated,
+        hasActiveTopic,
+        isTopicFromDatabase,
+        contentAlreadyLoaded,
+        shouldShowStartButton
+      });
+    }
+    
+    if (shouldShowStartButton) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
           <div className="w-full max-w-2xl text-center">
@@ -2915,14 +2921,22 @@ const ProLearningPage = () => {
     setBatchGenerationStatus('');
   };
 
-  // 🔍 Debug logging before render
-  console.log('🔍 Topic active status before render:', {
-    topicsCount: topicsList.length,
-    topics: topicsList.map(t => ({ name: t.name, isActive: t.isActive })),
-    selectedTopic: selectedTopic?.name,
-    topicParam,
-    hasContent: !!content
-  });
+  // 🔍 Debug logging before render (reduced frequency)
+  // Only log when topicsList changes or selectedTopic changes
+  const prevTopicsCount = useRef(0);
+  const prevSelectedTopic = useRef(null);
+  
+  if (topicsList.length !== prevTopicsCount.current || selectedTopic?.name !== prevSelectedTopic.current?.name) {
+    console.log('🔍 Topic active status before render:', {
+      topicsCount: topicsList.length,
+      topics: topicsList.map(t => ({ name: t.name, isActive: t.isActive })),
+      selectedTopic: selectedTopic?.name,
+      topicParam,
+      hasContent: !!content
+    });
+    prevTopicsCount.current = topicsList.length;
+    prevSelectedTopic.current = selectedTopic;
+  }
 
   return (
     <>
