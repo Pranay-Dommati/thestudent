@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getSchoolCourses } from '../../services/courseApi';
-import MobileNavigation from '../Navigation/MobileNavigation';
 import { 
   FaRocket, FaBrain, FaBookOpen, FaStar, FaChevronRight, 
   FaGraduationCap, FaUser, FaFire, FaAward, FaChartLine, 
@@ -244,11 +243,10 @@ const MobileFirstHomePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <MobileNavigation />
       <MobileHero />
       
       {/* Main Content */}
-      <div className="px-4 py-6 space-y-8">
+      <div className="px-4 py-6 space-y-8 pb-20">
         
         {/* Subjects Grid */}
         <section>
@@ -349,9 +347,6 @@ const MobileFirstHomePage = () => {
           </section>
         )}
       </div>
-
-      {/* Add bottom padding to account for fixed tab bar */}
-      <div className="h-20"></div>
     </div>
   );
 };

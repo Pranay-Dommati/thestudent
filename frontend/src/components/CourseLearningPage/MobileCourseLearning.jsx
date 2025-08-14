@@ -521,12 +521,12 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       </div>
 
       {/* Main Content */}
-      <div className="pb-12"> {/* Reduced bottom padding for more compact navigation */}
+      <div className="pb-32"> {/* Increased bottom padding for both lesson nav and unified nav */}
         {renderContent()}
       </div>
 
       {/* Mobile Navigation - Fixed Bottom - Compact */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-2 z-40 shadow-lg">
+      <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 p-2 z-30 shadow-lg">
         <div className="flex items-center justify-between max-w-sm mx-auto">
           <button 
             onClick={() => navigateToLesson('prev')}

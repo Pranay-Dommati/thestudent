@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle } from "react-icons/io5";
-import { FaRobot, FaGraduationCap, FaBook, FaRegUser } from "react-icons/fa";
+import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle } from "react-icons/io5";
+import { FaRobot } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -130,21 +130,6 @@ const MobileChatbotPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const initialQueryProcessed = useRef(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [chatSessions, setChatSessions] = useState([
-    {
-      id: 1,
-      title: "Course Recommendations",
-      timestamp: "2 hours ago",
-      preview: "Looking for web development courses...",
-    },
-    {
-      id: 2,
-      title: "Learning Path",
-      timestamp: "Yesterday",
-      preview: "Create a learning path for machine learning...",
-    },
-  ]);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
 
@@ -615,22 +600,22 @@ const MobileChatbotPage = () => {
     const isProCard = message.isProCard || false;
 
     return (
-      <div className="w-full px-3 mb-3 bg-white">
-        <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"} py-2`}>
+      <div className="w-full mb-4">
+        <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
           <div className={`${
             message.type === "user" 
-              ? "max-w-[75%]" // User messages - more constrained width
+              ? "max-w-[80%]" // User messages - more constrained width
               : isLearningPlan || isProCard 
                 ? "w-full" 
-                : "max-w-[95%] min-w-0" // Bot messages - content-dependent width
+                : "max-w-[90%] min-w-0" // Bot messages - content-dependent width
           }`}>
             <div
-              className={`px-3 py-2.5 w-fit ${
+              className={`px-4 py-3 ${
                 message.type === "user"
-                  ? "bg-indigo-600 text-white rounded-2xl rounded-tr-none"
+                  ? "bg-indigo-600 text-white rounded-2xl rounded-br-md shadow-md"
                   : isLearningPlan || isProCard
-                    ? "bg-white border border-gray-200 shadow-sm rounded-xl" 
-                    : "bg-white text-gray-800 border border-gray-100 rounded-2xl rounded-tl-none"
+                    ? "bg-gray-50 border border-gray-200 shadow-sm rounded-xl" 
+                    : "bg-white text-gray-800 border border-gray-200 rounded-2xl rounded-bl-md shadow-sm"
               }`}
             >
               {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
@@ -828,11 +813,11 @@ const MobileChatbotPage = () => {
 
               {message.type === "user" && <div className="text-sm">{message.content}</div>}
 
-              <div className={`text-[10px] mt-1.5 ${
+              <div className={`text-xs mt-2 ${
                 message.type === "user" 
-                  ? "text-blue-100/80" 
+                  ? "text-indigo-200" 
                   : isLearningPlan || isProCard
-                    ? "text-gray-400 pl-1" 
+                    ? "text-gray-400" 
                     : "text-gray-500"
               }`}>
                 {message.timestamp}
@@ -862,114 +847,26 @@ const MobileChatbotPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-white">
-      {/* Mobile Chat Header - ChatGPT style */}
-      <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-2.5 flex justify-between items-center">
-        <div className="flex items-center">
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="mr-3 p-1.5 text-gray-600"
-          >
-            <IoMenu size={20} />
-          </button>
-          <div className="flex items-center">
-            <div className="p-1 rounded-full bg-accent-blue text-white mr-2">
-              <FaRobot className="w-4 h-4" />
-            </div>
-            <h2 className="text-base font-medium text-gray-800">Learning Assistant</h2>
-          </div>
-        </div>
-        <div className="flex items-center">
-          <Link
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* Mobile Header */}
+      <div className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between px-3 py-2">
+          {/* Left: Back button */}
+          <Link 
             to="/"
-            className="p-1.5 text-gray-600"
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
           >
-            <IoHome size={18} />
+            <IoChevronBack size={18} className="text-gray-700" />
           </Link>
-        </div>
-      </header>
-
-      {/* Mobile Sidebar */}
-      <div 
-        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 ${
-          isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={() => setIsSidebarOpen(false)}
-      />
-      
-      <div
-        className={`fixed top-0 left-0 h-full w-4/5 max-w-xs bg-white shadow-xl z-50 transition-transform duration-300 transform ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="font-medium text-gray-800">Chat Menu</h2>
-          <button 
-            onClick={() => setIsSidebarOpen(false)}
-            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-md"
-          >
-            <IoChevronBack size={18} />
-          </button>
-        </div>
-        
-        <div className="p-4">
-          <div className="flex flex-col space-y-2">
-            <button
-              onClick={() => {
-                // Don't toggle proMode here, let handleCreateCourse do it
-                handleCreateCourse();
-                setIsSidebarOpen(false);
-              }}
-              className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md"
-            >
-              <div className="flex items-center">
-                <div className="p-1.5 rounded-full bg-white/20 mr-3">
-                  <IoSchoolOutline size={16} />
-                </div>
-                <span className="font-medium">Create Course</span>
-              </div>
-              <IoCheckmarkCircle size={16} className={proMode ? "opacity-100" : "opacity-0"} />
-            </button>
-            
-            <Link
-              to="/courses"
-              className="flex items-center justify-between p-3 rounded-lg bg-white border border-gray-100 hover:bg-indigo-50/50 shadow-sm"
-              onClick={() => setIsSidebarOpen(false)}
-            >
-              <div className="flex items-center">
-                <div className="p-1.5 rounded-full bg-indigo-100 text-indigo-600 mr-3">
-                  <FaBook size={16} />
-                </div>
-                <span className="font-medium text-gray-700">Courses</span>
-              </div>
-            </Link>
-            
-            <Link
-              to="/pro-learning"
-              className="flex items-center justify-between p-3 rounded-lg bg-white border border-gray-100 hover:bg-indigo-50/50 shadow-sm"
-              onClick={() => setIsSidebarOpen(false)}
-            >
-              <div className="flex items-center">
-                <div className="p-1.5 rounded-full bg-indigo-100 text-indigo-600 mr-3">
-                  <FaGraduationCap size={16} />
-                </div>
-                <span className="font-medium text-gray-700">Pro Learning</span>
-              </div>
-            </Link>
-            
-            <Link
-              to="/profile"
-              className="flex items-center justify-between p-3 rounded-lg bg-white border border-gray-100 hover:bg-indigo-50/50 shadow-sm"
-              onClick={() => setIsSidebarOpen(false)}
-            >
-              <div className="flex items-center">
-                <div className="p-1.5 rounded-full bg-indigo-100 text-indigo-600 mr-3">
-                  <FaRegUser size={16} />
-                </div>
-                <span className="font-medium text-gray-700">Profile</span>
-              </div>
-            </Link>
+          
+          {/* Center: Title and subtitle */}
+          <div className="flex-1 mx-3 text-center">
+            <h1 className="text-base font-bold text-gray-900">AI Chat</h1>
+            <p className="text-xs text-gray-500">Learning Assistant</p>
           </div>
+          
+          {/* Right: Empty space for balance */}
+          <div className="w-8"></div>
         </div>
       </div>
 
@@ -980,7 +877,7 @@ const MobileChatbotPage = () => {
           <div className="fixed inset-0 bg-black/30 backdrop-blur-md z-40"></div>
           
           {/* Top Positioned Welcome Message */}
-          <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-sm mx-4">
+          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-sm mx-4">
             <div className="bg-white/95 backdrop-blur-lg border border-white/30 rounded-xl p-4 shadow-xl animate-slide-down">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center">
@@ -1008,27 +905,27 @@ const MobileChatbotPage = () => {
       )}
 
       {/* Chat messages container */}
-      <div className="flex-1 overflow-y-auto pb-24">
-        <div className="min-h-full py-2">
+      <div className="flex-1 overflow-y-auto px-4 py-4 pt-16 pb-32 bg-white chat-container">
+        <div className="min-h-full">
           {chatHistory.map((chat) => (
             <MessageBubble key={chat.id} message={chat} />
           ))}
 
           {isLoading && (
-            <div className="w-full px-3 mb-3">
+            <div className="w-full mb-4">
               <div className="flex justify-start">
                 <div className="max-w-[85%]">
-                  <div className="bg-white/90 backdrop-blur-sm text-gray-800 border border-white/30 shadow-sm rounded-xl rounded-bl-md px-3 py-2.5">
+                  <div className="bg-white text-gray-800 border border-gray-200 shadow-sm rounded-2xl rounded-bl-md px-4 py-3">
                     <div className="flex items-center">
-                      <div className="relative mr-2">
-                        <BiLoaderAlt className="animate-spin text-indigo-500 w-4 h-4" />
+                      <div className="relative mr-3">
+                        <BiLoaderAlt className="animate-spin text-indigo-500 w-5 h-5" />
                         <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full blur-sm opacity-30 animate-pulse"></div>
                       </div>
-                      <span className="text-gray-700 text-sm">Thinking...</span>
-                      <div className="ml-1.5 flex space-x-1">
-                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
-                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                      <span className="text-gray-700">Thinking...</span>
+                      <div className="ml-2 flex space-x-1">
+                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div>
+                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                       </div>
                     </div>
                   </div>
@@ -1039,7 +936,7 @@ const MobileChatbotPage = () => {
 
           {/* Topic Confirmation Dialog */}
           {showTopicConfirmation && (
-            <div className="w-full px-3 mb-3">
+            <div className="w-full mb-3">
               <div className="flex justify-start">
                 <div className="max-w-[90%]">
                   <div className="bg-gradient-to-br from-blue-50/90 to-purple-50/90 backdrop-blur-md border-2 border-blue-200/50 rounded-xl rounded-bl-md p-3 shadow-lg">
@@ -1111,24 +1008,24 @@ const MobileChatbotPage = () => {
         </div>
       </div>
 
-      {/* Message input - Exactly like DeepSeek/ChatGPT */}
-      <div className="fixed bottom-0 left-0 right-0">
-        <div className="flex flex-col bg-gray-50">
+      {/* Message input - Fixed at bottom */}
+      <div className="fixed bottom-16 left-0 right-0 z-20">
+        <div className="bg-white border-t border-gray-200 shadow-lg">
           {/* Bottom input area */}
-          <div className="px-3 py-2 border-t border-gray-200">
+          <div className="px-4 py-3">
             {/* Quick action button - Course Creator */}
-            <div className="flex items-start gap-3 mb-2 px-1">
+            <div className="flex items-center gap-3 mb-3">
               <button
                 onClick={handleCreateCourse}
-                className={`flex items-center px-4 py-2 rounded-full text-sm border shadow-sm transition-all whitespace-nowrap flex-shrink-0 ${
+                className={`flex items-center px-4 py-2.5 rounded-full text-sm border shadow-sm transition-all whitespace-nowrap flex-shrink-0 ${
                   proMode 
-                  ? "bg-accent-blue text-white border-transparent"
-                  : "bg-white text-gray-700 border-gray-300"
+                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-transparent shadow-md"
+                  : "bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:bg-indigo-50"
                 }`}
               >
-                <IoSchoolOutline size={15} className="mr-1.5" />
-                <span>{proMode ? "Course Mode" : "Course Creator"}</span>
-                {proMode && <IoCheckmarkCircle size={14} className="ml-1.5 text-white" />}
+                <IoSchoolOutline size={16} className="mr-2" />
+                <span className="font-medium">{proMode ? "Course Mode" : "Course Creator"}</span>
+                {proMode && <IoCheckmarkCircle size={16} className="ml-2 text-white" />}
               </button>
               
               {/* Rate limit status beside the button - only when in proMode */}
@@ -1143,14 +1040,14 @@ const MobileChatbotPage = () => {
             </div>
             
             {/* Input container with proper spacing */}
-            <div className="relative flex items-center bg-white rounded-md border border-gray-300 shadow-sm">
+            <div className="relative flex items-center bg-gray-50 rounded-2xl border border-gray-200 shadow-sm">
               {/* Left robot button */}
               <button
                 onClick={() => {}} // Model toggle
-                className="px-2.5 py-2.5"
+                className="px-3 py-3"
               >
-                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-accent-blue text-white">
-                  <FaRobot size={12} />
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600 text-white shadow-sm">
+                  <FaRobot size={14} />
                 </div>
               </button>
               
@@ -1161,7 +1058,7 @@ const MobileChatbotPage = () => {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                className="flex-1 py-3 pl-1 pr-10 text-sm bg-transparent border-none focus:outline-none focus:ring-0"
+                className="flex-1 py-3 pl-2 pr-12 text-base bg-transparent border-none focus:outline-none focus:ring-0 placeholder-gray-500"
                 disabled={isLoading}
               />
               
@@ -1169,10 +1066,10 @@ const MobileChatbotPage = () => {
               <button
                 onClick={() => handleSendMessage()}
                 disabled={!message.trim() || isLoading}
-                className={`absolute right-2 p-2 rounded-md ${
+                className={`absolute right-3 p-2.5 rounded-full transition-all ${
                   message.trim() && !isLoading 
-                    ? "bg-accent-blue text-white" 
-                    : "bg-gray-200 text-gray-400"
+                    ? "bg-indigo-600 text-white shadow-md hover:bg-indigo-700" 
+                    : "bg-gray-300 text-gray-500"
                 }`}
               >
                 <IoSend size={14} />

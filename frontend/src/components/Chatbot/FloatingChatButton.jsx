@@ -18,12 +18,13 @@ const FloatingChatButton = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Don't show the button on the chat page, quiz pages, or admin pages
+  // Don't show the button on the chat page, quiz pages, admin pages, or on mobile
   if (
     location.pathname === '/chat' || 
     location.pathname.includes('/learning/quiz') ||
     location.pathname.startsWith('/admin-p') || // Add this condition
-    location.pathname === '/pro-learning' // Hide on Pro Learning page
+    location.pathname === '/pro-learning' || // Hide on Pro Learning page
+    isMobile // Hide on mobile since we have bottom nav
   ) {
     return null;
   }
@@ -32,8 +33,8 @@ const FloatingChatButton = () => {
     <div
       style={{
         position: 'fixed',
-        bottom: isMobile ? '16px' : '24px',
-        right: isMobile ? '16px' : '24px',
+        bottom: '24px',
+        right: '24px',
         zIndex: 9999,
         pointerEvents: 'auto'
       }}

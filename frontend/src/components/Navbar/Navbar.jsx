@@ -30,26 +30,27 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   } else if (initialStyle === 'light') {
     backgroundClass = 'bg-white shadow-sm';
   } else {
-    backgroundClass = 'bg-transparent';
+    // Fix: Make navbar visible by default with a semi-transparent background
+    backgroundClass = 'bg-white/90 backdrop-blur-md shadow-sm';
   }
 
   const textColor = (isScrolled || initialStyle === 'light') 
     ? 'text-gray-700 hover:text-blue-600' 
-    : 'text-white hover:text-blue-200';
+    : 'text-gray-700 hover:text-blue-600'; // Fix: Always use dark text for visibility
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${backgroundClass} ${isScrolled ? 'py-2' : 'py-3'}`}>
+    <nav className={`fixed top-0 left-0 w-full z-[100] transition-all duration-300 ${backgroundClass} ${isScrolled ? 'py-2' : 'py-3'} hidden md:block`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center">
           {/* Logo section */}
           <div className="flex items-center w-[200px]">
             <Link to="/" className="flex items-center space-x-2">
               <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">S</div>
-              <span className={`font-bold text-lg ${isScrolled || initialStyle === 'light' ? 'text-gray-800' : 'text-white'}`}>Students Hub</span>
+              <span className={`font-bold text-lg text-gray-800`}>Students Hub</span>
             </Link>
           </div>
           
@@ -103,9 +104,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <div className="hidden md:flex items-center space-x-4">
                 <Link to="/auth?mode=login" 
                   className={`px-4 py-2 rounded-full font-medium transition-all duration-300 
-                    ${isScrolled || initialStyle === 'light' 
-                      ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' 
-                      : 'text-white border border-white hover:bg-white/20'}`}
+                    text-blue-600 border border-blue-600 hover:bg-blue-50`}
                 >
                   Log In
                 </Link>
@@ -123,7 +122,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               className="md:hidden ml-4"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${isScrolled || initialStyle === 'light' ? 'text-gray-800' : 'text-white'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 text-gray-800`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {isMobileMenuOpen ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 ) : (

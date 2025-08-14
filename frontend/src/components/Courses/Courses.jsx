@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaGraduationCap, FaBook, FaUniversity, FaLaptopCode } from 'react-icons/fa';
-import Navbar from "../Navbar/Navbar";
 import Footer from "../Footer/Footer";
 import CourseHero from "./CourseHero/CourseHero";
 
@@ -89,7 +88,6 @@ const Courses = () => {
 
     return (
         <>
-            <Navbar initialStyle="transparent"/>
             <CourseHero />
             <div className="bg-gray-50 pb-16 pt-7">
                 <div className="container mx-auto px-4 py-12">

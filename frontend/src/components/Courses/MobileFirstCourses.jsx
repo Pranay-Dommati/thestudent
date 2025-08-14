@@ -11,7 +11,6 @@ import {
     FaFilter,
     FaStar
 } from 'react-icons/fa';
-import Navbar from "../Navbar/Navbar";
 import Footer from "../Footer/Footer";
 import '../../styles/mobile-courses.css';
 
@@ -306,7 +305,6 @@ const MobileFirstCourses = () => {
     if (selectedLevel) {
         return (
             <>
-                <Navbar initialStyle="transparent"/>
                 <Outlet />
                 <Footer />
             </>
@@ -315,7 +313,6 @@ const MobileFirstCourses = () => {
 
     return (
         <>
-            <Navbar initialStyle="transparent"/>
             <MobileHero />
             
             <div className="bg-gray-50 min-h-screen pb-6">

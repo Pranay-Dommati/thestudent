@@ -23,6 +23,7 @@ import ProfileLayout from './components/Profile/ProfilePageNew';
 import CourseDetails from './components/CourseDetails/CourseDetails';
 import SchoolCourseDetails from './components/CourseDetails/SchoolCourseDetails';
 import Navbar from './components/Navbar/Navbar';
+import MobileBottomNavigation from './components/Navigation/MobileBottomNavigation';
 import AdminDashboard from './components/Admin/Dashboard/AdminDashboard';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -65,11 +66,23 @@ const Layout = ({ children, excludePaths = [] }) => {
   // Check if the current route is in the excludePaths array
   const isExcluded = excludePaths.some(path => location.pathname.startsWith(path));
 
+  // Paths where we don't want mobile navigation (like auth, admin, etc.)
+  const noMobileNavPaths = ['/auth', '/admin-p', '/not-found'];
+  const shouldShowMobileNav = !noMobileNavPaths.some(path => location.pathname.startsWith(path));
+
   return (
     <>
-      {/* Render MentoringNavbar for mentoring pages, otherwise render Navbar */}
+      {/* Desktop Navigation */}
       {!isExcluded && (isMentoring ? <MentoringNavbar /> : <Navbar />)}
-      <div className="min-h-screen">
+      
+      {/* Mobile Navigation */}
+      {shouldShowMobileNav && (
+        <>
+          <MobileBottomNavigation />
+        </>
+      )}
+      
+      <div className={`min-h-screen ${shouldShowMobileNav ? 'pb-16 md:pb-0' : ''}`}>
         {children}
       </div>
     </> 
@@ -136,7 +149,7 @@ const App = () => {
           },
         }} 
       />      <BrowserRouter>
-        <Layout excludePaths={['/chat', '/profile', '/courses']}>
+        <Layout excludePaths={['/admin-p']}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             

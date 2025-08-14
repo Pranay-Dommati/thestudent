@@ -4,11 +4,10 @@ import AIGeneratedLearningPath from "./AIGeneratedLearningPath/AIGeneratedLearni
 import TrustSection from "./TrustSection/TrustSection";
 // import Testimonials from "./Testimonials/Testimonials";
 import Footer from "../Footer/Footer";
-import Navbar from "../Navbar/Navbar";
+
 const HomePage = () => {
     return (
         <>
-            <Navbar />
             <Hero />
             <FeaturedPlaylists />
             <AIGeneratedLearningPath />

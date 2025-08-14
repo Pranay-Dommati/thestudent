@@ -8,10 +8,7 @@ import {
   FaBrain, 
   FaChartLine, 
   FaGraduationCap,
-  FaFire,
-  FaHome,
-  FaComments,
-  FaUser
+  FaFire
 } from 'react-icons/fa';
 import ActiveCourses from './ActiveCourses/ActiveCourses';
 import AILearningPlans from './AILearningPlans/AILearningPlans';
@@ -117,12 +114,12 @@ const MobileLearningHubPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Modern Hero Section */}
-      <div className="relative overflow-hidden pt-10">
+      <div className="relative overflow-hidden pt-4">
         {/* Background Pattern */}
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600"></div>
         <div className="absolute inset-0 bg-black/10"></div>
         
-        <div className="relative px-4 py-6">
+        <div className="relative px-4 py-5">
           {/* Welcome Section */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -190,10 +187,10 @@ const MobileLearningHubPage = () => {
         </div>
       </div>
 
-      {/* Modern Tab Navigation */}
-      <div className="px-4 py-4">
-        <div className="bg-white/70 backdrop-blur-md rounded-2xl p-2 shadow-lg border border-white/20">
-          <div className="grid grid-cols-3 gap-2">
+      {/* Tab Navigation */}
+      <div className="px-4 pt-4 pb-2">
+        <div className="bg-white rounded-2xl p-1.5 shadow-lg border border-gray-200">
+          <div className="grid grid-cols-3 gap-1">
             {tabs.map((tab, index) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -201,9 +198,9 @@ const MobileLearningHubPage = () => {
                 <motion.button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative py-4 px-3 rounded-xl font-medium transition-all ${
+                  className={`relative py-3 px-2 rounded-xl font-medium transition-all duration-200 ${
                     isActive
-                      ? 'bg-indigo-500 text-white shadow-lg'
+                      ? 'bg-indigo-500 text-white shadow-md'
                       : 'text-gray-600 hover:bg-gray-50 active:scale-95'
                   }`}
                   whileTap={{ scale: 0.95 }}
@@ -219,12 +216,9 @@ const MobileLearningHubPage = () => {
                     />
                   )}
                   <div className="relative z-10 text-center">
-                    <Icon className={`text-xl mb-2 mx-auto ${isActive ? 'text-white' : 'text-indigo-500'}`} />
-                    <div className={`text-sm font-semibold ${isActive ? 'text-white' : 'text-gray-700'}`}>
+                    <Icon className={`text-lg mb-1 mx-auto ${isActive ? 'text-white' : 'text-indigo-500'}`} />
+                    <div className={`text-xs font-semibold leading-tight ${isActive ? 'text-white' : 'text-gray-700'}`}>
                       {tab.label}
-                    </div>
-                    <div className={`text-xs ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
-                      {tab.description}
                     </div>
                   </div>
                 </motion.button>
@@ -235,7 +229,7 @@ const MobileLearningHubPage = () => {
       </div>
 
       {/* Content Area with Animation */}
-      <div className="px-4 pb-24">
+      <div className="px-4 pt-2 pb-20">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -248,49 +242,6 @@ const MobileLearningHubPage = () => {
           </motion.div>
         </AnimatePresence>
       </div>
-
-      {/* Modern Bottom Navigation */}
-      <motion.div 
-        initial={{ opacity: 0, y: 100 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-gray-200/50 px-4 py-2"
-      >
-        <div className="flex items-center justify-between max-w-sm mx-auto">
-          <Link
-            to="/learning-hub"
-            className="flex flex-col items-center py-3 px-4 rounded-2xl text-indigo-600 bg-indigo-50"
-          >
-            <FaHome className="text-lg mb-1" />
-            <span className="text-xs font-semibold">Hub</span>
-          </Link>
-          
-          <Link
-            to="/courses"
-            className="flex flex-col items-center py-3 px-4 rounded-2xl text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-all active:scale-95"
-          >
-            <FaBookOpen className="text-lg mb-1" />
-            <span className="text-xs font-medium">Courses</span>
-          </Link>
-          
-          <Link
-            to="/chat"
-            className="flex flex-col items-center py-3 px-4 rounded-2xl text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-all active:scale-95 relative"
-          >
-            <FaComments className="text-lg mb-1" />
-            <span className="text-xs font-medium">AI Chat</span>
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></div>
-          </Link>
-          
-          <Link
-            to="/profile"
-            className="flex flex-col items-center py-3 px-4 rounded-2xl text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-all active:scale-95"
-          >
-            <FaUser className="text-lg mb-1" />
-            <span className="text-xs font-medium">Profile</span>
-          </Link>
-        </div>
-      </motion.div>
     </div>
   );
 };
