@@ -649,7 +649,7 @@ const ProfilePage = () => {
       </div>
       
       {/* Mobile-optimized footer */}
-      <div className="mt-8 sm:mt-12 lg:mt-16">
+      <div className="mt-4 sm:mt-8 lg:mt-12">
         <Footer />
       </div>
     </div>

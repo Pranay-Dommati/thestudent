@@ -93,6 +93,17 @@
     transition: padding-bottom 0.3s ease-in-out;
   }
 
+  /* Profile page specific mobile navigation padding */
+  .mobile-nav-visible .profile-container {
+    padding-bottom: 60px;
+    transition: padding-bottom 0.3s ease-in-out;
+  }
+  
+  .mobile-nav-hidden .profile-container {
+    padding-bottom: 0px;
+    transition: padding-bottom 0.3s ease-in-out;
+  }
+
   /* Hide scrollbar */
   .scrollbar-hide {
     -ms-overflow-style: none;

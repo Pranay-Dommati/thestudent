@@ -14,6 +14,7 @@ const MobileBottomNavigation = () => {
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const scrollTimeoutRef = useRef(null);
+  const lastToggleTime = useRef(0);
 
   // Set initial class on mount
   useEffect(() => {
@@ -34,20 +35,44 @@ const MobileBottomNavigation = () => {
         requestAnimationFrame(() => {
           const currentScrollY = window.scrollY;
           const scrollDifference = Math.abs(currentScrollY - lastScrollY);
+          const windowHeight = window.innerHeight;
+          const documentHeight = document.documentElement.scrollHeight;
+          const isNearBottom = (currentScrollY + windowHeight) >= (documentHeight - 100);
+          const now = Date.now();
+          const timeSinceLastToggle = now - lastToggleTime.current;
           
-          // Only react to significant scroll movements (threshold: 5px)
-          if (scrollDifference > 5) {
-            if (currentScrollY > lastScrollY && currentScrollY > 100) {
-              // Scrolling down & past 100px - hide navigation
-              setIsVisible(false);
-            } else if (currentScrollY < lastScrollY) {
-              // Scrolling up - show navigation
-              setIsVisible(true);
-            }
-            
+          // Prevent rapid toggling with minimum 300ms between visibility changes
+          const canToggle = timeSinceLastToggle > 300;
+          
+          // Only react to significant scroll movements (threshold: 10px for better stability)
+          if (scrollDifference > 10 && canToggle) {
             // If user is near the top (< 50px), always show navigation
             if (currentScrollY < 50) {
-              setIsVisible(true);
+              if (!isVisible) {
+                setIsVisible(true);
+                lastToggleTime.current = now;
+              }
+            }
+            // If near bottom, always show navigation to avoid glitching
+            else if (isNearBottom) {
+              if (!isVisible) {
+                setIsVisible(true);
+                lastToggleTime.current = now;
+              }
+            }
+            // Normal scroll behavior in the middle of the page
+            else if (currentScrollY > lastScrollY && currentScrollY > 100) {
+              // Scrolling down & past 100px - hide navigation
+              if (isVisible) {
+                setIsVisible(false);
+                lastToggleTime.current = now;
+              }
+            } else if (currentScrollY < lastScrollY) {
+              // Scrolling up - show navigation
+              if (!isVisible) {
+                setIsVisible(true);
+                lastToggleTime.current = now;
+              }
             }
             
             setLastScrollY(currentScrollY);
@@ -58,10 +83,13 @@ const MobileBottomNavigation = () => {
             clearTimeout(scrollTimeoutRef.current);
           }
           
-          // Set timeout to show navigation after 2 seconds of no scrolling
+          // Set timeout to show navigation after 3 seconds of no scrolling (increased for stability)
           scrollTimeoutRef.current = setTimeout(() => {
-            setIsVisible(true);
-          }, 2000);
+            if (!isVisible) {
+              setIsVisible(true);
+              lastToggleTime.current = Date.now();
+            }
+          }, 3000);
           
           ticking = false;
         });

@@ -4,6 +4,14 @@
 .profile-container {
   min-height: 100vh;
   background: linear-gradient(135deg, #f8fafc 0%, #e3f2fd 100%);
+  padding-bottom: 0;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+  .profile-container {
+    padding-bottom: 0;
+  }
 }
 
 .profile-navbar {
