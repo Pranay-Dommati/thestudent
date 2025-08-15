@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { 
-  IoChevronDown, IoClose, IoCheckmarkCircle, IoBookmark, IoArrowBack, IoMenu,
-  IoHome, IoShare, IoBookmarkOutline, IoEllipsisVertical, IoListOutline
+  IoChevronDown, IoClose, IoCheckmarkCircle, IoArrowBack, 
+  IoCheckmark, IoTime, IoChevronForward, IoHeart, IoMenu,
+  IoBook, IoPlayCircle, IoDocumentText, IoHelpCircle,
+  IoChevronUp, IoEllipsisHorizontal
 } from "react-icons/io5";
 import { 
-  FaBookOpen, FaBrain, FaVideo, FaQuestionCircle, FaLink, 
-  FaCheck, FaTrophy, FaRobot, FaBookmark, FaTimes
+  FaCheck, FaTrophy, FaBookmark, FaPlay, FaBook, FaQuestionCircle
 } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import { Link } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
-import "../../styles/mobile-courses.css";
 
 const ProLearningMobile = ({
   activeTab,
@@ -30,351 +27,274 @@ const ProLearningMobile = ({
   courseTitle,
   isLoading
 }) => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [activeTopicId, setActiveTopicId] = useState(null);
-  const [showTopicsList, setShowTopicsList] = useState(true);
-  const [showTopicsDrawer, setShowTopicsDrawer] = useState(false);
+  const [showTopicsSheet, setShowTopicsSheet] = useState(false);
+  const [showTabsSheet, setShowTabsSheet] = useState(false);
 
-  // Handle mobile tab selection
+  const currentTab = tabs.find(tab => tab.id === activeTab) || tabs[0];
+  const progressPercentage = topicsList.length > 0 ? Math.round((completedTopics.length / topicsList.length) * 100) : 0;
+
   const handleTabSelect = (tabId) => {
     setActiveTab(tabId);
-    setIsMobileMenuOpen(false);
+    setShowTabsSheet(false);
   };
-
-  // Handle topic selection
-  const handleMobileTopicSelect = (topicId) => {
-    setActiveTopicId(topicId);
-    handleTopicSelect(topicId);
-    setShowTopicsList(false);
-    setShowTopicsDrawer(false);
-  };
-
-  // Get current tab info
-  const currentTab = tabs.find(tab => tab.id === activeTab);
-  const activeTopic = topicsList.find(topic => topic.id === activeTopicId || topic.isActive);
 
   return (
-    <div className="lg:hidden min-h-screen bg-gray-50">
-      {/* Compact Mobile Header */}
-      <div className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
+    <div className="lg:hidden min-h-screen bg-gray-50 flex flex-col">
+      {/* Minimal Header */}
+      <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-3">
-            <Link to="/chat" className="p-1.5 text-gray-600 hover:text-gray-800 transition-colors">
-              <IoArrowBack className="text-xl text-gray-700" />
+            <Link 
+              to="/chat" 
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+            >
+              <IoArrowBack className="text-lg" />
             </Link>
             <div>
-              <h1 className="font-bold text-lg text-gray-900 line-clamp-1">
+              <h1 className="text-lg font-semibold text-gray-900">
                 {courseTitle || 'Pro Learning'}
               </h1>
-              <p className="text-xs text-gray-500">Interactive Course</p>
+              <p className="text-sm text-gray-500">AI-Generated Course</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-              <IoBookmarkOutline className="text-xl text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-              <IoShare className="text-xl text-gray-600" />
-            </button>
+          
+          <div className="text-right">
+            <div className="text-sm font-medium text-gray-900">
+              {completedTopics.length}/{topicsList.length}
+            </div>
+            <div className="text-xs text-gray-500">Topics</div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Progress Bar - Full Width */}
+      {/* Progress Section */}
       {topicsList.length > 0 && (
-        <div className="bg-white/80 backdrop-blur-sm px-4 py-3 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">Course Progress</span>
-            <span className="text-sm font-bold text-indigo-600">
-              {completedTopics.length} / {topicsList.length}
-            </span>
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-100 mx-4 mt-4 p-4 rounded-2xl">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Your Progress</h3>
+              <p className="text-sm text-gray-600">Keep up the great work!</p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-blue-600">{progressPercentage}%</div>
+              <div className="text-xs text-gray-500">Complete</div>
+            </div>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-white/70 rounded-full h-2">
             <div 
-              className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-700 ease-out"
-              style={{ 
-                width: `${topicsList.length > 0 ? (completedTopics.length / topicsList.length) * 100 : 0}%` 
-              }}
+              className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-500"
+              style={{ width: `${progressPercentage}%` }}
             ></div>
+          </div>
+          <div className="flex justify-between mt-2 text-sm text-gray-600">
+            <span>{completedTopics.length} completed</span>
+            <span>{topicsList.length - completedTopics.length} remaining</span>
           </div>
         </div>
       )}
 
-      {/* Tab Selector - Completely Edge-to-Edge */}
-      <div className="sticky top-[73px] z-30 bg-white border-b border-gray-200">
-        <div className="px-4 py-3">
+      {/* Content Type Selector */}
+      <div className="mx-4 mt-4">
+        <button
+          onClick={() => setShowTabsSheet(true)}
+          className="w-full flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-200 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center space-x-3">
+            {React.createElement(currentTab?.icon || IoBook, { 
+              className: "text-xl text-blue-600" 
+            })}
+            <div className="text-left">
+              <div className="font-semibold text-gray-900">{currentTab?.label || 'Reading'}</div>
+              <div className="text-sm text-gray-500">{currentTab?.description || 'Comprehensive study content'}</div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">Tap to switch</span>
+            <IoChevronDown className="text-gray-400" />
+          </div>
+        </button>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 mx-4 mt-4 mb-4">
+        <div className="bg-white rounded-2xl border border-gray-200 h-full">
+          <div className="p-6 h-full overflow-y-auto">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-gray-600">Loading content...</p>
+              </div>
+            ) : (
+              <div className="prose prose-sm max-w-none text-gray-800">
+                {renderTabContent()}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Actions */}
+      <div className="bg-white border-t border-gray-200 p-4">
+        {/* Save to Hub */}
+        {content && !savedToHub && (
           <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-2xl touch-target"
+            onClick={handleSaveToLearningHub}
+            disabled={isSavingToHub}
+            className={`w-full py-3 px-4 rounded-xl font-medium text-base transition-colors flex items-center justify-center space-x-2 ${
+              isSavingToHub
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-500 text-white hover:bg-blue-600'
+            }`}
           >
-            <div className="flex items-center">
-              {React.createElement(currentTab?.icon, { 
-                className: "mr-3 text-xl text-indigo-600" 
-              })}
-              <div className="text-left">
-                <div className="font-semibold text-gray-900">
-                  {currentTab?.label}
-                </div>
-                <div className="text-sm text-gray-500">
-                  {currentTab?.description}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="bg-indigo-100 text-indigo-600 text-xs font-medium px-2 py-1 rounded-full">
-                Tap to change
-              </div>
-              <IoChevronDown className="text-gray-400 text-lg" />
-            </div>
+            {isSavingToHub ? (
+              <>
+                <BiLoaderAlt className="animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <FaBookmark />
+                <span>Save to Learning Hub</span>
+              </>
+            )}
           </button>
-        </div>
-      </div>
-
-      <div className="px-0 pb-6">{/* Remove horizontal padding for edge-to-edge design */}
-        {/* Save to Hub - Edge-to-Edge Design */}
-        {content && topicsList.length > 0 && !topicsList.some(t => t.dbTopic) && savedToHub !== 'hidden' && (
-          <div className="mb-0">
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-4 shadow-xl text-white relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-bold text-lg mb-1">🎉 Course Ready!</h3>
-                    <p className="text-emerald-100 text-sm">Save to your Learning Hub for easy access</p>
-                  </div>
-                  <button
-                    onClick={handleSaveToLearningHub}
-                    disabled={isSavingToHub || savedToHub === true}
-                    className={`px-4 py-2 rounded-xl font-medium transition-all duration-300 flex items-center space-x-2 text-sm ${
-                      savedToHub === true
-                        ? 'bg-white/20 text-white cursor-default backdrop-blur-sm'
-                        : isSavingToHub
-                        ? 'bg-white/20 text-white cursor-not-allowed backdrop-blur-sm'
-                        : 'bg-white/90 text-emerald-600 hover:bg-white shadow-lg hover:shadow-xl transform hover:scale-105'
-                    }`}
-                  >
-                    {savedToHub === true ? (
-                      <>
-                        <FaCheck className="text-sm" />
-                        <span>Saved!</span>
-                      </>
-                    ) : isSavingToHub ? (
-                      <>
-                        <BiLoaderAlt className="text-sm animate-spin" />
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FaBookmark className="text-sm" />
-                        <span>Save</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
         )}
 
-        {/* Enhanced Mobile Content Display - Edge-to-Edge */}
-        <div className="space-y-0 mb-0">
-          {isLoading ? (
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-8 text-center">
-              <BiLoaderAlt className="text-4xl text-indigo-600 animate-spin mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading content...</h3>
-              <p className="text-sm text-gray-600">Please wait while we prepare your materials</p>
-            </div>
-          ) : (
-            /* Clean Content Display - Edge-to-Edge */
-            <div className="space-y-0">
-              {/* Content in full-width white section */}
-              <div className="bg-white p-6 border-b border-gray-100">
-                <div className="mobile-content-display prose prose-sm max-w-none mobile-hide-duplicate-headers">
-                  {renderTabContent()}
-                </div>
-              </div>
-
-              {/* Interactive Elements - Full Width */}
-              <div className="bg-gray-50 p-4 flex flex-wrap gap-2">
-                <button className="flex items-center px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium">
-                  <FaBookmark className="mr-2" />
-                  Bookmark
-                </button>
-                <button className="flex items-center px-3 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium">
-                  <IoShare className="mr-2" />
-                  Share
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Topics Grid - Edge-to-Edge */}
-        {topicsList.length > 0 && (
-          <div className="bg-white border-t border-gray-200 overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-lg text-gray-900">Learning Topics</h3>
-                {completedTopics.length === topicsList.length && topicsList.length > 0 && (
-                  <div className="flex items-center bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                    <FaTrophy className="mr-1" />
-                    Complete!
-                  </div>
-                )}
-              </div>
-              
-              <div className="grid gap-3">
-                {topicsList.map((topicItem, index) => (
-                  <button
-                    key={topicItem.id}
-                    onClick={() => handleTopicSelect(topicItem.id)}
-                    className={`w-full flex items-center p-4 rounded-xl transition-all duration-300 touch-target transform hover:scale-[1.02] ${
-                      topicItem.isActive
-                        ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg scale-[1.02]'
-                        : completedTopics.includes(topicItem.id)
-                          ? 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 border-2 border-emerald-200'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-indigo-700 border-2 border-transparent hover:border-indigo-200'
-                    }`}
-                  >
-                    {/* Topic Number & Status */}
-                    <div className="flex items-center mr-4">
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm mr-3 ${
-                          completedTopics.includes(topicItem.id)
-                            ? 'bg-emerald-500 text-white'
-                            : topicItem.isActive
-                              ? 'bg-white/20 text-white border-2 border-white/30'
-                              : 'bg-gray-200 text-gray-600'
-                        }`}
-                      >
-                        {completedTopics.includes(topicItem.id) ? (
-                          <IoCheckmarkCircle className="text-lg" />
-                        ) : (
-                          index + 1
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Topic Info */}
-                    <div className="flex-1 text-left">
-                      <span className="font-semibold text-base">{topicItem.name}</span>
-                      {completedTopics.includes(topicItem.id) && (
-                        <div className="flex items-center mt-1">
-                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">
-                            ✓ Completed
-                          </span>
-                        </div>
-                      )}
-                      {topicItem.isActive && (
-                        <div className="flex items-center mt-1">
-                          <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full font-medium">
-                            Currently studying
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Completion Toggle */}
-                    <button
-                      className="ml-3 p-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleTopicCompletion(topicItem.id, e);
-                      }}
-                    >
-                      <div
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                          completedTopics.includes(topicItem.id)
-                            ? 'bg-emerald-500 border-emerald-500 scale-110'
-                            : topicItem.isActive
-                              ? 'border-white/60 hover:border-white'
-                              : 'border-gray-300 hover:border-indigo-400'
-                        }`}
-                      >
-                        {completedTopics.includes(topicItem.id) && (
-                          <IoCheckmarkCircle className="text-white text-sm" />
-                        )}
-                      </div>
-                    </button>
-                  </button>
-                ))}
-              </div>
-            </div>
+        {savedToHub && (
+          <div className="w-full py-3 px-4 rounded-xl bg-green-50 text-green-700 font-medium text-base flex items-center justify-center space-x-2">
+            <FaCheck />
+            <span>Saved to Learning Hub</span>
           </div>
         )}
       </div>
 
-      {/* Enhanced Mobile Tab Selection Modal */}
-      {isMobileMenuOpen && (
+      {/* Topics Bottom Sheet */}
+      {showTopicsSheet && (
         <>
-          {/* Enhanced Backdrop */}
           <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity"
-            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0 bg-black/40 z-50"
+            onClick={() => setShowTopicsSheet(false)}
           />
           
-          {/* Modern Bottom Sheet Modal */}
-          <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up">
-            <div className="bg-white rounded-t-3xl shadow-2xl border-t border-gray-200 max-h-[80vh] overflow-hidden">
-              {/* Modal Handle */}
-              <div className="flex justify-center pt-3 pb-2">
-                <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
-              </div>
-              
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Choose Content Type</h3>
-                  <p className="text-sm text-gray-500 mt-1">Select what you want to study</p>
-                </div>
+          <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-xl max-h-[75vh] overflow-hidden">
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+            </div>
+            
+            <div className="px-4 py-3 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Course Topics</h3>
                 <button
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+                  onClick={() => setShowTopicsSheet(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-600"
                 >
-                  <IoClose className="text-xl" />
+                  <IoClose />
                 </button>
               </div>
-              
-              {/* Tab Options - Grid Layout */}
-              <div className="p-6 pb-safe">
-                <div className="grid gap-4">
-                  {tabs.map((tab) => {
-                    const IconComponent = tab.icon;
-                    const isActive = tab.id === activeTab;
-                    
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => handleTabSelect(tab.id)}
-                        className={`flex items-center p-4 rounded-2xl transition-all duration-300 touch-target transform hover:scale-[1.02] ${
-                          isActive
-                            ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-xl scale-[1.02]'
-                            : 'bg-gray-50 text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-indigo-700 border-2 border-transparent hover:border-indigo-200'
-                        }`}
-                      >
-                        <div className={`p-3 rounded-xl mr-4 ${
-                          isActive ? 'bg-white/20' : 'bg-white shadow-sm'
-                        }`}>
-                          <IconComponent className={`text-2xl ${isActive ? 'text-white' : 'text-indigo-600'}`} />
+            </div>
+            
+            <div className="overflow-y-auto p-4 space-y-3">
+              {topicsList.map((topic, index) => (
+                <button
+                  key={topic.id || index}
+                  onClick={() => {
+                    handleTopicSelect(topic.id || index);
+                    setShowTopicsSheet(false);
+                  }}
+                  className="w-full p-4 bg-gray-50 rounded-xl text-left hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium ${
+                      completedTopics.includes(topic.id || index)
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-300 text-gray-600'
+                    }`}>
+                      {completedTopics.includes(topic.id || index) ? (
+                        <IoCheckmark className="text-xs" />
+                      ) : (
+                        index + 1
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">
+                        {topic.name || `Topic ${index + 1}`}
+                      </div>
+                      {completedTopics.includes(topic.id || index) && (
+                        <div className="text-xs text-green-600 mt-1">Completed</div>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleTopicCompletion(topic.id || index);
+                      }}
+                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                        completedTopics.includes(topic.id || index)
+                          ? 'bg-green-500 border-green-500'
+                          : 'border-gray-300'
+                      }`}
+                    >
+                      {completedTopics.includes(topic.id || index) && (
+                        <IoCheckmark className="text-white text-xs" />
+                      )}
+                    </button>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Content Type Bottom Sheet */}
+      {showTabsSheet && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/40 z-50"
+            onClick={() => setShowTabsSheet(false)}
+          />
+          
+          <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-xl max-h-[60vh] overflow-hidden">
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
+            </div>
+            
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">Learning Mode</h3>
+            </div>
+            
+            <div className="p-4 space-y-3">
+              {tabs.map((tab) => {
+                const IconComponent = tab.icon;
+                const isActive = tab.id === activeTab;
+                
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabSelect(tab.id)}
+                    className={`w-full p-4 rounded-xl text-left transition-colors ${
+                      isActive
+                        ? 'bg-blue-50 border border-blue-200'
+                        : 'bg-gray-50 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <IconComponent className={`text-xl ${isActive ? 'text-blue-600' : 'text-gray-600'}`} />
+                      <div className="flex-1">
+                        <div className={`font-medium ${isActive ? 'text-blue-900' : 'text-gray-900'}`}>
+                          {tab.label}
                         </div>
-                        <div className="text-left flex-1">
-                          <div className="font-bold text-lg">{tab.label}</div>
-                          <div className={`text-sm mt-1 ${
-                            isActive ? 'text-white/80' : 'text-gray-500'
-                          }`}>
-                            {tab.description}
-                          </div>
+                        <div className={`text-sm ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+                          {tab.description}
                         </div>
-                        {isActive && (
-                          <div className="ml-3">
-                            <IoCheckmarkCircle className="text-2xl text-white" />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                      </div>
+                      {isActive && (
+                        <IoCheckmarkCircle className="text-blue-600 text-xl" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </>

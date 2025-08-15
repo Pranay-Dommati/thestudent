@@ -510,7 +510,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           <div className="flex items-center space-x-1.5 flex-1 min-w-0">
             <button
               onClick={() => navigate(-1)}
-              className="p-1 bg-gray-50 rounded hover:bg-gray-100 transition-colors flex-shrink-0 flex items-center justify-center"
+              className="p-0.5 bg-gray-50 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
             >
               <FaArrowLeft className="w-2.5 h-2.5 text-gray-600" />
             </button>
@@ -521,9 +521,9 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           </div>
           <button
             onClick={() => setShowMobileMenu(true)}
-            className="ml-1.5 p-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors flex-shrink-0 flex items-center justify-center"
+            className="ml-1.5 p-0.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors flex-shrink-0"
           >
-            <FaList className="w-3.5 h-3.5" />
+            <FaList className="w-2.5 h-2.5" />
           </button>
         </div>
       </div>
