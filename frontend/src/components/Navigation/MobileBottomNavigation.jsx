@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -9,6 +9,67 @@ const MobileBottomNavigation = () => {
   const { isLoggedIn } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // State for controlling navigation visibility
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const scrollTimeoutRef = useRef(null);
+
+  // Scroll detection effect
+  useEffect(() => {
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          const scrollDifference = Math.abs(currentScrollY - lastScrollY);
+          
+          // Only react to significant scroll movements (threshold: 5px)
+          if (scrollDifference > 5) {
+            if (currentScrollY > lastScrollY && currentScrollY > 100) {
+              // Scrolling down & past 100px - hide navigation
+              setIsVisible(false);
+            } else if (currentScrollY < lastScrollY) {
+              // Scrolling up - show navigation
+              setIsVisible(true);
+            }
+            
+            // If user is near the top (< 50px), always show navigation
+            if (currentScrollY < 50) {
+              setIsVisible(true);
+            }
+            
+            setLastScrollY(currentScrollY);
+          }
+          
+          // Clear any existing timeout
+          if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current);
+          }
+          
+          // Set timeout to show navigation after 2 seconds of no scrolling
+          scrollTimeoutRef.current = setTimeout(() => {
+            setIsVisible(true);
+          }, 2000);
+          
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    // Add scroll listener
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, [lastScrollY]);
 
   // Helper function to check if current path matches navigation item
   const isActive = (itemPath) => {
@@ -136,9 +197,21 @@ const MobileBottomNavigation = () => {
   const navConfig = getNavigationConfig();
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 md:hidden">
+    <div 
+      className={`fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 md:hidden transition-transform duration-300 ease-in-out ${
+        isVisible ? 'translate-y-0' : 'translate-y-full'
+      }`}
+      style={{
+        // Add backdrop blur for better visual separation
+        backdropFilter: 'blur(10px)',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)'
+      }}
+    >
       {/* Main Navigation Bar */}
-      <div className="flex items-center justify-around px-2 py-1">
+      <div className="flex items-center justify-around px-2 py-1 relative">
+        {/* Add subtle gradient overlay for premium feel */}
+        <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/10 pointer-events-none" />
+        
         {navConfig.items.map((item, index) => {
           const active = item.path ? isActive(item.path) : false;
           const isActionButton = item.isAction;
@@ -148,13 +221,13 @@ const MobileBottomNavigation = () => {
               <button
                 key={index}
                 onClick={item.action}
-                className={`flex flex-col items-center py-1 px-2 relative transition-all duration-200 rounded-lg hover:bg-gray-50 ${
+                className={`flex flex-col items-center py-1 px-2 relative transition-all duration-300 rounded-lg hover:bg-gray-50 active:scale-95 ${
                   item.label === 'Back' ? 'text-gray-600' : item.activeColor || 'text-gray-600'
                 }`}
               >
-                {/* Icon container */}
-                <div className="p-1.5 rounded-lg transition-all duration-200">
-                  <item.icon className="w-4 h-4" />
+                {/* Icon container with enhanced animation */}
+                <div className="p-1.5 rounded-lg transition-all duration-300 hover:bg-gray-100">
+                  <item.icon className="w-4 h-4 transition-transform duration-200 hover:scale-110" />
                 </div>
                 
                 {/* Label */}
@@ -169,24 +242,24 @@ const MobileBottomNavigation = () => {
             <Link 
               key={index}
               to={item.path} 
-              className={`flex flex-col items-center py-1 px-2 relative transition-all duration-200 rounded-lg ${
+              className={`flex flex-col items-center py-1 px-2 relative transition-all duration-300 rounded-lg active:scale-95 ${
                 active ? 'transform scale-105' : 'hover:bg-gray-50'
               }`}
             >
-              {/* Icon container */}
-              <div className={`p-1.5 rounded-lg transition-all duration-200 ${
+              {/* Icon container with enhanced animations */}
+              <div className={`p-1.5 rounded-lg transition-all duration-300 hover:scale-110 ${
                 active 
-                  ? `${item.bgColor} ${item.activeColor}` 
-                  : 'text-gray-500'
+                  ? `${item.bgColor} ${item.activeColor} shadow-md` 
+                  : 'text-gray-500 hover:bg-gray-100'
               }`}>
-                <item.icon className="w-4 h-4" />
+                <item.icon className="w-4 h-4 transition-transform duration-200" />
               </div>
               
-              {/* Label */}
-              <span className={`text-xs font-medium mt-0.5 transition-all duration-200 ${
+              {/* Label with enhanced styling */}
+              <span className={`text-xs font-medium mt-0.5 transition-all duration-300 ${
                 active 
-                  ? `${item.activeColor} font-semibold` 
-                  : 'text-gray-500'
+                  ? `${item.activeColor} font-semibold drop-shadow-sm` 
+                  : 'text-gray-500 group-hover:text-gray-700'
               }`}>
                 {item.label}
               </span>
@@ -195,8 +268,8 @@ const MobileBottomNavigation = () => {
         })}
       </div>
       
-      {/* Safe area padding for newer phones - reduced */}
-      <div className="h-0.5 sm:h-1" />
+      {/* Enhanced safe area padding for newer phones */}
+      <div className="h-1 sm:h-2 bg-gradient-to-t from-white/50 to-transparent" />
     </div>
   );
 };
