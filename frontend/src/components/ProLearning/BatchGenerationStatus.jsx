@@ -20,15 +20,15 @@ const BatchGenerationStatus = ({ isGenerating, progress, status, onClose }) => {
   }
   
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:w-96 bg-white border border-blue-200 rounded-lg shadow-lg z-50 p-4 animate-slide-up">
+    <div className="fixed bottom-20 sm:bottom-4 left-4 right-4 md:left-auto md:w-96 bg-white border border-blue-200 rounded-lg shadow-lg z-50 p-3 sm:p-4 animate-slide-up">
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center">
           {isGenerating ? (
-            <BiLoaderAlt className="animate-spin text-blue-600 w-5 h-5 mr-2" />
+            <BiLoaderAlt className="animate-spin text-blue-600 w-4 h-4 sm:w-5 sm:h-5 mr-2" />
           ) : (
-            <IoSparkles className="text-blue-600 w-5 h-5 mr-2" />
+            <IoSparkles className="text-blue-600 w-4 h-4 sm:w-5 sm:h-5 mr-2" />
           )}
-          <h4 className="text-base font-semibold text-gray-800">
+          <h4 className="text-sm sm:text-base font-semibold text-gray-800">
             {isGenerating ? 'Generating Content' : 'Generation Complete'}
           </h4>
         </div>
@@ -45,11 +45,11 @@ const BatchGenerationStatus = ({ isGenerating, progress, status, onClose }) => {
         )}
       </div>
       
-      <p className="text-sm text-gray-600 mb-3">{status || 'Preparing all your course materials...'}</p>
+      <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">{status || 'Preparing all your course materials...'}</p>
       
-      <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+      <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2 mb-1">
         <div 
-          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+          className="bg-blue-600 h-1.5 sm:h-2 rounded-full transition-all duration-300"
           style={{ width: `${progress}%` }}
         ></div>
       </div>
