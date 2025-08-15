@@ -274,7 +274,8 @@ const ProLearningMobile = ({
         </div>
       </nav>
 
-      {/* Floating Topic Selector - Simple and clean */}
+      {/* Floating Topic Selector - REMOVED to eliminate interference with content */}
+      {/* 
       {topicsList && topicsList.length > 1 && (
         <div className="fixed bottom-20 right-4 z-40">
           <button
@@ -285,6 +286,7 @@ const ProLearningMobile = ({
           </button>
         </div>
       )}
+      */}
       {/* Topics Sheet - Slide up modal */}
       {showTopicsSheet && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
