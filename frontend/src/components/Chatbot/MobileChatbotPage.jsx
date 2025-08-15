@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclassifier";
 import AuthModal from '../Common/AuthModal';
+import ErrorBoundary from '../Common/ErrorBoundary';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
 
@@ -118,10 +119,15 @@ const MobileChatbotPage = () => {
   const [pendingTopics, setPendingTopics] = useState([]);
   const [originalPrompt, setOriginalPrompt] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
+  // Generate unique IDs using timestamp and random component
+  const generateUniqueId = () => {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  };
+
   const [usageStats, setUsageStats] = useState(null); // Track rate limit usage stats
   const [chatHistory, setChatHistory] = useState([
     {
-      id: 1,
+      id: generateUniqueId(),
       type: "bot",
       content: "Hello! I'm your AI learning assistant. How can I help you today?",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -234,7 +240,17 @@ const MobileChatbotPage = () => {
 
   // Scroll to the bottom of the chat when chat history updates
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const timer = setTimeout(() => {
+      if (messagesEndRef.current) {
+        try {
+          messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        } catch (error) {
+          console.warn("Scroll error:", error);
+        }
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [chatHistory]);
 
   // Handle initial query from URL parameter
@@ -269,7 +285,7 @@ const MobileChatbotPage = () => {
     if (!messageToSend.trim() || isLoading) return;
 
     const userMessageObj = {
-      id: chatHistory.length + 1,
+      id: generateUniqueId(),
       type: "user",
       content: messageToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -351,7 +367,7 @@ const MobileChatbotPage = () => {
             // If no topics available due to limits, don't show confirmation
             if (availableTopics.length === 0) {
               const limitResponse = {
-                id: chatHistory.length + 2,
+                id: generateUniqueId(),
                 type: "bot",
                 content: limitMessage || "❌ You've reached your daily topic creation limit. Please try again tomorrow.",
                 timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -367,7 +383,7 @@ const MobileChatbotPage = () => {
             setShowTopicConfirmation(true);
             
             const confirmationResponse = {
-              id: chatHistory.length + 2,
+              id: generateUniqueId(),
               type: "bot",
               content: `🤔 I've analyzed your query "${messageToSend}" and extracted ${availableTopics.length} learning topic(s). ${limitMessage} Please review and confirm the topics you'd like to include in your course.`,
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -377,7 +393,7 @@ const MobileChatbotPage = () => {
           } else {
             // No topics extracted - show error
             const errorResponse = {
-              id: chatHistory.length + 2,
+              id: generateUniqueId(),
               type: "bot",
               content: "❌ I couldn't extract any learning topics from your query. Please try to be more specific about what you'd like to learn (e.g., 'JavaScript arrays and functions', 'Python data structures', etc.)",
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -391,7 +407,7 @@ const MobileChatbotPage = () => {
           if (error.isRateLimit) {
             const rateLimitMessage = formatRateLimitMessage(error);
             const rateLimitResponse = {
-              id: chatHistory.length + 2,
+              id: generateUniqueId(),
               type: "bot",
               content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 16 topics per day\n\nPlease try again later or contact support if you need higher limits.`,
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -407,7 +423,7 @@ const MobileChatbotPage = () => {
           } else {
             // Generic error handling
             const errorResponse = {
-              id: chatHistory.length + 2,
+              id: generateUniqueId(),
               type: "bot",
               content: `❌ Topic extraction failed: ${error.message}. Please try again with a clearer learning query.`,
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -421,7 +437,7 @@ const MobileChatbotPage = () => {
         const response = await callVectorBotAPI(messageToSend);
 
         const botResponse = {
-          id: chatHistory.length + 2,
+          id: generateUniqueId(),
           type: "bot",
           content: typeof response === 'string' ? response : String(response),
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -435,7 +451,7 @@ const MobileChatbotPage = () => {
     } catch (error) {
       console.error("Error in chat:", error);
       const errorResponse = {
-        id: chatHistory.length + 2,
+        id: generateUniqueId(),
         type: "bot",
         content: "Sorry, I couldn't process your request. Please try again later.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -497,7 +513,7 @@ const MobileChatbotPage = () => {
       if (response.status === 429) {
         // Rate limit exceeded
         const botResponse = {
-          id: chatHistory.length + 1,
+          id: generateUniqueId(),
           type: "bot",
           message: `🚫 ${result.message}`,
           timestamp: new Date().toLocaleTimeString(),
@@ -539,7 +555,7 @@ const MobileChatbotPage = () => {
       const topicString = topicNames.join(', ');
     
       const proResponse = {
-        id: chatHistory.length + 1,
+        id: generateUniqueId(),
         type: "bot",
         content: `🎓 Perfect! I'll create a comprehensive course on: **${topicNames.join(', ')}**. Click the card below to access your customized course materials. Content generation will begin automatically and you'll see a loading screen until all materials are ready.`,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -558,7 +574,7 @@ const MobileChatbotPage = () => {
     } catch (error) {
       console.error('Error creating course:', error);
       const errorResponse = {
-        id: chatHistory.length + 1,
+        id: generateUniqueId(),
         type: "bot",
         message: `❌ Failed to create course: ${error.message}`,
         timestamp: new Date().toLocaleTimeString(),
@@ -572,7 +588,7 @@ const MobileChatbotPage = () => {
 
   const handleTopicCancel = () => {
     const cancelResponse = {
-      id: chatHistory.length + 1,
+      id: generateUniqueId(),
       type: "bot",
       content: "❌ Course creation cancelled. Feel free to ask me anything else or try again with a different query!",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -584,7 +600,7 @@ const MobileChatbotPage = () => {
     setOriginalPrompt("");
   };
 
-  const MessageBubble = ({ message }) => {
+  const MessageBubble = React.memo(({ message }) => {
     // More specific detection for course content - look for multiple sections with specific course structure
     const isCourseContent = (
       message.content.includes("# ") && 
@@ -827,7 +843,7 @@ const MobileChatbotPage = () => {
         </div>
       </div>
     );
-  };
+  });
 
   // Handle Create Course button with authentication check
   const handleCreateCourse = async () => {
@@ -908,7 +924,9 @@ const MobileChatbotPage = () => {
       <div className="flex-1 overflow-y-auto px-4 py-4 pt-16 pb-32 bg-white chat-container">
         <div className="min-h-full">
           {chatHistory.map((chat) => (
-            <MessageBubble key={chat.id} message={chat} />
+            <ErrorBoundary key={`error-boundary-${chat.id}`}>
+              <MessageBubble key={chat.id} message={chat} />
+            </ErrorBoundary>
           ))}
 
           {isLoading && (
