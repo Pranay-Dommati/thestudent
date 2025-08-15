@@ -2969,7 +2969,7 @@ const ProLearningPage = () => {
       {/* <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50"> ... </header> */}
 
       {/* Main Content with Sidebar Layout */}
-      <div className="min-h-screen relative pt-20">
+      <div className="min-h-screen relative">
         {/* Main Content Area */}
         <div className={`transition-all duration-300 min-h-screen ${
           sidebarVisible 
