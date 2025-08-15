@@ -35,11 +35,12 @@ const ProLearningMobile = ({
   const [currentSection, setCurrentSection] = useState(activeTab || 'reading');
   const [showTopicsSheet, setShowTopicsSheet] = useState(false);
   const [showLearningGuide, setShowLearningGuide] = useState(false);
+  const [isSelectingTopic, setIsSelectingTopic] = useState(false);
 
-  // Calculate progress
-  const progressPercentage = topicsList && topicsList.length > 0 
-    ? Math.round((completedTopics.length / topicsList.length) * 100) 
-    : 0;
+  // Calculate progress - Hidden on mobile
+  // const progressPercentage = topicsList && topicsList.length > 0 
+  //   ? Math.round((completedTopics.length / topicsList.length) * 100) 
+  //   : 0;
 
   // Use the actual tabs passed from parent, but map to our icons
   const getIconForTab = (tabId) => {
@@ -57,6 +58,22 @@ const ProLearningMobile = ({
     setCurrentSection(sectionId);
     if (setActiveTab) {
       setActiveTab(sectionId);
+    }
+  };
+
+  // Handle topic selection and close modal
+  const handleTopicSelection = async (topicId) => {
+    if (handleTopicSelect) {
+      setIsSelectingTopic(true);
+      try {
+        await handleTopicSelect(topicId);
+        setShowLearningGuide(false); // Close the Learning Guide modal
+        setShowTopicsSheet(false); // Close the Topics Sheet modal if open
+      } catch (error) {
+        console.error('Error selecting topic:', error);
+      } finally {
+        setIsSelectingTopic(false);
+      }
     }
   };
 
@@ -154,7 +171,8 @@ const ProLearningMobile = ({
                 </button>
               </div>
               
-              {/* Simple Progress Indicator */}
+              {/* Simple Progress Indicator - Hidden on mobile */}
+              {/* 
               <div className="flex items-center justify-between text-sm text-gray-600">
                 <span>{completedTopics.length} of {topicsList.length} completed</span>
                 <div className="flex space-x-1">
@@ -168,6 +186,7 @@ const ProLearningMobile = ({
                   ))}
                 </div>
               </div>
+              */}
             </div>
           )}
 
@@ -312,18 +331,19 @@ const ProLearningMobile = ({
             <div className="p-4 overflow-y-auto max-h-[70vh]">
               <div className="space-y-3">
                 {topicsList.map((topic, index) => {
-                  const isCompleted = completedTopics.includes(topic.name);
+                  const isCompleted = completedTopics.includes(topic.id || topic.name);
                   const isActive = topic.isActive;
                   return (
                     <div
                       key={index}
+                      onClick={() => !isActive && !isSelectingTopic && handleTopicSelection(topic.id || topic.name)}
                       className={`p-4 rounded-xl border transition-all ${
                         isActive
                           ? "bg-gradient-to-r from-teal-50 to-blue-50 border-teal-200 shadow-sm"
                           : isCompleted
-                          ? "bg-green-50 border-green-200"
-                          : "bg-gray-50 border-gray-200"
-                      }`}
+                          ? "bg-green-50 border-green-200 cursor-pointer hover:border-green-300 hover:shadow-sm"
+                          : "bg-gray-50 border-gray-200 cursor-pointer hover:border-gray-300 hover:shadow-sm"
+                      } ${isSelectingTopic ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
                       <div className="flex items-center">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 flex-shrink-0 ${
@@ -415,19 +435,23 @@ const ProLearningMobile = ({
                   <h3 className="text-lg font-semibold text-gray-900">Learning Topics</h3>
                 </div>
                 
-                <p className="text-sm text-gray-600 mb-4">Select a topic to focus on:</p>
+                <p className="text-sm text-gray-600 mb-4">Select a topic to focus on and start learning:</p>
                 
                 {/* Topics List */}
                 <div className="space-y-3">
                   {topicsList && topicsList.map((topic, index) => {
                     const isSelected = topic.isActive;
-                    const isCompleted = completedTopics.includes(topic.name);
+                    const isCompleted = completedTopics.includes(topic.id || topic.name);
                     
                     return (
                       <div
                         key={index}
-                        onClick={() => handleTopicSelect && handleTopicSelect(topic)}
-                        className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        onClick={() => !isSelectingTopic && handleTopicSelection(topic.id || topic.name)}
+                        className={`p-3 rounded-xl border-2 transition-all ${
+                          isSelectingTopic 
+                            ? "cursor-not-allowed opacity-50"
+                            : "cursor-pointer"
+                        } ${
                           isSelected
                             ? "border-purple-500 bg-gradient-to-r from-purple-50 to-blue-50"
                             : "border-gray-200 hover:border-purple-300 hover:bg-gray-50"
@@ -439,7 +463,11 @@ const ProLearningMobile = ({
                               ? "border-purple-500 bg-purple-500"
                               : "border-gray-300"
                           }`}>
-                            {isSelected && <IoCheckmark className="text-white" size={12} />}
+                            {isSelectingTopic ? (
+                              <BiLoaderAlt className="animate-spin text-purple-500" size={12} />
+                            ) : isSelected ? (
+                              <IoCheckmark className="text-white" size={12} />
+                            ) : null}
                           </div>
                           <span className={`font-medium ${
                             isSelected ? "text-purple-900" : "text-gray-700"
@@ -458,7 +486,8 @@ const ProLearningMobile = ({
                 </div>
               </div>
 
-              {/* Progress Section */}
+              {/* Progress Section - Hidden on mobile */}
+              {/* 
               <div className="bg-gray-50 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-gray-700">Progress</span>
@@ -473,15 +502,28 @@ const ProLearningMobile = ({
                   ></div>
                 </div>
               </div>
+              */}
             </div>
 
             {/* Modal Footer */}
             <div className="border-t border-gray-200 p-4">
               <button
                 onClick={() => setShowLearningGuide(false)}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-xl font-medium hover:from-purple-700 hover:to-blue-700 transition-all"
+                disabled={isSelectingTopic}
+                className={`w-full py-3 rounded-xl font-medium transition-all ${
+                  isSelectingTopic
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700"
+                }`}
               >
-                Continue Learning
+                {isSelectingTopic ? (
+                  <div className="flex items-center justify-center">
+                    <BiLoaderAlt className="animate-spin mr-2" size={16} />
+                    Switching Topic...
+                  </div>
+                ) : (
+                  "Continue Learning"
+                )}
               </button>
             </div>
           </div>
