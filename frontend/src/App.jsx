@@ -82,7 +82,7 @@ const Layout = ({ children, excludePaths = [] }) => {
         </>
       )}
       
-      <div className={`min-h-screen ${shouldShowMobileNav ? 'pb-16 md:pb-0' : ''}`}>
+      <div className={`min-h-screen ${shouldShowMobileNav ? 'pb-0 md:pb-0' : ''}`}>
         {children}
       </div>
     </> 

@@ -15,6 +15,16 @@ const MobileBottomNavigation = () => {
   const [lastScrollY, setLastScrollY] = useState(0);
   const scrollTimeoutRef = useRef(null);
 
+  // Set initial class on mount
+  useEffect(() => {
+    const rootElement = document.documentElement;
+    rootElement.classList.add('mobile-nav-visible');
+    
+    return () => {
+      rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
+    };
+  }, []);
+
   // Scroll detection effect
   useEffect(() => {
     let ticking = false;
@@ -70,6 +80,23 @@ const MobileBottomNavigation = () => {
       }
     };
   }, [lastScrollY]);
+
+  // Dynamic padding based on navigation visibility
+  useEffect(() => {
+    const rootElement = document.documentElement;
+    if (isVisible) {
+      rootElement.classList.add('mobile-nav-visible');
+      rootElement.classList.remove('mobile-nav-hidden');
+    } else {
+      rootElement.classList.add('mobile-nav-hidden');
+      rootElement.classList.remove('mobile-nav-visible');
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
+    };
+  }, [isVisible]);
 
   // Helper function to check if current path matches navigation item
   const isActive = (itemPath) => {
@@ -208,7 +235,7 @@ const MobileBottomNavigation = () => {
       }}
     >
       {/* Main Navigation Bar */}
-      <div className="flex items-center justify-around px-2 py-1 relative">
+      <div className="flex items-center justify-around px-2 py-0.5 relative">
         {/* Add subtle gradient overlay for premium feel */}
         <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/10 pointer-events-none" />
         
@@ -221,7 +248,7 @@ const MobileBottomNavigation = () => {
               <button
                 key={index}
                 onClick={item.action}
-                className={`flex flex-col items-center py-1 px-2 relative transition-all duration-300 rounded-lg hover:bg-gray-50 active:scale-95 ${
+                className={`flex flex-col items-center py-0.5 px-2 relative transition-all duration-300 rounded-lg hover:bg-gray-50 active:scale-95 ${
                   item.label === 'Back' ? 'text-gray-600' : item.activeColor || 'text-gray-600'
                 }`}
               >
@@ -242,7 +269,7 @@ const MobileBottomNavigation = () => {
             <Link 
               key={index}
               to={item.path} 
-              className={`flex flex-col items-center py-1 px-2 relative transition-all duration-300 rounded-lg active:scale-95 ${
+              className={`flex flex-col items-center py-0.5 px-2 relative transition-all duration-300 rounded-lg active:scale-95 ${
                 active ? 'transform scale-105' : 'hover:bg-gray-50'
               }`}
             >
@@ -267,9 +294,6 @@ const MobileBottomNavigation = () => {
           );
         })}
       </div>
-      
-      {/* Enhanced safe area padding for newer phones */}
-      <div className="h-1 sm:h-2 bg-gradient-to-t from-white/50 to-transparent" />
     </div>
   );
 };

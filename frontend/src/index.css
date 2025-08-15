@@ -75,11 +75,22 @@
 
   /* Safe area support */
   .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 20px);
+    padding-bottom: env(safe-area-inset-bottom, 8px);
   }
   
   .pt-safe {
     padding-top: env(safe-area-inset-top, 20px);
+  }
+
+  /* Mobile navigation dynamic padding */
+  .mobile-nav-visible .min-h-screen {
+    padding-bottom: 60px;
+    transition: padding-bottom 0.3s ease-in-out;
+  }
+  
+  .mobile-nav-hidden .min-h-screen {
+    padding-bottom: 0px;
+    transition: padding-bottom 0.3s ease-in-out;
   }
 
   /* Hide scrollbar */
