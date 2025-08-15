@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle } from "react-icons/io5";
+import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoLibraryOutline, IoPersonOutline, IoHomeOutline, IoMenuOutline } from "react-icons/io5";
 import { FaRobot } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
@@ -138,6 +138,7 @@ const MobileChatbotPage = () => {
   const initialQueryProcessed = useRef(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
+  const [showNavMenu, setShowNavMenu] = useState(false);
 
   // Check if user has visited chat page before
   useEffect(() => {
@@ -221,22 +222,44 @@ const MobileChatbotPage = () => {
     }
   }, [proMode, isAuthenticated]);
 
-  // Handle ESC key to close welcome message
+  // Handle ESC key to close welcome message and navigation menu
   useEffect(() => {
     const handleEscKey = (event) => {
-      if (event.key === 'Escape' && showWelcomeMessage) {
-        setShowWelcomeMessage(false);
+      if (event.key === 'Escape') {
+        if (showWelcomeMessage) {
+          setShowWelcomeMessage(false);
+        }
+        if (showNavMenu) {
+          setShowNavMenu(false);
+        }
       }
     };
 
-    if (showWelcomeMessage) {
+    if (showWelcomeMessage || showNavMenu) {
       document.addEventListener('keydown', handleEscKey);
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscKey);
     };
-  }, [showWelcomeMessage]);
+  }, [showWelcomeMessage, showNavMenu]);
+
+  // Close navigation menu when scrolling
+  useEffect(() => {
+    const handleScroll = () => {
+      if (showNavMenu) {
+        setShowNavMenu(false);
+      }
+    };
+
+    if (showNavMenu) {
+      window.addEventListener('scroll', handleScroll);
+    }
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [showNavMenu]);
 
   // Scroll to the bottom of the chat when chat history updates
   useEffect(() => {
@@ -864,13 +887,13 @@ const MobileChatbotPage = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Mobile Header */}
+      {/* Mobile Header with Navigation */}
       <div className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm">
         <div className="flex items-center justify-between px-3 py-2">
           {/* Left: Back button */}
           <Link 
             to="/"
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+            className="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
           >
             <IoChevronBack size={18} className="text-gray-700" />
           </Link>
@@ -881,9 +904,86 @@ const MobileChatbotPage = () => {
             <p className="text-xs text-gray-500">Learning Assistant</p>
           </div>
           
-          {/* Right: Empty space for balance */}
-          <div className="w-8"></div>
+          {/* Right: Menu Button */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNavMenu(!showNavMenu)}
+              className="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+              title="Menu"
+            >
+              <IoMenuOutline size={18} className="text-gray-700" />
+            </button>
+            
+            {/* Dropdown Menu */}
+            {showNavMenu && (
+              <>
+                {/* Backdrop */}
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowNavMenu(false)}
+                ></div>
+                
+                {/* Menu Items */}
+                <div className="absolute right-0 top-12 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                  <Link
+                    to="/courses"
+                    className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => setShowNavMenu(false)}
+                  >
+                    <IoLibraryOutline size={18} className="mr-3 text-indigo-600" />
+                    <span className="font-medium">My Courses</span>
+                  </Link>
+                  
+                  <Link
+                    to="/profile"
+                    className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => setShowNavMenu(false)}
+                  >
+                    <IoPersonOutline size={18} className="mr-3 text-gray-600" />
+                    <span className="font-medium">Profile</span>
+                  </Link>
+                  
+                  <div className="border-t border-gray-100 my-1"></div>
+                  
+                  <Link
+                    to="/"
+                    className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => setShowNavMenu(false)}
+                  >
+                    <IoHomeOutline size={18} className="mr-3 text-green-600" />
+                    <span className="font-medium">Home</span>
+                  </Link>
+                </div>
+              </>
+            )}
+          </div>
         </div>
+        
+        {/* Quick Action Suggestions - only show when chat is empty */}
+        {!showTopicConfirmation && chatHistory.length === 0 && (
+          <div className="px-3 pb-2 border-t border-gray-100">
+            <div className="flex items-center justify-center space-x-3 py-2">
+              <button
+                onClick={() => setMessage("Explain quantum physics in simple terms")}
+                className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0"
+              >
+                📚 Quick Learn
+              </button>
+              <button
+                onClick={() => setMessage("Create a course about")}
+                className="text-xs text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-colors flex-shrink-0"
+              >
+                🎓 Create Course
+              </button>
+              <button
+                onClick={() => setMessage("Help me with homework")}
+                className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0"
+              >
+                ✏️ Help
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Welcome Message Popup for First-time Users */}
@@ -921,7 +1021,7 @@ const MobileChatbotPage = () => {
       )}
 
       {/* Chat messages container */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 pt-16 pb-32 bg-white chat-container">
+      <div className="flex-1 overflow-y-auto px-4 py-4 pt-20 pb-32 bg-white chat-container">
         <div className="min-h-full">
           {chatHistory.map((chat) => (
             <ErrorBoundary key={`error-boundary-${chat.id}`}>
@@ -952,36 +1052,39 @@ const MobileChatbotPage = () => {
             </div>
           )}
 
-          {/* Topic Confirmation Dialog */}
+          {/* Topic Confirmation Dialog - Improved */}
           {showTopicConfirmation && (
-            <div className="w-full mb-3">
+            <div className="w-full mb-4">
               <div className="flex justify-start">
-                <div className="max-w-[90%]">
-                  <div className="bg-gradient-to-br from-blue-50/90 to-purple-50/90 backdrop-blur-md border-2 border-blue-200/50 rounded-xl rounded-bl-md p-3 shadow-lg">
-                    <div className="flex items-center mb-2">
-                      <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mr-2">
-                        <span className="text-white text-xs font-bold">✓</span>
+                <div className="max-w-[92%]">
+                  <div className="bg-white border border-blue-200 rounded-2xl rounded-bl-md p-4 shadow-lg">
+                    {/* Header */}
+                    <div className="flex items-center mb-3">
+                      <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mr-3">
+                        <span className="text-white text-sm font-bold">✓</span>
                       </div>
-                      <h3 className="text-base font-semibold text-gray-800">Confirm Course Topics</h3>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800">Confirm Course Topics</h3>
+                        <p className="text-sm text-gray-500">
+                          Found {pendingTopics.length} topic(s) from "<em className="text-gray-700">{originalPrompt}</em>"
+                        </p>
+                      </div>
                     </div>
                     
-                    <p className="text-xs text-gray-600 mb-3">
-                      I found <strong>{pendingTopics.length}</strong> topic(s) from your query: "<em>{originalPrompt}</em>"
-                    </p>
-                    
-                    <div className="space-y-1.5 mb-3">
+                    {/* Topics List */}
+                    <div className="space-y-2 mb-4">
                       {pendingTopics.map((topic, index) => (
-                        <div key={topic.id || index} className="flex items-center bg-white/80 backdrop-blur-sm rounded-lg p-2 border border-white/30 text-sm">
-                          <span className="text-indigo-500 mr-1.5 font-bold">{index + 1}.</span>
+                        <div key={topic.id || index} className="flex items-center bg-gray-50 rounded-xl p-3 border border-gray-100">
+                          <span className="text-indigo-600 font-semibold mr-3 text-sm w-6">{index + 1}.</span>
                           <input
                             type="text"
                             value={topic.name}
                             onChange={(e) => handleTopicEdit(index, e.target.value)}
-                            className="flex-1 bg-transparent border-none focus:ring-1 focus:ring-indigo-300 rounded px-1 py-0.5 text-sm"
+                            className="flex-1 bg-transparent border-none focus:ring-2 focus:ring-indigo-300 rounded-lg px-2 py-1 text-sm"
                           />
                           <button
                             onClick={() => handleTopicDelete(index)}
-                            className="ml-1 text-gray-400 hover:text-red-500 p-1"
+                            className="ml-2 text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -991,26 +1094,27 @@ const MobileChatbotPage = () => {
                       ))}
                     </div>
                     
-                    <div className="flex flex-col space-y-2">
+                    {/* Action Buttons */}
+                    <div className="space-y-3">
                       <button
                         onClick={handleTopicConfirm}
-                        className="w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg shadow-sm font-medium text-sm hover:from-blue-700 hover:to-indigo-700"
+                        className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-sm font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all"
                       >
-                        Create Course
+                        Create Course with {pendingTopics.length} Topic{pendingTopics.length !== 1 ? 's' : ''}
                       </button>
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-3">
                         <button
                           onClick={handleTopicAdd}
                           disabled={pendingTopics.length >= 4}
-                          className={`flex-1 py-2 bg-white text-indigo-600 border border-indigo-300 rounded-lg text-sm font-medium ${
-                            pendingTopics.length >= 4 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-50'
+                          className={`flex-1 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-xl text-sm font-medium transition-all ${
+                            pendingTopics.length >= 4 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-50 hover:border-indigo-300'
                           }`}
                         >
-                          Add Topic
+                          + Add Topic
                         </button>
                         <button
                           onClick={handleTopicCancel}
-                          className="flex-1 py-2 bg-white text-gray-600 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
+                          className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition-all"
                         >
                           Cancel
                         </button>
@@ -1026,67 +1130,74 @@ const MobileChatbotPage = () => {
         </div>
       </div>
 
-      {/* Message input - Fixed at bottom */}
-      <div className="fixed bottom-16 left-0 right-0 z-20">
+      {/* Message input - Fixed at bottom with no bottom navigation */}
+      <div className="fixed bottom-0 left-0 right-0 z-20">
         <div className="bg-white border-t border-gray-200 shadow-lg">
           {/* Bottom input area */}
           <div className="px-4 py-3">
-            {/* Quick action button - Course Creator */}
-            <div className="flex items-center gap-3 mb-3">
-              <button
-                onClick={handleCreateCourse}
-                className={`flex items-center px-4 py-2.5 rounded-full text-sm border shadow-sm transition-all whitespace-nowrap flex-shrink-0 ${
-                  proMode 
-                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-transparent shadow-md"
-                  : "bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:bg-indigo-50"
-                }`}
-              >
-                <IoSchoolOutline size={16} className="mr-2" />
-                <span className="font-medium">{proMode ? "Course Mode" : "Course Creator"}</span>
-                {proMode && <IoCheckmarkCircle size={16} className="ml-2 text-white" />}
-              </button>
+            {/* Course Mode Section - Redesigned */}
+            <div className="mb-3">
+              {/* Course Creator Button */}
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  onClick={handleCreateCourse}
+                  className={`flex items-center px-4 py-2 rounded-xl text-sm transition-all ${
+                    proMode 
+                    ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-sm"
+                    : "bg-gray-100 text-gray-700 hover:bg-indigo-50 hover:text-indigo-700"
+                  }`}
+                >
+                  <IoSchoolOutline size={16} className="mr-2" />
+                  <span className="font-medium">{proMode ? "Course Mode" : "Course Creator"}</span>
+                  {proMode && <IoCheckmarkCircle size={14} className="ml-2" />}
+                </button>
+                
+                {/* Compact usage indicator - only show remaining count */}
+                {proMode && usageStats && (
+                  <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
+                    {Math.max(0, (usageStats.daily_limit || 16) - (usageStats.daily_used || 0))} left today
+                  </div>
+                )}
+              </div>
               
-              {/* Rate limit status beside the button - only when in proMode */}
-              {proMode && usageStats && (
-                <div className="flex-1 min-w-0">
-                  <CompactRateLimitStatus 
-                    usageStats={usageStats} 
-                    className="text-xs leading-tight"
-                  />
+              {/* Optional: Rate limit details - collapsible/subtle */}
+              {proMode && usageStats && (usageStats.daily_used || 0) > ((usageStats.daily_limit || 16) * 0.7) && (
+                <div className="text-xs text-orange-600 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-200">
+                  ⚠️ {Math.max(0, (usageStats.daily_limit || 16) - (usageStats.daily_used || 0))} course topics remaining today
                 </div>
               )}
             </div>
             
-            {/* Input container with proper spacing */}
-            <div className="relative flex items-center bg-gray-50 rounded-2xl border border-gray-200 shadow-sm">
+            {/* Input container - Improved spacing and styling */}
+            <div className="relative flex items-center bg-gray-50 rounded-2xl border border-gray-200 shadow-sm focus-within:border-indigo-300 focus-within:shadow-md transition-all">
               {/* Left robot button */}
               <button
                 onClick={() => {}} // Model toggle
                 className="px-3 py-3"
               >
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600 text-white shadow-sm">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 transition-colors">
                   <FaRobot size={14} />
                 </div>
               </button>
               
-              {/* Input field with exact styling */}
+              {/* Input field with better styling */}
               <input
                 type="text"
-                placeholder={proMode ? "Describe your course topic..." : "Ask anything"}
+                placeholder={proMode ? "Describe your course topic..." : "Ask anything..."}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                className="flex-1 py-3 pl-2 pr-12 text-base bg-transparent border-none focus:outline-none focus:ring-0 placeholder-gray-500"
+                className="flex-1 py-3 pl-2 pr-12 text-base bg-transparent border-none focus:outline-none focus:ring-0 placeholder-gray-400"
                 disabled={isLoading}
               />
               
-              {/* Send button with proper positioning - always visible */}
+              {/* Send button - improved styling */}
               <button
                 onClick={() => handleSendMessage()}
                 disabled={!message.trim() || isLoading}
-                className={`absolute right-3 p-2.5 rounded-full transition-all ${
+                className={`absolute right-2 p-2.5 rounded-xl transition-all ${
                   message.trim() && !isLoading 
-                    ? "bg-indigo-600 text-white shadow-md hover:bg-indigo-700" 
+                    ? "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 hover:shadow-md" 
                     : "bg-gray-300 text-gray-500"
                 }`}
               >

@@ -66,8 +66,8 @@ const Layout = ({ children, excludePaths = [] }) => {
   // Check if the current route is in the excludePaths array
   const isExcluded = excludePaths.some(path => location.pathname.startsWith(path));
 
-  // Paths where we don't want mobile navigation (like auth, admin, etc.)
-  const noMobileNavPaths = ['/auth', '/admin-p', '/not-found'];
+  // Paths where we don't want mobile navigation (like auth, admin, chat, etc.)
+  const noMobileNavPaths = ['/auth', '/admin-p', '/not-found', '/chat'];
   const shouldShowMobileNav = !noMobileNavPaths.some(path => location.pathname.startsWith(path));
 
   return (
