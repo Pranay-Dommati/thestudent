@@ -181,11 +181,10 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 </Link>
                 <Link to="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                   AI Chatbot
-                </Link>                {isLoggedIn && (
-                  <Link to="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
-                    Learning Hub
-                  </Link>
-                )}
+                </Link>
+                <Link to="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                  Learning Hub
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-gray-100 mt-2 border-t border-gray-100"
