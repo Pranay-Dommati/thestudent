@@ -42,7 +42,14 @@ const LearningHubPage = () => {
       console.log('🔥 [LEARNING HUB] authUser:', authUser);
       
       if (!isLoggedIn) {
-        console.log('🔥 [LEARNING HUB] ❌ User not logged in - skipping data fetch');
+        console.log('🔥 [LEARNING HUB] ❌ User not logged in - showing guest version');
+        // Set default values for guest users
+        setLearningStats({
+          weekly_hours: 0,
+          current_streak: 0,
+          today: { hours: 0 }
+        });
+        setEnrolledCoursesCount(0);
         return;
       }
 
@@ -89,7 +96,7 @@ const LearningHubPage = () => {
   
   // Create user object with real learning statistics - ALWAYS use fresh data from API
   const user = {
-    name: authUser?.full_name || authUser?.first_name || authUser?.username || "Student",
+    name: isLoggedIn ? (authUser?.full_name || authUser?.first_name || authUser?.username || "Student") : "Guest",
     totalCoursesEnrolled: enrolledCoursesCount,
     // FORCE real API data to override any dummy data
     hoursThisWeek: learningStats?.weekly_hours ?? 0,

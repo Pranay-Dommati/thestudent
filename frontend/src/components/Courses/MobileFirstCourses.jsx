@@ -145,7 +145,7 @@ const MobileFirstCourses = () => {
     };
 
     const MobileHero = () => (
-        <section className="bg-gradient-to-br from-indigo-600 via-purple-600 to-purple-700 text-white pt-16 pb-8 relative overflow-hidden">
+        <section className="course-hero-section bg-gradient-to-br from-indigo-600 via-purple-600 to-purple-700 text-white pt-16 pb-8 relative overflow-hidden">
             {/* Background decorations */}
             <div className="absolute inset-0 opacity-10">
                 <div className="absolute top-10 left-4 w-20 h-20 border-2 border-white rounded-full animate-pulse"></div>

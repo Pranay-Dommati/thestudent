@@ -198,11 +198,7 @@ const App = () => {
             <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
-            <Route path="/learning-hub" element={
-              <ProtectedRoute>
-                <LearningHubWrapper />
-              </ProtectedRoute>
-            } />
+            <Route path="/learning-hub" element={<LearningHubWrapper />} />
             <Route path="/auth" element={<AuthForm />} />
 
             {/* Course Detail Routes */}

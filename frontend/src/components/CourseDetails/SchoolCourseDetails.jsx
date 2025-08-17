@@ -347,7 +347,7 @@ const SchoolCourseDetails = () => {
     
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-20">
+      <div className="course-hero-section bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-20">
         <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-center">
             <div className="space-y-4 sm:space-y-6">

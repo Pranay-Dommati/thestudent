@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 const Hero = () => {
   return (
-    <section className="relative min-h-[80vh] sm:min-h-[85vh] lg:min-h-[90vh] pt-14 pb-12 sm:pt-20 sm:pb-16 lg:pt-24 lg:pb-32 xl:pt-32 xl:pb-48 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-700 overflow-hidden">
+    <section className="hero-section relative min-h-[80vh] sm:min-h-[85vh] lg:min-h-[90vh] pt-14 pb-12 sm:pt-20 sm:pb-16 lg:pt-24 lg:pb-32 xl:pt-32 xl:pb-48 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-700 overflow-hidden">
       {/* Mobile version - modern and visually appealing */}
       <div className="block sm:hidden">
         {/* Mobile background elements */}

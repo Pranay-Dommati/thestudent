@@ -16,27 +16,72 @@ const Navbar = ({ initialStyle = "transparent" }) => {
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
+      // Check if we're on pages with hero sections
+      const isHomePage = window.location.pathname === '/';
+      const isCoursesPage = window.location.pathname.startsWith('/courses');
+      const isLearningHubPage = window.location.pathname.startsWith('/learning-hub');
+      
+      if (isHomePage || isCoursesPage || isLearningHubPage) {
+        const homeHeroSection = document.querySelector('.hero-section');
+        const courseHeroSection = document.querySelector('.course-hero-section');
+        const learningHubHeroSection = document.querySelector('.learning-hub-hero-section');
+        
+        let heroSection = null;
+        if (isHomePage && homeHeroSection) {
+          heroSection = homeHeroSection;
+        } else if (isCoursesPage && courseHeroSection) {
+          heroSection = courseHeroSection;
+        } else if (isLearningHubPage && learningHubHeroSection) {
+          heroSection = learningHubHeroSection;
+        }
+        
+        if (heroSection) {
+          const heroHeight = heroSection.offsetHeight;
+          const scrollThreshold = heroHeight - 150; // Change to white 150px before hero ends
+          setIsScrolled(window.scrollY > scrollThreshold);
+        } else {
+          // Fallback if hero section not found - change after minimal scroll
+          setIsScrolled(window.scrollY > 50);
+        }
+      } else {
+        setIsScrolled(window.scrollY > 10);
+      }
     };
+    
     handleScroll();
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);  }, []);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Check if we're on pages with hero sections
+  const isHomePage = window.location.pathname === '/';
+  const isCoursesPage = window.location.pathname.startsWith('/courses');
+  const isLearningHubPage = window.location.pathname.startsWith('/learning-hub');
 
   let backgroundClass = '';
+  let textClass = '';
+  
   if (isScrolled) {
+    // When scrolled: white background for all pages
     backgroundClass = 'bg-white shadow-md';
+    textClass = 'text-gray-700';
   } else if (initialStyle === 'gradient') {
     backgroundClass = 'bg-gradient-to-r from-indigo-600 to-purple-700';
+    textClass = 'text-white';
   } else if (initialStyle === 'light') {
     backgroundClass = 'bg-white shadow-sm';
+    textClass = 'text-gray-700';
+  } else if (isHomePage || isCoursesPage || isLearningHubPage) {
+    // On home page, courses page, or learning hub page, not scrolled: transparent to blend with hero
+    backgroundClass = 'bg-transparent';
+    textClass = 'text-white';
   } else {
-    // Fix: Make navbar visible by default with a semi-transparent background
-    backgroundClass = 'bg-white/90 backdrop-blur-md shadow-sm';
+    // Other pages: default white background
+    backgroundClass = 'bg-white shadow-sm';
+    textClass = 'text-gray-700';
   }
 
-  const textColor = (isScrolled || initialStyle === 'light') 
-    ? 'text-gray-700 hover:text-blue-600' 
-    : 'text-gray-700 hover:text-blue-600'; // Fix: Always use dark text for visibility
+  const textColor = `${textClass} hover:text-blue-600 transition-colors duration-300`;
   const handleLogout = () => {
     logout();
     navigate('/');
@@ -50,7 +95,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           <div className="flex items-center w-[200px]">
             <Link to="/" className="flex items-center space-x-2">
               <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">S</div>
-              <span className={`font-bold text-lg text-gray-800`}>Students Hub</span>
+              <span className={`font-bold text-lg ${textClass}`}>Students Hub</span>
             </Link>
           </div>
           
@@ -64,14 +109,12 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               >
                 Courses
               </Link>
-              {isLoggedIn && (
-                <Link 
-                  to="/learning-hub" 
-                  className={`font-medium transition-colors ${textColor}`}
-                >
-                  Learning Hub
-                </Link>
-              )}
+              <Link 
+                to="/learning-hub" 
+                className={`font-medium transition-colors ${textColor}`}
+              >
+                Learning Hub
+              </Link>
               <Link 
                 to="/chat" 
                 className={`font-medium transition-colors ${textColor}`}
@@ -104,7 +147,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <div className="hidden md:flex items-center space-x-4">
                 <Link to="/auth?mode=login" 
                   className={`px-4 py-2 rounded-full font-medium transition-all duration-300 
-                    text-blue-600 border border-blue-600 hover:bg-blue-50`}
+                    ${isScrolled || (!isHomePage && !isCoursesPage && !isLearningHubPage)
+                      ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' 
+                      : 'text-white border border-white hover:bg-white/10'}`}
                 >
                   Log In
                 </Link>
@@ -122,7 +167,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               className="md:hidden ml-4"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 text-gray-800`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${textClass}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {isMobileMenuOpen ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 ) : (
@@ -149,11 +194,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 </Link>
                 <Link to="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
                   AI Chatbot
-                </Link>                {isLoggedIn && (
-                  <Link to="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
-                    Learning Hub
-                  </Link>
-                )}
+                </Link>                <Link to="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
+                  Learning Hub
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-gray-100 mt-2 border-t border-gray-100"
@@ -165,6 +208,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <>
                 <Link to="/" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Home</Link>
                 <Link to="/courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Courses</Link>
+                <Link to="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Learning Hub</Link>
                 <Link to="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">AI Chatbot</Link>
                 <div className="mt-4 flex flex-col space-y-2 px-4">
                   <Link to="/auth?mode=login" className="px-4 py-2 rounded-full text-blue-600 border border-blue-600 font-medium text-center">

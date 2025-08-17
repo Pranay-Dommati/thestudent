@@ -46,7 +46,16 @@ const MobileLearningHubPage = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!isLoggedIn) return;
+      if (!isLoggedIn) {
+        // Set default values for guest users
+        setLearningStats({
+          weekly_hours: 0,
+          current_streak: 0,
+          today: { hours: 0 }
+        });
+        setEnrolledCoursesCount(0);
+        return;
+      }
       
       try {
         const token = localStorage.getItem('accessToken');
@@ -114,7 +123,7 @@ const MobileLearningHubPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Modern Hero Section */}
-      <div className="relative overflow-hidden pt-4">
+      <div className="learning-hub-hero-section relative overflow-hidden pt-4">
         {/* Background Pattern */}
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600"></div>
         <div className="absolute inset-0 bg-black/10"></div>
@@ -127,10 +136,16 @@ const MobileLearningHubPage = () => {
             className="text-white mb-4"
           >
             <h1 className="text-xl font-bold mb-1">
-              Welcome back, {user?.firstName || 'Student'}! 👋
+              {isLoggedIn ? 
+                `Welcome back, ${authUser?.firstName || authUser?.first_name || 'Student'}! 👋` : 
+                'Welcome to Learning Hub! 👋'
+              }
             </h1>
             <p className="text-blue-100 text-sm">
-              Ready to continue your learning journey?
+              {isLoggedIn ? 
+                'Ready to continue your learning journey?' : 
+                'Sign up to start your learning journey!'
+              }
             </p>
           </motion.div>
 
