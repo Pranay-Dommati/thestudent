@@ -1,4 +1,7 @@
-# Google Sign-In Integration Guide
+http://localhost:5175
+http://localhost:5173
+http://127.0.0.1:5175
+http://127.0.0.1:5173# Google Sign-In Integration Guide
 
 ## ✅ Backend Integration Complete - Fully Compatible with Existing User Model
 
@@ -47,7 +50,10 @@ Created `authentication/pipeline.py` with functions that:
 - Ensure `agreed_to_terms=True` for Google users
 
 #### 4. **API Endpoints Created**
-- `/api/auth/google/auth-url/` - Get Google OAuth2 authorization URL
+- `/api/auth/http://localhost:5175
+http://localhost:5173
+http://127.0.0.1:5175
+http://127.0.0.1:51732 authorization URL
 - `/api/auth/google/callback/` - Handle authorization code callback  
 - `/api/auth/google/token/` - Authenticate with Google ID/access token
 - `/api/auth/social/` - Traditional social-auth-app-django URLs
