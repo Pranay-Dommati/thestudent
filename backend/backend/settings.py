@@ -236,6 +236,10 @@ if DEBUG:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5175",
+        "http://127.0.0.1:5175",
+        "http://localhost:5176",
+        "http://127.0.0.1:5176",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
@@ -293,7 +297,7 @@ SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.environ.get('GOOGLE_OAUTH2_CLIENT_SECRET',
 
 # Social Auth Configuration
 SOCIAL_AUTH_URL_NAMESPACE = 'social'
-SOCIAL_AUTH_LOGIN_REDIRECT_URL = 'http://localhost:5173/'
+SOCIAL_AUTH_LOGIN_REDIRECT_URL = 'http://localhost:5176/'
 SOCIAL_AUTH_LOGIN_URL = '/auth/login/'
 
 # Google OAuth2 specific settings
