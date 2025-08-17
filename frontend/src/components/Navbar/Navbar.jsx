@@ -16,41 +16,71 @@ const Navbar = ({ initialStyle = "transparent" }) => {
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
+      // Check if we're on pages with hero sections
+      const isHomePage = window.location.pathname === '/';
+      const isCoursesPage = window.location.pathname.startsWith('/courses');
+      
+      if (isHomePage || isCoursesPage) {
+        // On home page or courses page: change navbar to white when scrolling past the hero section
+        const scrollThreshold = 100; // Adjust this value as needed
+        setIsScrolled(window.scrollY > scrollThreshold);
+      } else {
+        // On other pages: change quickly
+        setIsScrolled(window.scrollY > 10);
+      }
     };
+    
     handleScroll();
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);  }, []);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
+  // Check if we're on pages with hero sections
+  const isHomePage = window.location.pathname === '/';
+  const isCoursesPage = window.location.pathname.startsWith('/courses');
+  
   let backgroundClass = '';
+  let textClass = '';
+  
   if (isScrolled) {
-    backgroundClass = 'bg-white shadow-md';
+    // When scrolled: white background with dark text
+    backgroundClass = 'bg-white shadow-lg';
+    textClass = 'text-gray-800';
   } else if (initialStyle === 'gradient') {
     backgroundClass = 'bg-gradient-to-r from-indigo-600 to-purple-700';
+    textClass = 'text-white';
   } else if (initialStyle === 'light') {
     backgroundClass = 'bg-white shadow-sm';
+    textClass = 'text-gray-800';
+  } else if (isHomePage || isCoursesPage) {
+    // On home page or courses page when not scrolled: transparent with white text to blend with hero
+    backgroundClass = 'bg-transparent';
+    textClass = 'text-white';
   } else {
-    // Fix: Make navbar visible by default with a semi-transparent background
-    backgroundClass = 'bg-white/90 backdrop-blur-md shadow-sm';
+    // Other pages: default white background
+    backgroundClass = 'bg-white shadow-sm';
+    textClass = 'text-gray-800';
   }
 
-  const textColor = (isScrolled || initialStyle === 'light') 
-    ? 'text-gray-700 hover:text-blue-600' 
-    : 'text-gray-700 hover:text-blue-600'; // Fix: Always use dark text for visibility
+  const linkHoverClass = isScrolled || (!isHomePage && !isCoursesPage) 
+    ? 'hover:text-blue-600' 
+    : 'hover:text-blue-200';
+  
+  const textColor = `${textClass} ${linkHoverClass} transition-colors duration-300`;
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-[100] transition-all duration-300 ${backgroundClass} ${isScrolled ? 'py-2' : 'py-3'} hidden md:block`}>
+    <nav className={`fixed top-0 left-0 w-full z-[100] transition-all duration-500 ease-in-out ${backgroundClass} ${isScrolled ? 'py-2' : 'py-3'} hidden md:block`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center">
           {/* Logo section */}
           <div className="flex items-center w-[200px]">
             <Link to="/" className="flex items-center space-x-2">
               <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">S</div>
-              <span className={`font-bold text-lg text-gray-800`}>Students Hub</span>
+              <span className={`font-bold text-lg ${textClass}`}>Students Hub</span>
             </Link>
           </div>
           
@@ -104,7 +134,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <div className="hidden md:flex items-center space-x-4">
                 <Link to="/auth?mode=login" 
                   className={`px-4 py-2 rounded-full font-medium transition-all duration-300 
-                    text-blue-600 border border-blue-600 hover:bg-blue-50`}
+                    ${isScrolled || (!isHomePage && !isCoursesPage)
+                      ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' 
+                      : 'text-white border border-white hover:bg-white/10'}`}
                 >
                   Log In
                 </Link>
@@ -122,7 +154,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               className="md:hidden ml-4"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 text-gray-800`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${textClass}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {isMobileMenuOpen ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 ) : (
