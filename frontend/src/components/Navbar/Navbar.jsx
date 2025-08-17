@@ -22,28 +22,11 @@ const Navbar = ({ initialStyle = "transparent" }) => {
       const isLearningHubPage = window.location.pathname.startsWith('/learning-hub');
       
       if (isHomePage || isCoursesPage || isLearningHubPage) {
-        const homeHeroSection = document.querySelector('.hero-section');
-        const courseHeroSection = document.querySelector('.course-hero-section');
-        const learningHubHeroSection = document.querySelector('.learning-hub-hero-section');
-        
-        let heroSection = null;
-        if (isHomePage && homeHeroSection) {
-          heroSection = homeHeroSection;
-        } else if (isCoursesPage && courseHeroSection) {
-          heroSection = courseHeroSection;
-        } else if (isLearningHubPage && learningHubHeroSection) {
-          heroSection = learningHubHeroSection;
-        }
-        
-        if (heroSection) {
-          const heroHeight = heroSection.offsetHeight;
-          const scrollThreshold = heroHeight - 150; // Change to white 150px before hero ends
-          setIsScrolled(window.scrollY > scrollThreshold);
-        } else {
-          // Fallback if hero section not found - change after minimal scroll
-          setIsScrolled(window.scrollY > 50);
-        }
+        // For hero pages, change navbar to white when scrolling past a threshold
+        const scrollThreshold = 100; // Simple threshold approach
+        setIsScrolled(window.scrollY > scrollThreshold);
       } else {
+        // For other pages, change navbar quickly
         setIsScrolled(window.scrollY > 10);
       }
     };
@@ -62,33 +45,37 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   let textClass = '';
   
   if (isScrolled) {
-    // When scrolled: white background for all pages
-    backgroundClass = 'bg-white shadow-md';
-    textClass = 'text-gray-700';
+    // When scrolled: white background with dark text for all pages
+    backgroundClass = 'bg-white shadow-lg';
+    textClass = 'text-gray-800';
   } else if (initialStyle === 'gradient') {
     backgroundClass = 'bg-gradient-to-r from-indigo-600 to-purple-700';
     textClass = 'text-white';
   } else if (initialStyle === 'light') {
     backgroundClass = 'bg-white shadow-sm';
-    textClass = 'text-gray-700';
+    textClass = 'text-gray-800';
   } else if (isHomePage || isCoursesPage || isLearningHubPage) {
-    // On home page, courses page, or learning hub page, not scrolled: transparent to blend with hero
+    // On hero pages when not scrolled: transparent with white text
     backgroundClass = 'bg-transparent';
     textClass = 'text-white';
   } else {
-    // Other pages: default white background
+    // Default for other pages: white background with dark text
     backgroundClass = 'bg-white shadow-sm';
-    textClass = 'text-gray-700';
+    textClass = 'text-gray-800';
   }
 
-  const textColor = `${textClass} hover:text-blue-600 transition-colors duration-300`;
+  const linkHoverClass = isScrolled || (!isHomePage && !isCoursesPage && !isLearningHubPage) 
+    ? 'hover:text-blue-600' 
+    : 'hover:text-blue-200';
+  
+  const textColor = `${textClass} ${linkHoverClass} transition-colors duration-300`;
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-[100] transition-all duration-300 ${backgroundClass} ${isScrolled ? 'py-2' : 'py-3'} hidden md:block`}>
+    <nav className={`fixed top-0 left-0 w-full z-[100] transition-all duration-500 ease-in-out ${backgroundClass} ${isScrolled ? 'py-2' : 'py-3'} hidden md:block`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center">
           {/* Logo section */}
