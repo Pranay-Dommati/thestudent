@@ -173,7 +173,7 @@ const App = () => {
           },
         }} 
       />      <BrowserRouter>
-        <Layout excludePaths={['/admin-p']}>
+        <Layout excludePaths={['/admin-p', '/chat']}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             

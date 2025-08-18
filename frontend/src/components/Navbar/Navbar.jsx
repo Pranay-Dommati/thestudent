@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
+import { FaUserCircle, FaSignOutAlt, FaUserPlus, FaSignInAlt } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 
 const Navbar = ({ initialStyle = "transparent" }) => {
@@ -8,6 +8,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -20,7 +21,38 @@ const Navbar = ({ initialStyle = "transparent" }) => {
     };
     handleScroll();
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);  }, []);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
+  // Handle clicking outside to close menus
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isMobileMenuOpen || isAuthMenuOpen) {
+        // Check if click is outside the menus
+        if (!event.target.closest('.navbar-menu') && 
+            !event.target.closest('.menu-toggle-button')) {
+          setIsMobileMenuOpen(false);
+          setIsAuthMenuOpen(false);
+        }
+      }
+    };
+    
+    // Handle ESC key press
+    const handleEscKey = (event) => {
+      if (event.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+        setIsAuthMenuOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscKey);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscKey);
+    };
+  }, [isMobileMenuOpen, isAuthMenuOpen]);
 
   let backgroundClass = '';
   if (isScrolled) {
@@ -40,6 +72,12 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const handleLogout = () => {
     logout();
     navigate('/');
+    closeAllMenus();
+  };
+  
+  const closeAllMenus = () => {
+    setIsMobileMenuOpen(false);
+    setIsAuthMenuOpen(false);
   };
 
   return (
@@ -104,7 +142,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <div className="hidden md:flex items-center space-x-4">
                 <Link to="/auth?mode=login" 
                   className={`px-4 py-2 rounded-full font-medium transition-all duration-300 
-                    text-blue-600 border border-blue-600 hover:bg-blue-50`}
+                    ${isScrolled || initialStyle === 'light' ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' : 'text-white border border-white hover:bg-white/10'}`}
                 >
                   Log In
                 </Link>
@@ -120,7 +158,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             {/* Mobile profile button - Clean and professional */}
             {isLoggedIn ? (
               <button 
-                className="md:hidden ml-4"
+                className="md:hidden ml-4 menu-toggle-button"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               >
                 <div className={`w-8 h-8 rounded-full ${isScrolled || initialStyle === 'light' ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-white/20 backdrop-blur-sm'} flex items-center justify-center`}>
@@ -128,26 +166,30 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 </div>
               </button>
             ) : (
-              <Link 
-                to="/auth?mode=login"
-                className={`md:hidden ml-4 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  isScrolled || initialStyle === 'light' 
-                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                    : 'bg-white/20 text-white backdrop-blur-sm hover:bg-white/30'
-                }`}
+              <button 
+                className="md:hidden ml-4 menu-toggle-button"
+                onClick={() => setIsAuthMenuOpen(!isAuthMenuOpen)}
               >
-                Login
-              </Link>
+                <div className={`w-8 h-8 rounded-full ${isScrolled || initialStyle === 'light' ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-white/20 backdrop-blur-sm'} flex items-center justify-center`}>
+                  <FaUserCircle className={`w-5 h-5 ${isScrolled || initialStyle === 'light' ? 'text-white' : 'text-white'}`} />
+                </div>
+              </button>
             )}
           </div>
         </div>
         
         {/* Mobile profile menu - Only profile-related options */}
         {isMobileMenuOpen && isLoggedIn && (
-          <div className="md:hidden mt-4 py-3 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-100 mx-4">
-            <div className="px-4 py-2 border-b border-gray-100">
-              <p className="text-sm font-medium text-gray-900">Profile Options</p>
-            </div>
+          <>
+            {/* Semi-transparent overlay for better UX */}
+            <div 
+              className="fixed inset-0 bg-black/30 z-40 md:hidden" 
+              onClick={closeAllMenus}
+            ></div>
+            <div className="md:hidden mt-4 py-3 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-100 mx-4 navbar-menu z-50 relative">
+              <div className="px-4 py-2 border-b border-gray-100">
+                <p className="text-sm font-medium text-gray-900">Profile Options</p>
+              </div>
             <Link 
               to="/profile" 
               className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
@@ -164,6 +206,39 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <span>Sign Out</span>
             </button>
           </div>
+          </>
+        )}
+        
+        {/* Mobile auth menu - Login/Signup options */}
+        {isAuthMenuOpen && !isLoggedIn && (
+          <>
+            {/* Semi-transparent overlay for better UX */}
+            <div 
+              className="fixed inset-0 bg-black/30 z-40 md:hidden" 
+              onClick={closeAllMenus}
+            ></div>
+            <div className="md:hidden mt-4 py-3 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-100 mx-4 navbar-menu z-50 relative">
+              <div className="px-4 py-2 border-b border-gray-100">
+                <p className="text-sm font-medium text-gray-900">Account Options</p>
+              </div>
+            <Link 
+              to="/auth?mode=login" 
+              className="flex items-center px-4 py-3 text-blue-600 hover:bg-blue-50 transition-colors"
+              onClick={() => setIsAuthMenuOpen(false)}
+            >
+              <FaSignInAlt className="w-4 h-4 mr-3" />
+              <span>Log In</span>
+            </Link>
+            <Link
+              to="/auth?mode=signup"
+              className="flex items-center px-4 py-3 text-indigo-600 hover:bg-indigo-50 transition-colors"
+              onClick={() => setIsAuthMenuOpen(false)}
+            >
+              <FaUserPlus className="w-4 h-4 mr-3" />
+              <span>Sign Up</span>
+            </Link>
+          </div>
+          </>
         )}
       </div>
     </nav>
