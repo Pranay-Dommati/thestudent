@@ -63,8 +63,9 @@ const Layout = ({ children, excludePaths = [] }) => {
   // Check if the current route is related to mentoring
   const isMentoring = location.pathname.startsWith('/mentoring');
 
-  // Check if the current route is in the excludePaths array
-  const isExcluded = excludePaths.some(path => location.pathname.startsWith(path));
+  // Check if the current route is in the excludePaths array or should be excluded
+  const isExcluded = excludePaths.some(path => location.pathname.startsWith(path)) || 
+                     location.pathname.startsWith('/profile'); // Exclude profile page as it has its own navbar
 
   // Paths where we don't want mobile navigation (like auth, admin, chat, etc.)
   const noMobileNavPaths = ['/auth', '/admin-p', '/not-found', '/chat'];
