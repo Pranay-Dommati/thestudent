@@ -468,7 +468,7 @@ const ProfilePage = () => {
               <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl transform transition-all group-hover:scale-105 group-hover:rotate-3">
                 S
               </div>
-              <span className="font-bold text-lg sm:text-xl bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent hidden xs:inline">
+              <span className="font-bold text-lg sm:text-xl bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 Students Hub
               </span>
             </Link>

@@ -50,7 +50,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           <div className="flex items-center w-[200px]">
             <Link to="/" className="flex items-center space-x-2">
               <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">S</div>
-              <span className={`font-bold text-lg text-gray-800`}>Students Hub</span>
+              <span className={`font-bold text-lg ${isScrolled || initialStyle === 'light' ? 'text-gray-800' : 'text-white'}`}>Students Hub</span>
             </Link>
           </div>
           
