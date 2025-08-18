@@ -70,10 +70,33 @@ const Layout = ({ children, excludePaths = [] }) => {
   const noMobileNavPaths = ['/auth', '/admin-p', '/not-found', '/chat'];
   const shouldShowMobileNav = !noMobileNavPaths.some(path => location.pathname.startsWith(path));
 
+  // Determine the navbar style based on the current route
+  const getNavbarStyle = () => {
+    // Light navbar for pages without hero sections or with light backgrounds
+    if (location.pathname.startsWith('/help-center') || 
+        location.pathname.startsWith('/feedback') ||
+        location.pathname.startsWith('/terms') ||
+        location.pathname.startsWith('/privacy') ||
+        location.pathname.startsWith('/profile')) {
+      return 'light';
+    }
+    
+    // Transparent navbar for pages with hero sections (Home, Courses, Learning Hub)
+    if (location.pathname === '/' || 
+        location.pathname.startsWith('/courses') ||
+        location.pathname.startsWith('/learning-hub') ||
+        location.pathname.startsWith('/pro-learning')) {
+      return 'transparent';
+    }
+    
+    // Default to transparent for other pages
+    return 'transparent';
+  };
+
   return (
     <>
       {/* Desktop Navigation */}
-      {!isExcluded && (isMentoring ? <MentoringNavbar /> : <Navbar />)}
+      {!isExcluded && (isMentoring ? <MentoringNavbar /> : <Navbar initialStyle={getNavbarStyle()} />)}
       
       {/* Mobile Navigation */}
       {shouldShowMobileNav && (

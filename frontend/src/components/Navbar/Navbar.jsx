@@ -24,26 +24,26 @@ const Navbar = ({ initialStyle = "transparent" }) => {
 
   let backgroundClass = '';
   if (isScrolled) {
-    backgroundClass = 'bg-white shadow-md';
+    backgroundClass = 'bg-white/95 backdrop-blur-md shadow-md';
   } else if (initialStyle === 'gradient') {
     backgroundClass = 'bg-gradient-to-r from-indigo-600 to-purple-700';
   } else if (initialStyle === 'light') {
     backgroundClass = 'bg-white shadow-sm';
   } else {
-    // Fix: Make navbar visible by default with a semi-transparent background
-    backgroundClass = 'bg-white/90 backdrop-blur-md shadow-sm';
+    // Transparent navbar for hero sections
+    backgroundClass = 'bg-transparent';
   }
 
   const textColor = (isScrolled || initialStyle === 'light') 
     ? 'text-gray-700 hover:text-blue-600' 
-    : 'text-gray-700 hover:text-blue-600'; // Fix: Always use dark text for visibility
+    : 'text-white hover:text-blue-200';
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
   return (
-    <nav className={`fixed top-0 left-0 w-full z-[100] transition-all duration-300 ${backgroundClass} ${isScrolled ? 'py-2' : 'py-3'} hidden md:block`}>
+    <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${backgroundClass} ${isScrolled ? 'py-2' : 'py-4'}`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center">
           {/* Logo section */}
@@ -117,68 +117,52 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               </div>
             )}
 
-            {/* Mobile menu button - Move to the right edge */}
-            <button 
-              className="md:hidden ml-4"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 text-gray-800`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {isMobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
+            {/* Mobile profile button - Clean and professional */}
+            {isLoggedIn ? (
+              <button 
+                className="md:hidden ml-4"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                <div className={`w-8 h-8 rounded-full ${isScrolled || initialStyle === 'light' ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-white/20 backdrop-blur-sm'} flex items-center justify-center`}>
+                  <FaUserCircle className={`w-5 h-5 ${isScrolled || initialStyle === 'light' ? 'text-white' : 'text-white'}`} />
+                </div>
+              </button>
+            ) : (
+              <Link 
+                to="/auth?mode=login"
+                className={`md:hidden ml-4 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  isScrolled || initialStyle === 'light' 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'bg-white/20 text-white backdrop-blur-sm hover:bg-white/30'
+                }`}
+              >
+                Login
+              </Link>
+            )}
           </div>
         </div>
         
-        {/* Mobile menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden mt-4 py-4 bg-white rounded-lg shadow-xl">
-            {isLoggedIn ? (
-              <>
-                <Link to="/profile" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
-                  Profile
-                </Link>
-                <Link to="/" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
-                  Home
-                </Link>
-                <Link to="/courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
-                  Courses
-                </Link>
-                <Link to="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
-                  AI Chatbot
-                </Link>                {isLoggedIn && (
-                  <Link to="/learning-hub" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">
-                    Learning Hub
-                  </Link>
-                )}
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-gray-100 mt-2 border-t border-gray-100"
-                >
-                  <FaSignOutAlt className="w-4 h-4 mr-2" />
-                  <span>Sign Out</span>
-                </button>
-              </>            ) : (
-              <>
-                <Link to="/" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Home</Link>
-                <Link to="/courses" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">Courses</Link>
-                <Link to="/chat" className="block px-4 py-2 text-gray-800 hover:bg-gray-100">AI Chatbot</Link>
-                <div className="mt-4 flex flex-col space-y-2 px-4">
-                  <Link to="/auth?mode=login" className="px-4 py-2 rounded-full text-blue-600 border border-blue-600 font-medium text-center">
-                    Log In
-                  </Link>
-                  <Link 
-                    to="/auth?mode=signup" 
-                    className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium text-center"
-                  >
-                    Sign Up
-                  </Link>
-                </div>
-              </>
-            )}
+        {/* Mobile profile menu - Only profile-related options */}
+        {isMobileMenuOpen && isLoggedIn && (
+          <div className="md:hidden mt-4 py-3 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-100 mx-4">
+            <div className="px-4 py-2 border-b border-gray-100">
+              <p className="text-sm font-medium text-gray-900">Profile Options</p>
+            </div>
+            <Link 
+              to="/profile" 
+              className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <FaUserCircle className="w-4 h-4 mr-3 text-gray-500" />
+              <span>View Profile</span>
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="flex items-center w-full px-4 py-3 text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <FaSignOutAlt className="w-4 h-4 mr-3" />
+              <span>Sign Out</span>
+            </button>
           </div>
         )}
       </div>
