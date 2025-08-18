@@ -94,31 +94,52 @@ class TopicRateLimiter:
         return sanitize_cache_key(cache_key)
     
     def get_daily_usage(self):
-        """Get current daily usage for the user/IP"""
+        """Get current daily usage for the user/IP with strict time-based validation"""
         cache_key = self.get_cache_key("_daily")
+        now = timezone.now()
         
         try:
-            usage_data = cache.get(cache_key, {
-                'count': 0,
-                'requests': [],
-                'first_request': None
-            })
+            usage_data = cache.get(cache_key)
             
-            # Validate cached data structure
-            if not isinstance(usage_data, dict):
-                logger.warning(f"Invalid cache data structure for key {cache_key}")
-                usage_data = {'count': 0, 'requests': [], 'first_request': None}
+            # If no data exists or data is corrupted, initialize new usage data
+            if not usage_data or not isinstance(usage_data, dict):
+                logger.warning(f"Invalid or missing cache data for key {cache_key}")
+                return self._initialize_usage_data(now)
             
-            # Ensure required fields exist
-            usage_data.setdefault('count', 0)
-            usage_data.setdefault('requests', [])
-            usage_data.setdefault('first_request', None)
+            # Check if the stored data is from a previous day
+            first_request_time = usage_data.get('first_request')
+            if first_request_time:
+                try:
+                    first_request_dt = datetime.fromisoformat(first_request_time)
+                    if first_request_dt.date() < now.date():
+                        logger.info(f"Resetting usage data for new day for {cache_key}")
+                        return self._initialize_usage_data(now)
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Invalid timestamp format in usage data: {e}")
+                    return self._initialize_usage_data(now)
+            
+            # Ensure all required fields exist with proper types
+            usage_data = {
+                'count': max(0, int(usage_data.get('count', 0))),
+                'requests': usage_data.get('requests', [])[-20:],  # Keep last 20 requests
+                'first_request': usage_data.get('first_request') or now.isoformat(),
+                'last_reset': usage_data.get('last_reset') or now.isoformat()
+            }
             
             return usage_data
             
         except Exception as e:
             logger.error(f"Error retrieving usage data: {e}")
-            return {'count': 0, 'requests': [], 'first_request': None}
+            return self._initialize_usage_data(now)
+            
+    def _initialize_usage_data(self, timestamp):
+        """Initialize fresh usage data with proper timestamps"""
+        return {
+            'count': 0,
+            'requests': [],
+            'first_request': timestamp.isoformat(),
+            'last_reset': timestamp.isoformat()
+        }
     
     def check_request_limit(self, requested_topics):
         """Check if the current request exceeds per-request limit"""
@@ -160,7 +181,7 @@ class TopicRateLimiter:
         return True, "", self.get_daily_usage()
     
     def record_usage(self, topics_created):
-        """Record topic creation usage with enhanced security"""
+        """Record topic creation usage with enhanced security and time validation"""
         try:
             validate_topic_input(topics_created)
         except ValueError as e:
@@ -168,40 +189,52 @@ class TopicRateLimiter:
             raise
         
         cache_key = self.get_cache_key("_daily")
-        usage_data = self.get_daily_usage()
+        usage_data = self.get_daily_usage()  # This already handles day transitions
         
-        # Update usage data
+        # Update usage data with atomic operations
         now = timezone.now()
         topics_count = len(topics_created)
         
-        # Ensure count doesn't go negative or exceed limits
+        # Double-check daily limits before recording
         new_count = max(0, int(usage_data.get('count', 0)) + topics_count)
-        usage_data['count'] = min(new_count, MAX_TOPICS_PER_DAY)  # Cap at daily limit
+        if new_count > MAX_TOPICS_PER_DAY:
+            logger.warning(f"Attempted to exceed daily limit for {cache_key}")
+            raise ValueError(f"Daily limit exceeded. Limit: {MAX_TOPICS_PER_DAY}, Attempted: {new_count}")
         
-        # Sanitize topic names for storage
+        usage_data['count'] = new_count
+        
+        # Sanitize topic names for storage with strict validation
         sanitized_topics = []
         for topic in topics_created:
             if isinstance(topic, dict):
-                name = str(topic.get('name', 'Unknown'))[:MAX_TOPIC_NAME_LENGTH]
+                name = str(topic.get('name', 'Unknown'))
             else:
-                name = str(topic)[:MAX_TOPIC_NAME_LENGTH]
+                name = str(topic)
+            
+            # Strict validation of topic names
+            if not name or len(name) > MAX_TOPIC_NAME_LENGTH:
+                name = name[:MAX_TOPIC_NAME_LENGTH] if name else 'Unknown'
+            if not ALLOWED_TOPIC_NAME_PATTERN.match(name):
+                name = re.sub(r'[^\w\s\-\+\#\.\(\)]', '', name) or 'Invalid_Name'
             sanitized_topics.append(name)
         
-        usage_data['requests'].append({
+        # Record request with precise timestamp
+        request_record = {
             'timestamp': now.isoformat(),
             'topics': topics_count,
             'topic_names': sanitized_topics
-        })
+        }
         
-        if not usage_data['first_request']:
+        # Update request history with rotation
+        usage_data['requests'] = (usage_data.get('requests', []) + [request_record])[-20:]
+        
+        # Update first request if not set
+        if not usage_data.get('first_request'):
             usage_data['first_request'] = now.isoformat()
         
-        # Keep only last 20 requests for debugging
-        if len(usage_data['requests']) > 20:
-            usage_data['requests'] = usage_data['requests'][-20:]
-        
-        # Cache until end of day (midnight + 1 hour buffer)
-        tomorrow = now.replace(hour=1, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        # Calculate precise cache timeout
+        # Store until next day's midnight plus a small buffer for timezone variations
+        tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=5, second=0, microsecond=0)
         cache_timeout = int((tomorrow - now).total_seconds())
         
         try:
@@ -213,24 +246,75 @@ class TopicRateLimiter:
         return usage_data
     
     def get_usage_stats(self):
-        """Get usage statistics for the user"""
+        """Get detailed usage statistics with time-based information"""
         usage_data = self.get_daily_usage()
+        now = timezone.now()
+        
+        # Calculate time-based metrics
+        reset_info = self._get_reset_time()
+        first_request_time = usage_data.get('first_request')
+        
+        try:
+            first_request_dt = datetime.fromisoformat(first_request_time) if first_request_time else now
+            usage_duration = (now - first_request_dt).total_seconds()
+        except (ValueError, TypeError):
+            usage_duration = 0
+            first_request_time = now.isoformat()
+        
+        # Get recent requests with proper ordering
+        recent_requests = sorted(
+            usage_data.get('requests', [])[-5:],
+            key=lambda x: x.get('timestamp', ''),
+            reverse=True
+        )
         
         return {
             'daily_used': usage_data['count'],
             'daily_limit': MAX_TOPICS_PER_DAY,
-            'daily_remaining': MAX_TOPICS_PER_DAY - usage_data['count'],
+            'daily_remaining': max(0, MAX_TOPICS_PER_DAY - usage_data['count']),
             'per_request_limit': MAX_TOPICS_PER_REQUEST,
-            'first_request_today': usage_data.get('first_request'),
-            'recent_requests': usage_data.get('requests', [])[-5:],  # Last 5 requests
-            'reset_time': self._get_reset_time()
+            'request_count_today': len(usage_data.get('requests', [])),
+            'first_request_today': first_request_time,
+            'usage_duration_seconds': int(usage_duration),
+            'recent_requests': recent_requests,
+            'reset_info': reset_info,
+            'current_time': now.isoformat(),
+            'rate_limits': {
+                'daily': {
+                    'limit': MAX_TOPICS_PER_DAY,
+                    'remaining': max(0, MAX_TOPICS_PER_DAY - usage_data['count']),
+                    'used': usage_data['count'],
+                    'percent_used': round((usage_data['count'] / MAX_TOPICS_PER_DAY) * 100, 2)
+                },
+                'per_request': {
+                    'limit': MAX_TOPICS_PER_REQUEST,
+                    'remaining': MAX_TOPICS_PER_REQUEST
+                }
+            }
         }
     
     def _get_reset_time(self):
-        """Get time when limits reset (midnight)"""
+        """Get precise time when limits reset (next midnight) with timezone handling"""
         now = timezone.now()
-        tomorrow = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-        return tomorrow.isoformat()
+        
+        # Get next midnight in user's timezone
+        # Add 1 minute buffer to ensure we're in the next day
+        tomorrow = (now + timedelta(days=1)).replace(
+            hour=0,
+            minute=1,
+            second=0,
+            microsecond=0
+        )
+        
+        # Calculate seconds until reset
+        self.seconds_until_reset = int((tomorrow - now).total_seconds())
+        
+        # Include timezone information in the reset time
+        return {
+            'reset_at': tomorrow.isoformat(),
+            'seconds_remaining': self.seconds_until_reset,
+            'timezone': str(timezone.get_current_timezone())
+        }
 
 def get_user_ip(request):
     """Extract user IP address from request with security validation"""
