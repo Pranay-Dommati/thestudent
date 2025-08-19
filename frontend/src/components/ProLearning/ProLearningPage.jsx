@@ -2978,7 +2978,7 @@ const ProLearningPage = () => {
             ? 'lg:mr-[400px]' // Add right margin on large screens when sidebar is visible
             : ''
         }`}>
-          <div className="w-full px-0 lg:px-6 py-0 lg:py-4 max-w-full overflow-x-hidden">{/* Remove mobile padding for edge-to-edge design */}
+          <div className="w-full px-0 lg:px-6 py-0 lg:pt-24 lg:pb-4 max-w-full overflow-x-hidden">{/* Remove mobile padding for edge-to-edge design, add more top padding for desktop */}
               {/* Enhanced Tab Navigation - Desktop Only */}
               <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border mb-6 hidden lg:block overflow-hidden">
                 <div className="p-2">
