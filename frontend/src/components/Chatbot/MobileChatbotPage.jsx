@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoLibraryOutline, IoPersonOutline, IoHomeOutline, IoMenuOutline } from "react-icons/io5";
+import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoLibraryOutline, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose } from "react-icons/io5";
 import { FaRobot } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
@@ -125,6 +125,7 @@ const MobileChatbotPage = () => {
   };
 
   const [usageStats, setUsageStats] = useState(null); // Track rate limit usage stats
+  const [usageStatsHidden, setUsageStatsHidden] = useState(false); // Track if user dismissed usage stats
   const [chatHistory, setChatHistory] = useState([
     {
       id: generateUniqueId(),
@@ -1135,10 +1136,10 @@ const MobileChatbotPage = () => {
         <div className="bg-white border-t border-gray-200 shadow-lg">
           {/* Bottom input area */}
           <div className="px-4 py-3">
-            {/* Course Mode Section - Redesigned */}
+            {/* Course Mode Section - Compact Horizontal Design */}
             <div className="mb-3">
-              {/* Course Creator Button */}
-              <div className="flex items-center justify-between mb-2">
+              {/* Course Creator Button and Usage Info in one row */}
+              <div className="flex items-center justify-between gap-3">
                 <button
                   onClick={handleCreateCourse}
                   className={`flex items-center px-4 py-2 rounded-xl text-sm transition-all ${
@@ -1152,18 +1153,31 @@ const MobileChatbotPage = () => {
                   {proMode && <IoCheckmarkCircle size={14} className="ml-2" />}
                 </button>
                 
-                {/* Compact usage indicator - only show remaining count */}
-                {proMode && usageStats && (
-                  <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
-                    {Math.max(0, (usageStats.daily_limit || 16) - (usageStats.daily_used || 0))} left today
+                {/* Minimalistic Usage indicator with dismiss button */}
+                {proMode && usageStats && !usageStatsHidden && (
+                  <div className="flex items-center gap-2 flex-1 justify-end">
+                    <div className="text-right">
+                      <div className="text-xs font-medium text-gray-600">
+                        {Math.max(0, (usageStats.daily_limit || 16) - (usageStats.daily_used || 0))} remaining today
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Up to {usageStats.per_request_limit || usageStats.request_limit || 4} per request
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setUsageStatsHidden(true)}
+                      className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                    >
+                      <IoClose size={14} className="text-gray-400" />
+                    </button>
                   </div>
                 )}
               </div>
               
-              {/* Optional: Rate limit details - collapsible/subtle */}
-              {proMode && usageStats && (usageStats.daily_used || 0) > ((usageStats.daily_limit || 16) * 0.7) && (
-                <div className="text-xs text-orange-600 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-200">
-                  ⚠️ {Math.max(0, (usageStats.daily_limit || 16) - (usageStats.daily_used || 0))} course topics remaining today
+              {/* Optional: Rate limit warning only when very low */}
+              {proMode && usageStats && (usageStats.daily_used || 0) >= (usageStats.daily_limit || 16) && (
+                <div className="mt-2 text-xs text-orange-600 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-200">
+                  ⚠️ Daily limit reached. Resets tomorrow.
                 </div>
               )}
             </div>
