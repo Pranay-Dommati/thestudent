@@ -124,26 +124,32 @@ def classify_topics(request):
         if settings.DEBUG:
             logger.debug(f"Classifying topics for: {safe_query}")
         
-        prompt = f"""Extract the main topics from this user's course creation request.
+        # Extract context and main topic focus
+        parts = user_query.lower().split(" in ")
+        learning_context = parts[1].strip() if len(parts) > 1 else None
+
+        prompt = f"""Extract the main learning topics from this user's request, understanding the context and relationships between topics.
 
 User Query: "{user_query}"
 
-Return ONLY a JSON array with the exact topics the user mentioned:
+Return ONLY a JSON array with properly contextualized topics:
 [
-  {{"id": 1, "name": "Topic Name", "isActive": true}}
+  {{"id": 1, "name": "Topic Name", "isActive": true, "context": "Optional Context"}}
 ]
 
 IMPORTANT RULES:
-- Extract ONLY the main topics explicitly mentioned by the user
-- Do NOT break topics into sub-topics or components  
-- Do NOT add related topics not mentioned by the user
-- Keep topic names simple and direct (1-2 words when possible)
-- Maximum 4 topics per response (rate limit enforcement)
-- If user mentions more than 4 topics, pick the 4 most important ones
-- If user says "arrays, strings" return exactly 2 topics: "Arrays" and "Strings"
-- If user says "JavaScript" return exactly 1 topic: "JavaScript"
-- If user says "Python data structures" return exactly 1 topic: "Python Data Structures"
-- Return JSON only, no explanations"""
+- Understand relationships between topics and technologies
+- If user specifies "X in Y" (e.g. "DSA in C++"), combine them as one topic
+- Keep the primary learning focus intact
+- Maximum 4 topics total
+- Preserve technological context in topic names
+
+Examples:
+- "learn DSA in C++" → [{{id: 1, name: "Data Structures and Algorithms in C++", isActive: true}}]
+- "create course on arrays and strings in java" → [{{id: 1, name: "Java Arrays", isActive: true}}, {{id: 2, name: "Java Strings", isActive: true}}]
+- "python for web development" → [{{id: 1, name: "Python Web Development", isActive: true}}]
+
+Return only the JSON array, no explanations."""
         
         try:
             # Call Gemini API

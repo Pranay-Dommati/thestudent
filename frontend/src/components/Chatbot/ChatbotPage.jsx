@@ -12,6 +12,60 @@ import AuthModal from '../Common/AuthModal';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
 
+// Extract learning context from user's prompt
+const extractLearningContext = (prompt) => {
+  if (!prompt) return '';
+  
+  // Common programming languages and technologies
+  const techKeywords = [
+    'python', 'javascript', 'java', 'c\\+\\+', 'typescript', 'ruby', 'php', 'golang', 'rust',
+    'react', 'angular', 'vue', 'node\\.?js', 'django', 'flask', 'spring', 'express'
+  ].join('|');
+
+  const contextPatterns = [
+    // Programming language context
+    { 
+      regex: new RegExp(`\\b(?:in|using|with|for)\\s+(${techKeywords})\\b`, 'i'),
+      type: 'language',
+      format: (match) => `Using ${match[1].toUpperCase()}`
+    },
+    // Learning style context
+    {
+      regex: /\b(?:beginner|intermediate|advanced|new to|experienced in)\s+([^.!?,]+)/i,
+      type: 'level',
+      format: (match) => `Level: ${match[1].trim()}`
+    },
+    // Purpose/goal context
+    {
+      regex: /\b(?:for|to|focus on)\s+([\w\s]+(?:development|engineering|programming|coding))/i,
+      type: 'purpose',
+      format: (match) => `Purpose: ${match[1].trim()}`
+    },
+    // Specific preferences
+    {
+      regex: /\bprefer\s+([^.!?,]+)/i,
+      type: 'preference',
+      format: (match) => `Preference: ${match[1].trim()}`
+    }
+  ];
+
+  const contexts = [];
+  contextPatterns.forEach(pattern => {
+    const match = prompt.match(pattern.regex);
+    if (match) {
+      contexts.push(pattern.format(match));
+    }
+  });
+
+  // Handle "X in Y" pattern specially for combining topics
+  const inMatch = prompt.match(/\b(\w+(?:\s+\w+)*)\s+in\s+(${techKeywords})\b/i);
+  if (inMatch) {
+    contexts.push(`Topic: ${inMatch[1]} in ${inMatch[2].toUpperCase()}`);
+  }
+
+  return contexts.join(' • ');
+};
+
 // Simple Gemini API call for regular chat
 const callGeminiAPI = async (message) => {
   const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -466,6 +520,7 @@ const ChatbotPage = () => {
   const [originalPrompt, setOriginalPrompt] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [usageStats, setUsageStats] = useState(null); // Track rate limit usage stats
+  const [learningContext, setLearningContext] = useState(""); // Store learning preferences and context
   const [chatHistory, setChatHistory] = useState([
     {
       id: 1,
@@ -868,7 +923,19 @@ const ChatbotPage = () => {
     }
 
     try {
-      // Call the new backend endpoint to actually create the course with rate limiting
+      // First show an AI thinking message
+      const thinkingResponse = {
+        id: chatHistory.length + 1,
+        type: "bot",
+        content: "🤔 Let me analyze your learning context to create a personalized course plan...",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      setChatHistory(prev => [...prev, thinkingResponse]);
+
+      // Extract context from original prompt
+      const learningContext = extractLearningContext(originalPrompt);
+      
+      // Call the new backend endpoint with context
       const token = localStorage.getItem('token');
       const response = await fetch('/ai/create-course-topics/', {
         method: 'POST',
@@ -877,7 +944,9 @@ const ChatbotPage = () => {
           ...(token && { 'Authorization': `Bearer ${token}` })
         },
         body: JSON.stringify({
-          topics: pendingTopics
+          topics: pendingTopics,
+          learningContext: learningContext,
+          originalPrompt: originalPrompt
         })
       });
 
@@ -1526,23 +1595,34 @@ const ChatbotPage = () => {
                         
                         <div className="space-y-2 mb-4">
                           {pendingTopics.map((topic, index) => (
-                            <div key={topic.id || index} className="flex items-center bg-white/80 backdrop-blur-sm rounded-lg p-2 border border-white/30">
-                              <span className="text-indigo-500 mr-2 font-bold">{index + 1}.</span>
-                              <input
-                                type="text"
-                                value={topic.name}
-                                onChange={(e) => handleTopicEdit(index, e.target.value)}
-                                className="flex-1 px-2 py-1 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                              />
-                              <button
-                                onClick={() => handleTopicDelete(index)}
-                                className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded transition-colors backdrop-blur-sm"
-                                title="Delete topic"
-                              >
-                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                </svg>
-                              </button>
+                            <div key={topic.id || index} className="space-y-1">
+                              <div className="flex items-center bg-white/80 backdrop-blur-sm rounded-lg p-2 border border-white/30">
+                                <span className="text-indigo-500 mr-2 font-bold">{index + 1}.</span>
+                                <div className="flex-1 flex flex-col">
+                                  <input
+                                    type="text"
+                                    value={topic.name}
+                                    onChange={(e) => handleTopicEdit(index, e.target.value)}
+                                    className="w-full px-2 py-1 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                  />
+                                  {topic.context && (
+                                    <div className="mt-1 ml-2">
+                                      <span className="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                                        {topic.context}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => handleTopicDelete(index)}
+                                  className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded transition-colors backdrop-blur-sm"
+                                  title="Delete topic"
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1561,6 +1641,28 @@ const ChatbotPage = () => {
                             : `+ Add New Topic (${pendingTopics.length}/4)`
                           }
                         </button>
+
+                        {/* Learning Context Section */}
+                        <div className="mb-4 p-4 bg-white/80 backdrop-blur-sm rounded-lg border border-indigo-100">
+                          <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                            🎯 Learning Preferences
+                          </h4>
+                          <p className="text-xs text-gray-500 mb-3">
+                            I've analyzed your request and detected these learning preferences. Feel free to modify or add more context.
+                          </p>
+                          <div className="space-y-2">
+                            <div className="flex items-start">
+                              <span className="text-indigo-500 mr-2">📌</span>
+                              <textarea
+                                value={learningContext || extractLearningContext(originalPrompt)}
+                                onChange={(e) => setLearningContext(e.target.value)}
+                                placeholder="E.g., 'I want to learn DSA using Java' or 'I prefer practical examples'"
+                                className="flex-1 p-2 text-sm bg-white/90 border border-gray-200 rounded resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                rows={2}
+                              />
+                            </div>
+                          </div>
+                        </div>
                         
                         <div className="flex gap-2">
                           <button
