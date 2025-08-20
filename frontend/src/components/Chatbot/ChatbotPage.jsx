@@ -1642,28 +1642,7 @@ const ChatbotPage = () => {
                           }
                         </button>
 
-                        {/* Learning Context Section */}
-                        <div className="mb-4 p-4 bg-white/80 backdrop-blur-sm rounded-lg border border-indigo-100">
-                          <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                            🎯 Learning Preferences
-                          </h4>
-                          <p className="text-xs text-gray-500 mb-3">
-                            I've analyzed your request and detected these learning preferences. Feel free to modify or add more context.
-                          </p>
-                          <div className="space-y-2">
-                            <div className="flex items-start">
-                              <span className="text-indigo-500 mr-2">📌</span>
-                              <textarea
-                                value={learningContext || extractLearningContext(originalPrompt)}
-                                onChange={(e) => setLearningContext(e.target.value)}
-                                placeholder="E.g., 'I want to learn DSA using Java' or 'I prefer practical examples'"
-                                className="flex-1 p-2 text-sm bg-white/90 border border-gray-200 rounded resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                rows={2}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        
+
                         <div className="flex gap-2">
                           <button
                             onClick={handleTopicConfirm}
