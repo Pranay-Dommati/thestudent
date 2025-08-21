@@ -2927,8 +2927,12 @@ const ProLearningPage = () => {
   return (
     <>
       <Navbar initialStyle="light" />
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      <div className="bg-gradient-to-br from-gray-50 via-white to-blue-50">
         <style>{`
+          body {
+            background: linear-gradient(to bottom right, #f9fafb, #ffffff, #eff6ff);
+            min-height: 100vh;
+          }
           .scrollbar-hide {
             -ms-overflow-style: none;
             scrollbar-width: none;
@@ -2971,14 +2975,14 @@ const ProLearningPage = () => {
       {/* <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50"> ... </header> */}
 
       {/* Main Content with Sidebar Layout */}
-      <div className="min-h-screen relative">
+      <div className="relative">
         {/* Main Content Area */}
-        <div className={`transition-all duration-300 min-h-screen ${
+        <div className={`transition-all duration-300 ${
           sidebarVisible 
             ? 'lg:mr-[400px]' // Add right margin on large screens when sidebar is visible
             : ''
         }`}>
-          <div className="w-full px-0 lg:px-6 py-0 lg:pt-24 lg:pb-4 max-w-full overflow-x-hidden">{/* Remove mobile padding for edge-to-edge design, add more top padding for desktop */}
+          <div className="w-full px-0 lg:px-6 py-0 lg:pt-20 lg:pb-4 max-w-full overflow-x-hidden">{/* Remove mobile padding for edge-to-edge design, add enough top padding for desktop to clear navbar */}
               {/* Enhanced Tab Navigation - Desktop Only */}
               <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border mb-6 hidden lg:block overflow-hidden">
                 <div className="p-2">
