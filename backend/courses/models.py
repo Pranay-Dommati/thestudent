@@ -102,7 +102,7 @@ class Lesson(models.Model):
     section = models.ForeignKey(CourseSection, on_delete=models.CASCADE, related_name='lessons', null=True, blank=True)
     title = models.CharField(max_length=255)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='video')
-    video_url = models.URLField(blank=True)
+    video_url = models.URLField(blank=True, max_length=500)
     description = models.TextField(blank=True)
     about_lesson = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=0)
@@ -123,7 +123,7 @@ class LessonResource(models.Model):
     type = models.CharField(max_length=20, choices=RESOURCE_TYPE_CHOICES)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    url = models.URLField(blank=True)
+    url = models.URLField(blank=True, max_length=500)
     file = models.FileField(upload_to='lesson_resources/', null=True, blank=True)
     
     def __str__(self):
@@ -284,7 +284,7 @@ class ProLearningVideo(models.Model):
         related_name='videos'
     )
     title = models.CharField(max_length=255)
-    video_url = models.URLField()  # YouTube or other video URLs
+    video_url = models.URLField(max_length=500)  # YouTube or other video URLs
     description = models.TextField(blank=True, null=True)
     duration = models.CharField(max_length=20, blank=True, null=True)  # e.g., "10:30"
     order = models.PositiveIntegerField(default=0)
@@ -358,7 +358,7 @@ class ProLearningResource(models.Model):
     )
     title = models.CharField(max_length=255)
     resource_type = models.CharField(max_length=20, choices=RESOURCE_TYPES, default='link')
-    url = models.URLField()
+    url = models.URLField(max_length=500)
     description = models.TextField(blank=True, null=True)
     order = models.PositiveIntegerField(default=0)
     
