@@ -67,10 +67,10 @@ const MobileNavigation = ({ showSearch = true, showNotifications = true }) => {
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-sm">S</span>
+                <span className="text-white font-bold text-sm">E</span>
               </div>
               <span className="font-bold text-lg bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                StudentsHub
+                EasyLearnova
               </span>
             </Link>
 
@@ -174,7 +174,7 @@ const MobileNavigation = ({ showSearch = true, showNotifications = true }) => {
                         <span className="text-white font-bold">S</span>
                       </div>
                       <div>
-                        <div className="font-bold text-gray-900">StudentsHub</div>
+                        <div className="font-bold text-gray-900">EasyLearnova</div>
                         <div className="text-sm text-gray-600">Your learning companion</div>
                       </div>
                     </>
@@ -232,7 +232,7 @@ const MobileNavigation = ({ showSearch = true, showNotifications = true }) => {
               {/* App Version */}
               <div className="mt-6 pt-4 border-t border-gray-200 text-center">
                 <div className="text-xs text-gray-500">
-                  StudentsHub v2.0
+                  EasyLearnova v2.0
                   <br />
                   Made with ❤️ for students
                 </div>

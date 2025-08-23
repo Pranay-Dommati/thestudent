@@ -170,7 +170,7 @@ const Footer = () => {
 
         {/* Copyright */}
         <p className="text-gray-400 text-sm mt-4">
-          © {new Date().getFullYear()} Students Hub. Empowering learners worldwide.
+          © {new Date().getFullYear()} EasyLearnova. Empowering learners worldwide.
         </p>
       </div>
     </footer>

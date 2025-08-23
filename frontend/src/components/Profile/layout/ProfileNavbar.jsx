@@ -30,7 +30,7 @@ const ProfileNavbar = ({ isDarkMode, profileData, setActiveTab }) => {
           >
             <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">S</div>
             <span className={`font-bold text-xl ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-              Students Hub
+              EasyLearnova
             </span>
           </Link>
         </div>

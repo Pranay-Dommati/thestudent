@@ -9,10 +9,10 @@ const AuthNav = () => {
           {/* Logo Section */}
           <Link to="/" className="flex items-center space-x-2 group">
             <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg transition-transform group-hover:scale-110">
-              S
+              E
             </div>
             <span className="font-bold text-lg bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-              Students Hub
+              EasyLearnova
             </span>
           </Link>
 

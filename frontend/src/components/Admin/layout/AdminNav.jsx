@@ -13,7 +13,7 @@ const AdminNav = ({ onLogout, isLoginPage, isDarkMode }) => {
                 S
               </div>
               <span className={`font-bold text-base sm:text-lg ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                Students Hub
+                EasyLearnova
               </span>
             </Link>          </div>
 

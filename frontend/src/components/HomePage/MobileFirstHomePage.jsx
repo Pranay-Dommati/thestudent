@@ -327,7 +327,7 @@ const MobileFirstHomePage = () => {
                 Ready to Start Learning?
               </h3>
               <p className="text-gray-600 text-sm mb-6">
-                Join thousands of students already learning with StudentsHub
+                Join thousands of students already learning with EasyLearnova
               </p>
               <div className="space-y-3">
                 <Link 

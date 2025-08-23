@@ -547,7 +547,7 @@ def send_password_reset_email(user_email, uid, token):
         reset_url = f"{frontend_domain}/reset-password/{uid}/{token}"
         
         # Email content
-        subject = "Password Reset Request - Students Hub"
+        subject = "Password Reset Request - EasyLearnova"
         
         html_content = f"""
         <!DOCTYPE html>
@@ -565,22 +565,22 @@ def send_password_reset_email(user_email, uid, token):
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>🎓 Students Hub</h1>
+                    <h1>🎓 EasyLearnova</h1>
                     <h2>Password Reset Request</h2>
                 </div>
                 <div class="content">
                     <p>Hello!</p>
-                    <p>We received a request to reset your password for your Students Hub account.</p>
+                    <p>We received a request to reset your password for your EasyLearnova account.</p>
                     <p>Click the button below to reset your password:</p>
                     <a href="{reset_url}" class="button">Reset Password</a>
                     <p>Or copy and paste this link in your browser:</p>
                     <p style="word-break: break-all; background: #e9e9e9; padding: 10px; border-radius: 5px;">{reset_url}</p>
                     <p><strong>Important:</strong> This link will expire in 1 hour for security reasons.</p>
                     <p>If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
-                    <p>Best regards,<br>The Students Hub Team</p>
+                    <p>Best regards,<br>The EasyLearnova Team</p>
                 </div>
                 <div class="footer">
-                    <p>© 2025 Students Hub. Empowering learners worldwide.</p>
+                    <p>© 2025 EasyLearnova. Empowering learners worldwide.</p>
                 </div>
             </div>
         </body>

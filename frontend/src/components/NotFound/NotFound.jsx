@@ -44,7 +44,7 @@ const NotFound = () => {
             <div className="flex items-center">
               <Link to="/" className="flex items-center space-x-2">
                 <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl">S</div>
-                <span className="font-bold text-lg sm:text-xl text-white">Students Hub</span>
+                <span className="font-bold text-lg sm:text-xl text-white">EasyLearnova</span>
               </Link>
             </div>
             <div className="hidden md:flex items-center justify-center flex-1 max-w-[600px]">
