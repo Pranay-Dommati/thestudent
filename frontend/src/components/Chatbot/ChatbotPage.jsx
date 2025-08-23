@@ -110,6 +110,7 @@ const callVectorBotAPI = async (message) => {
     console.log('📥 API Response ok:', response.ok);
 
     if (!response.ok) {
+      // Non-network/server error; bubble up as a normal error
       throw new Error(`Vector bot API error: ${response.status}`);
     }
 
@@ -122,8 +123,19 @@ const callVectorBotAPI = async (message) => {
     return data.response || 'Sorry, I could not generate a response.';
   } catch (error) {
     console.error('❌ Vector bot API error:', error);
-    // Fallback to basic educational response
-    return "I'm here to help with your studies! I can assist with math, science, history, English, computer science, and study techniques. What would you like to learn about?";
+    // If it's a network failure (fetch TypeError/Failed to fetch), throw a special error
+    const isNetworkFailure =
+      error?.name === 'TypeError' ||
+      (typeof error?.message === 'string' && /Failed to fetch|NetworkError|Network request failed/i.test(error.message));
+
+    if (isNetworkFailure) {
+      const netErr = new Error('Network connection error');
+      netErr.name = 'NetworkConnectionError';
+      throw netErr;
+    }
+
+    // Otherwise, rethrow to be handled by the caller
+    throw error;
   }
 };
 
@@ -1218,31 +1230,121 @@ const ChatbotPage = () => {
         }
       } else {
         // Regular chatbot response using vector bot for educational topics
+        console.log('🔄 Preparing to call vector bot API...');
+
+        // If the device is offline, use the network-lost UX instead of calling the local API
+        if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+          setLastFailedPrompt(messageToSend);
+          setNetworkRetryCount(0);
+
+          const networkLoadingResponse = {
+            id: generateMessageId(),
+            type: "bot",
+            content: "🌐 **Network connection lost. Attempting to reconnect...**",
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            isNetworkError: true,
+            isReconnecting: true,
+          };
+          setChatHistory((prev) => [...prev, networkLoadingResponse]);
+
+          const timeoutId = setTimeout(() => {
+            if (cancelledRetriesRef.current.has(networkLoadingResponse.id)) {
+              delete networkErrorTimeouts.current[networkLoadingResponse.id];
+              return;
+            }
+            setChatHistory((prev) => 
+              prev.map(msg => 
+                msg.id === networkLoadingResponse.id 
+                  ? {
+                      ...msg,
+                      content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
+                      isReconnecting: false,
+                      showRetryButton: msg.isRetryDisabled ? false : true
+                    }
+                  : msg
+              )
+            );
+            delete networkErrorTimeouts.current[networkLoadingResponse.id];
+          }, 8000);
+          networkErrorTimeouts.current[networkLoadingResponse.id] = timeoutId;
+          // Avoid global loading spinner during retry UX
+          setIsLoading(false);
+          return;
+        }
+
         console.log('🔄 Calling vector bot API...');
-        const response = await callVectorBotAPI(messageToSend);
-        
-        console.log("📨 Vector bot response received:");
-        console.log("📨 Response type:", typeof response);
-        console.log("📨 Response value:", response);
-        console.log("📨 Response length:", response ? response.length : 0);
-        console.log("📨 Is response truthy:", !!response);
+        try {
+          const response = await callVectorBotAPI(messageToSend);
+          
+          console.log("📨 Vector bot response received:");
+          console.log("📨 Response type:", typeof response);
+          console.log("📨 Response value:", response);
+          console.log("📨 Response length:", response ? response.length : 0);
+          console.log("📨 Is response truthy:", !!response);
 
-        const botResponse = {
-          id: generateMessageId(),
-          type: "bot",
-          content: typeof response === 'string' ? response : String(response),
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        };
+          const botResponse = {
+            id: generateMessageId(),
+            type: "bot",
+            content: typeof response === 'string' ? response : String(response),
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          };
 
-        console.log("📨 Bot response object:", botResponse);
-        console.log("📨 Bot response content:", botResponse.content);
-        console.log("📨 Bot response content length:", botResponse.content.length);
+          console.log("📨 Bot response object:", botResponse);
+          console.log("📨 Bot response content:", botResponse.content);
+          console.log("📨 Bot response content length:", botResponse.content.length);
 
-        setChatHistory((prev) => {
-          const newHistory = [...prev, botResponse];
-          console.log("📨 New chat history:", newHistory);
-          return newHistory;
-        });
+          setChatHistory((prev) => {
+            const newHistory = [...prev, botResponse];
+            console.log("📨 New chat history:", newHistory);
+            return newHistory;
+          });
+        } catch (error) {
+          // Handle network failures with the same UX as course creation mode
+          if (error.name === 'NetworkConnectionError') {
+            setLastFailedPrompt(messageToSend);
+            setNetworkRetryCount(0);
+
+            const networkLoadingResponse = {
+              id: generateMessageId(),
+              type: "bot",
+              content: "🌐 **Network connection lost. Attempting to reconnect...**",
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              isNetworkError: true,
+              isReconnecting: true,
+            };
+            setChatHistory((prev) => [...prev, networkLoadingResponse]);
+
+            const timeoutId = setTimeout(() => {
+              if (cancelledRetriesRef.current.has(networkLoadingResponse.id)) {
+                delete networkErrorTimeouts.current[networkLoadingResponse.id];
+                return;
+              }
+              setChatHistory((prev) => 
+                prev.map(msg => 
+                  msg.id === networkLoadingResponse.id 
+                    ? {
+                        ...msg,
+                        content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
+                        isReconnecting: false,
+                        showRetryButton: msg.isRetryDisabled ? false : true
+                      }
+                    : msg
+                )
+              );
+              delete networkErrorTimeouts.current[networkLoadingResponse.id];
+            }, 8000);
+            networkErrorTimeouts.current[networkLoadingResponse.id] = timeoutId;
+          } else {
+            // Non-network error: show a generic failure message (let outer finally clear loading)
+            const errorResponse = {
+              id: generateMessageId(),
+              type: "bot",
+              content: `Sorry, I couldn't process your request. ${error.message || ''}`,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+            setChatHistory((prev) => [...prev, errorResponse]);
+          }
+        }
       }
     } catch (error) {
       console.error("Error in chat:", error);
