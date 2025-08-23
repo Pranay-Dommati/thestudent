@@ -11,7 +11,7 @@ from .topics import handle_topics
 from .rate_limiter import check_topic_rate_limit, record_topic_creation
 import json
 import logging
-from .ai_service import call_gemini_api
+from .ai_service import call_gemini_api, NetworkError
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -229,6 +229,16 @@ Return only the JSON array, no explanations."""
                 return JsonResponse({
                     'topics': fallback_topics
                 })
+                
+        except NetworkError as network_error:
+            logger.warning(f"Network connection error: {network_error}")
+            # Return specific network error response
+            return JsonResponse({
+                'error': 'network_error',
+                'message': 'Network connection lost. Attempting to reconnect...',
+                'details': str(network_error),
+                'retry_suggested': True
+            }, status=503)  # Service Unavailable
                 
         except Exception as api_error:
             logger.error(f"Gemini API error: {api_error}")

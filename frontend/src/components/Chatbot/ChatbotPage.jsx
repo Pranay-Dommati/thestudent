@@ -110,6 +110,7 @@ const callVectorBotAPI = async (message) => {
     console.log('📥 API Response ok:', response.ok);
 
     if (!response.ok) {
+      // Non-network/server error; bubble up as a normal error
       throw new Error(`Vector bot API error: ${response.status}`);
     }
 
@@ -122,8 +123,19 @@ const callVectorBotAPI = async (message) => {
     return data.response || 'Sorry, I could not generate a response.';
   } catch (error) {
     console.error('❌ Vector bot API error:', error);
-    // Fallback to basic educational response
-    return "I'm here to help with your studies! I can assist with math, science, history, English, computer science, and study techniques. What would you like to learn about?";
+    // If it's a network failure (fetch TypeError/Failed to fetch), throw a special error
+    const isNetworkFailure =
+      error?.name === 'TypeError' ||
+      (typeof error?.message === 'string' && /Failed to fetch|NetworkError|Network request failed/i.test(error.message));
+
+    if (isNetworkFailure) {
+      const netErr = new Error('Network connection error');
+      netErr.name = 'NetworkConnectionError';
+      throw netErr;
+    }
+
+    // Otherwise, rethrow to be handled by the caller
+    throw error;
   }
 };
 
@@ -521,6 +533,14 @@ const ChatbotPage = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [usageStats, setUsageStats] = useState(null); // Track rate limit usage stats
   const [learningContext, setLearningContext] = useState(""); // Store learning preferences and context
+  const [networkRetryCount, setNetworkRetryCount] = useState(0); // Track network retry attempts
+  const [lastFailedPrompt, setLastFailedPrompt] = useState(""); // Store last failed prompt for retry
+  const [retryingMessageId, setRetryingMessageId] = useState(null); // Track which specific message is being retried
+  const networkErrorTimeouts = useRef({}); // Store timeout IDs for network error messages
+  const cancelledRetriesRef = useRef(new Set()); // Track message IDs whose retries were cancelled by a new prompt
+
+  // Generate unique message ID
+  const generateMessageId = () => Date.now() + Math.random();
   const [chatHistory, setChatHistory] = useState([
     {
       id: 1,
@@ -647,6 +667,16 @@ const ChatbotPage = () => {
     setIsSidebarOpen(false);
   }, [width]);
 
+  // Cleanup network error timeouts on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all network error timeouts when component unmounts
+      Object.values(networkErrorTimeouts.current).forEach(timeoutId => {
+        clearTimeout(timeoutId);
+      });
+    };
+  }, []);
+
   // Add window resize listener
   useEffect(() => {
     const handleResize = () => {
@@ -657,12 +687,326 @@ const ChatbotPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Function to check actual connection to the backend
+  const checkConnection = async () => {
+    try {
+      // Try hitting the backend API to verify connection
+      const response = await fetch('/ai/classify_topics/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: 'test connection',
+          expectedTopics: 1
+        })
+      });
+      
+      // Only consider it successful if we get a 200-299 response
+      // 503 (Service Unavailable) means network/server issues
+      if (response.ok) {
+        console.log('✅ Connection check passed:', response.status);
+        return true;
+      } else {
+        console.log('❌ Connection check failed with status:', response.status);
+        return false;
+      }
+    } catch (error) {
+      console.log('❌ Connection check failed with error:', error);
+      return false;
+    }
+  };
+
+  // Retry function for network errors
+  const retryLastRequest = async (messageId = null) => {
+    if (!lastFailedPrompt || isLoading) return;
+    
+    const promptToRetry = lastFailedPrompt;
+    setNetworkRetryCount(prev => prev + 1);
+    setRetryingMessageId(messageId);
+    // Don't set loading state during retry - we show loading in the specific message
+    // Clear any previous cancellation for this message because user is retrying explicitly
+    if (messageId != null) {
+      cancelledRetriesRef.current.delete(messageId);
+    }
+    
+    // Update only the specific error message to show reconnection attempt
+    setChatHistory((prev) => 
+      prev.map(msg => 
+        msg.id === messageId && msg.isNetworkError && !msg.isReconnecting 
+          ? {
+              ...msg,
+              content: "🌐 **Network connection lost. Attempting to reconnect...**",
+              isReconnecting: true,
+              showRetryButton: false,
+              isRetryDisabled: false
+            }
+          : msg
+      )
+    );
+    
+    // Add a delay to show proper "trying to reconnect" UX
+    // This gives users feedback that we're actually attempting to reconnect
+    await new Promise(resolve => setTimeout(resolve, 3000)); // 3 seconds loading
+    // If a new prompt cancelled this retry in the meantime, stop here
+    if (messageId != null && cancelledRetriesRef.current.has(messageId)) {
+      return;
+    }
+    
+    // First, check if connection is actually working
+    const isConnected = await checkConnection();
+    
+    if (isConnected) {
+      // Connection is working - proceed directly to API call
+      try {
+        // Clear the failed prompt before retry
+        setLastFailedPrompt(null);
+        
+        // Check if this is a course creation request (pro mode) or regular chat
+        const isProModeRequest = proMode;
+        
+        if (isProModeRequest) {
+          // This is a course creation request - call the classification API directly
+          console.log('🚀 Retrying topic extraction for:', promptToRetry);
+          const result = await classifyTopics(promptToRetry);
+          console.log('✅ AI Extracted Topics on retry:', result);
+          
+          // Update usage stats from the response
+          if (result.usage_stats) {
+            setUsageStats(result.usage_stats);
+          }
+          
+          const extractedTopics = result.topics || [];
+          
+          if (extractedTopics && extractedTopics.length > 0) {
+            // Handle rate limiting logic (same as in handleSendMessage)
+            let availableTopics = extractedTopics;
+            const maxPerRequest = 4;
+            
+            if (usageStats) {
+              const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
+              const maxPerRequestFromStats = usageStats.per_request_limit || 4;
+              const maxAllowedTopics = Math.min(remainingToday, maxPerRequestFromStats);
+              
+              if (extractedTopics.length > maxAllowedTopics) {
+                availableTopics = extractedTopics.slice(0, maxAllowedTopics);
+              }
+            } else if (extractedTopics.length > maxPerRequest) {
+              availableTopics = extractedTopics.slice(0, maxPerRequest);
+            }
+            
+            if (availableTopics.length === 0) {
+              // Replace network error with limit message
+              setChatHistory((prev) => 
+                prev.map(msg => 
+                  msg.id === messageId 
+                    ? {
+                        ...msg,
+                        content: "❌ You've reached your daily topic creation limit. Please try again tomorrow.",
+                        isNetworkError: false,
+                        isReconnecting: false,
+                        showRetryButton: false
+                      }
+                    : msg
+                )
+              );
+            } else {
+              // Remove the network error message and show topic confirmation
+              setChatHistory((prev) => prev.filter(msg => msg.id !== messageId));
+              
+              // Set up the topic confirmation dialog
+              setPendingTopics(availableTopics);
+              setOriginalPrompt(promptToRetry);
+              setShowTopicConfirmation(true);
+            }
+          } else {
+            // No topics extracted - replace with error message
+            setChatHistory((prev) => 
+              prev.map(msg => 
+                msg.id === messageId 
+                  ? {
+                      ...msg,
+                      content: "❌ I couldn't extract any learning topics from your query. Please try to be more specific about what you'd like to learn (e.g., 'JavaScript arrays and functions', 'Python data structures', etc.)",
+                      isNetworkError: false,
+                      isReconnecting: false,
+                      showRetryButton: false
+                    }
+                  : msg
+              )
+            );
+          }
+        } else {
+          // This is a regular chat request - call the vector bot API directly
+          const response = await callVectorBotAPI(promptToRetry);
+          
+          // Replace the network error message with the bot response
+          setChatHistory((prev) => 
+            prev.map(msg => 
+              msg.id === messageId 
+                ? {
+                    ...msg,
+                    content: response,
+                    isNetworkError: false,
+                    isReconnecting: false,
+                    showRetryButton: false
+                  }
+                : msg
+            )
+          );
+        }
+        
+        // Clean up retry state after successful request
+        
+      } catch (error) {
+        // Even though connection check passed, the actual request failed
+        console.log('Request failed despite connection check:', error);
+        
+        // Handle different types of errors
+        if (error.isRateLimit) {
+          const rateLimitMessage = formatRateLimitMessage(error);
+          setChatHistory((prev) => 
+            prev.map(msg => 
+              msg.id === messageId && msg.isNetworkError 
+                ? {
+                    ...msg,
+                    content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 16 topics per day\n\nPlease try again later or contact support if you need higher limits.`,
+                    isNetworkError: false,
+                    isReconnecting: false,
+                    showRetryButton: false,
+                    isRateLimitError: true
+                  }
+                : msg
+            )
+          );
+  } else {
+          setChatHistory((prev) => 
+            prev.map(msg => 
+              msg.id === messageId && msg.isNetworkError 
+                ? {
+                    ...msg,
+                    content: "🌐 **Request failed. Please try again.**\n\nThe connection is working but the request encountered an error. This might be a temporary issue.\n\nPlease try again in a moment.",
+                    isReconnecting: false,
+        // only show when not cancelled/disabled
+        showRetryButton: cancelledRetriesRef.current.has(messageId) || msg.isRetryDisabled ? false : true
+                  }
+                : msg
+            )
+          );
+          
+          // Restore the failed prompt for another retry
+          setLastFailedPrompt(promptToRetry);
+        }
+        
+        // Clean up retry state after error handling
+        
+  setChatHistory((prev) => 
+          prev.map(msg => 
+            msg.id === messageId && msg.isNetworkError 
+              ? {
+                  ...msg,
+                  content: "🌐 **Request failed. Please try again.**\n\nThe connection is working but the request encountered an error. This might be a temporary issue.\n\nPlease try again in a moment.",
+                  isReconnecting: false,
+      showRetryButton: cancelledRetriesRef.current.has(messageId) || msg.isRetryDisabled ? false : true
+                }
+              : msg
+          )
+        );
+        
+        // Restore the failed prompt for another retry
+        setLastFailedPrompt(promptToRetry);
+      }
+    } else {
+      // Connection is still not working
+  setChatHistory((prev) => 
+        prev.map(msg => 
+          msg.id === messageId && msg.isNetworkError 
+            ? {
+                ...msg,
+                content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
+                isReconnecting: false,
+        showRetryButton: cancelledRetriesRef.current.has(messageId) || msg.isRetryDisabled ? false : true
+              }
+            : msg
+        )
+      );
+      
+      // Restore the failed prompt for another retry
+      setLastFailedPrompt(promptToRetry);
+      
+      // Restore the failed prompt for another retry
+      setLastFailedPrompt(promptToRetry);
+    }
+    
+    // Clean up retry state
+    setRetryingMessageId(null);
+  };
+
   const handleSendMessage = async (customMessage = null) => {
     const messageToSend = customMessage || message;
     if (!messageToSend.trim() || isLoading) return;
 
+    // Hide all retry buttons (but keep messages) when a new prompt is sent
+    setChatHistory((prev) => 
+      prev.map(msg => {
+        if (msg.isNetworkError) {
+          // mark this retry as cancelled and disable button permanently for this error instance
+          cancelledRetriesRef.current.add(msg.id);
+          // Clear timeout for this message if it exists
+          if (networkErrorTimeouts.current[msg.id]) {
+            clearTimeout(networkErrorTimeouts.current[msg.id]);
+            delete networkErrorTimeouts.current[msg.id];
+          }
+          return { ...msg, showRetryButton: false, isRetryDisabled: true, isReconnecting: false };
+        }
+        return msg;
+      })
+    );
+
+    // If topic confirmation is open and user sends a new message, automatically cancel it
+    if (showTopicConfirmation && !customMessage) {
+      // Add cancellation message to chat history
+      const cancellationMessage = {
+        id: chatHistory.length + 1,
+        type: "bot",
+        content: "❌ **Course creation cancelled** - Processing your new request instead.",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        isCancellation: true,
+      };
+      
+      setChatHistory((prev) => [...prev, cancellationMessage]);
+      
+      // Cancel the current topic confirmation
+      setShowTopicConfirmation(false);
+      setPendingTopics([]);
+      setOriginalPrompt("");
+    }
+
+    // Cancel any ongoing reconnection attempts as well (redundant safety)
+    setChatHistory((prev) => 
+      prev.map(msg => {
+        if (msg.isNetworkError && msg.isReconnecting) {
+          cancelledRetriesRef.current.add(msg.id);
+          if (networkErrorTimeouts.current[msg.id]) {
+            clearTimeout(networkErrorTimeouts.current[msg.id]);
+            delete networkErrorTimeouts.current[msg.id];
+          }
+          return {
+            ...msg,
+            content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
+            isReconnecting: false,
+            showRetryButton: false,
+            isRetryDisabled: true
+          };
+        }
+        return msg;
+      })
+    );
+
+    // Clear any ongoing retry state
+    setRetryingMessageId(null);
+
     const userMessageObj = {
-      id: chatHistory.length + 1,
+      id: generateMessageId(),
       type: "user",
       content: messageToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -799,14 +1143,7 @@ const ChatbotPage = () => {
             setOriginalPrompt(messageToSend);
             setShowTopicConfirmation(true);
             
-            const confirmationResponse = {
-              id: chatHistory.length + 2,
-              type: "bot",
-              content: `🤔 I've analyzed your query "${messageToSend}" and extracted ${availableTopics.length} learning topic(s). ${limitMessage} Please review and confirm the topics you'd like to include in your course.`,
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              isTopicConfirmation: true,
-            };
-            setChatHistory((prev) => [...prev, confirmationResponse]);
+            // No need for redundant analysis message - the topic confirmation dialog is self-explanatory
           } else {
             // No topics extracted - show error
             const errorResponse = {
@@ -820,8 +1157,51 @@ const ChatbotPage = () => {
         } catch (error) {
           console.error('❌ Topic extraction failed:', error);
           
-          // Handle rate limiting specifically
-          if (error.isRateLimit) {
+          // Handle network connection errors specifically (like ChatGPT)
+          if (error.name === 'NetworkConnectionError') {
+            // Store failed prompt for potential retry
+            setLastFailedPrompt(messageToSend);
+            setNetworkRetryCount(0);
+            
+            // Show initial loading message
+            const networkLoadingResponse = {
+              id: generateMessageId(),
+              type: "bot",
+              content: "🌐 **Network connection lost. Attempting to reconnect...**",
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              isNetworkError: true,
+              isReconnecting: true,
+            };
+            setChatHistory((prev) => [...prev, networkLoadingResponse]);
+            
+            // Try to reconnect for 8 seconds, then show failure message
+            const timeoutId = setTimeout(() => {
+              // if this retry was cancelled or disabled, skip re-enabling the button
+              if (cancelledRetriesRef.current.has(networkLoadingResponse.id)) {
+                delete networkErrorTimeouts.current[networkLoadingResponse.id];
+                return;
+              }
+              // Update the message to show connection failed
+              setChatHistory((prev) => 
+                prev.map(msg => 
+                  msg.id === networkLoadingResponse.id 
+                    ? {
+                        ...msg,
+                        content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
+                        isReconnecting: false,
+                        // only show button when not disabled explicitly
+                        showRetryButton: msg.isRetryDisabled ? false : true
+                      }
+                    : msg
+                )
+              );
+              // Remove the timeout ID from the ref after it's executed
+              delete networkErrorTimeouts.current[networkLoadingResponse.id];
+            }, 8000); // 8 seconds timeout
+            
+            // Store the timeout ID in the ref
+            networkErrorTimeouts.current[networkLoadingResponse.id] = timeoutId;
+          } else if (error.isRateLimit) {
             const rateLimitMessage = formatRateLimitMessage(error);
             const rateLimitResponse = {
               id: chatHistory.length + 2,
@@ -850,36 +1230,126 @@ const ChatbotPage = () => {
         }
       } else {
         // Regular chatbot response using vector bot for educational topics
+        console.log('🔄 Preparing to call vector bot API...');
+
+        // If the device is offline, use the network-lost UX instead of calling the local API
+        if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+          setLastFailedPrompt(messageToSend);
+          setNetworkRetryCount(0);
+
+          const networkLoadingResponse = {
+            id: generateMessageId(),
+            type: "bot",
+            content: "🌐 **Network connection lost. Attempting to reconnect...**",
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            isNetworkError: true,
+            isReconnecting: true,
+          };
+          setChatHistory((prev) => [...prev, networkLoadingResponse]);
+
+          const timeoutId = setTimeout(() => {
+            if (cancelledRetriesRef.current.has(networkLoadingResponse.id)) {
+              delete networkErrorTimeouts.current[networkLoadingResponse.id];
+              return;
+            }
+            setChatHistory((prev) => 
+              prev.map(msg => 
+                msg.id === networkLoadingResponse.id 
+                  ? {
+                      ...msg,
+                      content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
+                      isReconnecting: false,
+                      showRetryButton: msg.isRetryDisabled ? false : true
+                    }
+                  : msg
+              )
+            );
+            delete networkErrorTimeouts.current[networkLoadingResponse.id];
+          }, 8000);
+          networkErrorTimeouts.current[networkLoadingResponse.id] = timeoutId;
+          // Avoid global loading spinner during retry UX
+          setIsLoading(false);
+          return;
+        }
+
         console.log('🔄 Calling vector bot API...');
-        const response = await callVectorBotAPI(messageToSend);
-        
-        console.log("📨 Vector bot response received:");
-        console.log("📨 Response type:", typeof response);
-        console.log("📨 Response value:", response);
-        console.log("📨 Response length:", response ? response.length : 0);
-        console.log("📨 Is response truthy:", !!response);
+        try {
+          const response = await callVectorBotAPI(messageToSend);
+          
+          console.log("📨 Vector bot response received:");
+          console.log("📨 Response type:", typeof response);
+          console.log("📨 Response value:", response);
+          console.log("📨 Response length:", response ? response.length : 0);
+          console.log("📨 Is response truthy:", !!response);
 
-        const botResponse = {
-          id: chatHistory.length + 2,
-          type: "bot",
-          content: typeof response === 'string' ? response : String(response),
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        };
+          const botResponse = {
+            id: generateMessageId(),
+            type: "bot",
+            content: typeof response === 'string' ? response : String(response),
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          };
 
-        console.log("📨 Bot response object:", botResponse);
-        console.log("📨 Bot response content:", botResponse.content);
-        console.log("📨 Bot response content length:", botResponse.content.length);
+          console.log("📨 Bot response object:", botResponse);
+          console.log("📨 Bot response content:", botResponse.content);
+          console.log("📨 Bot response content length:", botResponse.content.length);
 
-        setChatHistory((prev) => {
-          const newHistory = [...prev, botResponse];
-          console.log("📨 New chat history:", newHistory);
-          return newHistory;
-        });
+          setChatHistory((prev) => {
+            const newHistory = [...prev, botResponse];
+            console.log("📨 New chat history:", newHistory);
+            return newHistory;
+          });
+        } catch (error) {
+          // Handle network failures with the same UX as course creation mode
+          if (error.name === 'NetworkConnectionError') {
+            setLastFailedPrompt(messageToSend);
+            setNetworkRetryCount(0);
+
+            const networkLoadingResponse = {
+              id: generateMessageId(),
+              type: "bot",
+              content: "🌐 **Network connection lost. Attempting to reconnect...**",
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              isNetworkError: true,
+              isReconnecting: true,
+            };
+            setChatHistory((prev) => [...prev, networkLoadingResponse]);
+
+            const timeoutId = setTimeout(() => {
+              if (cancelledRetriesRef.current.has(networkLoadingResponse.id)) {
+                delete networkErrorTimeouts.current[networkLoadingResponse.id];
+                return;
+              }
+              setChatHistory((prev) => 
+                prev.map(msg => 
+                  msg.id === networkLoadingResponse.id 
+                    ? {
+                        ...msg,
+                        content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
+                        isReconnecting: false,
+                        showRetryButton: msg.isRetryDisabled ? false : true
+                      }
+                    : msg
+                )
+              );
+              delete networkErrorTimeouts.current[networkLoadingResponse.id];
+            }, 8000);
+            networkErrorTimeouts.current[networkLoadingResponse.id] = timeoutId;
+          } else {
+            // Non-network error: show a generic failure message (let outer finally clear loading)
+            const errorResponse = {
+              id: generateMessageId(),
+              type: "bot",
+              content: `Sorry, I couldn't process your request. ${error.message || ''}`,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+            setChatHistory((prev) => [...prev, errorResponse]);
+          }
+        }
       }
     } catch (error) {
       console.error("Error in chat:", error);
       const errorResponse = {
-        id: chatHistory.length + 2,
+        id: generateMessageId(),
         type: "bot",
         content: "Sorry, I couldn't process your request. Please try again later.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1045,7 +1515,7 @@ const ChatbotPage = () => {
     setOriginalPrompt("");
   };
 
-  const MessageBubble = ({ message }) => {
+  const MessageBubble = ({ message, retryLastRequest, setLastFailedPrompt }) => {
     // More specific detection for course content - look for multiple sections with specific course structure
     const isCourseContent = (
       message.content.includes("# ") && 
@@ -1285,6 +1755,32 @@ const ChatbotPage = () => {
               )}
 
               {message.type === "user" && <div className="text-sm lg:text-base">{message.content}</div>}
+
+              {/* Loading spinner for reconnection attempts */}
+              {message.isReconnecting && (
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                  <span className="text-sm text-gray-600">Trying to reconnect...</span>
+                </div>
+              )}
+
+              {/* Retry button for network errors (only after reconnection timeout) */}
+              {message.isNetworkError && message.showRetryButton && !message.isReconnecting && !message.isRetryDisabled && !cancelledRetriesRef.current.has(message.id) && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => {
+                      console.log('🔄 Retry button clicked for message ID:', message.id);
+                      retryLastRequest(message.id);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 bg-white border border-blue-300 hover:border-blue-400 hover:bg-blue-50 text-blue-600 text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Retry Connection
+                  </button>
+                </div>
+              )}
 
               <div className={`text-[10px] lg:text-xs mt-2 ${
                 message.type === "user" 
@@ -1549,7 +2045,12 @@ const ChatbotPage = () => {
               )}
 
               {chatHistory.map((chat) => (
-                <MessageBubble key={chat.id} message={chat} />
+                <MessageBubble 
+                  key={chat.id} 
+                  message={chat} 
+                  retryLastRequest={retryLastRequest}
+                  setLastFailedPrompt={setLastFailedPrompt}
+                />
               ))}
 
               {isLoading && (

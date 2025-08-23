@@ -63,7 +63,7 @@ const AIGeneratedLearningPath = () => {
         <div className="container mx-auto max-w-lg px-4 relative z-10">
           <div className="text-center mb-6">
             <div className="inline-block mb-2">
-              <div className="flex items-center justify-center bg-gradient-to-r from-purple-100 to-pink-100 rounded-full px-3 py-1 text-purple-700 font-medium text-xs">
+              <div className="flex items-center justify-center bg-gradient-to-r from-indigo-100 to-blue-100 rounded-full px-3 py-1 text-indigo-700 font-medium text-xs">
                 <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -71,7 +71,7 @@ const AIGeneratedLearningPath = () => {
               </div>
             </div>
             <h2 className="text-xl font-extrabold tracking-tight mb-2">
-              Generate <span className="text-purple-600">Learning Path</span>
+              Generate <span className="text-indigo-600">Learning Path</span>
             </h2>
             <p className="text-sm text-gray-600">
               Get a personalized course instantly
@@ -88,7 +88,7 @@ const AIGeneratedLearningPath = () => {
                   onFocus={() => setShowDropdown(true)}
                   onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
                   placeholder="Type any topic or select..."
-                  className="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
+                  className="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm"
                   disabled={isGenerating}
                   autoComplete="off"
                 />
@@ -106,7 +106,7 @@ const AIGeneratedLearningPath = () => {
                           setInputValue(topic);
                           setShowDropdown(false);
                         }}
-                        className="px-4 py-3 text-sm text-gray-700 hover:bg-purple-100 active:bg-purple-200 cursor-pointer border-b border-gray-100 last:border-b-0"
+                        className="px-4 py-3 text-sm text-gray-700 hover:bg-indigo-100 active:bg-indigo-200 cursor-pointer border-b border-gray-100 last:border-b-0"
                       >
                         {topic}
                       </li>
@@ -119,7 +119,7 @@ const AIGeneratedLearningPath = () => {
                 <button
                   type="submit"
                   disabled={!inputValue.trim() || isGenerating}
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg text-sm"
+                  className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg text-sm hover:from-indigo-700 hover:to-blue-700"
                 >
                   {isGenerating ? (
                     <div className="flex items-center justify-center">
@@ -138,13 +138,13 @@ const AIGeneratedLearningPath = () => {
 
       <div className="hidden sm:block">
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-32 w-80 h-80 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-32 w-80 h-80 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse" style={{animationDelay: '2s'}}></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-br from-indigo-400 to-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse" style={{animationDelay: '4s'}}></div>
+          <div className="absolute -top-40 -right-32 w-80 h-80 bg-gradient-to-br from-indigo-500 to-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-32 w-80 h-80 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse" style={{animationDelay: '2s'}}></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-br from-indigo-400 to-sky-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse" style={{animationDelay: '4s'}}></div>
         </div>
         
         <div className="absolute top-20 left-10 opacity-10">
-          <svg className="w-16 h-16 text-purple-500 animate-bounce" style={{animationDelay: '1s'}} fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-16 h-16 text-indigo-500 animate-bounce" style={{animationDelay: '1s'}} fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
         </div>
@@ -158,7 +158,7 @@ const AIGeneratedLearningPath = () => {
         <div className="container mx-auto relative z-10">
           <div className="text-center mb-16">
             <div className="inline-block mb-6">
-              <div className="flex items-center justify-center bg-gradient-to-r from-purple-100 to-pink-100 rounded-full px-6 py-3 text-purple-700 font-medium">
+              <div className="flex items-center justify-center bg-gradient-to-r from-indigo-100 to-blue-100 rounded-full px-6 py-3 text-indigo-700 font-medium">
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -167,7 +167,7 @@ const AIGeneratedLearningPath = () => {
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6">
               Generate Your{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-600">
                 Learning Path
               </span>
             </h1>
@@ -186,7 +186,7 @@ const AIGeneratedLearningPath = () => {
                     value={inputValue}
                     onChange={handleInputChange}
                     placeholder="What would you like to learn today? (e.g., Machine Learning, React.js, Digital Marketing)"
-                    className="w-full px-8 py-6 text-lg bg-white/80 backdrop-blur-sm border-2 border-gray-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 shadow-lg placeholder-gray-400"
+                    className="w-full px-8 py-6 text-lg bg-white/80 backdrop-blur-sm border-2 border-gray-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-300 shadow-lg placeholder-gray-400"
                     disabled={isGenerating}
                     onFocus={() => setShowDropdown(true)}
                   />
@@ -199,7 +199,7 @@ const AIGeneratedLearningPath = () => {
                         <li
                           key={index}
                           onClick={() => handleDropdownSelect(topic)}
-                          className="px-6 py-3 text-gray-700 hover:bg-purple-50 cursor-pointer transition-colors duration-200"
+                          className="px-6 py-3 text-gray-700 hover:bg-indigo-50 cursor-pointer transition-colors duration-200"
                         >
                           {topic}
                         </li>
@@ -218,7 +218,7 @@ const AIGeneratedLearningPath = () => {
                 <button
                   type="submit"
                   disabled={!inputValue.trim() || isGenerating}
-                  className="group relative inline-flex items-center justify-center px-12 py-4 text-lg font-semibold text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-4 focus:ring-purple-500/20 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl hover:shadow-2xl hover:-translate-y-1"
+                  className="group relative inline-flex items-center justify-center px-12 py-4 text-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl hover:from-indigo-700 hover:to-blue-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl hover:shadow-2xl hover:-translate-y-1"
                 >
                   {isGenerating ? (
                     <>

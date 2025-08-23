@@ -3,6 +3,12 @@ import json
 import time
 import random
 from django.conf import settings
+from requests.exceptions import ConnectionError, Timeout, RequestException
+import socket
+
+class NetworkError(Exception):
+    """Custom exception for network-related errors"""
+    pass
 
 def call_gemini_api(prompt, max_retries=5):
     """Call Gemini API with enhanced retry logic and exponential backoff for Pro model"""
@@ -58,6 +64,10 @@ def call_gemini_api(prompt, max_retries=5):
                     time.sleep(2)  # Short delay for other errors
                 continue
                 
+        except (ConnectionError, Timeout, socket.gaierror) as e:
+            print(f"🌐 Network connection error: {str(e)}")
+            # Don't retry network errors automatically - let frontend handle it
+            raise NetworkError("Network connection lost. Please check your internet connection and try again.")
         except Exception as e:
             print(f"❌ Error with Gemini API: {str(e)}")
             if attempt < max_retries - 1:
@@ -72,6 +82,8 @@ def call_gemini_flash_api(prompt, max_retries=3):
     
     if not settings.GEMINI_API_KEY:
         raise Exception("Gemini API key not configured")
+    
+    network_error_count = 0
     
     for attempt in range(max_retries):
         try:
@@ -120,6 +132,10 @@ def call_gemini_flash_api(prompt, max_retries=3):
                     time.sleep(1)  # Shorter delay for flash model
                 continue
                 
+        except (ConnectionError, Timeout, socket.gaierror) as e:
+            print(f"🌐 Network connection error: {str(e)}")
+            # Don't retry network errors automatically - let frontend handle it
+            raise NetworkError("Network connection lost. Please check your internet connection and try again.")
         except Exception as e:
             print(f"❌ Error with Gemini Flash API: {str(e)}")
             if attempt < max_retries - 1:

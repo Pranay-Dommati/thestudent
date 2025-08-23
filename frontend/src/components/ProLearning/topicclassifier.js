@@ -3,6 +3,14 @@
 
 import toast from 'react-hot-toast';
 
+// Custom error class for network connection issues
+class NetworkConnectionError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'NetworkConnectionError';
+  }
+}
+
 // Rate limiting constants
 export const MAX_TOPICS_PER_DAY = 16;
 export const MAX_TOPICS_PER_REQUEST = 4;
@@ -163,6 +171,12 @@ export const classifyTopics = async (query, expectedTopics = null) => {
       throw new Error('Rate limit exceeded');
     }
     
+    if (response.status === 503 && result.error === 'network_error') {
+      // Network connection lost - show proper message like ChatGPT
+      console.warn('🌐 Network connection lost. Attempting to reconnect...');
+      throw new NetworkConnectionError(result.message || 'Network connection lost. Attempting to reconnect...');
+    }
+    
     if (!response.ok) {
       throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
     }
@@ -171,9 +185,16 @@ export const classifyTopics = async (query, expectedTopics = null) => {
     return handleClassificationSuccess(result);
     
   } catch (error) {
-    if (error.message !== 'Rate limit exceeded') {
+    if (error instanceof NetworkConnectionError) {
+      // Handle network errors specifically - don't show toast here, let ChatbotPage handle it
+      console.error('🌐 Network error:', error.message);
+      throw error;
+    } else if (error.message !== 'Rate limit exceeded') {
       console.error('Topic classification error:', error);
-      toast.error(`Failed to classify topics: ${error.message}`, { duration: 4000 });
+      // Don't show toast for network-related errors to avoid duplicate notifications
+      if (!error.message.includes('Network') && !error.message.includes('connection')) {
+        toast.error(`Failed to classify topics: ${error.message}`, { duration: 4000 });
+      }
     }
     throw error;
   }
