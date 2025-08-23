@@ -1953,7 +1953,10 @@ def update_course(request, course_id):
             if 'category' in data:
                 engineering_course.category = data.get('category')
             if 'proficiency_level' in data:
-                engineering_course.proficiency_level = data.get('proficiency_level')
+                # Map proficiency_level to proficiency field in model
+                engineering_course.proficiency = data.get('proficiency_level')
+            if 'sources' in data:
+                engineering_course.sources = data.get('sources', '')
             if 'duration' in data:
                 engineering_course.duration = data.get('duration', '')
             if 'description' in data:
@@ -1967,26 +1970,41 @@ def update_course(request, course_id):
                     engineering_course.is_published = is_published_value.lower() in ('true', '1', 'yes', 'on')
                 else:
                     engineering_course.is_published = bool(is_published_value)
-            if 'price' in data:
-                engineering_course.price = data.get('price', 0)
+            if 'certificate' in data:
+                # Map certificate to certificate_given boolean field
+                certificate_value = data.get('certificate', '')
+                engineering_course.certificate_given = bool(certificate_value and certificate_value != 'No Certificate')
                 
-            # Handle learning_objectives
+            # Handle learning_objectives (map to learning_points in model)
             if 'learning_objectives' in data:
                 try:
                     objectives_data = data.get('learning_objectives', '[]')
                     if not objectives_data.strip():
                         objectives_data = '[]'
-                    engineering_course.learning_objectives = json.loads(objectives_data)
+                    engineering_course.learning_points = json.loads(objectives_data)
                 except (json.JSONDecodeError, AttributeError):
-                    engineering_course.learning_objectives = []
+                    engineering_course.learning_points = []
             elif 'learningObjectives' in data:
                 try:
                     objectives_data = data.get('learningObjectives', '[]')
                     if not objectives_data.strip():
                         objectives_data = '[]'
-                    engineering_course.learning_objectives = json.loads(objectives_data)
+                    engineering_course.learning_points = json.loads(objectives_data)
                 except (json.JSONDecodeError, AttributeError):
-                    engineering_course.learning_objectives = []
+                    engineering_course.learning_points = []
+            
+            # Handle prerequisites (map to requirements in model)
+            if 'prerequisites' in data:
+                try:
+                    prereq_data = data.get('prerequisites', '[]')
+                    if not prereq_data.strip():
+                        prereq_data = '[]'
+                    engineering_course.requirements = json.loads(prereq_data)
+                except (json.JSONDecodeError, AttributeError):
+                    engineering_course.requirements = []
+                    
+            # Handle course_content (note: this field may not exist in model, so we'll skip errors)
+            # Note: course_content is not in the current model, so we'll just ignore it for now
             
             # Handle thumbnail update
             if 'thumbnail' in request.FILES:
@@ -2025,9 +2043,13 @@ def update_course(request, course_id):
         else:
             course_data.update({
                 'category': course.category,
-                'proficiency_level': course.proficiency_level,
-                'learning_objectives': course.learning_objectives,
-                'price': course.price,
+                'proficiency_level': getattr(course, 'proficiency', 'beginner'),
+                'learning_objectives': course.learning_points or [],
+                'prerequisites': course.requirements or [],
+                'sources': course.sources or '',
+                'certificate': 'Certificate of Completion' if getattr(course, 'certificate_given', False) else '',
+                'price': str(getattr(course, 'price', 0)),
+                'course_content': getattr(course, 'course_content', []),
             })
         
         return Response({
@@ -2090,7 +2112,61 @@ def get_course_by_id(request, course_id):
                 'learning_points': course.learning_points,
                 'class': course.class_level,
                 'category': course.subject,
+                # Include chapters and lessons
+                'chapters': []
             }
+            
+            # Get chapters and lessons for school courses
+            chapters = course.chapters.all().order_by('order')
+            for chapter in chapters:
+                chapter_data = {
+                    'id': chapter.id,
+                    'name': chapter.name,
+                    'order': chapter.order,
+                    'lessons': []
+                }
+                
+                lessons = chapter.lessons.all().order_by('order')
+                for lesson in lessons:
+                    lesson_data = {
+                        'id': lesson.id,
+                        'title': lesson.title,
+                        'type': lesson.type,
+                        'video_url': lesson.video_url,
+                        'description': lesson.description,
+                        'about_lesson': lesson.about_lesson,
+                        'order': lesson.order,
+                        'resources': [],
+                        'quiz_questions': []
+                    }
+                    
+                    # Get lesson resources
+                    resources = lesson.resources.all()
+                    for resource in resources:
+                        resource_data = {
+                            'id': resource.id,
+                            'type': resource.type,
+                            'title': resource.title,
+                            'description': resource.description,
+                            'url': resource.url,
+                            'file': resource.file.url if resource.file else None
+                        }
+                        lesson_data['resources'].append(resource_data)
+                    
+                    # Get quiz questions
+                    quiz_questions = lesson.quiz_questions.all()
+                    for question in quiz_questions:
+                        question_data = {
+                            'id': question.id,
+                            'question': question.question,
+                            'options': question.options,
+                            'correct_answer': question.correct_answer
+                        }
+                        lesson_data['quiz_questions'].append(question_data)
+                    
+                    chapter_data['lessons'].append(lesson_data)
+                
+                course_data['chapters'].append(chapter_data)
         else:
             course = engineering_course
             course_data = {
@@ -2105,10 +2181,69 @@ def get_course_by_id(request, course_id):
                 'last_updated': course.last_updated,
                 'created_at': course.created_at,
                 'category': course.category,
-                'proficiency_level': course.proficiency_level,
-                'learning_objectives': course.learning_objectives,
-                'price': getattr(course, 'price', 0),
+                # Map model fields to expected edit form fields
+                'proficiency_level': getattr(course, 'proficiency', 'beginner'),
+                'learning_objectives': course.learning_points or [],
+                'prerequisites': course.requirements or [],
+                'course_content': getattr(course, 'course_content', []),
+                'sources': course.sources or '',
+                'certificate': 'Certificate of Completion' if getattr(course, 'certificate_given', False) else '',
+                'price': str(getattr(course, 'price', 0)),
+                # Include sections and lessons
+                'sections': []
             }
+            
+            # Get sections and lessons for engineering courses
+            sections = course.sections.all().order_by('order')
+            for section in sections:
+                section_data = {
+                    'id': section.id,
+                    'name': section.name,
+                    'order': section.order,
+                    'lessons': []
+                }
+                
+                lessons = section.lessons.all().order_by('order')
+                for lesson in lessons:
+                    lesson_data = {
+                        'id': lesson.id,
+                        'title': lesson.title,
+                        'type': lesson.type,
+                        'video_url': lesson.video_url,
+                        'description': lesson.description,
+                        'about_lesson': lesson.about_lesson,
+                        'order': lesson.order,
+                        'resources': [],
+                        'quiz_questions': []
+                    }
+                    
+                    # Get lesson resources
+                    resources = lesson.resources.all()
+                    for resource in resources:
+                        resource_data = {
+                            'id': resource.id,
+                            'type': resource.type,
+                            'title': resource.title,
+                            'description': resource.description,
+                            'url': resource.url,
+                            'file': resource.file.url if resource.file else None
+                        }
+                        lesson_data['resources'].append(resource_data)
+                    
+                    # Get quiz questions
+                    quiz_questions = lesson.quiz_questions.all()
+                    for question in quiz_questions:
+                        question_data = {
+                            'id': question.id,
+                            'question': question.question,
+                            'options': question.options,
+                            'correct_answer': question.correct_answer
+                        }
+                        lesson_data['quiz_questions'].append(question_data)
+                    
+                    section_data['lessons'].append(lesson_data)
+                
+                course_data['sections'].append(section_data)
         
         return Response(course_data, status=status.HTTP_200_OK)
         

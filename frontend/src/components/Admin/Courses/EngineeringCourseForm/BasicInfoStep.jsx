@@ -31,6 +31,14 @@ const BasicInfoStep = ({
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [newCategory, setNewCategory] = useState('');
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  
+  // Debug effect to check courseInfo prop
+  useEffect(() => {
+    console.log("BasicInfoStep received courseInfo:", courseInfo);
+    if (!courseInfo?.learningPoints) {
+      console.warn("courseInfo.learningPoints is undefined or null");
+    }
+  }, [courseInfo]);
 
   const handleAddCategory = () => {
     if (newCategory.trim()) {
@@ -117,7 +125,7 @@ const BasicInfoStep = ({
         <input
           type="text"
           name="title"
-          value={courseInfo.title}
+          value={courseInfo.title || ''}
           onChange={handleCourseInfoChange}
           className={`w-full p-2 border ${errors.title ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
           placeholder="e.g., Master Next.js: Complete Developer's Guide"
@@ -133,7 +141,7 @@ const BasicInfoStep = ({
         <input
           type="text"
           name="shortDescription"
-          value={courseInfo.shortDescription}
+          value={courseInfo.shortDescription || ''}
           onChange={handleCourseInfoChange}
           className={`w-full p-2 border ${errors.shortDescription ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
           placeholder="e.g., Build modern, production-ready web applications with Next.js and React"
@@ -242,7 +250,7 @@ const BasicInfoStep = ({
         </div>
         
         {/* Add new category input */}
-        {(courseInfo.category === 'add-new' || showNewCategoryInput) && (
+        {((courseInfo?.category === 'add-new') || showNewCategoryInput) && (
           <div className="mt-2 flex space-x-2">
             <input
               type="text"
@@ -305,20 +313,22 @@ const BasicInfoStep = ({
           </button>
         </div>
         
-        {courseInfo.learningPoints.map((point, index) => (
+        {/* Add debug log and defensive check */}
+        {console.log("courseInfo in BasicInfoStep:", courseInfo)}
+        {(courseInfo?.learningPoints || []).map((point, index) => (
           <div key={`learn-${index}`} className="flex items-center space-x-2">
             <input
               type="text"
               value={point}
               onChange={(e) => handleArrayFieldChange('learningPoints', index, e.target.value)}
-              className={`flex-1 p-2 border ${errors.learningPoints ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+              className={`flex-1 p-2 border ${errors?.learningPoints ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
               placeholder={`Learning point ${index + 1}`}
             />
             <button
               type="button"
               onClick={() => removeArrayField('learningPoints', index)}
               className="p-2 text-red-500 hover:text-red-700"
-              disabled={courseInfo.learningPoints.length <= 2}
+              disabled={(courseInfo?.learningPoints?.length || 0) <= 2}
             >
               <FaTrash />
             </button>
@@ -340,20 +350,20 @@ const BasicInfoStep = ({
           </button>
         </div>
         
-        {courseInfo.requirements.map((requirement, index) => (
+        {(courseInfo?.requirements || []).map((requirement, index) => (
           <div key={`req-${index}`} className="flex items-center space-x-2">
             <input
               type="text"
               value={requirement}
               onChange={(e) => handleArrayFieldChange('requirements', index, e.target.value)}
-              className={`flex-1 p-2 border ${errors.requirements ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
+              className={`flex-1 p-2 border ${errors?.requirements ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
               placeholder={`Requirement ${index + 1}`}
             />
             <button
               type="button"
               onClick={() => removeArrayField('requirements', index)}
               className="p-2 text-red-500 hover:text-red-700"
-              disabled={courseInfo.requirements.length <= 1}
+              disabled={(courseInfo?.requirements?.length || 0) <= 1}
             >
               <FaTrash />
             </button>
@@ -376,6 +386,15 @@ const BasicInfoStep = ({
           className="w-full p-2 border border-gray-300 rounded-lg"
         />
       </div>
+      
+      {/* Debug section - will only show in development */}
+      {process.env.NODE_ENV !== 'production' && !courseInfo?.learningPoints && (
+        <div className="mt-6 p-4 bg-yellow-100 rounded-lg">
+          <h3 className="text-amber-800 font-bold">Debug Information:</h3>
+          <p className="text-amber-700">courseInfo.learningPoints is undefined or null.</p>
+          <p className="text-amber-700">Available keys in courseInfo: {Object.keys(courseInfo || {}).join(', ')}</p>
+        </div>
+      )}
     </div>
   );
 };

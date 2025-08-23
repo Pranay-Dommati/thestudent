@@ -1,30 +1,16 @@
 import React, { useState } from 'react';
-import { FaSave, FaTimes, FaSpinner, FaImage, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaSave, FaTimes, FaSpinner, FaImage, FaPlus, FaTrash, FaUpload, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 
-const CLASS_LEVELS = [
-  { value: '6th', label: 'Class 6' },
-  { value: '7th', label: 'Class 7' },
-  { value: '8th', label: 'Class 8' },
-  { value: '9th', label: 'Class 9' },
-  { value: '10th', label: 'Class 10' },
-  { value: '11th', label: 'Class 11' },
-  { value: '12th', label: 'Class 12' },
-];
-
-const BOARDS = [
-  { value: 'cbse', label: 'CBSE' },
-  { value: 'state', label: 'State Board' },
-  { value: 'icse', label: 'ICSE' },
-];
-
-const SUBJECTS = [
-  'Physics', 'Chemistry', 'Mathematics', 'Biology', 'English', 
-  'Hindi', 'Social Science', 'Computer Science', 'Economics',
-  'Accountancy', 'Business Studies', 'Political Science'
-];
+// Import the step components from creation form
+import BasicInfoStep from './SchoolCourseForm/BasicInfoStep';
+import CourseStructureStep from './SchoolCourseForm/CourseStructureStep';
 
 const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMode }) => {
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 2;
+  
+  // Initialize form data with course structure
   const [formData, setFormData] = useState({
     title: course.title || '',
     class_level: course.class_level || '',
@@ -38,6 +24,68 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
     is_published: course.is_published || false,
     key_topics: course.key_topics || [],
     learning_points: course.learning_points || [],
+    // Add camelCase versions for the BasicInfoStep component
+    keyTopics: course.key_topics || [],
+    learningPoints: course.learning_points || [],
+    // Add chapterCount based on the number of chapters
+    chapterCount: course.chapters ? course.chapters.length : 1
+  });
+
+  // Initialize chapters from course data
+  const [chapters, setChapters] = useState(() => {
+    if (course.chapters && course.chapters.length > 0) {
+      return course.chapters.map(chapter => ({
+        id: chapter.id,
+        name: chapter.name || '',
+        lessons: chapter.lessons.map(lesson => ({
+          id: lesson.id,
+          title: lesson.title || '',
+          type: lesson.type || 'video',
+          videoUrl: lesson.video_url || '',
+          aboutLesson: lesson.about_lesson || '',
+          hasResources: lesson.resources && lesson.resources.length > 0,
+          resources: {
+            downloadable: lesson.resources.filter(r => r.type === 'downloadable').map(r => ({
+              id: r.id,
+              title: r.title || '',
+              description: r.description || '',
+              file: r.file
+            })),
+            internet: lesson.resources.filter(r => r.type === 'internet').map(r => ({
+              id: r.id,
+              title: r.title || '',
+              description: r.description || '',
+              url: r.url || ''
+            }))
+          },
+          quizQuestions: lesson.quiz_questions.map(q => ({
+            id: q.id,
+            question: q.question || '',
+            options: q.options || ['', '', '', ''],
+            correctAnswer: q.correct_answer || ''
+          }))
+        }))
+      }));
+    } else {
+      // Default single chapter if none exist
+      return [{
+        id: null,
+        name: '',
+        lessons: [{
+          id: null,
+          title: '',
+          type: 'video',
+          videoUrl: '',
+          aboutLesson: '',
+          hasResources: false,
+          resources: {
+            downloadable: [],
+            internet: []
+          },
+          quizQuestions: []
+        }]
+      }];
+    }
   });
 
   const [thumbnailFile, setThumbnailFile] = useState(null);
@@ -46,53 +94,409 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
   );
   const [errors, setErrors] = useState({});
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+  // Handler functions for step 1 (Basic Info)
+  const handleInputChange = (name, value) => {
+    console.log("handleInputChange called with", name, value);
+    
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
     }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+
+    // Clear state when board changes from state board
+    if (name === 'board' && value !== 'state') {
+      setFormData(prev => ({
+        ...prev,
+        state: ''
+      }));
     }
+
+    // Clear errors
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: undefined
+      }));
+    }
+  };
+  
+  // Event handler to work with standard React input events
+  const handleInputChangeEvent = (e) => {
+    const { name, value, type, checked } = e.target;
+    const fieldValue = type === 'checkbox' ? checked : value;
+    console.log("handleInputChangeEvent called with", name, fieldValue);
+    handleInputChange(name, fieldValue);
+  };
+
+  const handleArrayInputChange = (name, index, value) => {
+    setFormData(prev => {
+      // Map between camelCase and snake_case field names
+      const fieldMapping = {
+        'keyTopics': 'key_topics',
+        'learningPoints': 'learning_points',
+        'key_topics': 'keyTopics',
+        'learning_points': 'learningPoints'
+      };
+
+      // Update both camelCase and snake_case versions if there's a mapping
+      const updates = {
+        [name]: prev[name].map((item, i) => i === index ? value : item)
+      };
+      
+      if (fieldMapping[name]) {
+        updates[fieldMapping[name]] = updates[name];
+      }
+      
+      return { ...prev, ...updates };
+    });
+  };
+
+  const addArrayItem = (name) => {
+    setFormData(prev => {
+      // Map between camelCase and snake_case field names
+      const fieldMapping = {
+        'keyTopics': 'key_topics',
+        'learningPoints': 'learning_points',
+        'key_topics': 'keyTopics',
+        'learning_points': 'learningPoints'
+      };
+
+      // Update both camelCase and snake_case versions if there's a mapping
+      const updates = {
+        [name]: [...prev[name], '']
+      };
+      
+      if (fieldMapping[name]) {
+        updates[fieldMapping[name]] = [...updates[name]];
+      }
+      
+      return { ...prev, ...updates };
+    });
+  };
+
+  const removeArrayItem = (name, index) => {
+    setFormData(prev => {
+      // Map between camelCase and snake_case field names
+      const fieldMapping = {
+        'keyTopics': 'key_topics',
+        'learningPoints': 'learning_points',
+        'key_topics': 'keyTopics',
+        'learning_points': 'learningPoints'
+      };
+
+      // Update both camelCase and snake_case versions if there's a mapping
+      const updates = {
+        [name]: prev[name].filter((_, i) => i !== index)
+      };
+      
+      if (fieldMapping[name]) {
+        updates[fieldMapping[name]] = [...updates[name]];
+      }
+      
+      return { ...prev, ...updates };
+    });
   };
 
   const handleThumbnailChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast.error('Image size should be less than 5MB');
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size should be less than 5MB');
         return;
       }
-      
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+
       setThumbnailFile(file);
       const reader = new FileReader();
       reader.onload = (e) => setThumbnailPreview(e.target.result);
       reader.readAsDataURL(file);
+
+      // Clear thumbnail error
+      if (errors.thumbnail) {
+        setErrors(prev => ({ ...prev, thumbnail: undefined }));
+      }
     }
   };
 
-  const handleArrayFieldChange = (field, index, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: prev[field].map((item, i) => i === index ? value : item)
-    }));
+  // Handler functions for step 2 (Course Structure)
+  const handleChapterNameChange = (chapterIndex, value) => {
+    setChapters(prev => prev.map((chapter, i) => 
+      i === chapterIndex ? { ...chapter, name: value } : chapter
+    ));
   };
 
-  const addArrayField = (field) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: [...prev[field], '']
-    }));
+  const addLesson = (chapterIndex) => {
+    setChapters(prev => prev.map((chapter, i) => 
+      i === chapterIndex 
+        ? {
+            ...chapter,
+            lessons: [
+              ...chapter.lessons,
+              {
+                id: null,
+                title: '',
+                type: 'video',
+                videoUrl: '',
+                aboutLesson: '',
+                hasResources: false,
+                resources: {
+                  downloadable: [],
+                  internet: []
+                },
+                quizQuestions: []
+              }
+            ]
+          }
+        : chapter
+    ));
   };
 
-  const removeArrayField = (field, index) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
-    }));
+  const removeLesson = (chapterIndex, lessonIndex) => {
+    setChapters(prev => prev.map((chapter, i) => 
+      i === chapterIndex 
+        ? {
+            ...chapter,
+            lessons: chapter.lessons.filter((_, li) => li !== lessonIndex)
+          }
+        : chapter
+    ));
+  };
+
+  const handleLessonChange = (chapterIndex, lessonIndex, field, value) => {
+    setChapters(prev => prev.map((chapter, i) => 
+      i === chapterIndex 
+        ? {
+            ...chapter,
+            lessons: chapter.lessons.map((lesson, li) => 
+              li === lessonIndex ? { ...lesson, [field]: value } : lesson
+            )
+          }
+        : chapter
+    ));
+  };
+
+  const addResource = (chapterIndex, lessonIndex, resourceType) => {
+    const newResource = resourceType === 'downloadable' 
+      ? { id: null, title: '', description: '', file: null }
+      : { id: null, title: '', description: '', url: '' };
+
+    setChapters(prev => prev.map((chapter, i) => 
+      i === chapterIndex 
+        ? {
+            ...chapter,
+            lessons: chapter.lessons.map((lesson, li) => 
+              li === lessonIndex 
+                ? {
+                    ...lesson,
+                    resources: {
+                      ...lesson.resources,
+                      [resourceType]: [...lesson.resources[resourceType], newResource]
+                    }
+                  }
+                : lesson
+            )
+          }
+        : chapter
+    ));
+  };
+
+  const removeResource = (chapterIndex, lessonIndex, resourceType, resourceIndex) => {
+    setChapters(prev => prev.map((chapter, i) => 
+      i === chapterIndex 
+        ? {
+            ...chapter,
+            lessons: chapter.lessons.map((lesson, li) => 
+              li === lessonIndex 
+                ? {
+                    ...lesson,
+                    resources: {
+                      ...lesson.resources,
+                      [resourceType]: lesson.resources[resourceType].filter((_, ri) => ri !== resourceIndex)
+                    }
+                  }
+                : lesson
+            )
+          }
+        : chapter
+    ));
+  };
+
+  const handleResourceChange = (chapterIndex, lessonIndex, resourceType, resourceIndex, field, value) => {
+    setChapters(prev => prev.map((chapter, i) => 
+      i === chapterIndex 
+        ? {
+            ...chapter,
+            lessons: chapter.lessons.map((lesson, li) => 
+              li === lessonIndex 
+                ? {
+                    ...lesson,
+                    resources: {
+                      ...lesson.resources,
+                      [resourceType]: lesson.resources[resourceType].map((resource, ri) => 
+                        ri === resourceIndex ? { ...resource, [field]: value } : resource
+                      )
+                    }
+                  }
+                : lesson
+            )
+          }
+        : chapter
+    ));
+  };
+
+  const handleFileChange = (chapterIndex, lessonIndex, resourceIndex, file) => {
+    setChapters(prev => prev.map((chapter, i) => 
+      i === chapterIndex 
+        ? {
+            ...chapter,
+            lessons: chapter.lessons.map((lesson, li) => 
+              li === lessonIndex 
+                ? {
+                    ...lesson,
+                    resources: {
+                      ...lesson.resources,
+                      downloadable: lesson.resources.downloadable.map((resource, ri) => 
+                        ri === resourceIndex ? { ...resource, file } : resource
+                      )
+                    }
+                  }
+                : lesson
+            )
+          }
+        : chapter
+    ));
+  };
+
+  const addQuizQuestion = (chapterIndex, lessonIndex) => {
+    setChapters(prev => prev.map((chapter, i) => 
+      i === chapterIndex 
+        ? {
+            ...chapter,
+            lessons: chapter.lessons.map((lesson, li) => 
+              li === lessonIndex 
+                ? {
+                    ...lesson,
+                    quizQuestions: [
+                      ...lesson.quizQuestions,
+                      {
+                        id: null,
+                        question: '',
+                        options: ['', '', '', ''],
+                        correctAnswer: ''
+                      }
+                    ]
+                  }
+                : lesson
+            )
+          }
+        : chapter
+    ));
+  };
+
+  const removeQuizQuestion = (chapterIndex, lessonIndex, questionIndex) => {
+    setChapters(prev => prev.map((chapter, i) => 
+      i === chapterIndex 
+        ? {
+            ...chapter,
+            lessons: chapter.lessons.map((lesson, li) => 
+              li === lessonIndex 
+                ? {
+                    ...lesson,
+                    quizQuestions: lesson.quizQuestions.filter((_, qi) => qi !== questionIndex)
+                  }
+                : lesson
+            )
+          }
+        : chapter
+    ));
+  };
+
+  const handleQuizQuestionChange = (chapterIndex, lessonIndex, questionIndex, field, value) => {
+    setChapters(prev => prev.map((chapter, i) => 
+      i === chapterIndex 
+        ? {
+            ...chapter,
+            lessons: chapter.lessons.map((lesson, li) => 
+              li === lessonIndex 
+                ? {
+                    ...lesson,
+                    quizQuestions: lesson.quizQuestions.map((question, qi) => 
+                      qi === questionIndex ? { ...question, [field]: value } : question
+                    )
+                  }
+                : lesson
+            )
+          }
+        : chapter
+    ));
+  };
+
+  // Navigation functions
+  const nextStep = () => {
+    console.log("Current step before:", currentStep, "totalSteps:", totalSteps);
+    if (validateStep(currentStep)) {
+      // Use setTimeout to ensure state update is processed correctly
+      setTimeout(() => {
+        setCurrentStep(prev => {
+          const next = Math.min(prev + 1, totalSteps);
+          console.log("Setting current step from", prev, "to", next);
+          return next;
+        });
+      }, 0);
+    } else {
+      console.log("Validation failed for step", currentStep);
+    }
+  };
+
+  const prevStep = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
+
+  const validateStep = (step) => {
+    console.log("Validating step:", step);
+    const newErrors = {};
+
+    if (step === 1) {
+      // Validate basic info
+      console.log("Form data for validation:", formData);
+      if (!formData.title.trim()) newErrors.title = 'Title is required';
+      if (!formData.class_level) newErrors.class_level = 'Class level is required';
+      if (!formData.board) newErrors.board = 'Board is required';
+      if (formData.board === 'state' && !formData.state) newErrors.state = 'State is required for state board';
+      if (!formData.subject) newErrors.subject = 'Subject is required';
+      if (!formData.sources?.trim()) newErrors.sources = 'Sources are required';
+      if (!formData.duration?.trim()) newErrors.duration = 'Duration is required';
+      if (!formData.description?.trim()) newErrors.description = 'Description is required';
+      if (!formData.short_description?.trim()) newErrors.short_description = 'Short description is required';
+    } else if (step === 2) {
+      // Validate course structure
+      chapters.forEach((chapter, chapterIndex) => {
+        if (!chapter.name.trim()) {
+          newErrors[`chapter${chapterIndex}name`] = 'Chapter name is required';
+        }
+        
+        chapter.lessons.forEach((lesson, lessonIndex) => {
+          if (!lesson.title.trim()) {
+            newErrors[`chapter${chapterIndex}lesson${lessonIndex}`] = 'Lesson title is required';
+          }
+          
+          if (lesson.type === 'video' && !lesson.videoUrl.trim()) {
+            newErrors[`chapter${chapterIndex}lesson${lessonIndex}video`] = 'Video URL is required for video lessons';
+          }
+        });
+      });
+    }
+
+    setErrors(newErrors);
+    const isValid = Object.keys(newErrors).length === 0;
+    console.log("Validation result for step", step, ":", isValid, "errors:", Object.keys(newErrors));
+    return isValid;
   };
 
   const validateForm = () => {
@@ -101,8 +505,12 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
     if (!formData.title.trim()) newErrors.title = 'Title is required';
     if (!formData.class_level) newErrors.class_level = 'Class level is required';
     if (!formData.board) newErrors.board = 'Board is required';
+    if (formData.board === 'state' && !formData.state) newErrors.state = 'State is required for state board';
     if (!formData.subject) newErrors.subject = 'Subject is required';
+    if (!formData.sources.trim()) newErrors.sources = 'Sources are required';
+    if (!formData.duration.trim()) newErrors.duration = 'Duration is required';
     if (!formData.description.trim()) newErrors.description = 'Description is required';
+    if (!formData.short_description.trim()) newErrors.short_description = 'Short description is required';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -110,22 +518,36 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("Form submit triggered, current step:", currentStep);
     
-    if (!validateForm()) {
-      toast.error('Please fill in all required fields');
-      return;
+    // Validate all steps
+    for (let step = 1; step <= totalSteps; step++) {
+      if (!validateStep(step)) {
+        console.log("Validation failed at step", step, ", redirecting to that step");
+        setCurrentStep(step);
+        toast.error(`Please complete all required fields in step ${step}`);
+        return;
+      }
     }
 
     const submitFormData = new FormData();
     
     // Add all form fields
     Object.keys(formData).forEach(key => {
+      // Skip the camelCase versions when adding to submitFormData
+      if (key === 'keyTopics' || key === 'learningPoints') {
+        return; // Skip these as we'll use the snake_case versions
+      }
+      
       if (key === 'key_topics' || key === 'learning_points') {
         submitFormData.append(key, JSON.stringify(formData[key].filter(item => item.trim())));
       } else {
         submitFormData.append(key, formData[key]);
       }
     });
+    
+    // Add chapters data
+    submitFormData.append('chapters', JSON.stringify(chapters));
     
     // Add thumbnail if changed
     if (thumbnailFile) {
@@ -135,336 +557,186 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
     await onSubmit(submitFormData);
   };
 
-  const inputClasses = `w-full px-4 py-3 rounded-lg border transition-colors ${
-    isDarkMode 
-      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500' 
-      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-blue-600 focus:border-blue-500'
-  }`;
-
-  const labelClasses = `block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`;
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <BasicInfoStep
+            courseInfo={formData}
+            setCourseInfo={(updates) => setFormData(prev => ({...prev, ...updates}))}
+            handleCourseInfoChange={handleInputChangeEvent}
+            handleThumbnailChange={handleThumbnailChange}
+            thumbnailPreview={thumbnailPreview}
+            handleArrayFieldChange={handleArrayInputChange}
+            addArrayField={addArrayItem}
+            removeArrayField={removeArrayItem}
+            handleChapterCountChange={handleInputChangeEvent}
+            errors={errors}
+            isDarkMode={isDarkMode}
+            classLevel={formData.class_level}
+          />
+        );
+      case 2:
+        return (
+          <CourseStructureStep
+            chapters={chapters}
+            handleChapterNameChange={handleChapterNameChange}
+            addLesson={addLesson}
+            removeLesson={removeLesson}
+            handleLessonChange={handleLessonChange}
+            addResource={addResource}
+            removeResource={removeResource}
+            handleResourceChange={handleResourceChange}
+            handleFileChange={handleFileChange}
+            addQuizQuestion={addQuizQuestion}
+            removeQuizQuestion={removeQuizQuestion}
+            handleQuizQuestionChange={handleQuizQuestionChange}
+            errors={errors}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="p-6 space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Basic Information */}
-        <div className="space-y-4">
-          <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-            Basic Information
-          </h3>
-          
-          <div>
-            <label className={labelClasses}>
-              Course Title <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
-              className={`${inputClasses} ${errors.title ? 'border-red-500' : ''}`}
-              placeholder="Enter course title"
-            />
-            {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClasses}>
-                Class Level <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="class_level"
-                value={formData.class_level}
-                onChange={handleInputChange}
-                className={`${inputClasses} ${errors.class_level ? 'border-red-500' : ''}`}
-              >
-                <option value="">Select class level</option>
-                {CLASS_LEVELS.map(level => (
-                  <option key={level.value} value={level.value}>{level.label}</option>
-                ))}
-              </select>
-              {errors.class_level && <p className="text-red-500 text-sm mt-1">{errors.class_level}</p>}
-            </div>
-
-            <div>
-              <label className={labelClasses}>
-                Board <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="board"
-                value={formData.board}
-                onChange={handleInputChange}
-                className={`${inputClasses} ${errors.board ? 'border-red-500' : ''}`}
-              >
-                <option value="">Select board</option>
-                {BOARDS.map(board => (
-                  <option key={board.value} value={board.value}>{board.label}</option>
-                ))}
-              </select>
-              {errors.board && <p className="text-red-500 text-sm mt-1">{errors.board}</p>}
-            </div>
-          </div>
-
-          {formData.board === 'state' && (
-            <div>
-              <label className={labelClasses}>State</label>
-              <input
-                type="text"
-                name="state"
-                value={formData.state}
-                onChange={handleInputChange}
-                className={inputClasses}
-                placeholder="Enter state name"
-              />
-            </div>
-          )}
-
-          <div>
-            <label className={labelClasses}>
-              Subject <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="subject"
-              value={formData.subject}
-              onChange={handleInputChange}
-              className={`${inputClasses} ${errors.subject ? 'border-red-500' : ''}`}
-            >
-              <option value="">Select subject</option>
-              {SUBJECTS.map(subject => (
-                <option key={subject} value={subject}>{subject}</option>
-              ))}
-            </select>
-            {errors.subject && <p className="text-red-500 text-sm mt-1">{errors.subject}</p>}
-          </div>
-
-          <div>
-            <label className={labelClasses}>Duration</label>
-            <input
-              type="text"
-              name="duration"
-              value={formData.duration}
-              onChange={handleInputChange}
-              className={inputClasses}
-              placeholder="e.g., 10 weeks, 40 hours"
-            />
-          </div>
-
-          <div>
-            <label className={labelClasses}>Sources</label>
-            <input
-              type="text"
-              name="sources"
-              value={formData.sources}
-              onChange={handleInputChange}
-              className={inputClasses}
-              placeholder="Learning resource sources"
-            />
-          </div>
+    <div className={`p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg`}>
+      {/* Progress Bar */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            Edit Course
+          </h2>
+          <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Step {currentStep} of {totalSteps}
+          </span>
         </div>
-
-        {/* Thumbnail and Additional Info */}
-        <div className="space-y-4">
-          <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-            Course Details
-          </h3>
-
-          {/* Thumbnail Upload */}
-          <div>
-            <label className={labelClasses}>Course Thumbnail</label>
-            <div className="space-y-3">
-              {thumbnailPreview && (
-                <div className="relative inline-block">
-                  <img 
-                    src={thumbnailPreview} 
-                    alt="Course thumbnail preview" 
-                    className="w-32 h-32 object-cover rounded-lg border"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setThumbnailFile(null);
-                      setThumbnailPreview(null);
-                    }}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-              <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                isDarkMode 
-                  ? 'border-gray-600 hover:bg-gray-700 hover:border-gray-500' 
-                  : 'border-gray-300 hover:bg-gray-50 hover:border-gray-400'
-              }`}>
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <FaImage className={`w-8 h-8 mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    <span className="font-semibold">Click to upload</span> thumbnail
-                  </p>
-                  <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                    PNG, JPG up to 5MB
-                  </p>
-                </div>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handleThumbnailChange}
+        
+        <div className="flex items-center space-x-4">
+          {[1, 2].map((step) => (
+            <div key={step} className="flex items-center">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                  step <= currentStep
+                    ? 'bg-blue-600 text-white'
+                    : isDarkMode
+                    ? 'bg-gray-700 text-gray-400'
+                    : 'bg-gray-200 text-gray-600'
+                }`}
+              >
+                {step}
+              </div>
+              <span
+                className={`ml-2 text-sm ${
+                  step <= currentStep
+                    ? isDarkMode
+                      ? 'text-white'
+                      : 'text-gray-900'
+                    : isDarkMode
+                    ? 'text-gray-400'
+                    : 'text-gray-600'
+                }`}
+              >
+                {step === 1 ? 'Basic Information' : 'Course Structure'}
+              </span>
+              {step < totalSteps && (
+                <div
+                  className={`ml-4 w-16 h-0.5 ${
+                    step < currentStep
+                      ? 'bg-blue-600'
+                      : isDarkMode
+                      ? 'bg-gray-700'
+                      : 'bg-gray-200'
+                  }`}
                 />
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClasses}>
-              Short Description
-            </label>
-            <textarea
-              name="short_description"
-              value={formData.short_description}
-              onChange={handleInputChange}
-              rows={3}
-              className={inputClasses}
-              placeholder="Brief description for course card"
-            />
-          </div>
-
-          <div>
-            <label className={labelClasses}>
-              Description <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-              rows={4}
-              className={`${inputClasses} ${errors.description ? 'border-red-500' : ''}`}
-              placeholder="Detailed course description"
-            />
-            {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              name="is_published"
-              checked={formData.is_published}
-              onChange={handleInputChange}
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label className={`ml-2 text-sm ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-              Publish course immediately
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Key Topics */}
-      <div>
-        <label className={labelClasses}>Key Topics</label>
-        <div className="space-y-2">
-          {formData.key_topics.map((topic, index) => (
-            <div key={index} className="flex gap-2">
-              <input
-                type="text"
-                value={topic}
-                onChange={(e) => handleArrayFieldChange('key_topics', index, e.target.value)}
-                className={`flex-1 ${inputClasses}`}
-                placeholder="Enter key topic"
-              />
-              <button
-                type="button"
-                onClick={() => removeArrayField('key_topics', index)}
-                className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-              >
-                <FaTrash />
-              </button>
+              )}
             </div>
           ))}
-          <button
-            type="button"
-            onClick={() => addArrayField('key_topics')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed transition-colors ${
-              isDarkMode 
-                ? 'border-gray-600 text-gray-400 hover:bg-gray-700 hover:border-gray-500' 
-                : 'border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400'
-            }`}
-          >
-            <FaPlus /> Add Key Topic
-          </button>
         </div>
       </div>
 
-      {/* Learning Points */}
-      <div>
-        <label className={labelClasses}>Learning Points</label>
-        <div className="space-y-2">
-          {formData.learning_points.map((point, index) => (
-            <div key={index} className="flex gap-2">
-              <input
-                type="text"
-                value={point}
-                onChange={(e) => handleArrayFieldChange('learning_points', index, e.target.value)}
-                className={`flex-1 ${inputClasses}`}
-                placeholder="Enter learning point"
-              />
+      {/* Form Content */}
+      <form 
+        onSubmit={handleSubmit} 
+        onClick={(e) => {
+          // Prevent form submission if clicked outside a submit button
+          if (e.target.tagName !== 'BUTTON' || e.target.type !== 'submit') {
+            e.preventDefault();
+          }
+        }}
+      >
+        {renderStepContent()}
+        
+        {/* Navigation Buttons */}
+        <div className="flex justify-between pt-8 border-t border-gray-200 dark:border-gray-700 mt-8">
+          <div>
+            {currentStep > 1 && (
               <button
                 type="button"
-                onClick={() => removeArrayField('learning_points', index)}
-                className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                onClick={prevStep}
+                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                  isDarkMode
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               >
-                <FaTrash />
+                <FaArrowLeft className="inline mr-2" />
+                Previous
               </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => addArrayField('learning_points')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed transition-colors ${
-              isDarkMode 
-                ? 'border-gray-600 text-gray-400 hover:bg-gray-700 hover:border-gray-500' 
-                : 'border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400'
-            }`}
-          >
-            <FaPlus /> Add Learning Point
-          </button>
+            )}
+          </div>
+          
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isUpdating}
+              className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                isDarkMode
+                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50'
+              }`}
+            >
+              <FaTimes className="inline mr-2" />
+              Cancel
+            </button>
+            
+            {currentStep < totalSteps ? (
+              <button
+                type="button" 
+                onClick={(e) => {
+                  e.preventDefault(); // Prevent any form submission
+                  console.log("Next button clicked");
+                  nextStep();
+                }}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
+                Next
+                <FaArrowRight className="inline ml-2" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={isUpdating}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+              >
+                {isUpdating ? (
+                  <>
+                    <FaSpinner className="inline mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <FaSave className="inline mr-2" />
+                    Update Course
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-
-      {/* Form Actions */}
-      <div className="flex justify-end gap-4 pt-6 border-t border-gray-200 dark:border-gray-700">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isUpdating}
-          className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-            isDarkMode 
-              ? 'bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50' 
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50'
-          }`}
-        >
-          <FaTimes className="inline mr-2" />
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={isUpdating}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          {isUpdating ? (
-            <>
-              <FaSpinner className="inline mr-2 animate-spin" />
-              Updating...
-            </>
-          ) : (
-            <>
-              <FaSave className="inline mr-2" />
-              Update Course
-            </>
-          )}
-        </button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 };
 

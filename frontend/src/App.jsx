@@ -27,6 +27,7 @@ import MobileBottomNavigation from './components/Navigation/MobileBottomNavigati
 import AdminDashboard from './components/Admin/Dashboard/AdminDashboard';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import HelpCenter from './components/HelpCenter/HelpCenter';
 import StandaloneQuizPage from './components/CourseLearningPage/templ/StandaloneQuizPage';
 import NotFound from './components/NotFound/NotFound';
@@ -149,30 +150,31 @@ const ProtectedRoute = ({ children }) => {
 const App = () => {
   return (
     <AuthProvider>
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
+      <ThemeProvider>
+        <Toaster 
+          position="top-right"
+          toastOptions={{
             duration: 3000,
             style: {
-              background: '#22c55e',
+              background: '#363636',
               color: '#fff',
             },
-          },
-          error: {
-            duration: 4000,
-            style: {
-              background: '#ef4444',
-              color: '#fff',
+            success: {
+              duration: 3000,
+              style: {
+                background: '#22c55e',
+                color: '#fff',
+              },
             },
-          },
-        }} 
-      />      <BrowserRouter>
+            error: {
+              duration: 4000,
+              style: {
+                background: '#ef4444',
+                color: '#fff',
+              },
+            },
+          }} 
+        />      <BrowserRouter>
         <Layout excludePaths={['/admin-p', '/chat']}>
           <Routes>
             <Route path="/" element={<HomePage />} />
@@ -302,6 +304,7 @@ const App = () => {
         </Layout>
         <FloatingChatButton />
       </BrowserRouter>
+      </ThemeProvider>
     </AuthProvider>
   );
 }
