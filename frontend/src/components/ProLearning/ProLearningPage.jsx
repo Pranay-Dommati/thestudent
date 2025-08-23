@@ -1797,20 +1797,6 @@ const ProLearningPage = () => {
                     <p className="text-sm text-gray-600">Comprehensive study content</p>
                   </div>
                 </div>
-                <div className="hidden md:flex items-center space-x-3 text-xs text-gray-600">
-                  <div className="flex items-center bg-white px-2 py-1 rounded-full shadow-sm">
-                    <BiTime className="mr-1 text-blue-500" />
-                    <span>{stats.estimatedReadTime}m read</span>
-                  </div>
-                  <div className="flex items-center bg-white px-2 py-1 rounded-full shadow-sm">
-                    <FaBullseye className="mr-1 text-purple-500" />
-                    <span>{stats.difficulty}</span>
-                  </div>
-                  <button className="flex items-center text-blue-600 hover:text-blue-700 font-medium">
-                    <IoBookmark className="mr-1" />
-                    {bookmarked ? 'Bookmarked' : 'Bookmark'}
-                  </button>
-                </div>
               </div>
             </div>
             {/* Enhanced Content with better typography, all content together */}
