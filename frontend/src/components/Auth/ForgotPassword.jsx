@@ -65,8 +65,8 @@ export default function ForgotPassword() {
         <div className="md:hidden h-16" aria-hidden="true"></div>
 
         {/* Mobile (no card) */}
-        <div className="block md:hidden overflow-y-auto">
-          <div className="min-h-screen px-4 pt-4 pb-12 max-w-sm mx-auto">
+        <div className="block md:hidden">
+          <div className="min-h-screen px-4 pt-8 pb-20 max-w-sm mx-auto flex flex-col justify-center">
             <div className="text-center mb-6">
               <div className="text-6xl mb-3">✅</div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Email Sent!</h2>
@@ -166,17 +166,15 @@ export default function ForgotPassword() {
   <div className="md:hidden h-16" aria-hidden="true"></div>
 
       {/* Mobile (no card) */}
-      <div className="block md:hidden overflow-y-auto">
-  <div className="min-h-screen px-4 pt-4 pb-12 max-w-sm mx-auto">
+      <div className="block md:hidden">
+        <div className="min-h-screen px-4 pt-8 pb-20 max-w-sm mx-auto flex flex-col justify-center">
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Forgot Password?</h1>
             <p className="text-gray-600">
               No worries! Enter your email and we'll send you reset instructions.
             </p>
-          </div>
-
-          {/* Form */}
+          </div>          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
@@ -229,12 +227,7 @@ export default function ForgotPassword() {
             </Link>
           </div>
 
-          {/* Help Text */}
-          <div className="mt-8 p-4 rounded-xl border border-gray-100 bg-white">
-            <p className="text-sm text-gray-600 text-center">
-              <strong>Need help?</strong> Contact our support team if you're having trouble accessing your account.
-            </p>
-          </div>
+          {/* Help Text removed on mobile as requested */}
         </div>
       </div>
 
