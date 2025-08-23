@@ -1241,11 +1241,9 @@ const ChatbotPage = () => {
               className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 w-fit ${
                 message.type === "user"
                   ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg backdrop-blur-sm rounded-br-md"
-                  : message.isNetworkError
-                    ? "bg-gradient-to-br from-blue-50 to-sky-50 border border-blue-200 shadow-md rounded-2xl" 
-                    : isLearningPlan || isProCard
-                      ? "bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl" 
-                      : "bg-white/70 backdrop-blur-md text-gray-800 border border-white/30 shadow-sm rounded-bl-md hover:bg-white/80 transition-all duration-200"
+                  : isLearningPlan || isProCard
+                    ? "bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl" 
+                    : "bg-white/70 backdrop-blur-md text-gray-800 border border-white/30 shadow-sm rounded-bl-md hover:bg-white/80 transition-all duration-200"
               }`}
             >
               {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
