@@ -616,5 +616,4 @@ const ProfilePageDesktop = () => {
     </div>
   );
 };
-
 export default ProfilePageDesktop;
