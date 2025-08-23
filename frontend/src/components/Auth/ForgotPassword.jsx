@@ -68,7 +68,9 @@ export default function ForgotPassword() {
         <div className="block md:hidden">
           <div className="min-h-screen px-4 pt-8 pb-20 max-w-sm mx-auto flex flex-col justify-center">
             <div className="text-center mb-6">
-              <div className="text-6xl mb-3">✅</div>
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FaCheckCircle className="w-8 h-8 text-green-600" />
+              </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Email Sent!</h2>
               <p className="text-gray-600 leading-relaxed">
                 If an account with email <span className="font-semibold text-blue-600">{email}</span> exists, we've sent a password reset link to your inbox.
