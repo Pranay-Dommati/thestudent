@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoLibraryOutline, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose } from "react-icons/io5";
+import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoLibraryOutline, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline } from "react-icons/io5";
 import { FaRobot } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
@@ -12,6 +12,7 @@ import AuthModal from '../Common/AuthModal';
 import ErrorBoundary from '../Common/ErrorBoundary';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
+import proLearningHistoryService from '../../services/ProLearningHistoryService';
 
 // Custom CSS - added for DeepSeek-like UI
 import './mobileChatStyles.css';
@@ -140,6 +141,7 @@ const MobileChatbotPage = () => {
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
   const [showNavMenu, setShowNavMenu] = useState(false);
+  const [proLearningHistory, setProLearningHistory] = useState([]);
 
   // Check if user has visited chat page before
   useEffect(() => {
@@ -148,6 +150,34 @@ const MobileChatbotPage = () => {
       setShowWelcomeMessage(true);
       localStorage.setItem('hasVisitedChat', 'true');
     }
+  }, []);
+
+  // Load ProLearning history on component mount
+  useEffect(() => {
+    const loadHistory = () => {
+      const history = proLearningHistoryService.getHistory();
+      setProLearningHistory(history);
+    };
+    
+    loadHistory();
+    
+    // Listen for storage changes to update history in real-time
+    const handleStorageChange = () => {
+      loadHistory();
+    };
+    
+    // Listen for custom history update events
+    const handleHistoryUpdate = () => {
+      loadHistory();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('prolearning-history-updated', handleHistoryUpdate);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('prolearning-history-updated', handleHistoryUpdate);
+    };
   }, []);
 
   // Random course placeholder texts - Topic focused (same as desktop)
@@ -835,6 +865,13 @@ const MobileChatbotPage = () => {
                           
                           localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
                           console.log('🚀 Mobile Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
+                          
+                          // Track in ProLearning history
+                          proLearningHistoryService.trackCourseCreation(message.courseId, message.topic);
+                          
+                          // Refresh history state
+                          setProLearningHistory(proLearningHistoryService.getHistory());
+                          
                         } catch (error) {
                           console.error('Failed to store batch generation data:', error);
                         }
@@ -946,14 +983,37 @@ const MobileChatbotPage = () => {
                   
                   <div className="border-t border-gray-100 my-1"></div>
                   
-                  <Link
-                    to="/"
-                    className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
-                    onClick={() => setShowNavMenu(false)}
-                  >
-                    <IoHomeOutline size={18} className="mr-3 text-green-600" />
-                    <span className="font-medium">Home</span>
-                  </Link>
+                  {/* History Section */}
+                  <div className="px-4 py-2">
+                    <div className="flex items-center mb-2">
+                      <IoTimeOutline size={16} className="mr-2 text-purple-600" />
+                      <span className="font-medium text-sm text-gray-700">ProLearning History</span>
+                    </div>
+                    
+                    {proLearningHistory.length === 0 ? (
+                      <div className="text-xs text-gray-500 ml-6">No history yet</div>
+                    ) : (
+                      <div className="ml-6 max-h-64 overflow-y-auto">
+                        {proLearningHistory.slice(0, 10).map((item, index) => (
+                          <a
+                            key={item.id}
+                            href={item.url}
+                            className="block py-2 px-2 mb-1 text-xs text-gray-600 hover:bg-purple-50 hover:text-purple-700 rounded-md transition-colors border-l-2 border-purple-200 hover:border-purple-400"
+                            onClick={() => setShowNavMenu(false)}
+                          >
+                            <div className="font-medium truncate">{item.topic}</div>
+                            <div className="text-gray-400 text-xs">{item.dateCreated} • {item.timeCreated}</div>
+                          </a>
+                        ))}
+                        
+                        {proLearningHistory.length > 10 && (
+                          <div className="text-xs text-gray-400 text-center py-1">
+                            +{proLearningHistory.length - 10} more courses
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </>
             )}

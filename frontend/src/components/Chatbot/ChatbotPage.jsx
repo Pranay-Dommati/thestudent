@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle } from "react-icons/io5";
+import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline } from "react-icons/io5";
 import { FaRobot, FaGraduationCap, FaBook, FaRegUser } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
@@ -11,6 +11,7 @@ import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclas
 import AuthModal from '../Common/AuthModal';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
+import proLearningHistoryService from '../../services/ProLearningHistoryService';
 
 // Extract learning context from user's prompt
 const extractLearningContext = (prompt) => {
@@ -538,6 +539,7 @@ const ChatbotPage = () => {
   const [retryingMessageId, setRetryingMessageId] = useState(null); // Track which specific message is being retried
   const networkErrorTimeouts = useRef({}); // Store timeout IDs for network error messages
   const cancelledRetriesRef = useRef(new Set()); // Track message IDs whose retries were cancelled by a new prompt
+  const [proLearningHistory, setProLearningHistory] = useState([]); // ProLearning course history
 
   // Generate unique message ID
   const generateMessageId = () => Date.now() + Math.random();
@@ -607,6 +609,34 @@ const ChatbotPage = () => {
       setShowWelcomeMessage(true);
       localStorage.setItem('hasVisitedChat', 'true');
     }
+  }, []);
+
+  // Load ProLearning history on component mount
+  useEffect(() => {
+    const loadHistory = () => {
+      const history = proLearningHistoryService.getHistory();
+      setProLearningHistory(history);
+    };
+    
+    loadHistory();
+    
+    // Listen for storage changes to update history in real-time
+    const handleStorageChange = () => {
+      loadHistory();
+    };
+    
+    // Listen for custom history update events
+    const handleHistoryUpdate = () => {
+      loadHistory();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('prolearning-history-updated', handleHistoryUpdate);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('prolearning-history-updated', handleHistoryUpdate);
+    };
   }, []);
 
   // Handle ESC key to close welcome message
@@ -1726,6 +1756,13 @@ const ChatbotPage = () => {
                           
                           localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
                           console.log('🚀 Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
+                          
+                          // Track in ProLearning history
+                          proLearningHistoryService.trackCourseCreation(message.courseId, message.topic);
+                          
+                          // Refresh history state
+                          setProLearningHistory(proLearningHistoryService.getHistory());
+                          
                         } catch (error) {
                           console.error('Failed to store batch generation data:', error);
                         }
@@ -1918,31 +1955,6 @@ const ChatbotPage = () => {
             </Link>
             
             <Link
-              to="/pro-learning"
-              className="flex items-center justify-between p-3 rounded-xl hover:bg-white/50 
-                        group transition-all duration-200 border border-white/30 
-                        hover:border-white/50 shadow-sm hover:shadow-md backdrop-blur-sm"
-            >
-              <div className="flex items-center">
-                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 
-                              group-hover:text-white transition-colors shadow-sm">
-                  <FaGraduationCap size={18} />
-                </div>
-                <span className="ml-3 font-medium text-gray-700 group-hover:text-indigo-600">
-                  Pro Learning
-                </span>
-              </div>
-              <svg
-                className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transform group-hover:translate-x-1 transition-all"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-            
-            <Link
               to="/profile"
               className="flex items-center justify-between p-3 rounded-xl hover:bg-white/50 
                         group transition-all duration-200 border border-white/30 
@@ -1966,6 +1978,63 @@ const ChatbotPage = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </Link>
+
+            {/* ProLearning History Section */}
+            <div className="mt-4 pt-4 border-t border-white/30">
+              <div className="flex items-center mb-3">
+                <div className="p-2 rounded-full bg-purple-100 text-purple-600 shadow-sm">
+                  <IoTimeOutline size={18} />
+                </div>
+                <span className="ml-3 font-medium text-gray-700">ProLearning History</span>
+              </div>
+              
+              {proLearningHistory.length === 0 ? (
+                <div className="text-sm text-gray-500 text-center py-4 italic">
+                  No history yet. Create your first ProLearning course!
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {proLearningHistory.slice(0, 8).map((item, index) => (
+                    <a
+                      key={item.id}
+                      href={item.url}
+                      className="block p-3 rounded-lg bg-white/30 hover:bg-white/50 
+                               transition-all duration-200 border border-white/40 
+                               hover:border-purple-300 group"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-gray-700 group-hover:text-purple-700 
+                                        truncate mb-1">
+                            {item.topic}
+                          </div>
+                          <div className="text-xs text-gray-500 flex items-center">
+                            <span>{item.dateCreated}</span>
+                            <span className="mx-1">•</span>
+                            <span>{item.timeCreated}</span>
+                          </div>
+                        </div>
+                        <svg
+                          className="w-4 h-4 text-gray-400 group-hover:text-purple-600 
+                                   transform group-hover:translate-x-1 transition-all flex-shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </a>
+                  ))}
+                  
+                  {proLearningHistory.length > 8 && (
+                    <div className="text-xs text-gray-500 text-center py-2 border-t border-white/20">
+                      +{proLearningHistory.length - 8} more courses
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
