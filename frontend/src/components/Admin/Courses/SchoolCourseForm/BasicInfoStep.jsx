@@ -21,34 +21,34 @@ const STATE_OPTIONS = [
 // Subject options based on class
 const SUBJECT_OPTIONS = {
   '6th': [
-    'English', 'Hindi', 'Mathematics', 'Science', 'Social Science', 'Sanskrit', 
-    'Computer Science', 'Other'
+    'English', 'Hindi', 'Telugu', 'Mathematics', 'Science', 'Physics', 'Chemistry', 
+    'Biology', 'Social', 'Sanskrit', 'Computer Science', 'Other'
   ],
   '7th': [
-    'English', 'Hindi', 'Mathematics', 'Science', 'Social Science', 'Sanskrit', 
-    'Computer Science', 'Other'
+    'English', 'Hindi', 'Telugu', 'Mathematics', 'Science', 'Physics', 'Chemistry', 
+    'Biology', 'Social', 'Sanskrit', 'Computer Science', 'Other'
   ],
   '8th': [
-    'English', 'Hindi', 'Mathematics', 'Science', 'Social Science', 'Sanskrit', 
-    'Computer Science', 'Other'
+    'English', 'Hindi', 'Telugu', 'Mathematics', 'Science', 'Physics', 'Chemistry', 
+    'Biology', 'Social', 'Sanskrit', 'Computer Science', 'Other'
   ],
   '9th': [
-    'English', 'Hindi', 'Mathematics', 'Science', 'Social Science', 'Sanskrit', 
-    'Computer Science', 'Other'
+    'English', 'Hindi', 'Telugu', 'Mathematics', 'Science', 'Physics', 'Chemistry', 
+    'Biology', 'Social', 'Sanskrit', 'Computer Science', 'Other'
   ],
   '10th': [
-    'English', 'Hindi', 'Mathematics', 'Science', 'Social', 'Sanskrit', 
-    'Computer Science', 'Other'
+    'English', 'Hindi', 'Telugu', 'Mathematics', 'Science', 'Physics', 'Chemistry', 
+    'Biology', 'Social', 'Sanskrit', 'Computer Science', 'Other'
   ],
   '11th': [
-    'Physics', 'Chemistry', 'Mathematics', 'Biology', 'English', 'Computer Science', 
-    'Economics', 'Business Studies', 'Accountancy', 'Political Science', 'History', 
-    'Geography', 'Psychology', 'Sociology', 'Physical Education', 'Other'
+    'Physics', 'Chemistry', 'Mathematics', 'Biology', 'English', 'Hindi', 'Telugu', 
+    'Computer Science', 'Economics', 'Business Studies', 'Accountancy', 'Political Science', 
+    'History', 'Geography', 'Psychology', 'Sociology', 'Physical Education', 'Other'
   ],
   '12th': [
-    'Physics', 'Chemistry', 'Mathematics', 'Biology', 'English', 'Computer Science', 
-    'Economics', 'Business Studies', 'Accountancy', 'Political Science', 'History', 
-    'Geography', 'Psychology', 'Sociology', 'Physical Education', 'Other'
+    'Physics', 'Chemistry', 'Mathematics', 'Biology', 'English', 'Hindi', 'Telugu', 
+    'Computer Science', 'Economics', 'Business Studies', 'Accountancy', 'Political Science', 
+    'History', 'Geography', 'Psychology', 'Sociology', 'Physical Education', 'Other'
   ]
 };
 
