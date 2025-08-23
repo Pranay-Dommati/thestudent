@@ -1896,29 +1896,46 @@ def update_course(request, course_id):
             if 'short_description' in data or 'shortDescription' in data:
                 school_course.short_description = data.get('short_description', data.get('shortDescription', ''))
             if 'is_published' in data:
-                school_course.is_published = data.get('is_published', False)
+                # Handle string to boolean conversion for FormData
+                is_published_value = data.get('is_published', False)
+                if isinstance(is_published_value, str):
+                    school_course.is_published = is_published_value.lower() in ('true', '1', 'yes', 'on')
+                else:
+                    school_course.is_published = bool(is_published_value)
                 
             # Handle key_topics and learning_points
             if 'key_topics' in data:
                 try:
-                    school_course.key_topics = json.loads(data.get('key_topics', '[]'))
-                except json.JSONDecodeError:
+                    key_topics_data = data.get('key_topics', '[]')
+                    if not key_topics_data.strip():
+                        key_topics_data = '[]'
+                    school_course.key_topics = json.loads(key_topics_data)
+                except (json.JSONDecodeError, AttributeError):
                     school_course.key_topics = []
             elif 'keyTopics' in data:
                 try:
-                    school_course.key_topics = json.loads(data.get('keyTopics', '[]'))
-                except json.JSONDecodeError:
+                    key_topics_data = data.get('keyTopics', '[]')
+                    if not key_topics_data.strip():
+                        key_topics_data = '[]'
+                    school_course.key_topics = json.loads(key_topics_data)
+                except (json.JSONDecodeError, AttributeError):
                     school_course.key_topics = []
                     
             if 'learning_points' in data:
                 try:
-                    school_course.learning_points = json.loads(data.get('learning_points', '[]'))
-                except json.JSONDecodeError:
+                    learning_points_data = data.get('learning_points', '[]')
+                    if not learning_points_data.strip():
+                        learning_points_data = '[]'
+                    school_course.learning_points = json.loads(learning_points_data)
+                except (json.JSONDecodeError, AttributeError):
                     school_course.learning_points = []
             elif 'learningPoints' in data:
                 try:
-                    school_course.learning_points = json.loads(data.get('learningPoints', '[]'))
-                except json.JSONDecodeError:
+                    learning_points_data = data.get('learningPoints', '[]')
+                    if not learning_points_data.strip():
+                        learning_points_data = '[]'
+                    school_course.learning_points = json.loads(learning_points_data)
+                except (json.JSONDecodeError, AttributeError):
                     school_course.learning_points = []
             
             # Handle thumbnail update
@@ -1944,20 +1961,31 @@ def update_course(request, course_id):
             if 'short_description' in data or 'shortDescription' in data:
                 engineering_course.short_description = data.get('short_description', data.get('shortDescription', ''))
             if 'is_published' in data:
-                engineering_course.is_published = data.get('is_published', False)
+                # Handle string to boolean conversion for FormData
+                is_published_value = data.get('is_published', False)
+                if isinstance(is_published_value, str):
+                    engineering_course.is_published = is_published_value.lower() in ('true', '1', 'yes', 'on')
+                else:
+                    engineering_course.is_published = bool(is_published_value)
             if 'price' in data:
                 engineering_course.price = data.get('price', 0)
                 
             # Handle learning_objectives
             if 'learning_objectives' in data:
                 try:
-                    engineering_course.learning_objectives = json.loads(data.get('learning_objectives', '[]'))
-                except json.JSONDecodeError:
+                    objectives_data = data.get('learning_objectives', '[]')
+                    if not objectives_data.strip():
+                        objectives_data = '[]'
+                    engineering_course.learning_objectives = json.loads(objectives_data)
+                except (json.JSONDecodeError, AttributeError):
                     engineering_course.learning_objectives = []
             elif 'learningObjectives' in data:
                 try:
-                    engineering_course.learning_objectives = json.loads(data.get('learningObjectives', '[]'))
-                except json.JSONDecodeError:
+                    objectives_data = data.get('learningObjectives', '[]')
+                    if not objectives_data.strip():
+                        objectives_data = '[]'
+                    engineering_course.learning_objectives = json.loads(objectives_data)
+                except (json.JSONDecodeError, AttributeError):
                     engineering_course.learning_objectives = []
             
             # Handle thumbnail update
