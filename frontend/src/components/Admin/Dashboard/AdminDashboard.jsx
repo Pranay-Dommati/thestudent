@@ -10,6 +10,7 @@ import AdminFeedbacks from '../Feedbacks/AdminFeedbacks';
 import AdminNewsletter from '../Newsletter/AdminNewsletter';
 import CourseManagement from '../Courses/CourseManagement';
 import CourseForm from '../Courses/CourseForm';
+import EditCourse from '../Courses/EditCourse';
 import AdminLogin from '../AdminLogin';
 import authService from '../../../services/authService';
 
@@ -143,6 +144,7 @@ const AdminDashboard = () => {
               <Route index element={<Navigate to="/admin-p/courses" />} />
               <Route path="courses/*" element={<CourseManagement isDarkMode={isDarkMode} />} />
               <Route path="add-course" element={<CourseForm onCancel={() => navigate('/admin-p/courses')} isDarkMode={isDarkMode} />} />
+              <Route path="edit-course/:courseId" element={<EditCourse isDarkMode={isDarkMode} />} />
               <Route path="users" element={<AdminUsers isDarkMode={isDarkMode} />} />
               <Route path="feedbacks" element={<AdminFeedbacks isDarkMode={isDarkMode} />} />
               <Route path="newsletter" element={<AdminNewsletter isDarkMode={isDarkMode} />} />

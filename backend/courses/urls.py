@@ -10,6 +10,11 @@ urlpatterns = [
     path('api/courses/school/', views.list_school_courses, name='list-school-courses'),
     path('api/courses/school/<str:course_id>/', views.get_school_course_by_id, name='get-school-course-by-id'),
     
+    # Course CRUD operations
+    path('api/courses/<str:course_id>/', views.get_course_by_id, name='get-course-by-id'),
+    path('api/courses/<str:course_id>/update/', views.update_course, name='update-course'),
+    path('api/courses/<str:course_id>/delete/', views.delete_course, name='delete-course'),
+    
     # Progress tracking endpoints
     path('api/courses/progress/<str:course_id>/', views.get_course_progress, name='get-course-progress'),
     path('api/lessons/complete/<int:lesson_id>/', views.toggle_lesson_completion, name='toggle-lesson-completion'),

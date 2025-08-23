@@ -1801,3 +1801,291 @@ def get_learning_stats(request):
         return Response({
             'error': f'Failed to get learning stats: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+def delete_course(request, course_id):
+    """
+    Delete a course (both school and engineering courses)
+    """
+    try:
+        # Try to find the course in SchoolCourse first
+        school_course = None
+        engineering_course = None
+        
+        try:
+            school_course = get_object_or_404(SchoolCourse, id=course_id)
+            course_type = 'school'
+        except Http404:
+            try:
+                engineering_course = get_object_or_404(EngineeringCourse, id=course_id)
+                course_type = 'engineering'
+            except Http404:
+                return Response({
+                    'error': 'Course not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Delete the course
+        if school_course:
+            course_title = school_course.title
+            school_course.delete()
+        else:
+            course_title = engineering_course.title
+            engineering_course.delete()
+        
+        return Response({
+            'success': True,
+            'message': f'Course "{course_title}" deleted successfully',
+            'course_type': course_type
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in delete_course: {str(e)}")
+        return Response({
+            'error': f'Failed to delete course: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT', 'PATCH'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+@permission_classes([AllowAny])
+def update_course(request, course_id):
+    """
+    Update a course (both school and engineering courses)
+    """
+    try:
+        data = request.data
+        print("Received update data:", data)  # Debug print
+        
+        # Try to find the course in SchoolCourse first
+        school_course = None
+        engineering_course = None
+        
+        try:
+            school_course = get_object_or_404(SchoolCourse, id=course_id)
+            course_type = 'school'
+        except Http404:
+            try:
+                engineering_course = get_object_or_404(EngineeringCourse, id=course_id)
+                course_type = 'engineering'
+            except Http404:
+                return Response({
+                    'error': 'Course not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Update School Course
+        if school_course:
+            # Update basic fields
+            if 'title' in data:
+                school_course.title = data.get('title')
+            if 'class_level' in data:
+                school_course.class_level = data.get('class_level')
+            if 'board' in data:
+                school_course.board = data.get('board')
+            if 'state' in data:
+                school_course.state = data.get('state', '')
+            if 'subject' in data:
+                school_course.subject = data.get('subject')
+            if 'sources' in data:
+                school_course.sources = data.get('sources', '')
+            if 'duration' in data:
+                school_course.duration = data.get('duration', '')
+            if 'description' in data:
+                school_course.description = data.get('description')
+            if 'short_description' in data or 'shortDescription' in data:
+                school_course.short_description = data.get('short_description', data.get('shortDescription', ''))
+            if 'is_published' in data:
+                school_course.is_published = data.get('is_published', False)
+                
+            # Handle key_topics and learning_points
+            if 'key_topics' in data:
+                try:
+                    school_course.key_topics = json.loads(data.get('key_topics', '[]'))
+                except json.JSONDecodeError:
+                    school_course.key_topics = []
+            elif 'keyTopics' in data:
+                try:
+                    school_course.key_topics = json.loads(data.get('keyTopics', '[]'))
+                except json.JSONDecodeError:
+                    school_course.key_topics = []
+                    
+            if 'learning_points' in data:
+                try:
+                    school_course.learning_points = json.loads(data.get('learning_points', '[]'))
+                except json.JSONDecodeError:
+                    school_course.learning_points = []
+            elif 'learningPoints' in data:
+                try:
+                    school_course.learning_points = json.loads(data.get('learningPoints', '[]'))
+                except json.JSONDecodeError:
+                    school_course.learning_points = []
+            
+            # Handle thumbnail update
+            if 'thumbnail' in request.FILES:
+                school_course.thumbnail = request.FILES['thumbnail']
+            
+            school_course.save()
+            course = school_course
+            
+        # Update Engineering Course
+        else:
+            # Update basic fields
+            if 'title' in data:
+                engineering_course.title = data.get('title')
+            if 'category' in data:
+                engineering_course.category = data.get('category')
+            if 'proficiency_level' in data:
+                engineering_course.proficiency_level = data.get('proficiency_level')
+            if 'duration' in data:
+                engineering_course.duration = data.get('duration', '')
+            if 'description' in data:
+                engineering_course.description = data.get('description')
+            if 'short_description' in data or 'shortDescription' in data:
+                engineering_course.short_description = data.get('short_description', data.get('shortDescription', ''))
+            if 'is_published' in data:
+                engineering_course.is_published = data.get('is_published', False)
+            if 'price' in data:
+                engineering_course.price = data.get('price', 0)
+                
+            # Handle learning_objectives
+            if 'learning_objectives' in data:
+                try:
+                    engineering_course.learning_objectives = json.loads(data.get('learning_objectives', '[]'))
+                except json.JSONDecodeError:
+                    engineering_course.learning_objectives = []
+            elif 'learningObjectives' in data:
+                try:
+                    engineering_course.learning_objectives = json.loads(data.get('learningObjectives', '[]'))
+                except json.JSONDecodeError:
+                    engineering_course.learning_objectives = []
+            
+            # Handle thumbnail update
+            if 'thumbnail' in request.FILES:
+                engineering_course.thumbnail = request.FILES['thumbnail']
+            
+            engineering_course.save()
+            course = engineering_course
+        
+        # Return updated course data
+        course_data = {
+            'id': str(course.id),
+            'title': course.title,
+            'description': course.description,
+            'short_description': course.short_description,
+            'thumbnail': course.thumbnail.url if course.thumbnail else None,
+            'duration': course.duration,
+            'is_published': course.is_published,
+            'course_type': course_type,
+            'last_updated': course.last_updated,
+            'created_at': course.created_at,
+        }
+        
+        # Add type-specific fields
+        if course_type == 'school':
+            course_data.update({
+                'class_level': course.class_level,
+                'board': course.board,
+                'state': course.state,
+                'subject': course.subject,
+                'sources': course.sources,
+                'key_topics': course.key_topics,
+                'learning_points': course.learning_points,
+                'class': course.class_level,
+                'category': course.subject,
+            })
+        else:
+            course_data.update({
+                'category': course.category,
+                'proficiency_level': course.proficiency_level,
+                'learning_objectives': course.learning_objectives,
+                'price': course.price,
+            })
+        
+        return Response({
+            'success': True,
+            'message': f'Course "{course.title}" updated successfully',
+            'course': course_data
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in update_course: {str(e)}")
+        traceback.print_exc()
+        return Response({
+            'error': f'Failed to update course: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_course_by_id(request, course_id):
+    """
+    Get a specific course by ID (both school and engineering courses)
+    """
+    try:
+        # Try to find the course in SchoolCourse first
+        school_course = None
+        engineering_course = None
+        
+        try:
+            school_course = get_object_or_404(SchoolCourse, id=course_id)
+            course_type = 'school'
+        except Http404:
+            try:
+                engineering_course = get_object_or_404(EngineeringCourse, id=course_id)
+                course_type = 'engineering'
+            except Http404:
+                return Response({
+                    'error': 'Course not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get course data
+        if school_course:
+            course = school_course
+            course_data = {
+                'id': str(course.id),
+                'title': course.title,
+                'description': course.description,
+                'short_description': course.short_description,
+                'thumbnail': course.thumbnail.url if course.thumbnail else None,
+                'duration': course.duration,
+                'is_published': course.is_published,
+                'course_type': course_type,
+                'last_updated': course.last_updated,
+                'created_at': course.created_at,
+                'class_level': course.class_level,
+                'board': course.board,
+                'state': course.state,
+                'subject': course.subject,
+                'sources': course.sources,
+                'key_topics': course.key_topics,
+                'learning_points': course.learning_points,
+                'class': course.class_level,
+                'category': course.subject,
+            }
+        else:
+            course = engineering_course
+            course_data = {
+                'id': str(course.id),
+                'title': course.title,
+                'description': course.description,
+                'short_description': course.short_description,
+                'thumbnail': course.thumbnail.url if course.thumbnail else None,
+                'duration': course.duration,
+                'is_published': course.is_published,
+                'course_type': course_type,
+                'last_updated': course.last_updated,
+                'created_at': course.created_at,
+                'category': course.category,
+                'proficiency_level': course.proficiency_level,
+                'learning_objectives': course.learning_objectives,
+                'price': getattr(course, 'price', 0),
+            }
+        
+        return Response(course_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in get_course_by_id: {str(e)}")
+        return Response({
+            'error': f'Failed to get course: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

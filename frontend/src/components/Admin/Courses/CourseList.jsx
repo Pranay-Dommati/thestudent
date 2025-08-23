@@ -6,7 +6,7 @@ import { toast } from 'react-hot-toast';
 
 const API_URL = 'http://localhost:8000';
 
-const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
+const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshTrigger }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     category: '',
@@ -35,14 +35,14 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
     };
 
     fetchCourses();
-  }, [filters.category]);
+  }, [filters.category, refreshTrigger]); // Add refreshTrigger as dependency
 
   const handleEdit = (courseId, courseType) => {
     if (onEdit) onEdit(courseId, courseType);
   };
 
-  const handleDelete = (courseId, courseType) => {
-    if (onDelete) onDelete(courseId, courseType);
+  const handleDelete = (course) => {
+    if (onDelete) onDelete(course.id, course.course_type, course.title);
   };
 
   // Apply course type filter
@@ -233,7 +233,7 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
                       <FaEdit size={18} />
                     </button>
                     <button
-                      onClick={() => handleDelete(course.id, course.course_type)}
+                      onClick={() => handleDelete(course)}
                       className={`p-2.5 rounded-lg ${
                         isDarkMode 
                           ? 'bg-gray-700 text-red-400 hover:bg-gray-600' 

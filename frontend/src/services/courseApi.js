@@ -106,3 +106,76 @@ export const getSchoolCourses = async (classLevel, board, state = '') => {
     return [];
   }
 };
+
+export const getCourseById = async (courseId) => {
+  try {
+    console.log('Fetching course by ID:', courseId);
+    const response = await axios.get(`${API_URL}/api/courses/${courseId}/`);
+    console.log('Course data received:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching course by ID:', error);
+    throw error;
+  }
+};
+
+export const updateCourse = async (courseId, formData) => {
+  try {
+    console.log("Updating course with ID:", courseId);
+    console.log("Update data:", formData);
+    
+    const response = await axios.put(`${API_URL}/api/courses/${courseId}/update/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      withCredentials: true,
+    });
+    
+    console.log("Update API response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating course:', error);
+    
+    if (error.response?.status === 403) {
+      toast.error('Permission denied. Please check your authentication.');
+    } else if (error.response?.status === 400) {
+      const errorMessage = typeof error.response.data === 'object' 
+        ? JSON.stringify(error.response.data) 
+        : error.response.data;
+      toast.error(`Bad request: ${errorMessage}`);
+    } else if (error.response?.status === 404) {
+      toast.error('Course not found.');
+    } else if (error.code === 'ERR_NETWORK') {
+      toast.error('Cannot connect to server. Please make sure the backend is running.');
+    } else {
+      toast.error(error.response?.data?.message || 'Failed to update course');
+    }
+    throw error;
+  }
+};
+
+export const deleteCourse = async (courseId) => {
+  try {
+    console.log("Deleting course with ID:", courseId);
+    
+    const response = await axios.delete(`${API_URL}/api/courses/${courseId}/delete/`, {
+      withCredentials: true,
+    });
+    
+    console.log("Delete API response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting course:', error);
+    
+    if (error.response?.status === 403) {
+      toast.error('Permission denied. Please check your authentication.');
+    } else if (error.response?.status === 404) {
+      toast.error('Course not found.');
+    } else if (error.code === 'ERR_NETWORK') {
+      toast.error('Cannot connect to server. Please make sure the backend is running.');
+    } else {
+      toast.error(error.response?.data?.message || 'Failed to delete course');
+    }
+    throw error;
+  }
+};
