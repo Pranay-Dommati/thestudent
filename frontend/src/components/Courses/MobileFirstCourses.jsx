@@ -21,15 +21,18 @@ const MobileFirstCourses = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
     const [filteredLevels, setFilteredLevels] = useState([]);
+    const [availableLevels, setAvailableLevels] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const educationLevels = [
+    const allEducationLevels = [
         { 
             id: '6th', 
             name: '6th Standard', 
             icon: FaBook,
             description: 'Foundation courses for 6th grade',
             subjects: ['Math', 'Science', 'English'],
-            difficulty: 'Beginner'
+            difficulty: 'Beginner',
+            apiClass: '6th'
         },
         { 
             id: '7th', 
@@ -37,7 +40,8 @@ const MobileFirstCourses = () => {
             icon: FaBook,
             description: 'Foundation courses for 7th grade',
             subjects: ['Math', 'Science', 'English', 'Social'],
-            difficulty: 'Beginner'
+            difficulty: 'Beginner',
+            apiClass: '7th'
         },
         { 
             id: '8th', 
@@ -45,7 +49,8 @@ const MobileFirstCourses = () => {
             icon: FaBook,
             description: 'Foundation courses for 8th grade',
             subjects: ['Math', 'Science', 'English', 'Social'],
-            difficulty: 'Beginner'
+            difficulty: 'Beginner',
+            apiClass: '8th'
         },
         { 
             id: '9th', 
@@ -53,7 +58,8 @@ const MobileFirstCourses = () => {
             icon: FaGraduationCap,
             description: 'Foundation courses for 9th grade',
             subjects: ['Math', 'Physics', 'Chemistry', 'Biology'],
-            difficulty: 'Intermediate'
+            difficulty: 'Intermediate',
+            apiClass: '9th'
         },
         { 
             id: '10th', 
@@ -61,7 +67,8 @@ const MobileFirstCourses = () => {
             icon: FaBook,
             description: 'Board exam preparation',
             subjects: ['Math', 'Physics', 'Chemistry', 'Biology'],
-            difficulty: 'Intermediate'
+            difficulty: 'Intermediate',
+            apiClass: '10th'
         },
         { 
             id: '11th', 
@@ -69,7 +76,8 @@ const MobileFirstCourses = () => {
             icon: FaGraduationCap,
             description: 'Advanced courses for 11th grade',
             subjects: ['Math', 'Physics', 'Chemistry', 'Biology'],
-            difficulty: 'Advanced'
+            difficulty: 'Advanced',
+            apiClass: '11th'
         },
         { 
             id: '12th', 
@@ -77,7 +85,8 @@ const MobileFirstCourses = () => {
             icon: FaUniversity,
             description: 'Board & entrance exam prep',
             subjects: ['Math', 'Physics', 'Chemistry', 'Biology'],
-            difficulty: 'Advanced'
+            difficulty: 'Advanced',
+            apiClass: '12th'
         },
         { 
             id: 'engineering', 
@@ -85,14 +94,68 @@ const MobileFirstCourses = () => {
             icon: FaLaptopCode,
             description: 'Professional skill development',
             subjects: ['Programming', 'Web Dev', 'Data Science'],
-            difficulty: 'Expert'
+            difficulty: 'Expert',
+            apiClass: 'engineering'
         },
     ];
+
+    // Function to check if courses exist for a specific class level
+    const checkCoursesAvailability = async () => {
+        setLoading(true);
+        const levelsWithCourses = [];
+
+        try {
+            // Check school courses (6th to 12th)
+            const schoolLevels = allEducationLevels.filter(level => level.apiClass !== 'engineering');
+            
+            for (const level of schoolLevels) {
+                try {
+                    const response = await fetch(`http://localhost:8000/api/courses/school/?class=${level.apiClass}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data && data.length > 0) {
+                            levelsWithCourses.push(level);
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error checking courses for ${level.apiClass}:`, error);
+                }
+            }
+
+            // Check engineering courses
+            try {
+                const engineeringResponse = await fetch('http://localhost:8000/api/courses/engineering/');
+                if (engineeringResponse.ok) {
+                    const engineeringData = await engineeringResponse.json();
+                    if (engineeringData && engineeringData.length > 0) {
+                        const engineeringLevel = allEducationLevels.find(level => level.apiClass === 'engineering');
+                        if (engineeringLevel) {
+                            levelsWithCourses.push(engineeringLevel);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking engineering courses:', error);
+            }
+
+            setAvailableLevels(levelsWithCourses);
+        } catch (error) {
+            console.error('Error checking course availability:', error);
+            // Fallback: show all levels if API fails
+            setAvailableLevels(allEducationLevels);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleLevelSelect = (level) => {
         setSelectedLevel(level);
         navigate(`/courses/${level}`);
     };
+
+    useEffect(() => {
+        checkCoursesAvailability();
+    }, []);
 
     useEffect(() => {
         if (location.pathname === '/courses') {
@@ -102,7 +165,7 @@ const MobileFirstCourses = () => {
 
     useEffect(() => {
         if (searchQuery.trim()) {
-            const filtered = educationLevels.filter(level =>
+            const filtered = availableLevels.filter(level =>
                 level.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 level.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 level.subjects.some(subject => 
@@ -111,9 +174,9 @@ const MobileFirstCourses = () => {
             );
             setFilteredLevels(filtered);
         } else {
-            setFilteredLevels(educationLevels);
+            setFilteredLevels(availableLevels);
         }
-    }, [searchQuery]);
+    }, [searchQuery, availableLevels]);
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -317,50 +380,63 @@ const MobileFirstCourses = () => {
             
             <div className="bg-gray-50 min-h-screen pb-6">
                 <div className="container mx-auto px-4 py-6">
-                    <motion.div
-                        variants={containerVariants}
-                        initial="hidden"
-                        animate="visible"
-                        className="space-y-4"
-                    >
-                        {/* Course Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {filteredLevels.map((level, index) => (
-                                <MobileCourseCard 
-                                    key={level.id} 
-                                    level={level} 
-                                    index={index} 
-                                />
-                            ))}
+                    {loading ? (
+                        <div className="text-center py-12">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                            <p className="text-gray-600">Loading available courses...</p>
                         </div>
+                    ) : availableLevels.length === 0 ? (
+                        <div className="text-center py-12">
+                            <div className="text-gray-400 text-6xl mb-4">📚</div>
+                            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Courses Available Yet</h3>
+                            <p className="text-gray-500">New courses will appear here as they are added by administrators.</p>
+                        </div>
+                    ) : (
+                        <motion.div
+                            variants={containerVariants}
+                            initial="hidden"
+                            animate="visible"
+                            className="space-y-4"
+                        >
+                            {/* Course Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {filteredLevels.map((level, index) => (
+                                    <MobileCourseCard 
+                                        key={level.id} 
+                                        level={level} 
+                                        index={index} 
+                                    />
+                                ))}
+                            </div>
 
-                        {/* Empty State */}
-                        {filteredLevels.length === 0 && searchQuery && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="text-center py-12"
-                            >
-                                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full 
-                                              flex items-center justify-center">
-                                    <FaSearch className="w-6 h-6 text-gray-400" />
-                                </div>
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                    No courses found
-                                </h3>
-                                <p className="text-gray-500 text-sm">
-                                    Try searching with different keywords
-                                </p>
-                                <button
-                                    onClick={() => setSearchQuery('')}
-                                    className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg 
-                                             text-sm font-medium hover:bg-indigo-700 transition-colors"
+                            {/* Empty State for Search */}
+                            {filteredLevels.length === 0 && searchQuery && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="text-center py-12"
                                 >
-                                    Clear Search
-                                </button>
-                            </motion.div>
-                        )}
-                    </motion.div>
+                                    <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full 
+                                                  flex items-center justify-center">
+                                        <FaSearch className="w-6 h-6 text-gray-400" />
+                                    </div>
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                        No courses found
+                                    </h3>
+                                    <p className="text-gray-500 text-sm">
+                                        Try searching with different keywords
+                                    </p>
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg 
+                                                 text-sm font-medium hover:bg-indigo-700 transition-colors"
+                                    >
+                                        Clear Search
+                                    </button>
+                                </motion.div>
+                            )}
+                        </motion.div>
+                    )}
                 </div>
             </div>
             <Footer />

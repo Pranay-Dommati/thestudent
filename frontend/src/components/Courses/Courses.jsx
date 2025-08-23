@@ -9,57 +9,120 @@ const Courses = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [selectedLevel, setSelectedLevel] = useState(null);
+    const [availableLevels, setAvailableLevels] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const educationLevels = [
+    const allEducationLevels = [
         { 
             id: '6th', 
             name: '6th Standard', 
             icon: FaBook,
-            description: 'Foundation courses for 6th grade students'
+            description: 'Foundation courses for 6th grade students',
+            apiClass: '6th'
         },
         { 
             id: '7th', 
             name: '7th Standard', 
             icon: FaBook,
-            description: 'Foundation courses for 7th grade students'
+            description: 'Foundation courses for 7th grade students',
+            apiClass: '7th'
         },
         { 
             id: '8th', 
             name: '8th Standard', 
             icon: FaBook,
-            description: 'Foundation courses for 8th grade students'
+            description: 'Foundation courses for 8th grade students',
+            apiClass: '8th'
         },
         { 
             id: '9th', 
             name: '9th Standard', 
             icon: FaGraduationCap,
-            description: 'Foundation courses for 9th grade students'
+            description: 'Foundation courses for 9th grade students',
+            apiClass: '9th'
         },
         { 
             id: '10th', 
             name: '10th Standard', 
             icon: FaBook,
-            description: 'Foundation courses for 10th grade students'
+            description: 'Foundation courses for 10th grade students',
+            apiClass: '10th'
         },
         { 
             id: '11th', 
             name: '11th Standard', 
             icon: FaGraduationCap,
-            description: 'Advanced courses for 11th grade students'
+            description: 'Advanced courses for 11th grade students',
+            apiClass: '11th'
         },
         { 
             id: '12th', 
             name: '12th Standard', 
             icon: FaUniversity,
-            description: 'Preparation for higher education'
+            description: 'Preparation for higher education',
+            apiClass: '12th'
         },
         { 
             id: 'engineering', 
             name: 'Engineering', 
             icon: FaLaptopCode,
-            description: 'Professional skill development'
+            description: 'Professional skill development',
+            apiClass: 'engineering'
         },
     ];
+
+    // Function to check if courses exist for a specific class level
+    const checkCoursesAvailability = async () => {
+        setLoading(true);
+        const levelsWithCourses = [];
+
+        try {
+            // Check school courses (6th to 12th)
+            const schoolLevels = allEducationLevels.filter(level => level.apiClass !== 'engineering');
+            
+            for (const level of schoolLevels) {
+                try {
+                    const response = await fetch(`http://localhost:8000/api/courses/school/?class=${level.apiClass}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data && data.length > 0) {
+                            levelsWithCourses.push(level);
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error checking courses for ${level.apiClass}:`, error);
+                }
+            }
+
+            // Check engineering courses
+            try {
+                const engineeringResponse = await fetch('http://localhost:8000/api/courses/engineering/');
+                if (engineeringResponse.ok) {
+                    const engineeringData = await engineeringResponse.json();
+                    if (engineeringData && engineeringData.length > 0) {
+                        const engineeringLevel = allEducationLevels.find(level => level.apiClass === 'engineering');
+                        if (engineeringLevel) {
+                            levelsWithCourses.push(engineeringLevel);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking engineering courses:', error);
+            }
+
+            setAvailableLevels(levelsWithCourses);
+        } catch (error) {
+            console.error('Error checking course availability:', error);
+            // Fallback: show all levels if API fails
+            setAvailableLevels(allEducationLevels);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        checkCoursesAvailability();
+    }, []);
 
     const handleLevelSelect = (level) => {
         setSelectedLevel(level);
@@ -106,36 +169,48 @@ const Courses = () => {
                                 <p className="text-gray-600 text-lg max-w-2xl mx-auto">
                                     Select your education level to discover personalized learning resources
                                 </p>
+                                {loading && (
+                                    <p className="text-blue-600 mt-4">Loading available courses...</p>
+                                )}
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                {educationLevels.map((level) => (
-                                    <motion.button
-                                        key={level.id}
-                                        onClick={() => handleLevelSelect(level.id)}
-                                        className="group relative bg-white rounded-2xl shadow-sm hover:shadow-xl 
-                                                 transition-all duration-300 border border-gray-100 overflow-hidden"
-                                        whileHover={{ y: -5 }}
-                                        whileTap={{ scale: 0.98 }}
-                                    >
-                                        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-50 
-                                                      opacity-0 group-hover:opacity-100 transition-opacity duration-300"/>
-                                        <div className="relative p-8 flex flex-col items-center text-center">
-                                            <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center 
-                                                          justify-center mb-4 group-hover:bg-indigo-600 
-                                                          transition-colors duration-300">
-                                                <level.icon className="w-8 h-8 text-indigo-600 
-                                                                     group-hover:text-white transition-colors"/>
+                            
+                            {!loading && availableLevels.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <div className="text-gray-400 text-6xl mb-4">📚</div>
+                                    <h3 className="text-xl font-semibold text-gray-700 mb-2">No Courses Available Yet</h3>
+                                    <p className="text-gray-500">New courses will appear here as they are added by administrators.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                    {availableLevels.map((level) => (
+                                        <motion.button
+                                            key={level.id}
+                                            onClick={() => handleLevelSelect(level.id)}
+                                            className="group relative bg-white rounded-2xl shadow-sm hover:shadow-xl 
+                                                     transition-all duration-300 border border-gray-100 overflow-hidden"
+                                            whileHover={{ y: -5 }}
+                                            whileTap={{ scale: 0.98 }}
+                                        >
+                                            <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-50 
+                                                          opacity-0 group-hover:opacity-100 transition-opacity duration-300"/>
+                                            <div className="relative p-8 flex flex-col items-center text-center">
+                                                <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center 
+                                                              justify-center mb-4 group-hover:bg-indigo-600 
+                                                              transition-colors duration-300">
+                                                    <level.icon className="w-8 h-8 text-indigo-600 
+                                                                         group-hover:text-white transition-colors"/>
+                                                </div>
+                                                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                                    {level.name}
+                                                </h3>
+                                                <p className="text-gray-500 text-sm group-hover:text-gray-600">
+                                                    {level.description}
+                                                </p>
                                             </div>
-                                            <h3 className="text-xl font-bold text-gray-900 mb-2">
-                                                {level.name}
-                                            </h3>
-                                            <p className="text-gray-500 text-sm group-hover:text-gray-600">
-                                                {level.description}
-                                            </p>
-                                        </div>
-                                    </motion.button>
-                                ))}
-                            </div>
+                                        </motion.button>
+                                    ))}
+                                </div>
+                            )}
                         </motion.div>
                     ) : (
                         <Outlet />
