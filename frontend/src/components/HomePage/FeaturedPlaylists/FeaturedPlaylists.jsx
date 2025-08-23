@@ -388,10 +388,13 @@ const FeaturedPlaylists = () => {
               <div className="flex justify-center mt-6 sm:hidden">
                 <button
                   onClick={() => setShowAllOnMobile(true)}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors duration-200 flex items-center"
+                  aria-label="Load more courses"
+                  className="inline-flex items-center gap-2 px-4 h-11 min-h-[44px] rounded-full border border-blue-200 text-blue-700 bg-white/80 backdrop-blur-sm 
+                             font-medium text-sm transition-all duration-200 shadow-sm hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 
+                             active:scale-[0.99]"
                 >
                   Load More Courses
-                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
