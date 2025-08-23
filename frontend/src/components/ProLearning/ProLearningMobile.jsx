@@ -208,14 +208,14 @@ const ProLearningMobile = ({
               <button
                 key={tab.id}
                 onClick={() => handleSectionChange(tab.id)}
-                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 ${
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-300 ease-in-out ${
                   isActive 
-                    ? 'text-gray-700' 
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'text-blue-600 transform scale-105' 
+                    : 'text-gray-500 hover:text-gray-700 hover:scale-102'
                 }`}
               >
-                <Icon className={`text-xl mb-1 ${isActive ? 'text-blue-600' : 'text-gray-500'}`} />
-                <span className={`text-xs font-medium ${isActive ? 'text-gray-700' : 'text-gray-500'}`}>
+                <Icon className={`text-xl mb-1 transition-all duration-300 ease-in-out ${isActive ? 'text-blue-600 transform scale-110' : 'text-gray-500'}`} />
+                <span className={`text-xs font-medium transition-all duration-300 ease-in-out ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
                   {tab.label}
                 </span>
               </button>
@@ -225,66 +225,66 @@ const ProLearningMobile = ({
             <>
               <button
                 onClick={() => handleSectionChange('reading')}
-                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 ${
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-300 ease-in-out ${
                   currentSection === 'reading' 
-                    ? 'text-gray-700' 
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'text-blue-600 transform scale-105' 
+                    : 'text-gray-500 hover:text-gray-700 hover:scale-102'
                 }`}
               >
-                <IoBook className={`text-xl mb-1 ${currentSection === 'reading' ? 'text-blue-600' : 'text-gray-500'}`} />
-                <span className={`text-xs font-medium ${currentSection === 'reading' ? 'text-gray-700' : 'text-gray-500'}`}>
+                <IoBook className={`text-xl mb-1 transition-all duration-300 ease-in-out ${currentSection === 'reading' ? 'text-blue-600 transform scale-110' : 'text-gray-500'}`} />
+                <span className={`text-xs font-medium transition-all duration-300 ease-in-out ${currentSection === 'reading' ? 'text-blue-600' : 'text-gray-500'}`}>
                   Reading
                 </span>
               </button>
               <button
                 onClick={() => handleSectionChange('summary')}
-                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 ${
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-300 ease-in-out ${
                   currentSection === 'summary' 
-                    ? 'text-gray-700' 
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'text-blue-600 transform scale-105' 
+                    : 'text-gray-500 hover:text-gray-700 hover:scale-102'
                 }`}
               >
-                <IoDocumentText className={`text-xl mb-1 ${currentSection === 'summary' ? 'text-blue-600' : 'text-gray-500'}`} />
-                <span className={`text-xs font-medium ${currentSection === 'summary' ? 'text-gray-700' : 'text-gray-500'}`}>
+                <IoDocumentText className={`text-xl mb-1 transition-all duration-300 ease-in-out ${currentSection === 'summary' ? 'text-blue-600 transform scale-110' : 'text-gray-500'}`} />
+                <span className={`text-xs font-medium transition-all duration-300 ease-in-out ${currentSection === 'summary' ? 'text-blue-600' : 'text-gray-500'}`}>
                   Summary
                 </span>
               </button>
               <button
                 onClick={() => handleSectionChange('videos')}
-                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 ${
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-300 ease-in-out ${
                   currentSection === 'videos' 
-                    ? 'text-gray-700' 
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'text-blue-600 transform scale-105' 
+                    : 'text-gray-500 hover:text-gray-700 hover:scale-102'
                 }`}
               >
-                <IoPlayCircle className={`text-xl mb-1 ${currentSection === 'videos' ? 'text-blue-600' : 'text-gray-500'}`} />
-                <span className={`text-xs font-medium ${currentSection === 'videos' ? 'text-gray-700' : 'text-gray-500'}`}>
+                <IoPlayCircle className={`text-xl mb-1 transition-all duration-300 ease-in-out ${currentSection === 'videos' ? 'text-blue-600 transform scale-110' : 'text-gray-500'}`} />
+                <span className={`text-xs font-medium transition-all duration-300 ease-in-out ${currentSection === 'videos' ? 'text-blue-600' : 'text-gray-500'}`}>
                   Videos
                 </span>
               </button>
               <button
                 onClick={() => handleSectionChange('quiz')}
-                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 ${
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-300 ease-in-out ${
                   currentSection === 'quiz' 
-                    ? 'text-gray-700' 
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'text-blue-600 transform scale-105' 
+                    : 'text-gray-500 hover:text-gray-700 hover:scale-102'
                 }`}
               >
-                <IoHelpCircle className={`text-xl mb-1 ${currentSection === 'quiz' ? 'text-blue-600' : 'text-gray-500'}`} />
-                <span className={`text-xs font-medium ${currentSection === 'quiz' ? 'text-gray-700' : 'text-gray-500'}`}>
+                <IoHelpCircle className={`text-xl mb-1 transition-all duration-300 ease-in-out ${currentSection === 'quiz' ? 'text-blue-600 transform scale-110' : 'text-gray-500'}`} />
+                <span className={`text-xs font-medium transition-all duration-300 ease-in-out ${currentSection === 'quiz' ? 'text-blue-600' : 'text-gray-500'}`}>
                   Quiz
                 </span>
               </button>
               <button
                 onClick={() => handleSectionChange('resources')}
-                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 ${
+                className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-300 ease-in-out ${
                   currentSection === 'resources' 
-                    ? 'text-gray-700' 
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'text-blue-600 transform scale-105' 
+                    : 'text-gray-500 hover:text-gray-700 hover:scale-102'
                 }`}
               >
-                <IoLibrary className={`text-xl mb-1 ${currentSection === 'resources' ? 'text-blue-600' : 'text-gray-500'}`} />
-                <span className={`text-xs font-medium ${currentSection === 'resources' ? 'text-gray-700' : 'text-gray-500'}`}>
+                <IoLibrary className={`text-xl mb-1 transition-all duration-300 ease-in-out ${currentSection === 'resources' ? 'text-blue-600 transform scale-110' : 'text-gray-500'}`} />
+                <span className={`text-xs font-medium transition-all duration-300 ease-in-out ${currentSection === 'resources' ? 'text-blue-600' : 'text-gray-500'}`}>
                   Resources
                 </span>
               </button>
