@@ -524,6 +524,8 @@ const ChatbotPage = () => {
   const [networkRetryCount, setNetworkRetryCount] = useState(0); // Track network retry attempts
   const [lastFailedPrompt, setLastFailedPrompt] = useState(""); // Store last failed prompt for retry
   const [retryingMessageId, setRetryingMessageId] = useState(null); // Track which specific message is being retried
+  const networkErrorTimeouts = useRef({}); // Store timeout IDs for network error messages
+  const cancelledRetriesRef = useRef(new Set()); // Track message IDs whose retries were cancelled by a new prompt
 
   // Generate unique message ID
   const generateMessageId = () => Date.now() + Math.random();
@@ -653,6 +655,16 @@ const ChatbotPage = () => {
     setIsSidebarOpen(false);
   }, [width]);
 
+  // Cleanup network error timeouts on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all network error timeouts when component unmounts
+      Object.values(networkErrorTimeouts.current).forEach(timeoutId => {
+        clearTimeout(timeoutId);
+      });
+    };
+  }, []);
+
   // Add window resize listener
   useEffect(() => {
     const handleResize = () => {
@@ -700,7 +712,11 @@ const ChatbotPage = () => {
     const promptToRetry = lastFailedPrompt;
     setNetworkRetryCount(prev => prev + 1);
     setRetryingMessageId(messageId);
-    setIsLoading(true); // Set loading state during retry
+    // Don't set loading state during retry - we show loading in the specific message
+    // Clear any previous cancellation for this message because user is retrying explicitly
+    if (messageId != null) {
+      cancelledRetriesRef.current.delete(messageId);
+    }
     
     // Update only the specific error message to show reconnection attempt
     setChatHistory((prev) => 
@@ -710,7 +726,8 @@ const ChatbotPage = () => {
               ...msg,
               content: "🌐 **Network connection lost. Attempting to reconnect...**",
               isReconnecting: true,
-              showRetryButton: false
+              showRetryButton: false,
+              isRetryDisabled: false
             }
           : msg
       )
@@ -719,26 +736,16 @@ const ChatbotPage = () => {
     // Add a delay to show proper "trying to reconnect" UX
     // This gives users feedback that we're actually attempting to reconnect
     await new Promise(resolve => setTimeout(resolve, 3000)); // 3 seconds loading
+    // If a new prompt cancelled this retry in the meantime, stop here
+    if (messageId != null && cancelledRetriesRef.current.has(messageId)) {
+      return;
+    }
     
     // First, check if connection is actually working
     const isConnected = await checkConnection();
     
     if (isConnected) {
-      // Connection is working - update message to show "thinking" state
-      setChatHistory((prev) => 
-        prev.map(msg => 
-          msg.id === messageId && msg.isNetworkError 
-            ? {
-                ...msg,
-                content: "🤔 **Thinking...**",
-                isReconnecting: false,
-                showRetryButton: false
-              }
-            : msg
-        )
-      );
-      
-      // Try the actual request
+      // Connection is working - proceed directly to API call
       try {
         // Clear the failed prompt before retry
         setLastFailedPrompt(null);
@@ -836,8 +843,7 @@ const ChatbotPage = () => {
           );
         }
         
-        // Clean up loading state
-        setIsLoading(false);
+        // Clean up retry state after successful request
         
       } catch (error) {
         // Even though connection check passed, the actual request failed
@@ -860,7 +866,7 @@ const ChatbotPage = () => {
                 : msg
             )
           );
-        } else {
+  } else {
           setChatHistory((prev) => 
             prev.map(msg => 
               msg.id === messageId && msg.isNetworkError 
@@ -868,7 +874,8 @@ const ChatbotPage = () => {
                     ...msg,
                     content: "🌐 **Request failed. Please try again.**\n\nThe connection is working but the request encountered an error. This might be a temporary issue.\n\nPlease try again in a moment.",
                     isReconnecting: false,
-                    showRetryButton: true
+        // only show when not cancelled/disabled
+        showRetryButton: cancelledRetriesRef.current.has(messageId) || msg.isRetryDisabled ? false : true
                   }
                 : msg
             )
@@ -878,17 +885,16 @@ const ChatbotPage = () => {
           setLastFailedPrompt(promptToRetry);
         }
         
-        // Clean up loading state
-        setIsLoading(false);
+        // Clean up retry state after error handling
         
-        setChatHistory((prev) => 
+  setChatHistory((prev) => 
           prev.map(msg => 
             msg.id === messageId && msg.isNetworkError 
               ? {
                   ...msg,
                   content: "🌐 **Request failed. Please try again.**\n\nThe connection is working but the request encountered an error. This might be a temporary issue.\n\nPlease try again in a moment.",
                   isReconnecting: false,
-                  showRetryButton: true
+      showRetryButton: cancelledRetriesRef.current.has(messageId) || msg.isRetryDisabled ? false : true
                 }
               : msg
           )
@@ -899,14 +905,14 @@ const ChatbotPage = () => {
       }
     } else {
       // Connection is still not working
-      setChatHistory((prev) => 
+  setChatHistory((prev) => 
         prev.map(msg => 
           msg.id === messageId && msg.isNetworkError 
             ? {
                 ...msg,
                 content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
                 isReconnecting: false,
-                showRetryButton: true
+        showRetryButton: cancelledRetriesRef.current.has(messageId) || msg.isRetryDisabled ? false : true
               }
             : msg
         )
@@ -915,8 +921,8 @@ const ChatbotPage = () => {
       // Restore the failed prompt for another retry
       setLastFailedPrompt(promptToRetry);
       
-      // Clean up loading state
-      setIsLoading(false);
+      // Restore the failed prompt for another retry
+      setLastFailedPrompt(promptToRetry);
     }
     
     // Clean up retry state
@@ -929,11 +935,19 @@ const ChatbotPage = () => {
 
     // Hide all retry buttons (but keep messages) when a new prompt is sent
     setChatHistory((prev) => 
-      prev.map(msg => 
-        msg.isNetworkError 
-          ? { ...msg, showRetryButton: false, isRetryDisabled: true }
-          : msg
-      )
+      prev.map(msg => {
+        if (msg.isNetworkError) {
+          // mark this retry as cancelled and disable button permanently for this error instance
+          cancelledRetriesRef.current.add(msg.id);
+          // Clear timeout for this message if it exists
+          if (networkErrorTimeouts.current[msg.id]) {
+            clearTimeout(networkErrorTimeouts.current[msg.id]);
+            delete networkErrorTimeouts.current[msg.id];
+          }
+          return { ...msg, showRetryButton: false, isRetryDisabled: true, isReconnecting: false };
+        }
+        return msg;
+      })
     );
 
     // If topic confirmation is open and user sends a new message, automatically cancel it
@@ -954,6 +968,30 @@ const ChatbotPage = () => {
       setPendingTopics([]);
       setOriginalPrompt("");
     }
+
+    // Cancel any ongoing reconnection attempts as well (redundant safety)
+    setChatHistory((prev) => 
+      prev.map(msg => {
+        if (msg.isNetworkError && msg.isReconnecting) {
+          cancelledRetriesRef.current.add(msg.id);
+          if (networkErrorTimeouts.current[msg.id]) {
+            clearTimeout(networkErrorTimeouts.current[msg.id]);
+            delete networkErrorTimeouts.current[msg.id];
+          }
+          return {
+            ...msg,
+            content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
+            isReconnecting: false,
+            showRetryButton: false,
+            isRetryDisabled: true
+          };
+        }
+        return msg;
+      })
+    );
+
+    // Clear any ongoing retry state
+    setRetryingMessageId(null);
 
     const userMessageObj = {
       id: generateMessageId(),
@@ -1125,7 +1163,12 @@ const ChatbotPage = () => {
             setChatHistory((prev) => [...prev, networkLoadingResponse]);
             
             // Try to reconnect for 8 seconds, then show failure message
-            setTimeout(() => {
+            const timeoutId = setTimeout(() => {
+              // if this retry was cancelled or disabled, skip re-enabling the button
+              if (cancelledRetriesRef.current.has(networkLoadingResponse.id)) {
+                delete networkErrorTimeouts.current[networkLoadingResponse.id];
+                return;
+              }
               // Update the message to show connection failed
               setChatHistory((prev) => 
                 prev.map(msg => 
@@ -1134,12 +1177,18 @@ const ChatbotPage = () => {
                         ...msg,
                         content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
                         isReconnecting: false,
-                        showRetryButton: true
+                        // only show button when not disabled explicitly
+                        showRetryButton: msg.isRetryDisabled ? false : true
                       }
                     : msg
                 )
               );
+              // Remove the timeout ID from the ref after it's executed
+              delete networkErrorTimeouts.current[networkLoadingResponse.id];
             }, 8000); // 8 seconds timeout
+            
+            // Store the timeout ID in the ref
+            networkErrorTimeouts.current[networkLoadingResponse.id] = timeoutId;
           } else if (error.isRateLimit) {
             const rateLimitMessage = formatRateLimitMessage(error);
             const rateLimitResponse = {
@@ -1614,7 +1663,7 @@ const ChatbotPage = () => {
               )}
 
               {/* Retry button for network errors (only after reconnection timeout) */}
-              {message.isNetworkError && message.showRetryButton && !message.isReconnecting && (
+              {message.isNetworkError && message.showRetryButton && !message.isReconnecting && !message.isRetryDisabled && !cancelledRetriesRef.current.has(message.id) && (
                 <div className="mt-4">
                   <button
                     onClick={() => {
