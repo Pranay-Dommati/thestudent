@@ -9,6 +9,8 @@ const MobileBottomNavigation = () => {
   const { isLoggedIn } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  // Hide bottom nav on specific routes (e.g., auth recovery flows)
+  const hideNav = location.pathname === '/forgot-password';
   
   // State for controlling navigation visibility
   const [isVisible, setIsVisible] = useState(true);
@@ -20,7 +22,10 @@ const MobileBottomNavigation = () => {
   useEffect(() => {
     const rootElement = document.documentElement;
     const isSmallScreen = window.innerWidth < 768;
-    if (isSmallScreen) {
+    if (hideNav) {
+      // Ensure classes are cleared when nav is hidden
+      rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
+    } else if (isSmallScreen) {
       rootElement.classList.add('mobile-nav-visible');
     } else {
       rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
@@ -29,12 +34,19 @@ const MobileBottomNavigation = () => {
     return () => {
       rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
     };
-  }, []);
+  }, [hideNav]);
 
   // Scroll detection effect (only on small screens)
   useEffect(() => {
     // Skip on desktop/tablet
     if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      const rootElement = document.documentElement;
+      rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
+      return;
+    }
+
+    // Skip all scroll handling when nav is hidden
+    if (hideNav) {
       const rootElement = document.documentElement;
       rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
       return;
@@ -119,13 +131,15 @@ const MobileBottomNavigation = () => {
         clearTimeout(scrollTimeoutRef.current);
       }
     };
-  }, [lastScrollY]);
+  }, [lastScrollY, hideNav]);
 
   // Dynamic padding based on navigation visibility (small screens only)
   useEffect(() => {
     const rootElement = document.documentElement;
     const isSmallScreen = window.innerWidth < 768;
-    if (isSmallScreen) {
+    if (hideNav) {
+      rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
+    } else if (isSmallScreen) {
       if (isVisible) {
         rootElement.classList.add('mobile-nav-visible');
         rootElement.classList.remove('mobile-nav-hidden');
@@ -141,7 +155,7 @@ const MobileBottomNavigation = () => {
     return () => {
       rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
     };
-  }, [isVisible]);
+  }, [isVisible, hideNav]);
 
   // Helper function to check if current path matches navigation item
   const isActive = (itemPath) => {
@@ -267,6 +281,10 @@ const MobileBottomNavigation = () => {
   };
 
   const navConfig = getNavigationConfig();
+
+  if (hideNav) {
+    return null;
+  }
 
   return (
     <div 
