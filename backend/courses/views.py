@@ -1443,6 +1443,33 @@ def start_predefined_course(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+def enrollment_status(request, course_id):
+    """Compatibility endpoint used by frontend to check if user already enrolled.
+
+    The existing canonical endpoint is `check_course_enrollment` which requires
+    both course_type and course_id. Some frontend code (e.g. SchoolCourseDetails)
+    calls `/api/courses/enrollment-status/<course_id>/` without specifying the
+    course type. This helper tries to infer the type by probing SchoolCourse
+    first, then EngineeringCourse. Returns a simplified boolean response.
+    """
+    from .models import UserStartedPredefinedCourse, SchoolCourse, EngineeringCourse
+    user = request.user
+    course_type = None
+    try:
+        if SchoolCourse.objects.filter(id=course_id).exists():
+            course_type = 'school'
+            is_enrolled = UserStartedPredefinedCourse.objects.filter(user=user, school_course_id=course_id).exists()
+        elif EngineeringCourse.objects.filter(id=course_id).exists():
+            course_type = 'engineering'
+            is_enrolled = UserStartedPredefinedCourse.objects.filter(user=user, engineering_course_id=course_id).exists()
+        else:
+            return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'is_enrolled': is_enrolled, 'course_type': course_type})
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_user_enrolled_courses(request):
     """
     Get all courses the user has enrolled in
