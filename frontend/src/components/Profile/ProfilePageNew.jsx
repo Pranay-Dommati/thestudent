@@ -31,8 +31,6 @@ const ProfilePage = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    classLevel: '',
-    boardOfEducation: '',
     country: ''
   });
   const [passwordData, setPasswordData] = useState({
@@ -58,8 +56,6 @@ const ProfilePage = () => {
       setFormData({
         name: user.full_name || '',
         email: user.email || '',
-        classLevel: user.class_level || '',
-        boardOfEducation: user.board_of_education || '',
         country: user.country || ''
       });
       setProfileImageUrl(user.profile_image_url || 'https://via.placeholder.com/150');
@@ -225,8 +221,6 @@ const ProfilePage = () => {
       setFormData({
         name: user.full_name || '',
         email: user.email || '',
-        classLevel: user.class_level || '',
-        boardOfEducation: user.board_of_education || '',
         country: user.country || ''
       });
     }
@@ -351,29 +345,6 @@ const ProfilePage = () => {
       type: 'email',
       icon: FaRegEnvelope,
       placeholder: 'Enter your email'
-    },
-    {
-      id: 'classLevel',
-      label: 'Class Level',
-      type: 'select',
-      options: [
-        { value: '', label: 'Select Class' },
-        { value: '10', label: 'Class 10' },
-        { value: '11', label: 'Class 11' },
-        { value: '12', label: 'Class 12' }
-      ]
-    },
-    {
-      id: 'boardOfEducation',
-      label: 'Board of Education',
-      type: 'select',
-      options: [
-        { value: '', label: 'Select Board' },
-        { value: 'cbse', label: 'CBSE' },
-        { value: 'icse', label: 'ICSE' },
-        { value: 'state', label: 'State Board' },
-        { value: 'ib', label: 'International Baccalaureate' }
-      ]
     }
   ];
 
