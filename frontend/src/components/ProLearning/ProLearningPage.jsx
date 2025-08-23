@@ -1784,7 +1784,7 @@ const ProLearningPage = () => {
         const hasAnyContent = content && (content.reading || content.summary || content.videos?.length || content.quiz?.length || content.resources?.length);
         
         return (
-          <div className="max-w-none">
+          <div className="max-w-none pt-6">
             {/* Compact Reading Header */}
             <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-xl p-4 mb-6 shadow-sm">
               <div className="flex items-center justify-between">
@@ -2224,7 +2224,7 @@ const ProLearningPage = () => {
 
       case "summary":
         return (
-          <div className="max-w-none">
+          <div className="max-w-none pt-6">
             {/* Compact Summary Header */}
             <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50 border border-purple-200 rounded-xl p-4 mb-6 shadow-sm">
               <div className="flex items-center justify-between">
@@ -2338,7 +2338,7 @@ const ProLearningPage = () => {
 
       case "videos":
         return (
-          <div>
+          <div className="pt-6">
             {/* Compact Videos Header */}
             <div className="bg-gradient-to-br from-red-50 via-pink-50 to-orange-50 border border-red-200 rounded-xl p-4 mb-6 shadow-sm">
               <div className="flex items-center justify-between">
@@ -2565,7 +2565,7 @@ const ProLearningPage = () => {
         const allQuestionsAnswered = answeredQuestions === content.quiz.length;
         
         return (
-          <div>
+          <div className="pt-6">
             {/* Compact Quiz Header */}
             <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 border border-green-200 rounded-xl p-4 mb-6 shadow-sm">
               <div className="flex items-center justify-between mb-3">
@@ -2824,7 +2824,7 @@ const ProLearningPage = () => {
 
       case "resources":
         return (
-          <div className="space-y-6">
+          <div className="space-y-6 pt-6">
             {/* Compact Resources Header */}
             <div className="bg-gradient-to-br from-blue-50 via-sky-50 to-cyan-50 border border-blue-200 rounded-xl p-4 mb-6 shadow-sm">
               <div className="flex items-center justify-between">
