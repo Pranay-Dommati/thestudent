@@ -14,8 +14,8 @@ const AuthFooter = () => {
             <Link to="/terms" className="hover:text-blue-600 transition-colors">
               Terms of Service
             </Link>
-            <Link to="/contact" className="hover:text-blue-600 transition-colors">
-              Contact Us
+            <Link to="http://localhost:5173/feedback" className="hover:text-blue-600 transition-colors">
+              Feedback
             </Link>
           </div>
 
