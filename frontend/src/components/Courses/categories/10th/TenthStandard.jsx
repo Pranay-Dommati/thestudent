@@ -125,11 +125,12 @@ const TenthStandard = () => {
     }
   }, [selectedBoard, stateId]);
 
-  const handleBoardSelect = (board) => {
-    if (board === 'state') {
+  const handleBoardSelect = (boardId) => {
+    if (boardId === 'state') {
       setShowStateBoards(true);
     } else {
-      navigate(`/courses/10th/${board}`);
+      setSelectedBoard(boardId);
+      navigate(`/courses/10th/${boardId}`);
     }
   };
 
@@ -144,18 +145,11 @@ const TenthStandard = () => {
   const handleBack = () => {
     if (showStateBoards) {
       setShowStateBoards(false);
-      return;
+    } else if (selectedBoard) {
+      setSelectedBoard(null);
+    } else {
+      navigate('/courses');
     }
-    if (selectedBoard) {
-      // If URL contains a board segment, navigate back to base 10th route
-      if (location.pathname.includes('/cbse') || location.pathname.includes('/state/')) {
-        navigate('/courses/10th');
-      } else {
-        setSelectedBoard(null);
-      }
-      return;
-    }
-    navigate('/courses');
   };
 
   return (
@@ -221,27 +215,21 @@ const TenthStandard = () => {
           <BackButton 
             title="Select Your State" 
             subtitle="Choose your state board" 
+            onBack={handleBack}
           />
           <div className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {stateBoards.map((state) => (
-                <Link key={state.id} to={`/courses/10th/state/${state.id}`} onClick={(e) => {
-                  // Ensure both link and programmatic nav work; prevent double nav
-                  e.preventDefault();
-                  handleStateSelect(state.id);
-                }}>
-                  <motion.div
-                    className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 cursor-pointer hover:border-indigo-300"
-                    whileHover={{ y: -5 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-indigo-600 transition-colors">{state.name}</h3>
-                    <p className="text-gray-500 text-sm group-hover:text-indigo-500 transition-colors">{state.fullName}</p>
-                    <div className="mt-3 text-indigo-600 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                      Select →
-                    </div>
-                  </motion.div>
-                </Link>
+                <motion.button
+                  key={state.id}
+                  onClick={() => handleStateSelect(state.id)}
+                  className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
+                  whileHover={{ y: -5 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{state.name}</h3>
+                  <p className="text-gray-500 text-sm">{state.fullName}</p>
+                </motion.button>
               ))}
             </div>
           </div>
