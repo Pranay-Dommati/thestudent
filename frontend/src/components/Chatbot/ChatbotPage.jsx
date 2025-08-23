@@ -717,6 +717,10 @@ const ChatbotPage = () => {
       position: 'top-center'
     });
     
+    // Add a delay to show proper "trying to reconnect" UX
+    // This gives users feedback that we're actually attempting to reconnect
+    await new Promise(resolve => setTimeout(resolve, 3000)); // 3 seconds loading
+    
     // First, check if connection is actually working
     const isConnected = await checkConnection();
     
