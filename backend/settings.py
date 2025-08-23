@@ -123,3 +123,15 @@ SIMPLE_JWT = {
 # Social Auth
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv('GOOGLE_OAUTH2_CLIENT_ID')
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv('GOOGLE_OAUTH2_CLIENT_SECRET')
+
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'easylearnova@gmail.com'
+EMAIL_HOST_PASSWORD = 'cedr hdik avgu gllp'
+DEFAULT_FROM_EMAIL = 'easylearnova@gmail.com'
+
+# Frontend domain for password reset links
+FRONTEND_DOMAIN = 'http://localhost:5173'

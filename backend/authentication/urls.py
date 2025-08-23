@@ -8,7 +8,10 @@ from .views import (
     verify_admin_token,
     google_auth_url,
     google_auth_callback,
-    google_auth_token
+    google_auth_token,
+    forgot_password,
+    reset_password,
+    validate_reset_token
 )
 
 urlpatterns = [
@@ -23,6 +26,11 @@ urlpatterns = [
     path('google/auth-url/', google_auth_url, name='google_auth_url'),
     path('google/callback/', google_auth_callback, name='google_auth_callback'),
     path('google/token/', google_auth_token, name='google_auth_token'),
+    
+    # Password reset endpoints
+    path('forgot-password/', forgot_password, name='forgot_password'),
+    path('reset-password/', reset_password, name='reset_password'),
+    path('validate-reset-token/<str:uid>/<str:token>/', validate_reset_token, name='validate_reset_token'),
     
     # Social auth URLs (for traditional social-auth-app-django flow)
     path('social/', include('social_django.urls', namespace='social')),

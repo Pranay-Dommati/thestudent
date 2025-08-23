@@ -11,6 +11,15 @@ from django.http import JsonResponse
 from urllib.parse import urlencode
 import logging
 import requests
+from django.core.mail import send_mail
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.template.loader import render_to_string
+from django.urls import reverse
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
 from .models import User
@@ -511,3 +520,232 @@ def google_auth_token(request):
             {"error": "Authentication failed"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+# Custom token generator for password reset
+class AccountActivationTokenGenerator(PasswordResetTokenGenerator):
+    def _make_hash_value(self, user, timestamp):
+        return (
+            str(user.pk) + str(timestamp) +
+            str(user.email) + str(user.password)
+        )
+
+token_generator = AccountActivationTokenGenerator()
+
+
+def send_password_reset_email(user_email, uid, token):
+    """Send password reset email using Gmail SMTP"""
+    try:
+        # Email configuration
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+        sender_email = "easylearnova@gmail.com"
+        sender_password = "cedr hdik avgu gllp"
+        
+        # Create reset URL
+        frontend_domain = getattr(settings, 'FRONTEND_DOMAIN', 'http://localhost:5173')
+        reset_url = f"{frontend_domain}/reset-password/{uid}/{token}"
+        
+        # Email content
+        subject = "Password Reset Request - Students Hub"
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+                .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
+                .button {{ display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+                .footer {{ text-align: center; margin-top: 20px; color: #666; font-size: 12px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🎓 Students Hub</h1>
+                    <h2>Password Reset Request</h2>
+                </div>
+                <div class="content">
+                    <p>Hello!</p>
+                    <p>We received a request to reset your password for your Students Hub account.</p>
+                    <p>Click the button below to reset your password:</p>
+                    <a href="{reset_url}" class="button">Reset Password</a>
+                    <p>Or copy and paste this link in your browser:</p>
+                    <p style="word-break: break-all; background: #e9e9e9; padding: 10px; border-radius: 5px;">{reset_url}</p>
+                    <p><strong>Important:</strong> This link will expire in 1 hour for security reasons.</p>
+                    <p>If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
+                    <p>Best regards,<br>The Students Hub Team</p>
+                </div>
+                <div class="footer">
+                    <p>© 2025 Students Hub. Empowering learners worldwide.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = sender_email
+        msg['To'] = user_email
+        
+        html_part = MIMEText(html_content, 'html')
+        msg.attach(html_part)
+        
+        # Send email
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+        
+        logger.info(f"Password reset email sent successfully to {user_email}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to send password reset email to {user_email}: {str(e)}")
+        return False
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def forgot_password(request):
+    """Handle forgot password request"""
+    try:
+        email = request.data.get('email', '').strip().lower()
+        
+        if not email:
+            return Response({
+                'error': 'Email is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Always return success message for security (don't reveal if email exists)
+        success_message = "If that email exists in our system, we've sent a password reset link to your inbox."
+        
+        try:
+            user = User.objects.get(email=email)
+            
+            # Generate token and uid
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = token_generator.make_token(user)
+            
+            # Send email
+            email_sent = send_password_reset_email(user.email, uid, token)
+            
+            if email_sent:
+                logger.info(f"Password reset initiated for user: {email}")
+            else:
+                logger.error(f"Failed to send reset email for user: {email}")
+                
+        except User.DoesNotExist:
+            # Don't reveal that email doesn't exist - security best practice
+            logger.info(f"Password reset attempted for non-existent email: {email}")
+            pass
+        
+        return Response({
+            'message': success_message
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error in forgot_password: {str(e)}")
+        return Response({
+            'error': 'An error occurred. Please try again later.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password(request):
+    """Handle password reset with token validation"""
+    try:
+        uid = request.data.get('uid')
+        token = request.data.get('token')
+        new_password = request.data.get('new_password')
+        confirm_password = request.data.get('confirm_password')
+        
+        # Validation
+        if not all([uid, token, new_password, confirm_password]):
+            return Response({
+                'error': 'All fields are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if new_password != confirm_password:
+            return Response({
+                'error': 'Passwords do not match'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Password strength validation
+        if len(new_password) < 8:
+            return Response({
+                'error': 'Password must be at least 8 characters long'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check for at least one uppercase, one lowercase, one digit
+        import re
+        if not re.search(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$', new_password):
+            return Response({
+                'error': 'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Decode user ID
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=user_id)
+            
+            # Validate token
+            if not token_generator.check_token(user, token):
+                return Response({
+                    'error': 'Invalid or expired reset link. Please request a new password reset.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Update password
+            user.set_password(new_password)
+            user.save()
+            
+            logger.info(f"Password successfully reset for user: {user.email}")
+            
+            return Response({
+                'message': 'Password reset successfully! You can now log in with your new password.'
+            }, status=status.HTTP_200_OK)
+            
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({
+                'error': 'Invalid reset link. Please request a new password reset.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        logger.error(f"Error in reset_password: {str(e)}")
+        return Response({
+            'error': 'An error occurred. Please try again later.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def validate_reset_token(request, uid, token):
+    """Validate reset token without resetting password"""
+    try:
+        # Decode user ID
+        user_id = force_str(urlsafe_base64_decode(uid))
+        user = User.objects.get(pk=user_id)
+        
+        # Validate token
+        if token_generator.check_token(user, token):
+            return Response({
+                'valid': True,
+                'email': user.email
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'valid': False,
+                'error': 'Invalid or expired reset link'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        return Response({
+            'valid': False,
+            'error': 'Invalid reset link'
+        }, status=status.HTTP_400_BAD_REQUEST)

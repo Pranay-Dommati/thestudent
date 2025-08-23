@@ -11,6 +11,8 @@ import ResponsiveCourseLearningPage from './components/CourseLearningPage/Respon
 import LearningHubWrapper from './components/LearningHub/LearningHubWrapper';
 import FloatingChatButton from './components/Chatbot/FloatingChatButton';
 import AuthForm from './components/Auth/AuthForm';
+import ForgotPassword from './components/Auth/ForgotPassword';
+import ResetPassword from './components/Auth/ResetPassword';
 import SixthStandard from './components/Courses/categories/6th/SixthStandard';
 import SeventhStandard from './components/Courses/categories/7th/SeventhStandard';
 import EighthStandard from './components/Courses/categories/8th/EighthStandard';
@@ -230,6 +232,10 @@ const App = () => {
               </ProtectedRoute>
             } />
             <Route path="/auth" element={<AuthForm />} />
+            
+            {/* Password Reset Routes */}
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
 
             {/* Course Detail Routes */}
             <Route path="/courses/6th/cbse/:subjectId" element={<SchoolCourseDetails />} />

@@ -380,16 +380,12 @@ export default function AuthForm() {
                   {/* Forgot Password - Only for login */}
                   {!isSignUp && (
                     <div className="text-right -mt-2 mb-1">
-                      <button
-                        type="button"
-                        onClick={() => toast("Password reset feature will be added soon.", { 
-                          icon: '📧',
-                          style: { backgroundColor: '#3b82f6', color: 'white' }
-                        })}
+                      <Link
+                        to="/forgot-password"
                         className="text-sm text-blue-600 hover:text-blue-700 px-2 py-1 hover:underline font-medium"
                       >
                         Forgot password?
-                      </button>
+                      </Link>
                     </div>
                   )}
 
@@ -660,16 +656,12 @@ export default function AuthForm() {
 
                     {!isSignUp && (
                       <div className="text-right mt-2 mb-1">
-                        <button
-                          type="button"
-                          onClick={() => toast("Password reset feature will be added soon.", { 
-                            icon: '📧',
-                            style: { backgroundColor: '#3b82f6', color: 'white' }
-                          })}
+                        <Link
+                          to="/forgot-password"
                           className="text-sm text-blue-600 hover:text-blue-700 px-2 py-1 hover:underline font-medium"
                         >
                           Forgot password?
-                        </button>
+                        </Link>
                       </div>
                     )}
 
