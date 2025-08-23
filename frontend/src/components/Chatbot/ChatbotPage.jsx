@@ -1904,83 +1904,8 @@ const ChatbotPage = () => {
         {/* Navigation Links */}
         <div className="flex-1 overflow-y-auto scrollbar-glass p-4">
           <div className="space-y-3">
-            <Link
-              to="/"
-              className="flex items-center justify-between p-3 rounded-xl hover:bg-white/50 
-                        group transition-all duration-200 border border-white/30 
-                        hover:border-white/50 shadow-sm hover:shadow-md backdrop-blur-sm"
-            >
-              <div className="flex items-center">
-                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 
-                              group-hover:text-white transition-colors shadow-sm">
-                  <IoHome size={18} />
-                </div>
-                <span className="ml-3 font-medium text-gray-700 group-hover:text-indigo-600">
-                  Home
-                </span>
-              </div>
-              <svg
-                className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transform group-hover:translate-x-1 transition-all"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-            
-            <Link
-              to="/courses"
-              className="flex items-center justify-between p-3 rounded-xl hover:bg-white/50 
-                        group transition-all duration-200 border border-white/30 
-                        hover:border-white/50 shadow-sm hover:shadow-md backdrop-blur-sm"
-            >
-              <div className="flex items-center">
-                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 
-                              group-hover:text-white transition-colors shadow-sm">
-                  <FaBook size={18} />
-                </div>
-                <span className="ml-3 font-medium text-gray-700 group-hover:text-indigo-600">
-                  Courses
-                </span>
-              </div>
-              <svg
-                className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transform group-hover:translate-x-1 transition-all"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-            
-            <Link
-              to="/profile"
-              className="flex items-center justify-between p-3 rounded-xl hover:bg-white/50 
-                        group transition-all duration-200 border border-white/30 
-                        hover:border-white/50 shadow-sm hover:shadow-md backdrop-blur-sm"
-            >
-              <div className="flex items-center">
-                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 
-                              group-hover:text-white transition-colors shadow-sm">
-                  <FaRegUser size={18} />
-                </div>
-                <span className="ml-3 font-medium text-gray-700 group-hover:text-indigo-600">
-                  Profile
-                </span>
-              </div>
-              <svg
-                className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transform group-hover:translate-x-1 transition-all"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-
             {/* ProLearning History Section */}
-            <div className="mt-4 pt-4 border-t border-white/30">
+            <div className="pt-4 border-t border-white/30">
               <div className="flex items-center mb-3">
                 <div className="p-2 rounded-full bg-purple-100 text-purple-600 shadow-sm">
                   <IoTimeOutline size={18} />

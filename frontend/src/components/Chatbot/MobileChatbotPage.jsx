@@ -962,27 +962,7 @@ const MobileChatbotPage = () => {
                 ></div>
                 
                 {/* Menu Items */}
-                <div className="absolute right-0 top-12 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                  <Link
-                    to="/courses"
-                    className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
-                    onClick={() => setShowNavMenu(false)}
-                  >
-                    <IoLibraryOutline size={18} className="mr-3 text-indigo-600" />
-                    <span className="font-medium">My Courses</span>
-                  </Link>
-                  
-                  <Link
-                    to="/profile"
-                    className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
-                    onClick={() => setShowNavMenu(false)}
-                  >
-                    <IoPersonOutline size={18} className="mr-3 text-gray-600" />
-                    <span className="font-medium">Profile</span>
-                  </Link>
-                  
-                  <div className="border-t border-gray-100 my-1"></div>
-                  
+                <div className="absolute right-0 top-12 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
                   {/* History Section */}
                   <div className="px-4 py-2">
                     <div className="flex items-center mb-2">
