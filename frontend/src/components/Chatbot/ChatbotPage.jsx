@@ -524,6 +524,9 @@ const ChatbotPage = () => {
   const [networkRetryCount, setNetworkRetryCount] = useState(0); // Track network retry attempts
   const [lastFailedPrompt, setLastFailedPrompt] = useState(""); // Store last failed prompt for retry
   const [retryingMessageId, setRetryingMessageId] = useState(null); // Track which specific message is being retried
+
+  // Generate unique message ID
+  const generateMessageId = () => Date.now() + Math.random();
   const [chatHistory, setChatHistory] = useState([
     {
       id: 1,
@@ -721,7 +724,21 @@ const ChatbotPage = () => {
     const isConnected = await checkConnection();
     
     if (isConnected) {
-      // Connection is working, try the actual request
+      // Connection is working - update message to show "thinking" state
+      setChatHistory((prev) => 
+        prev.map(msg => 
+          msg.id === messageId && msg.isNetworkError 
+            ? {
+                ...msg,
+                content: "🤔 **Thinking...**",
+                isReconnecting: false,
+                showRetryButton: false
+              }
+            : msg
+        )
+      );
+      
+      // Try the actual request
       try {
         // Clear the failed prompt before retry
         setLastFailedPrompt(null);
@@ -939,7 +956,7 @@ const ChatbotPage = () => {
     }
 
     const userMessageObj = {
-      id: chatHistory.length + (showTopicConfirmation && !customMessage ? 2 : 1),
+      id: generateMessageId(),
       type: "user",
       content: messageToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1098,7 +1115,7 @@ const ChatbotPage = () => {
             
             // Show initial loading message
             const networkLoadingResponse = {
-              id: chatHistory.length + 2,
+              id: generateMessageId(),
               type: "bot",
               content: "🌐 **Network connection lost. Attempting to reconnect...**",
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1162,7 +1179,7 @@ const ChatbotPage = () => {
         console.log("📨 Is response truthy:", !!response);
 
         const botResponse = {
-          id: chatHistory.length + 2,
+          id: generateMessageId(),
           type: "bot",
           content: typeof response === 'string' ? response : String(response),
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1181,7 +1198,7 @@ const ChatbotPage = () => {
     } catch (error) {
       console.error("Error in chat:", error);
       const errorResponse = {
-        id: chatHistory.length + 2,
+        id: generateMessageId(),
         type: "bot",
         content: "Sorry, I couldn't process your request. Please try again later.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
