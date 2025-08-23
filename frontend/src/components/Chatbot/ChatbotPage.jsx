@@ -521,6 +521,8 @@ const ChatbotPage = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [usageStats, setUsageStats] = useState(null); // Track rate limit usage stats
   const [learningContext, setLearningContext] = useState(""); // Store learning preferences and context
+  const [networkRetryCount, setNetworkRetryCount] = useState(0); // Track network retry attempts
+  const [lastFailedPrompt, setLastFailedPrompt] = useState(""); // Store last failed prompt for retry
   const [chatHistory, setChatHistory] = useState([
     {
       id: 1,
@@ -656,6 +658,135 @@ const ChatbotPage = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Function to check actual connection to the backend
+  const checkConnection = async () => {
+    try {
+      // Try hitting the backend API to verify connection
+      const response = await fetch('/ai/classify_topics/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: 'test connection',
+          expectedTopics: 1
+        })
+      });
+      
+      // Only consider it successful if we get a 200-299 response
+      // 503 (Service Unavailable) means network/server issues
+      if (response.ok) {
+        console.log('✅ Connection check passed:', response.status);
+        return true;
+      } else {
+        console.log('❌ Connection check failed with status:', response.status);
+        return false;
+      }
+    } catch (error) {
+      console.log('❌ Connection check failed with error:', error);
+      return false;
+    }
+  };
+
+  // Retry function for network errors
+  const retryLastRequest = async () => {
+    if (!lastFailedPrompt || isLoading) return;
+    
+    const promptToRetry = lastFailedPrompt;
+    setNetworkRetryCount(prev => prev + 1);
+    
+    // Update the existing error message to show reconnection attempt
+    setChatHistory((prev) => 
+      prev.map(msg => 
+        msg.isNetworkError && !msg.isReconnecting 
+          ? {
+              ...msg,
+              content: "🌐 **Network connection lost. Attempting to reconnect...**",
+              isReconnecting: true,
+              showRetryButton: false
+            }
+          : msg
+      )
+    );
+    
+    // Show loading toast
+    toast.loading('🔄 Checking connection...', {
+      id: 'retry-attempt',
+      duration: 8000,
+      position: 'top-center'
+    });
+    
+    // First, check if connection is actually working
+    const isConnected = await checkConnection();
+    
+    if (isConnected) {
+      // Connection is working, try the actual request
+      try {
+        // Clear the failed prompt before retry
+        setLastFailedPrompt(null);
+        
+        // Attempt to send the message again
+        await handleSendMessage(promptToRetry);
+        
+        // If we reach here, the request was successful
+        // Remove the network error message
+        setChatHistory((prev) => prev.filter(msg => !msg.isNetworkError));
+        
+        toast.success('🌐 Connection restored!', {
+          id: 'retry-attempt',
+          duration: 3000
+        });
+        
+      } catch (error) {
+        // Even though connection check passed, the actual request failed
+        console.log('Request failed despite connection check:', error);
+        
+        setChatHistory((prev) => 
+          prev.map(msg => 
+            msg.isNetworkError 
+              ? {
+                  ...msg,
+                  content: "🌐 **Request failed. Please try again.**\n\nThe connection is working but the request encountered an error. This might be a temporary issue.\n\nPlease try again in a moment.",
+                  isReconnecting: false,
+                  showRetryButton: true
+                }
+              : msg
+          )
+        );
+        
+        toast.error('🌐 Request failed. Please try again.', {
+          id: 'retry-attempt',
+          duration: 6000
+        });
+        
+        // Restore the failed prompt for another retry
+        setLastFailedPrompt(promptToRetry);
+      }
+    } else {
+      // Connection is still not working
+      setChatHistory((prev) => 
+        prev.map(msg => 
+          msg.isNetworkError 
+            ? {
+                ...msg,
+                content: "🌐 **Internet connection lost. Please check your internet connection and try again.**\n\nThis usually happens when:\n\n• Your internet connection is unstable\n• There's a temporary server issue\n• Network connectivity problems\n\nPlease check your connection and refresh the page or try again.",
+                isReconnecting: false,
+                showRetryButton: true
+              }
+            : msg
+        )
+      );
+      
+      toast.error('🌐 Still unable to connect. Please check your internet.', {
+        id: 'retry-attempt',
+        duration: 6000
+      });
+      
+      // Restore the failed prompt for another retry
+      setLastFailedPrompt(promptToRetry);
+    }
+  };
 
   const handleSendMessage = async (customMessage = null) => {
     const messageToSend = customMessage || message;
@@ -820,8 +951,64 @@ const ChatbotPage = () => {
         } catch (error) {
           console.error('❌ Topic extraction failed:', error);
           
-          // Handle rate limiting specifically
-          if (error.isRateLimit) {
+          // Handle network connection errors specifically (like ChatGPT)
+          if (error.name === 'NetworkConnectionError') {
+            // Store failed prompt for potential retry
+            setLastFailedPrompt(messageToSend);
+            setNetworkRetryCount(0);
+            
+            // Show initial loading message
+            const networkLoadingResponse = {
+              id: chatHistory.length + 2,
+              type: "bot",
+              content: "🌐 **Network connection lost. Attempting to reconnect...**",
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              isNetworkError: true,
+              isReconnecting: true,
+            };
+            setChatHistory((prev) => [...prev, networkLoadingResponse]);
+            
+            // Show loading toast
+            toast.loading('🌐 Network connection lost. Attempting to reconnect...', {
+              id: 'network-error',
+              duration: 8000,
+              position: 'top-center',
+              style: {
+                background: '#fef3c7',
+                color: '#92400e',
+                border: '1px solid #fcd34d'
+              }
+            });
+            
+            // Try to reconnect for 8 seconds, then show failure message
+            setTimeout(() => {
+              // Update the message to show connection failed
+              setChatHistory((prev) => 
+                prev.map(msg => 
+                  msg.id === networkLoadingResponse.id 
+                    ? {
+                        ...msg,
+                        content: "🌐 **Internet connection lost. Please check your internet connection and try again.**\n\nThis usually happens when:\n\n• Your internet connection is unstable\n• There's a temporary server issue\n• Network connectivity problems\n\nPlease check your connection and refresh the page or try again.",
+                        isReconnecting: false,
+                        showRetryButton: true
+                      }
+                    : msg
+                )
+              );
+              
+              // Update toast to show failure
+              toast.error('🌐 Unable to reconnect. Please check your internet connection.', {
+                id: 'network-error',
+                duration: 6000,
+                position: 'top-center',
+                style: {
+                  background: '#fee2e2',
+                  color: '#991b1b',
+                  border: '1px solid #fecaca'
+                }
+              });
+            }, 8000); // 8 seconds timeout
+          } else if (error.isRateLimit) {
             const rateLimitMessage = formatRateLimitMessage(error);
             const rateLimitResponse = {
               id: chatHistory.length + 2,
@@ -1045,7 +1232,7 @@ const ChatbotPage = () => {
     setOriginalPrompt("");
   };
 
-  const MessageBubble = ({ message }) => {
+  const MessageBubble = ({ message, retryLastRequest, setLastFailedPrompt }) => {
     // More specific detection for course content - look for multiple sections with specific course structure
     const isCourseContent = (
       message.content.includes("# ") && 
@@ -1285,6 +1472,43 @@ const ChatbotPage = () => {
               )}
 
               {message.type === "user" && <div className="text-sm lg:text-base">{message.content}</div>}
+
+              {/* Loading spinner for reconnection attempts */}
+              {message.isReconnecting && (
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                  <span className="text-sm text-gray-600">Trying to reconnect...</span>
+                </div>
+              )}
+
+              {/* Retry button for network errors (only after reconnection timeout) */}
+              {message.isNetworkError && message.showRetryButton && !message.isReconnecting && (
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => {
+                      console.log('🔄 Retry button clicked');
+                      retryLastRequest();
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-sm font-medium rounded-lg transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Retry Connection
+                  </button>
+                  <button
+                    onClick={() => {
+                      console.log('❌ Cancel button clicked');
+                      setLastFailedPrompt(null);
+                      // Remove the network error message from chat
+                      setChatHistory((prev) => prev.filter(msg => !msg.isNetworkError));
+                    }}
+                    className="px-3 py-2 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
 
               <div className={`text-[10px] lg:text-xs mt-2 ${
                 message.type === "user" 
@@ -1549,7 +1773,12 @@ const ChatbotPage = () => {
               )}
 
               {chatHistory.map((chat) => (
-                <MessageBubble key={chat.id} message={chat} />
+                <MessageBubble 
+                  key={chat.id} 
+                  message={chat} 
+                  retryLastRequest={retryLastRequest}
+                  setLastFailedPrompt={setLastFailedPrompt}
+                />
               ))}
 
               {isLoading && (
