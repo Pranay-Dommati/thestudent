@@ -16,18 +16,30 @@ const MobileBottomNavigation = () => {
   const scrollTimeoutRef = useRef(null);
   const lastToggleTime = useRef(0);
 
-  // Set initial class on mount
+  // Set initial html class on mount (only on small screens)
   useEffect(() => {
     const rootElement = document.documentElement;
-    rootElement.classList.add('mobile-nav-visible');
+    const isSmallScreen = window.innerWidth < 768;
+    if (isSmallScreen) {
+      rootElement.classList.add('mobile-nav-visible');
+    } else {
+      rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
+    }
     
     return () => {
       rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
     };
   }, []);
 
-  // Scroll detection effect
+  // Scroll detection effect (only on small screens)
   useEffect(() => {
+    // Skip on desktop/tablet
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      const rootElement = document.documentElement;
+      rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
+      return;
+    }
+
     let ticking = false;
 
     const handleScroll = () => {
@@ -109,15 +121,20 @@ const MobileBottomNavigation = () => {
     };
   }, [lastScrollY]);
 
-  // Dynamic padding based on navigation visibility
+  // Dynamic padding based on navigation visibility (small screens only)
   useEffect(() => {
     const rootElement = document.documentElement;
-    if (isVisible) {
-      rootElement.classList.add('mobile-nav-visible');
-      rootElement.classList.remove('mobile-nav-hidden');
+    const isSmallScreen = window.innerWidth < 768;
+    if (isSmallScreen) {
+      if (isVisible) {
+        rootElement.classList.add('mobile-nav-visible');
+        rootElement.classList.remove('mobile-nav-hidden');
+      } else {
+        rootElement.classList.add('mobile-nav-hidden');
+        rootElement.classList.remove('mobile-nav-visible');
+      }
     } else {
-      rootElement.classList.add('mobile-nav-hidden');
-      rootElement.classList.remove('mobile-nav-visible');
+      rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
     }
     
     // Cleanup on unmount

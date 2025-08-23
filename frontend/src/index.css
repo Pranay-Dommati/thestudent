@@ -82,26 +82,28 @@
     padding-top: env(safe-area-inset-top, 20px);
   }
 
-  /* Mobile navigation dynamic padding */
-  .mobile-nav-visible .min-h-screen {
-    padding-bottom: 60px;
-    transition: padding-bottom 0.3s ease-in-out;
-  }
-  
-  .mobile-nav-hidden .min-h-screen {
-    padding-bottom: 0px;
-    transition: padding-bottom 0.3s ease-in-out;
-  }
+  /* Mobile navigation dynamic padding - only on small screens */
+  @media (max-width: 767px) {
+    .mobile-nav-visible .min-h-screen {
+      padding-bottom: 60px;
+      transition: padding-bottom 0.3s ease-in-out;
+    }
+    
+    .mobile-nav-hidden .min-h-screen {
+      padding-bottom: 0px;
+      transition: padding-bottom 0.3s ease-in-out;
+    }
 
-  /* Profile page specific mobile navigation padding */
-  .mobile-nav-visible .profile-container {
-    padding-bottom: 60px;
-    transition: padding-bottom 0.3s ease-in-out;
-  }
-  
-  .mobile-nav-hidden .profile-container {
-    padding-bottom: 0px;
-    transition: padding-bottom 0.3s ease-in-out;
+    /* Profile page specific mobile navigation padding */
+    .mobile-nav-visible .profile-container {
+      padding-bottom: 60px;
+      transition: padding-bottom 0.3s ease-in-out;
+    }
+    
+    .mobile-nav-hidden .profile-container {
+      padding-bottom: 0px;
+      transition: padding-bottom 0.3s ease-in-out;
+    }
   }
 
   /* Hide scrollbar */
@@ -522,4 +524,14 @@
   .pointer-events-auto {
     pointer-events: auto !important;
   }
+}
+
+/* Ensure no unexpected gaps around the app */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #0f172a00; /* transparent, rely on sections */
 }

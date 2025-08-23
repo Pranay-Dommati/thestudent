@@ -79,7 +79,7 @@ const Footer = () => {
   const isButtonDisabled = isSubmitting;
 
   return (
-    <footer className="bg-gray-900 text-white py-6 md:py-10 px-4">
+    <footer className="block bg-gray-900 text-white py-6 md:py-10 px-4 mt-0 border-t-0">
       <div className="max-w-6xl mx-auto text-center space-y-6">
         {/* Subscribe Section */}
         <h3 className="text-2xl font-semibold">Start Learning Today!</h3>
