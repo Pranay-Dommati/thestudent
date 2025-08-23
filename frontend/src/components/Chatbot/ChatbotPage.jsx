@@ -710,13 +710,6 @@ const ChatbotPage = () => {
       )
     );
     
-    // Show loading toast
-    toast.loading('🔄 Checking connection...', {
-      id: 'retry-attempt',
-      duration: 8000,
-      position: 'top-center'
-    });
-    
     // Add a delay to show proper "trying to reconnect" UX
     // This gives users feedback that we're actually attempting to reconnect
     await new Promise(resolve => setTimeout(resolve, 3000)); // 3 seconds loading
@@ -737,11 +730,6 @@ const ChatbotPage = () => {
         // Remove the network error message
         setChatHistory((prev) => prev.filter(msg => !msg.isNetworkError));
         
-        toast.success('🌐 Connection restored!', {
-          id: 'retry-attempt',
-          duration: 3000
-        });
-        
       } catch (error) {
         // Even though connection check passed, the actual request failed
         console.log('Request failed despite connection check:', error);
@@ -758,11 +746,6 @@ const ChatbotPage = () => {
               : msg
           )
         );
-        
-        toast.error('🌐 Request failed. Please try again.', {
-          id: 'retry-attempt',
-          duration: 6000
-        });
         
         // Restore the failed prompt for another retry
         setLastFailedPrompt(promptToRetry);
@@ -781,11 +764,6 @@ const ChatbotPage = () => {
             : msg
         )
       );
-      
-      toast.error('🌐 Still unable to connect. Please check your internet.', {
-        id: 'retry-attempt',
-        duration: 6000
-      });
       
       // Restore the failed prompt for another retry
       setLastFailedPrompt(promptToRetry);
@@ -972,18 +950,6 @@ const ChatbotPage = () => {
             };
             setChatHistory((prev) => [...prev, networkLoadingResponse]);
             
-            // Show loading toast
-            toast.loading('🌐 Network connection lost. Attempting to reconnect...', {
-              id: 'network-error',
-              duration: 8000,
-              position: 'top-center',
-              style: {
-                background: '#fef3c7',
-                color: '#92400e',
-                border: '1px solid #fcd34d'
-              }
-            });
-            
             // Try to reconnect for 8 seconds, then show failure message
             setTimeout(() => {
               // Update the message to show connection failed
@@ -999,18 +965,6 @@ const ChatbotPage = () => {
                     : msg
                 )
               );
-              
-              // Update toast to show failure
-              toast.error('🌐 Unable to reconnect. Please check your internet connection.', {
-                id: 'network-error',
-                duration: 6000,
-                position: 'top-center',
-                style: {
-                  background: '#fee2e2',
-                  color: '#991b1b',
-                  border: '1px solid #fecaca'
-                }
-              });
             }, 8000); // 8 seconds timeout
           } else if (error.isRateLimit) {
             const rateLimitMessage = formatRateLimitMessage(error);

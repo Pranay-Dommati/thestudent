@@ -186,16 +186,15 @@ export const classifyTopics = async (query, expectedTopics = null) => {
     
   } catch (error) {
     if (error instanceof NetworkConnectionError) {
-      // Handle network errors specifically
+      // Handle network errors specifically - don't show toast here, let ChatbotPage handle it
       console.error('🌐 Network error:', error.message);
-      toast.error(error.message, { 
-        duration: 6000,
-        icon: '🌐'
-      });
       throw error;
     } else if (error.message !== 'Rate limit exceeded') {
       console.error('Topic classification error:', error);
-      toast.error(`Failed to classify topics: ${error.message}`, { duration: 4000 });
+      // Don't show toast for network-related errors to avoid duplicate notifications
+      if (!error.message.includes('Network') && !error.message.includes('connection')) {
+        toast.error(`Failed to classify topics: ${error.message}`, { duration: 4000 });
+      }
     }
     throw error;
   }
