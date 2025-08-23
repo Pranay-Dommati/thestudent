@@ -774,8 +774,27 @@ const ChatbotPage = () => {
     const messageToSend = customMessage || message;
     if (!messageToSend.trim() || isLoading) return;
 
+    // If topic confirmation is open and user sends a new message, automatically cancel it
+    if (showTopicConfirmation && !customMessage) {
+      // Add cancellation message to chat history
+      const cancellationMessage = {
+        id: chatHistory.length + 1,
+        type: "bot",
+        content: "❌ **Course creation cancelled** - Processing your new request instead.",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        isCancellation: true,
+      };
+      
+      setChatHistory((prev) => [...prev, cancellationMessage]);
+      
+      // Cancel the current topic confirmation
+      setShowTopicConfirmation(false);
+      setPendingTopics([]);
+      setOriginalPrompt("");
+    }
+
     const userMessageObj = {
-      id: chatHistory.length + 1,
+      id: chatHistory.length + (showTopicConfirmation && !customMessage ? 2 : 1),
       type: "user",
       content: messageToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -912,14 +931,7 @@ const ChatbotPage = () => {
             setOriginalPrompt(messageToSend);
             setShowTopicConfirmation(true);
             
-            const confirmationResponse = {
-              id: chatHistory.length + 2,
-              type: "bot",
-              content: `🤔 I've analyzed your query "${messageToSend}" and extracted ${availableTopics.length} learning topic(s). ${limitMessage} Please review and confirm the topics you'd like to include in your course.`,
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              isTopicConfirmation: true,
-            };
-            setChatHistory((prev) => [...prev, confirmationResponse]);
+            // No need for redundant analysis message - the topic confirmation dialog is self-explanatory
           } else {
             // No topics extracted - show error
             const errorResponse = {
