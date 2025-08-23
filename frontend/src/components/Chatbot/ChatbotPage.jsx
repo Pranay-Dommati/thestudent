@@ -523,6 +523,7 @@ const ChatbotPage = () => {
   const [learningContext, setLearningContext] = useState(""); // Store learning preferences and context
   const [networkRetryCount, setNetworkRetryCount] = useState(0); // Track network retry attempts
   const [lastFailedPrompt, setLastFailedPrompt] = useState(""); // Store last failed prompt for retry
+  const [retryingMessageId, setRetryingMessageId] = useState(null); // Track which specific message is being retried
   const [chatHistory, setChatHistory] = useState([
     {
       id: 1,
@@ -690,16 +691,17 @@ const ChatbotPage = () => {
   };
 
   // Retry function for network errors
-  const retryLastRequest = async () => {
+  const retryLastRequest = async (messageId = null) => {
     if (!lastFailedPrompt || isLoading) return;
     
     const promptToRetry = lastFailedPrompt;
     setNetworkRetryCount(prev => prev + 1);
+    setRetryingMessageId(messageId);
     
-    // Update the existing error message to show reconnection attempt
+    // Update only the specific error message to show reconnection attempt
     setChatHistory((prev) => 
       prev.map(msg => 
-        msg.isNetworkError && !msg.isReconnecting 
+        msg.id === messageId && msg.isNetworkError && !msg.isReconnecting 
           ? {
               ...msg,
               content: "🌐 **Network connection lost. Attempting to reconnect...**",
@@ -727,8 +729,8 @@ const ChatbotPage = () => {
         await handleSendMessage(promptToRetry);
         
         // If we reach here, the request was successful
-        // Remove the network error message
-        setChatHistory((prev) => prev.filter(msg => !msg.isNetworkError));
+        // Remove the specific network error message that was being retried
+        setChatHistory((prev) => prev.filter(msg => msg.id !== messageId));
         
       } catch (error) {
         // Even though connection check passed, the actual request failed
@@ -736,7 +738,7 @@ const ChatbotPage = () => {
         
         setChatHistory((prev) => 
           prev.map(msg => 
-            msg.isNetworkError 
+            msg.id === messageId && msg.isNetworkError 
               ? {
                   ...msg,
                   content: "🌐 **Request failed. Please try again.**\n\nThe connection is working but the request encountered an error. This might be a temporary issue.\n\nPlease try again in a moment.",
@@ -754,7 +756,7 @@ const ChatbotPage = () => {
       // Connection is still not working
       setChatHistory((prev) => 
         prev.map(msg => 
-          msg.isNetworkError 
+          msg.id === messageId && msg.isNetworkError 
             ? {
                 ...msg,
                 content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
@@ -768,11 +770,23 @@ const ChatbotPage = () => {
       // Restore the failed prompt for another retry
       setLastFailedPrompt(promptToRetry);
     }
+    
+    // Clean up retry state
+    setRetryingMessageId(null);
   };
 
   const handleSendMessage = async (customMessage = null) => {
     const messageToSend = customMessage || message;
     if (!messageToSend.trim() || isLoading) return;
+
+    // Hide all retry buttons (but keep messages) when a new prompt is sent
+    setChatHistory((prev) => 
+      prev.map(msg => 
+        msg.isNetworkError 
+          ? { ...msg, showRetryButton: false, isRetryDisabled: true }
+          : msg
+      )
+    );
 
     // If topic confirmation is open and user sends a new message, automatically cancel it
     if (showTopicConfirmation && !customMessage) {
@@ -1456,8 +1470,8 @@ const ChatbotPage = () => {
                 <div className="mt-4">
                   <button
                     onClick={() => {
-                      console.log('🔄 Retry button clicked');
-                      retryLastRequest();
+                      console.log('🔄 Retry button clicked for message ID:', message.id);
+                      retryLastRequest(message.id);
                     }}
                     className="flex items-center gap-2 px-3 py-2 bg-white border border-blue-300 hover:border-blue-400 hover:bg-blue-50 text-blue-600 text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
                   >
