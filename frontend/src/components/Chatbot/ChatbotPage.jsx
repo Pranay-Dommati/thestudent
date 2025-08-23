@@ -697,6 +697,7 @@ const ChatbotPage = () => {
     const promptToRetry = lastFailedPrompt;
     setNetworkRetryCount(prev => prev + 1);
     setRetryingMessageId(messageId);
+    setIsLoading(true); // Set loading state during retry
     
     // Update only the specific error message to show reconnection attempt
     setChatHistory((prev) => 
@@ -725,16 +726,143 @@ const ChatbotPage = () => {
         // Clear the failed prompt before retry
         setLastFailedPrompt(null);
         
-        // Attempt to send the message again
-        await handleSendMessage(promptToRetry);
+        // Check if this is a course creation request (pro mode) or regular chat
+        const isProModeRequest = proMode;
         
-        // If we reach here, the request was successful
-        // Remove the specific network error message that was being retried
-        setChatHistory((prev) => prev.filter(msg => msg.id !== messageId));
+        if (isProModeRequest) {
+          // This is a course creation request - call the classification API directly
+          console.log('🚀 Retrying topic extraction for:', promptToRetry);
+          const result = await classifyTopics(promptToRetry);
+          console.log('✅ AI Extracted Topics on retry:', result);
+          
+          // Update usage stats from the response
+          if (result.usage_stats) {
+            setUsageStats(result.usage_stats);
+          }
+          
+          const extractedTopics = result.topics || [];
+          
+          if (extractedTopics && extractedTopics.length > 0) {
+            // Handle rate limiting logic (same as in handleSendMessage)
+            let availableTopics = extractedTopics;
+            const maxPerRequest = 4;
+            
+            if (usageStats) {
+              const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
+              const maxPerRequestFromStats = usageStats.per_request_limit || 4;
+              const maxAllowedTopics = Math.min(remainingToday, maxPerRequestFromStats);
+              
+              if (extractedTopics.length > maxAllowedTopics) {
+                availableTopics = extractedTopics.slice(0, maxAllowedTopics);
+              }
+            } else if (extractedTopics.length > maxPerRequest) {
+              availableTopics = extractedTopics.slice(0, maxPerRequest);
+            }
+            
+            if (availableTopics.length === 0) {
+              // Replace network error with limit message
+              setChatHistory((prev) => 
+                prev.map(msg => 
+                  msg.id === messageId 
+                    ? {
+                        ...msg,
+                        content: "❌ You've reached your daily topic creation limit. Please try again tomorrow.",
+                        isNetworkError: false,
+                        isReconnecting: false,
+                        showRetryButton: false
+                      }
+                    : msg
+                )
+              );
+            } else {
+              // Remove the network error message and show topic confirmation
+              setChatHistory((prev) => prev.filter(msg => msg.id !== messageId));
+              
+              // Set up the topic confirmation dialog
+              setPendingTopics(availableTopics);
+              setOriginalPrompt(promptToRetry);
+              setShowTopicConfirmation(true);
+            }
+          } else {
+            // No topics extracted - replace with error message
+            setChatHistory((prev) => 
+              prev.map(msg => 
+                msg.id === messageId 
+                  ? {
+                      ...msg,
+                      content: "❌ I couldn't extract any learning topics from your query. Please try to be more specific about what you'd like to learn (e.g., 'JavaScript arrays and functions', 'Python data structures', etc.)",
+                      isNetworkError: false,
+                      isReconnecting: false,
+                      showRetryButton: false
+                    }
+                  : msg
+              )
+            );
+          }
+        } else {
+          // This is a regular chat request - call the vector bot API directly
+          const response = await callVectorBotAPI(promptToRetry);
+          
+          // Replace the network error message with the bot response
+          setChatHistory((prev) => 
+            prev.map(msg => 
+              msg.id === messageId 
+                ? {
+                    ...msg,
+                    content: response,
+                    isNetworkError: false,
+                    isReconnecting: false,
+                    showRetryButton: false
+                  }
+                : msg
+            )
+          );
+        }
+        
+        // Clean up loading state
+        setIsLoading(false);
         
       } catch (error) {
         // Even though connection check passed, the actual request failed
         console.log('Request failed despite connection check:', error);
+        
+        // Handle different types of errors
+        if (error.isRateLimit) {
+          const rateLimitMessage = formatRateLimitMessage(error);
+          setChatHistory((prev) => 
+            prev.map(msg => 
+              msg.id === messageId && msg.isNetworkError 
+                ? {
+                    ...msg,
+                    content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 16 topics per day\n\nPlease try again later or contact support if you need higher limits.`,
+                    isNetworkError: false,
+                    isReconnecting: false,
+                    showRetryButton: false,
+                    isRateLimitError: true
+                  }
+                : msg
+            )
+          );
+        } else {
+          setChatHistory((prev) => 
+            prev.map(msg => 
+              msg.id === messageId && msg.isNetworkError 
+                ? {
+                    ...msg,
+                    content: "🌐 **Request failed. Please try again.**\n\nThe connection is working but the request encountered an error. This might be a temporary issue.\n\nPlease try again in a moment.",
+                    isReconnecting: false,
+                    showRetryButton: true
+                  }
+                : msg
+            )
+          );
+          
+          // Restore the failed prompt for another retry
+          setLastFailedPrompt(promptToRetry);
+        }
+        
+        // Clean up loading state
+        setIsLoading(false);
         
         setChatHistory((prev) => 
           prev.map(msg => 
@@ -769,6 +897,9 @@ const ChatbotPage = () => {
       
       // Restore the failed prompt for another retry
       setLastFailedPrompt(promptToRetry);
+      
+      // Clean up loading state
+      setIsLoading(false);
     }
     
     // Clean up retry state
