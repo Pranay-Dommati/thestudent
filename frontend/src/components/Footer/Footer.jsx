@@ -146,10 +146,24 @@ const Footer = () => {
 
         {/* Social Media Icons */}
         <div className="flex justify-center space-x-8 text-xl mt-4">
-          <a href="#" className="hover:text-gray-300 transition-colors" title="X (Twitter)">
+          <a
+            href="https://x.com/easylearnova"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-gray-300 transition-colors"
+            title="X (Twitter)"
+            aria-label="Visit us on X (Twitter)"
+          >
             <FaXTwitter />
           </a>
-          <a href="#" className="hover:text-blue-600 transition-colors" title="LinkedIn">
+          <a
+            href="https://www.linkedin.com/company/easylearnova/?viewAsMember=true"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-blue-600 transition-colors"
+            title="LinkedIn"
+            aria-label="Visit us on LinkedIn"
+          >
             <FaLinkedin />
           </a>
         </div>
