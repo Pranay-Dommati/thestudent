@@ -2826,32 +2826,26 @@ const ProLearningPage = () => {
         return (
           <div className="space-y-6">
             {/* Compact Resources Header */}
-            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 rounded-2xl p-6 text-white shadow-xl">
+            <div className="bg-gradient-to-br from-blue-50 via-sky-50 to-cyan-50 border border-blue-200 rounded-xl p-4 mb-6 shadow-sm">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
-                    <FaLink className="text-xl text-white" />
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-sky-600 text-white rounded-lg flex items-center justify-center shadow-lg mr-3">
+                    <FaLink className="text-sm" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold mb-1">Learning Resources</h2>
-                    <p className="text-indigo-100 text-sm">
-                      Curated materials for {getCurrentTopic()} mastery
-                    </p>
+                    <h2 className="text-lg font-bold text-gray-900">Learning Resources</h2>
+                    <p className="text-sm text-gray-600">Curated materials for {getCurrentTopic()} mastery</p>
                   </div>
                 </div>
-                <div className="hidden lg:flex items-center space-x-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">{content.resources.length}</div>
-                    <div className="text-indigo-200 text-xs">Resources</div>
+                <div className="hidden md:flex items-center space-x-3 text-xs">
+                  <div className="bg-white px-2 py-1 rounded-full shadow-sm">
+                    <span className="text-blue-600 font-medium">{content.resources.length} Resources</span>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold">⭐</div>
-                    <div className="text-indigo-200 text-xs">Quality</div>
+                  <div className="flex items-center text-gray-600">
+                    <span>⭐ Quality</span>
                   </div>
                 </div>
               </div>
-              
-              {/* Removed resource categories display for a cleaner look */}
             </div>
             
             {/* Compact Professional Resources Grid */}
