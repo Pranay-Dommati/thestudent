@@ -172,6 +172,86 @@ class ProLearningHistoryService {
       .slice(0, limit)
       .map(([topic, count]) => ({ topic, count }));
   }
+
+  // Clean up error status items from history
+  cleanupErrorItems() {
+    try {
+      const history = this.getHistory();
+      const cleanedHistory = history.filter(item => item.status !== 'error');
+      
+      // Only update storage if we actually removed items
+      if (cleanedHistory.length !== history.length) {
+        localStorage.setItem(this.storageKey, JSON.stringify(cleanedHistory));
+        console.log(`🧹 Cleaned up ${history.length - cleanedHistory.length} error items from ProLearning history`);
+        
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('prolearning-history-updated', {
+          detail: { action: 'cleanup', removedCount: history.length - cleanedHistory.length }
+        }));
+        
+        return history.length - cleanedHistory.length; // Return count of removed items
+      }
+      
+      return 0; // No items removed
+    } catch (error) {
+      console.error('Error cleaning up ProLearning history:', error);
+      return 0;
+    }
+  }
+
+  // Get filtered history (excluding error items)
+  getValidHistory() {
+    const history = this.getHistory();
+    return history.filter(item => item.status !== 'error');
+  }
+
+  // Validate and clean course data - remove courses that have invalid URLs or data
+  validateAndCleanHistory() {
+    try {
+      const history = this.getHistory();
+      const validHistory = history.filter(item => {
+        // Basic validation - must have required fields
+        if (!item.courseId || !item.topic || !item.url) {
+          console.log(`🧹 Removing invalid history item missing required fields:`, item);
+          return false;
+        }
+        
+        // Check if URL is properly formatted
+        try {
+          new URL(item.url);
+        } catch {
+          console.log(`🧹 Removing history item with invalid URL:`, item);
+          return false;
+        }
+        
+        // Don't include error status items
+        if (item.status === 'error') {
+          console.log(`🧹 Removing error status item:`, item);
+          return false;
+        }
+        
+        return true;
+      });
+      
+      // Update storage if we removed any items
+      if (validHistory.length !== history.length) {
+        localStorage.setItem(this.storageKey, JSON.stringify(validHistory));
+        console.log(`🧹 Cleaned up ${history.length - validHistory.length} invalid items from ProLearning history`);
+        
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('prolearning-history-updated', {
+          detail: { action: 'validation-cleanup', removedCount: history.length - validHistory.length }
+        }));
+        
+        return history.length - validHistory.length;
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('Error validating ProLearning history:', error);
+      return 0;
+    }
+  }
 }
 
 // Create and export a singleton instance

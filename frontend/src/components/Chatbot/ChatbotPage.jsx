@@ -655,7 +655,12 @@ const ChatbotPage = () => {
   // Load ProLearning history on component mount
   useEffect(() => {
     const loadHistory = () => {
-      const history = proLearningHistoryService.getHistory();
+      // Clean up any error items and validate data automatically
+      proLearningHistoryService.cleanupErrorItems();
+      proLearningHistoryService.validateAndCleanHistory();
+      
+      // Get the cleaned history (valid items only)
+      const history = proLearningHistoryService.getValidHistory();
       setProLearningHistory(history);
     };
     

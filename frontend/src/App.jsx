@@ -167,7 +167,12 @@ const App = () => {
   // Load ProLearning history globally
   useEffect(() => {
     const loadHistory = () => {
-      const history = proLearningHistoryService.getHistory();
+      // Clean up any error items and validate data on app start
+      proLearningHistoryService.cleanupErrorItems();
+      proLearningHistoryService.validateAndCleanHistory();
+      
+      // Get the cleaned history
+      const history = proLearningHistoryService.getValidHistory();
       setProLearningHistory(history);
     };
     
