@@ -6,7 +6,7 @@ import { toast } from 'react-hot-toast';
 
 const API_URL = 'http://localhost:8000';
 
-const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
+const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshKey }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     category: '',
@@ -35,7 +35,7 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete }) => {
     };
 
     fetchCourses();
-  }, [filters.category]);
+  }, [filters.category, refreshKey]); // Added refreshKey dependency
 
   const handleEdit = (courseId, courseType) => {
     if (onEdit) onEdit(courseId, courseType);

@@ -74,6 +74,18 @@ export const getEngineeringCourseById = async (courseId) => {
   }
 };
 
+export const getSchoolCourseById = async (courseId) => {
+  try {
+    console.log('Fetching school course details for ID:', courseId);
+    const response = await axios.get(`${API_URL}/api/courses/school/${courseId}/`);
+    console.log('School course details received:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching school course details:', error);
+    throw error;
+  }
+};
+
 export const getAllCourses = async (category = 'all') => {
   try {
     // Remove any colon prefix from category if present (e.g., ":1" becomes "1")
@@ -104,5 +116,83 @@ export const getSchoolCourses = async (classLevel, board, state = '') => {
   } catch (error) {
     console.error('Error fetching school courses:', error);
     return [];
+  }
+};
+
+export const deleteCourse = async (courseType, courseId) => {
+  try {
+    console.log(`Deleting ${courseType} course with ID: ${courseId}`);
+    const response = await axios.delete(`${API_URL}/api/courses/delete/${courseType}/${courseId}/`, {
+      withCredentials: true,
+    });
+    console.log('Delete response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting course:', error);
+    
+    if (error.response?.status === 404) {
+      toast.error('Course not found');
+    } else if (error.response?.status === 403) {
+      toast.error('Permission denied');
+    } else if (error.code === 'ERR_NETWORK') {
+      toast.error('Cannot connect to server. Please make sure the backend is running.');
+    } else {
+      toast.error(error.response?.data?.error || 'Failed to delete course');
+    }
+    throw error;
+  }
+};
+
+export const updateSchoolCourse = async (courseId, formData) => {
+  try {
+    console.log(`Updating school course with ID: ${courseId}`);
+    const response = await axios.put(`${API_URL}/api/courses/school/${courseId}/update/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      withCredentials: true,
+    });
+    console.log('Update response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating school course:', error);
+    
+    if (error.response?.status === 404) {
+      toast.error('Course not found');
+    } else if (error.response?.status === 403) {
+      toast.error('Permission denied');
+    } else if (error.code === 'ERR_NETWORK') {
+      toast.error('Cannot connect to server. Please make sure the backend is running.');
+    } else {
+      toast.error(error.response?.data?.error || 'Failed to update course');
+    }
+    throw error;
+  }
+};
+
+export const updateEngineeringCourse = async (courseId, formData) => {
+  try {
+    console.log(`Updating engineering course with ID: ${courseId}`);
+    const response = await axios.put(`${API_URL}/api/courses/engineering/${courseId}/update/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      withCredentials: true,
+    });
+    console.log('Update response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating engineering course:', error);
+    
+    if (error.response?.status === 404) {
+      toast.error('Course not found');
+    } else if (error.response?.status === 403) {
+      toast.error('Permission denied');
+    } else if (error.code === 'ERR_NETWORK') {
+      toast.error('Cannot connect to server. Please make sure the backend is running.');
+    } else {
+      toast.error(error.response?.data?.error || 'Failed to update course');
+    }
+    throw error;
   }
 };

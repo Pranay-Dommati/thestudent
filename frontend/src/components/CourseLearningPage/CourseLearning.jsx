@@ -446,15 +446,19 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   // Get current lesson
   const getCurrentLesson = () => {
     if (!course || !course.chapters || !Array.isArray(course.chapters)) {
+      console.log('🚫 No course or chapters data available');
       return null;
     }
     
     const chapter = course.chapters[activeChapter];
     if (!chapter || !chapter.lessons || !Array.isArray(chapter.lessons)) {
+      console.log('🚫 No chapter or lessons data available for chapter:', activeChapter);
       return null;
     }
     
-    return chapter.lessons[activeLesson] || null;
+    const lesson = chapter.lessons[activeLesson] || null;
+    console.log('🎯 getCurrentLesson result:', lesson);
+    return lesson;
   };
 
   // Filter lessons based on search
@@ -493,8 +497,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const currentLesson = getCurrentLesson();
     console.log('🎯 Current lesson for content type detection:', currentLesson);
     if (currentLesson && currentLesson.type) {
-      console.log('🎮 Setting content type based on lesson type:', currentLesson.type);
-      // Map lesson types to content types
+      console.log('🎮 Setting content type based on lesson type:', currentLesson.type);      // Map lesson types to content types
       switch (currentLesson.type) {
         case 'quiz':
           setContentType('quiz');
@@ -595,7 +598,22 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const renderContent = () => {
     if (loading) {
       return <div className="animate-pulse bg-gray-200 h-96 rounded-lg"></div>;
-    }    if (contentType === 'notFound') {
+    }
+    
+    const currentLesson = getCurrentLesson();
+    
+    // Debug logging
+    console.log('🎬 Rendering content with:', {
+      currentLesson,
+      video_url: currentLesson?.video_url,
+      videoUrl: currentLesson?.videoUrl,
+      title: currentLesson?.title,
+      activeChapter,
+      activeLesson,
+      contentType
+    });
+    
+    if (contentType === 'notFound') {
       return (
         <div className="p-8 text-center">
           <div className="mb-6">
@@ -664,7 +682,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             <div className="mb-8">
               <div ref={videoRef} className="mb-6">
                 <LessonVideo 
-                  videoUrl={currentLesson?.videoUrl} 
+                  videoUrl={currentLesson?.video_url || currentLesson?.videoUrl} 
                   title={currentLesson?.title}
                 />
               </div>

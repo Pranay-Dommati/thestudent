@@ -12,6 +12,7 @@ import AuthModal from '../Common/AuthModal';
 import ErrorBoundary from '../Common/ErrorBoundary';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
+import useNetworkStatus from '../../hooks/useNetworkStatus';
 
 // Custom CSS - added for DeepSeek-like UI
 import './mobileChatStyles.css';
@@ -111,6 +112,7 @@ const MobileChatbotPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoggedIn } = useAuth();
+  const { isOnline, isReconnecting, reconnectAttempts } = useNetworkStatus();
   const initialQuery = searchParams.get("q");
 
   const [message, setMessage] = useState("");

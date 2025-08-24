@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import BasicInfoStep from './BasicInfoStep';
 import CourseStructureStep from './CourseStructureStep';
-import { createCourse } from '../../../../services/courseApi';
+import { createCourse, getSchoolCourseById, updateSchoolCourse } from '../../../../services/courseApi';
 import { sanitizeFileName } from '../../../../utils/fileHelpers';
 
-const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
+const SchoolCourseForm = ({ onSubmit, onCancel, classLevel, isEditMode = false, courseId = null }) => {
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(isEditMode);
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
   
   // Basic Course Info
@@ -52,6 +53,106 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   
   // Errors for validation
   const [errors, setErrors] = useState({});
+
+  // Load existing course data in edit mode
+  useEffect(() => {
+    if (isEditMode && courseId) {
+      loadCourseData();
+    }
+  }, [isEditMode, courseId]);
+
+  const loadCourseData = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🔄 Loading course data for edit mode. CourseId:', courseId);
+      const courseData = await getSchoolCourseById(courseId);
+      
+      if (courseData) {
+        console.log('✅ Course data loaded successfully:', courseData.title);
+        // Set course info
+        setCourseInfo({
+          thumbnail: null, // Don't set existing thumbnail file
+          title: courseData.title || '',
+          board: courseData.board || '',
+          state: courseData.state || '',
+          subject: courseData.subject || '',
+          sources: courseData.sources || '',
+          duration: courseData.duration || '',
+          lastUpdated: courseData.last_updated || courseData.lastUpdated || new Date().toISOString().split('T')[0],
+          keyTopics: courseData.key_topics || courseData.keyTopics || [''],
+          learningPoints: courseData.learning_points || courseData.learningPoints || ['', ''],
+          chapterCount: courseData.chapters?.length || 1
+        });
+
+        // Set thumbnail preview if exists
+        if (courseData.thumbnail) {
+          const thumbnailUrl = courseData.thumbnail.startsWith('http') 
+            ? courseData.thumbnail 
+            : `http://localhost:8000${courseData.thumbnail}`;
+          setThumbnailPreview(thumbnailUrl);
+        }
+
+        // Set chapters
+        if (courseData.chapters && courseData.chapters.length > 0) {
+          setChapters(courseData.chapters.map(chapter => ({
+            name: chapter.name || '',
+            lessons: chapter.lessons?.map(lesson => ({
+              type: lesson.type || 'video',
+              title: lesson.title || '',
+              videoUrl: lesson.video_url || lesson.videoUrl || '',
+              description: lesson.description || '',
+              aboutLesson: lesson.about_lesson || lesson.aboutLesson || '',
+              hasResources: lesson.has_resources || lesson.hasResources || false,
+              resources: lesson.resources || {
+                downloadable: [],
+                internet: []
+              },
+              quizQuestions: lesson.quiz_questions || lesson.quizQuestions || []
+            })) || [{
+              type: 'video',
+              title: '',
+              videoUrl: '',
+              description: '',
+              aboutLesson: '',
+              hasResources: false,
+              resources: {
+                downloadable: [],
+                internet: []
+              },
+              quizQuestions: []
+            }]
+          })));
+        } else {
+          // Set default chapter if no chapters exist
+          setChapters([
+            {
+              name: '',
+              lessons: [
+                {
+                  type: 'video',
+                  title: '',
+                  videoUrl: '',
+                  description: '',
+                  aboutLesson: '',
+                  hasResources: false,
+                  resources: {
+                    downloadable: [],
+                    internet: []
+                  },
+                  quizQuestions: []
+                }
+              ]
+            }
+          ]);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading course data:', error);
+      toast.error('Failed to load course data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
   // Handle thumbnail upload
   const handleThumbnailChange = (e) => {
     const file = e.target.files[0];
@@ -412,7 +513,8 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     // Only validate first step fields when on first step
     if (activeStep === 1) {
       // Basic info validation
-      if (!courseInfo.thumbnail) newErrors.thumbnail = 'Course thumbnail is required';
+      // In edit mode, thumbnail is optional (existing one can be used)
+      if (!isEditMode && !courseInfo.thumbnail) newErrors.thumbnail = 'Course thumbnail is required';
       if (!courseInfo.title.trim()) newErrors.title = 'Course title is required';
       if (!courseInfo.board) newErrors.board = 'Board selection is required';
       if (courseInfo.board === 'state' && !courseInfo.state) newErrors.state = 'State selection is required';
@@ -484,8 +586,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       });
     }
     
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
   
   const handleNext = (e) => {
@@ -496,11 +597,14 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     console.log("Current errors:", errors);
     
     // Validate the form before proceeding
-    if (validateForm()) {
+    const validationErrors = validateForm();
+    setErrors(validationErrors);
+    
+    if (Object.keys(validationErrors).length === 0) {
       setActiveStep(activeStep + 1);
       window.scrollTo(0, 0);
     } else {
-      console.log("Form validation failed", errors);
+      console.log("Form validation failed", validationErrors);
       toast("Please fill in all required fields correctly", {
         icon: '❌',
         style: {
@@ -633,18 +737,30 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       console.log('Sending formData with files:', resourceFiles.map(rf => rf.id));
       
       // Submit the form
-      await createCourse(formData);
-      toast('Course created successfully', {
-        icon: '🎉',
-        style: {
-          backgroundColor: '#10B981',
-          color: 'white',
-        }
-      });
+      if (isEditMode) {
+        await updateSchoolCourse(courseId, formData);
+        toast('Course updated successfully', {
+          icon: '🎉',
+          style: {
+            backgroundColor: '#10B981',
+            color: 'white',
+          }
+        });
+      } else {
+        await createCourse(formData);
+        toast('Course created successfully', {
+          icon: '🎉',
+          style: {
+            backgroundColor: '#10B981',
+            color: 'white',
+          }
+        });
+      }
       navigate('/admin-p/courses');
     } catch (error) {
-      console.error('Error creating course:', error);
-      toast('Failed to create course. Please try again.', {
+      const action = isEditMode ? 'update' : 'create';
+      console.error(`Error ${action}ing course:`, error);
+      toast(`Failed to ${action} course. Please try again.`, {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -659,28 +775,37 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Create {classLevel} Course</h1>
+        <h1 className="text-2xl font-bold">
+          {isEditMode ? `Edit ${classLevel} Course` : `Create ${classLevel} Course`}
+        </h1>
       </div>
       
-      {/* Progress Indicator */}
-      <div className="mb-8">
-        <div className="flex items-center">
-          <div className={`flex items-center justify-center w-10 h-10 rounded-full ${activeStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-            1
-          </div>
-          <div className={`flex-1 h-1 mx-2 ${activeStep >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-          <div className={`flex items-center justify-center w-10 h-10 rounded-full ${activeStep >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-            2
-          </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <span className="ml-2">Loading course data...</span>
         </div>
-        <div className="flex text-xs justify-between mt-2">
-          <span className="font-medium">Basic Information</span>
-          <span className="font-medium">Course Structure</span>
-        </div>
-      </div>
-      
-      {/* Form Content */}
-      <form onSubmit={handleSubmit}>
+      ) : (
+        <>
+          {/* Progress Indicator */}
+          <div className="mb-8">
+            <div className="flex items-center">
+              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${activeStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                1
+              </div>
+              <div className={`flex-1 h-1 mx-2 ${activeStep >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${activeStep >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                2
+              </div>
+            </div>
+            <div className="flex text-xs justify-between mt-2">
+              <span className="font-medium">Basic Information</span>
+              <span className="font-medium">Course Structure</span>
+            </div>
+          </div>
+          
+          {/* Form Content */}
+          <form onSubmit={handleSubmit}>
         <AnimatePresence mode="sync">
           <motion.div
             key={activeStep}
@@ -756,11 +881,13 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
                   </svg>
                   Processing...
                 </>
-              ) : 'Create Course'}
+              ) : (isEditMode ? 'Update Course' : 'Create Course')}
             </button>
           )}
         </div>
       </form>
+      </>
+      )}
     </div>
   );
 };

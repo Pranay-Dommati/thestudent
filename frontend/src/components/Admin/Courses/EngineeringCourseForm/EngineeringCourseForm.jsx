@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import BasicInfoStep from './BasicInfoStep';
 import CourseStructureStep from './CourseStructureStep';
-import { createCourse } from '../../../../services/courseApi';
+import { createCourse, getEngineeringCourseById, updateEngineeringCourse } from '../../../../services/courseApi';
 import { sanitizeFileName } from '../../../../utils/fileHelpers';
 
-const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
+const EngineeringCourseForm = ({ onSubmit, onCancel, isEditMode = false, courseId = null }) => {
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(isEditMode);
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
   
   // Basic Course Info
@@ -55,6 +56,107 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   
   // Errors for validation
   const [errors, setErrors] = useState({});
+
+  // Load existing course data in edit mode
+  useEffect(() => {
+    if (isEditMode && courseId) {
+      loadCourseData();
+    }
+  }, [isEditMode, courseId]);
+
+  const loadCourseData = async () => {
+    try {
+      setIsLoading(true);
+      const courseData = await getEngineeringCourseById(courseId);
+      
+      if (courseData) {
+        // Set course info
+        setCourseInfo({
+          thumbnail: null, // Don't set existing thumbnail file
+          title: courseData.title || '',
+          shortDescription: courseData.short_description || courseData.shortDescription || '',
+          sources: courseData.sources || '',
+          duration: courseData.duration || '',
+          proficiency: courseData.proficiency || 'beginner',
+          category: courseData.category || '',
+          certificateGiven: courseData.certificate_given || courseData.certificateGiven || false,
+          projectBased: courseData.project_based || courseData.projectBased || false,
+          lastUpdated: courseData.last_updated || courseData.lastUpdated || new Date().toISOString().split('T')[0],
+          description: courseData.description || '',
+          learningPoints: courseData.learning_points || courseData.learningPoints || ['', ''],
+          requirements: courseData.requirements || [''],
+          sectionCount: courseData.sections?.length || 1
+        });
+
+        // Set thumbnail preview if exists
+        if (courseData.thumbnail) {
+          const thumbnailUrl = courseData.thumbnail.startsWith('http') 
+            ? courseData.thumbnail 
+            : `http://localhost:8000${courseData.thumbnail}`;
+          setThumbnailPreview(thumbnailUrl);
+        }
+
+        // Set sections
+        if (courseData.sections && courseData.sections.length > 0) {
+          setSections(courseData.sections.map(section => ({
+            name: section.name || '',
+            lessons: section.lessons?.map(lesson => ({
+              type: lesson.type || 'video',
+              title: lesson.title || '',
+              videoUrl: lesson.video_url || lesson.videoUrl || '',
+              description: lesson.description || '',
+              aboutLesson: lesson.about_lesson || lesson.aboutLesson || '',
+              hasResources: lesson.has_resources || lesson.hasResources || false,
+              resources: lesson.resources || {
+                downloadable: [],
+                internet: []
+              },
+              quizQuestions: lesson.quiz_questions || lesson.quizQuestions || []
+            })) || [{
+              type: 'video',
+              title: '',
+              videoUrl: '',
+              description: '',
+              aboutLesson: '',
+              hasResources: false,
+              resources: {
+                downloadable: [],
+                internet: []
+              },
+              quizQuestions: []
+            }]
+          })));
+        } else {
+          // Set default section if no sections exist
+          setSections([
+            {
+              name: '',
+              lessons: [
+                {
+                  type: 'video',
+                  title: '',
+                  videoUrl: '',
+                  description: '',
+                  aboutLesson: '',
+                  hasResources: false,
+                  resources: {
+                    downloadable: [],
+                    internet: []
+                  },
+                  quizQuestions: []
+                }
+              ]
+            }
+          ]);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading course data:', error);
+      toast.error('Failed to load course data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
   // Handle thumbnail upload
   const handleThumbnailChange = (e) => {
     const file = e.target.files[0];
@@ -357,7 +459,8 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     const newErrors = {};
     
     // Validate course info
-    if (!courseInfo.thumbnail) newErrors.thumbnail = 'Course thumbnail is required';
+    // In edit mode, thumbnail is optional (existing one can be used)
+    if (!isEditMode && !courseInfo.thumbnail) newErrors.thumbnail = 'Course thumbnail is required';
     if (!courseInfo.title.trim()) newErrors.title = 'Course title is required';
     if (!courseInfo.shortDescription.trim()) newErrors.shortDescription = 'Course short description is required';
     if (!courseInfo.sources.trim()) newErrors.sources = 'Course sources are required';
@@ -420,15 +523,25 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       });
     }
     
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
   
   // Handle step navigation
   const handleNext = () => {
-    if (validateForm()) {
+    const validationErrors = validateForm();
+    setErrors(validationErrors);
+    
+    if (Object.keys(validationErrors).length === 0) {
       setActiveStep(activeStep + 1);
       window.scrollTo(0, 0);
+    } else {
+      toast("Please fill in all required fields correctly", {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
     }
   };
   
@@ -440,7 +553,20 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    
+    const validationErrors = validateForm();
+    setErrors(validationErrors);
+    
+    if (Object.keys(validationErrors).length > 0) {
+      toast('Please fix the form errors', {
+        icon: '❌',
+        style: {
+          backgroundColor: '#EF4444',
+          color: 'white',
+        }
+      });
+      return;
+    }
     
     setIsSubmitting(true);
     try {
@@ -529,21 +655,33 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       
       console.log('Sending formData with files:', resourceFiles.map(rf => rf.id));
       
-      // Call createCourse API
-      await createCourse(formData);
-      toast('Course created successfully!', {
-        icon: '🎉',
-        style: {
-          backgroundColor: '#10B981',
-          color: 'white',
-        }
-      });
+      // Call appropriate API based on edit mode
+      if (isEditMode) {
+        await updateEngineeringCourse(courseId, formData);
+        toast('Course updated successfully!', {
+          icon: '🎉',
+          style: {
+            backgroundColor: '#10B981',
+            color: 'white',
+          }
+        });
+      } else {
+        await createCourse(formData);
+        toast('Course created successfully!', {
+          icon: '🎉',
+          style: {
+            backgroundColor: '#10B981',
+            color: 'white',
+          }
+        });
+      }
       navigate('/admin-p/courses');
     } catch (error) {
-      console.error('Error creating course:', error);
+      const action = isEditMode ? 'update' : 'create';
+      console.error(`Error ${action}ing course:`, error);
       if (error.response?.data) {
         console.error('Error response:', error.response.data);
-        toast(`Failed to create course: ${JSON.stringify(error.response.data)}`, {
+        toast(`Failed to ${action} course: ${JSON.stringify(error.response.data)}`, {
           icon: '❌',
           style: {
             backgroundColor: '#EF4444',
@@ -551,7 +689,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
           }
         });
       } else {
-        toast('Failed to create course. Please try again.', {
+        toast(`Failed to ${action} course. Please try again.`, {
           icon: '❌',
           style: {
             backgroundColor: '#EF4444',
@@ -613,28 +751,37 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Create Engineering Course</h1>
+        <h1 className="text-2xl font-bold">
+          {isEditMode ? 'Edit Engineering Course' : 'Create Engineering Course'}
+        </h1>
       </div>
       
-      {/* Progress Indicator */}
-      <div className="mb-8">
-        <div className="flex items-center">
-          <div className={`flex items-center justify-center w-10 h-10 rounded-full ${activeStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-            1
-          </div>
-          <div className={`flex-1 h-1 mx-2 ${activeStep >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
-          <div className={`flex items-center justify-center w-10 h-10 rounded-full ${activeStep >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
-            2
-          </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <span className="ml-2">Loading course data...</span>
         </div>
-        <div className="flex text-xs justify-between mt-2">
-          <span className="font-medium">Basic Information</span>
-          <span className="font-medium">Course Structure</span>
-        </div>
-      </div>
-      
-      {/* Form Content */}
-      <form onSubmit={handleSubmit}>
+      ) : (
+        <>
+          {/* Progress Indicator */}
+          <div className="mb-8">
+            <div className="flex items-center">
+              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${activeStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                1
+              </div>
+              <div className={`flex-1 h-1 mx-2 ${activeStep >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${activeStep >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                2
+              </div>
+            </div>
+            <div className="flex text-xs justify-between mt-2">
+              <span className="font-medium">Basic Information</span>
+              <span className="font-medium">Course Structure</span>
+            </div>
+          </div>
+          
+          {/* Form Content */}
+          <form onSubmit={handleSubmit}>
         <AnimatePresence mode="sync">
           <motion.div
             key={activeStep}
@@ -709,11 +856,13 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
                   </svg>
                   Processing...
                 </>
-              ) : 'Create Course'}
+              ) : (isEditMode ? 'Update Course' : 'Create Course')}
             </button>
           )}
         </div>
       </form>
+      </>
+      )}
     </div>
   );
 };

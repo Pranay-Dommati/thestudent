@@ -102,7 +102,7 @@ class Lesson(models.Model):
     section = models.ForeignKey(CourseSection, on_delete=models.CASCADE, related_name='lessons', null=True, blank=True)
     title = models.CharField(max_length=255)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='video')
-    video_url = models.URLField(blank=True, max_length=500)
+    video_url = models.URLField(blank=True, max_length=2000)  # Increased from 500 to 2000 for iframe embeds
     description = models.TextField(blank=True)
     about_lesson = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=0)

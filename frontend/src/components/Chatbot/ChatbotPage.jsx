@@ -11,6 +11,7 @@ import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclas
 import AuthModal from '../Common/AuthModal';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
+import useNetworkStatus from '../../hooks/useBasicNetworkStatus';
 
 // Extract learning context from user's prompt
 const extractLearningContext = (prompt) => {
@@ -241,14 +242,16 @@ const useWindowSize = () => {
   return windowSize;
 };
 
-const CourseSection = ({ section, subsections }) => {
+const CourseSection = ({ section, subsections, isOnline, isReconnecting }) => {
   const [isOpen, setIsOpen] = useState(true);
   
   return (
     <div className="mb-4 lg:mb-6 bg-white rounded-lg shadow-sm">
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 lg:px-4 py-2.5 lg:py-3 flex items-center justify-between bg-gray-50 rounded-t-lg hover:bg-gray-100 transition-colors"
+        onClick={() => {
+          setIsOpen(!isOpen);
+        }}
+        className="w-full px-3 lg:px-4 py-2.5 lg:py-3 flex items-center justify-between bg-gray-50 rounded-t-lg transition-colors hover:bg-gray-100"
       >
         <h3 className="text-base lg:text-lg font-semibold text-gray-800">{section}</h3>
         <svg
@@ -271,10 +274,10 @@ const CourseSection = ({ section, subsections }) => {
                   href={video.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center p-2 rounded hover:bg-blue-50 transition-colors group mb-2 last:mb-0"
+                  className="flex items-center p-2 rounded transition-colors group mb-2 last:mb-0 hover:bg-blue-50"
                 >
-                  <IoPlayCircle className="text-blue-500 group-hover:text-blue-600 mr-2 w-4 h-4 lg:w-5 lg:h-5 flex-shrink-0" />
-                  <span className="text-gray-600 group-hover:text-blue-600 text-sm lg:text-base line-clamp-2">{video.title}</span>
+                  <IoPlayCircle className="mr-2 w-4 h-4 lg:w-5 lg:h-5 flex-shrink-0 text-blue-500 group-hover:text-blue-600" />
+                  <span className="text-sm lg:text-base line-clamp-2 text-gray-600 group-hover:text-blue-600">{video.title}</span>
                 </a>
               ))}
             </div>
@@ -396,9 +399,14 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
           {days.map(day => (
             <button
               key={day.number}
-              onClick={() => setActiveDay(day.number)}
+              onClick={() => {
+                setActiveDay(day.number);
+              }}
+              disabled={!isOnline || isReconnecting}
               className={`px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-xs lg:text-sm font-medium whitespace-nowrap flex-shrink-0 ${
-                activeDay === day.number 
+                !isOnline || isReconnecting
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : activeDay === day.number 
                   ? 'bg-blue-600 text-white' 
                   : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
@@ -430,12 +438,12 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
                     href={video.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center p-2 lg:p-3 border border-gray-200 rounded-md hover:bg-blue-50 transition-colors group"
+                    className="flex items-center p-2 lg:p-3 border border-gray-200 rounded-md transition-colors group hover:bg-blue-50"
                   >
-                    <div className="bg-red-600 text-white p-1.5 lg:p-2 rounded-md mr-2 lg:mr-3 flex-shrink-0">
+                    <div className="p-1.5 lg:p-2 rounded-md mr-2 lg:mr-3 flex-shrink-0 bg-red-600 text-white">
                       <IoPlayCircle className="w-4 h-4 lg:w-5 lg:h-5" />
                     </div>
-                    <span className="text-gray-700 group-hover:text-blue-600 text-sm lg:text-base line-clamp-2">{video.title}</span>
+                    <span className="text-sm lg:text-base line-clamp-2 text-gray-700 group-hover:text-blue-600">{video.title}</span>af
                   </a>
                 ))}
               </div>
@@ -446,7 +454,7 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
           <div className="mt-4 lg:mt-6 pt-4 border-t border-gray-200">
             <Link 
               to="/pro-learning"
-              className="block w-full p-3 lg:p-4 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
+              className="block w-full p-3 lg:p-4 rounded-lg shadow-md transition-all duration-300 transform bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white hover:shadow-lg hover:-translate-y-1"
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -510,17 +518,26 @@ const ChatbotPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoggedIn } = useAuth();
+  const { isOnline, isReconnecting, reconnectAttempts, isVerifying, manualVerification } = useNetworkStatus();
   const initialQuery = searchParams.get("q");
+
+  // Generate unique IDs using timestamp and random component
+  const generateUniqueId = () => {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  };
 
   const [message, setMessage] = useState("");
   const [proMode, setProMode] = useState(false);
   const [coursePlaceholder, setCoursePlaceholder] = useState("Create arrays and strings course...");
+  const [isContinuousChecking, setIsContinuousChecking] = useState(false);
   const [showTopicConfirmation, setShowTopicConfirmation] = useState(false);
   const [pendingTopics, setPendingTopics] = useState([]);
   const [originalPrompt, setOriginalPrompt] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [usageStats, setUsageStats] = useState(null); // Track rate limit usage stats
   const [learningContext, setLearningContext] = useState(""); // Store learning preferences and context
+  const [offlineMessageQueue, setOfflineMessageQueue] = useState([]); // Queue for messages sent while offline
+  const [isProcessingOfflineMessages, setIsProcessingOfflineMessages] = useState(false); // Prevent duplicate processing
   const [chatHistory, setChatHistory] = useState([
     {
       id: 1,
@@ -657,9 +674,330 @@ const ChatbotPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Function to process offline messages when connection is restored
+  const processOfflineMessages = async () => {
+    if (offlineMessageQueue.length === 0 || isProcessingOfflineMessages) return;
+    
+    setIsProcessingOfflineMessages(true);
+    console.log('🔄 Processing offline messages:', offlineMessageQueue);
+    
+    try {
+      for (const queuedMessage of offlineMessageQueue) {
+        try {
+          // Process each queued message WITHOUT adding user message to chat history again
+          // since it was already added when the message was sent offline
+          await processQueuedMessage(queuedMessage);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Small delay between messages
+        } catch (error) {
+          console.error('Error processing offline message:', error);
+        }
+      }
+      
+      // Clear the queue after processing
+      setOfflineMessageQueue([]);
+      console.log('✅ Processed offline messages successfully!');
+    } finally {
+      setIsProcessingOfflineMessages(false);
+    }
+  };
+
+  // Process queued message without adding user message to chat (already displayed)
+  const processQueuedMessage = async (messageToSend) => {
+    setIsLoading(true);
+
+    try {
+      console.log('Pro Mode:', proMode);
+      console.log('Message:', messageToSend);
+
+      if (proMode) {
+        // Pro mode - extract topics using AI first with rate limiting
+        try {
+          console.log('🚀 Starting topic extraction for:', messageToSend);
+          const result = await classifyTopics(messageToSend);
+          console.log('✅ AI Extracted Topics:', result);
+          
+          // Update usage stats from the response
+          if (result.usage_stats) {
+            setUsageStats(result.usage_stats);
+          }
+          
+          const extractedTopics = result.topics || [];
+          
+          // Show toast notification IMMEDIATELY if more than 4 topics were extracted
+          const maxPerRequest = 4; // Default max per request
+          if (extractedTopics.length > maxPerRequest) {
+            toast.info(
+              `📝 Maximum ${maxPerRequest} topics per request. Found ${extractedTopics.length} topics, showing first ${maxPerRequest}.`,
+              { 
+                duration: 4000,
+                position: 'top-center',
+                icon: '📝'
+              }
+            );
+          }
+          
+          if (extractedTopics && extractedTopics.length > 0) {
+            // Check current rate limit status to determine how many topics user can actually create
+            let availableTopics = extractedTopics;
+            let limitMessage = "";
+            
+            if (usageStats) {
+              const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
+              const maxPerRequestFromStats = usageStats.per_request_limit || 4;
+              
+              // Limit topics to the smaller of: remaining daily limit or max per request
+              const maxAllowedTopics = Math.min(remainingToday, maxPerRequestFromStats);
+              
+              if (extractedTopics.length > maxAllowedTopics) {
+                // Limit the topics to what user can actually create
+                availableTopics = extractedTopics.slice(0, maxAllowedTopics);
+                
+                if (remainingToday <= 0) {
+                  limitMessage = `⚠️ You've reached your daily limit of ${usageStats.daily_limit || 16} topics. Please try again tomorrow.`;
+                  // Show toast for daily limit reached
+                  toast.error(`🚫 Daily limit reached (${usageStats.daily_used || 0}/${usageStats.daily_limit || 16} used)`, {
+                    duration: 4000
+                  });
+                } else if (remainingToday < extractedTopics.length && extractedTopics.length <= maxPerRequestFromStats) {
+                  limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you only have ${remainingToday} topic(s) remaining today. Showing first ${availableTopics.length} topic(s).`;
+                  // Show informational toast for daily quota limiting
+                  toast(`📊 Limited to ${availableTopics.length} topics due to daily quota`, {
+                    icon: '⚠️',
+                    style: {
+                      background: '#fff3cd',
+                      color: '#856404',
+                      border: '1px solid #ffeaa7'
+                    },
+                    duration: 4000
+                  });
+                } else if (extractedTopics.length > maxPerRequestFromStats && remainingToday >= maxPerRequestFromStats) {
+                  limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you can create maximum ${maxPerRequestFromStats} topics at a time. Showing first ${availableTopics.length} topic(s).`;
+                  // Show informational toast for per-request limiting
+                  toast(`🔢 Limited to ${maxPerRequestFromStats} topics per request`, {
+                    icon: 'ℹ️',
+                    style: {
+                      background: '#d1ecf1',
+                      color: '#0c5460',
+                      border: '1px solid #bee5eb'
+                    },
+                    duration: 4000
+                  });
+                } else if (extractedTopics.length > maxPerRequestFromStats && remainingToday < maxPerRequestFromStats) {
+                  limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you can only create maximum ${maxPerRequestFromStats} topics at a time and have ${remainingToday} topic(s) remaining today. Showing first ${availableTopics.length} topic(s).`;
+                  // Show informational toast for combined limiting
+                  toast(`📊 Limited by daily quota (${remainingToday} left) and per-request limit (${maxPerRequestFromStats} max)`, {
+                    icon: '⚠️',
+                    style: {
+                      background: '#fff3cd',
+                      color: '#856404',
+                      border: '1px solid #ffeaa7'
+                    },
+                    duration: 5000
+                  });
+                }
+              }
+            } else {
+              // If no usage stats, just limit to 4 topics max
+              if (extractedTopics.length > maxPerRequest) {
+                availableTopics = extractedTopics.slice(0, maxPerRequest);
+                limitMessage = `⚠️ Showing first ${maxPerRequest} topics. You can create maximum ${maxPerRequest} topics at a time.`;
+                // Show informational toast for general per-request limiting
+                toast(`🔢 Limited to ${maxPerRequest} topics per request`, {
+                  icon: 'ℹ️',
+                  style: {
+                    background: '#d1ecf1',
+                    color: '#0c5460',
+                    border: '1px solid #bee5eb'
+                  },
+                  duration: 4000
+                });
+              }
+            }
+            
+            // If no topics available due to limits, don't show confirmation
+            if (availableTopics.length === 0) {
+              const limitResponse = {
+                id: generateUniqueId(),
+                type: "bot",
+                content: limitMessage || "❌ You've reached your daily topic creation limit. Please try again tomorrow.",
+                timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              };
+              setChatHistory((prev) => [...prev, limitResponse]);
+              setIsLoading(false);
+              return;
+            }
+            
+            // Store limited topics for confirmation and show confirmation dialog
+            setPendingTopics(availableTopics);
+            setOriginalPrompt(messageToSend);
+            setShowTopicConfirmation(true);
+            
+            const confirmationResponse = {
+              id: generateUniqueId(),
+              type: "bot",
+              content: `🤔 I've analyzed your query "${messageToSend}" and extracted ${availableTopics.length} learning topic(s). ${limitMessage} Please review and confirm the topics you'd like to include in your course.`,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              isTopicConfirmation: true,
+            };
+            setChatHistory((prev) => [...prev, confirmationResponse]);
+          } else {
+            // No topics extracted - show error
+            const errorResponse = {
+              id: generateUniqueId(),
+              type: "bot",
+              content: "❌ I couldn't extract any learning topics from your query. Please try to be more specific about what you'd like to learn (e.g., 'JavaScript arrays and functions', 'Python data structures', etc.)",
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+            setChatHistory((prev) => [...prev, errorResponse]);
+          }
+        } catch (error) {
+          console.error('❌ Topic extraction failed:', error);
+          
+          // Handle rate limiting specifically
+          if (error.isRateLimit) {
+            const rateLimitMessage = formatRateLimitMessage(error);
+            const rateLimitResponse = {
+              id: generateUniqueId(),
+              type: "bot",
+              content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 16 topics per day\n\nPlease try again later or contact support if you need higher limits.`,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              isRateLimitError: true,
+            };
+            setChatHistory((prev) => [...prev, rateLimitResponse]);
+            
+            // Show toast notification
+            toast.error('Daily topic creation limit reached', {
+              duration: 5000,
+              position: 'top-center',
+            });
+          } else {
+            // Generic error handling
+            const errorResponse = {
+              id: generateUniqueId(),
+              type: "bot",
+              content: `❌ Topic extraction failed: ${error.message}. Please try again with a clearer learning query.`,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+            setChatHistory((prev) => [...prev, errorResponse]);
+          }
+        }
+      } else {
+        // Regular chatbot response using vector bot for educational topics
+        console.log('🔄 Calling vector bot API...');
+        const response = await callVectorBotAPI(messageToSend);
+        
+        console.log("📨 Vector bot response received:");
+        console.log("📨 Response type:", typeof response);
+        console.log("📨 Response value:", response);
+        console.log("📨 Response length:", response ? response.length : 0);
+        console.log("📨 Is response truthy:", !!response);
+
+        const botResponse = {
+          id: generateUniqueId(),
+          type: "bot",
+          content: typeof response === 'string' ? response : String(response),
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+
+        console.log("📨 Bot response object:", botResponse);
+        console.log("📨 Bot response content:", botResponse.content);
+        console.log("📨 Bot response content length:", botResponse.content.length);
+
+        setChatHistory((prev) => {
+          const newHistory = [...prev, botResponse];
+          console.log("📨 New chat history:", newHistory);
+          return newHistory;
+        });
+      }
+    } catch (error) {
+      console.error("Error in chat:", error);
+      const errorResponse = {
+        id: generateUniqueId(),
+        type: "bot",
+        content: "Sorry, I couldn't process your request. Please try again later.",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      setChatHistory((prev) => [...prev, errorResponse]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Continuous connection checking when enabled
+  useEffect(() => {
+    let interval;
+    
+    if (isContinuousChecking) {
+      interval = setInterval(async () => {
+        try {
+          console.log('🔄 Checking connection status...');
+          const isSuccess = await manualVerification();
+          if (isSuccess) {
+            console.log('✅ Connection verified as restored');
+            setIsContinuousChecking(false); // Stop continuous checking when connection is restored
+            
+            // Remove connection status messages from chat history
+            setChatHistory((prev) => 
+              prev.filter(msg => !msg.isConnectionStatus)
+            );
+            
+            // Process any queued offline messages
+            await processOfflineMessages();
+            
+            console.log('✅ Connection restored! Chat is now available.');
+          } else {
+            console.log('🔄 Still offline, continuing to check...');
+          }
+        } catch (error) {
+          console.log('Continuous connection check failed:', error);
+        }
+      }, 3000); // Check every 3 seconds
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isContinuousChecking, manualVerification, offlineMessageQueue]);
+
   const handleSendMessage = async (customMessage = null) => {
     const messageToSend = customMessage || message;
     if (!messageToSend.trim() || isLoading) return;
+
+    // Check connection status first
+    if (!isOnline || isReconnecting) {
+      // Show user message first
+      const userMessageObj = {
+        id: generateUniqueId(),
+        type: "user",
+        content: messageToSend,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+
+      // Add connection status message with retry functionality (only this message)
+      const connectionStatusObj = {
+        id: generateUniqueId(),
+        type: "bot",
+        content: "Connection issue detected. Checking status...",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        isConnectionStatus: true,
+      };
+      
+      // Queue the message for processing when online
+      setOfflineMessageQueue(prev => [...prev, messageToSend]);
+      
+      setChatHistory((prev) => [...prev, userMessageObj, connectionStatusObj]);
+      if (!customMessage) setMessage("");
+      
+      return;
+    }
+
+    // If online, process normally
+    return handleSendMessageOnline(messageToSend, customMessage);
+  };
+
+  const handleSendMessageOnline = async (messageToSend, customMessage = null) => {
 
     const userMessageObj = {
       id: chatHistory.length + 1,
@@ -1045,7 +1383,7 @@ const ChatbotPage = () => {
     setOriginalPrompt("");
   };
 
-  const MessageBubble = ({ message }) => {
+  const MessageBubble = ({ message, isOnline, isReconnecting }) => {
     // More specific detection for course content - look for multiple sections with specific course structure
     const isCourseContent = (
       message.content.includes("# ") && 
@@ -1089,7 +1427,7 @@ const ChatbotPage = () => {
                     : "bg-white/70 backdrop-blur-md text-gray-800 border border-white/30 shadow-sm rounded-bl-md hover:bg-white/80 transition-all duration-200"
               }`}
             >
-              {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
+              {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && !message.isConnectionStatus && (
                 <div className="prose prose-sm lg:prose max-w-none dark:prose-invert prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-code:bg-gray-100 prose-code:text-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-strong:text-gray-900 prose-headings:text-gray-900">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
@@ -1218,6 +1556,55 @@ const ChatbotPage = () => {
                 </div>
               )}
 
+              {/* Connection Status Message */}
+              {message.type === "bot" && message.isConnectionStatus && (
+                <div className="flex items-start space-x-3">
+                  {/* AI Assistant Icon */}
+                  <div className="flex-shrink-0 mt-1">
+                    <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <FaRobot className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                  
+                  {/* Message Content */}
+                  <div className="flex-1">
+                    <p className="text-gray-700 text-sm mb-3">
+                      🌐 {message.content}
+                    </p>
+                    
+                    {/* Interactive reload button or spinner */}
+                    {!isContinuousChecking ? (
+                      <button
+                        onClick={async () => {
+                          // Start continuous checking - this will keep running until truly online
+                          setIsContinuousChecking(true);
+                        }}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                      >
+                        🔄 Retry Connection
+                      </button>
+                    ) : (
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></div>
+                        <span className="text-xs text-gray-500">
+                          {isVerifying ? 'Checking connection...' : 'Reconnecting...'}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* Status indicator */}
+                    <div className="flex items-center justify-between text-xs mt-2">
+                      <div className="text-gray-400">
+                        🤖 AI Learning Assistant
+                      </div>
+                      <div className="text-gray-500">
+                        {message.timestamp} • Status: {isVerifying ? 'Checking...' : 'Awaiting connection'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {message.type === "bot" && isCourseContent && !isLearningPlan && !isProCard && (
                 <div className="mt-2">
                   {sections.map((section, index) => (
@@ -1225,6 +1612,8 @@ const ChatbotPage = () => {
                       key={index}
                       section={section.title}
                       subsections={section.subsections}
+                      isOnline={isOnline}
+                      isReconnecting={isReconnecting}
                     />
                   ))}
                 </div>
@@ -1360,8 +1749,10 @@ const ChatbotPage = () => {
             Navigation
           </h2>
           <button
-            onClick={() => setIsSidebarOpen(false)}
-            className="p-2 hover:bg-white/50 rounded-full text-gray-500 hover:text-indigo-600 transition-all duration-200"
+            onClick={() => {
+              setIsSidebarOpen(false);
+            }}
+            className="p-2 rounded-full transition-all duration-200 hover:bg-white/50 text-gray-500 hover:text-indigo-600"
             aria-label="Close sidebar"
           >
             <IoChevronBack size={20} />
@@ -1373,13 +1764,10 @@ const ChatbotPage = () => {
           <div className="space-y-3">
             <Link
               to="/"
-              className="flex items-center justify-between p-3 rounded-xl hover:bg-white/50 
-                        group transition-all duration-200 border border-white/30 
-                        hover:border-white/50 shadow-sm hover:shadow-md backdrop-blur-sm"
+              className="flex items-center justify-between p-3 rounded-xl transition-all duration-200 border shadow-sm backdrop-blur-sm hover:bg-white/50 hover:border-white/50 hover:shadow-md border-white/30 group"
             >
               <div className="flex items-center">
-                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 
-                              group-hover:text-white transition-colors shadow-sm">
+                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm">
                   <IoHome size={18} />
                 </div>
                 <span className="ml-3 font-medium text-gray-700 group-hover:text-indigo-600">
@@ -1398,13 +1786,10 @@ const ChatbotPage = () => {
             
             <Link
               to="/courses"
-              className="flex items-center justify-between p-3 rounded-xl hover:bg-white/50 
-                        group transition-all duration-200 border border-white/30 
-                        hover:border-white/50 shadow-sm hover:shadow-md backdrop-blur-sm"
+              className="flex items-center justify-between p-3 rounded-xl transition-all duration-200 border shadow-sm backdrop-blur-sm hover:bg-white/50 hover:border-white/50 hover:shadow-md border-white/30 group"
             >
               <div className="flex items-center">
-                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 
-                              group-hover:text-white transition-colors shadow-sm">
+                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm">
                   <FaBook size={18} />
                 </div>
                 <span className="ml-3 font-medium text-gray-700 group-hover:text-indigo-600">
@@ -1423,13 +1808,10 @@ const ChatbotPage = () => {
             
             <Link
               to="/pro-learning"
-              className="flex items-center justify-between p-3 rounded-xl hover:bg-white/50 
-                        group transition-all duration-200 border border-white/30 
-                        hover:border-white/50 shadow-sm hover:shadow-md backdrop-blur-sm"
+              className="flex items-center justify-between p-3 rounded-xl transition-all duration-200 border shadow-sm backdrop-blur-sm hover:bg-white/50 hover:border-white/50 hover:shadow-md border-white/30 group"
             >
               <div className="flex items-center">
-                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 
-                              group-hover:text-white transition-colors shadow-sm">
+                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm">
                   <FaGraduationCap size={18} />
                 </div>
                 <span className="ml-3 font-medium text-gray-700 group-hover:text-indigo-600">
@@ -1448,13 +1830,10 @@ const ChatbotPage = () => {
             
             <Link
               to="/profile"
-              className="flex items-center justify-between p-3 rounded-xl hover:bg-white/50 
-                        group transition-all duration-200 border border-white/30 
-                        hover:border-white/50 shadow-sm hover:shadow-md backdrop-blur-sm"
+              className="flex items-center justify-between p-3 rounded-xl transition-all duration-200 border shadow-sm backdrop-blur-sm hover:bg-white/50 hover:border-white/50 hover:shadow-md border-white/30 group"
             >
               <div className="flex items-center">
-                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 
-                              group-hover:text-white transition-colors shadow-sm">
+                <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm">
                   <FaRegUser size={18} />
                 </div>
                 <span className="ml-3 font-medium text-gray-700 group-hover:text-indigo-600">
@@ -1481,8 +1860,11 @@ const ChatbotPage = () => {
           <div className="flex items-center">
             {!isSidebarOpen && (
               <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="mr-3 lg:mr-4 p-2 -ml-2 text-gray-600 hover:text-gray-800 hover:bg-white/50 rounded-lg transition-colors backdrop-blur-sm"
+                onClick={() => {
+                  console.log('Hamburger button clicked. isOnline:', isOnline, 'isReconnecting:', isReconnecting);
+                  setIsSidebarOpen(true);
+                }}
+                className="mr-3 lg:mr-4 p-2 -ml-2 rounded-lg transition-colors backdrop-blur-sm text-gray-600 hover:text-gray-800 hover:bg-white/50"
                 aria-label="Open sidebar"
               >
                 <IoMenu size={22} />
@@ -1530,8 +1912,10 @@ const ChatbotPage = () => {
                           <h3 className="text-lg font-semibold text-gray-800">Welcome!</h3>
                         </div>
                         <button
-                          onClick={() => setShowWelcomeMessage(false)}
-                          className="text-gray-600 hover:text-gray-800 transition-all duration-200 p-2 hover:bg-gray-100 rounded-full hover:scale-110 cursor-pointer"
+                          onClick={() => {
+                            setShowWelcomeMessage(false);
+                          }}
+                          className="transition-all duration-200 p-2 rounded-full cursor-pointer text-gray-600 hover:text-gray-800 hover:bg-gray-100 hover:scale-110"
                           aria-label="Close welcome message"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1549,7 +1933,7 @@ const ChatbotPage = () => {
               )}
 
               {chatHistory.map((chat) => (
-                <MessageBubble key={chat.id} message={chat} />
+                <MessageBubble key={chat.id} message={chat} isOnline={isOnline} isReconnecting={isReconnecting} />
               ))}
 
               {isLoading && (
@@ -1614,8 +1998,10 @@ const ChatbotPage = () => {
                                   )}
                                 </div>
                                 <button
-                                  onClick={() => handleTopicDelete(index)}
-                                  className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded transition-colors backdrop-blur-sm"
+                                  onClick={() => {
+                                    handleTopicDelete(index);
+                                  }}
+                                  className="ml-2 p-1 rounded transition-colors backdrop-blur-sm text-red-500 hover:bg-red-50"
                                   title="Delete topic"
                                 >
                                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -1628,16 +2014,18 @@ const ChatbotPage = () => {
                         </div>
                         
                         <button
-                          onClick={handleTopicAdd}
+                          onClick={() => {
+                            handleTopicAdd();
+                          }}
                           disabled={pendingTopics.length >= 4}
                           className={`w-full mb-4 p-2 border-2 border-dashed rounded-lg transition-colors text-sm ${
-                            pendingTopics.length >= 4 
+                            pendingTopics.length >= 4
                               ? 'border-gray-300/50 text-gray-400 bg-gray-50/50 cursor-not-allowed'
                               : 'border-indigo-300/50 text-indigo-600 hover:bg-indigo-50/50 backdrop-blur-sm'
                           }`}
                         >
-                          {pendingTopics.length >= 4 
-                            ? `Maximum 4 topics reached` 
+                          {pendingTopics.length >= 4
+                            ? `Maximum 4 topics reached`
                             : `+ Add New Topic (${pendingTopics.length}/4)`
                           }
                         </button>
@@ -1645,15 +2033,23 @@ const ChatbotPage = () => {
 
                         <div className="flex gap-2">
                           <button
-                            onClick={handleTopicConfirm}
+                            onClick={() => {
+                              handleTopicConfirm();
+                            }}
                             disabled={pendingTopics.length === 0}
-                            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 text-sm font-medium backdrop-blur-sm"
+                            className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 text-sm font-medium backdrop-blur-sm ${
+                              pendingTopics.length === 0
+                                ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                                : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700"
+                            }`}
                           >
                             ✓ Create Course ({pendingTopics.length} topic{pendingTopics.length !== 1 ? 's' : ''})
                           </button>
                           <button
-                            onClick={handleTopicCancel}
-                            className="flex-1 bg-gray-500/80 backdrop-blur-sm text-white py-2 px-4 rounded-lg hover:bg-gray-600/80 transition-colors text-sm font-medium"
+                            onClick={() => {
+                              handleTopicCancel();
+                            }}
+                            className="flex-1 py-2 px-4 rounded-lg transition-colors text-sm font-medium backdrop-blur-sm bg-gray-500/80 text-white hover:bg-gray-600/80"
                           >
                             ✗ Cancel
                           </button>
@@ -1676,11 +2072,13 @@ const ChatbotPage = () => {
                 <div className="flex items-center gap-4">
                   {/* Button Section */}
                   <button 
-                    onClick={handleCreateCourse}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-105 ${
+                    onClick={() => {
+                      handleCreateCourse();
+                    }}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 backdrop-blur-sm shadow-lg ${
                       proMode 
-                        ? 'bg-indigo-50/80 text-indigo-600 border-2 border-indigo-300/50' 
-                        : 'bg-white/80 text-gray-700 border-2 border-gray-200/50 hover:bg-gray-50/80 hover:text-gray-800 hover:border-gray-300/50'
+                        ? 'bg-indigo-50/80 text-indigo-600 border-2 border-indigo-300/50 hover:shadow-xl transform hover:scale-105' 
+                        : 'bg-white/80 text-gray-700 border-2 border-gray-200/50 hover:bg-gray-50/80 hover:text-gray-800 hover:border-gray-300/50 hover:shadow-xl transform hover:scale-105'
                     }`}
                   >
                     {proMode ? (
@@ -1729,18 +2127,22 @@ const ChatbotPage = () => {
                     }
                   }}
                   disabled={isLoading}
-                  className="w-full pl-5 pr-14 py-4 bg-white/80 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-gray-800 placeholder-gray-500 shadow-lg transition-all duration-200 hover:shadow-xl"
+                  className="w-full pl-5 pr-14 py-4 backdrop-blur-sm border rounded-xl focus:outline-none text-gray-800 shadow-lg transition-all duration-200 hover:shadow-xl bg-white/80 border-white/30 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 placeholder-gray-500"
                 />
                 <button
                   onClick={() => handleSendMessage()}
                   disabled={!message.trim() || isLoading}
                   className={`absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg transition-all duration-200 backdrop-blur-sm ${
-                    message.trim() && !isLoading 
+                    message.trim() && !isLoading
                       ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:scale-105" 
                       : "bg-gray-200/50 text-gray-400"
                   }`}
                 >
-                  <IoSend size={18} />
+                  {isLoading ? (
+                    <div className="w-4 h-4 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>
+                  ) : (
+                    <IoSend size={18} />
+                  )}
                 </button>
               </div>
               

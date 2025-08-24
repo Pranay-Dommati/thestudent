@@ -4,7 +4,7 @@ import {
   FaUser, FaLock, FaRegUser, FaRegEnvelope, FaEye, FaEyeSlash,
   FaEdit, FaCheck, FaTimes, FaSpinner, FaSignOutAlt, FaHome,
   FaGoogle, FaUnlink, FaCamera, FaGraduationCap,
-  FaBookOpen, FaCertificate
+  FaBookOpen, FaCertificate 
 } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';

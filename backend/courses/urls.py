@@ -6,9 +6,12 @@ urlpatterns = [
     path('api/courses/create/', views.create_course, name='create-course'),
     path('api/courses/engineering/', views.list_engineering_courses, name='list-engineering-courses'),
     path('api/courses/engineering/<str:course_id>/', views.get_engineering_course_by_id, name='get-engineering-course-by-id'),
+    path('api/courses/engineering/<str:course_id>/update/', views.update_engineering_course, name='update-engineering-course'),
     path('api/courses/all/', views.list_all_courses, name='list-all-courses'),
     path('api/courses/school/', views.list_school_courses, name='list-school-courses'),
     path('api/courses/school/<str:course_id>/', views.get_school_course_by_id, name='get-school-course-by-id'),
+    path('api/courses/school/<str:course_id>/update/', views.update_school_course, name='update-school-course'),
+    path('api/courses/delete/<str:course_type>/<str:course_id>/', views.delete_course, name='delete-course'),
     
     # Progress tracking endpoints
     path('api/courses/progress/<str:course_id>/', views.get_course_progress, name='get-course-progress'),

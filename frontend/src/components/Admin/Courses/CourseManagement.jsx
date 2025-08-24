@@ -3,9 +3,11 @@ import CourseForm from './CourseForm';
 import CourseList from './CourseList';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { deleteCourse } from '../../../services/courseApi';
 
 const CourseManagement = ({ isDarkMode }) => {
   const [view, setView] = useState('list'); // 'list' or 'add'
+  const [refreshKey, setRefreshKey] = useState(0); // For triggering re-fetch
   const navigate = useNavigate();
   
   const handleAddNew = () => {
@@ -13,25 +15,65 @@ const CourseManagement = ({ isDarkMode }) => {
   };
   
   const handleEditCourse = (courseId, courseType) => {
-    // For future implementation
-    toast(`Edit ${courseType} course with ID: ${courseId}`, {
-      icon: '📝',
+    // Show loading toast
+    toast.loading('Loading course for editing...', {
+      id: 'edit-course-loading',
       style: {
         backgroundColor: isDarkMode ? '#1e40af' : '#3b82f6',
         color: 'white',
       }
     });
+    
+    // Navigate to edit course page with course ID and type
+    navigate(`/admin-p/edit-course/${courseType}/${courseId}`);
   };
   
-  const handleDeleteCourse = (courseId, courseType) => {
-    // For future implementation
-    toast(`Delete ${courseType} course with ID: ${courseId}`, {
-      icon: '🗑️',
-      style: {
-        backgroundColor: isDarkMode ? '#991b1b' : '#ef4444',
-        color: 'white',
+  const handleDeleteCourse = async (courseId, courseType) => {
+    try {
+      // Show confirmation dialog
+      if (!window.confirm(`Are you sure you want to delete this ${courseType} course? This action cannot be undone.`)) {
+        return;
       }
-    });
+      
+      // Show loading toast
+      const loadingToast = toast.loading('Deleting course...');
+      
+      // Call the delete API
+      const response = await deleteCourse(courseType, courseId);
+      
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+      
+      if (response.success) {
+        toast.success(response.message || 'Course deleted successfully', {
+          icon: '✅',
+          style: {
+            backgroundColor: isDarkMode ? '#059669' : '#10b981',
+            color: 'white',
+          }
+        });
+        
+        // Trigger refresh of course list
+        setRefreshKey(prev => prev + 1);
+      } else {
+        toast.error(response.error || 'Failed to delete course', {
+          icon: '❌',
+          style: {
+            backgroundColor: isDarkMode ? '#991b1b' : '#ef4444',
+            color: 'white',
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      toast.error('Failed to delete course. Please try again.', {
+        icon: '❌',
+        style: {
+          backgroundColor: isDarkMode ? '#991b1b' : '#ef4444',
+          color: 'white',
+        }
+      });
+    }
   };
     return (
     <div className={`p-0 ${isDarkMode ? 'text-white' : ''}`}>
@@ -41,6 +83,7 @@ const CourseManagement = ({ isDarkMode }) => {
           onEdit={handleEditCourse}
           onDelete={handleDeleteCourse}
           isDarkMode={isDarkMode}
+          refreshKey={refreshKey}
         />
       </div>
     </div>

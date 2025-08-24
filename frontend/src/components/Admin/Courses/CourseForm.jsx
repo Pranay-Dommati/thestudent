@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { FaPlus, FaTrash, FaUpload } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import BasicInfoTab from './tabs/BasicInfoTab';
 import CourseContentTab from './tabs/CourseContentTab';
@@ -36,7 +37,8 @@ const EDUCATION_LEVELS = [
   { id: '12th', label: 'Class 12' }
 ];
 
-const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
+const CourseForm = ({ onSubmit, onCancel, initialData = null, isEditMode = false, isDarkMode = false }) => {
+  const { courseType, courseId } = useParams();
   const [activeTab, setActiveTab] = useState('basic');
   const [form, setForm] = useState({
     title: initialData?.title || '',
@@ -58,7 +60,73 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [selectedLevel, setSelectedLevel] = useState(null);
-  const [showLevelSelection, setShowLevelSelection] = useState(true);
+  const [showLevelSelection, setShowLevelSelection] = useState(!isEditMode);
+  const [loading, setLoading] = useState(isEditMode);
+
+  // Load course data for edit mode
+  useEffect(() => {
+    if (isEditMode && courseType && courseId) {
+      loadCourseData();
+    }
+  }, [isEditMode, courseType, courseId]);
+
+  const loadCourseData = async () => {
+    try {
+      setLoading(true);
+      // Import the API function based on course type
+      let courseData;
+      if (courseType === 'engineering') {
+        const { getEngineeringCourseById } = await import('../../../services/courseApi');
+        courseData = await getEngineeringCourseById(courseId);
+      } else {
+        // For school courses
+        const { getSchoolCourseById } = await import('../../../services/courseApi');
+        courseData = await getSchoolCourseById(courseId);
+      }
+
+      if (courseData) {
+        // Set the form data
+        setForm({
+          title: courseData.title || '',
+          category: courseData.category || '',
+          board: courseData.board || '',
+          subject: courseData.subject || '',
+          duration: courseData.duration || '',
+          price: courseData.price || '',
+          description: courseData.description || '',
+          thumbnail: null, // Don't set existing thumbnail to avoid FormData issues
+          youtubeLink: courseData.youtube_link || courseData.youtubeLink || '',
+          subtopics: courseData.subtopics || [{ title: '', link: '', type: 'video', duration: '' }],
+          requirements: courseData.requirements || [''],
+          learningObjectives: courseData.learningObjectives || [''],
+          isPublished: courseData.is_published || false
+        });
+
+        // Set the selected level based on course type
+        if (courseType === 'engineering') {
+          setSelectedLevel({ id: 'engineering', label: 'Engineering' });
+        } else {
+          // For school courses, determine the class level
+          const classLevel = courseData.class || courseData.class_level;
+          const level = EDUCATION_LEVELS.find(l => l.id === classLevel);
+          if (level) {
+            setSelectedLevel(level);
+          }
+        }
+        
+        setShowLevelSelection(false);
+        
+        // Dismiss loading toast
+        toast.dismiss('edit-course-loading');
+      }
+    } catch (error) {
+      console.error('Error loading course data:', error);
+      toast.dismiss('edit-course-loading');
+      toast.error('Failed to load course data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const validateForm = useCallback(() => {
     const newErrors = {};
@@ -137,9 +205,18 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
   };
 
   const renderFormBasedOnLevel = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <span className="ml-2">Loading course data...</span>
+        </div>
+      );
+    }
+
     switch(selectedLevel?.id) {
       case 'engineering':
-        return <EngineeringCourseForm onCancel={onCancel} />;
+        return <EngineeringCourseForm onCancel={onCancel} isEditMode={isEditMode} courseId={courseId} />;
       case '6th':
       case '7th':
       case '8th':
@@ -147,7 +224,7 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
       case '10th':
       case '11th':
       case '12th':
-        return <SchoolCourseForm onCancel={onCancel} classLevel={selectedLevel.id} />;
+        return <SchoolCourseForm onCancel={onCancel} classLevel={selectedLevel.id} isEditMode={isEditMode} courseId={courseId} />;
       default:
         return null;
     }
@@ -187,12 +264,12 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
     }
   };
   return (
-    <div className="bg-white rounded-xl shadow-lg p-4 sm:p-5 md:p-6 max-w-7xl mx-auto">
+    <div className={`${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-lg p-4 sm:p-5 md:p-6 max-w-7xl mx-auto`}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold">
-          {initialData ? 'Edit Course' : 'Create New Course'}
+          {isEditMode ? 'Edit Course' : 'Create New Course'}
         </h2>
-        {!showLevelSelection && (
+        {!showLevelSelection && !loading && (
           <button
             onClick={() => setShowLevelSelection(true)}
             className="text-blue-600 hover:text-blue-700 text-sm sm:text-base"

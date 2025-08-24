@@ -143,6 +143,7 @@ const AdminDashboard = () => {
               <Route index element={<Navigate to="/admin-p/courses" />} />
               <Route path="courses/*" element={<CourseManagement isDarkMode={isDarkMode} />} />
               <Route path="add-course" element={<CourseForm onCancel={() => navigate('/admin-p/courses')} isDarkMode={isDarkMode} />} />
+              <Route path="edit-course/:courseType/:courseId" element={<CourseForm onCancel={() => navigate('/admin-p/courses')} isDarkMode={isDarkMode} isEditMode={true} />} />
               <Route path="users" element={<AdminUsers isDarkMode={isDarkMode} />} />
               <Route path="feedbacks" element={<AdminFeedbacks isDarkMode={isDarkMode} />} />
               <Route path="newsletter" element={<AdminNewsletter isDarkMode={isDarkMode} />} />

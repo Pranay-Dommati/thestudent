@@ -374,6 +374,11 @@ const ProLearningPage = () => {
   const [batchGenerationProgress, setBatchGenerationProgress] = useState(0);
   const [batchGenerationStatus, setBatchGenerationStatus] = useState("");
   
+  // Timer states for generation progress
+  const [estimatedTime, setEstimatedTime] = useState(0); // in seconds
+  const [elapsedTime, setElapsedTime] = useState(0); // in seconds
+  const [startTime, setStartTime] = useState(null);
+  
   // Reading sections state
   const [readingSections, setReadingSections] = useState([]);
   const [readingSectionIndex, setReadingSectionIndex] = useState(0);
@@ -464,6 +469,41 @@ const ProLearningPage = () => {
     }
   }, [courseTitle, courseId]);
 
+  // Timer effect for batch generation
+  useEffect(() => {
+    let interval;
+    
+    if (isBatchGenerating && startTime) {
+      interval = setInterval(() => {
+        const now = Date.now();
+        const elapsed = Math.floor((now - startTime) / 1000);
+        setElapsedTime(elapsed);
+      }, 1000);
+    } else {
+      setElapsedTime(0);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isBatchGenerating, startTime]);
+
+  // Calculate estimated time based on number of topics and content types
+  useEffect(() => {
+    if (topicsList.length > 0) {
+      // Estimate: 30 seconds per topic for all content types (reading, summary, videos, quiz)
+      const estimatedSeconds = topicsList.length * 30;
+      setEstimatedTime(estimatedSeconds);
+    }
+  }, [topicsList]);
+
+  // Helper function to format time in MM:SS format
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   // Use environment variable for Gemini API key
   const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -536,10 +576,12 @@ const ProLearningPage = () => {
         setBatchGenerationProgress(100);
         setBatchGenerationStatus('Course generation completed!');
         setIsBatchGenerating(false);
+        setStartTime(null);
       }
       // If not all topics have content, start batch generation
       else if (progress.generated < progress.total) {
         setIsBatchGenerating(true);
+        setStartTime(Date.now());
         setBatchGenerationStatus('Starting content generation for all topics...');
         
         // Generate content for all topics using new storage system
@@ -558,6 +600,7 @@ const ProLearningPage = () => {
             console.log('✅ Batch generation completed successfully');
             setBatchGenerationProgress(100);
             setIsBatchGenerating(false);
+            setStartTime(null);
             setAllTopicsGenerated(true);
           }
         }, 500);
@@ -1149,6 +1192,7 @@ const ProLearningPage = () => {
         // If not all topics have content, start batch generation
         if (progress.generated < progress.total) {
           setIsBatchGenerating(true);
+          setStartTime(Date.now());
           setBatchGenerationStatus('Starting batch content generation...');
           
           // Generate content for all topics using new storage system
@@ -1471,6 +1515,7 @@ const ProLearningPage = () => {
 
         // Set up the batch generation
         setIsBatchGenerating(true);
+        setStartTime(Date.now());
         setBatchGenerationProgress(0);
         setBatchGenerationStatus('Initializing course generation...');
         setTopicsList(topics);
@@ -1604,8 +1649,23 @@ const ProLearningPage = () => {
                   style={{ width: `${batchGenerationProgress}%` }}
                 ></div>
               </div>
-              <div className="text-xs sm:text-sm text-gray-600 mb-2">
-                {batchGenerationProgress}% Complete
+              <div className="flex justify-between items-center mb-2">
+                <div className="text-xs sm:text-sm text-gray-600">
+                  {batchGenerationProgress}% Complete
+                </div>
+                <div className="text-xs sm:text-sm text-gray-500 flex items-center space-x-3">
+                  <span className="flex items-center">
+                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                    </svg>
+                    {formatTime(elapsedTime)}
+                  </span>
+                  {estimatedTime > 0 && (
+                    <span className="text-gray-400">
+                      / ~{formatTime(estimatedTime)}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )}

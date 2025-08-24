@@ -1,6 +1,9 @@
 import React from 'react';
 
 const LessonVideo = ({ videoUrl, title }) => {
+  // Debug logging
+  console.log('🎥 LessonVideo received:', { videoUrl, title });
+  
   // Helper: convert plain YouTube URL to embed URL
   const getYouTubeEmbedUrl = (url) => {
     if (!url) return '';
@@ -23,11 +26,17 @@ const LessonVideo = ({ videoUrl, title }) => {
   let videoSrc = '';
   // If input is an iframe string
   if (videoUrl && videoUrl.includes('<iframe')) {
+    console.log('🎯 Detected iframe format');
     videoSrc = extractSrc(videoUrl);
+    console.log('🎯 Extracted src:', videoSrc);
   } else {
+    console.log('🎯 Treating as plain URL');
     // Assume it's a plain YouTube URL
     videoSrc = getYouTubeEmbedUrl(videoUrl);
+    console.log('🎯 Converted to embed URL:', videoSrc);
   }
+
+  console.log('🎯 Final videoSrc:', videoSrc);
 
   return (
     <div className="relative aspect-video w-full">

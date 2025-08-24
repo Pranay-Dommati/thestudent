@@ -1589,6 +1589,59 @@ def delete_course_enrollment(request, enrollment_id):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['DELETE'])
+@permission_classes([AllowAny])  # You can change this to IsAuthenticated if you want to restrict access
+def delete_course(request, course_type, course_id):
+    """
+    Delete a course (either school or engineering course)
+    """
+    try:
+        if course_type == 'school':
+            try:
+                course = SchoolCourse.objects.get(id=course_id)
+                course_title = course.title
+                course.delete()
+                return Response({
+                    'success': True,
+                    'message': f'School course "{course_title}" deleted successfully',
+                    'course_id': course_id
+                }, status=status.HTTP_200_OK)
+            except SchoolCourse.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'error': 'School course not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+                
+        elif course_type == 'engineering':
+            try:
+                course = EngineeringCourse.objects.get(id=course_id)
+                course_title = course.title
+                course.delete()
+                return Response({
+                    'success': True,
+                    'message': f'Engineering course "{course_title}" deleted successfully',
+                    'course_id': course_id
+                }, status=status.HTTP_200_OK)
+            except EngineeringCourse.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'error': 'Engineering course not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response({
+                'success': False,
+                'error': 'Invalid course type. Must be "school" or "engineering"'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        print(f"Error in delete_course: {str(e)}")
+        traceback.print_exc()
+        return Response({
+            'success': False,
+            'error': f'Failed to delete course: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def check_course_enrollment(request, course_type, course_id):
@@ -1800,4 +1853,258 @@ def get_learning_stats(request):
         print(f"Error in get_learning_stats: {str(e)}")
         return Response({
             'error': f'Failed to get learning stats: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT', 'PATCH'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+@permission_classes([AllowAny])
+def update_school_course(request, course_id):
+    """
+    Updates an existing school course
+    """
+    try:
+        # Get the existing course
+        course = get_object_or_404(SchoolCourse, id=course_id)
+        
+        data = request.data
+        print(f"Updating school course {course_id} with data:", data)
+        
+        # Update course fields
+        if 'title' in data:
+            course.title = data['title']
+        if 'board' in data:
+            course.board = data['board']
+        if 'state' in data:
+            course.state = data['state']
+        if 'subject' in data:
+            course.subject = data['subject']
+        if 'sources' in data:
+            course.sources = data['sources']
+        if 'duration' in data:
+            course.duration = data['duration']
+        if 'shortDescription' in data:
+            course.short_description = data['shortDescription']
+        if 'description' in data:
+            course.description = data['description']
+            
+        # Handle key_topics and learning_points
+        if 'key_topics' in data or 'keyTopics' in data:
+            try:
+                topics_data = data.get('key_topics', data.get('keyTopics', '[]'))
+                if isinstance(topics_data, str):
+                    course.key_topics = json.loads(topics_data)
+                else:
+                    course.key_topics = topics_data
+            except (json.JSONDecodeError, TypeError):
+                pass
+                
+        if 'learning_points' in data or 'learningPoints' in data:
+            try:
+                points_data = data.get('learning_points', data.get('learningPoints', '[]'))
+                if isinstance(points_data, str):
+                    course.learning_points = json.loads(points_data)
+                else:
+                    course.learning_points = points_data
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
+        # Handle thumbnail update
+        if 'thumbnail' in request.FILES:
+            course.thumbnail = request.FILES['thumbnail']
+        
+        # Save the course
+        course.save()
+        
+        # Handle chapters update if provided
+        if 'chapters' in data:
+            try:
+                chapters_data = data.get('chapters')
+                if isinstance(chapters_data, str):
+                    chapters_data = json.loads(chapters_data)
+                
+                # Clear existing chapters and lessons
+                course.chapters.all().delete()
+                
+                # Create new chapters and lessons
+                for chapter_data in chapters_data:
+                    chapter = course.chapters.create(
+                        name=chapter_data.get('name', ''),
+                        order=chapter_data.get('order', 0)
+                    )
+                    
+                    for lesson_data in chapter_data.get('lessons', []):
+                        lesson = chapter.lessons.create(
+                            title=lesson_data.get('title', ''),
+                            type=lesson_data.get('type', 'video'),
+                            video_url=lesson_data.get('videoUrl', ''),
+                            description=lesson_data.get('description', ''),
+                            about_lesson=lesson_data.get('aboutLesson', ''),
+                            order=lesson_data.get('order', 0)
+                        )
+                        
+                        # Handle resources if present
+                        if lesson_data.get('hasResources') and 'resources' in lesson_data:
+                            resources = lesson_data['resources']
+                            # Process downloadable resources
+                            for resource in resources.get('downloadable', []):
+                                LessonResource.objects.create(
+                                    lesson=lesson,
+                                    name=resource.get('name', ''),
+                                    description=resource.get('description', ''),
+                                    resource_type='downloadable',
+                                    file_url=resource.get('link', '')
+                                )
+                            
+                            # Process internet resources  
+                            for resource in resources.get('internet', []):
+                                LessonResource.objects.create(
+                                    lesson=lesson,
+                                    name=resource.get('name', ''),
+                                    description=resource.get('description', ''),
+                                    resource_type='internet',
+                                    file_url=resource.get('link', '')
+                                )
+            except (json.JSONDecodeError, TypeError) as e:
+                print(f"Error processing chapters: {e}")
+        
+        # Serialize and return the updated course
+        serializer = CourseWithChaptersSerializer(course)
+        return Response({
+            'message': 'School course updated successfully',
+            'course': serializer.data
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error updating school course: {str(e)}")
+        return Response({
+            'error': f'Failed to update course: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT', 'PATCH'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+@permission_classes([AllowAny])
+def update_engineering_course(request, course_id):
+    """
+    Updates an existing engineering course
+    """
+    try:
+        # Get the existing course
+        course = get_object_or_404(EngineeringCourse, id=course_id)
+        
+        data = request.data
+        print(f"Updating engineering course {course_id} with data:", data)
+        
+        # Update course fields
+        if 'title' in data:
+            course.title = data['title']
+        if 'shortDescription' in data:
+            course.short_description = data['shortDescription']
+        if 'description' in data:
+            course.description = data['description']
+        if 'sources' in data:
+            course.sources = data['sources']
+        if 'duration' in data:
+            course.duration = data['duration']
+        if 'proficiency' in data:
+            course.proficiency = data['proficiency']
+        if 'category' in data:
+            course.category = data['category']
+        if 'certificateGiven' in data:
+            course.certificate_given = data['certificateGiven']
+        if 'projectBased' in data:
+            course.project_based = data['projectBased']
+            
+        # Handle learning_points and requirements
+        if 'learning_points' in data or 'learningPoints' in data:
+            try:
+                points_data = data.get('learning_points', data.get('learningPoints', '[]'))
+                if isinstance(points_data, str):
+                    course.learning_points = json.loads(points_data)
+                else:
+                    course.learning_points = points_data
+            except (json.JSONDecodeError, TypeError):
+                pass
+                
+        if 'requirements' in data:
+            try:
+                req_data = data.get('requirements', '[]')
+                if isinstance(req_data, str):
+                    course.requirements = json.loads(req_data)
+                else:
+                    course.requirements = req_data
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
+        # Handle thumbnail update
+        if 'thumbnail' in request.FILES:
+            course.thumbnail = request.FILES['thumbnail']
+        
+        # Save the course
+        course.save()
+        
+        # Handle sections update if provided
+        if 'sections' in data:
+            try:
+                sections_data = data.get('sections')
+                if isinstance(sections_data, str):
+                    sections_data = json.loads(sections_data)
+                
+                # Clear existing sections and lessons
+                course.sections.all().delete()
+                
+                # Create new sections and lessons
+                for section_data in sections_data:
+                    section = course.sections.create(
+                        name=section_data.get('name', ''),
+                        order=section_data.get('order', 0)
+                    )
+                    
+                    for lesson_data in section_data.get('lessons', []):
+                        lesson = section.lessons.create(
+                            title=lesson_data.get('title', ''),
+                            type=lesson_data.get('type', 'video'),
+                            video_url=lesson_data.get('videoUrl', ''),
+                            description=lesson_data.get('description', ''),
+                            about_lesson=lesson_data.get('aboutLesson', ''),
+                            order=lesson_data.get('order', 0)
+                        )
+                        
+                        # Handle resources if present
+                        if lesson_data.get('hasResources') and 'resources' in lesson_data:
+                            resources = lesson_data['resources']
+                            # Process downloadable resources
+                            for resource in resources.get('downloadable', []):
+                                LessonResource.objects.create(
+                                    lesson=lesson,
+                                    name=resource.get('name', ''),
+                                    description=resource.get('description', ''),
+                                    resource_type='downloadable',
+                                    file_url=resource.get('link', '')
+                                )
+                            
+                            # Process internet resources  
+                            for resource in resources.get('internet', []):
+                                LessonResource.objects.create(
+                                    lesson=lesson,
+                                    name=resource.get('name', ''),
+                                    description=resource.get('description', ''),
+                                    resource_type='internet',
+                                    file_url=resource.get('link', '')
+                                )
+            except (json.JSONDecodeError, TypeError) as e:
+                print(f"Error processing sections: {e}")
+        
+        # Serialize and return the updated course
+        serializer = EngineeringCourseWithSectionsSerializer(course)
+        return Response({
+            'message': 'Engineering course updated successfully',
+            'course': serializer.data
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error updating engineering course: {str(e)}")
+        return Response({
+            'error': f'Failed to update course: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
