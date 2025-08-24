@@ -2245,22 +2245,8 @@ const ChatbotPage = () => {
                           </div>
                           <div className="flex flex-col">
                             <span className="text-gray-700 font-medium">
-                              {proMode ? 'Creating your course...' : 'Thinking...'}
+                              Thinking...
                             </span>
-                            {proMode && (
-                              <div className="mt-2">
-                                <p className="text-xs text-gray-600 mb-2">
-                                  🌟 Feel free to explore while we work! You'll be notified when your course is ready.
-                                </p>
-                                <Link 
-                                  to="/"
-                                  className="inline-flex items-center px-3 py-1.5 text-xs bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-sm hover:shadow-md"
-                                >
-                                  <IoHome className="w-3 h-3 mr-1" />
-                                  Go to Home
-                                </Link>
-                              </div>
-                            )}
                           </div>
                           <div className="ml-2 flex space-x-1">
                             <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
