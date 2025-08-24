@@ -440,7 +440,7 @@ const ProfilePage = () => {
                 S
               </div>
               <span className="font-bold text-lg sm:text-xl bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                Students Hub
+                EasyLearnova
               </span>
             </Link>
             

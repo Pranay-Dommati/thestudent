@@ -29,7 +29,7 @@ export default function MentoringNavbar() {
             </div>
             <span className={`font-bold text-xl ${
               isScrolled ? 'text-gray-800' : 'text-white'
-            }`}>Students Hub</span>
+            }`}>EasyLearnova</span>
           </Link>
 
           {/* Navigation Links */}

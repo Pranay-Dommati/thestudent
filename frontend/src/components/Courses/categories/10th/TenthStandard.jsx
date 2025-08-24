@@ -43,12 +43,18 @@ const TenthStandard = () => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Set selected board based on URL
+  // Set selected board based on URL and reset on base route
   useEffect(() => {
     if (location.pathname.includes('/state/')) {
       setSelectedBoard(`state-${stateId}`);
+      setShowStateBoards(false);
     } else if (location.pathname.includes('/cbse')) {
       setSelectedBoard('cbse');
+      setShowStateBoards(false);
+    } else {
+      // Base route: reset local selection UI
+      setSelectedBoard(null);
+      setShowStateBoards(false);
     }
   }, [location, stateId]);
 
@@ -119,16 +125,20 @@ const TenthStandard = () => {
     }
   }, [selectedBoard, stateId]);
 
-  const handleBoardSelect = (board) => {
-    if (board === 'state') {
+  const handleBoardSelect = (boardId) => {
+    if (boardId === 'state') {
       setShowStateBoards(true);
     } else {
-      navigate(`/courses/10th/${board}`);
+      setSelectedBoard(boardId);
+      navigate(`/courses/10th/${boardId}`);
     }
   };
 
   const handleStateSelect = (stateId) => {
-    navigate(`/courses/10th/state/${stateId}`);
+    console.log('State selected:', stateId);
+    const to = `/courses/10th/state/${stateId}`;
+    console.log('Navigating to:', to);
+    navigate(to);
     setShowStateBoards(false);
   };
 
@@ -144,7 +154,7 @@ const TenthStandard = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 pt-20">
-      {selectedBoard ? (
+  {selectedBoard ? (
         <>
           <BackButton 
             title={selectedBoard.includes('state') ? 
@@ -203,36 +213,9 @@ const TenthStandard = () => {
       ) : showStateBoards ? (
         <>
           <BackButton 
-            title="Select Your Board" 
-            subtitle="Choose your education board to view relevant courses" 
-          />
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {boards.filter(board => board.available).map((board) => (
-                <motion.button
-                  key={board.id}
-                  onClick={() => handleBoardSelect(board.id)}
-                  className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
-                  whileHover={{ y: -5 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{board.name}</h3>
-                  <p className="text-gray-500 text-sm">{board.fullName}</p>
-                </motion.button>
-              ))}
-            </div>
-
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
-              <h3 className="text-lg font-semibold text-indigo-900 mb-2">More Boards Coming Soon!</h3>
-              <p className="text-indigo-700">We're working hard to bring you content for ICSE, NIOS, and other boards. Stay tuned for updates!</p>
-            </div>
-          </div>
-        </>
-      ) : showStateBoards ? (
-        <>
-          <BackButton 
             title="Select Your State" 
             subtitle="Choose your state board" 
+            onBack={handleBack}
           />
           <div className="space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">

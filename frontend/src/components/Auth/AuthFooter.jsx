@@ -14,14 +14,14 @@ const AuthFooter = () => {
             <Link to="/terms" className="hover:text-blue-600 transition-colors">
               Terms of Service
             </Link>
-            <Link to="/contact" className="hover:text-blue-600 transition-colors">
-              Contact Us
+            <Link to="http://localhost:5173/feedback" className="hover:text-blue-600 transition-colors">
+              Feedback
             </Link>
           </div>
 
           {/* Right side - Copyright */}
           <div className="flex items-center space-x-2 text-sm text-gray-500">
-            <span>© {new Date().getFullYear()} Students Hub.</span>
+            <span>© {new Date().getFullYear()} EasyLearnova.</span>
             <span className="hidden sm:inline">All rights reserved.</span>
           </div>
         </div>

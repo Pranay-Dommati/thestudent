@@ -29,18 +29,18 @@ const HelpCenter = () => {
     general: [
       { 
         id: 'general-1', 
-        question: 'How do I get started with Students Hub?', 
+        question: 'How do I get started with EasyLearnova?', 
         answer: 'To get started, create an account by clicking "Sign Up" on the homepage. Once registered, you can explore courses, set up your profile, and begin your learning journey.' 
       },
       { 
         id: 'general-2', 
-        question: 'Is Students Hub available on mobile devices?', 
-        answer: 'Yes, Students Hub is fully responsive and works on all devices. You can access your courses, track your progress, and interact with other students from your smartphone, tablet, or computer.' 
+        question: 'Is EasyLearnova available on mobile devices?', 
+        answer: 'Yes, EasyLearnova is fully responsive and works on all devices. You can access your courses, track your progress, and interact with other students from your smartphone, tablet, or computer.' 
       },
       { 
         id: 'general-3', 
         question: 'How can I contact support?', 
-        answer: 'You can reach our support team by emailing support@studentshub.com or by using the live chat feature available at the bottom right of every page. Our team is available 24/7 to assist you.' 
+        answer: 'You can reach our support team by emailing support@easylearnova.com or by using the live chat feature available at the bottom right of every page. Our team is available 24/7 to assist you.' 
       }
     ],
     account: [
@@ -132,7 +132,7 @@ const HelpCenter = () => {
                 <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center text-indigo-600 font-bold text-xl">
                   S
                 </div>
-                <span className="font-bold text-xl text-white">Students Hub</span>
+                <span className="font-bold text-xl text-white">EasyLearnova</span>
               </Link>
               <div className="h-6 border-r border-blue-400 mx-4"></div>
               <span className="text-lg font-medium text-white">Help Center</span>
@@ -287,7 +287,7 @@ const HelpCenter = () => {
             </div>
             <p className="text-gray-600 mb-4">Have a complex question? Our support team is ready to help.</p>
             <a 
-              href="mailto:support@studentshub.com" 
+              href="mailto:support@easylearnova.com" 
               className="inline-block px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
             >
               Contact Support

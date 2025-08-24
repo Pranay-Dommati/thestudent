@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaUserPlus, FaSignInAlt } from 'react-icons/fa';
+import { HiBookOpen } from 'react-icons/hi2';
 import { useAuth } from '../../context/AuthContext';
 
 const Navbar = ({ initialStyle = "transparent" }) => {
@@ -87,8 +88,10 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           {/* Logo section */}
           <div className="flex items-center w-[200px]">
             <Link to="/" className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">S</div>
-              <span className={`font-bold text-lg ${isScrolled || initialStyle === 'light' ? 'text-gray-800' : 'text-white'}`}>Students Hub</span>
+              <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white">
+                <HiBookOpen className="text-sm" />
+              </div>
+              <span className={`font-bold text-lg ${isScrolled || initialStyle === 'light' ? 'text-gray-800' : 'text-white'}`}>EasyLearnova</span>
             </Link>
           </div>
           

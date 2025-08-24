@@ -100,7 +100,7 @@ const FeaturedPlaylists = () => {
             title: course.title,
             duration: duration,
             category: category,
-            author: course.subject || 'StudentsHub', // Use subject as author/category
+            author: course.subject || 'EasyLearnova', // Use subject as author/category
             board: boardName,
             board_raw: course.board, // Store raw board data for navigation
             state: course.state, // Store state data for navigation
@@ -150,7 +150,7 @@ const FeaturedPlaylists = () => {
             title: 'Recently Added Mathematics Course',
             duration: '25 hours',
             category: 'tenth',
-            author: 'StudentsHub',
+            author: 'EasyLearnova',
             board: 'CBSE',
             subject: 'Mathematics',
             image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3',

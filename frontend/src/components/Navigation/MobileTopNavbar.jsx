@@ -20,7 +20,7 @@ const MobileTopNavbar = () => {
 
   const getPageTitle = () => {
     const path = location.pathname;
-    if (path === '/') return 'Students Hub';
+    if (path === '/') return 'EasyLearnova';
     if (path === '/courses') return 'Courses';
     if (path.startsWith('/courses/6th')) return '6th Standard';
     if (path.startsWith('/courses/7th')) return '7th Standard';
@@ -35,7 +35,7 @@ const MobileTopNavbar = () => {
     if (path.startsWith('/profile')) return 'Profile';
     if (path.startsWith('/auth')) return 'Sign In';
     if (path.includes('/learning')) return 'Learning';
-    return 'Students Hub';
+    return 'EasyLearnova';
   };
 
   const shouldShowBackButton = () => {
@@ -79,7 +79,7 @@ const MobileTopNavbar = () => {
                 {getPageTitle()}
               </span>
               {location.pathname !== '/' && !shouldShowBackButton() && (
-                <span className="text-xs text-gray-500 -mt-0.5">Students Hub</span>
+                <span className="text-xs text-gray-500 -mt-0.5">EasyLearnova</span>
               )}
             </div>
           </div>
@@ -197,10 +197,10 @@ const MobileTopNavbar = () => {
                   ) : (
                     <>
                       <div className="w-14 h-14 bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <span className="text-white font-bold text-xl">S</span>
+                        <span className="text-white font-bold text-xl">E</span>
                       </div>
                       <div>
-                        <div className="font-bold text-gray-900 text-lg">StudentsHub</div>
+                        <div className="font-bold text-gray-900 text-lg">EasyLearnova</div>
                         <div className="text-sm text-gray-600">Your learning companion</div>
                       </div>
                     </>
@@ -295,7 +295,7 @@ const MobileTopNavbar = () => {
               {/* App Version */}
               <div className="mt-auto pt-6 border-t border-gray-200 text-center">
                 <div className="text-xs text-gray-400">
-                  StudentsHub v2.0
+                  EasyLearnova v2.0
                   <br />
                   Made with ❤️ for students
                 </div>
