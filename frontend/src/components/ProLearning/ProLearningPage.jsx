@@ -128,17 +128,6 @@ const ProLearningPage = () => {
     };
   }, []); // Empty dependency array - run once on mount/unmount
 
-  // Mark course as ready in history once topics are loaded (first time only)
-  useEffect(() => {
-    if (!historyReadyRef.current && courseId && topicsList && topicsList.length > 0) {
-      const updated = proLearningHistoryService.updateStatus(courseId, 'ready');
-      if (updated) {
-        console.log('✅ ProLearning history status updated to ready for course', courseId);
-        historyReadyRef.current = true;
-      }
-    }
-  }, [courseId, topicsList]);
-
   // Set default topics and initialize with consistent course ID
   useEffect(() => {
     const initializeCourseData = async () => {
@@ -578,6 +567,17 @@ const ProLearningPage = () => {
       }
     }
   }, [topicsList, courseTitle]); // Depend on both topicsList and courseTitle
+
+  // Mark course as ready in history once topics are loaded AND generation is complete
+  useEffect(() => {
+    if (!historyReadyRef.current && courseId && topicsList && topicsList.length > 0 && !isBatchGenerating) {
+      const updated = proLearningHistoryService.updateStatus(courseId, 'ready');
+      if (updated) {
+        console.log('✅ ProLearning history status updated to ready for course', courseId);
+        historyReadyRef.current = true;
+      }
+    }
+  }, [courseId, topicsList, isBatchGenerating]);
 
   // Load content for initially active topic using new storage system
   useEffect(() => {

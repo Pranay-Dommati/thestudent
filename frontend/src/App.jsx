@@ -1,6 +1,8 @@
 import './App.css';
 import { BrowserRouter, Routes, Route, useParams, useLocation, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
+import proLearningHistoryService from './services/ProLearningHistoryService';
 import HomePage from './components/HomePage/HomePage';
 import Courses from './components/Courses/Courses';
 import CoursesWrapper from './components/Courses/CoursesWrapper';
@@ -150,6 +152,182 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const App = () => {
+  // Global ProLearning notification state
+  const [proLearningHistory, setProLearningHistory] = useState([]);
+  const [notifiedCourses, setNotifiedCourses] = useState(() => {
+    // Load from localStorage to persist across page refreshes
+    try {
+      const stored = localStorage.getItem('notifiedCourses');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Load ProLearning history globally
+  useEffect(() => {
+    const loadHistory = () => {
+      const history = proLearningHistoryService.getHistory();
+      setProLearningHistory(history);
+    };
+    
+    loadHistory();
+    
+    // Listen for storage changes to update history in real-time
+    const handleStorageChange = () => {
+      loadHistory();
+    };
+    
+    // Listen for custom history update events
+    const handleHistoryUpdate = () => {
+      loadHistory();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('prolearning-history-updated', handleHistoryUpdate);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('prolearning-history-updated', handleHistoryUpdate);
+    };
+  }, []);
+
+  // Global monitoring for ProLearning course completion
+  useEffect(() => {
+    const checkForReadyCourses = () => {
+      const readyCourses = proLearningHistory.filter(course => 
+        course.status === 'ready' && !notifiedCourses.has(course.id)
+      );
+      
+      if (readyCourses.length === 0) return;
+      
+      // Handle multiple courses ready at once with staggered notifications
+      if (readyCourses.length === 1) {
+        const course = readyCourses[0];
+        // Single course notification
+        setTimeout(() => {
+          toast.success(
+            (t) => (
+              <div 
+                className="flex items-center space-x-3 cursor-pointer p-2"
+                onClick={() => {
+                  window.open(course.url, '_blank');
+                  toast.dismiss(t.id);
+                }}
+              >
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center animate-bounce">
+                    <span className="text-white text-xl">🎉</span>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900 text-lg">Course Ready!</p>
+                  <p className="text-gray-700 font-medium">"{course.topic}" is ready to explore</p>
+                  <p className="text-blue-600 font-semibold mt-1 text-sm">👆 Click anywhere to open course</p>
+                </div>
+                <div className="flex-shrink-0">
+                  <svg className="w-6 h-6 text-blue-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </div>
+              </div>
+            ),
+            {
+              duration: 15000, // Show for 15 seconds
+              position: 'bottom-right',
+              style: {
+                background: 'white',
+                border: '3px solid #10b981',
+                borderRadius: '16px',
+                boxShadow: '0 20px 40px rgba(16, 185, 129, 0.4), 0 0 0 1px rgba(16, 185, 129, 0.1)',
+                cursor: 'pointer',
+                minWidth: '320px',
+                maxWidth: '380px',
+                zIndex: 9999,
+                animation: 'slideInRight 0.5s ease-out',
+              },
+              icon: false, // We use custom content
+            }
+          );
+        }, 500);
+      } else {
+        // Multiple courses ready - show individual notifications with delays
+        readyCourses.forEach((course, index) => {
+          setTimeout(() => {
+            toast.success(
+              (t) => (
+                <div 
+                  className="flex items-center space-x-3 cursor-pointer p-2"
+                  onClick={() => {
+                    window.open(course.url, '_blank');
+                    toast.dismiss(t.id);
+                  }}
+                >
+                  <div className="flex-shrink-0">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      index % 3 === 0 ? 'bg-gradient-to-r from-purple-400 to-pink-400' :
+                      index % 3 === 1 ? 'bg-gradient-to-r from-blue-400 to-cyan-400' :
+                      'bg-gradient-to-r from-green-400 to-teal-400'
+                    }`}>
+                      <span className="text-white text-lg">🎉</span>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-900">Course Ready! ({index + 1}/{readyCourses.length})</p>
+                    <p className="text-gray-700">"{course.topic}"</p>
+                    <p className="text-blue-600 font-medium text-xs mt-0.5">Click to open →</p>
+                  </div>
+                </div>
+              ),
+              {
+                duration: 12000 + (index * 1000), // Staggered duration
+                position: 'bottom-right',
+                style: {
+                  background: 'white',
+                  border: `2px solid ${
+                    index % 3 === 0 ? '#8b5cf6' :
+                    index % 3 === 1 ? '#3b82f6' :
+                    '#10b981'
+                  }`,
+                  borderRadius: '12px',
+                  boxShadow: `0 10px 25px rgba(${
+                    index % 3 === 0 ? '139, 92, 246' :
+                    index % 3 === 1 ? '59, 130, 246' :
+                    '16, 185, 129'
+                  }, 0.3)`,
+                  cursor: 'pointer',
+                  minWidth: '280px',
+                  maxWidth: '320px',
+                  zIndex: 9999 - index, // Ensure proper stacking
+                  animation: 'slideInRight 0.4s ease-out',
+                },
+                icon: false,
+              }
+            );
+          }, index * 1500); // Stagger notifications by 1.5 seconds
+        });
+      }
+      
+      // Mark all as notified and save to localStorage
+      readyCourses.forEach(course => {
+        setNotifiedCourses(prev => {
+          const newSet = new Set([...prev, course.id]);
+          // Save to localStorage
+          try {
+            localStorage.setItem('notifiedCourses', JSON.stringify([...newSet]));
+          } catch (e) {
+            console.warn('Failed to save notified courses to localStorage:', e);
+          }
+          return newSet;
+        });
+      });
+    };
+
+    if (proLearningHistory.length > 0) {
+      checkForReadyCourses();
+    }
+  }, [proLearningHistory, notifiedCourses]);
+
   return (
     <AuthProvider>
       <ThemeProvider>
