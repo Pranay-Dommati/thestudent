@@ -58,6 +58,7 @@ import proContentManager from '../../services/ProContentManager';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 import Navbar from '../Navbar/Navbar';
 import { classifyTopicsWithGemini } from './topicclassifier';
+import proLearningHistoryService from '../../services/ProLearningHistoryService';
 // import BatchGenerationStatus from './BatchGenerationStatus'; // REMOVED - eliminated duplicate loading card
 import ProLearningMobile from './ProLearningMobile';
 
@@ -77,6 +78,8 @@ const ProLearningPage = () => {
   const activeTabParam = searchParams.get("tab") || "reading"; // Get active tab from URL
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [topicsList, setTopicsList] = useState([]);
+  // Track if we've already marked this course as ready in history
+  const historyReadyRef = useRef(false);
   
   // Function to fetch course data from database
   const fetchCourseFromDB = async (courseId) => {
@@ -124,6 +127,17 @@ const ProLearningPage = () => {
       stopLearningTracking();
     };
   }, []); // Empty dependency array - run once on mount/unmount
+
+  // Mark course as ready in history once topics are loaded (first time only)
+  useEffect(() => {
+    if (!historyReadyRef.current && courseId && topicsList && topicsList.length > 0) {
+      const updated = proLearningHistoryService.updateStatus(courseId, 'ready');
+      if (updated) {
+        console.log('✅ ProLearning history status updated to ready for course', courseId);
+        historyReadyRef.current = true;
+      }
+    }
+  }, [courseId, topicsList]);
 
   // Set default topics and initialize with consistent course ID
   useEffect(() => {
@@ -1652,6 +1666,23 @@ const ProLearningPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Small Floating Navigation Popup */}
+      {isBatchGenerating && (
+        <div className="fixed top-4 right-4 z-50 animate-pulse">
+          <div className="bg-white/95 backdrop-blur-md border border-green-200 rounded-xl px-5 py-4 shadow-lg max-w-xs">
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-2">
+                <span className="text-green-500 text-xl mr-2">✨</span>
+                <h4 className="text-sm font-bold text-gray-800">Come back when course is ready!</h4>
+              </div>
+              <p className="text-xs text-gray-600 leading-relaxed">
+                🔔 You'll be notified wherever you are in the app. Feel free to explore!
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

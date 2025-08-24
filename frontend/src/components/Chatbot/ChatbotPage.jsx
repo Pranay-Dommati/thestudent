@@ -171,6 +171,45 @@ style.textContent = `
     animation: slide-down 0.4s ease-out forwards;
   }
   
+  /* Subtle pulse animation for important messages */
+  @keyframes pulse-subtle {
+    0%, 100% { 
+      box-shadow: 0 0 0 0 rgba(147, 51, 234, 0.4);
+      border-color: rgba(147, 51, 234, 0.6);
+    }
+    50% { 
+      box-shadow: 0 0 0 4px rgba(147, 51, 234, 0.1);
+      border-color: rgba(147, 51, 234, 0.8);
+    }
+  }
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s ease-in-out infinite;
+  }
+  
+  /* Slide in from top animation for notifications */
+  @keyframes slideInDown {
+    from {
+      opacity: 0;
+      transform: translate3d(-50%, -100%, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+  
+  /* Slide in from right animation for bottom-right notifications */
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translate3d(100%, 0, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  
   /* Custom scrollbar styling */
   .scrollbar-glass::-webkit-scrollbar {
     width: 6px;
@@ -540,6 +579,17 @@ const ChatbotPage = () => {
   const networkErrorTimeouts = useRef({}); // Store timeout IDs for network error messages
   const cancelledRetriesRef = useRef(new Set()); // Track message IDs whose retries were cancelled by a new prompt
   const [proLearningHistory, setProLearningHistory] = useState([]); // ProLearning course history
+  const [courseReadyNotifications, setCourseReadyNotifications] = useState([]); // Track course ready notifications
+  const [notifiedCourses, setNotifiedCourses] = useState(() => {
+    // Load from localStorage to persist across page refreshes
+    try {
+      const stored = localStorage.getItem('notifiedCourses');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  }); // Track which courses we've already notified about
+  const [notificationQueue, setNotificationQueue] = useState([]); // Queue for managing multiple notifications
 
   // Generate unique message ID
   const generateMessageId = () => Date.now() + Math.random();
@@ -706,6 +756,166 @@ const ChatbotPage = () => {
       });
     };
   }, []);
+
+  // Monitor ProLearning History for course completion and show notifications
+  useEffect(() => {
+    const checkForReadyCourses = () => {
+      const readyCourses = proLearningHistory.filter(course => 
+        course.status === 'ready' && !notifiedCourses.has(course.id)
+      );
+      
+      if (readyCourses.length === 0) return;
+      
+      // Handle multiple courses ready at once with staggered notifications
+      if (readyCourses.length === 1) {
+        const course = readyCourses[0];
+        // Single course notification
+        setTimeout(() => {
+          toast.success(
+            (t) => (
+              <div 
+                className="flex items-center space-x-3 cursor-pointer p-2"
+                onClick={() => {
+                  window.open(course.url, '_blank');
+                  toast.dismiss(t.id);
+                }}
+              >
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center animate-bounce">
+                    <span className="text-white text-xl">🎉</span>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900 text-lg">Course Ready!</p>
+                  <p className="text-gray-700 font-medium">"{course.topic}" is ready to explore</p>
+                  <p className="text-blue-600 font-semibold mt-1 text-sm">👆 Click anywhere to open course</p>
+                </div>
+                <div className="flex-shrink-0">
+                  <svg className="w-6 h-6 text-blue-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </div>
+              </div>
+            ),
+            {
+              duration: 15000, // Show for 15 seconds
+              position: 'bottom-right',
+              style: {
+                background: 'white',
+                border: '3px solid #10b981',
+                borderRadius: '16px',
+                boxShadow: '0 20px 40px rgba(16, 185, 129, 0.4), 0 0 0 1px rgba(16, 185, 129, 0.1)',
+                cursor: 'pointer',
+                minWidth: '320px',
+                maxWidth: '380px',
+                zIndex: 9999,
+                animation: 'slideInRight 0.5s ease-out',
+              },
+              icon: false, // We use custom content
+            }
+          );
+        }, 500);
+        
+        // Add individual notification to chat
+        const notificationId = `course-ready-${course.id}-${Date.now()}`;
+        setChatHistory(prev => [...prev, {
+          id: notificationId,
+          type: 'bot',
+          content: `🎉 **Great news!** Your ProLearning course "${course.topic}" is ready! \n\n[📖 Open Course](${course.url}) \n\n✨ Click the course link above or find it in your ProLearning History anytime.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isImportant: true
+        }]);
+      } else {
+        // Multiple courses ready - show individual notifications with delays
+        readyCourses.forEach((course, index) => {
+          setTimeout(() => {
+            toast.success(
+              (t) => (
+                <div 
+                  className="flex items-center space-x-3 cursor-pointer p-2"
+                  onClick={() => {
+                    window.open(course.url, '_blank');
+                    toast.dismiss(t.id);
+                  }}
+                >
+                  <div className="flex-shrink-0">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      index % 3 === 0 ? 'bg-gradient-to-r from-purple-400 to-pink-400' :
+                      index % 3 === 1 ? 'bg-gradient-to-r from-blue-400 to-cyan-400' :
+                      'bg-gradient-to-r from-green-400 to-teal-400'
+                    }`}>
+                      <span className="text-white text-lg">🎉</span>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-900">Course Ready! ({index + 1}/{readyCourses.length})</p>
+                    <p className="text-gray-700">"{course.topic}"</p>
+                    <p className="text-blue-600 font-medium text-xs mt-0.5">Click to open →</p>
+                  </div>
+                </div>
+              ),
+              {
+                duration: 12000 + (index * 1000), // Staggered duration
+                position: 'bottom-right',
+                style: {
+                  background: 'white',
+                  border: `2px solid ${
+                    index % 3 === 0 ? '#8b5cf6' :
+                    index % 3 === 1 ? '#3b82f6' :
+                    '#10b981'
+                  }`,
+                  borderRadius: '12px',
+                  boxShadow: `0 10px 25px rgba(${
+                    index % 3 === 0 ? '139, 92, 246' :
+                    index % 3 === 1 ? '59, 130, 246' :
+                    '16, 185, 129'
+                  }, 0.3)`,
+                  cursor: 'pointer',
+                  minWidth: '280px',
+                  maxWidth: '320px',
+                  zIndex: 9999 - index, // Ensure proper stacking
+                  animation: 'slideInRight 0.4s ease-out',
+                },
+                icon: false,
+              }
+            );
+          }, index * 1500); // Stagger notifications by 1.5 seconds
+        });
+        
+        // Add summary notification to chat with individual links
+        const courseLinks = readyCourses.map(course => 
+          `• [📖 ${course.topic}](${course.url})`
+        ).join('\n');
+        
+        const notificationId = `multiple-courses-ready-${Date.now()}`;
+        setChatHistory(prev => [...prev, {
+          id: notificationId,
+          type: 'bot',
+          content: `🎉 **Amazing! ${readyCourses.length} ProLearning courses are ready!** \n\n${courseLinks} \n\n✨ Click any course link above or find them in your ProLearning History anytime.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isImportant: true
+        }]);
+      }
+      
+      // Mark all as notified and save to localStorage
+      readyCourses.forEach(course => {
+        setNotifiedCourses(prev => {
+          const newSet = new Set([...prev, course.id]);
+          // Save to localStorage
+          try {
+            localStorage.setItem('notifiedCourses', JSON.stringify([...newSet]));
+          } catch (e) {
+            console.warn('Failed to save notified courses to localStorage:', e);
+          }
+          return newSet;
+        });
+      });
+    };
+
+    if (proLearningHistory.length > 0) {
+      checkForReadyCourses();
+    }
+  }, [proLearningHistory, notifiedCourses]);
 
   // Add window resize listener
   useEffect(() => {
@@ -1586,7 +1796,9 @@ const ChatbotPage = () => {
                   ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg backdrop-blur-sm rounded-br-md"
                   : isLearningPlan || isProCard
                     ? "bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl" 
-                    : "bg-white/70 backdrop-blur-md text-gray-800 border border-white/30 shadow-sm rounded-bl-md hover:bg-white/80 transition-all duration-200"
+                    : message.isImportant
+                      ? "bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-300 text-gray-800 shadow-lg rounded-bl-md animate-pulse-subtle"
+                      : "bg-white/70 backdrop-blur-md text-gray-800 border border-white/30 shadow-sm rounded-bl-md hover:bg-white/80 transition-all duration-200"
               }`}
             >
               {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
@@ -1711,6 +1923,57 @@ const ChatbotPage = () => {
                       em({children}) {
                         return <em className="italic text-gray-700">{children}</em>;
                       },
+                      // Enhanced link styling with special handling for course links
+                      a({href, children, ...props}) {
+                        // Check if it's a ProLearning course link
+                        const isProLearningLink = href && href.includes('/prolearning/');
+                        // Check if it's a home page link
+                        const isHomeLink = href === '/';
+                        
+                        if (isHomeLink) {
+                          return (
+                            <Link
+                              to="/"
+                              className="inline-flex items-center gap-1 bg-gradient-to-r from-green-500 to-teal-500 text-white px-3 py-1.5 rounded-lg font-medium hover:from-green-600 hover:to-teal-600 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                            >
+                              <IoHome className="w-4 h-4" />
+                              {children}
+                            </Link>
+                          );
+                        }
+                        
+                        return (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`${
+                              isProLearningLink
+                                ? 'inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 py-1.5 rounded-lg font-medium hover:from-purple-600 hover:to-blue-600 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
+                                : 'text-blue-600 hover:text-blue-800 underline decoration-blue-600 hover:decoration-blue-800 transition-colors duration-200'
+                            }`}
+                            onClick={(e) => {
+                              if (isProLearningLink) {
+                                e.preventDefault();
+                                window.open(href, '_blank');
+                                toast.success('Opening ProLearning course...', {
+                                  duration: 2000,
+                                  position: 'bottom-right',
+                                  icon: '🚀'
+                                });
+                              }
+                            }}
+                            {...props}
+                          >
+                            {children}
+                            {isProLearningLink && (
+                              <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            )}
+                          </a>
+                        );
+                      },
                     }}
                   >
                     {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
@@ -1757,11 +2020,21 @@ const ChatbotPage = () => {
                           localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
                           console.log('🚀 Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
                           
-                          // Track in ProLearning history
-                          proLearningHistoryService.trackCourseCreation(message.courseId, message.topic);
-                          
-                          // Refresh history state
+                          // Track in ProLearning history (status = generating)
+                          const item = proLearningHistoryService.trackCourseCreation(message.courseId, message.topic);
                           setProLearningHistory(proLearningHistoryService.getHistory());
+                          
+                          // Inline guidance toast style (non-blocking)
+                          try {
+                            const guidanceId = `guidance-${Date.now()}`;
+                            setChatHistory(prev => [...prev, {
+                              id: guidanceId,
+                              type: 'bot',
+                              content: `🚀 Your ProLearning course for "${message.topic}" is being generated! \n\n✨ **Go ahead and explore!** Navigate anywhere in the app - browse other courses, visit different pages, or continue chatting. \n\n🔔 **You'll be notified wherever you are** when your course is ready! Just click the notification to open your course instantly. \n\n🏠 **[Go to Home Page](/)** or stay here - your choice! \n\n📚 Your courses are **temporarily stored** and accessible anytime from the **ProLearning History** tab in the chat sidebar or at **/chat**.`,
+                              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                              isImportant: true // Special flag for styling
+                            }]);
+                          } catch (e) { /* ignore */ }
                           
                         } catch (error) {
                           console.error('Failed to store batch generation data:', error);
@@ -1910,52 +2183,122 @@ const ChatbotPage = () => {
                 <div className="p-2 rounded-full bg-purple-100 text-purple-600 shadow-sm">
                   <IoTimeOutline size={18} />
                 </div>
-                <span className="ml-3 font-medium text-gray-700">ProLearning History</span>
+                <div className="ml-3">
+                  <span className="font-medium text-gray-700">ProLearning History</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Temporarily stored • Access anytime at /chat</p>
+                </div>
               </div>
               
               {proLearningHistory.length === 0 ? (
-                <div className="text-sm text-gray-500 text-center py-4 italic">
-                  No history yet. Create your first ProLearning course!
+                <div className="text-sm text-gray-500 text-center py-4 italic space-y-1">
+                  <p>No courses yet!</p>
+                  <p className="text-xs">Create your first ProLearning course and navigate freely - you'll get notified when it's ready.</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {proLearningHistory.slice(0, 8).map((item, index) => (
-                    <a
+                    <div
                       key={item.id}
-                      href={item.url}
-                      className="block p-3 rounded-lg bg-white/30 hover:bg-white/50 
-                               transition-all duration-200 border border-white/40 
-                               hover:border-purple-300 group"
+                      className={`block p-3 rounded-lg transition-all duration-200 border group ${
+                        item.status === 'ready' 
+                          ? 'bg-white/30 hover:bg-white/50 border-white/40 hover:border-purple-300 cursor-pointer'
+                          : item.status === 'generating'
+                            ? 'bg-amber-50/30 border-amber-200/50 cursor-default'
+                            : 'bg-red-50/30 border-red-200/50 cursor-not-allowed'
+                      }`}
+                      onClick={() => {
+                        if (item.status === 'ready') {
+                          window.open(item.url, '_blank');
+                          // Show feedback toast
+                          toast.success(`Opening "${item.topic}" course...`, {
+                            duration: 2000,
+                            position: 'bottom-right',
+                            icon: '🚀'
+                          });
+                        } else if (item.status === 'generating') {
+                          toast.loading(`"${item.topic}" is still generating...`, {
+                            duration: 3000,
+                            position: 'bottom-right',
+                          });
+                        } else {
+                          toast.error(`"${item.topic}" encountered an error during generation.`, {
+                            duration: 4000,
+                            position: 'bottom-right',
+                          });
+                        }
+                      }}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-gray-700 group-hover:text-purple-700 
-                                        truncate mb-1">
+                          <div className={`font-medium text-sm truncate mb-1 ${
+                            item.status === 'ready' 
+                              ? 'text-gray-700 group-hover:text-purple-700'
+                              : item.status === 'generating'
+                                ? 'text-amber-700'
+                                : 'text-red-700'
+                          }`}>
                             {item.topic}
                           </div>
-                          <div className="text-xs text-gray-500 flex items-center">
-                            <span>{item.dateCreated}</span>
-                            <span className="mx-1">•</span>
-                            <span>{item.timeCreated}</span>
+                          <div className="flex items-center space-x-2">
+                            <div className="text-xs text-gray-500 flex items-center">
+                              <span>{item.dateCreated}</span>
+                              <span className="mx-1">•</span>
+                              <span>{item.timeCreated}</span>
+                            </div>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full tracking-wide font-medium flex items-center gap-1
+                              ${item.status === 'ready' ? 'bg-green-100 text-green-700' : item.status === 'error' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}
+                            `}>
+                              {item.status === 'generating' && <BiLoaderAlt className="animate-spin w-3 h-3" />}
+                              {item.status === 'generating' ? 'Generating' : item.status === 'ready' ? 'Ready' : 'Error'}
+                            </span>
                           </div>
                         </div>
-                        <svg
-                          className="w-4 h-4 text-gray-400 group-hover:text-purple-600 
-                                   transform group-hover:translate-x-1 transition-all flex-shrink-0"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
+                        {item.status === 'ready' && (
+                          <svg
+                            className="w-4 h-4 text-gray-400 group-hover:text-purple-600 
+                                     transform group-hover:translate-x-1 transition-all flex-shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        )}
+                        {item.status === 'generating' && (
+                          <div className="w-4 h-4 flex items-center justify-center">
+                            <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
+                          </div>
+                        )}
+                        {item.status === 'error' && (
+                          <div className="w-4 h-4 flex items-center justify-center">
+                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                          </div>
+                        )}
                       </div>
-                    </a>
+                    </div>
                   ))}
                   
                   {proLearningHistory.length > 8 && (
-                    <div className="text-xs text-gray-500 text-center py-2 border-t border-white/20">
-                      +{proLearningHistory.length - 8} more courses
-                    </div>
+                    <Link 
+                      to="/chat" 
+                      className="block text-xs text-center py-3 border-t border-white/20 
+                               text-purple-600 hover:text-purple-700 hover:bg-white/20 
+                               transition-all duration-200 rounded-b-lg"
+                    >
+                      <div className="font-medium">+{proLearningHistory.length - 8} more courses</div>
+                      <div className="text-gray-500 mt-0.5">View all at /chat</div>
+                    </Link>
+                  )}
+                  
+                  {proLearningHistory.length > 0 && proLearningHistory.length <= 8 && (
+                    <Link 
+                      to="/chat" 
+                      className="block text-xs text-center py-2 border-t border-white/20 
+                               text-gray-500 hover:text-purple-600 hover:bg-white/20 
+                               transition-all duration-200 rounded-b-lg"
+                    >
+                      View full history at /chat
+                    </Link>
                   )}
                 </div>
               )}
@@ -2057,7 +2400,25 @@ const ChatbotPage = () => {
                             <BiLoaderAlt className="animate-spin text-indigo-500 w-5 h-5" />
                             <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full blur-sm opacity-30 animate-pulse"></div>
                           </div>
-                          <span className="text-gray-700">Thinking...</span>
+                          <div className="flex flex-col">
+                            <span className="text-gray-700 font-medium">
+                              {proMode ? 'Creating your course...' : 'Thinking...'}
+                            </span>
+                            {proMode && (
+                              <div className="mt-2">
+                                <p className="text-xs text-gray-600 mb-2">
+                                  🌟 Feel free to explore while we work! You'll be notified when your course is ready.
+                                </p>
+                                <Link 
+                                  to="/"
+                                  className="inline-flex items-center px-3 py-1.5 text-xs bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-sm hover:shadow-md"
+                                >
+                                  <IoHome className="w-3 h-3 mr-1" />
+                                  Go to Home
+                                </Link>
+                              </div>
+                            )}
+                          </div>
                           <div className="ml-2 flex space-x-1">
                             <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
                             <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>

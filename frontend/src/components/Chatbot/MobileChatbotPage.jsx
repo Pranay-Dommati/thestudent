@@ -866,11 +866,18 @@ const MobileChatbotPage = () => {
                           localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
                           console.log('🚀 Mobile Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
                           
-                          // Track in ProLearning history
+                          // Track in ProLearning history (status generating)
                           proLearningHistoryService.trackCourseCreation(message.courseId, message.topic);
-                          
-                          // Refresh history state
                           setProLearningHistory(proLearningHistoryService.getHistory());
+                          // Lightweight inline guidance message after card (not interfering)
+                          try {
+                            setChatHistory(prev => [...prev, {
+                              id: generateUniqueId(),
+                              type: 'bot',
+                              content: `⏳ Your ProLearning course for "${message.topic}" is generating in the background. You can continue chatting. Access it anytime from the History menu (top-right).`,
+                              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            }]);
+                          } catch (e) { /* ignore */ }
                           
                         } catch (error) {
                           console.error('Failed to store batch generation data:', error);
@@ -981,8 +988,13 @@ const MobileChatbotPage = () => {
                             className="block py-2 px-2 mb-1 text-xs text-gray-600 hover:bg-purple-50 hover:text-purple-700 rounded-md transition-colors border-l-2 border-purple-200 hover:border-purple-400"
                             onClick={() => setShowNavMenu(false)}
                           >
-                            <div className="font-medium truncate">{item.topic}</div>
-                            <div className="text-gray-400 text-xs">{item.dateCreated} • {item.timeCreated}</div>
+                            <div className="flex items-center justify-between">
+                              <div className="font-medium truncate max-w-[110px]">{item.topic}</div>
+                              <span className={`text-[9px] px-2 py-0.5 rounded-full tracking-wide font-medium ml-2 flex-shrink-0
+                                ${item.status === 'ready' ? 'bg-green-100 text-green-700' : item.status === 'error' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}
+                              >{item.status === 'generating' ? 'Gen' : item.status === 'ready' ? 'Ready' : 'Error'}</span>
+                            </div>
+                            <div className="text-gray-400 text-[10px]">{item.dateCreated} • {item.timeCreated}</div>
                           </a>
                         ))}
                         

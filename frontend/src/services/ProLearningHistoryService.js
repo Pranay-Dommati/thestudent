@@ -19,6 +19,7 @@ class ProLearningHistoryService {
         topic: courseData.topic || 'Unknown Topic',
         url: courseData.url,
         title: courseData.title || courseData.topic || 'ProLearning Course',
+        status: courseData.status || 'generating', // generating | ready | error
         timestamp: Date.now(),
         dateCreated: new Date().toLocaleDateString(),
         timeCreated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -45,6 +46,29 @@ class ProLearningHistoryService {
     } catch (error) {
       console.error('Error adding to ProLearning history:', error);
       return null;
+    }
+  }
+
+  // Update status of a history item
+  updateStatus(courseId, status) {
+    try {
+      const history = this.getHistory();
+      let updated = false;
+      const newHistory = history.map(item => {
+        if (item.courseId === courseId) {
+          updated = true;
+          return { ...item, status, updatedAt: Date.now() };
+        }
+        return item;
+      });
+      if (updated) {
+        localStorage.setItem(this.storageKey, JSON.stringify(newHistory));
+        window.dispatchEvent(new CustomEvent('prolearning-history-updated', { detail: { courseId, status } }));
+      }
+      return updated;
+    } catch (e) {
+      console.error('Failed to update ProLearning history status', e);
+      return false;
     }
   }
 
@@ -114,7 +138,8 @@ class ProLearningHistoryService {
       courseId,
       topic,
       url,
-      title: `ProLearning: ${topic}`
+      title: `ProLearning: ${topic}`,
+      status: 'generating'
     });
   }
 
