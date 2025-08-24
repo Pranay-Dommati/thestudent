@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline } from "react-icons/io5";
-import { FaRobot, FaGraduationCap, FaBook, FaRegUser } from "react-icons/fa";
+import { FaRobot, FaGraduationCap, FaBook, FaRegUser, FaBookOpen, FaExclamationTriangle } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -2018,33 +2018,50 @@ const ChatbotPage = () => {
           <div className="space-y-3">
             {/* ProLearning History Section */}
             <div className="pt-2">
-              <div className="flex items-center mb-3">
-                <div className="p-2 rounded-full bg-purple-100 text-purple-600 shadow-sm">
-                  <IoTimeOutline size={18} />
-                </div>
-                <div className="ml-3">
-                  <span className="font-medium text-gray-700">📦 Stored locally in your browser</span>
-                  <p className="text-xs text-gray-500 mt-0.5">💾 Want to keep them permanently? Save to Learning Hub!</p>
+              {/* Professional Storage Notice */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-4 shadow-sm">
+                <div className="flex items-start">
+                  <div className="p-2 rounded-lg bg-blue-100 text-blue-600 shadow-sm mr-3 flex-shrink-0">
+                    <FaGraduationCap size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-800 text-sm mb-1">
+                      ProLearning Courses
+                    </h3>
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      Courses are <span className="font-medium text-blue-600 underline decoration-blue-200 decoration-2 underline-offset-2">temporarily</span> stored. Visit each course to save to your Learning Hub.
+                    </p>
+                  </div>
                 </div>
               </div>
               {proLearningHistory.length === 0 ? (
-                <div className="text-sm text-gray-500 text-center py-4 italic space-y-1">
-                  <p>No courses yet!</p>
-                  <p className="text-xs">🚀 Create your first ProLearning course and explore freely!</p>
-                  <p className="text-xs">⚠️ <strong>Note:</strong> Courses are stored locally and may disappear if you clear browser data.</p>
-                  <p className="text-xs">💡 <strong>Tip:</strong> Save important courses to your Learning Hub for permanent access!</p>
+                <div className="bg-white/50 border border-gray-200 rounded-xl p-6 text-center shadow-sm">
+                  <div className="w-12 h-12 mx-auto mb-3 flex items-center justify-center rounded-full bg-indigo-100">
+                    <FaRobot className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-800 mb-2">No Courses Yet</h3>
+                  <p className="text-sm text-gray-600 mb-3 leading-relaxed">
+                    Create your first ProLearning course by asking me about any topic.
+                  </p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+                    <div className="font-medium mb-1">� Try asking:</div>
+                    <div className="space-y-1 text-left">
+                      <div>• "Create course on Python programming"</div>
+                      <div>• "Create course about quantum physics"</div>
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <div className="space-y-2" style={{maxHeight: 'none', overflowY: 'visible'}}>
+                <div className="space-y-3" style={{maxHeight: 'none', overflowY: 'visible'}}>
                   {proLearningHistory.map((item, index) => (
                     <div
                       key={item.id}
-                      className={`block p-3 rounded-lg transition-all duration-200 border group ${
+                      className={`block p-4 rounded-xl transition-all duration-200 border group shadow-sm ${
                         item.status === 'ready' 
-                          ? 'bg-white/30 hover:bg-white/50 border-white/40 hover:border-purple-300 cursor-pointer'
+                          ? 'bg-white/60 hover:bg-white/80 border-indigo-200 hover:border-indigo-300 cursor-pointer hover:shadow-md'
                           : item.status === 'generating'
-                            ? 'bg-amber-50/30 hover:bg-amber-50/50 border-amber-200/50 hover:border-amber-300 cursor-pointer'
-                            : 'bg-red-50/30 border-red-200/50 cursor-not-allowed'
+                            ? 'bg-amber-50/60 hover:bg-amber-50/80 border-amber-200 hover:border-amber-300 cursor-pointer hover:shadow-md'
+                            : 'bg-red-50/60 border-red-200 cursor-not-allowed'
                       }`}
                       onClick={() => {
                         if (item.status === 'ready') {
@@ -2072,51 +2089,66 @@ const ChatbotPage = () => {
                       }}
                     >
                       <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className={`font-medium text-sm truncate mb-1 ${
+                        <div className="flex items-center flex-1 min-w-0">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 flex-shrink-0 ${
                             item.status === 'ready' 
-                              ? 'text-gray-700 group-hover:text-purple-700'
+                              ? 'bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-600'
                               : item.status === 'generating'
-                                ? 'text-amber-700'
-                                : 'text-red-700'
+                                ? 'bg-gradient-to-br from-amber-100 to-orange-100 text-amber-600'
+                                : 'bg-gradient-to-br from-red-100 to-pink-100 text-red-600'
                           }`}>
-                            {item.topic}
+                            {item.status === 'ready' && <FaBookOpen className="w-4 h-4" />}
+                            {item.status === 'generating' && <BiLoaderAlt className="w-4 h-4 animate-spin" />}
+                            {item.status === 'error' && <FaExclamationTriangle className="w-4 h-4" />}
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="text-xs text-gray-500 flex items-center">
-                              <span>{item.dateCreated}</span>
-                              <span className="mx-1">•</span>
-                              <span>{item.timeCreated}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className={`font-semibold text-sm truncate mb-1 ${
+                              item.status === 'ready' 
+                                ? 'text-gray-800 group-hover:text-indigo-700'
+                                : item.status === 'generating'
+                                  ? 'text-amber-800'
+                                  : 'text-red-800'
+                            }`}>
+                              {item.topic}
                             </div>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full tracking-wide font-medium flex items-center gap-1
-                              ${item.status === 'ready' ? 'bg-green-100 text-green-700' : item.status === 'error' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}
-                            `}>
-                              {item.status === 'generating' && <BiLoaderAlt className="animate-spin w-3 h-3" />}
-                              {item.status === 'generating' ? 'Generating' : item.status === 'ready' ? 'Ready' : 'Error'}
-                            </span>
+                            <div className="flex items-center space-x-2">
+                              <div className="text-xs text-gray-500 flex items-center">
+                                <span>{item.dateCreated}</span>
+                                <span className="mx-1">•</span>
+                                <span>{item.timeCreated}</span>
+                              </div>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full tracking-wide font-medium flex items-center gap-1
+                                ${item.status === 'ready' ? 'bg-green-100 text-green-700' : item.status === 'error' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}
+                              `}>
+                                {item.status === 'generating' && <BiLoaderAlt className="animate-spin w-3 h-3" />}
+                                {item.status === 'generating' ? 'Generating' : item.status === 'ready' ? 'Ready' : 'Error'}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        {item.status === 'ready' && (
-                          <svg
-                            className="w-4 h-4 text-gray-400 group-hover:text-purple-600 
-                                     transform group-hover:translate-x-1 transition-all flex-shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        )}
-                        {item.status === 'generating' && (
-                          <div className="w-4 h-4 flex items-center justify-center">
-                            <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
-                          </div>
-                        )}
-                        {item.status === 'error' && (
-                          <div className="w-4 h-4 flex items-center justify-center">
-                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                          </div>
-                        )}
+                        <div className="flex items-center">
+                          {item.status === 'ready' && (
+                            <svg
+                              className="w-4 h-4 text-gray-400 group-hover:text-indigo-600 
+                                       transform group-hover:translate-x-1 transition-all flex-shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          )}
+                          {item.status === 'generating' && (
+                            <div className="w-4 h-4 flex items-center justify-center">
+                              <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
+                            </div>
+                          )}
+                          {item.status === 'error' && (
+                            <div className="w-4 h-4 flex items-center justify-center">
+                              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}

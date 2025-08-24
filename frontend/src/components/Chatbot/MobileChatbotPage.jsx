@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoLibraryOutline, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline } from "react-icons/io5";
-import { FaRobot } from "react-icons/fa";
+import { FaRobot, FaGraduationCap, FaBookOpen, FaExclamationTriangle } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -974,38 +974,79 @@ const MobileChatbotPage = () => {
                 ></div>
                 
                 {/* Menu Items */}
-                <div className="absolute right-0 top-12 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                  {/* History Section */}
+                <div className="absolute right-0 top-12 w-72 bg-white rounded-xl shadow-lg border border-gray-200 py-3 z-50">
+                  {/* Professional History Section */}
                   <div className="px-4 py-2">
-                    <div className="flex items-center mb-2">
-                      <IoTimeOutline size={16} className="mr-2 text-purple-600" />
-                      <span className="font-medium text-sm text-gray-700">ProLearning History</span>
+                    <div className="flex items-center mb-3">
+                      <div className="p-1.5 rounded-lg bg-indigo-100 text-indigo-600 mr-2">
+                        <FaGraduationCap size={14} />
+                      </div>
+                      <span className="font-semibold text-sm text-gray-800">ProLearning History</span>
+                    </div>
+                    
+                    {/* Storage Notice */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 mb-3 text-xs">
+                      <p className="text-blue-600 leading-relaxed">
+                        Courses are <span className="font-medium text-blue-600 underline decoration-blue-200 decoration-2 underline-offset-2">temporarily</span> stored. Visit each course to save to your Learning Hub.
+                      </p>
                     </div>
                     
                     {proLearningHistory.length === 0 ? (
-                      <div className="text-xs text-gray-500 ml-6">No history yet</div>
+                      <div className="text-center py-4">
+                        <div className="w-8 h-8 mx-auto mb-2 flex items-center justify-center rounded-full bg-indigo-100">
+                          <FaRobot className="w-4 h-4 text-indigo-600" />
+                        </div>
+                        <div className="text-xs text-gray-600 mb-2 font-medium">No courses yet</div>
+                        <div className="text-[10px] text-gray-500 leading-relaxed">
+                          Ask me to create a course on any topic.
+                        </div>
+                      </div>
                     ) : (
-                      <div className="ml-6 max-h-64 overflow-y-auto">
+                      <div className="max-h-64 overflow-y-auto space-y-2">
                         {proLearningHistory.slice(0, 10).map((item, index) => (
                           <a
                             key={item.id}
                             href={item.url}
-                            className="block py-2 px-2 mb-1 text-xs text-gray-600 hover:bg-purple-50 hover:text-purple-700 rounded-md transition-colors border-l-2 border-purple-200 hover:border-purple-400"
+                            className={`block p-2.5 rounded-lg transition-all duration-200 border group ${
+                              item.status === 'ready' 
+                                ? 'bg-white hover:bg-indigo-50 border-indigo-200 hover:border-indigo-300'
+                                : item.status === 'generating'
+                                  ? 'bg-amber-50 hover:bg-amber-100 border-amber-200 hover:border-amber-300'
+                                  : 'bg-red-50 border-red-200'
+                            }`}
                             onClick={() => setShowNavMenu(false)}
                           >
-                            <div className="flex items-center justify-between">
-                              <div className="font-medium truncate max-w-[110px]">{item.topic}</div>
-                              <span className={`text-[9px] px-2 py-0.5 rounded-full tracking-wide font-medium ml-2 flex-shrink-0
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center flex-1 min-w-0">
+                                <div className={`w-6 h-6 rounded-md flex items-center justify-center mr-2 flex-shrink-0 ${
+                                  item.status === 'ready' 
+                                    ? 'bg-indigo-100 text-indigo-600'
+                                    : item.status === 'generating'
+                                      ? 'bg-amber-100 text-amber-600'
+                                      : 'bg-red-100 text-red-600'
+                                }`}>
+                                  {item.status === 'ready' && <FaBookOpen className="w-3 h-3" />}
+                                  {item.status === 'generating' && <BiLoaderAlt className="w-3 h-3 animate-spin" />}
+                                  {item.status === 'error' && <FaExclamationTriangle className="w-3 h-3" />}
+                                </div>
+                                <div className="font-semibold text-xs truncate text-gray-800">{item.topic}</div>
+                              </div>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full tracking-wide font-medium ml-2 flex-shrink-0
                                 ${item.status === 'ready' ? 'bg-green-100 text-green-700' : item.status === 'error' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}
                               >{item.status === 'generating' ? 'Gen' : item.status === 'ready' ? 'Ready' : 'Error'}</span>
                             </div>
-                            <div className="text-gray-400 text-[10px]">{item.dateCreated} • {item.timeCreated}</div>
+                            <div className="text-gray-500 text-[10px] flex items-center">
+                              <span>{item.dateCreated}</span>
+                              <span className="mx-1">•</span>
+                              <span>{item.timeCreated}</span>
+                            </div>
                           </a>
                         ))}
                         
                         {proLearningHistory.length > 10 && (
-                          <div className="text-xs text-gray-400 text-center py-1">
-                            +{proLearningHistory.length - 10} more courses
+                          <div className="text-xs text-gray-500 text-center py-2 border-t border-gray-100">
+                            <span className="font-medium">+{proLearningHistory.length - 10} more courses</span>
+                            <div className="text-[10px] text-gray-400">View all at /chat</div>
                           </div>
                         )}
                       </div>
