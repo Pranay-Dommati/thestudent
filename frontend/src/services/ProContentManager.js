@@ -11,6 +11,27 @@ class ProContentManager {
     this.generationPromises = new Map(); // Track ongoing content generation
   }
 
+  // Create a safe key segment from topic names for localStorage keys
+  _slugify(value) {
+    try {
+      return String(value)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 120);
+    } catch {
+      return 'topic';
+    }
+  }
+
+  _topicLockKey(courseId, topicName) {
+    return `proLearning_generation_lock_${courseId}_${this._slugify(topicName)}`;
+  }
+
+  _taskLockKey(courseId, topicName, contentType) {
+    return `proLearning_generation_lock_${courseId}_${this._slugify(topicName)}_${contentType}`;
+  }
+
   /**
    * Set the current course context
    * @param {String} courseTitle - Course title
@@ -131,6 +152,44 @@ class ProContentManager {
 
     const generationKey = `${this.currentCourseId}_${topicName}`;
 
+    // Cross-tab topic-level lock: if present, observe instead of regenerating
+    const lockKey = this._topicLockKey(this.currentCourseId, topicName);
+    const hasTopicLock = !!localStorage.getItem(lockKey);
+    if (hasTopicLock) {
+      console.log('🔒 Topic generation lock detected, observing instead:', { topicName, courseId: this.currentCourseId });
+      const observed = await new Promise((resolve, reject) => {
+        const start = Date.now();
+        const maxWaitMs = 5 * 60 * 1000; // 5 minutes
+        const poll = setInterval(() => {
+          try {
+            const storedContent = contentStorageService.getContentByTopicName(topicName, this.currentCourseId);
+            if (storedContent?.reading) {
+              clearInterval(poll);
+              console.log('👀 Observed topic content ready via storage for:', topicName);
+              resolve({ source: 'storage', content: storedContent, fromCache: true });
+            } else {
+              // Also check course payload if available
+              const courseContent = this.getStoredCourseContent(this.currentCourseId);
+              const status = courseContent?.topics?.[topicName]?.status;
+              if (status === 'completed' && courseContent?.topics?.[topicName]?.content?.reading) {
+                clearInterval(poll);
+                console.log('👀 Observed topic completion via course content for:', topicName);
+                resolve({ source: 'storage', content: courseContent.topics[topicName].content, fromCache: true });
+              }
+            }
+            if (Date.now() - start > maxWaitMs) {
+              clearInterval(poll);
+              reject(new Error('Timeout waiting for topic generation to complete.'));
+            }
+          } catch (e) {
+            clearInterval(poll);
+            reject(e);
+          }
+        }, 1200);
+      });
+      return observed;
+    }
+
     // Check if generation is already in progress for this topic
     if (this.generationPromises.has(generationKey)) {
       console.log('🔄 Content generation already in progress for:', topicName);
@@ -138,7 +197,7 @@ class ProContentManager {
     }
 
     // Create a new promise for this generation request
-    const contentPromise = (async () => {
+  const contentPromise = (async () => {
       try {
         // Step 1: Check for valid stored content first (localStorage)
         const storedContent = contentStorageService.getContentByTopicName(topicName, this.currentCourseId);
@@ -180,7 +239,9 @@ class ProContentManager {
           return null;
         }
 
-        console.log('🚀 Starting content generation for:', topicName);
+  console.log('🚀 Starting content generation for:', topicName);
+  // Acquire cross-tab topic lock so other tabs observe
+  try { localStorage.setItem(lockKey, 'true'); } catch {}
         const generationStartTime = Date.now();
         const generatedContent = await new Promise((resolve, reject) => {
           let resolved = false;
@@ -242,7 +303,7 @@ class ProContentManager {
           }
         }
         
-        return {
+  return {
           source: 'generated',
           content: generatedContent,
           fromCache: false
@@ -254,6 +315,8 @@ class ProContentManager {
       } finally {
         // Always clean up the generation promise
         this.generationPromises.delete(generationKey);
+  // Release cross-tab topic lock
+  try { localStorage.removeItem(lockKey); } catch {}
       }
     })();
     
@@ -426,6 +489,9 @@ class ProContentManager {
             }
             
             console.log(`📝 Generating ${contentType} for ${topic.name}`);
+            // Acquire per-task cross-tab lock (defensive, topic lock should already serialize)
+            const taskLockKey = this._taskLockKey(courseId, topic.name, contentType);
+            try { localStorage.setItem(taskLockKey, 'true'); } catch {}
             
             try {
               switch (contentType) {
@@ -551,11 +617,41 @@ class ProContentManager {
               
               currentStep++;
               console.log(`✅ Generated ${contentType} for ${topic.name}`);
+
+              // Persist incremental progress only for this content type (avoid empty placeholders)
+              try {
+                const existingContent = courseContent.topics[topic.name].content || {};
+                const partial = { ...existingContent };
+                switch (contentType) {
+                  case 'reading':
+                    if (generatedContent.reading) partial.reading = generatedContent.reading;
+                    break;
+                  case 'summary':
+                    if (generatedContent.summary) partial.summary = generatedContent.summary;
+                    break;
+                  case 'videos':
+                    if ((generatedContent.videos?.length || 0) > 0) partial.videos = generatedContent.videos;
+                    break;
+                  case 'resources':
+                    if ((generatedContent.resources?.length || 0) > 0) partial.resources = generatedContent.resources;
+                    break;
+                  case 'quiz':
+                    if ((generatedContent.quiz?.length || 0) > 0) partial.quiz = generatedContent.quiz;
+                    break;
+                }
+                courseContent.topics[topic.name].content = partial;
+                localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent));
+              } catch (e) {
+                console.warn('Failed to persist incremental type progress:', e);
+              }
               
             } catch (error) {
               console.error(`❌ Failed to generate ${contentType} for ${topic.name}:`, error);
               currentStep++;
               // Continue with next content type instead of failing completely
+            }
+            finally {
+              try { localStorage.removeItem(taskLockKey); } catch {}
             }
           }
           

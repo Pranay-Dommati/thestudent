@@ -585,8 +585,12 @@ const ProLearningPage = () => {
           let done = 0;
           topicsList.forEach(t => {
             const c = proContentManager.getStoredTopicContent(currentCourseId, t.name);
-            if (c && (c.reading || c.summary || (c.videos?.length || 0) > 0 || (c.resources?.length || 0) > 0 || (c.quiz?.length || 0) > 0)) {
-              done += 5;
+            if (c) {
+              if (c.reading) done += 1;
+              if (c.summary) done += 1;
+              if ((c.videos?.length || 0) > 0) done += 1;
+              if ((c.resources?.length || 0) > 0) done += 1;
+              if ((c.quiz?.length || 0) > 0) done += 1;
             }
           });
           const pct = Math.min(100, Math.round((done / total) * 100));
@@ -1213,6 +1217,22 @@ const ProLearningPage = () => {
     // Start batch generation for all topics if needed
     const initializeBatchGeneration = async () => {
       if (topicsList.length > 0 && courseId) {
+        // Respect ProContentManager state/lock to avoid duplicate legacy generation from direct URL
+        const existingPM = proContentManager.getStoredCourseContent(courseId);
+        const pmLockKey = `proLearning_generation_lock_${courseId}`;
+        const pmLocked = !!localStorage.getItem(pmLockKey);
+
+        if (existingPM?.metadata?.status === 'completed') {
+          setAllTopicsGenerated(true);
+          updateBatchProgress(100, { force: true });
+          setBatchGenerationStatus('Course generation completed!');
+          setIsBatchGenerating(false);
+          return;
+        }
+        if (pmLocked || existingPM?.metadata?.status === 'generating') {
+          // The other effect that watches PM state will handle observer mode
+          return;
+        }
         
         // Get current generation progress using the storage service
         const progress = getGenerationProgress(courseId);
@@ -1563,13 +1583,16 @@ const ProLearningPage = () => {
           }
           const poll = setInterval(() => {
             const current = proContentManager.getStoredCourseContent(batchCourseId);
-            const total = topics.length * 5; // rough steps across 5 content types
-            // Approximate progress based on topics with any content
+            const total = topics.length * 5; // five content types
             let done = 0;
             topics.forEach(t => {
               const c = proContentManager.getStoredTopicContent(batchCourseId, t.name);
-              if (c && (c.reading || c.summary || (c.videos?.length || 0) > 0 || (c.resources?.length || 0) > 0 || (c.quiz?.length || 0) > 0)) {
-                done += 5;
+              if (c) {
+                if (c.reading) done += 1;
+                if (c.summary) done += 1;
+                if ((c.videos?.length || 0) > 0) done += 1;
+                if ((c.resources?.length || 0) > 0) done += 1;
+                if ((c.quiz?.length || 0) > 0) done += 1;
               }
             });
             const pct = Math.min(100, Math.round((done / total) * 100));
