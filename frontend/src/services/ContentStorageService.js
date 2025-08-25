@@ -24,7 +24,8 @@ class ContentStorageService {
    * @returns {String} - Generated course ID
    */
   storeCourse(courseData) {
-    const courseId = this.generateId('course');
+    // Allow callers to provide a fixed ID to ensure stability across tabs/routes
+    const courseId = courseData.id || this.generateId('course');
     const course = {
       id: courseId,
       title: courseData.title,

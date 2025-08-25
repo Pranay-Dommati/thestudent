@@ -16,7 +16,7 @@ import contentStorageService from '../../services/ContentStorageService.js';
  * @param {Function} setGenerationProgress - Function to update generation progress
  */
 export const batchGenerateAllTopics = async (
-  courseTitle,
+  courseIdOrTitle,
   topicsList, 
   generateProContent, 
   setLoadingStatus, 
@@ -28,35 +28,60 @@ export const batchGenerateAllTopics = async (
     return { success: false, message: 'No topics provided' };
   }
 
-  if (!courseTitle) {
+  if (!courseIdOrTitle) {
     setIsGenerating(false);
-    return { success: false, message: 'No course title provided' };
+    return { success: false, message: 'No course id/title provided' };
   }
 
   setIsGenerating(true);
   setLoadingStatus('Initializing content generation for all topics...');
   
   try {
-    // 1. First, ensure course exists in storage
-    let course = contentStorageService.getCourseByTitle(courseTitle);
-    let courseId;
+    // Require a stable courseId; do NOT proceed on plain titles
+    const isIdLike = typeof courseIdOrTitle === 'string' && courseIdOrTitle.startsWith('course_');
+    if (!isIdLike) {
+      console.warn('🚫 batchGenerateAllTopics called without stable courseId. Aborting to prevent duplicate generations.', { courseIdOrTitle });
+      setLoadingStatus('Invalid course identifier. Reload or start from Chat to get a stable course.');
+      return { success: false, message: 'Missing stable courseId' };
+    }
+
+    // Cross-tab generation lock strictly by courseId
+    const lockKey = `proLearning_generation_lock_${courseIdOrTitle}`;
+    if (localStorage.getItem(lockKey)) {
+      setLoadingStatus('Course generation already in progress...');
+      const p = getGenerationProgress(courseIdOrTitle);
+      setGenerationProgress(p?.percentage || 0);
+      return { success: true, message: 'Already generating (locked)' };
+    }
+    localStorage.setItem(lockKey, 'true');
+
+  // 1. First, ensure course exists in storage (ID lookup only)
+  let course = contentStorageService.getCourse(courseIdOrTitle);
+  let courseId;
+  let courseTitle = null;
     
     if (!course) {
-      // Create course if it doesn't exist
-      courseId = contentStorageService.storeCourse({
+      // Create course if it doesn't exist using provided courseId
+      courseTitle = 'ProLearning Course';
+      courseId = courseIdOrTitle;
+      const newId = contentStorageService.storeCourse({
+        id: courseId,
         title: courseTitle,
         description: `AI-generated course: ${courseTitle}`
       });
-      course = contentStorageService.getCourse(courseId);
+      course = contentStorageService.getCourse(newId);
     } else {
       courseId = course.id;
+      courseTitle = course.title;
     }
 
+    console.log('🚀 Starting batch generation for course:', { courseId: course.id, courseTitle, topics: topicsList?.length });
+
     // 2. Store topics in the structured storage
-    const topicIds = contentStorageService.storeTopics(courseId, topicsList);
+    const topicIds = contentStorageService.storeTopics(course.id, topicsList);
 
     // 3. Check which topics already have content
-    const progress = contentStorageService.getCourseProgress(courseId);
+  const progress = contentStorageService.getCourseProgress(course.id);
 
     if (progress.isComplete) {
       setLoadingStatus('All topics are ready! Content loaded from storage.');
@@ -67,7 +92,7 @@ export const batchGenerateAllTopics = async (
 
     // 4. Generate content for topics that don't have it
     let processedCount = progress.generated; // Start from already generated count
-    const topicsToGenerate = contentStorageService.getTopicsForCourse(courseId)
+  const topicsToGenerate = contentStorageService.getTopicsForCourse(course.id)
       .filter(topic => !topic.contentGenerated);
 
 
@@ -135,7 +160,7 @@ export const batchGenerateAllTopics = async (
     }
     
     // 5. Final progress check and completion
-    const finalProgress = contentStorageService.getCourseProgress(courseId);
+    const finalProgress = contentStorageService.getCourseProgress(course.id);
     
     if (finalProgress.isComplete) {
       setLoadingStatus('All topics are ready! Click on a topic to start learning.');
@@ -149,7 +174,7 @@ export const batchGenerateAllTopics = async (
     
     return { 
       success: true, 
-      courseId, 
+      courseId: course.id, 
       progress: finalProgress, 
       message: 'Batch generation completed' 
     };
@@ -160,6 +185,7 @@ export const batchGenerateAllTopics = async (
     return { success: false, message: error.message };
   } finally {
     setIsGenerating(false);
+  try { localStorage.removeItem(`proLearning_generation_lock_${courseIdOrTitle}`); } catch {}
   }
 };
 
@@ -207,17 +233,18 @@ export const getStoredTopicContent = (topicName, courseTitle, courseId = null) =
  * @param {String} courseTitle - Course title
  * @returns {Object} - Progress details
  */
-export const getGenerationProgress = (courseTitle) => {
-  if (!courseTitle) {
+export const getGenerationProgress = (courseIdOrTitle) => {
+  if (!courseIdOrTitle) {
     return { percentage: 0, generated: 0, total: 0, isComplete: false };
   }
-  
-  const course = contentStorageService.getCourseByTitle(courseTitle);
-  if (!course) {
-    return { percentage: 0, generated: 0, total: 0, isComplete: false };
-  }
-  
-  return contentStorageService.getCourseProgress(course.id);
+  // Prefer ID lookup
+  const byId = contentStorageService.getCourse(courseIdOrTitle);
+  if (byId) return contentStorageService.getCourseProgress(byId.id);
+
+  // Fallback to title lookup
+  const byTitle = contentStorageService.getCourseByTitle(courseIdOrTitle);
+  if (!byTitle) return { percentage: 0, generated: 0, total: 0, isComplete: false };
+  return contentStorageService.getCourseProgress(byTitle.id);
 };
 
 /**
@@ -248,20 +275,26 @@ export const getCourseTopicsWithStatus = (courseTitle) => {
  * @param {Array} topicsList - List of topics
  * @returns {Object} - Course and topic IDs
  */
-export const initializeCourseStorage = (courseTitle, topicsList) => {
-  if (!courseTitle || !topicsList || topicsList.length === 0) {
+export const initializeCourseStorage = (courseIdOrTitle, topicsList) => {
+  if (!courseIdOrTitle || !topicsList || topicsList.length === 0) {
     return { success: false, message: 'Invalid course data' };
   }
 
   try {
-    // Create or get existing course
-    let course = contentStorageService.getCourseByTitle(courseTitle);
+    // Only allow initialize with a stable courseId to avoid duplicates
+    const isIdLike = typeof courseIdOrTitle === 'string' && courseIdOrTitle.startsWith('course_');
+    if (!isIdLike) {
+      return { success: false, message: 'Missing stable courseId' };
+    }
+    let course = contentStorageService.getCourse(courseIdOrTitle);
     let courseId;
-    
+    const fallbackTitle = 'ProLearning Course';
+
     if (!course) {
       courseId = contentStorageService.storeCourse({
-        title: courseTitle,
-        description: `AI-generated course: ${courseTitle}`
+        id: courseIdOrTitle,
+        title: fallbackTitle,
+        description: `AI-generated course: ${fallbackTitle}`
       });
     } else {
       courseId = course.id;

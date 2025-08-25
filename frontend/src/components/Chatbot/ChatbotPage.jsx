@@ -1767,7 +1767,7 @@ const ChatbotPage = () => {
                       // Enhanced link styling with special handling for course links
                       a({href, children, ...props}) {
                         // Check if it's a ProLearning course link
-                        const isProLearningLink = href && href.includes('/prolearning/');
+                        const isProLearningLink = href && (href.includes('/pro-learning/') || href.includes('/prolearning/'));
                         // Check if it's a home page link
                         const isHomeLink = href === '/';
                         
@@ -1786,8 +1786,6 @@ const ChatbotPage = () => {
                         return (
                           <a
                             href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
                             className={`${
                               isProLearningLink
                                 ? 'inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 py-1.5 rounded-lg font-medium hover:from-purple-600 hover:to-blue-600 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5'
@@ -1796,12 +1794,23 @@ const ChatbotPage = () => {
                             onClick={(e) => {
                               if (isProLearningLink) {
                                 e.preventDefault();
-                                window.open(href, '_blank');
-                                toast.success('Opening ProLearning course...', {
-                                  duration: 2000,
-                                  position: 'bottom-right',
-                                  icon: '🚀'
-                                });
+                                try {
+                                  // Extract courseId from href: /pro-learning/<courseId>
+                                  const match = href.match(/\/pro-learning\/([^/?#]+)/);
+                                  const courseId = match ? match[1] : null;
+                                  if (courseId) {
+                                    navigate(`/pro-learning/${courseId}`);
+                                    toast.success('Opening ProLearning course...', {
+                                      duration: 2000,
+                                      position: 'bottom-right',
+                                      icon: '🚀'
+                                    });
+                                  } else {
+                                    navigate(href);
+                                  }
+                                } catch {
+                                  navigate(href);
+                                }
                               }
                             }}
                             {...props}
@@ -2053,9 +2062,9 @@ const ChatbotPage = () => {
                 </div>
               ) : (
                 <div className="space-y-3" style={{maxHeight: 'none', overflowY: 'visible'}}>
-                  {proLearningHistory.map((item, index) => (
+          {proLearningHistory.map((item, index) => (
                     <div
-                      key={item.id}
+            key={item.courseId || item.id}
                       className={`block p-4 rounded-xl transition-all duration-200 border group shadow-sm ${
                         item.status === 'ready' 
                           ? 'bg-white/60 hover:bg-white/80 border-indigo-200 hover:border-indigo-300 cursor-pointer hover:shadow-md'
@@ -2065,7 +2074,17 @@ const ChatbotPage = () => {
                       }`}
                       onClick={() => {
                         if (item.status === 'ready') {
-                          window.open(item.url, '_blank');
+                          try {
+                            const match = item.url && item.url.match(/\/(?:pro-learning|prolearning)\/([^/?#]+)/);
+                            const courseId = match ? match[1] : null;
+                            if (courseId) {
+                              navigate(`/pro-learning/${courseId}`);
+                            } else if (item.url) {
+                              navigate(item.url);
+                            }
+                          } catch {
+                            if (item.url) navigate(item.url);
+                          }
                           // Show feedback toast
                           toast.success(`Opening "${item.topic}" course...`, {
                             duration: 2000,
@@ -2074,7 +2093,17 @@ const ChatbotPage = () => {
                           });
                         } else if (item.status === 'generating') {
                           // Navigate to ProLearning page to show generation progress
-                          window.open(item.url, '_blank');
+                          try {
+                            const match = item.url && item.url.match(/\/(?:pro-learning|prolearning)\/([^/?#]+)/);
+                            const courseId = match ? match[1] : null;
+                            if (courseId) {
+                              navigate(`/pro-learning/${courseId}`);
+                            } else if (item.url) {
+                              navigate(item.url);
+                            }
+                          } catch {
+                            if (item.url) navigate(item.url);
+                          }
                           toast.loading(`"${item.topic}" is still generating... Opening progress page.`, {
                             duration: 3000,
                             position: 'bottom-right',

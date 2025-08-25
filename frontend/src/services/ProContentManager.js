@@ -331,6 +331,27 @@ class ProContentManager {
     }
 
     console.log('🚀 Starting batch content generation for', topics.length, 'topics');
+    const lockKey = `proLearning_generation_lock_${courseId}`;
+
+    // If another tab is already generating, don't restart. Observe instead.
+    try {
+      const existing = this.getStoredCourseContent(courseId);
+      const isLocked = !!localStorage.getItem(lockKey);
+      const isGenerating = existing?.metadata?.status === 'generating';
+      if (isLocked || isGenerating) {
+        console.log('🔒 Generation lock detected or existing generation in progress for course:', courseId);
+        return existing || {
+          courseId,
+          topics: {},
+          metadata: { status: 'generating', generatedAt: new Date().toISOString() }
+        };
+      }
+    } catch (e) {
+      console.warn('Lock check failed, continuing:', e);
+    }
+
+    // Acquire lock for this courseId
+    try { localStorage.setItem(lockKey, 'true'); } catch {}
     
     // Set course context
     this.setCourse("Generated Course", courseId);
@@ -344,6 +365,13 @@ class ProContentManager {
         status: 'generating'
       }
     };
+
+    // Persist initial generating state so other tabs can observe
+    try {
+      localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent));
+    } catch (e) {
+      console.warn('Failed to persist initial course content state:', e);
+    }
 
     // Content types to generate for each topic (reading first since others depend on it)
     const contentTypes = ['reading', 'summary', 'quiz', 'resources', 'videos'];
@@ -548,12 +576,19 @@ class ProContentManager {
           return generatedContent;
         });
 
-        // Store the generated content in our course structure
+  // Store the generated content in our course structure
         courseContent.topics[topic.name].content = content;
         courseContent.topics[topic.name].status = 'completed';
         
         console.log(`✅ Completed all content for topic: ${topic.name}`);
         
+        // Persist progress after each topic so other tabs can see updates
+        try {
+          localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent));
+        } catch (e) {
+          console.warn('Failed to persist incremental course content state:', e);
+        }
+
       } catch (error) {
         console.error(`❌ Failed to generate content for topic ${topic.name}:`, error);
         courseContent.topics[topic.name].status = 'failed';
@@ -561,7 +596,7 @@ class ProContentManager {
       }
     }
 
-    // Mark course as completed
+  // Mark course as completed
     courseContent.metadata.status = 'completed';
     courseContent.metadata.completedAt = new Date().toISOString();
     
@@ -573,7 +608,8 @@ class ProContentManager {
       console.error('❌ Failed to store batch generated content:', error);
     }
     
-    console.log('🎉 Batch content generation completed for course:', courseId);
+  console.log('🎉 Batch content generation completed for course:', courseId);
+  try { localStorage.removeItem(lockKey); } catch {}
     return courseContent;
   }
 

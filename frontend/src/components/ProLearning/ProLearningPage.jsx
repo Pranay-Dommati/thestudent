@@ -376,6 +376,34 @@ const ProLearningPage = () => {
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
   const [batchGenerationProgress, setBatchGenerationProgress] = useState(0);
   const [batchGenerationStatus, setBatchGenerationStatus] = useState("");
+
+  // Ensure monotonic progress and single poller control
+  const batchProgressRef = useRef(0);
+  const generationPollerRef = useRef(null);
+
+  const updateBatchProgress = (next, options = {}) => {
+    const { force = false } = options;
+    const numeric = Number.isFinite(next) ? next : 0;
+    const clamped = Math.max(0, Math.min(100, numeric));
+    if (force) {
+      batchProgressRef.current = clamped;
+      setBatchGenerationProgress(clamped);
+      return;
+    }
+    if (clamped >= batchProgressRef.current) {
+      batchProgressRef.current = clamped;
+      setBatchGenerationProgress(clamped);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (generationPollerRef.current) {
+        clearInterval(generationPollerRef.current);
+        generationPollerRef.current = null;
+      }
+    };
+  }, []);
   
   // Reading sections state
   const [readingSections, setReadingSections] = useState([]);
@@ -529,37 +557,75 @@ const ProLearningPage = () => {
   useEffect(() => {
     const currentCourseId = getCourseId();
     if (topicsList.length > 0 && !isBatchGenerating && currentCourseId) {
-      // Check if we need to start batch generation using new storage system
-      const progress = getGenerationProgress(currentCourseId);
-      
-      // If all topics already have content, set completion state
-      if (progress.generated >= progress.total && progress.total > 0) {
-        console.log('🎉 Course already complete, setting completion state');
+      // Prefer ProContentManager storage and generation state
+      const existingPM = proContentManager.getStoredCourseContent(currentCourseId);
+      const lockKey = `proLearning_generation_lock_${currentCourseId}`;
+      const isLocked = !!localStorage.getItem(lockKey);
+
+      if (existingPM?.metadata?.status === 'completed') {
+        console.log('🎉 Course already complete (ProContentManager), setting completion state');
         setAllTopicsGenerated(true);
-        setBatchGenerationProgress(100);
+        updateBatchProgress(100, { force: true });
         setBatchGenerationStatus('Course generation completed!');
         setIsBatchGenerating(false);
+        return;
       }
-      // If not all topics have content, start batch generation
-      else if (progress.generated < progress.total) {
+
+      if (isLocked || existingPM?.metadata?.status === 'generating') {
+        console.log('👀 Observing ongoing generation (ProContentManager)');
+        setIsBatchGenerating(true);
+        setBatchGenerationStatus('Resuming generation...');
+        if (generationPollerRef.current) {
+          clearInterval(generationPollerRef.current);
+          generationPollerRef.current = null;
+        }
+        const poll = setInterval(() => {
+          const current = proContentManager.getStoredCourseContent(currentCourseId);
+          const total = topicsList.length * 5;
+          let done = 0;
+          topicsList.forEach(t => {
+            const c = proContentManager.getStoredTopicContent(currentCourseId, t.name);
+            if (c && (c.reading || c.summary || (c.videos?.length || 0) > 0 || (c.resources?.length || 0) > 0 || (c.quiz?.length || 0) > 0)) {
+              done += 5;
+            }
+          });
+          const pct = Math.min(100, Math.round((done / total) * 100));
+          updateBatchProgress(pct);
+          if (current?.metadata?.status === 'completed' || pct === 100) {
+            clearInterval(poll);
+            generationPollerRef.current = null;
+            setIsBatchGenerating(false);
+            setAllTopicsGenerated(true);
+            setBatchGenerationStatus('Course generation completed!');
+          }
+        }, 1500);
+        generationPollerRef.current = poll;
+        return;
+      }
+
+      // Legacy content-storage path (ContentStorageService) only if no PM content/lock exists
+      const progress = getGenerationProgress(currentCourseId);
+      if (progress.generated >= progress.total && progress.total > 0) {
+        console.log('🎉 Course already complete (legacy storage), setting completion state');
+        setAllTopicsGenerated(true);
+        updateBatchProgress(100, { force: true });
+        setBatchGenerationStatus('Course generation completed!');
+        setIsBatchGenerating(false);
+      } else if (progress.generated < progress.total) {
         setIsBatchGenerating(true);
         setBatchGenerationStatus('Starting content generation for all topics...');
-        
-        // Generate content for all topics using new storage system
         setTimeout(async () => {
           const result = await batchGenerateAllTopics(
             currentCourseId,
-            topicsList, 
-            generateProContent, 
-            setBatchGenerationStatus, 
-            setIsBatchGenerating, 
-            setBatchGenerationProgress
+            topicsList,
+            generateProContent,
+            setBatchGenerationStatus,
+            setIsBatchGenerating,
+            (p) => updateBatchProgress(p)
           );
-          
-          // Ensure completion state is properly set
           if (result && result.success) {
-            console.log('✅ Batch generation completed successfully');
-            setBatchGenerationProgress(100);
+            console.log('✅ Batch generation completed successfully (legacy storage)');
+            updateBatchProgress(100, { force: true });
             setIsBatchGenerating(false);
             setAllTopicsGenerated(true);
           }
@@ -586,11 +652,12 @@ const ProLearningPage = () => {
       return; // Let the URL topic loading useEffect handle this
     }
     
-    if (topicsList.length > 0 && courseTitle) {
+  if (topicsList.length > 0 && courseTitle) {
       const activeTopic = topicsList.find(t => t.isActive);
       if (activeTopic) {
-        // Check if content exists in storage for the active topic
-        const storedContent = getStoredTopicContent(activeTopic.name, courseTitle, getCourseId());
+    // Prefer ProContentManager stored content
+    const pmStored = proContentManager.getStoredTopicContent(getCourseId(), activeTopic.name);
+    const storedContent = pmStored || getStoredTopicContent(activeTopic.name, courseTitle, getCourseId());
         
         if (storedContent) {
           setContent(storedContent);
@@ -1145,16 +1212,16 @@ const ProLearningPage = () => {
     
     // Start batch generation for all topics if needed
     const initializeBatchGeneration = async () => {
-      if (topicsList.length > 0 && courseTitle) {
+      if (topicsList.length > 0 && courseId) {
         
         // Get current generation progress using the storage service
-        const progress = getGenerationProgress(courseTitle);
+        const progress = getGenerationProgress(courseId);
         
         // If all topics already have content, set completion state
         if (progress.generated >= progress.total && progress.total > 0) {
           console.log('🎉 Direct URL course already complete, setting completion state');
           setAllTopicsGenerated(true);
-          setBatchGenerationProgress(100);
+          updateBatchProgress(100, { force: true });
           setBatchGenerationStatus('Course generation completed!');
           setIsBatchGenerating(false);
           return;
@@ -1167,12 +1234,12 @@ const ProLearningPage = () => {
           
           // Generate content for all topics using new storage system
           await batchGenerateAllTopics(
-            courseTitle,
+            courseId,
             topicsList, 
             generateProContent, 
             setBatchGenerationStatus, 
             setIsBatchGenerating, 
-            setBatchGenerationProgress
+            (p) => updateBatchProgress(p)
           );
         } else {
         }
@@ -1181,7 +1248,7 @@ const ProLearningPage = () => {
     
     // Add a small delay to ensure topicsList and courseTitle are populated
     const timer = setTimeout(() => {
-      if (topicsList.length > 0 && courseTitle) {
+      if (topicsList.length > 0 && courseId) {
         initializeBatchGeneration();
       }
     }, 500);
@@ -1471,11 +1538,11 @@ const ProLearningPage = () => {
           return;
         }
 
-        console.log('🚀 Starting batch generation for course:', batchCourseId);
-        console.log('📚 Topics to generate:', topics);
-
-        // Check if content already exists for this course
+        const lockKey = `proLearning_generation_lock_${batchCourseId}`;
         const existingContent = proContentManager.getStoredCourseContent(batchCourseId);
+        const isLocked = !!localStorage.getItem(lockKey);
+        const isGenerating = existingContent?.metadata?.status === 'generating';
+
         if (existingContent && existingContent.metadata.status === 'completed') {
           console.log('✅ Course content already exists, loading from storage');
           setTopicsList(topics);
@@ -1483,19 +1550,62 @@ const ProLearningPage = () => {
           return;
         }
 
+        if (isLocked || isGenerating) {
+          console.log('👀 Observing existing generation for course:', batchCourseId);
+          setIsBatchGenerating(true);
+          setBatchGenerationStatus('Resuming generation...');
+          setTopicsList(topics);
+
+          // Poll for completion
+          if (generationPollerRef.current) {
+            clearInterval(generationPollerRef.current);
+            generationPollerRef.current = null;
+          }
+          const poll = setInterval(() => {
+            const current = proContentManager.getStoredCourseContent(batchCourseId);
+            const total = topics.length * 5; // rough steps across 5 content types
+            // Approximate progress based on topics with any content
+            let done = 0;
+            topics.forEach(t => {
+              const c = proContentManager.getStoredTopicContent(batchCourseId, t.name);
+              if (c && (c.reading || c.summary || (c.videos?.length || 0) > 0 || (c.resources?.length || 0) > 0 || (c.quiz?.length || 0) > 0)) {
+                done += 5;
+              }
+            });
+            const pct = Math.min(100, Math.round((done / total) * 100));
+            updateBatchProgress(pct);
+            if (current?.metadata?.status === 'completed' || pct === 100) {
+              clearInterval(poll);
+              generationPollerRef.current = null;
+              setIsBatchGenerating(false);
+              setAllTopicsGenerated(true);
+              setBatchGenerationStatus('Course generation completed!');
+              localStorage.removeItem('proLearning_batchGeneration');
+              if (topicParam || topics[0]?.name) {
+                loadTopicContent(topicParam || topics[0].name);
+              }
+            }
+          }, 1500);
+          generationPollerRef.current = poll;
+          return;
+        }
+
+        console.log('🚀 Starting batch generation for course:', batchCourseId);
+        console.log('📚 Topics to generate:', topics);
+
         // Set up the batch generation
         setIsBatchGenerating(true);
-        setBatchGenerationProgress(0);
+  updateBatchProgress(0, { force: true });
         setBatchGenerationStatus('Initializing course generation...');
         setTopicsList(topics);
 
-        // Start batch generation
+  // Start batch generation
         await proContentManager.generateAllContentBatch(
           topics,
           batchCourseId,
           (current, total, topicName, contentType) => {
             const progress = Math.round((current / total) * 100);
-            setBatchGenerationProgress(progress);
+            updateBatchProgress(progress);
             setBatchGenerationStatus(`Generating ${contentType} for ${topicName}...`);
             console.log(`📈 Batch Generation Progress: ${progress}% - ${contentType} for ${topicName}`);
           }
@@ -1504,7 +1614,7 @@ const ProLearningPage = () => {
         // Mark generation as complete
         setIsBatchGenerating(false);
         setAllTopicsGenerated(true);
-        setBatchGenerationProgress(100); // Set progress to 100% when completed
+  updateBatchProgress(100, { force: true }); // Set progress to 100% when completed
         setBatchGenerationStatus('Course generation completed!');
         
         // Auto-load the first topic or topic from URL
@@ -2922,7 +3032,7 @@ const ProLearningPage = () => {
 
   // Handle closing of batch generation status notification
   const handleCloseBatchStatus = () => {
-    setBatchGenerationProgress(0);
+  // Don't reset progress here to avoid regressions during generation
     setBatchGenerationStatus('');
   };
 
