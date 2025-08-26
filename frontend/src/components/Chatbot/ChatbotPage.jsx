@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline } from "react-icons/io5";
+import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline, IoBook, IoBookmark, IoInformationCircle, IoChevronForward } from "react-icons/io5";
 import { FaRobot, FaGraduationCap, FaBook, FaRegUser } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
@@ -1876,81 +1876,105 @@ const ChatbotPage = () => {
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 z-30 lg:relative lg:flex-shrink-0 ${
         isSidebarOpen ? "w-full lg:w-80" : "w-0"
-      } transition-all duration-300 bg-white/90 backdrop-blur-md border-r border-white/20 shadow-lg flex flex-col overflow-hidden`}>
-        <div className="p-4 border-b border-white/20 bg-white/50 backdrop-blur-sm flex items-center justify-between">
+      } transition-all duration-300 bg-white/95 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col overflow-hidden`}>
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm flex items-center justify-between">
           <h2 className="font-semibold text-gray-800 flex items-center">
-            <FaGraduationCap className="mr-2 text-indigo-600" />
-            Navigation
+            <div className="p-1.5 rounded-lg bg-blue-100 text-blue-600 mr-3">
+              <IoBookmark size={16} />
+            </div>
+            ProLearning History
           </h2>
           <button
             onClick={() => setIsSidebarOpen(false)}
-            className="p-2 hover:bg-white/50 rounded-full text-gray-500 hover:text-indigo-600 transition-all duration-200"
+            className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700 transition-all duration-200"
             aria-label="Close sidebar"
           >
             <IoChevronBack size={20} />
           </button>
         </div>
         
-        {/* Navigation Links */}
-        <div className="flex-1 overflow-y-auto scrollbar-glass p-4">
-          <div className="space-y-3">
-            {/* ProLearning History Section */}
-            <div className="pt-4 border-t border-white/30">
-              <div className="flex items-center mb-3">
-                <div className="p-2 rounded-full bg-purple-100 text-purple-600 shadow-sm">
-                  <IoTimeOutline size={18} />
-                </div>
-                <span className="ml-3 font-medium text-gray-700">ProLearning History</span>
+        {/* ProLearning Courses Section */}
+        <div className="p-4">
+          <div className="bg-blue-50/80 border border-blue-200/50 rounded-xl p-4 mb-4">
+            <div className="flex items-center mb-3">
+              <div className="p-2 rounded-lg bg-blue-100 text-blue-600 mr-3">
+                <IoSchoolOutline size={18} />
               </div>
-              
-              {proLearningHistory.length === 0 ? (
-                <div className="text-sm text-gray-500 text-center py-4 italic">
-                  No history yet. Create your first ProLearning course!
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {proLearningHistory.slice(0, 8).map((item, index) => (
-                    <a
-                      key={item.id}
-                      href={item.url}
-                      className="block p-3 rounded-lg bg-white/30 hover:bg-white/50 
-                               transition-all duration-200 border border-white/40 
-                               hover:border-purple-300 group"
+              <h3 className="font-semibold text-gray-800">
+                ProLearning Courses
+              </h3>
+            </div>
+            {proLearningHistory.length > 0 ? (
+              <div className="text-sm text-gray-600 mb-1">
+                <span>Courses are <span className="text-blue-600 font-medium">temporarily stored</span>. Visit each course to save to your Learning Hub.</span>
+              </div>
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-sm text-gray-600">
+                  Create your first customized course
+                </p>
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-gray-500">
+                    Click 
+                    <button
+                      type="button"
+                      className="inline-block px-2 py-1 border border-indigo-200 text-indigo-600 rounded-md font-medium mx-1 hover:bg-indigo-50 focus:outline-none focus:ring-1 focus:ring-indigo-300 transition"
+                      onClick={handleCreateCourse}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-gray-700 group-hover:text-purple-700 
-                                        truncate mb-1">
-                            {item.topic}
-                          </div>
-                          <div className="text-xs text-gray-500 flex items-center">
-                            <span>{item.dateCreated}</span>
-                            <span className="mx-1">•</span>
-                            <span>{item.timeCreated}</span>
-                          </div>
-                        </div>
-                        <svg
-                          className="w-4 h-4 text-gray-400 group-hover:text-purple-600 
-                                   transform group-hover:translate-x-1 transition-all flex-shrink-0"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
+                      Create Course
+                    </button>
+                    button to enable course creation mode
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto px-4 pb-4">
+          {proLearningHistory.length === 0 ? (
+            <div></div>
+          ) : (
+            <div className="space-y-3">
+              {proLearningHistory.slice(0, 8).map((item, index) => (
+                <a
+                  key={item.id}
+                  href={item.url}
+                  className="block p-3 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200 group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-indigo-50 rounded-lg p-2">
+                        <IoBook className="w-5 h-5 text-indigo-600" />
                       </div>
-                    </a>
-                  ))}
-                  
-                  {proLearningHistory.length > 8 && (
-                    <div className="text-xs text-gray-500 text-center py-2 border-t border-white/20">
-                      +{proLearningHistory.length - 8} more courses
+                      <div>
+                        <div className="font-medium text-sm text-gray-800 group-hover:text-blue-600">
+                          {item.topic}
+                        </div>
+                        <div className="text-xs text-gray-500 flex items-center mt-1">
+                          <span>{item.dateCreated}</span>
+                          <span className="mx-1.5">•</span>
+                          <span>{item.timeCreated}</span>
+                          <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-600 text-xs rounded-md">Ready</span>
+                        </div>
+                      </div>
                     </div>
-                  )}
+                    <div className="text-gray-400">
+                      <IoChevronForward size={18} className="group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </div>
+                </a>
+              ))}
+              
+              {proLearningHistory.length > 8 && (
+                <div className="text-xs text-gray-500 text-center py-3 border-t border-gray-200 mt-4">
+                  +{proLearningHistory.length - 8} more courses
                 </div>
               )}
             </div>
-          </div>
+          )}
         </div>
       </div>
 
