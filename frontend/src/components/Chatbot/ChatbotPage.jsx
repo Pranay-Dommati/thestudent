@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline, IoBook, IoBookmark, IoInformationCircle } from "react-icons/io5";
+import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline, IoBook, IoBookmark, IoInformationCircle, IoChevronForward } from "react-icons/io5";
 import { FaRobot, FaGraduationCap, FaBook, FaRegUser } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
@@ -555,7 +555,7 @@ const ChatbotPage = () => {
   const messagesEndRef = useRef(null);
   const initialQueryProcessed = useRef(false);
   const { width } = useWindowSize();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [chatSessions, setChatSessions] = useState([
     {
       id: 1,
@@ -1921,13 +1921,13 @@ const ChatbotPage = () => {
               </div>
             ) : (
               <div className="text-center py-2">
-                <p className="text-xs text-gray-500 leading-relaxed">
+                <p className="text-sm text-gray-600">
                   Create your first customized course
                 </p>
-                <div className="mt-3 bg-blue-50/70 rounded-lg p-3 border border-blue-100/50">
-                  <div className="text-xs text-gray-600">
-                    <span className="text-blue-600 font-medium">Pro tip:</span> Include format, difficulty level and learning goals
-                  </div>
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-gray-500">
+                    Click "Create Course" button to enable course creation mode
+                  </p>
                 </div>
               </div>
             )}
@@ -1944,27 +1944,28 @@ const ChatbotPage = () => {
                 <a
                   key={item.id}
                   href={item.url}
-                  className="block p-4 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200 group"
+                  className="block p-3 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200 group"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-gray-800 group-hover:text-blue-600 truncate mb-2">
-                        {item.topic}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-indigo-50 rounded-lg p-2">
+                        <IoBook className="w-5 h-5 text-indigo-600" />
                       </div>
-                      <div className="text-xs text-gray-500 flex items-center">
-                        <span>{item.dateCreated}</span>
-                        <span className="mx-1.5">•</span>
-                        <span>{item.timeCreated}</span>
+                      <div>
+                        <div className="font-medium text-sm text-gray-800 group-hover:text-blue-600">
+                          {item.topic}
+                        </div>
+                        <div className="text-xs text-gray-500 flex items-center mt-1">
+                          <span>{item.dateCreated}</span>
+                          <span className="mx-1.5">•</span>
+                          <span>{item.timeCreated}</span>
+                          <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-600 text-xs rounded-md">Ready</span>
+                        </div>
                       </div>
                     </div>
-                    <svg
-                      className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all flex-shrink-0 ml-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                    <div className="text-gray-400">
+                      <IoChevronForward size={18} className="group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all" />
+                    </div>
                   </div>
                 </a>
               ))}
