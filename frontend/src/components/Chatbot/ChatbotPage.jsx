@@ -555,7 +555,7 @@ const ChatbotPage = () => {
   const messagesEndRef = useRef(null);
   const initialQueryProcessed = useRef(false);
   const { width } = useWindowSize();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [chatSessions, setChatSessions] = useState([
     {
       id: 1,
@@ -1926,7 +1926,15 @@ const ChatbotPage = () => {
                 </p>
                 <div className="mt-3 space-y-2">
                   <p className="text-xs text-gray-500">
-                    Click "Create Course" button to enable course creation mode
+                    Click 
+                    <button
+                      type="button"
+                      className="inline-block px-2 py-1 border border-indigo-200 text-indigo-600 rounded-md font-medium mx-1 hover:bg-indigo-50 focus:outline-none focus:ring-1 focus:ring-indigo-300 transition"
+                      onClick={handleCreateCourse}
+                    >
+                      Create Course
+                    </button>
+                    button to enable course creation mode
                   </p>
                 </div>
               </div>
