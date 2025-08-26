@@ -7,8 +7,6 @@
  * @param {string} topic - The topic to find videos for
  */
 export async function generateVideosContent(setContent, topic = '') {
-  console.log('🎥 Fetching top YouTube educational videos...');
-  
   try {
     // First try to get real YouTube videos
     const videoContent = await fetchTopYouTubeVideos(topic);
@@ -24,9 +22,6 @@ export async function generateVideosContent(setContent, topic = '') {
         avgViewCount: calculateAverageViews(videoContent)
       }
     });
-    
-    console.log(`✅ Found ${videoContent.length} top YouTube videos with ${calculateTotalViews(videoContent)} total views`);
-    
   } catch (error) {
     console.error('🚨 YouTube API failed, trying AI recommendations:', error);
     

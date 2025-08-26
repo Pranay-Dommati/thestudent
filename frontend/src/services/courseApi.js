@@ -52,9 +52,7 @@ export const getCourses = async () => {
 
 export const getEngineeringCourses = async (category = 'all') => {
   try {
-    console.log('Fetching courses for category:', category);
     const response = await axios.get(`${API_URL}/api/courses/engineering/?category=${category}`);
-    console.log('Course data received:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error fetching courses:', error);
@@ -64,9 +62,7 @@ export const getEngineeringCourses = async (category = 'all') => {
 
 export const getEngineeringCourseById = async (courseId) => {
   try {
-    console.log('Fetching course details for ID:', courseId);
     const response = await axios.get(`${API_URL}/api/courses/engineering/${courseId}/`);
-    console.log('Course details received:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error fetching course details:', error);
@@ -78,9 +74,7 @@ export const getAllCourses = async (category = 'all') => {
   try {
     // Remove any colon prefix from category if present (e.g., ":1" becomes "1")
     const cleanCategory = category.toString().replace(/^:/, '');
-    console.log('Fetching all courses for category:', cleanCategory);
     const response = await axios.get(`${API_URL}/api/courses/all/?category=${cleanCategory}`);
-    console.log('Course data received:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error fetching courses:', error);
@@ -90,16 +84,12 @@ export const getAllCourses = async (category = 'all') => {
 
 export const getSchoolCourses = async (classLevel, board, state = '') => {
   try {
-    console.log(`API call: getSchoolCourses(${classLevel}, ${board}, ${state})`);
-    
     let url = `${API_URL}/api/courses/school/?class=${classLevel}&board=${board}`;
     if (board === 'state' && state) {
       url += `&state=${state}`;
     }
     
-    console.log(`Requesting URL: ${url}`);
     const response = await axios.get(url);
-    console.log(`Received ${response.data.length} courses from API`); 
     return response.data;
   } catch (error) {
     console.error('Error fetching school courses:', error);
@@ -109,9 +99,7 @@ export const getSchoolCourses = async (classLevel, board, state = '') => {
 
 export const getCourseById = async (courseId) => {
   try {
-    console.log('Fetching course by ID:', courseId);
     const response = await axios.get(`${API_URL}/api/courses/${courseId}/`);
-    console.log('Course data received:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error fetching course by ID:', error);

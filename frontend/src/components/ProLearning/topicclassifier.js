@@ -238,8 +238,6 @@ export const getStatusMessage = (usageStats) => {
 // Wraps the new classifyTopics function to maintain backward compatibility
 export const classifyTopicsWithGemini = async (query, apiKey = null) => {
   try {
-    console.log('🔄 Using legacy classifyTopicsWithGemini wrapper for:', query);
-    
     // Call the new rate-limited API instead of direct Gemini
     const result = await classifyTopics(query);
     

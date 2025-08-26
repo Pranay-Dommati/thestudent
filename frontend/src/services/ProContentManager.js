@@ -35,9 +35,6 @@ class ProContentManager {
   transformDatabaseContent(dbTopic) {
     if (!dbTopic) return null;
     
-    console.log('🔄 Transforming database content for topic:', dbTopic.topic_name);
-    console.log('🔄 Raw database topic data:', dbTopic);
-    
     // Transform database format to localStorage format
     const transformedContent = {
       reading: dbTopic.reading_material || null,
@@ -46,15 +43,6 @@ class ProContentManager {
       quiz: this.transformQuizQuestions(dbTopic.quiz_questions || []), // This will return [] if no quiz data
       resources: this.transformResources(dbTopic.resources || [])
     };
-    
-    console.log('✅ Database content transformed:', {
-      hasReading: !!transformedContent.reading,
-      readingLength: transformedContent.reading?.length || 0,
-      hasSummary: !!transformedContent.summary,
-      videosCount: transformedContent.videos?.length || 0,
-      quizQuestions: transformedContent.quiz?.questions?.length || 0,
-      resourcesCount: transformedContent.resources?.length || 0
-    });
     
     return transformedContent;
   }
@@ -133,7 +121,6 @@ class ProContentManager {
 
     // Check if generation is already in progress for this topic
     if (this.generationPromises.has(generationKey)) {
-      console.log('🔄 Content generation already in progress for:', topicName);
       return this.generationPromises.get(generationKey);
     }
 
@@ -143,7 +130,6 @@ class ProContentManager {
         // Step 1: Check for valid stored content first (localStorage)
         const storedContent = contentStorageService.getContentByTopicName(topicName, this.currentCourseId);
         if (storedContent?.reading?.length > 0) {
-          console.log('📦 Using localStorage content for:', topicName);
           return {
             source: 'storage',
             content: storedContent,
@@ -153,16 +139,6 @@ class ProContentManager {
 
         // Step 2: Check for database content if dbTopic is provided
         if (dbTopic && (dbTopic.reading_material || dbTopic.summary || dbTopic.videos?.length > 0 || dbTopic.quiz_questions?.length > 0 || dbTopic.resources?.length > 0)) {
-          console.log('🗄️ Using database content for:', topicName);
-          console.log('🗄️ Database topic structure:', {
-            hasReadingMaterial: !!dbTopic.reading_material,
-            readingLength: dbTopic.reading_material?.length || 0,
-            hasSummary: !!dbTopic.summary,
-            videosCount: dbTopic.videos?.length || 0,
-            quizQuestionsCount: dbTopic.quiz_questions?.length || 0,
-            resourcesCount: dbTopic.resources?.length || 0
-          });
-          
           const transformedContent = this.transformDatabaseContent(dbTopic);
           
           if (transformedContent) {
@@ -180,7 +156,6 @@ class ProContentManager {
           return null;
         }
 
-        console.log('🚀 Starting content generation for:', topicName);
         const generationStartTime = Date.now();
         const generatedContent = await new Promise((resolve, reject) => {
           let resolved = false;
@@ -208,10 +183,9 @@ class ProContentManager {
                 // Ensure we have a proper content object
                 const content = typeof newContent === 'function' ? newContent({}) : newContent;
                 
-                console.log(`✅ Content generation completed after ${elapsed}s, resolving with:`, content);
                 resolve(content);
               } else {
-                console.log(`⚠️ setContent called after Promise already resolved (${elapsed}s), ignoring`);
+                // Ignore if already resolved
               }
             },
             setStats: () => {},
@@ -220,20 +194,17 @@ class ProContentManager {
         });
 
         // Once content is generated, store it atomically
-        console.log('✅ Content generated successfully for:', topicName);
         
         // Find or create topic
         let topic = contentStorageService.getTopicByName(topicName, this.currentCourseId);
         if (!topic) {
           const topicId = contentStorageService.createTopic(topicName, this.currentCourseId);
           topic = { id: topicId, name: topicName };
-          console.log('📝 Created new topic:', topicId);
         }
         
         // Store the content
         if (topic) {
           contentStorageService.storeTopicContent(topic.id, generatedContent);
-          console.log('💾 Content stored successfully for:', topicName);
           
           // Verify storage worked
           const storedContent = contentStorageService.getTopicContent(topic.id);
@@ -351,8 +322,6 @@ class ProContentManager {
     let currentStep = 0;
 
     for (const topic of topics) {
-      console.log(`📚 Generating content for topic: ${topic.name}`);
-      
       courseContent.topics[topic.name] = {
         id: topic.id,
         name: topic.name,
@@ -363,11 +332,8 @@ class ProContentManager {
       try {
         // Generate all content for this topic
         const { content } = await this.getTopicContent(topic.name, async (params) => {
-          console.log(`🔧 Content generator called with params:`, params);
-          
           // Extract topic name from params object
           const topicName = params.topic || topic.name;
-          console.log(`🔧 Using topic name: "${topicName}" (type: ${typeof topicName})`);
           
           // Validate topic name
           if (!topicName || typeof topicName !== 'string' || topicName.trim().length === 0) {

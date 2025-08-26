@@ -31,13 +31,8 @@ const FeaturedPlaylists = () => {
           getEngineeringCourses('all') // Get all engineering courses
         ]);
         
-        console.log('Fetched school courses:', schoolCourses);
-        console.log('Fetched engineering courses:', engineeringCourses);
-        
         // Transform school courses to match our display format
         const transformedSchoolCourses = schoolCourses.map(course => {
-          console.log('Raw school course data:', course); // Debug log
-          
           // Determine category based on class_level
           let category = 'other';
           if (course.class_level && course.class_level.includes('6')) category = 'sixth';
@@ -137,8 +132,6 @@ const FeaturedPlaylists = () => {
 
         // Combine both types of courses
         const allCourses = [...transformedSchoolCourses, ...transformedEngineeringCourses];
-        console.log('Combined courses:', allCourses);
-        console.log('Engineering courses count:', transformedEngineeringCourses.length);
         
         setCourses(allCourses);
       } catch (error) {

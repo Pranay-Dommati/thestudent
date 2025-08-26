@@ -1560,16 +1560,6 @@ const ChatbotPage = () => {
     const isLearningPlan = message.isLearningPlan || (message.content.includes("Learning Plan") && message.content.includes("Day "));
     const isProCard = message.isProCard || false;
 
-    // Debug logging
-    console.log("🔍 MessageBubble render:", {
-      messageType: message.type,
-      content: message.content ? message.content.substring(0, 100) + "..." : "empty",
-      contentLength: message.content ? message.content.length : 0,
-      isCourseContent,
-      isLearningPlan,
-      isProCard
-    });
-
     return (
       <div className="w-full max-w-5xl mx-auto px-6 lg:px-8 mb-4 lg:mb-6">
         <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
