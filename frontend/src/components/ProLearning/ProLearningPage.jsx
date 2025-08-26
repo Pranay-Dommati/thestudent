@@ -54,6 +54,15 @@ import {
   getGenerationProgress,
   initializeCourseStorage
 } from './ProBatchGenerator';
+import progressiveContentGenerator, {
+  initializeProgressiveGeneration,
+  startProgressiveGeneration,
+  stopProgressiveGeneration,
+  isTabContentAvailable,
+  getAvailableTabsForTopic,
+  getProgressiveTopicContent
+} from './ProgressiveContentGenerator';
+import ProgressiveGenerationStatus from './ProgressiveGenerationStatus';
 import proContentManager from '../../services/ProContentManager';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 import Navbar from '../Navbar/Navbar';
@@ -373,6 +382,12 @@ const ProLearningPage = () => {
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
   const [batchGenerationProgress, setBatchGenerationProgress] = useState(0);
   const [batchGenerationStatus, setBatchGenerationStatus] = useState("");
+  
+  // Progressive generation state
+  const [isProgressiveGenerating, setIsProgressiveGenerating] = useState(false);
+  const [progressiveGenerationProgress, setProgressiveGenerationProgress] = useState({});
+  const [availableTabsForTopics, setAvailableTabsForTopics] = useState({});
+  const [useProgressiveGeneration, setUseProgressiveGeneration] = useState(true); // Feature flag
   
   // Reading sections state
   const [readingSections, setReadingSections] = useState([]);
@@ -908,6 +923,68 @@ const ProLearningPage = () => {
     }
   };
 
+  // Helper function to load topic content from progressive generation data
+  const loadProgressiveTopicContent = async (topicName) => {
+    if (!topicName) return;
+
+    try {
+      setIsLoading(true);
+      setLoadingStep(`Loading ${topicName} content...`);
+
+      console.log('🔍 Loading progressive content for:', topicName);
+      
+      // Get content from progressive generator
+      const progressiveContent = getProgressiveTopicContent(topicName);
+      
+      if (progressiveContent) {
+        console.log('✅ Found progressive content for:', topicName, progressiveContent);
+        
+        // Transform content to expected format
+        const formattedContent = {
+          reading: progressiveContent.reading || '',
+          summary: progressiveContent.summary || '',
+          quiz: progressiveContent.quiz || [],
+          videos: progressiveContent.videos || [],
+          resources: progressiveContent.resources || []
+        };
+        
+        setContent(formattedContent);
+        
+        // Parse and set reading sections
+        if (progressiveContent.reading) {
+          const sections = parseReadingSections(progressiveContent.reading);
+          setReadingSections(sections);
+          setReadingSectionIndex(0);
+        }
+        
+        console.log('✅ Progressive content loaded successfully');
+      } else {
+        console.log('⚠️ No progressive content found for:', topicName);
+        
+        // Show partial content with placeholders
+        setContent({
+          reading: '',
+          summary: '',
+          quiz: [],
+          videos: [],
+          resources: []
+        });
+      }
+    } catch (error) {
+      console.error('❌ Failed to load progressive content:', error);
+      setContent({
+        reading: 'Failed to load content. Please try again.',
+        summary: 'Failed to load summary.',
+        quiz: [],
+        videos: [],
+        resources: []
+      });
+    } finally {
+      setIsLoading(false);
+      setLoadingStep('');
+    }
+  };
+
   // Handle topic selection from sidebar using new storage system
   const handleTopicSelect = (topicId) => {
     // Find the topic in the list
@@ -917,18 +994,26 @@ const ProLearningPage = () => {
     // Update URL with new topic
     updateTopicInUrl(selectedTopic.name);
 
-    // Update active states
+    // Update active states and set selected topic
     setTopicsList(topics => topics.map(topic => ({
       ...topic,
       isActive: topic.id === topicId
     })));
+    
+    setSelectedTopic(selectedTopic);
 
-    // If all topics are generated, load from storage
-    if (allTopicsGenerated || hasTopicContent(selectedTopic.name)) {
-      loadTopicContent(selectedTopic.name);
+    // Handle content loading based on generation type
+    if (useProgressiveGeneration) {
+      // For progressive generation, load any available content
+      loadProgressiveTopicContent(selectedTopic.name);
     } else {
-      // Show message that content needs to be generated
-      setContent(null);
+      // For batch generation, load if all topics are generated
+      if (allTopicsGenerated || hasTopicContent(selectedTopic.name)) {
+        loadTopicContent(selectedTopic.name);
+      } else {
+        // Show message that content needs to be generated
+        setContent(null);
+      }
     }
   };
 
@@ -1436,7 +1521,7 @@ const ProLearningPage = () => {
 
   // Handle batch generation from ChatbotPage
   useEffect(() => {
-    const handleBatchGeneration = async () => {
+    const handleContentGeneration = async () => {
       try {
         const batchData = localStorage.getItem('proLearning_batchGeneration');
         if (!batchData) return;
@@ -1457,7 +1542,7 @@ const ProLearningPage = () => {
           return;
         }
 
-        console.log('🚀 Starting batch generation for course:', batchCourseId);
+        console.log('🚀 Starting content generation for course:', batchCourseId);
         console.log('📚 Topics to generate:', topics);
 
         // Check if content already exists for this course
@@ -1469,51 +1554,117 @@ const ProLearningPage = () => {
           return;
         }
 
-        // Set up the batch generation
-        setIsBatchGenerating(true);
-        setBatchGenerationProgress(0);
-        setBatchGenerationStatus('Initializing course generation...');
         setTopicsList(topics);
 
-        // Start batch generation
-        await proContentManager.generateAllContentBatch(
-          topics,
-          batchCourseId,
-          (current, total, topicName, contentType) => {
-            const progress = Math.round((current / total) * 100);
-            setBatchGenerationProgress(progress);
-            setBatchGenerationStatus(`Generating ${contentType} for ${topicName}...`);
-            console.log(`📈 Batch Generation Progress: ${progress}% - ${contentType} for ${topicName}`);
-          }
-        );
+        if (useProgressiveGeneration) {
+          console.log('🎯 Using progressive content generation');
+          // Initialize progressive generation
+          await initializeProgressiveGeneration(courseTitle, topics, {
+            onProgress: (progress) => {
+              setProgressiveGenerationProgress(progress);
+              console.log(`📈 Progressive Generation Progress: ${progress.overallProgress}% - ${progress.tabName} for ${progress.topic}`);
+            },
+            onTabComplete: (tabInfo) => {
+              console.log(`✅ Tab completed: ${tabInfo.tabName} for ${tabInfo.topic}`);
+              
+              // Update available tabs
+              setAvailableTabsForTopics(prev => {
+                const topicTabs = prev[tabInfo.topic] || [];
+                if (!topicTabs.includes(tabInfo.tabType)) {
+                  return {
+                    ...prev,
+                    [tabInfo.topic]: [...topicTabs, tabInfo.tabType]
+                  };
+                }
+                return prev;
+              });
 
-        // Mark generation as complete
-        setIsBatchGenerating(false);
-        setAllTopicsGenerated(true);
-        setBatchGenerationProgress(100); // Set progress to 100% when completed
-        setBatchGenerationStatus('Course generation completed!');
+              // If this is the first tab of the first topic, auto-load it
+              if (tabInfo.topicIndex === 0 && tabInfo.tabIndex === 0) {
+                const topicToLoad = topicParam || topics[0]?.name;
+                if (topicToLoad === tabInfo.topic) {
+                  console.log('🎯 Auto-loading first topic content after first tab generation');
+                  loadProgressiveTopicContent(tabInfo.topic);
+                  
+                  // Set the selected topic
+                  const topicData = topics.find(t => (t.name || t) === tabInfo.topic);
+                  if (topicData) {
+                    setSelectedTopic(topicData);
+                  }
+                }
+              }
+              
+              // If the current selected topic just got new content, refresh it
+              if (selectedTopic && (selectedTopic.name || selectedTopic) === tabInfo.topic) {
+                console.log('🔄 Refreshing content for current topic:', tabInfo.topic);
+                loadProgressiveTopicContent(tabInfo.topic);
+              }
+            },
+            onTopicComplete: (topicInfo) => {
+              console.log(`🎉 Topic completed: ${topicInfo.topic}`);
+            },
+            onAllComplete: () => {
+              console.log('🎉 All progressive content generation completed!');
+              setIsProgressiveGenerating(false);
+              setAllTopicsGenerated(true);
+            },
+            onError: (error) => {
+              console.error('❌ Progressive generation error:', error);
+              setIsProgressiveGenerating(false);
+            }
+          });
+
+          // Start progressive generation
+          setIsProgressiveGenerating(true);
+          await startProgressiveGeneration();
+        } else {
+          // Fallback to batch generation
+          console.log('🎯 Using batch content generation');
+          setIsBatchGenerating(true);
+          setBatchGenerationProgress(0);
+          setBatchGenerationStatus('Initializing course generation...');
+
+          // Start batch generation
+          await proContentManager.generateAllContentBatch(
+            topics,
+            batchCourseId,
+            (current, total, topicName, contentType) => {
+              const progress = Math.round((current / total) * 100);
+              setBatchGenerationProgress(progress);
+              setBatchGenerationStatus(`Generating ${contentType} for ${topicName}...`);
+              console.log(`📈 Batch Generation Progress: ${progress}% - ${contentType} for ${topicName}`);
+            }
+          );
+
+          // Mark generation as complete
+          setIsBatchGenerating(false);
+          setAllTopicsGenerated(true);
+          setBatchGenerationProgress(100);
+          setBatchGenerationStatus('Course generation completed!');
+        }
         
-        // Auto-load the first topic or topic from URL
-        const topicToLoad = topicParam || topics[0]?.name;
-        if (topicToLoad) {
-          console.log('🎯 Auto-loading topic after batch generation:', topicToLoad);
-          loadTopicContent(topicToLoad);
+        // Auto-load the first topic or topic from URL for batch generation
+        if (!useProgressiveGeneration) {
+          const topicToLoad = topicParam || topics[0]?.name;
+          if (topicToLoad) {
+            console.log('🎯 Auto-loading topic after batch generation:', topicToLoad);
+            loadTopicContent(topicToLoad);
+          }
         }
         
         // Clear the trigger so it doesn't run again
         localStorage.removeItem('proLearning_batchGeneration');
-        
-        console.log('🎉 Batch generation completed for course:', batchCourseId);
 
       } catch (error) {
-        console.error('❌ Batch generation failed:', error);
+        console.error('❌ Content generation failed:', error);
         setIsBatchGenerating(false);
+        setIsProgressiveGenerating(false);
         setBatchGenerationStatus('Generation failed. Please try again.');
       }
     };
 
     // Run the handler
-    handleBatchGeneration();
+    handleContentGeneration();
   }, []); // Remove courseId dependency to prevent multiple triggers
 
   // Auto-load first topic's content when all topics generation is completed
@@ -1662,6 +1813,28 @@ const ProLearningPage = () => {
       return <LoadingComponent />;
     }
 
+    // Show progressive generation status if using progressive generation
+    if (isProgressiveGenerating) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
+          <div className="max-w-4xl mx-auto pt-6">
+            <ProgressiveGenerationStatus 
+              isGenerating={isProgressiveGenerating}
+              currentProgress={progressiveGenerationProgress}
+              availableTabs={availableTabsForTopics}
+              onTabClick={(tabId) => {
+                if (selectedTopic?.name) {
+                  updateActiveTab(tabId);
+                }
+              }}
+              currentTopic={selectedTopic?.name}
+              topics={topicsList.map(t => t.name || t)}
+            />
+          </div>
+        </div>
+      );
+    }
+
     // If no content and course not generated, show Pro Learning Experience button
     // BUT skip this if we have an active topic from database (content should load automatically)
     const hasActiveTopic = topicsList.some(t => t.isActive);
@@ -1772,6 +1945,54 @@ const ProLearningPage = () => {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      );
+    }
+
+    // Check if current tab content is available in progressive generation
+    const isCurrentTabAvailable = useProgressiveGeneration && selectedTopic?.name
+      ? (availableTabsForTopics[selectedTopic.name]?.includes(activeTab)) ||
+        (content && (
+          (activeTab === 'reading' && content.reading) ||
+          (activeTab === 'summary' && content.summary) ||
+          (activeTab === 'videos' && content.videos?.length > 0) ||
+          (activeTab === 'quiz' && content.quiz?.length > 0) ||
+          (activeTab === 'resources' && content.resources?.length > 0)
+        ))
+      : true;
+
+    // Show "content being generated" message for progressive generation ONLY if no content exists
+    if (useProgressiveGeneration && !isCurrentTabAvailable && !content) {
+      return (
+        <div className="max-w-none pt-6">
+          <div className="bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 border border-yellow-200 rounded-xl p-8 mb-6 shadow-sm text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-orange-600 text-white rounded-xl flex items-center justify-center shadow-lg mx-auto mb-4">
+              <FaClock className="text-xl animate-pulse" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Content Being Generated</h3>
+            <p className="text-gray-600 mb-4">
+              {tabs.find(t => t.id === activeTab)?.label} content for <strong>{selectedTopic?.name}</strong> is currently being generated.
+            </p>
+            {isProgressiveGenerating && progressiveGenerationProgress.topic === selectedTopic?.name && (
+              <div className="bg-white rounded-lg p-4 border border-yellow-200">
+                <div className="text-sm text-gray-700 mb-2">
+                  Currently generating: <strong>{progressiveGenerationProgress.tabName}</strong>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-gradient-to-r from-yellow-500 to-orange-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${progressiveGenerationProgress.overallProgress || 0}%` }}
+                  ></div>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {progressiveGenerationProgress.overallProgress || 0}% Complete
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-gray-500 mt-4">
+              Content will appear here automatically once it's ready. You can switch to other topics or check available tabs.
+            </p>
           </div>
         </div>
       );
@@ -2970,24 +3191,62 @@ const ProLearningPage = () => {
                     {tabs.map((tab) => {
                       const IconComponent = tab.icon;
                       const isActive = activeTab === tab.id;
+                      
+                      // Check if tab content is available for progressive generation
+                      const isTabAvailable = useProgressiveGeneration 
+                        ? (selectedTopic?.name && availableTabsForTopics[selectedTopic.name]?.includes(tab.id)) || 
+                          (content && (
+                            (tab.id === 'reading' && content.reading) ||
+                            (tab.id === 'summary' && content.summary) ||
+                            (tab.id === 'videos' && content.videos?.length > 0) ||
+                            (tab.id === 'quiz' && content.quiz?.length > 0) ||
+                            (tab.id === 'resources' && content.resources?.length > 0)
+                          ))
+                        : true; // For batch generation, all tabs are available once content is loaded
+                      
+                      const isTabDisabled = useProgressiveGeneration && !isTabAvailable && !isLoading;
+                      
                       return (
                         <button
                           key={tab.id}
                           onClick={() => {
-                            updateActiveTab(tab.id);
+                            if (!isTabDisabled) {
+                              updateActiveTab(tab.id);
+                            }
                           }}
-                          disabled={isLoading}
+                          disabled={isLoading || isTabDisabled}
                           className={`group flex-1 min-w-[120px] p-4 rounded-xl font-medium transition-all duration-300 ${
                             isActive
                               ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg transform scale-105'
-                              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                          } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              : isTabDisabled
+                                ? 'text-gray-400 bg-gray-50 cursor-not-allowed'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                          } ${(isLoading || isTabDisabled) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          title={isTabDisabled ? `${tab.label} is being generated...` : tab.description}
                         >
                           <div className="flex flex-col items-center space-y-2">
-                            <div className={`p-2 rounded-lg transition-colors ${
-                              isActive ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-gray-200'
+                            <div className={`relative p-2 rounded-lg transition-colors ${
+                              isActive 
+                                ? 'bg-white/20' 
+                                : isTabDisabled
+                                  ? 'bg-gray-200'
+                                  : 'bg-gray-100 group-hover:bg-gray-200'
                             }`}>
                               <IconComponent className="text-lg" />
+                              {/* Progressive generation status indicator */}
+                              {useProgressiveGeneration && (
+                                <div className="absolute -top-1 -right-1">
+                                  {isTabAvailable ? (
+                                    <div className="w-3 h-3 bg-green-500 rounded-full" title="Content ready" />
+                                  ) : isProgressiveGenerating && 
+                                       progressiveGenerationProgress.topic === selectedTopic?.name && 
+                                       progressiveGenerationProgress.tabType === tab.id ? (
+                                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" title="Generating..." />
+                                  ) : (
+                                    <div className="w-3 h-3 bg-gray-300 rounded-full" title="Waiting..." />
+                                  )}
+                                </div>
+                              )}
                             </div>
                             <span className="text-sm font-semibold whitespace-nowrap">{tab.label}</span>
                           </div>
