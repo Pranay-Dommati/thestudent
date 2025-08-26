@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoLibraryOutline, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline } from "react-icons/io5";
+import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoBook, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline } from "react-icons/io5";
 import { FaRobot } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
