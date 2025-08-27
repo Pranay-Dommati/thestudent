@@ -3,6 +3,7 @@
 // Acts as an interface between UI components and ContentStorageService
 
 import contentStorageService from './ContentStorageService.js';
+import indexedDBService from './IndexedDBService.js';
 
 class ProContentManager {
   constructor() {
@@ -567,10 +568,12 @@ class ProContentManager {
     
     // Store the complete course structure
     try {
-      localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent));
+      await indexedDBService.setItem(`course_content_${courseId}`, courseContent);
+      try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
       console.log('💾 Batch generated content stored successfully for course:', courseId);
     } catch (error) {
-      console.error('❌ Failed to store batch generated content:', error);
+      try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
+      console.error('❌ Failed to store batch generated content in IndexedDB, cached in localStorage:', error);
     }
     
     console.log('🎉 Batch content generation completed for course:', courseId);
@@ -584,8 +587,18 @@ class ProContentManager {
    */
   getStoredCourseContent(courseId) {
     try {
-      const stored = localStorage.getItem(`course_content_${courseId}`);
-      return stored ? JSON.parse(stored) : null;
+      // Return cached value synchronously for UI callers
+      const cached = (typeof localStorage !== 'undefined') ? localStorage.getItem(`course_content_${courseId}`) : null;
+      const parsed = cached ? JSON.parse(cached) : null;
+
+      // Refresh cache from IndexedDB in the background (non-blocking)
+      indexedDBService.getItem(`course_content_${courseId}`).then((idbVal) => {
+        if (idbVal && typeof localStorage !== 'undefined') {
+          try { localStorage.setItem(`course_content_${courseId}`, JSON.stringify(idbVal)); } catch {}
+        }
+      }).catch(() => {});
+
+      return parsed;
     } catch (error) {
       console.error('❌ Failed to retrieve stored course content:', error);
       return null;
@@ -599,18 +612,31 @@ class ProContentManager {
    */
   getStoredTopics(courseId) {
     const courseContent = this.getStoredCourseContent(courseId);
-    
-    if (!courseContent || !courseContent.topics) {
-      return [];
+
+    // Primary path: aggregate cache from course_content_{courseId}
+    if (courseContent && courseContent.topics) {
+      return Object.values(courseContent.topics).map((topic, index) => ({
+        id: topic.id || index + 1,
+        name: topic.name,
+        isActive: false,
+        hasContent: !!(topic.content && topic.content.reading)
+      }));
     }
-    
-    // Convert topics object to array format
-    return Object.values(courseContent.topics).map((topic, index) => ({
-      id: topic.id || index + 1,
-      name: topic.name,
-      isActive: false,
-      hasContent: !!(topic.content && topic.content.reading)
-    }));
+
+    // Fallback: reconstruct from ContentStorageService maps (already loaded from IDB)
+    try {
+      const topics = contentStorageService.getTopicsForCourse(courseId);
+      if (topics && topics.length > 0) {
+        return topics.map((t, index) => ({
+          id: t.id || index + 1,
+          name: t.name,
+          isActive: !!t.isActive,
+          hasContent: !!t.contentGenerated
+        }));
+      }
+    } catch (_) {}
+
+    return [];
   }
 
   /**

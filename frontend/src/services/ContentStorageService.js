@@ -1,6 +1,8 @@
 // ContentStorageService.js
 // Database-like content storage service for Pro Learning system
-// This will be easily replaceable with actual database calls later
+// Internally persists to IndexedDB with a localStorage fallback
+
+import indexedDBService from './IndexedDBService.js';
 
 class ContentStorageService {
   constructor() {
@@ -12,8 +14,8 @@ class ContentStorageService {
       metadata: new Map()      // general metadata storage
     };
     
-    // Initialize from localStorage if available
-    this.loadFromPersistence();
+  // Initialize by loading from IndexedDB, falling back to localStorage
+  this.loadFromPersistence();
   }
 
   // ==================== COURSE MANAGEMENT ====================
@@ -36,7 +38,7 @@ class ContentStorageService {
     };
     
     this.storage.courses.set(courseId, course);
-    this.persistToStorage();
+  this.persistToStorage();
     
     console.log('💾 Course stored:', courseId, course.title);
     return courseId;
@@ -102,7 +104,7 @@ class ContentStorageService {
       this.storage.courses.set(courseId, course);
     }
 
-    this.persistToStorage();
+  this.persistToStorage();
     console.log('💾 Topics stored for course:', courseId, topicIds.length, 'topics');
     return topicIds;
   }
@@ -167,7 +169,7 @@ class ContentStorageService {
       this.storage.courses.set(courseId, course);
     }
 
-    this.persistToStorage();
+  this.persistToStorage();
     console.log('💾 Single topic created:', topicId, topicName);
     return topicId;
   }
@@ -221,7 +223,7 @@ class ContentStorageService {
       this.storage.topics.set(topicId, topic);
     }
 
-    this.persistToStorage();
+  this.persistToStorage();
     console.log('💾 Content stored for topic:', topicId, 'Content ID:', contentId);
     return contentId;
   }
@@ -344,39 +346,54 @@ class ContentStorageService {
   }
 
   /**
-   * Save storage to localStorage
+   * Save storage to IndexedDB (preferred) with localStorage fallback
    */
-  persistToStorage() {
+  async persistToStorage() {
+    const storageData = {
+      courses: Object.fromEntries(this.storage.courses),
+      topics: Object.fromEntries(this.storage.topics),
+      contents: Object.fromEntries(this.storage.contents),
+      metadata: Object.fromEntries(this.storage.metadata),
+      lastUpdated: new Date().toISOString()
+    };
+
     try {
-      const storageData = {
-        courses: Object.fromEntries(this.storage.courses),
-        topics: Object.fromEntries(this.storage.topics),
-        contents: Object.fromEntries(this.storage.contents),
-        metadata: Object.fromEntries(this.storage.metadata),
-        lastUpdated: new Date().toISOString()
-      };
-      
-      localStorage.setItem('proLearning_storage', JSON.stringify(storageData));
+      const ok = await indexedDBService.setItem('proLearning_storage', storageData);
+      if (!ok && typeof localStorage !== 'undefined') {
+        localStorage.setItem('proLearning_storage', JSON.stringify(storageData));
+      }
     } catch (error) {
-      console.warn('Failed to persist storage:', error);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('proLearning_storage', JSON.stringify(storageData));
+        }
+      } catch (inner) {
+        console.warn('Failed to persist storage (IndexedDB and localStorage):', inner || error);
+      }
     }
   }
 
   /**
-   * Load storage from localStorage
+   * Load storage from IndexedDB, with localStorage fallback and auto-migration
    */
-  loadFromPersistence() {
+  async loadFromPersistence() {
     try {
-      const savedData = localStorage.getItem('proLearning_storage');
-      if (savedData) {
-        const storageData = JSON.parse(savedData);
-        
+      let storageData = await indexedDBService.getItem('proLearning_storage');
+      if (!storageData && typeof localStorage !== 'undefined') {
+        const saved = localStorage.getItem('proLearning_storage');
+        storageData = saved ? JSON.parse(saved) : null;
+        if (storageData) {
+          // Backfill IndexedDB
+          await indexedDBService.setItem('proLearning_storage', storageData);
+        }
+      }
+
+      if (storageData) {
         this.storage.courses = new Map(Object.entries(storageData.courses || {}));
         this.storage.topics = new Map(Object.entries(storageData.topics || {}));
         this.storage.contents = new Map(Object.entries(storageData.contents || {}));
         this.storage.metadata = new Map(Object.entries(storageData.metadata || {}));
-        
-        console.log('💾 Storage loaded from persistence');
+        console.log('💾 Storage loaded from persistence (IndexedDB/localStorage)');
       }
     } catch (error) {
       console.warn('Failed to load storage from persistence:', error);
@@ -434,7 +451,7 @@ class ContentStorageService {
     this.storage.contents = new Map(Object.entries(storageData.contents || {}));
     this.storage.metadata = new Map(Object.entries(storageData.metadata || {}));
     
-    this.persistToStorage();
+  this.persistToStorage();
     console.log('💾 Storage imported successfully');
   }
 }

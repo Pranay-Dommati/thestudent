@@ -1754,7 +1754,19 @@ const ChatbotPage = () => {
                             timestamp: Date.now()
                           };
                           
-                          localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
+                          try {
+                            // Prefer IndexedDB for full payload; use a tiny localStorage marker to avoid quota issues
+                            void import('../../services/IndexedDBService.js')
+                              .then(({ default: idb }) => idb.setItem('proLearning_batchGeneration', batchGenerationData))
+                              .catch(() => {});
+                            // Remove any legacy large item and set a lightweight marker for navigation handoff
+                            try { localStorage.removeItem('proLearning_batchGeneration'); } catch {}
+                            localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
+                          } catch (_) {
+                            // As a last resort, store only a minimal marker
+                            try { localStorage.removeItem('proLearning_batchGeneration'); } catch {}
+                            localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
+                          }
                           console.log('🚀 Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
                           
                           // Track in ProLearning history

@@ -92,7 +92,17 @@ const ProLearningPage = () => {
     try {
       console.log('🔄 Attempting to fetch course from database:', courseId);
       
-      const token = localStorage.getItem('accessToken');
+      let token = null;
+      try {
+        const { default: idb } = await import('../../services/IndexedDBService.js');
+        token = await idb.getItem('accessToken');
+        if (!token && typeof localStorage !== 'undefined') {
+          token = localStorage.getItem('accessToken');
+          if (token) await idb.setItem('accessToken', token);
+        }
+      } catch {
+        token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      }
       if (!token) {
         console.log('❌ No access token found');
         return null;
@@ -136,6 +146,18 @@ const ProLearningPage = () => {
 
   // Set default topics and initialize with consistent course ID
   useEffect(() => {
+    // Helper: wait briefly for an IndexedDB item to appear (handles navigation race)
+    const waitForIDBItem = async (key, attempts = 10, interval = 120) => {
+      for (let i = 0; i < attempts; i++) {
+        try {
+          const { default: idb } = await import('../../services/IndexedDBService.js');
+          const val = await idb.getItem(key);
+          if (val) return val;
+        } catch {}
+        await new Promise(r => setTimeout(r, interval));
+      }
+      return null;
+    };
     const initializeCourseData = async () => {
       const currentCourseId = getCourseId();
       
@@ -154,19 +176,37 @@ const ProLearningPage = () => {
         return;
       }
       
-      // Step 2: Check batch generation data in localStorage
-      const batchData = localStorage.getItem('proLearning_batchGeneration');
-      if (batchData) {
-        try {
-          const { courseId: batchCourseId, topics } = JSON.parse(batchData);
-          if (batchCourseId === currentCourseId && topics && topics.length > 0) {
-            console.log('✅ Found batch generation data - loading topics:', topics);
-            setTopicsList(topics);
-            return;
+      // Step 2: Check batch generation data (IndexedDB first; legacy localStorage payload fallback)
+    let foundFromBatch = false;
+    try {
+        const { default: idb } = await import('../../services/IndexedDBService.js');
+        const idbVal = await idb.getItem('proLearning_batchGeneration');
+        let payload = idbVal;
+        if (!payload && typeof localStorage !== 'undefined') {
+          // Backward compatibility: legacy payload in localStorage
+          const legacy = localStorage.getItem('proLearning_batchGeneration');
+          if (legacy) {
+            try { payload = JSON.parse(legacy); } catch {}
           }
-        } catch (error) {
-          console.warn('Failed to parse batch generation data:', error);
+          // If no legacy payload but a marker exists, wait for IDB write to land
+          if (!payload && localStorage.getItem('proLearning_batchMarker')) {
+            payload = await waitForIDBItem('proLearning_batchGeneration');
+          }
         }
+        if (payload && payload.courseId === currentCourseId && Array.isArray(payload.topics) && payload.topics.length > 0) {
+          console.log('✅ Found batch generation data - loading topics:', payload.topics);
+          setTopicsList(payload.topics);
+          // Persist topics immediately so refresh shows them in sidebar
+          try {
+            const normalized = payload.topics.map((t, i) => ({ id: (t.id || i + 1), name: t.name || t }));
+            proContentManager.setCourse(courseTitle || 'Generated Course', currentCourseId);
+            proContentManager.storeTopics(normalized, currentCourseId);
+          } catch (e) { console.warn('Failed to persist batch topics to storage:', e); }
+      foundFromBatch = true;
+      return;
+        }
+      } catch (error) {
+        console.warn('Batch generation data lookup failed:', error);
       }
 
       // Step 3: Try to fetch from database
@@ -190,6 +230,12 @@ const ProLearningPage = () => {
           );
           
           setTopicsList(transformedTopics);
+          // Persist DB topics so they’re available on refresh
+          try {
+            const normalized = transformedTopics.map(t => ({ id: t.id, name: t.name }));
+            proContentManager.setCourse(databaseCourse.course_name || courseTitle || 'Database Course', currentCourseId);
+            proContentManager.storeTopics(normalized, currentCourseId);
+          } catch (e) { console.warn('Failed to persist DB topics to storage:', e); }
           
           // Set selectedTopic immediately if we have an active topic
           const activeTopic = transformedTopics.find(t => t.isActive);
@@ -212,8 +258,9 @@ const ProLearningPage = () => {
         }
       }
       
-      // Step 4: Fallback - show course not found or create default topics
-      if (!courseTitle) {
+  // Step 4: Fallback - only create default topics when truly nothing else is available
+  const hasBatchMarker = typeof localStorage !== 'undefined' ? localStorage.getItem('proLearning_batchMarker') : null;
+  if (!courseTitle && !topicParam && !hasBatchMarker && !foundFromBatch) {
         console.log('🆕 No data found, creating default topics');
         const defaultTopics = [
           { id: 1, name: "Introduction" },
@@ -693,10 +740,8 @@ const ProLearningPage = () => {
           return null;
         };
         
-        // Use ProContentManager to handle content retrieval/generation
-        if (courseTitle) {
-          proContentManager.setCourse(courseTitle, currentCourseId);
-        }
+  // Use ProContentManager to handle content retrieval/generation
+  proContentManager.setCourse(courseTitle || 'Generated Course', currentCourseId);
         
         getDatabaseTopicData().then(result => {
           const dbTopic = result?.dbTopic || null;
@@ -1467,15 +1512,46 @@ const ProLearningPage = () => {
     setSearchParams(newSearchParams, { replace: true });
   };
 
+  // Auto-switch to the first ready tab for current topic when content becomes available
+  useEffect(() => {
+    if (!useProgressiveGeneration) return; // Only for progressive mode
+    const topicName = selectedTopic?.name;
+    if (!topicName) return;
+
+    const readyTabs = availableTabsForTopics[topicName] || [];
+    // Consider content already loaded as ready as well
+    if (content) {
+      if (content.reading && !readyTabs.includes('reading')) readyTabs.push('reading');
+      if (content.summary && !readyTabs.includes('summary')) readyTabs.push('summary');
+      if ((content.videos?.length || 0) > 0 && !readyTabs.includes('videos')) readyTabs.push('videos');
+      if ((content.quiz?.length || 0) > 0 && !readyTabs.includes('quiz')) readyTabs.push('quiz');
+      if ((content.resources?.length || 0) > 0 && !readyTabs.includes('resources')) readyTabs.push('resources');
+    }
+
+    if (readyTabs.length === 0) return;
+
+    // If the current tab isn't ready, switch to the first ready tab
+    if (!readyTabs.includes(activeTab)) {
+      const preferredOrder = ['reading', 'summary', 'videos', 'quiz', 'resources'];
+      const firstReady = preferredOrder.find(t => readyTabs.includes(t)) || readyTabs[0];
+      if (firstReady) updateActiveTab(firstReady);
+    }
+  }, [availableTabsForTopics, selectedTopic?.name, content, activeTab, useProgressiveGeneration]);
+
   // Generate or get course ID for current session
   const generateCourseId = () => `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
   const getCourseId = () => {
-    return courseId || localStorage.getItem('currentCourseId') || null;
+    // Prefer URL param; otherwise use cached localStorage. The IndexedDB write happens when setting.
+    return courseId || (typeof localStorage !== 'undefined' ? localStorage.getItem('currentCourseId') : null) || null;
   };
 
-  const setAndNavigateToCourseId = (id) => {
-    localStorage.setItem('currentCourseId', id);
+  const setAndNavigateToCourseId = async (id) => {
+    try {
+      const { default: idb } = await import('../../services/IndexedDBService.js');
+      await idb.setItem('currentCourseId', id);
+    } catch {}
+    try { if (typeof localStorage !== 'undefined') localStorage.setItem('currentCourseId', id); } catch {}
     navigate(`/pro-learning/${id}${window.location.search}`, { replace: true });
   };
 
@@ -1503,7 +1579,20 @@ const ProLearningPage = () => {
       const currentCourseId = getCourseId();
       if (!currentCourseId) return;
       
-      const savedStatus = localStorage.getItem('coursesSavedToHub');
+      let savedStatus = null;
+      try {
+        void import('../../services/IndexedDBService.js')
+          .then(({ default: idb }) => idb.getItem('coursesSavedToHub'))
+          .then((val) => {
+            if (val && typeof localStorage !== 'undefined') {
+              try { localStorage.setItem('coursesSavedToHub', JSON.stringify(val)); } catch {}
+            }
+          })
+          .catch(() => {});
+        savedStatus = typeof localStorage !== 'undefined' ? localStorage.getItem('coursesSavedToHub') : null;
+      } catch {
+        savedStatus = typeof localStorage !== 'undefined' ? localStorage.getItem('coursesSavedToHub') : null;
+      }
       if (savedStatus) {
         try {
           const savedCourses = JSON.parse(savedStatus);
@@ -1523,19 +1612,41 @@ const ProLearningPage = () => {
   useEffect(() => {
     const handleContentGeneration = async () => {
       try {
-        const batchData = localStorage.getItem('proLearning_batchGeneration');
-        if (!batchData) return;
+        // Use small localStorage marker for fast check, fetch real payload from IndexedDB
+        const marker = typeof localStorage !== 'undefined' ? localStorage.getItem('proLearning_batchMarker') : null;
+        let payload = null;
+        try {
+          const { default: idb } = await import('../../services/IndexedDBService.js');
+          payload = await idb.getItem('proLearning_batchGeneration');
+        } catch {}
+        // Backward compatibility: if no IDB payload, try legacy localStorage payload
+        if (!payload && typeof localStorage !== 'undefined') {
+          const legacy = localStorage.getItem('proLearning_batchGeneration');
+          if (legacy) {
+            try { payload = JSON.parse(legacy); } catch {}
+          }
+        }
+        if (!payload && marker) {
+          // Wait briefly for IDB write to land after navigation
+          const wait = async () => {
+            for (let i = 0; i < 8; i++) {
+              try {
+                const { default: idb } = await import('../../services/IndexedDBService.js');
+                const val = await idb.getItem('proLearning_batchGeneration');
+                if (val) return val;
+              } catch {}
+              await new Promise(r => setTimeout(r, 120));
+            }
+            return null;
+          };
+          payload = await wait();
+        }
+        if (!payload) return;
 
-        const {
-          courseId: batchCourseId,
-          topics,
-          topicString,
-          triggerBatchGeneration,
-          timestamp
-        } = JSON.parse(batchData);
+        const { courseId: batchCourseId, topics, topicString, triggerBatchGeneration, timestamp } = payload;
 
         // Only trigger if this is a recent request (within 5 minutes) and for this course
-        const isRecent = Date.now() - timestamp < 5 * 60 * 1000;
+        const isRecent = timestamp && (Date.now() - timestamp < 5 * 60 * 1000);
         const isCurrentCourse = batchCourseId === courseId;
         
         if (!triggerBatchGeneration || !isRecent || !isCurrentCourse) {
@@ -1653,7 +1764,17 @@ const ProLearningPage = () => {
         }
         
         // Clear the trigger so it doesn't run again
-        localStorage.removeItem('proLearning_batchGeneration');
+        try {
+          void import('../../services/IndexedDBService.js')
+            .then(({ default: idb }) => idb.removeItem('proLearning_batchGeneration'))
+            .catch(() => {});
+        } catch {}
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('proLearning_batchGeneration'); // legacy
+            localStorage.removeItem('proLearning_batchMarker'); // new marker
+          }
+        } catch {}
 
       } catch (error) {
         console.error('❌ Content generation failed:', error);
@@ -1812,27 +1933,49 @@ const ProLearningPage = () => {
     if (isGeneratingCourse || isLoading || isBatchGenerating) {
       return <LoadingComponent />;
     }
-
-    // Show progressive generation status if using progressive generation
+    
+    // Decide whether to show the progressive generation card or the actual content
+    // If the active tab (especially Reading) is already ready, skip the generation card
     if (isProgressiveGenerating) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
-          <div className="max-w-4xl mx-auto pt-6">
-            <ProgressiveGenerationStatus 
-              isGenerating={isProgressiveGenerating}
-              currentProgress={progressiveGenerationProgress}
-              availableTabs={availableTabsForTopics}
-              onTabClick={(tabId) => {
-                if (selectedTopic?.name) {
-                  updateActiveTab(tabId);
-                }
-              }}
-              currentTopic={selectedTopic?.name}
-              topics={topicsList.map(t => t.name || t)}
-            />
-          </div>
-        </div>
+      const currentTopicName = selectedTopic?.name;
+      const readyTabs = (currentTopicName && availableTabsForTopics[currentTopicName]) || [];
+      const isReadingReady = !!content?.reading || readyTabs.includes('reading');
+      const isSummaryReady = !!content?.summary || readyTabs.includes('summary');
+      const isVideosReady = (content?.videos?.length || 0) > 0 || readyTabs.includes('videos');
+      const isQuizReady = (content?.quiz?.length || 0) > 0 || readyTabs.includes('quiz');
+      const isResourcesReady = (content?.resources?.length || 0) > 0 || readyTabs.includes('resources');
+
+      const activeReady = (
+        (activeTab === 'reading' && isReadingReady) ||
+        (activeTab === 'summary' && isSummaryReady) ||
+        (activeTab === 'videos' && isVideosReady) ||
+        (activeTab === 'quiz' && isQuizReady) ||
+        (activeTab === 'resources' && isResourcesReady)
       );
+
+      const anyReady = isReadingReady || isSummaryReady || isVideosReady || isQuizReady || isResourcesReady;
+
+      // Only show the generation status card if the active tab isn't ready yet
+      if (!activeReady && !anyReady) {
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
+            <div className="max-w-4xl mx-auto pt-6">
+              <ProgressiveGenerationStatus 
+                isGenerating={isProgressiveGenerating}
+                currentProgress={progressiveGenerationProgress}
+                availableTabs={availableTabsForTopics}
+                onTabClick={(tabId) => {
+                  if (selectedTopic?.name) {
+                    updateActiveTab(tabId);
+                  }
+                }}
+                currentTopic={selectedTopic?.name}
+                topics={topicsList.map(t => t.name || t)}
+              />
+            </div>
+          </div>
+        );
+      }
     }
 
     // If no content and course not generated, show Pro Learning Experience button

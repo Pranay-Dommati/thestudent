@@ -1,5 +1,6 @@
 // ProLearningHistoryService.js
-// Service to manage ProLearning course history in session storage
+// Service to manage ProLearning course history with IndexedDB-backed persistence
+import indexedDBService from './IndexedDBService.js';
 
 class ProLearningHistoryService {
   constructor() {
@@ -33,8 +34,8 @@ class ProLearningHistoryService {
       // Limit history size
       const limitedHistory = filteredHistory.slice(0, this.maxHistoryItems);
       
-      // Save to local storage (persists across tabs)
-      localStorage.setItem(this.storageKey, JSON.stringify(limitedHistory));
+  // Save using IndexedDB (fallback to localStorage)
+  this._set(limitedHistory);
       
       // Dispatch a custom event to notify other tabs about the history update
       window.dispatchEvent(new CustomEvent('prolearning-history-updated', {
@@ -51,10 +52,26 @@ class ProLearningHistoryService {
   // Get all history items
   getHistory() {
     try {
-      const historyData = localStorage.getItem(this.storageKey);
-      if (!historyData) return [];
-      
-      const history = JSON.parse(historyData);
+      // Synchronous wrapper that returns cached localStorage first, then updates async
+      const cached = (typeof localStorage !== 'undefined') ? localStorage.getItem(this.storageKey) : null;
+      if (cached) {
+        // Async refresh from IndexedDB, but don't block UI
+        this._get().then((fresh) => {
+          if (fresh) {
+            try { localStorage.setItem(this.storageKey, JSON.stringify(fresh)); } catch {}
+          }
+        });
+        const history = JSON.parse(cached);
+        return history.sort((a, b) => b.timestamp - a.timestamp);
+      }
+
+      // If no cache, try to synchronously return empty and trigger async fetch
+      this._get().then((fresh) => {
+        if (fresh && typeof localStorage !== 'undefined') {
+          try { localStorage.setItem(this.storageKey, JSON.stringify(fresh)); } catch {}
+        }
+      });
+      const history = [];
       
       // Sort by timestamp (newest first)
       return history.sort((a, b) => b.timestamp - a.timestamp);
@@ -70,7 +87,7 @@ class ProLearningHistoryService {
       const history = this.getHistory();
       const filteredHistory = history.filter(item => item.courseId !== courseId);
       
-      localStorage.setItem(this.storageKey, JSON.stringify(filteredHistory));
+  this._set(filteredHistory);
       return true;
     } catch (error) {
       console.error('Error removing from ProLearning history:', error);
@@ -81,7 +98,7 @@ class ProLearningHistoryService {
   // Clear all history
   clearHistory() {
     try {
-      localStorage.removeItem(this.storageKey);
+      this._set([]);
       return true;
     } catch (error) {
       console.error('Error clearing ProLearning history:', error);
@@ -155,3 +172,34 @@ export default proLearningHistoryService;
 
 // Export the class as well for direct instantiation if needed
 export { ProLearningHistoryService };
+
+// Private helpers
+ProLearningHistoryService.prototype._get = async function () {
+  // Try IndexedDB, then migrate from localStorage if present
+  let data = await indexedDBService.getItem(this.storageKey);
+  if (!data && typeof localStorage !== 'undefined') {
+    const raw = localStorage.getItem(this.storageKey);
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+        await indexedDBService.setItem(this.storageKey, data);
+      } catch (_) {
+        data = [];
+      }
+    }
+  }
+  return Array.isArray(data) ? data : [];
+};
+
+ProLearningHistoryService.prototype._set = async function (value) {
+  try {
+    await indexedDBService.setItem(this.storageKey, value);
+  } finally {
+    // Keep a small local cache to make getHistory synchronous
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(this.storageKey, JSON.stringify(value));
+      }
+    } catch {}
+  }
+};

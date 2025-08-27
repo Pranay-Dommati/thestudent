@@ -1,4 +1,5 @@
 import axios from 'axios';
+import indexedDBService from '../services/IndexedDBService.js';
 
 const instance = axios.create({
   baseURL: 'http://localhost:8000/api',  // Your Django backend URL with /api prefix
@@ -8,9 +9,17 @@ const instance = axios.create({
 });
 
 // Request interceptor
+// Note: Axios request interceptors can be async to await token from IndexedDB
 instance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('accessToken');
+  async (config) => {
+    let token = await indexedDBService.getItem('accessToken');
+    if (!token && typeof localStorage !== 'undefined') {
+      token = localStorage.getItem('accessToken');
+      // Backfill IndexedDB for future requests
+      if (token) {
+        indexedDBService.setItem('accessToken', token);
+      }
+    }
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
