@@ -518,6 +518,7 @@ const ChatbotPage = () => {
   const [pendingTopics, setPendingTopics] = useState([]);
   const [originalPrompt, setOriginalPrompt] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showTopicModal, setShowTopicModal] = useState(false);
   const [usageStats, setUsageStats] = useState(null); // Track rate limit usage stats
   const [learningContext, setLearningContext] = useState(""); // Store learning preferences and context
   const [networkRetryCount, setNetworkRetryCount] = useState(0); // Track network retry attempts

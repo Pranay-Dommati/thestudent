@@ -282,58 +282,44 @@ const ProLearningPage = () => {
     initializeCourseData();
   }, [courseTitle, courseId, topicParam]); // Add topicParam dependency for immediate sync
   
-  // Robust useEffect to sync URL topic with internal state (runs after topics are loaded)
+  // Unified useEffect to handle topic URL synchronization and selection
   useEffect(() => {
-    if (topicsList.length > 0 && topicParam) {
-      const matched = topicsList.find(t => t.name === topicParam || t.name.toLowerCase() === topicParam.toLowerCase());
-      if (matched && (!selectedTopic || selectedTopic.name !== matched.name)) {
-        setSelectedTopic(matched);
-        
-        // Ensure the matched topic is marked as active
-        setTopicsList(prev =>
-          prev.map(t => ({
-            ...t,
-            isActive: t.name === topicParam || t.name.toLowerCase() === topicParam.toLowerCase()
-          }))
-        );
-        
-        // Topic state synchronized with URL parameter
-      }
-    }
-  }, [topicsList, topicParam, selectedTopic]);
-  
-  // Auto-select first topic when topics list is loaded, or set active topic from URL
-  useEffect(() => {
-    if (topicsList.length > 0) {
-      if (topicParam) {
-        // If we have a topic from URL, find and activate the matching topic
-        // Handle case where topicParam might contain multiple topics (comma-separated)
-        const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
-        
-        // Find the topic that matches the URL parameter with multiple matching strategies
-        let matchingTopicIndex = -1;
-        
-        // Strategy 1: Exact match (case insensitive)
+    if (topicsList.length === 0) return; // Wait for topics to be loaded
+    
+    if (topicParam) {
+      // If we have a topic from URL, find and activate the matching topic
+      // Handle case where topicParam might contain multiple topics (comma-separated)
+      const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
+      
+      // Find the topic that matches the URL parameter with multiple matching strategies
+      let matchingTopicIndex = -1;
+      
+      // Strategy 1: Exact match (case insensitive)
+      matchingTopicIndex = topicsList.findIndex(topic => 
+        topic.name.toLowerCase().trim() === actualTopic.toLowerCase().trim()
+      );
+      
+      // Strategy 2: Partial match - check if topic name contains the URL topic
+      if (matchingTopicIndex === -1) {
         matchingTopicIndex = topicsList.findIndex(topic => 
-          topic.name.toLowerCase().trim() === actualTopic.toLowerCase().trim()
+          topic.name.toLowerCase().includes(actualTopic.toLowerCase()) ||
+          actualTopic.toLowerCase().includes(topic.name.toLowerCase())
         );
-        
-        // Strategy 2: Partial match - check if topic name contains the URL topic
-        if (matchingTopicIndex === -1) {
-          matchingTopicIndex = topicsList.findIndex(topic => 
-            topic.name.toLowerCase().includes(actualTopic.toLowerCase()) ||
-            actualTopic.toLowerCase().includes(topic.name.toLowerCase())
-          );
-        }
-        
-        // Strategy 3: If still not found, just use the first topic
-        if (matchingTopicIndex === -1) {
-          console.log('⚠️ Topic from URL not found, using first topic as fallback');
-          matchingTopicIndex = 0;
-        }
-        
-        const selectedTopicName = topicsList[matchingTopicIndex].name;
-        // Selected topic at index
+      }
+      
+      // Strategy 3: If still not found, just use the first topic
+      if (matchingTopicIndex === -1) {
+        console.log('⚠️ Topic from URL not found, using first topic as fallback');
+        matchingTopicIndex = 0;
+      }
+      
+      const selectedTopicName = topicsList[matchingTopicIndex].name;
+      const selectedTopicObject = topicsList[matchingTopicIndex];
+      
+      // Only update if this topic is not already selected and active
+      if (!selectedTopic || selectedTopic.name !== selectedTopicObject.name || !selectedTopicObject.isActive) {
+        // Set the selected topic state
+        setSelectedTopic(selectedTopicObject);
         
         // Set the matching topic as active in the topics list
         setTopicsList(prevTopics => {
@@ -342,51 +328,50 @@ const ProLearningPage = () => {
             isActive: index === matchingTopicIndex // Only matching topic is active
           }));
           
-          // Updated topics with active state
+          return updatedTopics;
+        });
+        
+        // Update URL to reflect the actual topic name (not the URL-encoded one) - only if different
+        if (selectedTopicName !== actualTopic) {
+          const newSearchParams = new URLSearchParams(searchParams);
+          newSearchParams.set("topic", selectedTopicName);
+          navigate(`/pro-learning/${courseId}?${newSearchParams.toString()}`, { replace: true });
+        }
+        
+        // Load content for the selected topic automatically
+        setTimeout(() => {
+          loadTopicContent(selectedTopicName);
+        }, 100); // Small delay to ensure state is updated
+      }
+    } else {
+      // If no topic is specified in URL and we have topics, select the first one
+      const firstTopic = topicsList[0];
+      if (firstTopic && (!selectedTopic || selectedTopic.name !== firstTopic.name || !firstTopic.isActive)) {
+        // Set the selected topic state
+        setSelectedTopic(firstTopic);
+        
+        // Set the first topic as active in the topics list
+        setTopicsList(prevTopics => {
+          const updatedTopics = prevTopics.map((topic, index) => ({
+            ...topic,
+            isActive: index === 0 // Only first topic is active
+          }));
           
           return updatedTopics;
         });
         
-        // Update URL to reflect the actual topic name (not the URL-encoded one)
+        // Update URL to include the first topic
         const newSearchParams = new URLSearchParams(searchParams);
-        newSearchParams.set("topic", selectedTopicName);
+        newSearchParams.set("topic", firstTopic.name);
         navigate(`/pro-learning/${courseId}?${newSearchParams.toString()}`, { replace: true });
         
-        // Load content for the selected topic automatically
-        // Auto-loading content for selected topic
-        loadTopicContent(selectedTopicName);
-      } else {
-        // If no topic is specified in URL and we have topics, select the first one
-        const firstTopic = topicsList[0];
-        if (firstTopic) {
-          console.log('🎯 Auto-selecting first topic:', firstTopic.name);
-          
-          // Set the first topic as active in the topics list
-          setTopicsList(prevTopics => {
-            const updatedTopics = prevTopics.map((topic, index) => ({
-              ...topic,
-              isActive: index === 0 // Only first topic is active
-            }));
-            
-            console.log('✅ Updated topics with first topic active:', 
-              updatedTopics.map(t => ({ name: t.name, isActive: t.isActive }))
-            );
-            
-            return updatedTopics;
-          });
-          
-          // Update URL to include the first topic
-          const newSearchParams = new URLSearchParams(searchParams);
-          newSearchParams.set("topic", firstTopic.name);
-          navigate(`/pro-learning/${courseId}?${newSearchParams.toString()}`, { replace: true });
-          
-          // Load content for the first topic automatically
-          console.log('🔄 Auto-loading content for first topic:', firstTopic.name);
+        // Load content for the first topic automatically
+        setTimeout(() => {
           loadTopicContent(firstTopic.name);
-        }
+        }, 100); // Small delay to ensure state is updated
       }
     }
-  }, [topicsList.length, topicParam, courseId, navigate, searchParams]); // Trigger when topics are loaded
+  }, [topicsList.length, topicParam, courseId, navigate, searchParams, selectedTopic]); // Comprehensive dependency array
   
   // Content state
   const [content, setContent] = useState(null);
