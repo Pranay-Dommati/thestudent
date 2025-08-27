@@ -614,7 +614,6 @@ const ProLearningPage = () => {
             // Set course context with database course name if courseTitle is empty
             const courseName = courseTitle || databaseCourse.course_name || "Database Course";
             proContentManager.setCourse(courseName, currentCourseId);
-            console.log('✅ ProContentManager initialized for direct URL with course:', courseName);
             
             return {
               dbTopic: databaseCourse.topics.find(topic => topic.topic_name === actualTopic),
@@ -639,7 +638,6 @@ const ProLearningPage = () => {
               const sections = parseReadingSections(result.content.reading);
               setReadingSections(sections);
               setReadingSectionIndex(0);
-              console.log('✅ Content ready:', result.source === 'storage' ? 'from storage' : result.source === 'database' ? 'from database' : 'newly generated');
             } else {
               throw new Error('Invalid content received');
             }
@@ -745,28 +743,22 @@ const ProLearningPage = () => {
       setIsLoading(true);
       setLoadingStep(`Loading ${topicName} content...`);
 
-      console.log('🔍 Attempting to load content for:', topicName);
-      console.log('🔍 Course ID:', currentCourseId);
-      
       // Try multiple ways to get stored content
       let storedContent = null;
       
       // Method 1: Try the ProContentManager method
       storedContent = proContentManager.getStoredTopicContent(currentCourseId, topicName);
-      console.log('🔍 Method 1 (ProContentManager):', storedContent ? 'Found' : 'Not found');
       
       // Method 2: Try direct storage access if Method 1 fails
       if (!storedContent) {
         try {
           const courseContent = proContentManager.getStoredCourseContent(currentCourseId);
-          console.log('🔍 Course content structure:', courseContent);
           
           if (courseContent && courseContent.topics) {
             storedContent = courseContent.topics[topicName]?.content;
-            console.log('🔍 Method 2 (Direct access):', storedContent ? 'Found' : 'Not found');
           }
         } catch (err) {
-          console.warn('🔍 Method 2 failed:', err);
+          // Silent error handling
         }
       }
       
@@ -782,14 +774,11 @@ const ProLearningPage = () => {
           
           if (matchingKey) {
             storedContent = courseContent.topics[matchingKey]?.content;
-            console.log('🔍 Method 3 (Case insensitive):', storedContent ? `Found with key: ${matchingKey}` : 'Not found');
           }
         }
       }
       
       if (storedContent && (storedContent.reading || storedContent.summary)) {
-        console.log('✅ Successfully found stored content for:', topicName);
-        
         // Transform stored content to the expected format
         setContent({
           reading: storedContent.reading || 'Content not available',
@@ -806,11 +795,8 @@ const ProLearningPage = () => {
           setReadingSectionIndex(0);
         }
         
-        console.log('✅ Content loaded successfully from storage');
       } else {
         // Fallback to generating content if not in storage
-        console.log('⚠️ No stored content found, attempting database then generation for:', topicName);
-        console.log('⚠️ Available topic keys:', Object.keys(proContentManager.getStoredCourseContent(currentCourseId)?.topics || {}));
         
         // CRITICAL: Set course context in ProContentManager before calling getTopicContent
         proContentManager.setCourse(courseTitle || "Database Course", currentCourseId);
@@ -820,7 +806,6 @@ const ProLearningPage = () => {
         let dbTopic = null;
         if (databaseCourse?.topics) {
           dbTopic = databaseCourse.topics.find(topic => topic.topic_name === topicName);
-          console.log('🗄️ Found database topic:', dbTopic);
         }
         
         const result = await proContentManager.getTopicContent(topicName, generateProContent, dbTopic);
@@ -1473,11 +1458,13 @@ const ProLearningPage = () => {
           return;
         }
 
-        console.log('🚀 Starting content generation for course:', batchCourseId);
+        // CRITICAL FIX: Always use current active courseId for generation, not stored batchCourseId
+        const currentCourseId = getCourseId();
+        console.log('🚀 Starting content generation for course:', currentCourseId, '(was:', batchCourseId, ')');
         console.log('📚 Topics to generate:', topics);
 
         // Check if content already exists for this course
-        const existingContent = proContentManager.getStoredCourseContent(batchCourseId);
+        const existingContent = proContentManager.getStoredCourseContent(currentCourseId);
         if (existingContent && existingContent.metadata.status === 'completed') {
           console.log('✅ Course content already exists, loading from storage');
           setTopicsList(topics);
@@ -1489,7 +1476,7 @@ const ProLearningPage = () => {
 
         if (useProgressiveGeneration) {
           console.log('🎯 Using progressive content generation');
-          // Initialize progressive generation
+          // Initialize progressive generation with current courseId
           await initializeProgressiveGeneration(courseTitle, topics, {
             onProgress: (progress) => {
               setProgressiveGenerationProgress(progress);
@@ -1543,7 +1530,7 @@ const ProLearningPage = () => {
               console.error('❌ Progressive generation error:', error);
               setIsProgressiveGenerating(false);
             }
-          });
+          }, currentCourseId); // CRITICAL FIX: Pass current courseId to progressive generation
 
           // Start progressive generation
           setIsProgressiveGenerating(true);
@@ -1555,10 +1542,10 @@ const ProLearningPage = () => {
           setBatchGenerationProgress(0);
           setBatchGenerationStatus('Initializing course generation...');
 
-          // Start batch generation
+          // Start batch generation - CRITICAL FIX: Use current courseId
           await proContentManager.generateAllContentBatch(
             topics,
-            batchCourseId,
+            currentCourseId, // Use current courseId, not batchCourseId
             (current, total, topicName, contentType) => {
               const progress = Math.round((current / total) * 100);
               setBatchGenerationProgress(progress);
@@ -1739,13 +1726,65 @@ const ProLearningPage = () => {
 
   const renderTabContent = () => {
     
+    // Helper function to check if content exists for the current tab
+    const hasContentForCurrentTab = () => {
+      // CRITICAL FIX: Don't check content while generation is in progress
+      if (isLoading || isProgressiveGenerating) {
+        return false;
+      }
+      
+      if (!selectedTopic?.name || !activeTab) return false;
+      
+      const currentCourseId = getCourseId();
+      if (!currentCourseId) return false;
+      
+      // Get stored topic content from ProContentManager
+      const topicContent = proContentManager.getStoredTopicContent(currentCourseId, selectedTopic.name);
+      
+      if (!topicContent) {
+        return false;
+      }
+      
+      // Normalize tab name to lowercase for consistent checking
+      const normalizedTab = activeTab.toLowerCase();
+      
+      // Check if the specific tab has content
+      let hasContent = false;
+      switch (normalizedTab) {
+        case 'reading':
+          hasContent = !!(topicContent.reading && topicContent.reading.length > 0);
+          break;
+        case 'summary':
+          hasContent = !!(topicContent.summary && topicContent.summary.length > 0);
+          break;
+        case 'videos':
+          hasContent = !!(topicContent.videos && topicContent.videos.length > 0);
+          break;
+        case 'quiz':
+          hasContent = !!(topicContent.quiz && topicContent.quiz.length > 0);
+          break;
+        case 'resources':
+          hasContent = !!(topicContent.resources && topicContent.resources.length > 0);
+          break;
+        default:
+          hasContent = false;
+      }
+      
+      return hasContent;
+    };
+    
     // Show loading if generating course, individual content, or batch generating
     if (isGeneratingCourse || isLoading || isBatchGenerating) {
       return <LoadingComponent />;
     }
 
-    // Show progressive generation status if using progressive generation
-    if (isProgressiveGenerating) {
+    // Show content if available for current tab, otherwise show progressive generation status
+    const hasCurrentTabContent = hasContentForCurrentTab();
+    
+    if (hasCurrentTabContent) {
+      // Content is available for this tab, proceed to render it
+    } else if (isProgressiveGenerating) {
+      // No content for current tab and generation is in progress
       return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
           <div className="max-w-4xl mx-auto pt-6">
@@ -1771,15 +1810,6 @@ const ProLearningPage = () => {
     const hasActiveTopic = topicsList.some(t => t.isActive);
     const isTopicFromDatabase = topicsList.some(t => t.dbTopic); // Check if any topic has database data
     const contentAlreadyLoaded = !!content;
-    
-    console.log('🔍 Start Experience check:', {
-      hasContent: !!content,
-      allTopicsGenerated,
-      hasActiveTopic,
-      isTopicFromDatabase,
-      contentAlreadyLoaded,
-      shouldShowStartButton: !content && !allTopicsGenerated && !hasActiveTopic && !isTopicFromDatabase && !contentAlreadyLoaded
-    });
     
     if (!content && !allTopicsGenerated && !hasActiveTopic && !isTopicFromDatabase && !contentAlreadyLoaded) {
       return (
@@ -1884,17 +1914,11 @@ const ProLearningPage = () => {
     // Check if current tab content is available in progressive generation
     const isCurrentTabAvailable = useProgressiveGeneration && selectedTopic?.name
       ? (availableTabsForTopics[selectedTopic.name]?.includes(activeTab)) ||
-        (content && (
-          (activeTab === 'reading' && content.reading) ||
-          (activeTab === 'summary' && content.summary) ||
-          (activeTab === 'videos' && content.videos?.length > 0) ||
-          (activeTab === 'quiz' && content.quiz?.length > 0) ||
-          (activeTab === 'resources' && content.resources?.length > 0)
-        ))
+        hasContentForCurrentTab()
       : true;
 
-    // Show "content being generated" message for progressive generation ONLY if no content exists
-    if (useProgressiveGeneration && !isCurrentTabAvailable && !content) {
+    // Show "content being generated" message for progressive generation ONLY if no content exists for current tab
+    if (useProgressiveGeneration && !hasContentForCurrentTab()) {
       return (
         <div className="max-w-none pt-6">
           <div className="bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 border border-yellow-200 rounded-xl p-8 mb-6 shadow-sm text-center">
@@ -1929,11 +1953,26 @@ const ProLearningPage = () => {
       );
     }
 
+    // Helper function to get current tab content from ProContentManager
+    const getCurrentTabContent = () => {
+      if (!selectedTopic?.name) return null;
+      
+      const currentCourseId = getCourseId();
+      if (!currentCourseId) return null;
+      
+      const topicContent = proContentManager.getStoredTopicContent(currentCourseId, selectedTopic.name);
+      
+      return topicContent;
+    };
+
+    // Get the current content for rendering
+    const currentContent = getCurrentTabContent() || content;
+
     switch (activeTab) {
       case "reading":
         
         // Additional fallback: if content exists but reading is empty, try to show other content
-        const hasAnyContent = content && (content.reading || content.summary || content.videos?.length || content.quiz?.length || content.resources?.length);
+        const hasAnyContent = currentContent && (currentContent.reading || currentContent.summary || currentContent.videos?.length || currentContent.quiz?.length || currentContent.resources?.length);
         
         return (
           <div className="max-w-none pt-6">
@@ -1953,7 +1992,7 @@ const ProLearningPage = () => {
             </div>
             {/* Enhanced Content with better typography, all content together */}
             <div className="prose prose-lg max-w-none">
-              {content && content.reading ? (
+              {currentContent && currentContent.reading ? (
                 <ReactMarkdown
                   components={{
                     h1: ({children}) => (
@@ -2129,11 +2168,11 @@ const ProLearningPage = () => {
                     )
                   }}
                 >
-                  {content.reading}
+                  {currentContent.reading}
                 </ReactMarkdown>
               ) : (
                 // Fallback: render raw content if sections are empty
-                content && content.reading ? (
+                currentContent && currentContent.reading ? (
                   <ReactMarkdown
                     components={{
                       h1: ({children}) => (
@@ -2309,7 +2348,7 @@ const ProLearningPage = () => {
                       )
                     }}
                   >
-                    {content.reading}
+                    {currentContent.reading}
                   </ReactMarkdown>
                 ) : isLoading ? (
                   <div className="text-center py-12">
@@ -2482,7 +2521,7 @@ const ProLearningPage = () => {
                   )
                 }}
               >
-                {content.summary}
+                {currentContent.summary}
               </ReactMarkdown>
             </div>
           </div>
@@ -2501,18 +2540,18 @@ const ProLearningPage = () => {
                   <div>
                     <h2 className="text-lg font-bold text-gray-900">Video Learning</h2>
                     <p className="text-sm text-gray-600">
-                      {content.videosMetadata?.source === 'youtube_api' ? 'Live YouTube Data' : 'Curated educational content'}
+                      {currentContent.videosMetadata?.source === 'youtube_api' ? 'Live YouTube Data' : 'Curated educational content'}
                     </p>
                   </div>
                 </div>
                 <div className="hidden md:flex items-center space-x-3 text-xs">
                   <div className="bg-white px-2 py-1 rounded-full shadow-sm">
-                    <span className="text-red-600 font-medium">{content.videos.length} videos</span>
+                    <span className="text-red-600 font-medium">{currentContent.videos.length} videos</span>
                   </div>
-                  {content.videosMetadata?.avgViewCount && (
+                  {currentContent.videosMetadata?.avgViewCount && (
                     <div className="bg-white px-2 py-1 rounded-full shadow-sm">
                       <span className="text-gray-600">
-                        Avg: {formatViewCount(content.videosMetadata.avgViewCount)}
+                        Avg: {formatViewCount(currentContent.videosMetadata.avgViewCount)}
                       </span>
                     </div>
                   )}
@@ -2522,37 +2561,37 @@ const ProLearningPage = () => {
                   <div className="flex items-center text-gray-600">
                     <FaYoutube className="text-red-500 mr-1" />
                     <span>
-                      {content.videosMetadata?.source === 'youtube_api' ? 'Real YouTube Data' : 'YouTube Curated'}
+                      {currentContent.videosMetadata?.source === 'youtube_api' ? 'Real YouTube Data' : 'YouTube Curated'}
                     </span>
                   </div>
                 </div>
               </div>
               
               {/* Video Stats Summary */}
-              {content.videosMetadata?.source === 'youtube_api' && content.videos.length > 0 && (
+              {currentContent.videosMetadata?.source === 'youtube_api' && currentContent.videos.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-red-200">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center">
                       <div className="text-lg font-bold text-red-600">
-                        {content.videos.reduce((sum, v) => sum + (v.viewCount || 0), 0).toLocaleString()}
+                        {currentContent.videos.reduce((sum, v) => sum + (v.viewCount || 0), 0).toLocaleString()}
                       </div>
                       <div className="text-xs text-gray-600">Total Views</div>
                     </div>
                     <div className="text-center">
                       <div className="text-lg font-bold text-purple-600">
-                        {content.videos.reduce((sum, v) => sum + (v.subscriberCount || 0), 0).toLocaleString()}
+                        {currentContent.videos.reduce((sum, v) => sum + (v.subscriberCount || 0), 0).toLocaleString()}
                       </div>
                       <div className="text-xs text-gray-600">Total Subscribers</div>
                     </div>
                     <div className="text-center">
                       <div className="text-lg font-bold text-green-600">
-                        {content.videosMetadata.totalDuration || 0} min
+                        {currentContent.videosMetadata.totalDuration || 0} min
                       </div>
                       <div className="text-xs text-gray-600">Total Duration</div>
                     </div>
                     <div className="text-center">
                       <div className="text-lg font-bold text-blue-600">
-                        {content.videos.filter(v => v.isEducationalChannel).length}
+                        {currentContent.videos.filter(v => v.isEducationalChannel).length}
                       </div>
                       <div className="text-xs text-gray-600">Verified Channels</div>
                     </div>
@@ -2563,7 +2602,7 @@ const ProLearningPage = () => {
             
             {/* Enhanced Video Grid */}
             <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {content.videos.map((video, index) => (
+              {currentContent.videos.map((video, index) => (
                 <div key={video.id} className="group bg-white border border-gray-200 rounded-2xl hover:shadow-xl transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
                   <div className="flex flex-col">
                     {/* Video Thumbnail */}
@@ -2711,10 +2750,10 @@ const ProLearningPage = () => {
         );
 
       case "quiz":
-        const answeredQuestions = content.quiz.filter(q => q.userAnswer !== null).length;
-        const correctAnswers = content.quiz.filter(q => q.userAnswer === q.correct).length;
-        const quizProgress = (answeredQuestions / content.quiz.length) * 100;
-        const allQuestionsAnswered = answeredQuestions === content.quiz.length;
+        const answeredQuestions = currentContent.quiz.filter(q => q.userAnswer !== null).length;
+        const correctAnswers = currentContent.quiz.filter(q => q.userAnswer === q.correct).length;
+        const quizProgress = (answeredQuestions / currentContent.quiz.length) * 100;
+        const allQuestionsAnswered = answeredQuestions === currentContent.quiz.length;
         
         return (
           <div className="pt-6">
@@ -2732,7 +2771,7 @@ const ProLearningPage = () => {
                 </div>
                 <div className="hidden md:flex items-center space-x-3 text-xs">
                   <div className="bg-white px-2 py-1 rounded-full shadow-sm">
-                    <span className="text-green-600 font-medium">{content.quiz.length} questions</span>
+                    <span className="text-green-600 font-medium">{currentContent.quiz.length} questions</span>
                   </div>
                   {quizSubmitted && (
                     <>
@@ -2775,7 +2814,7 @@ const ProLearningPage = () => {
             
             {/* Quiz Questions */}
             <div className="space-y-6">
-              {content.quiz.map((question, index) => {
+              {currentContent.quiz.map((question, index) => {
                 const isAnswered = question.userAnswer !== null;
                 return (
                   <div key={question.id} className="bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300">
@@ -2787,7 +2826,7 @@ const ProLearningPage = () => {
                             {index + 1}
                           </div>
                           <div>
-                            <span className="text-sm font-medium text-gray-600">Question {index + 1} of {content.quiz.length}</span>
+                            <span className="text-sm font-medium text-gray-600">Question {index + 1} of {currentContent.quiz.length}</span>
                           </div>
                         </div>
                       </div>
@@ -2874,7 +2913,7 @@ const ProLearningPage = () => {
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">Ready to Submit?</h3>
                   <p className="text-gray-600 mb-4">
-                    You've answered all {content.quiz.length} questions. You can still change your answers before submitting.
+                    You've answered all {currentContent.quiz.length} questions. You can still change your answers before submitting.
                   </p>
                   <button 
                     onClick={() => setQuizSubmitted(true)}
@@ -2893,15 +2932,15 @@ const ProLearningPage = () => {
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-1">Quiz Results</h3>
                   <div className="text-2xl font-bold text-green-600 mb-1">
-                    {correctAnswers}/{content.quiz.length} correct
+                    {correctAnswers}/{currentContent.quiz.length} correct
                   </div>
                   <div className="text-gray-600 mb-4">
-                    Score: {((correctAnswers / content.quiz.length) * 100).toFixed(0)}%
+                    Score: {((correctAnswers / currentContent.quiz.length) * 100).toFixed(0)}%
                   </div>
                   <div className="mb-4 text-gray-700 font-medium">
-                    {((correctAnswers / content.quiz.length) * 100) >= 80
+                    {((correctAnswers / currentContent.quiz.length) * 100) >= 80
                       ? 'Excellent work! 🎉'
-                      : ((correctAnswers / content.quiz.length) * 100) >= 60
+                      : ((correctAnswers / currentContent.quiz.length) * 100) >= 60
                         ? 'Good job! Review explanations to improve. 📚'
                         : 'Keep practicing and try again! 💪'}
                   </div>
@@ -2909,7 +2948,7 @@ const ProLearningPage = () => {
                   <div className="text-left mt-6">
                     <h4 className="font-semibold text-gray-800 mb-4">Question Review</h4>
                     <div className="space-y-4">
-                      {content.quiz.map((question, idx) => {
+                      {currentContent.quiz.map((question, idx) => {
                         const isCorrect = question.userAnswer === question.correct;
                         return (
                           <div key={question.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">

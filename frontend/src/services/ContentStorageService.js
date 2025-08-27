@@ -219,6 +219,11 @@ class ContentStorageService {
       topic.contentId = contentId;
       topic.updatedAt = new Date().toISOString();
       this.storage.topics.set(topicId, topic);
+      
+      // ALSO store content under courseId + topicName key for easy retrieval
+      const lookupKey = `${topic.courseId}-${topic.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+      this.storage.contents.set(lookupKey, content);
+      console.log('💾 Content also stored under lookup key:', lookupKey);
     }
 
     this.persistToStorage();
@@ -259,6 +264,50 @@ class ContentStorageService {
   hasTopicContent(topicId) {
     const topic = this.storage.topics.get(topicId);
     return !!(topic && topic.contentGenerated && topic.contentId);
+  }
+
+  /**
+   * Merge partial content into existing topic content (for incremental generation)
+   * @param {String} topicId - Topic ID
+   * @param {Object} partialContent - Partial content to merge (e.g., { reading: "..." })
+   * @returns {String|null} - Content ID or null if failed
+   */
+  mergeTopicContent(topicId, partialContent) {
+    console.log('🔄 Merging partial content for topic:', topicId, 'Keys:', Object.keys(partialContent));
+    
+    // Get existing content or create new structure
+    let existingContent = this.getTopicContent(topicId);
+    let contentId;
+    
+    if (existingContent) {
+      // Update existing content
+      contentId = existingContent.id;
+      const updatedContent = {
+        ...existingContent,
+        ...partialContent,
+        updatedAt: new Date().toISOString()
+      };
+      
+      this.storage.contents.set(contentId, updatedContent);
+      console.log('🔄 Updated existing content:', contentId);
+    } else {
+      // Create new content entry
+      contentId = this.storeTopicContent(topicId, partialContent);
+      console.log('🔄 Created new content:', contentId);
+    }
+    
+    // Also update the lookup key for ProContentManager compatibility
+    const topic = this.storage.topics.get(topicId);
+    if (topic) {
+      const lookupKey = `${topic.courseId}-${topic.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+      const updatedContent = this.storage.contents.get(contentId);
+      this.storage.contents.set(lookupKey, updatedContent);
+      console.log('🔄 Updated lookup key:', lookupKey);
+    }
+    
+    this.persistToStorage();
+    console.log('💾 Partial content merged and stored for topic:', topicId);
+    return contentId;
   }
 
   /**

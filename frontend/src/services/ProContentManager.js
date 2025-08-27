@@ -8,7 +8,26 @@ class ProContentManager {
   constructor() {
     this.currentCourse = null;
     this.currentCourseId = null;
-    this.generationPromises = new Map(); // Track ongoing content generation
+    this.generationPromises = new Map(); // Track ongoing generations to prevent duplicates
+  }
+
+  /**
+   * Normalize topic name for consistent key generation
+   * @param {String} topicName - Topic name to normalize
+   * @returns {String} - Normalized topic name
+   */
+  normalizeTopicName(topicName) {
+    return topicName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+  }
+
+  /**
+   * Generate lookup key for topic content
+   * @param {String} courseId - Course ID
+   * @param {String} topicName - Topic name
+   * @returns {String} - Lookup key
+   */
+  generateLookupKey(courseId, topicName) {
+    return `${courseId}-${this.normalizeTopicName(topicName)}`;
   }
 
   /**
@@ -142,7 +161,6 @@ class ProContentManager {
           const transformedContent = this.transformDatabaseContent(dbTopic);
           
           if (transformedContent) {
-            console.log('✅ Successfully transformed database content:', transformedContent);
             return {
               source: 'database',
               content: transformedContent,
@@ -152,72 +170,14 @@ class ProContentManager {
         }
 
         // Step 3: If no valid content and no generator, return null
+        // CRITICAL FIX: Don't generate content here - let ProLearningLogic handle generation
         if (!generateCallback) {
           return null;
         }
 
-        const generationStartTime = Date.now();
-        const generatedContent = await new Promise((resolve, reject) => {
-          let resolved = false;
-          const timeout = setTimeout(() => {
-            if (!resolved) {
-              resolved = true;
-              const elapsed = (Date.now() - generationStartTime) / 1000;
-              console.error(`⏰ Content generation timeout after ${elapsed}s for topic: ${topicName}`);
-              reject(new Error('Content generation timeout - this usually means the setContent callback was not called properly'));
-            }
-          }, 300000); // Increased to 5 minutes for AI content generation with retry logic
-
-          generateCallback({
-            topic: topicName,
-            setIsLoading: () => {},
-            setLoadingProgress: () => {},
-            setShowSkeletons: () => {},
-            setLoadingStep: () => {},
-            setContent: (newContent) => {
-              const elapsed = (Date.now() - generationStartTime) / 1000;
-              if (!resolved) {
-                clearTimeout(timeout);
-                resolved = true;
-                
-                // Ensure we have a proper content object
-                const content = typeof newContent === 'function' ? newContent({}) : newContent;
-                
-                resolve(content);
-              } else {
-                // Ignore if already resolved
-              }
-            },
-            setStats: () => {},
-            content: null
-          });
-        });
-
-        // Once content is generated, store it atomically
-        
-        // Find or create topic
-        let topic = contentStorageService.getTopicByName(topicName, this.currentCourseId);
-        if (!topic) {
-          const topicId = contentStorageService.createTopic(topicName, this.currentCourseId);
-          topic = { id: topicId, name: topicName };
-        }
-        
-        // Store the content
-        if (topic) {
-          contentStorageService.storeTopicContent(topic.id, generatedContent);
-          
-          // Verify storage worked
-          const storedContent = contentStorageService.getTopicContent(topic.id);
-          if (!storedContent?.reading) {
-            throw new Error('Content storage verification failed');
-          }
-        }
-        
-        return {
-          source: 'generated',
-          content: generatedContent,
-          fromCache: false
-        };
+        // CRITICAL FIX: Even if generateCallback exists, don't use it here
+        // This prevents double generation - ProLearningLogic should be the only generator
+        return null;
 
       } catch (error) {
         console.error('❌ Content generation/storage failed:', error);
@@ -301,8 +261,6 @@ class ProContentManager {
       throw new Error('No topics provided for batch generation');
     }
 
-    console.log('🚀 Starting batch content generation for', topics.length, 'topics');
-    
     // Set course context
     this.setCourse("Generated Course", courseId);
     
@@ -363,14 +321,10 @@ class ProContentManager {
               progressCallback(currentStep, totalSteps, topic.name, contentType);
             }
             
-            console.log(`📝 Generating ${contentType} for ${topic.name}`);
-            
             try {
               switch (contentType) {
                 case 'reading':
-                  console.log(`📖 Calling generateReadingContent with topic: "${topicName}"`);
                   await generateReadingContent(topicName, (contentOrFunction) => {
-                    console.log(`📖 Reading content received:`, typeof contentOrFunction, contentOrFunction);
                     
                     // Handle both direct content and function-based content
                     let content;
@@ -384,12 +338,49 @@ class ProContentManager {
                     console.log(`📖 Processed reading content:`, content);
                     if (content && content.reading) {
                       generatedContent.reading = content.reading;
+                      
+                      // 🚀 STORE READING IMMEDIATELY for incremental access
+                      try {
+                        // Use the current courseId instead of topic.courseId to ensure consistency
+                        const currentCourseId = courseId; // Use the courseId parameter from batchGenerateContent
+                        console.log('💾 Storing reading with courseId:', currentCourseId, 'topicId:', topic.id);
+                        contentStorageService.mergeTopicContent(topic.id, { reading: content.reading });
+                        
+                        // Also create/update the direct lookup key for immediate access
+                        const lookupKey = this.generateLookupKey(currentCourseId, topic.name);
+                        const existingContent = contentStorageService.storage.contents.get(lookupKey) || {};
+                        const updatedContent = { ...existingContent, reading: content.reading };
+                        contentStorageService.storage.contents.set(lookupKey, updatedContent);
+                        contentStorageService.persistToStorage();
+                        
+                        console.log('💾 Reading content stored incrementally for:', topic.name, 'under key:', lookupKey);
+                      } catch (error) {
+                        console.error('❌ Failed to store reading incrementally:', error);
+                      }
                     }
                   });
                   // Ensure we have some reading content even if the function doesn't set it
                   if (!generatedContent.reading) {
                     console.log(`⚠️ No reading content received, using fallback for ${topicName}`);
                     generatedContent.reading = `# ${topicName}\n\nThis is the reading material for ${topicName}.`;
+                    
+                    // Store fallback reading content too
+                    try {
+                      const currentCourseId = courseId;
+                      console.log('💾 Storing fallback reading with courseId:', currentCourseId, 'topicId:', topic.id);
+                      contentStorageService.mergeTopicContent(topic.id, { reading: generatedContent.reading });
+                      
+                      // Also create/update the direct lookup key for immediate access
+                      const lookupKey = `${currentCourseId}-${topic.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+                      const existingContent = contentStorageService.storage.contents.get(lookupKey) || {};
+                      const updatedContent = { ...existingContent, reading: generatedContent.reading };
+                      contentStorageService.storage.contents.set(lookupKey, updatedContent);
+                      contentStorageService.persistToStorage();
+                      
+                      console.log('💾 Fallback reading content stored incrementally for:', topic.name, 'under key:', lookupKey);
+                    } catch (error) {
+                      console.error('❌ Failed to store fallback reading incrementally:', error);
+                    }
                   }
                   break;
                 case 'summary':
@@ -401,6 +392,24 @@ class ProContentManager {
                     if (content && content.summary) {
                       generatedContent.summary = content.summary;
                       console.log(`📝 Summary stored:`, generatedContent.summary.length, 'chars');
+                      
+                      // 🚀 STORE SUMMARY IMMEDIATELY
+                      try {
+                        const currentCourseId = courseId;
+                        console.log('💾 Storing summary with courseId:', currentCourseId, 'topicId:', topic.id);
+                        contentStorageService.mergeTopicContent(topic.id, { summary: content.summary });
+                        
+                        // Also create/update the direct lookup key for immediate access
+                        const lookupKey = `${currentCourseId}-${topic.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+                        const existingContent = contentStorageService.storage.contents.get(lookupKey) || {};
+                        const updatedContent = { ...existingContent, summary: content.summary };
+                        contentStorageService.storage.contents.set(lookupKey, updatedContent);
+                        contentStorageService.persistToStorage();
+                        
+                        console.log('💾 Summary content stored incrementally for:', topic.name, 'under key:', lookupKey);
+                      } catch (error) {
+                        console.error('❌ Failed to store summary incrementally:', error);
+                      }
                     } else {
                       console.log(`⚠️ No summary content in response:`, content);
                     }
@@ -409,12 +418,48 @@ class ProContentManager {
                   if (!generatedContent.summary) {
                     console.log(`⚠️ No summary generated, using fallback for ${topicName}`);
                     generatedContent.summary = `## Summary of ${topicName}\n\n• **Key Topic**: ${topicName}\n• **Main Focus**: Understanding core concepts and applications\n• **Learning Outcome**: Practical knowledge and implementation skills`;
+                    
+                    // Store fallback summary too
+                    try {
+                      const currentCourseId = courseId;
+                      console.log('💾 Storing fallback summary with courseId:', currentCourseId, 'topicId:', topic.id);
+                      contentStorageService.mergeTopicContent(topic.id, { summary: generatedContent.summary });
+                      
+                      // Also create/update the direct lookup key for immediate access
+                      const lookupKey = `${currentCourseId}-${topic.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+                      const existingContent = contentStorageService.storage.contents.get(lookupKey) || {};
+                      const updatedContent = { ...existingContent, summary: generatedContent.summary };
+                      contentStorageService.storage.contents.set(lookupKey, updatedContent);
+                      contentStorageService.persistToStorage();
+                      
+                      console.log('💾 Fallback summary content stored incrementally for:', topic.name, 'under key:', lookupKey);
+                    } catch (error) {
+                      console.error('❌ Failed to store fallback summary incrementally:', error);
+                    }
                   }
                   break;
                 case 'quiz':
                   await generateQuizContent((content) => {
                     if (content && content.quiz) {
                       generatedContent.quiz = content.quiz;
+                      
+                      // 🚀 STORE QUIZ IMMEDIATELY
+                      try {
+                        const currentCourseId = courseId;
+                        console.log('💾 Storing quiz with courseId:', currentCourseId, 'topicId:', topic.id);
+                        contentStorageService.mergeTopicContent(topic.id, { quiz: content.quiz });
+                        
+                        // Also create/update the direct lookup key for immediate access
+                        const lookupKey = `${currentCourseId}-${topic.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+                        const existingContent = contentStorageService.storage.contents.get(lookupKey) || {};
+                        const updatedContent = { ...existingContent, quiz: content.quiz };
+                        contentStorageService.storage.contents.set(lookupKey, updatedContent);
+                        contentStorageService.persistToStorage();
+                        
+                        console.log('💾 Quiz content stored incrementally for:', topic.name, 'under key:', lookupKey);
+                      } catch (error) {
+                        console.error('❌ Failed to store quiz incrementally:', error);
+                      }
                     }
                   }, topicName, generatedContent.reading);
                   // Ensure we have quiz content
@@ -433,12 +478,48 @@ class ProContentManager {
                         explanation: `${topicName} is a fundamental concept in programming.`
                       }
                     ];
+                    
+                    // Store fallback quiz too
+                    try {
+                      const currentCourseId = courseId;
+                      console.log('💾 Storing fallback quiz with courseId:', currentCourseId, 'topicId:', topic.id);
+                      contentStorageService.mergeTopicContent(topic.id, { quiz: generatedContent.quiz });
+                      
+                      // Also create/update the direct lookup key for immediate access
+                      const lookupKey = `${currentCourseId}-${topic.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+                      const existingContent = contentStorageService.storage.contents.get(lookupKey) || {};
+                      const updatedContent = { ...existingContent, quiz: generatedContent.quiz };
+                      contentStorageService.storage.contents.set(lookupKey, updatedContent);
+                      contentStorageService.persistToStorage();
+                      
+                      console.log('💾 Fallback quiz content stored incrementally for:', topic.name, 'under key:', lookupKey);
+                    } catch (error) {
+                      console.error('❌ Failed to store fallback quiz incrementally:', error);
+                    }
                   }
                   break;
                 case 'resources':
                   await generateResourcesContent((content) => {
                     if (content && content.resources) {
                       generatedContent.resources = content.resources;
+                      
+                      // 🚀 STORE RESOURCES IMMEDIATELY
+                      try {
+                        const currentCourseId = courseId;
+                        console.log('💾 Storing resources with courseId:', currentCourseId, 'topicId:', topic.id);
+                        contentStorageService.mergeTopicContent(topic.id, { resources: content.resources });
+                        
+                        // Also create/update the direct lookup key for immediate access
+                        const lookupKey = `${currentCourseId}-${topic.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+                        const existingContent = contentStorageService.storage.contents.get(lookupKey) || {};
+                        const updatedContent = { ...existingContent, resources: content.resources };
+                        contentStorageService.storage.contents.set(lookupKey, updatedContent);
+                        contentStorageService.persistToStorage();
+                        
+                        console.log('💾 Resources content stored incrementally for:', topic.name, 'under key:', lookupKey);
+                      } catch (error) {
+                        console.error('❌ Failed to store resources incrementally:', error);
+                      }
                     }
                   }, topicName);
                   // Ensure we have resources content
@@ -452,12 +533,48 @@ class ProContentManager {
                         description: `Official documentation for ${topicName}`
                       }
                     ];
+                    
+                    // Store fallback resources too
+                    try {
+                      const currentCourseId = courseId;
+                      console.log('💾 Storing fallback resources with courseId:', currentCourseId, 'topicId:', topic.id);
+                      contentStorageService.mergeTopicContent(topic.id, { resources: generatedContent.resources });
+                      
+                      // Also create/update the direct lookup key for immediate access
+                      const lookupKey = `${currentCourseId}-${topic.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+                      const existingContent = contentStorageService.storage.contents.get(lookupKey) || {};
+                      const updatedContent = { ...existingContent, resources: generatedContent.resources };
+                      contentStorageService.storage.contents.set(lookupKey, updatedContent);
+                      contentStorageService.persistToStorage();
+                      
+                      console.log('💾 Fallback resources content stored incrementally for:', topic.name, 'under key:', lookupKey);
+                    } catch (error) {
+                      console.error('❌ Failed to store fallback resources incrementally:', error);
+                    }
                   }
                   break;
                 case 'videos':
                   await generateVideosContent((content) => {
                     if (content && content.videos) {
                       generatedContent.videos = content.videos;
+                      
+                      // 🚀 STORE VIDEOS IMMEDIATELY
+                      try {
+                        const currentCourseId = courseId;
+                        console.log('💾 Storing videos with courseId:', currentCourseId, 'topicId:', topic.id);
+                        contentStorageService.mergeTopicContent(topic.id, { videos: content.videos });
+                        
+                        // Also create/update the direct lookup key for immediate access
+                        const lookupKey = `${currentCourseId}-${topic.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+                        const existingContent = contentStorageService.storage.contents.get(lookupKey) || {};
+                        const updatedContent = { ...existingContent, videos: content.videos };
+                        contentStorageService.storage.contents.set(lookupKey, updatedContent);
+                        contentStorageService.persistToStorage();
+                        
+                        console.log('💾 Videos content stored incrementally for:', topic.name, 'under key:', lookupKey);
+                      } catch (error) {
+                        console.error('❌ Failed to store videos incrementally:', error);
+                      }
                     }
                   }, topicName);
                   // Ensure we have videos even if API fails
@@ -483,6 +600,24 @@ class ProContentManager {
                         description: `Best practices and tips for working with ${topicName}`
                       }
                     ];
+                    
+                    // Store fallback videos too
+                    try {
+                      const currentCourseId = courseId;
+                      console.log('💾 Storing fallback videos with courseId:', currentCourseId, 'topicId:', topic.id);
+                      contentStorageService.mergeTopicContent(topic.id, { videos: generatedContent.videos });
+                      
+                      // Also create/update the direct lookup key for immediate access
+                      const lookupKey = `${currentCourseId}-${topic.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+                      const existingContent = contentStorageService.storage.contents.get(lookupKey) || {};
+                      const updatedContent = { ...existingContent, videos: generatedContent.videos };
+                      contentStorageService.storage.contents.set(lookupKey, updatedContent);
+                      contentStorageService.persistToStorage();
+                      
+                      console.log('💾 Fallback videos content stored incrementally for:', topic.name, 'under key:', lookupKey);
+                    } catch (error) {
+                      console.error('❌ Failed to store fallback videos incrementally:', error);
+                    }
                   }
                   break;
               }
@@ -587,19 +722,42 @@ class ProContentManager {
    * @returns {Object|null} - Specific content or null if not found
    */
   getStoredTopicContent(courseId, topicName, contentType = null) {
+    // Method 1: Try the original course content structure
     const courseContent = this.getStoredCourseContent(courseId);
     
-    if (!courseContent || !courseContent.topics[topicName]) {
-      return null;
+    if (courseContent && courseContent.topics && courseContent.topics[topicName]) {
+      const topicData = courseContent.topics[topicName];
+      
+      if (contentType) {
+        return topicData.content[contentType] || null;
+      }
+      
+      return topicData.content;
     }
     
-    const topicData = courseContent.topics[topicName];
-    
-    if (contentType) {
-      return topicData.content[contentType] || null;
+    // Method 2: Try ContentStorageService direct lookup
+    try {
+      const lookupKey = this.generateLookupKey(courseId, topicName);
+      console.log('🔍 Trying direct lookup with key:', lookupKey);
+      
+      // Use the imported contentStorageService
+      const content = contentStorageService.storage.contents.get(lookupKey);
+      
+      if (content) {
+        console.log('✅ Found content via direct lookup!', { courseId, topicName, contentType });
+        
+        if (contentType) {
+          return content[contentType] || null;
+        }
+        
+        return content;
+      }
+    } catch (error) {
+      console.error('❌ Direct lookup failed:', error);
     }
     
-    return topicData.content;
+    console.log('❌ No content found for topic:', { courseId, topicName, contentType });
+    return null;
   }
 
   /**

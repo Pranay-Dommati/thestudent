@@ -38,7 +38,7 @@ export class ProgressiveContentGenerator {
   /**
    * Initialize progressive generation for a course
    */
-  async initializeGeneration(courseTitle, topicsList, callbacks = {}) {
+  async initializeGeneration(courseTitle, topicsList, callbacks = {}, existingCourseId = null) {
     if (this.isGenerating) {
       console.warn('⚠️ Generation already in progress');
       return { success: false, message: 'Generation already in progress' };
@@ -54,15 +54,22 @@ export class ProgressiveContentGenerator {
       onError: callbacks.onError || (() => {})
     };
 
-    // Initialize course storage
-    let course = contentStorageService.getCourseByTitle(courseTitle);
-    if (!course) {
-      this.courseId = contentStorageService.storeCourse({
-        title: courseTitle,
-        description: `AI-generated course: ${courseTitle}`
-      });
+    // CRITICAL FIX: Use existing courseId if provided, otherwise create new one
+    if (existingCourseId) {
+      this.courseId = existingCourseId;
+      console.log('🎯 Using existing courseId for progressive generation:', this.courseId);
     } else {
-      this.courseId = course.id;
+      // Initialize course storage
+      let course = contentStorageService.getCourseByTitle(courseTitle);
+      if (!course) {
+        this.courseId = contentStorageService.storeCourse({
+          title: courseTitle,
+          description: `AI-generated course: ${courseTitle}`
+        });
+      } else {
+        this.courseId = course.id;
+      }
+      console.log('🆕 Created/found courseId for progressive generation:', this.courseId);
     }
 
     // Store topics
@@ -319,6 +326,15 @@ export class ProgressiveContentGenerator {
     
     if (topicData) {
       contentStorageService.storeTopicContent(topicData.id, existingContent);
+      
+      // CRITICAL FIX: Also store using direct lookup key for immediate access
+      const lookupKey = `${this.courseId}-${topicName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+      const existingDirectContent = contentStorageService.storage.contents.get(lookupKey) || {};
+      const updatedDirectContent = { ...existingDirectContent, [tabType]: content };
+      contentStorageService.storage.contents.set(lookupKey, updatedDirectContent);
+      contentStorageService.persistToStorage();
+      
+      console.log(`💾 Progressive: ${tabType} content stored for "${topicName}" under key:`, lookupKey);
     }
 
     return existingContent;
@@ -397,8 +413,8 @@ const progressiveContentGenerator = new ProgressiveContentGenerator();
 export default progressiveContentGenerator;
 
 // Export utility functions
-export const initializeProgressiveGeneration = (courseTitle, topicsList, callbacks) => {
-  return progressiveContentGenerator.initializeGeneration(courseTitle, topicsList, callbacks);
+export const initializeProgressiveGeneration = (courseTitle, topicsList, callbacks, existingCourseId) => {
+  return progressiveContentGenerator.initializeGeneration(courseTitle, topicsList, callbacks, existingCourseId);
 };
 
 export const startProgressiveGeneration = () => {
