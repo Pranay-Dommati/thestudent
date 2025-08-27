@@ -64,6 +64,7 @@ import progressiveContentGenerator, {
 } from './ProgressiveContentGenerator';
 import ProgressiveGenerationStatus from './ProgressiveGenerationStatus';
 import proContentManager from '../../services/ProContentManager';
+import contentStorageService from '../../services/ContentStorageService.js';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 import Navbar from '../Navbar/Navbar';
 import { classifyTopicsWithGemini } from './topicclassifier';
@@ -1655,6 +1656,53 @@ const ProLearningPage = () => {
   useEffect(() => {
     const id = getCourseId();
   }, []);
+
+  // Compute course readiness: show Save button only when ALL topics have ALL tabs
+  const courseCompletionStatus = useMemo(() => {
+    const currentCourseId = getCourseId();
+    const result = {
+      totalTopics: topicsList?.length || 0,
+      topicsComplete: 0,
+      allComplete: false,
+      shouldShowSaveButton: false,
+    };
+    if (!currentCourseId || !topicsList || topicsList.length === 0) {
+      return result;
+    }
+
+    const isTopicComplete = (topic) => {
+      // Prefer stored content when available (progressive/batch paths)
+      const stored = contentStorageService.getContentByTopicName(topic.name || topic, currentCourseId);
+      const fromDB = topic.dbTopic || null;
+      const c = stored || (fromDB
+        ? {
+            reading: fromDB.reading_material,
+            summary: fromDB.summary,
+            videos: Array.isArray(fromDB.videos) ? fromDB.videos : [],
+            quiz: Array.isArray(fromDB.quiz_questions) ? fromDB.quiz_questions : [],
+            resources: Array.isArray(fromDB.resources) ? fromDB.resources : [],
+          }
+        : null);
+      if (!c) return false;
+      const readingOk = typeof c.reading === 'string' && c.reading.trim().length > 0;
+      const summaryOk = typeof c.summary === 'string' && c.summary.trim().length > 0;
+      const videosOk = Array.isArray(c.videos) && c.videos.length > 0;
+      const quizOk = Array.isArray(c.quiz)
+        ? c.quiz.length > 0
+        : (c.quiz && Array.isArray(c.quiz?.questions) && c.quiz.questions.length > 0);
+      const resourcesOk = Array.isArray(c.resources) && c.resources.length > 0;
+      return readingOk && summaryOk && videosOk && quizOk && resourcesOk;
+    };
+
+    let completeCount = 0;
+    for (const t of topicsList) {
+      if (isTopicComplete(t)) completeCount += 1;
+    }
+    result.topicsComplete = completeCount;
+    result.allComplete = completeCount === topicsList.length && topicsList.length > 0;
+    result.shouldShowSaveButton = result.allComplete && savedToHub !== 'hidden';
+    return result;
+  }, [topicsList, availableTabsForTopics, content, savedToHub, courseId]);
 
   // Check if current course was previously saved to Learning Hub
   useEffect(() => {
@@ -3504,6 +3552,7 @@ const ProLearningPage = () => {
                 handleSaveToLearningHub={handleSaveToLearningHub}
                 isSavingToHub={isSavingToHub}
                 savedToHub={savedToHub}
+                shouldShowSaveButton={courseCompletionStatus.shouldShowSaveButton}
                 tabs={tabs}
                 renderTabContent={renderTabContent}
                 courseTitle={courseTitle}
@@ -3511,11 +3560,7 @@ const ProLearningPage = () => {
               />
 
               {/* Save to Learning Hub Button - Desktop Version */}
-              {(() => {
-                const isFromDatabase = topicsList.some(t => t.dbTopic);
-                const shouldShowSaveButton = content && topicsList.length > 0 && !isFromDatabase && savedToHub !== 'hidden';
-                return shouldShowSaveButton;
-              })() && (
+              {courseCompletionStatus.shouldShowSaveButton && (
                 <div className="mb-6 hidden lg:block">
                   <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 shadow-lg">
                     <div className="flex items-center justify-between">

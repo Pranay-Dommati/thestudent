@@ -20,6 +20,7 @@ const ProLearningMobile = ({
   handleSaveToLearningHub,
   isSavingToHub,
   savedToHub,
+  shouldShowSaveButton, // NEW: gate display of Save button
   tabs,
   renderTabContent,
   courseTitle,
@@ -36,11 +37,6 @@ const ProLearningMobile = ({
   const [showTopicsSheet, setShowTopicsSheet] = useState(false);
   const [showLearningGuide, setShowLearningGuide] = useState(false);
   const [isSelectingTopic, setIsSelectingTopic] = useState(false);
-
-  // Calculate progress - Hidden on mobile
-  // const progressPercentage = topicsList && topicsList.length > 0 
-  //   ? Math.round((completedTopics.length / topicsList.length) * 100) 
-  //   : 0;
 
   // Use the actual tabs passed from parent, but map to our icons
   const getIconForTab = (tabId) => {
@@ -109,34 +105,36 @@ const ProLearningMobile = ({
           <h1 className="text-lg font-semibold text-gray-900">AI Pro</h1>
           
           {/* Simple Save Button - Only essential action in header */}
-          <button
-            onClick={handleSaveToLearningHub}
-            disabled={isSavingToHub || savedToHub}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-              savedToHub
-                ? "bg-green-100 text-green-700"
-                : isSavingToHub
-                ? "bg-gray-100 text-gray-400"
-                : "bg-blue-600 text-white hover:bg-blue-700"
-            }`}
-          >
-            {isSavingToHub ? (
-              <>
-                <BiLoaderAlt className="animate-spin" size={16} />
-                <span>Saving...</span>
-              </>
-            ) : savedToHub ? (
-              <>
-                <FaCheck size={14} />
-                <span>Saved</span>
-              </>
-            ) : (
-              <>
-                <FaBookmark size={14} />
-                <span>Save</span>
-              </>
-            )}
-          </button>
+          {(shouldShowSaveButton ?? true) && (
+            <button
+              onClick={handleSaveToLearningHub}
+              disabled={isSavingToHub || savedToHub}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                savedToHub
+                  ? "bg-green-100 text-green-700"
+                  : isSavingToHub
+                  ? "bg-gray-100 text-gray-400"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+            >
+              {isSavingToHub ? (
+                <>
+                  <BiLoaderAlt className="animate-spin" size={16} />
+                  <span>Saving...</span>
+                </>
+              ) : savedToHub ? (
+                <>
+                  <FaCheck size={14} />
+                  <span>Saved</span>
+                </>
+              ) : (
+                <>
+                  <FaBookmark size={14} />
+                  <span>Save</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </header>
 
