@@ -209,7 +209,7 @@ const ProLearningPage = () => {
         console.warn('Batch generation data lookup failed:', error);
       }
 
-      // Step 3: Try to fetch from database
+  // Step 3: Try to fetch from database
       console.log('🔄 No localStorage data found, trying database...');
       const databaseCourse = await fetchCourseFromDB(currentCourseId);
       
@@ -255,6 +255,29 @@ const ProLearningPage = () => {
           }
           
           return;
+        }
+      }
+      
+      // Step 3.5: If no stored/batch/db topics, but URL has a topic list, derive topics from URL
+      if (topicParam) {
+        try {
+          const topicNames = topicParam.split(',').map(t => t.trim()).filter(Boolean);
+          if (topicNames.length > 0) {
+            const derivedTopics = topicNames.map((name, idx) => ({ id: idx + 1, name }));
+            console.log('🧭 Derived topics from URL parameter:', derivedTopics);
+            setTopicsList(derivedTopics);
+            // Persist immediately so sidebar/progress work and refresh is safe
+            try {
+              proContentManager.setCourse(courseTitle || 'Generated Course', currentCourseId);
+              await proContentManager.storeTopics(derivedTopics, currentCourseId);
+              console.log('💾 Stored URL-derived topics for course:', currentCourseId);
+            } catch (e) {
+              console.warn('Failed to persist URL-derived topics:', e);
+            }
+            return; // We’ve initialized topics from URL; stop here
+          }
+        } catch (e) {
+          console.warn('Failed to derive topics from topicParam:', e);
         }
       }
       
@@ -3376,22 +3399,27 @@ const ProLearningPage = () => {
                                   : 'bg-gray-100 group-hover:bg-gray-200'
                             }`}>
                               <IconComponent className="text-lg" />
-                              {/* Progressive generation status indicator */}
+                              {/* Progressive generation status indicator - only show while generating */}
                               {useProgressiveGeneration && (
-                                <div className="absolute -top-1 -right-1">
-                                  {isTabAvailable ? (
-                                    <div className="w-3 h-3 bg-green-500 rounded-full" title="Content ready" />
-                                  ) : isProgressiveGenerating && 
-                                       progressiveGenerationProgress.topic === selectedTopic?.name && 
-                                       progressiveGenerationProgress.tabType === tab.id ? (
-                                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" title="Generating..." />
-                                  ) : (
-                                    <div className="w-3 h-3 bg-gray-300 rounded-full" title="Waiting..." />
-                                  )}
-                                </div>
+                                (() => {
+                                  const isGenerating = isProgressiveGenerating &&
+                                    progressiveGenerationProgress.topic === selectedTopic?.name &&
+                                    progressiveGenerationProgress.tabType === tab.id;
+                                  return isGenerating ? (
+                                    <div className="absolute -top-1 -right-1">
+                                      <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" title="Generating..." />
+                                    </div>
+                                  ) : null;
+                                })()
                               )}
                             </div>
                             <span className="text-sm font-semibold whitespace-nowrap">{tab.label}</span>
+                            {/* Tiny status label: show only when generating */}
+                            {useProgressiveGeneration && isProgressiveGenerating &&
+                              progressiveGenerationProgress.topic === selectedTopic?.name &&
+                              progressiveGenerationProgress.tabType === tab.id && (
+                                <span className="text-[10px] leading-none text-blue-600" aria-live="polite">Loading…</span>
+                            )}
                           </div>
                         </button>
                       );
