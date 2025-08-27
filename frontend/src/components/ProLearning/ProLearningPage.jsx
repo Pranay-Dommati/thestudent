@@ -1514,6 +1514,26 @@ const ProLearningPage = () => {
     setSearchParams(newSearchParams, { replace: true });
   };
 
+  // Debounced version for desktop to prevent rapid clicking issues
+  const debouncedUpdateActiveTab = useRef(null);
+  
+  const updateActiveTabDesktop = (newTab) => {
+    // Clear any pending debounced calls
+    if (debouncedUpdateActiveTab.current) {
+      clearTimeout(debouncedUpdateActiveTab.current);
+    }
+    
+    // Immediately update the UI
+    setActiveTab(newTab);
+    
+    // Debounce the URL update to prevent excessive navigation
+    debouncedUpdateActiveTab.current = setTimeout(() => {
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.set('tab', newTab);
+      setSearchParams(newSearchParams, { replace: true });
+    }, 100); // 100ms debounce
+  };
+
   // Update URL when topic changes
   const updateTopicInUrl = (newTopic) => {
     const newSearchParams = new URLSearchParams(searchParams);
@@ -1548,7 +1568,16 @@ const ProLearningPage = () => {
       const firstReady = preferredOrder.find(t => readyTabs.includes(t)) || readyTabs[0];
       if (firstReady) updateActiveTab(firstReady);
     }
-  }, [availableTabsForTopics, selectedTopic?.name, content, activeTab, useProgressiveGeneration]);
+  }, [availableTabsForTopics, selectedTopic?.name, content, useProgressiveGeneration]); // Remove activeTab to prevent loops
+
+  // Cleanup debounced timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debouncedUpdateActiveTab.current) {
+        clearTimeout(debouncedUpdateActiveTab.current);
+      }
+    };
+  }, []);
 
   // Generate or get course ID for current session
   const generateCourseId = () => `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -3395,9 +3424,10 @@ const ProLearningPage = () => {
                           key={tab.id}
                           onClick={() => {
                             if (!isTabDisabled) {
-                              updateActiveTab(tab.id);
-                              if (useProgressiveGeneration && selectedTopic?.name && isTabAvailable) {
-                                // Refresh progressive content for immediate tab display
+                              updateActiveTabDesktop(tab.id); // Use debounced version for desktop
+                              // Only reload content if progressive generation is enabled AND content is not already available
+                              if (useProgressiveGeneration && selectedTopic?.name && isTabAvailable && !content?.[tab.id]) {
+                                // Only refresh if this specific tab content doesn't exist yet
                                 loadProgressiveTopicContent(selectedTopic.name, { showLoader: false });
                               }
                             }
