@@ -200,15 +200,41 @@ const ProLearningPage = () => {
   // Step 3: Try to fetch from database
       const databaseCourse = await fetchCourseFromDB(currentCourseId);
       
+      console.log('🗄️ Database course fetch result:', {
+        courseId: currentCourseId,
+        found: !!databaseCourse,
+        topics: databaseCourse?.topics?.length || 0,
+        courseName: databaseCourse?.course_name
+      });
+      
       if (databaseCourse) {
         // Transform database course data to the format expected by the UI
         if (databaseCourse.topics && databaseCourse.topics.length > 0) {
+          // Find the index of the first topic that matches URL parameter
+          let activeTopicIndex = -1;
+          if (topicParam) {
+            activeTopicIndex = databaseCourse.topics.findIndex(topic => 
+              topic.topic_name.toLowerCase().trim() === topicParam.toLowerCase().trim()
+            );
+          }
+          
+          // If no match found and we have topics, use first topic
+          if (activeTopicIndex === -1 && databaseCourse.topics.length > 0) {
+            activeTopicIndex = 0;
+          }
+          
           const transformedTopics = databaseCourse.topics.map((topic, index) => ({
             id: index + 1,
             name: topic.topic_name,
             dbTopic: topic, // Keep reference to original database topic
-            isActive: topic.topic_name === topicParam // Set active based on URL parameter
+            isActive: index === activeTopicIndex // Only ONE topic is active
           }));
+          
+          console.log('🔄 Transformed database topics:', {
+            activeTopicIndex,
+            topicParam,
+            topics: transformedTopics.map(t => ({ name: t.name, isActive: t.isActive }))
+          });
           
           setTopicsList(transformedTopics);
           // Persist DB topics so they’re available on refresh
@@ -222,6 +248,12 @@ const ProLearningPage = () => {
           const activeTopic = transformedTopics.find(t => t.isActive);
           if (activeTopic) {
             setSelectedTopic(activeTopic);
+            
+            // Automatically load content for the active topic from database
+            console.log('🚀 Auto-loading content for database topic:', activeTopic.name);
+            setTimeout(() => {
+              loadTopicContent(activeTopic.name);
+            }, 100); // Small delay to ensure state is set
           }
           
           // CRITICAL: Set course context in ProContentManager for database-loaded courses
@@ -241,8 +273,22 @@ const ProLearningPage = () => {
         try {
           const topicNames = topicParam.split(',').map(t => t.trim()).filter(Boolean);
           if (topicNames.length > 0) {
-            const derivedTopics = topicNames.map((name, idx) => ({ id: idx + 1, name }));
+            const derivedTopics = topicNames.map((name, idx) => ({ 
+              id: idx + 1, 
+              name,
+              isActive: idx === 0 // Only first topic is active
+            }));
             setTopicsList(derivedTopics);
+            
+            // Set the first topic as selected
+            setSelectedTopic(derivedTopics[0]);
+            
+            // Automatically load content for the first topic
+            console.log('🚀 Auto-loading content for URL-derived topic:', derivedTopics[0].name);
+            setTimeout(() => {
+              loadTopicContent(derivedTopics[0].name);
+            }, 100); // Small delay to ensure state is set
+            
             // Persist immediately so sidebar/progress work and refresh is safe
             try {
               proContentManager.setCourse(courseTitle || 'Generated Course', currentCourseId);
@@ -260,13 +306,16 @@ const ProLearningPage = () => {
   if (!courseTitle && !topicParam && !hasBatchMarker && !foundFromBatch) {
         // No data found - create fresh default topics
         const defaultTopics = [
-          { id: 1, name: "Introduction" },
-          { id: 2, name: "Getting Started" },
-          { id: 3, name: "Key Concepts" },
-          { id: 4, name: "Best Practices" },
-          { id: 5, name: "Advanced Topics" }
+          { id: 1, name: "Introduction", isActive: true }, // First topic is active
+          { id: 2, name: "Getting Started", isActive: false },
+          { id: 3, name: "Key Concepts", isActive: false },
+          { id: 4, name: "Best Practices", isActive: false },
+          { id: 5, name: "Advanced Topics", isActive: false }
         ];
         setTopicsList(defaultTopics);
+        
+        // Set the first topic as selected
+        setSelectedTopic(defaultTopics[0]);
         
         try {
           proContentManager.setCourse("Default Course", currentCourseId);
@@ -285,6 +334,9 @@ const ProLearningPage = () => {
   // Unified useEffect to handle topic URL synchronization and selection
   useEffect(() => {
     if (topicsList.length === 0) return; // Wait for topics to be loaded
+    
+    console.log('🔄 Unified useEffect running - topicsList:', topicsList.map(t => ({ name: t.name, isActive: t.isActive })));
+    console.log('🔄 topicParam:', topicParam, 'selectedTopic:', selectedTopic?.name);
     
     if (topicParam) {
       // If we have a topic from URL, find and activate the matching topic
@@ -328,6 +380,7 @@ const ProLearningPage = () => {
             isActive: index === matchingTopicIndex // Only matching topic is active
           }));
           
+          console.log('✅ Setting topic as active (URL match):', updatedTopics.map(t => ({ name: t.name, isActive: t.isActive })));
           return updatedTopics;
         });
         
@@ -357,6 +410,7 @@ const ProLearningPage = () => {
             isActive: index === 0 // Only first topic is active
           }));
           
+          console.log('✅ Setting first topic as active (no URL):', updatedTopics.map(t => ({ name: t.name, isActive: t.isActive })));
           return updatedTopics;
         });
         
@@ -2067,12 +2121,13 @@ const ProLearningPage = () => {
     }
 
     // If no content and course not generated, show Pro Learning Experience button
-    // BUT skip this if we have an active topic from database (content should load automatically)
+    // ONLY if we truly have no course data at all
     const hasActiveTopic = topicsList.some(t => t.isActive);
     const isTopicFromDatabase = topicsList.some(t => t.dbTopic); // Check if any topic has database data
     const contentAlreadyLoaded = !!content;
     
-    if (!content && !allTopicsGenerated && !hasActiveTopic && !isTopicFromDatabase && !contentAlreadyLoaded) {
+    // Only show the "get started" screen if we have absolutely no course data
+    if (!content && !allTopicsGenerated && !hasActiveTopic && !isTopicFromDatabase && !contentAlreadyLoaded && topicsList.length === 0) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
           <div className="w-full max-w-2xl text-center">
@@ -2140,10 +2195,21 @@ const ProLearningPage = () => {
 
     // If no content but course is generated, show message
     if (!content) {
+      console.log('🔍 No content found - debugging values:', {
+        content: !!content,
+        allTopicsGenerated,
+        hasActiveTopic,
+        isTopicFromDatabase,
+        contentAlreadyLoaded,
+        courseTitle,
+        selectedTopic: selectedTopic?.name,
+        topicsListLength: topicsList.length
+      });
+      
       return (
         <div className="flex items-center justify-center h-64">
           <div className="text-center max-w-lg">
-            {!courseTitle ? (
+            {!courseTitle && topicsList.length === 0 ? (
               <div>
                 <p className="text-gray-600 mb-4">Enter a course title to get started</p>
                 <div className="text-gray-500 text-sm space-y-2">
@@ -2157,14 +2223,11 @@ const ProLearningPage = () => {
               </div>
             ) : (
               <div>
-                <p className="text-gray-600 mb-4">Select a topic from the sidebar to view content</p>
-                <button
-                  className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition-all duration-300 flex items-center space-x-2"
-                  onClick={() => setSidebarVisible(!sidebarVisible)}
-                >
-                  <IoMenu className="text-xl" />
-                  <span>Open Topics Menu</span>
-                </button>
+                <div className="flex items-center justify-center mb-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                  <p className="text-gray-600 ml-3">Loading content for "{selectedTopic?.name || 'selected topic'}"...</p>
+                </div>
+                <p className="text-gray-500 text-sm">Content will appear automatically once loaded</p>
               </div>
             )}
           </div>
