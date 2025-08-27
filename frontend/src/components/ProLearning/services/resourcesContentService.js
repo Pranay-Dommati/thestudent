@@ -12,7 +12,7 @@ const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
  */
 const generateResourcesWithGoogleSearch = async (topic) => {
   try {
-    console.log('🔍 Generating high-quality resources for topic:', topic);
+    // Generating high-quality resources for topic
     
     // Check cache first
     const cacheKey = topic.toLowerCase().trim();
@@ -191,7 +191,7 @@ const extractResourceTypes = (resources) => {
 
 // Main function to generate resources content using Google Search API
 export async function generateResourcesContent(setContent, topic = '', options = {}) {
-  console.log('📚 Generating Google Search-powered resources for:', topic);
+  // Generating Google Search-powered resources for topic
   
   // Add a try-catch to ensure setContent is always called
   try {
@@ -214,7 +214,7 @@ export async function generateResourcesContent(setContent, topic = '', options =
     if (resourcesCache.has(cacheKey)) {
       const cached = resourcesCache.get(cacheKey);
       if (Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log('📋 Using cached Google Search resources');
+        // Using cached Google Search resources
         setContent({
           resources: cached.resources,
           resourcesMetadata: {
@@ -251,7 +251,7 @@ export async function generateResourcesContent(setContent, topic = '', options =
       timestamp: Date.now()
     });
     
-    console.log('✅ Successfully generated', validatedResources.length, 'Google Search-powered resources');
+    // Successfully generated Google Search-powered resources
     
     // Set the content
     setContent({

@@ -18,7 +18,7 @@ class ActivityTracker {
     this.lastActivityTime = Date.now();
     this.sessionMinutes = 0;
     
-    console.log('🎯 Started learning activity tracking');
+    // Started learning activity tracking
     
     // Track every 5 minutes
     this.intervalId = setInterval(() => {
@@ -61,7 +61,7 @@ class ActivityTracker {
         token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
       }
       if (!token) {
-        console.log('⚠️ No auth token found, skipping activity tracking');
+        // No auth token found, skipping activity tracking
         return;
       }
 
@@ -75,8 +75,7 @@ class ActivityTracker {
       });
 
       if (response.data.success) {
-        console.log(`✅ Tracked ${minutes} minutes of learning activity`);
-        console.log(`📊 Total today: ${response.data.data.total_today_hours}h`);
+        // Tracked learning activity and total hours
       }
     } catch (error) {
       console.error('❌ Error tracking learning activity:', error);
@@ -161,7 +160,7 @@ class ActivityTracker {
       console.log('🔥 [LEARNING STATS] Type of response.data.data:', typeof response.data.data);
       
       if (response.data.success && response.data.data) {
-        console.log('🔥 [LEARNING STATS] ✅ Success response - extracting data');
+        // Learning stats success response
         console.log('🔥 [LEARNING STATS] response.data.data.weekly_hours:', response.data.data.weekly_hours);
         console.log('🔥 [LEARNING STATS] response.data.data.current_streak:', response.data.data.current_streak);
         console.log('🔥 [LEARNING STATS] Type of weekly_hours:', typeof response.data.data.weekly_hours);

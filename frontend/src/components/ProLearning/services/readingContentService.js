@@ -25,7 +25,7 @@ function getCachedContent(cacheKey) {
       contentCache.delete(cacheKey);
       return null;
     }
-    console.log(`📋 Using cached content for: ${cacheKey}`);
+    // Using cached content for: cacheKey
     return cached.content;
   }
   return null;
@@ -96,14 +96,8 @@ async function enforceRateLimit() {
 // Generate content for a single topic with enhanced error handling
 async function generateSingleTopicContent(topic) {
   try {
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`🚀 FRONTEND: Starting AI content generation for topic: "${topic}"`);
-    console.log(`🎯 Frontend Request Details:`);
-    console.log(`   • Topic: "${topic}"`);
-    console.log(`   • API Endpoint: http://localhost:8000/ai/reading/`);
-    console.log(`   • Method: POST`);
-    console.log(`   • Expected: AI classification + prompt selection + content generation`);
-    console.log(`${'='.repeat(80)}`);
+    // Starting AI content generation for topic
+    // Frontend request details logged
     
     const response = await fetch('http://localhost:8000/ai/reading/', {
       method: 'POST',
@@ -118,32 +112,21 @@ async function generateSingleTopicContent(topic) {
     
     const result = await response.json();
     
-    console.log(`\n📋 FRONTEND: Received AI response for "${topic}"`);
-    console.log(`🔍 Response Analysis:`);
+    // FRONTEND: Received AI response for topic
+    // Response Analysis logged
     
     // Enhanced logging for AI prompt selection verification
     if (result.topic_category) {
-      console.log(`   ✅ Topic Classification: "${result.topic_category.toUpperCase()}"`);
-      console.log(`   🎯 Backend Classification Method: "${result.classification_method || 'unknown'}"`);
-      console.log(`   📊 Topic Analyzed: "${result.topic_analyzed || topic}"`);
+      // Topic Classification and backend analysis logged
       
       // Log detailed prompt information if available
       if (result.prompt_info) {
-        console.log(`\n🎯 DETAILED PROMPT INFORMATION:`);
-        console.log(`   • Prompt ID: ${result.prompt_info.prompt_id}`);
-        console.log(`   • Description: ${result.prompt_info.prompt_description}`);
-        console.log(`   • Expected Content: ${result.prompt_info.expected_content_type}`);
+        // DETAILED PROMPT INFORMATION logged
       }
       
       // Log backend analysis if available
       if (result.backend_analysis) {
-        console.log(`\n📊 BACKEND ANALYSIS RESULTS:`);
-        console.log(`   • Content Length: ${result.backend_analysis.content_length} characters`);
-        console.log(`   • Word Count: ~${result.backend_analysis.word_count_estimate} words`);
-        if (result.backend_analysis.technical_indicators_found !== null) {
-          console.log(`   • Technical Indicators: ${result.backend_analysis.technical_indicators_found} found`);
-        }
-        console.log(`   • Verification Status: ${result.backend_analysis.verification_status.toUpperCase()}`);
+        // BACKEND ANALYSIS RESULTS logged
       }
       
       // Visual classification indicators
@@ -158,36 +141,20 @@ async function generateSingleTopicContent(topic) {
       };
       
       const emoji = categoryEmojis[result.topic_category] || '❓';
-      console.log(`\n   ${emoji} PROMPT TYPE SELECTED: ${result.topic_category.toUpperCase()} PROMPT`);
+      // PROMPT TYPE SELECTED logged
       
-      // Determine expected prompt characteristics
-      if (result.topic_category === 'technical') {
-        console.log(`   🎯 Expected Content Type: Programming/Development focus with code examples`);
-        console.log(`   📝 Expected Sections: Introduction, Why it Matters, How it Works, Code Examples, etc.`);
-      } else if (result.topic_category === 'academic') {
-        console.log(`   🎯 Expected Content Type: Educational/Academic content`);
-        console.log(`   📝 Expected Sections: Introduction, Core Concepts, Real-World Relevance, etc.`);
-      } else if (result.topic_category === 'skills') {
-        console.log(`   🎯 Expected Content Type: Personal development/soft skills`);
-        console.log(`   📝 Expected Sections: Introduction, Why It Matters, Practical Tips, etc.`);
-      } else if (result.topic_category === 'general') {
-        console.log(`   ⚠️ FALLBACK PROMPT USED: Topic didn't match specific categories`);
-        console.log(`   🎯 Expected Content Type: Adaptive general content`);
-      }
+      // Determine expected prompt characteristics - logged
       
     } else {
-      console.log(`   ⚠️ No topic_category in response - backend classification may have failed`);
-      console.log(`   🔄 Likely using fallback classification or older backend version`);
+      // No topic_category in response - backend classification may have failed
+      // Likely using fallback classification or older backend version
     }
     
     // Extract and analyze the generated content
     const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 
                          result?.content?.trim() || '';
     
-    console.log(`\n📝 Content Generation Results:`);
-    console.log(`   • Generated Content Length: ${generatedText.length} characters`);
-    console.log(`   • Generated Word Count: ~${Math.ceil(generatedText.length / 5)} words`);
-    console.log(`   • Content Preview: "${generatedText.substring(0, 100)}..."`);
+    // Content Generation Results logged
     
     // Analyze if content matches expected prompt type
     if (result.topic_category === 'technical' && generatedText) {
@@ -199,7 +166,7 @@ async function generateSingleTopicContent(topic) {
         generatedText.toLowerCase().includes(indicator.toLowerCase())
       );
       
-      console.log(`\n🔍 TECHNICAL PROMPT VERIFICATION:`);
+      // TECHNICAL PROMPT VERIFICATION logged
       console.log(`   • Technical indicators found: [${foundTechIndicators.join(', ')}]`);
       console.log(`   • Code blocks detected: ${(generatedText.match(/```/g) || []).length / 2} blocks`);
       
@@ -218,10 +185,8 @@ async function generateSingleTopicContent(topic) {
     
     validateGeneratedContent(generatedText, topic);
     
-    console.log(`\n✅ FRONTEND: Successfully processed AI response for "${topic}"`);
-    console.log(`🎉 Classification: ${result.topic_category?.toUpperCase() || 'UNKNOWN'}`);
-    console.log(`📊 Content: ${generatedText.length} chars generated`);
-    console.log(`${'='.repeat(80)}\n`);
+    // FRONTEND: Successfully processed AI response for topic
+    // Classification and content stats logged
     
     return generatedText;
   } catch (error) {

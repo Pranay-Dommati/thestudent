@@ -8,7 +8,7 @@
  * @param {string} readingContent - The reading content to base questions on
  */
 export async function generateQuizContent(setContent, topic = '', readingContent = '') {
-  console.log('✅ Generating interactive quiz questions...');
+  // Generating interactive quiz questions
   
   try {
     let quizQuestions = [];
@@ -37,7 +37,7 @@ export async function generateQuizContent(setContent, topic = '', readingContent
       }
     });
     
-    console.log(`✅ Generated ${quizQuestions.length} quiz questions`);
+    // Generated quiz questions
     
   } catch (error) {
     console.error('🚨 Quiz generation failed:', error);

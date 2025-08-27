@@ -36,9 +36,6 @@ class ProContentManager {
   transformDatabaseContent(dbTopic) {
     if (!dbTopic) return null;
     
-    console.log('🔄 Transforming database content for topic:', dbTopic.topic_name);
-    console.log('🔄 Raw database topic data:', dbTopic);
-    
     // Transform database format to localStorage format
     const transformedContent = {
       reading: dbTopic.reading_material || null,
@@ -47,15 +44,6 @@ class ProContentManager {
       quiz: this.transformQuizQuestions(dbTopic.quiz_questions || []), // This will return [] if no quiz data
       resources: this.transformResources(dbTopic.resources || [])
     };
-    
-    console.log('✅ Database content transformed:', {
-      hasReading: !!transformedContent.reading,
-      readingLength: transformedContent.reading?.length || 0,
-      hasSummary: !!transformedContent.summary,
-      videosCount: transformedContent.videos?.length || 0,
-      quizQuestions: transformedContent.quiz?.questions?.length || 0,
-      resourcesCount: transformedContent.resources?.length || 0
-    });
     
     return transformedContent;
   }
@@ -134,7 +122,6 @@ class ProContentManager {
 
     // Check if generation is already in progress for this topic
     if (this.generationPromises.has(generationKey)) {
-      console.log('🔄 Content generation already in progress for:', topicName);
       return this.generationPromises.get(generationKey);
     }
 
@@ -144,7 +131,6 @@ class ProContentManager {
         // Step 1: Check for valid stored content first (localStorage)
         const storedContent = contentStorageService.getContentByTopicName(topicName, this.currentCourseId);
         if (storedContent?.reading?.length > 0) {
-          console.log('📦 Using localStorage content for:', topicName);
           return {
             source: 'storage',
             content: storedContent,
@@ -154,20 +140,9 @@ class ProContentManager {
 
         // Step 2: Check for database content if dbTopic is provided
         if (dbTopic && (dbTopic.reading_material || dbTopic.summary || dbTopic.videos?.length > 0 || dbTopic.quiz_questions?.length > 0 || dbTopic.resources?.length > 0)) {
-          console.log('🗄️ Using database content for:', topicName);
-          console.log('🗄️ Database topic structure:', {
-            hasReadingMaterial: !!dbTopic.reading_material,
-            readingLength: dbTopic.reading_material?.length || 0,
-            hasSummary: !!dbTopic.summary,
-            videosCount: dbTopic.videos?.length || 0,
-            quizQuestionsCount: dbTopic.quiz_questions?.length || 0,
-            resourcesCount: dbTopic.resources?.length || 0
-          });
-          
           const transformedContent = this.transformDatabaseContent(dbTopic);
           
           if (transformedContent) {
-            console.log('✅ Successfully transformed database content:', transformedContent);
             return {
               source: 'database',
               content: transformedContent,
@@ -181,7 +156,6 @@ class ProContentManager {
           return null;
         }
 
-        console.log('🚀 Starting content generation for:', topicName);
         const generationStartTime = Date.now();
         const generatedContent = await new Promise((resolve, reject) => {
           let resolved = false;
@@ -209,10 +183,9 @@ class ProContentManager {
                 // Ensure we have a proper content object
                 const content = typeof newContent === 'function' ? newContent({}) : newContent;
                 
-                console.log(`✅ Content generation completed after ${elapsed}s, resolving with:`, content);
                 resolve(content);
               } else {
-                console.log(`⚠️ setContent called after Promise already resolved (${elapsed}s), ignoring`);
+                // Content already resolved, ignore
               }
             },
             setStats: () => {},
@@ -221,20 +194,17 @@ class ProContentManager {
         });
 
         // Once content is generated, store it atomically
-        console.log('✅ Content generated successfully for:', topicName);
         
         // Find or create topic
         let topic = contentStorageService.getTopicByName(topicName, this.currentCourseId);
         if (!topic) {
           const topicId = contentStorageService.createTopic(topicName, this.currentCourseId);
           topic = { id: topicId, name: topicName };
-          console.log('📝 Created new topic:', topicId);
         }
         
         // Store the content
         if (topic) {
           contentStorageService.storeTopicContent(topic.id, generatedContent);
-          console.log('💾 Content stored successfully for:', topicName);
           
           // Verify storage worked
           const storedContent = contentStorageService.getTopicContent(topic.id);
@@ -331,8 +301,6 @@ class ProContentManager {
       throw new Error('No topics provided for batch generation');
     }
 
-    console.log('🚀 Starting batch content generation for', topics.length, 'topics');
-    
     // Set course context
     this.setCourse("Generated Course", courseId);
     
@@ -352,8 +320,6 @@ class ProContentManager {
     let currentStep = 0;
 
     for (const topic of topics) {
-      console.log(`📚 Generating content for topic: ${topic.name}`);
-      
       courseContent.topics[topic.name] = {
         id: topic.id,
         name: topic.name,
@@ -364,11 +330,10 @@ class ProContentManager {
       try {
         // Generate all content for this topic
         const { content } = await this.getTopicContent(topic.name, async (params) => {
-          console.log(`🔧 Content generator called with params:`, params);
           
           // Extract topic name from params object
           const topicName = params.topic || topic.name;
-          console.log(`🔧 Using topic name: "${topicName}" (type: ${typeof topicName})`);
+          // Using topic name for content generation
           
           // Validate topic name
           if (!topicName || typeof topicName !== 'string' || topicName.trim().length === 0) {
@@ -398,14 +363,14 @@ class ProContentManager {
               progressCallback(currentStep, totalSteps, topic.name, contentType);
             }
             
-            console.log(`📝 Generating ${contentType} for ${topic.name}`);
+            // Generating contentType for topic.name
             
             try {
               switch (contentType) {
                 case 'reading':
-                  console.log(`📖 Calling generateReadingContent with topic: "${topicName}"`);
+                  // Calling generateReadingContent with topic
                   await generateReadingContent(topicName, (contentOrFunction) => {
-                    console.log(`📖 Reading content received:`, typeof contentOrFunction, contentOrFunction);
+                    // Reading content received
                     
                     // Handle both direct content and function-based content
                     let content;
@@ -416,33 +381,32 @@ class ProContentManager {
                       content = contentOrFunction;
                     }
                     
-                    console.log(`📖 Processed reading content:`, content);
+                    // Processed reading content
                     if (content && content.reading) {
                       generatedContent.reading = content.reading;
                     }
                   });
                   // Ensure we have some reading content even if the function doesn't set it
                   if (!generatedContent.reading) {
-                    console.log(`⚠️ No reading content received, using fallback for ${topicName}`);
+                    // No reading content received, using fallback
                     generatedContent.reading = `# ${topicName}\n\nThis is the reading material for ${topicName}.`;
                   }
                   break;
                 case 'summary':
-                  console.log(`📝 Generating summary for ${topicName} with reading content:`, 
-                    generatedContent.reading ? `${generatedContent.reading.length} chars` : 'NO READING CONTENT');
+                  // Generating summary with reading content
                   // Summary service expects (setContent, topic, readingContent)
                   await generateSummaryContent((content) => {
-                    console.log(`📝 Summary content received:`, content);
+                    // Summary content received
                     if (content && content.summary) {
                       generatedContent.summary = content.summary;
-                      console.log(`📝 Summary stored:`, generatedContent.summary.length, 'chars');
+                      // Summary stored
                     } else {
-                      console.log(`⚠️ No summary content in response:`, content);
+                      // No summary content in response
                     }
                   }, topicName, generatedContent.reading);
                   // Ensure we have summary content
                   if (!generatedContent.summary) {
-                    console.log(`⚠️ No summary generated, using fallback for ${topicName}`);
+                    // No summary generated, using fallback
                     generatedContent.summary = `## Summary of ${topicName}\n\n• **Key Topic**: ${topicName}\n• **Main Focus**: Understanding core concepts and applications\n• **Learning Outcome**: Practical knowledge and implementation skills`;
                   }
                   break;
@@ -497,7 +461,7 @@ class ProContentManager {
                   }, topicName);
                   // Ensure we have videos even if API fails
                   if (!generatedContent.videos || generatedContent.videos.length === 0) {
-                    console.log(`⚠️ No videos received, using fallback for ${topicName}`);
+                    // No videos received, using fallback
                     generatedContent.videos = [
                       {
                         title: `${topicName} - Complete Tutorial`,
@@ -523,7 +487,7 @@ class ProContentManager {
               }
               
               currentStep++;
-              console.log(`✅ Generated ${contentType} for ${topic.name}`);
+              // Generated contentType for topic
               
             } catch (error) {
               console.error(`❌ Failed to generate ${contentType} for ${topic.name}:`, error);
@@ -534,13 +498,7 @@ class ProContentManager {
           
           // Call setContent with the complete generated content
           if (params.setContent) {
-            console.log('🔧 Calling setContent with generated content:', {
-              hasReading: !!generatedContent.reading,
-              hasSummary: !!generatedContent.summary,
-              hasQuiz: !!generatedContent.quiz,
-              hasVideos: !!generatedContent.videos,
-              hasResources: !!generatedContent.resources
-            });
+            // Calling setContent with generated content
             params.setContent(generatedContent);
           } else {
             console.warn('⚠️ No setContent callback available');
@@ -553,7 +511,7 @@ class ProContentManager {
         courseContent.topics[topic.name].content = content;
         courseContent.topics[topic.name].status = 'completed';
         
-        console.log(`✅ Completed all content for topic: ${topic.name}`);
+        // Completed all content for topic
         
       } catch (error) {
         console.error(`❌ Failed to generate content for topic ${topic.name}:`, error);
@@ -570,13 +528,13 @@ class ProContentManager {
     try {
       await indexedDBService.setItem(`course_content_${courseId}`, courseContent);
       try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
-      console.log('💾 Batch generated content stored successfully for course:', courseId);
+      // Batch generated content stored successfully
     } catch (error) {
       try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
       console.error('❌ Failed to store batch generated content in IndexedDB, cached in localStorage:', error);
     }
     
-    console.log('🎉 Batch content generation completed for course:', courseId);
+    // Batch content generation completed
     return courseContent;
   }
 

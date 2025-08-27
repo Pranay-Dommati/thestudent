@@ -96,7 +96,6 @@ const callGeminiAPI = async (message) => {
 // Vector bot API call for general educational responses
 const callVectorBotAPI = async (message) => {
   try {
-    console.log('📤 Sending request to vector bot API:', message);
     const response = await fetch('http://localhost:8000/api/chatbot/chat/general/', {
       method: 'POST',
       headers: {
@@ -107,19 +106,12 @@ const callVectorBotAPI = async (message) => {
       }),
     });
 
-    console.log('📥 API Response status:', response.status);
-    console.log('📥 API Response ok:', response.ok);
-
     if (!response.ok) {
       // Non-network/server error; bubble up as a normal error
       throw new Error(`Vector bot API error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('📥 Full API response data:', data);
-    console.log('📥 Extracted response:', data.response);
-    console.log('📥 Response type:', typeof data.response);
-    console.log('📥 Response length:', data.response ? data.response.length : 0);
     
     return data.response || 'Sorry, I could not generate a response.';
   } catch (error) {
@@ -306,8 +298,6 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
 
   useEffect(() => {
     try {
-      console.log("Parsing learning plan content:", content.slice(0, 100) + "...");
-      
       // Parse markdown content to extract learning plan data
       const lines = content.split('\n');
       let currentTitle = '';
@@ -319,7 +309,6 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
         const linkMatch = content.match(/\/learning\/([0-9a-f-]{36})/);
         if (linkMatch && linkMatch[1]) {
           setExtractedPlanId(linkMatch[1]);
-          console.log("Extracted learning plan ID:", linkMatch[1]);
         }
       }
   
@@ -375,7 +364,6 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
               title: videoMatch[1],
               url: videoMatch[2]
             });
-            console.log("Found video:", videoMatch[1]);
           }
         }
       }
@@ -385,8 +373,6 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
         currentDays.push(currentDay);
       }
   
-      console.log("Parsed learning plan days:", currentDays.length);
-      
       setTitle(currentTitle);
       setDays(currentDays);
     } catch (error) {
@@ -735,14 +721,11 @@ const ChatbotPage = () => {
       // Only consider it successful if we get a 200-299 response
       // 503 (Service Unavailable) means network/server issues
       if (response.ok) {
-        console.log('✅ Connection check passed:', response.status);
         return true;
       } else {
-        console.log('❌ Connection check failed with status:', response.status);
         return false;
       }
     } catch (error) {
-      console.log('❌ Connection check failed with error:', error);
       return false;
     }
   };
@@ -797,9 +780,7 @@ const ChatbotPage = () => {
         
         if (isProModeRequest) {
           // This is a course creation request - call the classification API directly
-          console.log('🚀 Retrying topic extraction for:', promptToRetry);
           const result = await classifyTopics(promptToRetry);
-          console.log('✅ AI Extracted Topics on retry:', result);
           
           // Update usage stats from the response
           if (result.usage_stats) {
@@ -889,7 +870,6 @@ const ChatbotPage = () => {
         
       } catch (error) {
         // Even though connection check passed, the actual request failed
-        console.log('Request failed despite connection check:', error);
         
         // Handle different types of errors
         if (error.isRateLimit) {
@@ -1047,15 +1027,10 @@ const ChatbotPage = () => {
     setIsLoading(true);
 
     try {
-      console.log('Pro Mode:', proMode);
-      console.log('Message:', messageToSend);
-
       if (proMode) {
         // Pro mode - extract topics using AI first with rate limiting
         try {
-          console.log('🚀 Starting topic extraction for:', messageToSend);
           const result = await classifyTopics(messageToSend);
-          console.log('✅ AI Extracted Topics:', result);
           
           // Update usage stats from the response
           if (result.usage_stats) {
@@ -1260,7 +1235,6 @@ const ChatbotPage = () => {
         }
       } else {
         // Regular chatbot response using vector bot for educational topics
-        console.log('🔄 Preparing to call vector bot API...');
 
         // If the device is offline, use the network-lost UX instead of calling the local API
         if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
@@ -1302,16 +1276,9 @@ const ChatbotPage = () => {
           return;
         }
 
-        console.log('🔄 Calling vector bot API...');
         try {
           const response = await callVectorBotAPI(messageToSend);
           
-          console.log("📨 Vector bot response received:");
-          console.log("📨 Response type:", typeof response);
-          console.log("📨 Response value:", response);
-          console.log("📨 Response length:", response ? response.length : 0);
-          console.log("📨 Is response truthy:", !!response);
-
           const botResponse = {
             id: generateMessageId(),
             type: "bot",
@@ -1319,13 +1286,8 @@ const ChatbotPage = () => {
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           };
 
-          console.log("📨 Bot response object:", botResponse);
-          console.log("📨 Bot response content:", botResponse.content);
-          console.log("📨 Bot response content length:", botResponse.content.length);
-
           setChatHistory((prev) => {
             const newHistory = [...prev, botResponse];
-            console.log("📨 New chat history:", newHistory);
             return newHistory;
           });
         } catch (error) {
@@ -1495,9 +1457,9 @@ const ChatbotPage = () => {
       // Create the topic string for URL - extract just the names from objects
       const topicNames = pendingTopics.map(topic => topic.name);
       const topicString = topicNames.join(', ');
-      console.log('📝 Confirmed topic names:', topicNames);
-      console.log('📝 Generated course ID:', courseId);
-      console.log('📝 Topic string for URL:', topicString);
+      // Confirmed topic names: topicNames
+      // Generated course ID: courseId
+      // Topic string for URL: topicString
     
       const proResponse = {
         id: chatHistory.length + 1,
@@ -1559,16 +1521,6 @@ const ChatbotPage = () => {
     const sections = isCourseContent ? parseMarkdownResponse(message.content) : [];
     const isLearningPlan = message.isLearningPlan || (message.content.includes("Learning Plan") && message.content.includes("Day "));
     const isProCard = message.isProCard || false;
-
-    // Debug logging
-    console.log("🔍 MessageBubble render:", {
-      messageType: message.type,
-      content: message.content ? message.content.substring(0, 100) + "..." : "empty",
-      contentLength: message.content ? message.content.length : 0,
-      isCourseContent,
-      isLearningPlan,
-      isProCard
-    });
 
     return (
       <div className="w-full max-w-5xl mx-auto px-6 lg:px-8 mb-4 lg:mb-6">
@@ -1767,7 +1719,7 @@ const ChatbotPage = () => {
                             try { localStorage.removeItem('proLearning_batchGeneration'); } catch {}
                             localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
                           }
-                          console.log('🚀 Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
+                          // Pro Learning Experience button clicked - batch generation data stored
                           
                           // Track in ProLearning history
                           proLearningHistoryService.trackCourseCreation(message.courseId, message.topic);
@@ -2126,7 +2078,7 @@ const ChatbotPage = () => {
                         
                         <div className="space-y-2 mb-4">
                           {pendingTopics.map((topic, index) => (
-                            <div key={topic.id || index} className="space-y-1">
+                            <div key={`pending-topic-${topic.id || `${index}-${topic.name}`}`} className="space-y-1">
                               <div className="flex items-center bg-white/80 backdrop-blur-sm rounded-lg p-2 border border-white/30">
                                 <span className="text-indigo-500 mr-2 font-bold">{index + 1}.</span>
                                 <div className="flex-1 flex flex-col">

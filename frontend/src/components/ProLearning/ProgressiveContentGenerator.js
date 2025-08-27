@@ -90,8 +90,8 @@ export class ProgressiveContentGenerator {
     this.currentTopic = 0;
     this.currentTab = 0;
 
-    console.log('🚀 Starting progressive content generation...');
-    console.log(`📚 Topics: ${this.topics.length}, Tabs per topic: ${this.tabOrder.length}`);
+    // Starting progressive content generation...
+    // Topics: this.topics.length, Tabs per topic: this.tabOrder.length
 
     try {
       await this.generateNextTabContent();
@@ -110,14 +110,14 @@ export class ProgressiveContentGenerator {
       // All content generated
       this.isGenerating = false;
       this.callbacks.onAllComplete();
-      console.log('🎉 All progressive content generation completed!');
+      // All progressive content generation completed!
       return;
     }
 
     const topic = this.topics[this.currentTopic];
     const tab = this.tabOrder[this.currentTab];
     
-    console.log(`🔄 Generating ${tab.name} for ${topic.name || topic} (Topic ${this.currentTopic + 1}/${this.topics.length}, Tab ${this.currentTab + 1}/${this.tabOrder.length})`);
+    // Generating tab.name for topic (progress info)
 
     // Calculate overall progress
     const totalTabs = this.topics.length * this.tabOrder.length;

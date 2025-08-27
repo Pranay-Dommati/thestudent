@@ -40,7 +40,6 @@ class ContentStorageService {
     this.storage.courses.set(courseId, course);
   this.persistToStorage();
     
-    console.log('💾 Course stored:', courseId, course.title);
     return courseId;
   }
 
@@ -105,7 +104,6 @@ class ContentStorageService {
     }
 
   this.persistToStorage();
-    console.log('💾 Topics stored for course:', courseId, topicIds.length, 'topics');
     return topicIds;
   }
 
@@ -170,7 +168,6 @@ class ContentStorageService {
     }
 
   this.persistToStorage();
-    console.log('💾 Single topic created:', topicId, topicName);
     return topicId;
   }
 
@@ -224,7 +221,6 @@ class ContentStorageService {
     }
 
   this.persistToStorage();
-    console.log('💾 Content stored for topic:', topicId, 'Content ID:', contentId);
     return contentId;
   }
 
@@ -236,19 +232,10 @@ class ContentStorageService {
   getTopicContent(topicId) {
     const topic = this.storage.topics.get(topicId);
     if (!topic || !topic.contentId) {
-      console.log('🔧 ContentStorageService: No topic or contentId found:', { topicId, topic: !!topic, contentId: topic?.contentId });
       return null;
     }
 
     const content = this.storage.contents.get(topic.contentId);
-    console.log('🔧 ContentStorageService: Retrieved content for topic:', topicId, {
-      hasContent: !!content,
-      contentKeys: content ? Object.keys(content) : 'NO_CONTENT',
-      readingExists: !!content?.reading,
-      readingLength: content?.reading?.length || 0,
-      readingType: typeof content?.reading,
-      readingPreview: content?.reading ? content.reading.substring(0, 100) + '...' : 'NO_READING'
-    });
     
     return content ? { ...content } : null;
   }
@@ -309,7 +296,7 @@ class ContentStorageService {
       }
     });
 
-    console.log('💾 Batch content storage completed:', results);
+    // Batch content storage completed
     return results;
   }
 
@@ -393,7 +380,7 @@ class ContentStorageService {
         this.storage.topics = new Map(Object.entries(storageData.topics || {}));
         this.storage.contents = new Map(Object.entries(storageData.contents || {}));
         this.storage.metadata = new Map(Object.entries(storageData.metadata || {}));
-        console.log('💾 Storage loaded from persistence (IndexedDB/localStorage)');
+        // Storage loaded from persistence
       }
     } catch (error) {
       console.warn('Failed to load storage from persistence:', error);
@@ -452,7 +439,7 @@ class ContentStorageService {
     this.storage.metadata = new Map(Object.entries(storageData.metadata || {}));
     
   this.persistToStorage();
-    console.log('💾 Storage imported successfully');
+    // Storage imported successfully
   }
 }
 

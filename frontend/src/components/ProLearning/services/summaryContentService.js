@@ -8,9 +8,8 @@
  * @param {string} readingContent - The main reading content to summarize (optional)
  */
 export async function generateSummaryContent(setContent, topic = '', readingContent = '') {
-  console.log(`🧠 Generating summary content for topic: "${topic}"`);
-  console.log(`📖 Reading content available:`, readingContent ? `${readingContent.length} chars` : 'NONE');
-  console.log(`📖 Reading content preview:`, readingContent ? readingContent.substring(0, 200) + '...' : 'NO CONTENT');
+  // Generating summary content for topic
+  // Reading content available and preview
   
   try {
     let summary;
@@ -22,20 +21,20 @@ export async function generateSummaryContent(setContent, topic = '', readingCont
     // Prioritize reading content for actual summaries
     if (readingContent && readingContent.length > 100) {
       // Generate content-based summary from actual reading material
-      console.log('📚 Generating content-based summary from reading material...');
+      // Generating content-based summary from reading material
       summary = await generateAISummary(readingContent, topic);
       metadata.type = 'content-based';
       metadata.sourceLength = readingContent.length;
       metadata.topic = topic;
     } else if (topic && topic.length > 0) {
       // Generate topic-based summary only when no reading content
-      console.log('🎯 Generating topic-based summary...');
+      // Generating topic-based summary
       summary = await generateTopicBasedSummary(topic, readingContent);
       metadata.type = 'topic-based';
       metadata.hasReadingContent = false;
     } else {
       // Use fallback summary
-      console.log('⚠️ Using fallback summary...');
+      // Using fallback summary
       throw new Error('No summary content available');
     }
 
@@ -46,8 +45,8 @@ export async function generateSummaryContent(setContent, topic = '', readingCont
       }
     }
 
-    console.log('✅ Summary content generated successfully:', summary ? `${summary.length} chars` : 'EMPTY');
-    console.log('📊 Summary metadata:', metadata);
+    // Summary content generated successfully
+    // Summary metadata logged
 
     // Call setContent with the generated summary
     setContent({
@@ -81,8 +80,8 @@ async function generateTopicBasedSummary(topic, readingContent = '') {
 
 // Generate AI-powered summary from reading content
 async function generateAISummary(readingContent, topic = '') {
-  console.log(`🤖 Calling AI summary API for topic: "${topic}"`);
-  console.log(`📖 Sending reading content:`, readingContent ? `${readingContent.length} chars` : 'NO CONTENT');
+  // Calling AI summary API for topic
+  // Sending reading content
   
   try {
     const response = await fetch('http://localhost:8000/ai/summary/', {
@@ -91,7 +90,7 @@ async function generateAISummary(readingContent, topic = '') {
       body: JSON.stringify({ topic, reading_content: readingContent })
     });
     
-    console.log(`🤖 AI Summary API response status:`, response.status);
+    // AI Summary API response status
     
     if (!response.ok) {
       console.error(`🚨 AI Summary API failed:`, response.status, response.statusText);
@@ -99,10 +98,10 @@ async function generateAISummary(readingContent, topic = '') {
     }
     
     const result = await response.json();
-    console.log(`🤖 AI Summary API result:`, result);
+    // AI Summary API result
     
     const summaryText = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    console.log(`✅ Generated summary:`, summaryText ? `${summaryText.length} chars` : 'EMPTY');
+    // Generated summary
     
     return summaryText;
   } catch (error) {
