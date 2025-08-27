@@ -49,13 +49,14 @@ export async function generateProContent({ topic, setIsLoading, setLoadingProgre
     metadata: {}
   };
   
-  console.log('🔧 ProLearningLogic: Starting content generation with local content structure');
+  // Reduced logging for content generation start
   
   try {
     // Step 1: Generate Reading Content
     setLoadingStep('📘 Generating comprehensive reading material...');
     setLoadingProgress(10);
-    console.log('🔧 ProLearningLogic: About to call generateReadingContent for topic:', topic);
+    // Only log for debugging when needed
+    // console.log('🔧 ProLearningLogic: About to call generateReadingContent for topic:', topic);
     
     // Create a wrapper setContent that updates local content properly
     const localSetContent = (updater) => {
@@ -65,17 +66,19 @@ export async function generateProContent({ topic, setIsLoading, setLoadingProgre
         // Merge the new content with existing content
         localContent = { ...localContent, ...updater };
       }
-      console.log('🔧 ProLearningLogic: Local content updated:', {
-        hasReading: !!localContent.reading,
-        hasSummary: !!localContent.summary,
-        hasQuiz: localContent.quiz && localContent.quiz.length > 0,
-        hasVideos: localContent.videos && localContent.videos.length > 0,
-        hasResources: localContent.resources && localContent.resources.length > 0
-      });
+      // Reduced logging frequency
+      // console.log('🔧 ProLearningLogic: Local content updated:', {
+      //   hasReading: !!localContent.reading,
+      //   hasSummary: !!localContent.summary,
+      //   hasQuiz: localContent.quiz && localContent.quiz.length > 0,
+      //   hasVideos: localContent.videos && localContent.videos.length > 0,
+      //   hasResources: localContent.resources && localContent.resources.length > 0
+      // });
     };
     
     await generateReadingContent(topic, localSetContent);
-    console.log('🔧 ProLearningLogic: generateReadingContent completed for topic:', topic);
+    // Reduced completion logging
+    // console.log('🔧 ProLearningLogic: generateReadingContent completed for topic:', topic);
     // Wait a bit to ensure content is updated
     await new Promise(resolve => setTimeout(resolve, 100));
     

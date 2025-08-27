@@ -70,11 +70,12 @@ function validateGeneratedContent(content, topic) {
     throw new Error(`Generated content too short for topic: ${topic}`);
   }
   
-  // Check for essential markdown sections
+  // Check for essential markdown sections (only log critical missing sections)
   const requiredSections = ['## 📘', '### 🔹 What is', '### 🔹 Core Concepts'];
   const missingSection = requiredSections.find(section => !content.includes(section));
   if (missingSection) {
-    console.warn(`Missing expected section "${missingSection}" in generated content for: ${topic}`);
+    // Only log if this is a critical section, reduce noise
+    // console.warn(`Missing expected section "${missingSection}" in generated content for: ${topic}`);
   }
   
   return true;
@@ -156,7 +157,7 @@ async function generateSingleTopicContent(topic) {
     
     // Content Generation Results logged
     
-    // Analyze if content matches expected prompt type
+    // Analyze if content matches expected prompt type (reduced logging)
     if (result.topic_category === 'technical' && generatedText) {
       const technicalIndicators = [
         'code', 'programming', 'function', 'syntax', 'algorithm', 
@@ -166,15 +167,9 @@ async function generateSingleTopicContent(topic) {
         generatedText.toLowerCase().includes(indicator.toLowerCase())
       );
       
-      // TECHNICAL PROMPT VERIFICATION logged
-      console.log(`   • Technical indicators found: [${foundTechIndicators.join(', ')}]`);
-      console.log(`   • Code blocks detected: ${(generatedText.match(/```/g) || []).length / 2} blocks`);
-      
-      if (foundTechIndicators.length >= 2) {
-        console.log(`   ✅ VERIFICATION PASSED: Content appears to use TECHNICAL prompt`);
-      } else {
-        console.log(`   ⚠️ VERIFICATION WARNING: Content may NOT be using technical prompt`);
-        console.log(`   🔄 Possible fallback to general prompt occurred`);
+      // Only log verification failures to reduce noise
+      if (foundTechIndicators.length < 2) {
+        console.log(`   ⚠️ VERIFICATION WARNING: Content may NOT be using technical prompt for ${result.topic}`);
       }
     }
     
@@ -243,11 +238,14 @@ export async function generateReadingContent(user_input, setContent, options = {
         successRate: '100%'
       }
     });
-    console.log(`📦 Served from cache: ${user_input}`);
+    // Reduced logging for cache hits
     return;
   }
 
-  console.log(`🚀 Generating content for ${topics.length} topic(s)`);
+  // Only log for multiple topics to reduce noise
+  if (topics.length > 1) {
+    console.log(`🚀 Generating content for ${topics.length} topic(s)`);
+  }
 
   try {
     // Process topics in batches to respect rate limits
@@ -259,7 +257,7 @@ export async function generateReadingContent(user_input, setContent, options = {
     const allResponses = [];
     
     for (const batch of batches) {
-      console.log(`📝 Processing batch of ${batch.length} topics...`);
+      // Reduced logging for batch processing
       
       const batchPromises = batch.map(async (topic, index) => {
         // Check cache first

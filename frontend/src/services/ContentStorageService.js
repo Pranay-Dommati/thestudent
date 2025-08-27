@@ -75,6 +75,7 @@ class ContentStorageService {
    * @returns {Array} - Array of stored topic IDs
    */
   storeTopics(courseId, topicsList) {
+    console.log('📝 STORAGE DEBUG: Storing topics for course:', courseId, 'topics:', topicsList.map(t => t.name || t));
     const topicIds = [];
     
     topicsList.forEach(topic => {
@@ -93,6 +94,7 @@ class ContentStorageService {
       
       this.storage.topics.set(topicId, topicData);
       topicIds.push(topicId);
+      console.log('📝 STORAGE DEBUG: Stored topic:', topicId, 'name:', topic.name);
     });
 
     // Update course with topic IDs
@@ -101,6 +103,7 @@ class ContentStorageService {
       course.topicIds = topicIds;
       course.updatedAt = new Date().toISOString();
       this.storage.courses.set(courseId, course);
+      console.log('📝 STORAGE DEBUG: Course updated with topicIds:', topicIds);
     }
 
   this.persistToStorage();
@@ -114,11 +117,23 @@ class ContentStorageService {
    */
   getTopicsForCourse(courseId) {
     const course = this.storage.courses.get(courseId);
-    if (!course) return [];
+    if (!course) {
+      console.log('🔍 STORAGE DEBUG: Course not found for ID:', courseId);
+      return [];
+    }
 
-    return course.topicIds.map(topicId => 
+    const topics = course.topicIds.map(topicId => 
       this.storage.topics.get(topicId)
     ).filter(Boolean);
+    
+    console.log('🔍 STORAGE DEBUG: getTopicsForCourse result:', {
+      courseId,
+      topicIds: course.topicIds,
+      foundTopics: topics.length,
+      topicNames: topics.map(t => t.name)
+    });
+    
+    return topics;
   }
 
   /**
@@ -180,36 +195,49 @@ class ContentStorageService {
    * @returns {String} - Content ID
    */
   storeTopicContent(topicId, contentData) {
+    console.log('💾 STORAGE DEBUG: Storing content for topic ID:', topicId, 'contentData keys:', Object.keys(contentData || {}));
     const contentId = this.generateId('content');
+    const isProgressive = !!(contentData && contentData.metadata);
     const content = {
       id: contentId,
       topicId: topicId,
-      
+
       // Main content sections
-      reading: contentData.reading || null,
-      summary: contentData.summary || null,
-      videos: contentData.videos || [],
-      quiz: contentData.quiz || null,
-      resources: contentData.resources || [],
-      
-      // Metadata
-      generatedAt: new Date().toISOString(),
-      generationMethod: 'ai_batch',
+      reading: contentData?.reading ?? null,
+      summary: contentData?.summary ?? null,
+      videos: Array.isArray(contentData?.videos) ? contentData.videos : (contentData?.videos ? contentData.videos : []),
+      // Preserve quiz structure (array or object with questions)
+      quiz: (Array.isArray(contentData?.quiz) || (contentData?.quiz && typeof contentData.quiz === 'object')) ? contentData.quiz : (contentData?.quiz ?? null),
+      resources: Array.isArray(contentData?.resources) ? contentData.resources : (contentData?.resources ? contentData.resources : []),
+
+      // Metadata (preserve progressive generation timestamps)
+      metadata: contentData?.metadata ? { ...contentData.metadata } : undefined,
+      generatedAt: (contentData?.metadata?.lastUpdated) || new Date().toISOString(),
+      generationMethod: isProgressive ? 'ai_progressive' : 'ai_batch',
       version: '1.0',
-      
+
       // Statistics
-      stats: contentData.stats || {},
-      
+      stats: contentData?.stats || {},
+
       // Status flags
-      isComplete: true,
-      hasReading: !!(contentData.reading),
-      hasSummary: !!(contentData.summary),
-      hasVideos: !!(contentData.videos && contentData.videos.length > 0),
-      hasQuiz: !!(contentData.quiz),
-      hasResources: !!(contentData.resources && contentData.resources.length > 0)
+      isComplete: !!(
+        (contentData?.reading && contentData?.summary) &&
+        (Array.isArray(contentData?.videos) ? contentData.videos.length > 0 : false) &&
+        ((Array.isArray(contentData?.quiz) ? contentData.quiz.length > 0 : (contentData?.quiz && Array.isArray(contentData.quiz.questions) && contentData.quiz.questions.length > 0))) &&
+        (Array.isArray(contentData?.resources) ? contentData.resources.length > 0 : false)
+      ),
+      hasReading: !!(contentData?.reading),
+      hasSummary: !!(contentData?.summary),
+      hasVideos: !!(Array.isArray(contentData?.videos) && contentData.videos.length > 0),
+      hasQuiz: !!(
+        (Array.isArray(contentData?.quiz) && contentData.quiz.length > 0) ||
+        (contentData?.quiz && Array.isArray(contentData.quiz.questions) && contentData.quiz.questions.length > 0)
+      ),
+      hasResources: !!(Array.isArray(contentData?.resources) && contentData.resources.length > 0)
     };
 
-    this.storage.contents.set(contentId, content);
+  this.storage.contents.set(contentId, content);
+  console.log('💾 STORAGE DEBUG: Content stored in contents map with ID:', contentId);
 
     // Update topic to reference this content
     const topic = this.storage.topics.get(topicId);
@@ -217,11 +245,66 @@ class ContentStorageService {
       topic.contentGenerated = true;
       topic.contentId = contentId;
       topic.updatedAt = new Date().toISOString();
-      this.storage.topics.set(topicId, topic);
+    this.storage.topics.set(topicId, topic);
+    console.log('💾 STORAGE DEBUG: Topic updated with contentId:', contentId, 'topic name:', topic.name);
+
+    // Persist changes asynchronously (best-effort)
+    try { this.persistToStorage(); } catch {}
+    } else {
+      console.error('❌ STORAGE DEBUG: Topic not found for ID:', topicId);
     }
 
   this.persistToStorage();
     return contentId;
+  }
+
+  /**
+   * Remove content entry for a topic (by topicId)
+   * @param {String} topicId - Topic ID
+   */
+  removeTopicContent(topicId) {
+    // Find content by topicId
+    let contentKeyToRemove = null;
+    for (const [contentId, content] of this.storage.contents.entries()) {
+      if (content.topicId === topicId) {
+        contentKeyToRemove = contentId;
+        break;
+      }
+    }
+    if (contentKeyToRemove) {
+      this.storage.contents.delete(contentKeyToRemove);
+    }
+    // Also update the topic linkage
+    const topic = this.storage.topics.get(topicId);
+    if (topic) {
+      topic.contentGenerated = false;
+      topic.contentId = null;
+      topic.updatedAt = new Date().toISOString();
+      this.storage.topics.set(topicId, topic);
+    }
+    this.persistToStorage();
+  }
+
+  /**
+   * Remove a topic entirely from a course
+   * @param {String} topicId - Topic ID
+   */
+  removeTopic(topicId) {
+    // Remove associated content first
+    this.removeTopicContent(topicId);
+    // Remove topic record
+    const topic = this.storage.topics.get(topicId);
+    if (topic) {
+      this.storage.topics.delete(topicId);
+      // Remove from course.topicIds
+      const course = this.storage.courses.get(topic.courseId);
+      if (course) {
+        course.topicIds = (course.topicIds || []).filter(id => id !== topicId);
+        course.updatedAt = new Date().toISOString();
+        this.storage.courses.set(topic.courseId, course);
+      }
+    }
+    this.persistToStorage();
   }
 
   /**
@@ -257,10 +340,14 @@ class ContentStorageService {
    * @returns {Object|null} - Content data or null
    */
   getContentByTopicName(topicName, courseId) {
+    console.log('🔍 STORAGE DEBUG: Looking for content - topicName:', topicName, 'courseId:', courseId);
     const topic = this.getTopicByName(topicName, courseId);
+    console.log('🔍 STORAGE DEBUG: Found topic:', !!topic, topic ? topic.id : 'none');
     if (!topic) return null;
     
-    return this.getTopicContent(topic.id);
+    const content = this.getTopicContent(topic.id);
+    console.log('🔍 STORAGE DEBUG: Found content for topic:', !!content);
+    return content;
   }
 
   // ==================== BATCH OPERATIONS ====================
