@@ -608,7 +608,11 @@ const ProLearningPage = () => {
   }, [courseTitle, GEMINI_API_KEY]);
 
   // Separate useEffect to handle batch generation when topics are available
+  // Skip this entirely when progressive generation is enabled
   useEffect(() => {
+    if (useProgressiveGeneration) {
+      return; // progressive flow manages its own generation lifecycle
+    }
     const currentCourseId = getCourseId();
     if (topicsList.length > 0 && !isBatchGenerating && currentCourseId) {
       // Check if we need to start batch generation using new storage system
@@ -648,7 +652,7 @@ const ProLearningPage = () => {
         }, 500);
       }
     }
-  }, [topicsList, courseTitle]); // Depend on both topicsList and courseTitle
+  }, [topicsList, courseTitle, useProgressiveGeneration]); // Depend on both topicsList and courseTitle
 
   // Load content for initially active topic using new storage system
   useEffect(() => {
@@ -992,11 +996,12 @@ const ProLearningPage = () => {
   };
 
   // Helper function to load topic content from progressive generation data
-  const loadProgressiveTopicContent = async (topicName) => {
+  const loadProgressiveTopicContent = async (topicName, options = {}) => {
+    const { showLoader = true } = options;
     if (!topicName) return;
 
     try {
-      setIsLoading(true);
+      if (showLoader) setIsLoading(true);
       setLoadingStep(`Loading ${topicName} content...`);
 
       console.log('🔍 Loading progressive content for:', topicName);
@@ -1048,7 +1053,7 @@ const ProLearningPage = () => {
         resources: []
       });
     } finally {
-      setIsLoading(false);
+      if (showLoader) setIsLoading(false);
       setLoadingStep('');
     }
   };
@@ -1261,6 +1266,10 @@ const ProLearningPage = () => {
 
   // Check for pending topics
   useEffect(() => {
+    // If progressive generation is enabled, don't kick off the legacy batch flow here
+    if (useProgressiveGeneration) {
+      return;
+    }
     
     // Check if we have pending topics from the chatbot
     try {
@@ -1283,7 +1292,7 @@ const ProLearningPage = () => {
     }
     
     // Start batch generation for all topics if needed
-    const initializeBatchGeneration = async () => {
+  const initializeBatchGeneration = async () => {
       if (topicsList.length > 0 && courseTitle) {
         
         // Get current generation progress using the storage service
@@ -1326,7 +1335,7 @@ const ProLearningPage = () => {
     }, 500);
     
     return () => clearTimeout(timer);
-  }, [topicsList, courseTitle]); // Add courseTitle dependency
+  }, [topicsList, courseTitle, useProgressiveGeneration]); // Add courseTitle dependency
 
   // Handle initial content loading when page loads with topic parameter
   useEffect(() => {
@@ -1395,27 +1404,73 @@ const ProLearningPage = () => {
     }
 
     try {
-      // Use the new ProContentManager batch generation
-      await proContentManager.generateAllContentBatch(
-        topicsList,
-        currentCourseId,
-        (current, total, topicName, contentType) => {
-          const progress = Math.round((current / total) * 100);
-          setCourseGenerationProgress(progress);
-          setCourseGenerationStatus(`Generating ${contentType} for ${topicName}...`);
-          console.log(`📈 Pro Learning Start Progress: ${progress}% - ${contentType} for ${topicName}`);
-        }
-      );
+      if (useProgressiveGeneration) {
+        // Progressive generation: reveal tabs as they are ready
+        await initializeProgressiveGeneration(courseTitle, topicsList, {
+          onProgress: (progress) => {
+            setProgressiveGenerationProgress(progress);
+            setCourseGenerationProgress(progress.overallProgress || 0);
+            setCourseGenerationStatus(`Generating ${progress.tabName} for ${progress.topic}...`);
+          },
+          onTabComplete: (tabInfo) => {
+            // Make this tab clickable immediately for this topic
+            setAvailableTabsForTopics(prev => {
+              const topicTabs = prev[tabInfo.topic] || [];
+              return topicTabs.includes(tabInfo.tabType)
+                ? prev
+                : { ...prev, [tabInfo.topic]: [...topicTabs, tabInfo.tabType] };
+            });
 
-      // Mark all topics as generated
-      setAllTopicsGenerated(true);
-      setCourseGenerationStatus("✅ All topics generated successfully!");
-      
-      // Auto-load first topic content or topic from URL
-      const topicToLoad = topicParam || topicsList[0]?.name;
-      if (topicToLoad) {
-        console.log('🎯 Auto-loading topic after Pro Learning start:', topicToLoad);
-        await loadTopicContent(topicToLoad);
+            // Load/refresh content for the current topic as soon as first tab is ready
+            if (selectedTopic?.name === tabInfo.topic) {
+              loadProgressiveTopicContent(tabInfo.topic);
+            }
+          },
+          onTopicComplete: () => {},
+          onAllComplete: () => {
+            setIsProgressiveGenerating(false);
+            setAllTopicsGenerated(true);
+            setCourseGenerationStatus('✅ All topics generated successfully!');
+          },
+          onError: (err) => {
+            console.error('❌ Progressive generation error:', err);
+            setIsProgressiveGenerating(false);
+          }
+        });
+
+        setIsProgressiveGenerating(true);
+  // Do not block the UI with the generic loader; tabs should appear as they become ready
+  setIsGeneratingCourse(false);
+        await startProgressiveGeneration();
+
+        // Load first topic immediately (it will show partial content)
+        const topicToLoad = topicParam || topicsList[0]?.name;
+        if (topicToLoad) {
+          await loadProgressiveTopicContent(topicToLoad);
+        }
+      } else {
+        // Legacy batch generation (kept as fallback)
+        await proContentManager.generateAllContentBatch(
+          topicsList,
+          currentCourseId,
+          (current, total, topicName, contentType) => {
+            const progress = Math.round((current / total) * 100);
+            setCourseGenerationProgress(progress);
+            setCourseGenerationStatus(`Generating ${contentType} for ${topicName}...`);
+            console.log(`📈 Pro Learning Start Progress: ${progress}% - ${contentType} for ${topicName}`);
+          }
+        );
+
+        // Mark all topics as generated
+        setAllTopicsGenerated(true);
+        setCourseGenerationStatus("✅ All topics generated successfully!");
+        
+        // Auto-load first topic content or topic from URL
+        const topicToLoad = topicParam || topicsList[0]?.name;
+        if (topicToLoad) {
+          console.log('🎯 Auto-loading topic after Pro Learning start:', topicToLoad);
+          await loadTopicContent(topicToLoad);
+        }
       }
 
     } catch (error) {
@@ -1552,6 +1607,11 @@ const ProLearningPage = () => {
     }
 
     if (readyTabs.length === 0) return;
+
+    // If the active tab just became available, refresh content silently
+    if (readyTabs.includes(activeTab)) {
+      loadProgressiveTopicContent(topicName, { showLoader: false });
+    }
 
     // If the current tab isn't ready, switch to the first ready tab
     if (!readyTabs.includes(activeTab)) {
@@ -3378,6 +3438,10 @@ const ProLearningPage = () => {
                           onClick={() => {
                             if (!isTabDisabled) {
                               updateActiveTab(tab.id);
+                              if (useProgressiveGeneration && selectedTopic?.name && isTabAvailable) {
+                                // Refresh progressive content for immediate tab display
+                                loadProgressiveTopicContent(selectedTopic.name, { showLoader: false });
+                              }
                             }
                           }}
                           disabled={isLoading || isTabDisabled}
