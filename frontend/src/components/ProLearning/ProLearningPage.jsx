@@ -1232,9 +1232,11 @@ const ProLearningPage = () => {
 
     // Check if this topic is blocked (2nd topic onwards until course completion)
     if (isTopicBlocked(selectedTopic.name)) {
-      // For blocked topics, don't try to load content - just show loading state
+      // For blocked topics, set loading state with appropriate message
+      setIsLoading(true);
+      setLoadingStep(`Loading ${selectedTopic.name} content...`);
       console.log('🚫 Topic is blocked until course completion:', selectedTopic.name);
-      return; // Exit early, content will show blocking message
+      return; // Exit early, content will show loading UI
     }
 
     // Handle content loading for non-blocked topics (first topic only until course completion)
@@ -1718,6 +1720,7 @@ const ProLearningPage = () => {
                   onComplete: () => {
                     setAllTopicsGenerated(true);
                     setIsProgressiveGenerating(false);
+                    setIsLoading(false); // Clear loading state when all topics are ready
                     setCourseGenerationStatus('✅ All topics generated successfully!');
                     
                     // Clear the batch marker since generation is complete
@@ -1741,6 +1744,7 @@ const ProLearningPage = () => {
               // Only one topic in course
               setIsProgressiveGenerating(false);
               setAllTopicsGenerated(true);
+              setIsLoading(false); // Clear loading state when single topic is ready
               setCourseGenerationStatus('✅ Course generated successfully!');
               
               // Clear the batch marker since generation is complete
@@ -2490,22 +2494,8 @@ const ProLearningPage = () => {
     
     // CRITICAL: Check if current topic is blocked (2nd topic onwards until course completion)
     if (currentTopicName && isTopicBlocked(currentTopicName)) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center max-w-lg">
-            <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg mb-4">
-              <BiLoaderAlt className="text-2xl text-white animate-spin" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Course Generation in Progress</h3>
-            <p className="text-gray-600 text-sm leading-relaxed mb-4">
-              Please wait while we generate content for all topics. This topic will be available once the entire course is ready.
-            </p>
-            <div className="text-xs text-gray-500">
-              Content for "{currentTopicName}" is being prepared...
-            </div>
-          </div>
-        </div>
-      );
+      // For blocked topics, show the existing loading component instead of content
+      return <LoadingComponent />;
     }
     
     // Show loading thoughtfully: in progressive mode, don't block UI if any tab/content is ready
