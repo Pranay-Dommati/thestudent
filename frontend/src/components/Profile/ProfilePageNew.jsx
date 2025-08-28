@@ -305,8 +305,7 @@ const ProfilePage = () => {
     }));
   };
   const tabs = [
-    { id: 'profile', label: 'Personal Information', icon: FaUser },
-    { id: 'security', label: 'Security & Password', icon: FaLock }
+    { id: 'profile', label: 'Personal Information', icon: FaUser }
   ];
 
   // Handle profile image change
@@ -566,138 +565,6 @@ const ProfilePage = () => {
                     {renderFormField(field)}
                   </div>
                 ))}
-              </div>
-            </motion.div>
-          )}
-          
-          {/* Certificates Tab */}
-          {activeTab === 'certificates' && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Certificates />
-            </motion.div>
-          )}
-          
-          {/* Security Tab */}
-          {activeTab === 'security' && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="profile-card"
-            >
-              <div className="profile-header">
-                <div>
-                  <h2 className="profile-title">Security & Password</h2>
-                  <p className="profile-subtitle">Manage your account security settings</p>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <h3 className="font-medium text-gray-900">Password</h3>
-                      <p className="text-sm text-gray-600">Update your password regularly for better security</p>
-                    </div>
-                    <button
-                      onClick={() => setShowPasswordForm(!showPasswordForm)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                    >
-                      Change Password
-                    </button>
-                  </div>
-                  
-                  {showPasswordForm && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="space-y-4 p-4 border border-gray-200 rounded-lg"
-                    >
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Current Password
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showPasswords.current ? 'text' : 'password'}
-                            value={passwordData.currentPassword}
-                            onChange={(e) => setPasswordData(prev => ({...prev, currentPassword: e.target.value}))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter current password"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => togglePasswordVisibility('current')}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-                          >
-                            {showPasswords.current ? <FaEyeSlash /> : <FaEye />}
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          New Password
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showPasswords.new ? 'text' : 'password'}
-                            value={passwordData.newPassword}
-                            onChange={(e) => setPasswordData(prev => ({...prev, newPassword: e.target.value}))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter new password"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => togglePasswordVisibility('new')}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-                          >
-                            {showPasswords.new ? <FaEyeSlash /> : <FaEye />}
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Confirm New Password
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showPasswords.confirm ? 'text' : 'password'}
-                            value={passwordData.confirmPassword}
-                            onChange={(e) => setPasswordData(prev => ({...prev, confirmPassword: e.target.value}))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Confirm new password"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => togglePasswordVisibility('confirm')}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-                          >
-                            {showPasswords.confirm ? <FaEyeSlash /> : <FaEye />}
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-3 pt-4">
-                        <button
-                          onClick={handleCancelPasswordChange}
-                          className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handlePasswordChange}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          Update Password
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
               </div>
             </motion.div>
           )}
