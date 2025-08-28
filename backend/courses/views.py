@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, Http404
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view, parser_classes, permission_classes
+from rest_framework.decorators import api_view, parser_classes, permission_classes, authentication_classes
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -307,6 +307,7 @@ def create_course(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def list_engineering_courses(request):
     try:
         category = request.query_params.get('category', 'all')
@@ -352,6 +353,7 @@ def list_engineering_courses(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def get_engineering_course_by_id(request, course_id):
     try:
         course = EngineeringCourse.objects.get(id=course_id)
@@ -365,6 +367,7 @@ def get_engineering_course_by_id(request, course_id):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def get_school_course_by_id(request, course_id):
     try:
         course = SchoolCourse.objects.get(id=course_id)
@@ -378,6 +381,7 @@ def get_school_course_by_id(request, course_id):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def list_all_courses(request):
     try:
         category = request.query_params.get('category', 'all')
@@ -440,6 +444,7 @@ def list_all_courses(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def list_school_courses(request):
     try:
         class_level = request.query_params.get('class', '')
@@ -2095,6 +2100,7 @@ def update_course(request, course_id):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def get_course_by_id(request, course_id):
     """
     Get a specific course by ID (both school and engineering courses)
