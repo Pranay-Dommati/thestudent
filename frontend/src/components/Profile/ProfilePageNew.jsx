@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  FaUser, FaLock, FaRegUser, FaRegEnvelope, FaEye, FaEyeSlash,
+  FaUser, FaRegUser, FaRegEnvelope,
   FaEdit, FaCheck, FaTimes, FaSpinner, FaSignOutAlt, FaHome,
   FaGoogle, FaUnlink, FaCamera, FaGraduationCap,
   FaBookOpen
@@ -16,12 +16,6 @@ const ProfilePage = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
-  const [showPasswords, setShowPasswords] = useState({
-    current: false,
-    new: false,
-    confirm: false
-  });
   const [profileImage, setProfileImage] = useState(null);
   const [profileImageUrl, setProfileImageUrl] = useState('https://via.placeholder.com/150');
   
@@ -32,11 +26,6 @@ const ProfilePage = () => {
     name: '',
     email: '',
     country: ''
-  });
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
   });
   // Social accounts state - dynamically set based on user's auth method
   const [socialAccounts, setSocialAccounts] = useState({});
@@ -298,12 +287,6 @@ const ProfilePage = () => {
     navigate('/');
   };
 
-  const togglePasswordVisibility = (field) => {
-    setShowPasswords(prev => ({
-      ...prev,
-      [field]: !prev[field]
-    }));
-  };
   const tabs = [
     { id: 'profile', label: 'Personal Information', icon: FaUser }
   ];
