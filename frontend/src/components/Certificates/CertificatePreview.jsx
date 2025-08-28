@@ -16,6 +16,12 @@ const CertificatePreview = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  
+  // Debug logging
+  console.log('CertificatePreview - courseId:', courseId);
+  console.log('CertificatePreview - navigate function:', typeof navigate);
+  console.log('CertificatePreview - user:', user);
+  
   const [loading, setLoading] = useState(true);
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState('');
@@ -114,12 +120,35 @@ const CertificatePreview = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Enhanced Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
+      <div className="bg-white border-b border-gray-200 shadow-sm relative z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <button
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Back to Course clicked, courseId:', courseId);
+                try {
+                  // Try to navigate to the specific course page first
+                  if (courseId) {
+                    console.log('Navigating to course:', `/courses/${courseId}`);
+                    navigate(`/courses/${courseId}`);
+                  } else {
+                    console.log('Navigating back in history');
+                    navigate(-1);
+                  }
+                } catch (error) {
+                  console.error('Navigation error:', error);
+                  // Fallback to window navigation
+                  if (courseId) {
+                    window.location.href = `/courses/${courseId}`;
+                  } else {
+                    window.history.back();
+                  }
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200 cursor-pointer relative z-10"
+              style={{ pointerEvents: 'auto' }}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -128,43 +157,86 @@ const CertificatePreview = () => {
             </button>
             
             {/* Action buttons */}
-            <div className="flex items-center gap-3">
-              {certificate?.download_url && (
-                <>
-                  {/* Share button */}
-                  <button
-                    onClick={() => {
-                      if (navigator.share) {
-                        navigator.share({
-                          title: 'My Certificate of Completion',
-                          text: `I've completed the ${courseTitle} course!`,
-                          url: window.location.href
-                        });
-                      } else {
-                        navigator.clipboard.writeText(window.location.href);
-                        toast.success('Certificate link copied to clipboard!');
-                      }
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                    </svg>
-                    <span className="hidden sm:inline">Share</span>
-                  </button>
-                  
-                  {/* Download button */}
-                  <a
-                    href={`${certificate.download_url}?v=${encodeURIComponent(certificate.certificate_id || Date.now())}`}
-                    download
-                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105 font-medium shadow-lg"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Download PDF
-                  </a>
-                </>
+            <div className="flex items-center gap-3 relative z-10">
+              {/* Share button - always available */}
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('Share button clicked');
+                  try {
+                    const shareData = {
+                      title: 'My Certificate of Completion',
+                      text: `I've completed the ${courseTitle || 'course'} course!`,
+                      url: window.location.href
+                    };
+                    
+                    console.log('Attempting to share:', shareData);
+                    
+                    if (navigator.share) {
+                      console.log('Using Web Share API');
+                      await navigator.share(shareData);
+                      // Removed automatic toast - let the system handle share feedback
+                    } else {
+                      console.log('Web Share not available, using clipboard');
+                      await navigator.clipboard.writeText(window.location.href);
+                      toast.success('Certificate link copied to clipboard!');
+                    }
+                  } catch (error) {
+                    console.log('Share/clipboard failed:', error);
+                    // Manual fallback
+                    const textArea = document.createElement('textarea');
+                    textArea.value = window.location.href;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                      document.execCommand('copy');
+                      toast.success('Certificate link copied to clipboard!');
+                    } catch (copyError) {
+                      console.error('Manual copy failed:', copyError);
+                      toast.error('Unable to copy link. Please copy the URL manually.');
+                    }
+                    document.body.removeChild(textArea);
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200 cursor-pointer"
+                style={{ pointerEvents: 'auto' }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                </svg>
+                <span className="hidden sm:inline">Share</span>
+              </button>
+              
+              {/* Download button - only show when certificate is available */}
+              {certificate?.download_url ? (
+                <a
+                  href={`${certificate.download_url}?v=${encodeURIComponent(certificate.certificate_id || Date.now())}`}
+                  download={`certificate-${learnerName.replace(/\s+/g, '-').toLowerCase()}.pdf`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    console.log('Download button clicked');
+                    console.log('Download URL:', certificate.download_url);
+                    toast.success('Certificate download started!');
+                  }}
+                  className="flex items-center gap-2 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 font-medium shadow-lg cursor-pointer relative z-10"
+                  style={{ pointerEvents: 'auto' }}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download PDF
+                </a>
+              ) : (
+                <button
+                  disabled
+                  className="flex items-center gap-2 px-6 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed font-medium shadow-lg opacity-50"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download PDF
+                </button>
               )}
             </div>
           </div>
@@ -178,7 +250,7 @@ const CertificatePreview = () => {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               {/* Certificate Header */}
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
                 <h1 className="text-2xl font-bold text-white">Certificate of Completion</h1>
               </div>
 
@@ -284,42 +356,14 @@ const CertificatePreview = () => {
                 )}
               </div>
             </div>
-
-            {/* Action Buttons */}
-            {certificate?.download_url && (
-              <div className="mt-6 flex items-center gap-4">
-                <button
-                  onClick={() => navigate(-1)}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                >
-                  Back to course
-                </button>
-                <a
-                  href={`${certificate.download_url}?v=${encodeURIComponent(certificate.certificate_id || Date.now())}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download
-                </a>
-              </div>
-            )}
           </div>
 
           {/* Right: Course Details */}
           <div className="space-y-6">
             {/* Enhanced Certificate Details Card */}
             <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                    </svg>
-                  </div>
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
+                <div className="flex items-center">
                   <h2 className="text-lg font-semibold text-white">Certificate Details</h2>
                 </div>
               </div>
@@ -355,12 +399,7 @@ const CertificatePreview = () => {
             {/* Enhanced About the Course Card */}
             <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
               <div className="bg-gradient-to-r from-green-500 to-teal-500 px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                  </div>
+                <div className="flex items-center">
                   <h2 className="text-lg font-semibold text-white">About the Course</h2>
                 </div>
               </div>
@@ -389,8 +428,14 @@ const CertificatePreview = () => {
                   <div className="pt-4 space-y-3">
                     <a
                       href={`${certificate?.download_url}?v=${encodeURIComponent(certificate?.certificate_id || Date.now())}`}
-                      download
-                      className="w-full bg-yellow-400 text-gray-900 px-4 py-3 rounded-lg font-medium hover:bg-yellow-500 transition-all duration-200 transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg"
+                      download={`certificate-${learnerName.replace(/\s+/g, '-').toLowerCase()}.pdf`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('Sidebar Download button clicked');
+                        toast.success('Certificate download started!');
+                      }}
+                      className="w-full bg-yellow-400 text-gray-900 px-4 py-3 rounded-lg font-medium hover:bg-yellow-500 transition-all duration-200 transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg cursor-pointer relative z-10"
+                      style={{ pointerEvents: 'auto' }}
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -398,19 +443,29 @@ const CertificatePreview = () => {
                       Download Certificate
                     </a>
                     <button 
-                      onClick={() => {
-                        if (navigator.share) {
-                          navigator.share({
-                            title: 'Certificate of Completion',
-                            text: `I've completed the ${courseTitle} course and earned my certificate!`,
-                            url: window.location.href
-                          });
-                        } else {
-                          navigator.clipboard.writeText(window.location.href);
-                          toast.success('Certificate link copied to clipboard!');
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Sidebar Share button clicked');
+                        try {
+                          if (navigator.share) {
+                            await navigator.share({
+                              title: 'Certificate of Completion',
+                              text: `I've completed the ${courseTitle || 'course'} course and earned my certificate!`,
+                              url: window.location.href
+                            });
+                            // Removed automatic toast - let the system handle share feedback
+                          } else {
+                            await navigator.clipboard.writeText(window.location.href);
+                            toast.success('Certificate link copied to clipboard!');
+                          }
+                        } catch (error) {
+                          console.log('Sidebar share failed:', error);
+                          toast.error('Unable to share. Please try again.');
                         }
                       }}
-                      className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-all duration-200 flex items-center justify-center gap-2"
+                      className="w-full border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer relative z-10"
+                      style={{ pointerEvents: 'auto' }}
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
