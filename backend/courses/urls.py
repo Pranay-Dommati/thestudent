@@ -29,6 +29,8 @@ urlpatterns = [
 
     # Progress tracking endpoints
     path('api/courses/progress/<str:course_id>/', views.get_course_progress, name='get-course-progress'),
+    # Engineering progress (strictly engineering by ID)
+    path('api/courses/<str:course_id>/progress/', views.get_engineering_course_progress, name='get-engineering-course-progress'),
     path('api/lessons/complete/<int:lesson_id>/', views.toggle_lesson_completion, name='toggle-lesson-completion'),
     path('api/lessons/toggle-completion/<int:lesson_id>/', views.toggle_lesson_completion, name='toggle-lesson-completion'),
 
@@ -44,6 +46,9 @@ urlpatterns = [
     path('api/courses/pro-learning/', include('courses.pro_learning_urls')),
     # Direct Pro Learning save endpoint (bypasses DRF)
     path('api/courses/pro-learning-direct/save/', save_pro_learning_course, name='direct-save-course'),
+
+    # Certification endpoints
+    path('api/courses/<str:course_id>/certificate/', views.issue_engineering_certificate, name='issue-engineering-certificate'),
 
     # Generic course CRUD (placed AFTER specific routes to avoid conflicts)
     path('api/courses/<str:course_id>/', views.get_course_by_id, name='get-course-by-id'),

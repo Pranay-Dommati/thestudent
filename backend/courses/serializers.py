@@ -3,7 +3,7 @@ from .models import (
     SchoolCourse, EngineeringCourse, CourseChapter, 
     CourseSection, Lesson, LessonResource, QuizQuestion, UserLessonProgress,
     ProLearningCourse, ProLearningTopic, ProLearningVideo, 
-    ProLearningQuizQuestion, ProLearningResource
+    ProLearningQuizQuestion, ProLearningResource, Certification
 )
 
 class LessonResourceSerializer(serializers.ModelSerializer):
@@ -116,6 +116,24 @@ class EngineeringCourseWithSectionsSerializer(serializers.ModelSerializer):
             'sections'
         ]
 
+class CertificationSerializer(serializers.ModelSerializer):
+    course_title = serializers.CharField(source='course.title', read_only=True)
+    user_name = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Certification
+        fields = ['certificate_id', 'issued_at', 'course_title', 'user_name', 'download_url']
+
+    def get_user_name(self, obj):
+        user = obj.user
+        return getattr(user, 'full_name', None) or getattr(user, 'username', None) or user.email
+
+    def get_download_url(self, obj):
+        request = self.context.get('request')
+        if obj.file and request:
+            return request.build_absolute_uri(obj.file.url)
+        return None
 
 # Pro Learning Serializers
 

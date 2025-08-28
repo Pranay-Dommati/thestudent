@@ -66,6 +66,23 @@ class EngineeringCourse(BaseCourse):
     def __str__(self):
         return f"Engineering - {self.title} ({self.proficiency})"
 
+
+class Certification(models.Model):
+    """Certificate issued to a user for completing an EngineeringCourse."""
+    id = models.BigAutoField(primary_key=True)
+    certificate_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='certificates')
+    course = models.ForeignKey('EngineeringCourse', on_delete=models.CASCADE, related_name='certificates')
+    issued_at = models.DateTimeField(auto_now_add=True)
+    file = models.FileField(upload_to='certificates/', null=True, blank=True)
+
+    class Meta:
+        unique_together = ('user', 'course')
+        ordering = ['-issued_at']
+
+    def __str__(self):
+        return f"Certificate {self.certificate_id} - {self.user} - {self.course.title}"
+
 class CourseChapter(models.Model):
     """For School Courses"""
     school_course = models.ForeignKey(SchoolCourse, on_delete=models.CASCADE, related_name='chapters')

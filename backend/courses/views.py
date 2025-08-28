@@ -5,8 +5,12 @@ from rest_framework.decorators import api_view, parser_classes, permission_class
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource, LearningActivity
-from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer
+from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource, LearningActivity, UserStartedPredefinedCourse, Certification
+from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer, CertificationSerializer
+from django.utils import timezone
+from django.conf import settings
+import uuid
+import os
 import json
 import traceback
 import requests
@@ -712,6 +716,117 @@ def get_course_progress(request, course_id):
             {"error": str(e)},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_engineering_course_progress(request, course_id):
+    """Return authenticated user's progress for a specific engineering course."""
+    try:
+        user = request.user
+        # Validate course exists
+        try:
+            course = EngineeringCourse.objects.get(id=course_id)
+        except EngineeringCourse.DoesNotExist:
+            return Response({"error": "Course not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Compute progress
+        total_lessons = Lesson.objects.filter(section__engineering_course=course).count()
+        completed_lessons = UserLessonProgress.objects.filter(
+            user=user,
+            lesson__section__engineering_course=course
+        ).count()
+        percentage = int((completed_lessons / total_lessons) * 100) if total_lessons else 0
+
+        # If tracking enrollment, update it
+        enrollment = UserStartedPredefinedCourse.objects.filter(user=user, engineering_course=course).first()
+        if enrollment:
+            enrollment.progress_percentage = percentage
+            enrollment.is_completed = percentage == 100
+            if enrollment.is_completed and not enrollment.completed_at:
+                enrollment.completed_at = timezone.now()
+            enrollment.save(update_fields=['progress_percentage', 'is_completed', 'completed_at'])
+
+        # If a certificate already exists, include it
+        cert = Certification.objects.filter(user=user, course=course).first()
+        cert_data = CertificationSerializer(cert, context={'request': request}).data if cert else None
+
+        return Response({
+            'course_id': str(course.id),
+            'progress': {
+                'completed': completed_lessons,
+                'total': total_lessons,
+                'percentage': percentage,
+                'is_completed': percentage == 100
+            },
+            'certificate': cert_data
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _render_certificate_file(user, course, certificate_obj):
+    """Create a certificate file for download. Minimal placeholder: store the provided sample PDF under a new name.
+    TODO: In production, render dynamic text on PDF using ReportLab or borb/Pillow.
+    """
+    # Location of sample template provided by user
+    template_path = os.path.join(settings.BASE_DIR, 'courses', 'certificates', 'sample_certificate', 'Blue Simple Minimalist Participation Certificate.pdf')
+    media_dir = settings.MEDIA_ROOT
+    os.makedirs(os.path.join(media_dir, 'certificates'), exist_ok=True)
+    filename = f"certificate_{certificate_obj.certificate_id}.pdf"
+    dest_path = os.path.join(media_dir, 'certificates', filename)
+    try:
+        # Copy the template for now
+        with open(template_path, 'rb') as src, open(dest_path, 'wb') as dst:
+            dst.write(src.read())
+        return f"certificates/{filename}"
+    except Exception:
+        return None
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def issue_engineering_certificate(request, course_id):
+    """Issue a certificate for the user if progress is 100%."""
+    try:
+        user = request.user
+        try:
+            course = EngineeringCourse.objects.get(id=course_id)
+        except EngineeringCourse.DoesNotExist:
+            return Response({"error": "Course not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Compute progress
+        total_lessons = Lesson.objects.filter(section__engineering_course=course).count()
+        if total_lessons == 0:
+            return Response({"error": "Course has no lessons"}, status=status.HTTP_400_BAD_REQUEST)
+
+        completed_lessons = UserLessonProgress.objects.filter(
+            user=user,
+            lesson__section__engineering_course=course
+        ).count()
+        percentage = int((completed_lessons / total_lessons) * 100)
+
+        if percentage < 100:
+            return Response({"error": "Course not completed"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get or create certificate (enforce single per user/course)
+        cert, created = Certification.objects.get_or_create(user=user, course=course)
+
+        # If no file yet, generate/store one
+        if not cert.file:
+            rel_path = _render_certificate_file(user, course, cert)
+            if rel_path:
+                cert.file.name = rel_path
+                cert.save(update_fields=['file'])
+
+        data = CertificationSerializer(cert, context={'request': request}).data
+        data.update({
+            'course_name': course.title,
+            'user_name': getattr(user, 'full_name', None) or getattr(user, 'username', None) or user.email,
+        })
+        return Response(data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

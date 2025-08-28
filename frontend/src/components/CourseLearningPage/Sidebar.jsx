@@ -15,7 +15,12 @@ const Sidebar = ({
   toggleChapter,
   toggleSidebar,  // Add this prop to receive the toggle function
   toggleLessonCompletion, // Add this prop for handling lesson completion toggle
-  navigate // For navigation
+  navigate, // For navigation
+  isLoggedIn = false,
+  progressPercent = 0,
+  certificate = null,
+  issuingCert = false,
+  onIssueCertificate = () => {}
 }) => {
   // Filter lessons based on search
   const filteredChapters = () => {
@@ -55,18 +60,50 @@ const Sidebar = ({
           <div>
             <div className="flex justify-between text-sm mb-1">
               <span className="font-medium">Your progress</span>
-              <span>{Math.round((completedLessons / totalLessons) * 100)}%</span>
+              <span>{progressPercent || Math.round((completedLessons / totalLessons) * 100)}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
                 className="bg-indigo-600 h-2 rounded-full"
-                style={{ width: `${(completedLessons / totalLessons) * 100}%` }}
+                style={{ width: `${progressPercent || Math.round((completedLessons / Math.max(1,totalLessons)) * 100)}%` }}
               ></div>
             </div>
             <div className="flex justify-between text-xs text-gray-500 mt-1">
               <span>{completedLessons}/{totalLessons} lessons completed</span>
             </div>
           </div>
+
+          {/* Certificate CTA */}
+          {isLoggedIn && (
+            <div className="mt-4">
+              {certificate ? (
+                <a
+                  href={certificate.download_url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 transition"
+                >
+                  Certificate earned ✅
+                </a>
+              ) : (
+                <button
+                  disabled={(progressPercent < 100) || issuingCert}
+                  onClick={onIssueCertificate}
+                  className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md transition text-white ${
+                    (progressPercent < 100) || issuingCert ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
+                >
+                  {issuingCert ? 'Issuing…' : '🎓 Gain Certificate'}
+                </button>
+              )}
+              {certificate && (
+                <div className="mt-2 text-xs text-gray-500">
+                  <div>Issued: {new Date(certificate.issued_at).toLocaleString()}</div>
+                  <div>ID: {certificate.certificate_id}</div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         
         {/* Course chapters list with scroll */}

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../utils/axios';
+import indexedDBService from '../services/IndexedDBService';
 
 const AuthContext = createContext(null);
 
@@ -25,7 +26,9 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (response.data.access) {
-        localStorage.setItem('accessToken', response.data.access);
+  localStorage.setItem('accessToken', response.data.access);
+  // Keep IndexedDB in sync to avoid stale tokens being used elsewhere
+  indexedDBService.setItem('accessToken', response.data.access);
         return true;
       }
       return false;
@@ -82,6 +85,8 @@ export const AuthProvider = ({ children }) => {
   const handleAuthFailure = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+  // Clear IndexedDB token as well
+  indexedDBService.removeItem('accessToken');
     setUser(null);
     setIsLoggedIn(false);
     setLastChecked(0);
@@ -122,8 +127,10 @@ export const AuthProvider = ({ children }) => {
       const response = await axiosInstance.post('/auth/register/', registrationData);
       const { user, tokens } = response.data;
 
-      localStorage.setItem('accessToken', tokens.access);
-      localStorage.setItem('refreshToken', tokens.refresh);
+  localStorage.setItem('accessToken', tokens.access);
+  localStorage.setItem('refreshToken', tokens.refresh);
+  // Sync to IndexedDB
+  indexedDBService.setItem('accessToken', tokens.access);
 
       setUser(user);
       setIsLoggedIn(true);
@@ -161,8 +168,10 @@ export const AuthProvider = ({ children }) => {
       
       const { user, access, refresh } = response.data;
       
-      localStorage.setItem('accessToken', access);
-      localStorage.setItem('refreshToken', refresh);
+  localStorage.setItem('accessToken', access);
+  localStorage.setItem('refreshToken', refresh);
+  // Sync to IndexedDB
+  indexedDBService.setItem('accessToken', access);
       
       setUser(user);
       setIsLoggedIn(true);
@@ -209,8 +218,10 @@ export const AuthProvider = ({ children }) => {
       
       const { user, access, refresh } = response.data;
       
-      localStorage.setItem('accessToken', access);
-      localStorage.setItem('refreshToken', refresh);
+  localStorage.setItem('accessToken', access);
+  localStorage.setItem('refreshToken', refresh);
+  // Sync to IndexedDB
+  indexedDBService.setItem('accessToken', access);
       
       setUser(user);
       setIsLoggedIn(true);

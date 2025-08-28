@@ -30,6 +30,9 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [savingProgress, setSavingProgress] = useState(false);
   const [internetResourcesOpen, setInternetResourcesOpen] = useState(false);
   const [downloadResourcesOpen, setDownloadResourcesOpen] = useState(false);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [certificate, setCertificate] = useState(null);
+  const [issuingCert, setIssuingCert] = useState(false);
   const videoRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -311,6 +314,16 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         
         setCourse(updatedCourse);
+
+        // Also get engineering progress summary (percentage + certificate if any)
+        try {
+          const summary = await axiosInstance.get(`/courses/${course.id}/progress/`);
+          const pct = summary.data?.progress?.percentage ?? 0;
+          setProgressPercent(pct);
+          setCertificate(summary.data?.certificate || null);
+        } catch (e) {
+          // ignore if not engineering course or not logged in
+        }
         
       } catch (error) {
         console.error('Error fetching user progress:', error);
@@ -323,6 +336,29 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     
     fetchUserProgress();
   }, [course?.id, isLoggedIn]);
+
+  const handleIssueCertificate = async () => {
+    if (!course?.id) return;
+    if (!isLoggedIn) {
+      toast.error('Please log in to claim your certificate');
+      return;
+    }
+    if ((progressPercent || Math.round((completedLessons / Math.max(1,totalLessons)) * 100)) < 100) {
+      toast.error('Complete the course to earn your certificate');
+      return;
+    }
+    try {
+      setIssuingCert(true);
+      const res = await axiosInstance.post(`/courses/${course.id}/certificate/`);
+      setCertificate(res.data);
+      toast.success('Certificate issued!');
+    } catch (e) {
+      const msg = e.response?.data?.error || 'Failed to issue certificate';
+      toast.error(msg);
+    } finally {
+      setIssuingCert(false);
+    }
+  };
 
   // Handle chapter toggling
   const toggleChapter = (index) => {
@@ -350,6 +386,10 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   // Mark lesson as complete (with backend integration)
   const markLessonComplete = async () => {
     if (!course) return;
+    if (!isLoggedIn) {
+      toast.error('Please log in to track your progress');
+      return;
+    }
     
     try {
       const currentLesson = course.chapters[activeChapter].lessons[activeLesson];
@@ -375,6 +415,10 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   // Toggle lesson completion from sidebar
   const toggleLessonCompletion = async (chapterIndex, lessonIndex) => {
     if (!course) return;
+    if (!isLoggedIn) {
+      toast.error('Please log in to track your progress');
+      return;
+    }
     
     try {
       const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
@@ -903,6 +947,11 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           toggleSidebar={() => setSidebarVisible(!sidebarVisible)}
           toggleLessonCompletion={toggleLessonCompletion}
           navigate={navigate}
+          isLoggedIn={isLoggedIn}
+          progressPercent={progressPercent || Math.round((completedLessons / Math.max(1,totalLessons)) * 100)}
+          certificate={certificate}
+          issuingCert={issuingCert}
+          onIssueCertificate={handleIssueCertificate}
         />
       </div>
     </div>
