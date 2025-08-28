@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from rest_framework import status, generics
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, login
@@ -27,7 +27,9 @@ from .models import User
 logger = logging.getLogger(__name__)
 
 class RegisterView(generics.CreateAPIView):
+    # Public endpoint: no auth required and skip JWT auth entirely
     permission_classes = (AllowAny,)
+    authentication_classes = ()
     serializer_class = RegisterSerializer
     
     def post(self, request, *args, **kwargs):
@@ -50,7 +52,9 @@ class RegisterView(generics.CreateAPIView):
         }, status=status.HTTP_201_CREATED)
 
 class LoginView(generics.CreateAPIView):
+    # Public endpoint: no auth required and skip JWT auth entirely
     permission_classes = (AllowAny,)
+    authentication_classes = ()
     serializer_class = LoginSerializer
 
     def post(self, request, *args, **kwargs):
@@ -106,6 +110,7 @@ def user_profile(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def admin_login(request):
     """
     Admin login endpoint that only allows Django superusers to authenticate
@@ -228,6 +233,7 @@ def verify_admin_token(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def google_auth_url(request):
     """
     Generate Google OAuth2 authentication URL
@@ -261,6 +267,7 @@ def google_auth_url(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def google_auth_callback(request):
     """
     Handle Google OAuth2 callback and exchange code for tokens
@@ -381,6 +388,7 @@ def google_auth_callback(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])  
+@authentication_classes([])
 def google_auth_token(request):
     """
     Authenticate user directly with Google access token
@@ -612,6 +620,7 @@ def send_password_reset_email(user_email, uid, token):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def forgot_password(request):
     """Handle forgot password request"""
     try:
@@ -658,6 +667,7 @@ def forgot_password(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def reset_password(request):
     """Handle password reset with token validation"""
     try:
@@ -725,6 +735,7 @@ def reset_password(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def validate_reset_token(request, uid, token):
     """Validate reset token without resetting password"""
     try:
