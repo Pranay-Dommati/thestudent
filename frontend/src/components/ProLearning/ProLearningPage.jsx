@@ -270,10 +270,11 @@ const ProLearningPage = () => {
       }
       
       // Step 3.5: If no stored/batch/db topics, but URL has a topic list, derive topics from URL
-      if (topicParam) {
+      // IMPORTANT: Only do this if we don't already have topics and if URL contains multiple topics
+      if (topicParam && topicParam.includes(',')) {
         try {
           const topicNames = topicParam.split(',').map(t => t.trim()).filter(Boolean);
-          if (topicNames.length > 0) {
+          if (topicNames.length > 1) { // Only if multiple topics in URL
             const derivedTopics = topicNames.map((name, idx) => ({ 
               id: idx + 1, 
               name,
@@ -1132,14 +1133,14 @@ const ProLearningPage = () => {
             resources: progressiveContent.resources || []
           };
 
-          // Merge with any existing content to avoid dropping already visible tabs
-          setContent(prev => ({
-            reading: formattedContent.reading || prev?.reading || '',
-            summary: formattedContent.summary || prev?.summary || '',
-            quiz: (Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) ? formattedContent.quiz : (prev?.quiz || []),
-            videos: (Array.isArray(formattedContent.videos) && formattedContent.videos.length > 0) ? formattedContent.videos : (prev?.videos || []),
-            resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0) ? formattedContent.resources : (prev?.resources || [])
-          }));
+          // Set content for this topic only - don't merge with previous topic's content
+          setContent({
+            reading: formattedContent.reading,
+            summary: formattedContent.summary,
+            quiz: formattedContent.quiz,
+            videos: formattedContent.videos,
+            resources: formattedContent.resources
+          });
           
           // Parse and set reading sections
           if (progressiveContent.reading) {
@@ -1150,25 +1151,25 @@ const ProLearningPage = () => {
         } else {
           // Show empty content and let the generation process fill it
           console.log('🆕 DEBUG: Initializing empty content for fresh generation:', topicName);
-          setContent(prev => ({
-            reading: prev?.reading || '',
-            summary: prev?.summary || '',
-            quiz: prev?.quiz || [],
-            videos: prev?.videos || [],
-            resources: prev?.resources || []
-          }));
+          setContent({
+            reading: '',
+            summary: '',
+            quiz: [],
+            videos: [],
+            resources: []
+          });
         }
         
       } else {
         
-        // Show partial content with placeholders
-        setContent(prev => ({
-          reading: prev?.reading || '',
-          summary: prev?.summary || '',
-          quiz: prev?.quiz || [],
-          videos: prev?.videos || [],
-          resources: prev?.resources || []
-        }));
+        // Show empty content with placeholders for topic that hasn't started generating
+        setContent({
+          reading: '',
+          summary: '',
+          quiz: [],
+          videos: [],
+          resources: []
+        });
       }
     } catch (error) {
       console.error('❌ Failed to load progressive content:', error);
@@ -1202,10 +1203,27 @@ const ProLearningPage = () => {
     
     setSelectedTopic(selectedTopic);
 
+    // CRITICAL: Clear content immediately when switching topics to prevent cross-topic content display
+    setContent(null);
+    
+    // Reset active tab to 'reading' for new topic
+    setActiveTab('reading');
+
     // Handle content loading based on generation type
     if (useProgressiveGeneration) {
-      // For progressive generation, load any available content
-  loadProgressiveTopicContent(selectedTopic.name, { showLoader: false });
+      // For progressive generation, load any available content for this topic
+      loadProgressiveTopicContent(selectedTopic.name, { showLoader: false });
+      
+      // If no content is available yet for this topic, ensure we're in generation mode
+      const hasProgressiveContent = getProgressiveTopicContent(selectedTopic.name);
+      const hasAvailableTabs = availableTabsForTopics[selectedTopic.name]?.length > 0;
+      
+      if (!hasProgressiveContent && !hasAvailableTabs && !isProgressiveGenerating) {
+        console.log('🚀 Topic has no content yet, ensuring progressive generation is running for:', selectedTopic.name);
+        // The progressive generation should already be running for all topics
+        // but ensure we show the generation status
+        setIsProgressiveGenerating(true);
+      }
     } else {
       // For batch generation, load if all topics are generated
       if (allTopicsGenerated || hasTopicContent(selectedTopic.name)) {
@@ -2573,14 +2591,7 @@ const ProLearningPage = () => {
 
     // Check if current tab content is available in progressive generation
     const isCurrentTabAvailable = useProgressiveGeneration && selectedTopic?.name
-      ? (availableTabsForTopics[selectedTopic.name]?.includes(activeTab)) ||
-        (content && (
-          (activeTab === 'reading' && content.reading) ||
-          (activeTab === 'summary' && content.summary) ||
-          (activeTab === 'videos' && content.videos?.length > 0) ||
-          (activeTab === 'quiz' && content.quiz?.length > 0) ||
-          (activeTab === 'resources' && content.resources?.length > 0)
-        ))
+      ? (availableTabsForTopics[selectedTopic.name]?.includes(activeTab))
       : true;
 
     // Show "content being generated" message for progressive generation ONLY if no content exists
@@ -3806,14 +3817,7 @@ const ProLearningPage = () => {
                       
                       // Check if tab content is available for progressive generation
                       const isTabAvailable = useProgressiveGeneration 
-                        ? (selectedTopic?.name && availableTabsForTopics[selectedTopic.name]?.includes(tab.id)) || 
-                          (content && (
-                            (tab.id === 'reading' && content.reading) ||
-                            (tab.id === 'summary' && content.summary) ||
-                            (tab.id === 'videos' && content.videos?.length > 0) ||
-                            (tab.id === 'quiz' && content.quiz?.length > 0) ||
-                            (tab.id === 'resources' && content.resources?.length > 0)
-                          ))
+                        ? (selectedTopic?.name && availableTabsForTopics[selectedTopic.name]?.includes(tab.id)) 
                         : true; // For batch generation, all tabs are available once content is loaded
                       
                       const isTabDisabled = useProgressiveGeneration && !isTabAvailable && !isLoading;
