@@ -63,7 +63,6 @@ import progressiveContentGenerator, {
   getAvailableTabsForTopic,
   getProgressiveTopicContent
 } from './ProgressiveContentGenerator';
-import ProgressiveGenerationStatus from './ProgressiveGenerationStatus';
 import proContentManager from '../../services/ProContentManager';
 import contentStorageService from '../../services/ContentStorageService.js';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
@@ -2456,24 +2455,7 @@ const ProLearningPage = () => {
   const activeReady = readyTabs.includes(activeTab);
 
       if (!activeReady) {
-        return (
-          <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
-            <div className="max-w-4xl mx-auto pt-6">
-              <ProgressiveGenerationStatus 
-                isGenerating={isProgressiveGenerating}
-                currentProgress={progressiveGenerationProgress}
-                availableTabs={availableTabsForTopics}
-                onTabClick={(tabId) => {
-                  if (selectedTopic?.name) {
-                    updateActiveTab(tabId);
-                  }
-                }}
-                currentTopic={selectedTopic?.name}
-                topics={topicsList.map(t => t.name || t)}
-              />
-            </div>
-          </div>
-        );
+        return <LoadingComponent />;
       }
     }
 
