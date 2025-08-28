@@ -1147,6 +1147,10 @@ const ProLearningPage = () => {
             const sections = parseReadingSections(progressiveContent.reading);
             setReadingSections(sections);
             setReadingSectionIndex(0);
+          } else {
+            // Ensure stale sections are cleared if reading isn't ready yet
+            setReadingSections([]);
+            setReadingSectionIndex(0);
           }
         } else {
           // Show empty content and let the generation process fill it
@@ -1170,6 +1174,8 @@ const ProLearningPage = () => {
           videos: [],
           resources: []
         });
+  setReadingSections([]);
+  setReadingSectionIndex(0);
       }
     } catch (error) {
       console.error('❌ Failed to load progressive content:', error);
@@ -1203,8 +1209,11 @@ const ProLearningPage = () => {
     
     setSelectedTopic(selectedTopic);
 
-    // CRITICAL: Clear content immediately when switching topics to prevent cross-topic content display
-    setContent(null);
+  // CRITICAL: Clear content immediately when switching topics to prevent cross-topic content display
+  setContent(null);
+  // Also clear reading sections so previous topic's text doesn't persist
+  setReadingSections([]);
+  setReadingSectionIndex(0);
     
     // Reset active tab to 'reading' for new topic
     setActiveTab('reading');
@@ -2443,14 +2452,8 @@ const ProLearningPage = () => {
     if (isProgressiveGenerating) {
       const currentTopicName = selectedTopic?.name;
       const readyTabs = (currentTopicName && availableTabsForTopics[currentTopicName]) || [];
-      const activeHasData = (
-        (activeTab === 'reading' && !!content?.reading) ||
-        (activeTab === 'summary' && !!content?.summary) ||
-        (activeTab === 'videos' && (content?.videos?.length || 0) > 0) ||
-        (activeTab === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
-        (activeTab === 'resources' && (content?.resources?.length || 0) > 0)
-      );
-      const activeReady = readyTabs.includes(activeTab) || activeHasData;
+  // In progressive mode, a tab is considered ready ONLY if it's in readyTabs for the current topic
+  const activeReady = readyTabs.includes(activeTab);
 
       if (!activeReady) {
         return (
@@ -3900,6 +3903,11 @@ const ProLearningPage = () => {
                 renderTabContent={renderTabContent}
                 courseTitle={courseTitle}
                 isLoading={isLoading}
+                useProgressiveGeneration={useProgressiveGeneration}
+                availableTabsForTopics={availableTabsForTopics}
+                selectedTopic={selectedTopic}
+                isProgressiveGenerating={isProgressiveGenerating}
+                progressiveGenerationProgress={progressiveGenerationProgress}
               />
 
               {/* Save to Learning Hub Button - Desktop Version */}

@@ -24,7 +24,13 @@ const ProLearningMobile = ({
   tabs,
   renderTabContent,
   courseTitle,
-  isLoading
+  isLoading,
+  // Progressive gating
+  useProgressiveGeneration,
+  availableTabsForTopics,
+  selectedTopic,
+  isProgressiveGenerating,
+  progressiveGenerationProgress
 }) => {
   // Sync currentSection with activeTab prop
   useEffect(() => {
@@ -201,21 +207,38 @@ const ProLearningMobile = ({
           {tabs && tabs.length > 0 ? tabs.map((tab) => {
             const Icon = getIconForTab(tab.id);
             const isActive = currentSection === tab.id;
+            // Progressive-mode gating: a tab is available only if marked ready for the current topic
+            const isTabAvailable = useProgressiveGeneration 
+              ? (selectedTopic?.name && availableTabsForTopics?.[selectedTopic.name]?.includes(tab.id)) 
+              : true;
+            const isDisabled = useProgressiveGeneration && !isTabAvailable && !isLoading;
             
             return (
               <button
                 key={tab.id}
-                onClick={() => handleSectionChange(tab.id)}
+                onClick={() => {
+                  if (!isDisabled) handleSectionChange(tab.id);
+                }}
+                disabled={isLoading || isDisabled}
                 className={`flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-300 ease-in-out ${
                   isActive 
                     ? 'text-blue-600 transform scale-105' 
-                    : 'text-gray-500 hover:text-gray-700 hover:scale-102'
+                    : isDisabled
+                      ? 'text-gray-400'
+                      : 'text-gray-500 hover:text-gray-700 hover:scale-102'
                 }`}
               >
-                <Icon className={`text-xl mb-1 transition-all duration-300 ease-in-out ${isActive ? 'text-blue-600 transform scale-110' : 'text-gray-500'}`} />
-                <span className={`text-xs font-medium transition-all duration-300 ease-in-out ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+                <Icon className={`text-xl mb-1 transition-all duration-300 ease-in-out ${
+                  isActive ? 'text-blue-600 transform scale-110' : (isDisabled ? 'text-gray-400' : 'text-gray-500')
+                }`} />
+                <span className={`text-xs font-medium transition-all duration-300 ease-in-out ${
+                  isActive ? 'text-blue-600' : (isDisabled ? 'text-gray-400' : 'text-gray-500')
+                }`}>
                   {tab.label}
                 </span>
+                {isDisabled && isProgressiveGenerating && progressiveGenerationProgress?.topic === selectedTopic?.name && progressiveGenerationProgress?.tabType === tab.id && (
+                  <span className="text-[10px] leading-none text-blue-600 mt-0.5" aria-live="polite">Loading…</span>
+                )}
               </button>
             );
           }) : (
