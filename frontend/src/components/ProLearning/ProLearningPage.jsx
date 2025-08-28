@@ -960,6 +960,18 @@ const ProLearningPage = () => {
     return !!hasGenerationTimestamps;
   };
 
+  // Helper function to determine if a topic should be blocked
+  const isTopicBlocked = (topicName) => {
+    if (!topicsList || topicsList.length === 0) return false;
+    
+    // First topic (index 0) is never blocked - it gets progressive generation
+    const topicIndex = topicsList.findIndex(topic => topic.name === topicName || topic === topicName);
+    if (topicIndex === 0) return false;
+    
+    // All other topics are blocked until entire course generation is complete
+    return !allTopicsGenerated;
+  };
+
   // Helper function to load topic content from batch-generated data
   const loadTopicContent = async (topicName) => {
     const currentCourseId = getCourseId();
@@ -1208,16 +1220,24 @@ const ProLearningPage = () => {
     
     setSelectedTopic(selectedTopic);
 
-  // CRITICAL: Clear content immediately when switching topics to prevent cross-topic content display
-  setContent(null);
-  // Also clear reading sections so previous topic's text doesn't persist
-  setReadingSections([]);
-  setReadingSectionIndex(0);
+    // CRITICAL: Clear content immediately when switching topics to prevent cross-topic content display
+    setContent(null);
+    setContentTopicName(null); // Clear topic association
+    // Also clear reading sections so previous topic's text doesn't persist
+    setReadingSections([]);
+    setReadingSectionIndex(0);
     
     // Reset active tab to 'reading' for new topic
     setActiveTab('reading');
 
-    // Handle content loading based on generation type
+    // Check if this topic is blocked (2nd topic onwards until course completion)
+    if (isTopicBlocked(selectedTopic.name)) {
+      // For blocked topics, don't try to load content - just show loading state
+      console.log('🚫 Topic is blocked until course completion:', selectedTopic.name);
+      return; // Exit early, content will show blocking message
+    }
+
+    // Handle content loading for non-blocked topics (first topic only until course completion)
     if (useProgressiveGeneration) {
       // For progressive generation, load any available content for this topic
       loadProgressiveTopicContent(selectedTopic.name, { showLoader: false });
@@ -1682,18 +1702,56 @@ const ProLearningPage = () => {
           },
           onTopicComplete: () => {},
           onAllComplete: () => {
-            setIsProgressiveGenerating(false);
-            setAllTopicsGenerated(true);
-            setCourseGenerationStatus('✅ All topics generated successfully!');
-            
-            // Clear the batch marker since generation is complete
-            try {
-              if (typeof localStorage !== 'undefined') {
-                localStorage.removeItem('proLearning_batchMarker');
-                console.log('🧹 DEBUG: Batch marker cleared after progressive generation completion');
+            // First topic progressive generation complete, now generate remaining topics
+            const remainingTopics = topicsList.slice(1); // All topics except the first
+            if (remainingTopics.length > 0) {
+              // Start batch generation for remaining topics
+              console.log('🚀 First topic complete, generating remaining topics:', remainingTopics.map(t => t.name || t));
+              proContentManager.generateAllContentBatch(
+                remainingTopics,
+                courseTitle || 'Pro Learning Course',
+                {
+                  onProgress: (progress, contentType, topicName) => {
+                    setCourseGenerationProgress(Math.round((1 + progress * (topicsList.length - 1)) / topicsList.length * 100));
+                    setCourseGenerationStatus(`📈 Generating ${contentType} for ${topicName}`);
+                  },
+                  onComplete: () => {
+                    setAllTopicsGenerated(true);
+                    setIsProgressiveGenerating(false);
+                    setCourseGenerationStatus('✅ All topics generated successfully!');
+                    
+                    // Clear the batch marker since generation is complete
+                    try {
+                      if (typeof localStorage !== 'undefined') {
+                        localStorage.removeItem('proLearning_batchMarker');
+                        console.log('🧹 DEBUG: Batch marker cleared after full course generation completion');
+                      }
+                    } catch (error) {
+                      console.warn('⚠️ DEBUG: Failed to clear batch marker:', error);
+                    }
+                  },
+                  onError: (error) => {
+                    console.error('❌ Remaining topics generation error:', error);
+                    setIsProgressiveGenerating(false);
+                  }
+                },
+                getCourseId()
+              );
+            } else {
+              // Only one topic in course
+              setIsProgressiveGenerating(false);
+              setAllTopicsGenerated(true);
+              setCourseGenerationStatus('✅ Course generated successfully!');
+              
+              // Clear the batch marker since generation is complete
+              try {
+                if (typeof localStorage !== 'undefined') {
+                  localStorage.removeItem('proLearning_batchMarker');
+                  console.log('🧹 DEBUG: Batch marker cleared after single topic completion');
+                }
+              } catch (error) {
+                console.warn('⚠️ DEBUG: Failed to clear batch marker:', error);
               }
-            } catch (error) {
-              console.warn('⚠️ DEBUG: Failed to clear batch marker:', error);
             }
           },
           onError: (err) => {
@@ -1703,9 +1761,14 @@ const ProLearningPage = () => {
   }, { courseId: getCourseId() });
 
         setIsProgressiveGenerating(true);
-  // Do not block the UI with the generic loader; tabs should appear as they become ready
-  setIsGeneratingCourse(false);
-        await startProgressiveGeneration();
+        // Do not block the UI with the generic loader; tabs should appear as they become ready
+        setIsGeneratingCourse(false);
+        
+        // Only start progressive generation for the first topic
+        const firstTopic = topicsList[0];
+        if (firstTopic) {
+          await startProgressiveGeneration([firstTopic]); // Only generate first topic progressively
+        }
 
         // Load first topic immediately (hydrate without blocking loader)
         const topicToLoad = topicParam || topicsList[0]?.name;
@@ -2423,10 +2486,30 @@ const ProLearningPage = () => {
   );
 
   const renderTabContent = () => {
+    const currentTopicName = selectedTopic?.name;
+    
+    // CRITICAL: Check if current topic is blocked (2nd topic onwards until course completion)
+    if (currentTopicName && isTopicBlocked(currentTopicName)) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center max-w-lg">
+            <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg mb-4">
+              <BiLoaderAlt className="text-2xl text-white animate-spin" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Course Generation in Progress</h3>
+            <p className="text-gray-600 text-sm leading-relaxed mb-4">
+              Please wait while we generate content for all topics. This topic will be available once the entire course is ready.
+            </p>
+            <div className="text-xs text-gray-500">
+              Content for "{currentTopicName}" is being prepared...
+            </div>
+          </div>
+        </div>
+      );
+    }
     
     // Show loading thoughtfully: in progressive mode, don't block UI if any tab/content is ready
     if (useProgressiveGeneration) {
-      const currentTopicName = selectedTopic?.name;
       const readyTabs = (currentTopicName && availableTabsForTopics[currentTopicName]) || [];
       const hasAnyContent = !!content && (
         (content.reading && content.reading.trim()) ||
@@ -3800,12 +3883,16 @@ const ProLearningPage = () => {
                       const IconComponent = tab.icon;
                       const isActive = activeTab === tab.id;
                       
+                      // Check if current topic is blocked (2nd topic onwards)
+                      const currentTopicBlocked = selectedTopic?.name && isTopicBlocked(selectedTopic.name);
+                      
                       // Check if tab content is available for progressive generation
                       const isTabAvailable = useProgressiveGeneration 
                         ? (selectedTopic?.name && availableTabsForTopics[selectedTopic.name]?.includes(tab.id)) 
                         : true; // For batch generation, all tabs are available once content is loaded
                       
-                      const isTabDisabled = useProgressiveGeneration && !isTabAvailable && !isLoading;
+                      // Tab is disabled if topic is blocked OR if progressive tab is not available
+                      const isTabDisabled = currentTopicBlocked || (useProgressiveGeneration && !isTabAvailable && !isLoading);
                       
                       return (
                         <button
@@ -3828,7 +3915,13 @@ const ProLearningPage = () => {
                                 ? 'text-gray-400 bg-gray-50 cursor-not-allowed'
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                           } ${(isLoading || isTabDisabled) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          title={isTabDisabled ? `${tab.label} is being generated...` : tab.description}
+                          title={
+                            currentTopicBlocked 
+                              ? `${tab.label} will be available after course generation completes`
+                              : isTabDisabled 
+                                ? `${tab.label} is being generated...` 
+                                : tab.description
+                          }
                         >
                           <div className="flex flex-col items-center space-y-2">
                             <div className={`relative p-2 rounded-lg transition-colors ${
