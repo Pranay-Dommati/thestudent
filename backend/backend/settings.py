@@ -103,6 +103,7 @@ MIDDLEWARE = [
     'social_django.middleware.SocialAuthExceptionMiddleware',  # Add social auth middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'backend.middleware.CertificateFrameMiddleware',  # Custom middleware for certificate PDFs
 ]
 
 ROOT_URLCONF = 'backend.urls'
@@ -382,3 +383,7 @@ LOGGING = {
 # Rate Limiting Configuration
 MAX_TOPICS_PER_DAY = int(os.environ.get('MAX_TOPICS_PER_DAY', '16'))
 MAX_TOPICS_PER_REQUEST = int(os.environ.get('MAX_TOPICS_PER_REQUEST', '4'))
+
+# X-Frame-Options Configuration
+# Allow iframe embedding for certificate PDFs while maintaining security
+X_FRAME_OPTIONS = 'SAMEORIGIN'  # Allow framing from same origin (localhost:8000)
