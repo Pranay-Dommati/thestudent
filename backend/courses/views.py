@@ -18,6 +18,14 @@ import time
 from django.conf import settings
 import os
 import mimetypes
+import io
+from PyPDF2 import PdfReader, PdfWriter
+from reportlab.pdfgen import canvas
+from reportlab.lib.colors import HexColor
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
@@ -766,22 +774,140 @@ def get_engineering_course_progress(request, course_id):
 
 
 def _render_certificate_file(user, course, certificate_obj):
-    """Create a certificate file for download. Minimal placeholder: store the provided sample PDF under a new name.
-    TODO: In production, render dynamic text on PDF using ReportLab or borb/Pillow.
-    """
-    # Location of sample template provided by user
-    template_path = os.path.join(settings.BASE_DIR, 'courses', 'certificates', 'sample_certificate', 'Blue Simple Minimalist Participation Certificate.pdf')
+    """Overlay clean certificate content onto the blue EasyLearnova template."""
+    template_path = os.path.join(
+        settings.BASE_DIR,
+        'courses', 'certificates', 'sample_certificate.pdf',
+    )
     media_dir = settings.MEDIA_ROOT
     os.makedirs(os.path.join(media_dir, 'certificates'), exist_ok=True)
-    filename = f"certificate_{certificate_obj.certificate_id}.pdf"
+    # Use a time-stamped filename to avoid any stale caching issues
+    filename = f"certificate_{certificate_obj.certificate_id}_{int(time.time())}.pdf"
     dest_path = os.path.join(media_dir, 'certificates', filename)
+
     try:
-        # Copy the template for now
-        with open(template_path, 'rb') as src, open(dest_path, 'wb') as dst:
-            dst.write(src.read())
+        # Read base template
+        with open(template_path, 'rb') as f:
+            base_reader = PdfReader(f)
+            base_page = base_reader.pages[0]
+            page_width = float(base_page.mediabox.width)
+            page_height = float(base_page.mediabox.height)
+
+        # Build overlay PDF in memory
+        overlay_stream = io.BytesIO()
+        c = canvas.Canvas(overlay_stream, pagesize=(page_width, page_height))
+
+        # Get user data
+        name = getattr(user, 'full_name', None) or getattr(user, 'username', None) or user.email
+        name_text = str(name).title()
+        course_title = str(getattr(course, 'title', 'Course')).title()
+        issued_at = getattr(certificate_obj, 'issued_at', timezone.now())
+        issued_str = issued_at.strftime('%m/%d/%Y, %I:%M:%S %p')
+        cert_id = str(certificate_obj.certificate_id)
+
+        # Register script font if available
+        script_font_name = 'Helvetica-Bold'
+        script_ttf_path = os.path.join(settings.BASE_DIR, 'courses', 'fonts', 'SamiraScript.ttf')
+        try:
+            if os.path.exists(script_ttf_path) and 'SamiraScript' not in pdfmetrics.getRegisteredFontNames():
+                pdfmetrics.registerFont(TTFont('SamiraScript', script_ttf_path))
+                script_font_name = 'SamiraScript'
+        except Exception:
+            pass
+
+        # Layout coordinates (adjusted for your blue template)
+        center_x = page_width / 2.0
+
+        # "Certificate of Completion" title
+        c.setFont('Helvetica-Bold', 36)
+        c.setFillColor(HexColor('#1E293B'))  # Dark gray
+        c.drawCentredString(center_x, page_height * 0.68, "Certificate of Completion")
+        
+        # "This certifies that" subtitle
+        c.setFont('Helvetica', 14)
+        c.setFillColor(HexColor('#64748B'))  # Medium gray
+        c.drawCentredString(center_x, page_height * 0.63, "This certifies that")
+        
+        # User name (large, colored, script font if available)
+        c.setFont(script_font_name, 36)
+        c.setFillColor(HexColor('#6366F1'))  # Indigo
+        c.drawCentredString(center_x, page_height * 0.55, name_text)
+        
+        # "has successfully completed the course" text
+        c.setFont('Helvetica', 14)
+        c.setFillColor(HexColor('#64748B'))  # Medium gray
+        c.drawCentredString(center_x, page_height * 0.49, "has successfully completed the course")
+        
+        # Course title
+        c.setFont('Helvetica-Bold', 20)
+        c.setFillColor(HexColor('#1E293B'))  # Dark gray
+        c.drawCentredString(center_x, page_height * 0.43, course_title)
+        
+        # Bottom boxes for issued date and certificate ID
+        box_y = page_height * 0.25
+        box_height = page_height * 0.08
+        box_width = page_width * 0.35
+        margin_x = page_width * 0.08
+        
+        # Left box - Issued date
+        c.setFillColor(HexColor('#F8FAFC'))  # Very light gray
+        c.setStrokeColor(HexColor('#E2E8F0'))  # Light gray border
+        c.rect(margin_x, box_y, box_width, box_height, fill=1, stroke=1)
+        
+        c.setFont('Helvetica', 10)
+        c.setFillColor(HexColor('#64748B'))
+        c.drawString(margin_x + 15, box_y + box_height - 15, "Issued")
+        c.setFont('Helvetica-Bold', 11)
+        c.setFillColor(HexColor('#1E293B'))
+        c.drawString(margin_x + 15, box_y + 15, issued_str)
+        
+        # Right box - Certificate ID
+        right_box_x = page_width - margin_x - box_width
+        c.setFillColor(HexColor('#F8FAFC'))
+        c.setStrokeColor(HexColor('#E2E8F0'))
+        c.rect(right_box_x, box_y, box_width, box_height, fill=1, stroke=1)
+        
+        c.setFont('Helvetica', 10)
+        c.setFillColor(HexColor('#64748B'))
+        c.drawString(right_box_x + 15, box_y + box_height - 15, "Certificate ID")
+        c.setFont('Helvetica-Bold', 7)
+        c.setFillColor(HexColor('#1E293B'))
+        
+        # Keep certificate ID on single line with smaller font if needed
+        c.drawString(right_box_x + 15, box_y + 15, cert_id)
+
+        c.showPage()
+        c.save()
+        overlay_stream.seek(0)
+
+        overlay_reader = PdfReader(overlay_stream)
+        overlay_page = overlay_reader.pages[0]
+
+        # Merge overlay on base template
+        merged_writer = PdfWriter()
+        with open(template_path, 'rb') as f2:
+            base_reader_again = PdfReader(f2)
+            base_page2 = base_reader_again.pages[0]
+            base_page2.merge_page(overlay_page)
+            merged_writer.add_page(base_page2)
+
+            # Add remaining pages if any, unchanged
+            for i in range(1, len(base_reader_again.pages)):
+                merged_writer.add_page(base_reader_again.pages[i])
+
+            with open(dest_path, 'wb') as out_f:
+                merged_writer.write(out_f)
+
         return f"certificates/{filename}"
-    except Exception:
-        return None
+        
+    except Exception as e:
+        # Fallback: try plain copy to avoid breaking the flow
+        try:
+            with open(template_path, 'rb') as src, open(dest_path, 'wb') as dst:
+                dst.write(src.read())
+            return f"certificates/{filename}"
+        except Exception:
+            return None
 
 
 @api_view(['POST'])
@@ -812,12 +938,20 @@ def issue_engineering_certificate(request, course_id):
         # Get or create certificate (enforce single per user/course)
         cert, created = Certification.objects.get_or_create(user=user, course=course)
 
-        # If no file yet, generate/store one
-        if not cert.file:
-            rel_path = _render_certificate_file(user, course, cert)
-            if rel_path:
-                cert.file.name = rel_path
-                cert.save(update_fields=['file'])
+        # Always (re)generate the personalized PDF to ensure latest template/text
+        rel_path = _render_certificate_file(user, course, cert)
+        if rel_path:
+            # Delete old file if different
+            old_path = None
+            if cert.file and cert.file.name and cert.file.name != rel_path:
+                old_path = os.path.join(settings.MEDIA_ROOT, cert.file.name)
+            cert.file.name = rel_path
+            cert.save(update_fields=['file'])
+            if old_path and os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except Exception:
+                    pass
 
         data = CertificationSerializer(cert, context={'request': request}).data
         data.update({

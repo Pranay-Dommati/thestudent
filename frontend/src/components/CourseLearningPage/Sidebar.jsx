@@ -77,29 +77,32 @@ const Sidebar = ({
           {isLoggedIn && (
             <div className="mt-4">
               {certificate ? (
-                <a
-                  href={certificate.download_url || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => navigate(`/courses/${course?.id}/certificate`, { state: { courseTitle: course?.title } })}
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 transition"
                 >
                   Certificate earned ✅
-                </a>
+                </button>
               ) : (
                 <button
                   disabled={(progressPercent < 100) || issuingCert}
-                  onClick={onIssueCertificate}
+                  onClick={() => navigate(`/courses/${course?.id}/certificate`, { state: { courseTitle: course?.title } })}
                   className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md transition text-white ${
                     (progressPercent < 100) || issuingCert ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
                   }`}
                 >
-                  {issuingCert ? 'Issuing…' : '🎓 Gain Certificate'}
+                  {issuingCert ? 'Opening…' : '🎓 Generate Certificate'}
                 </button>
               )}
               {certificate && (
                 <div className="mt-2 text-xs text-gray-500">
                   <div>Issued: {new Date(certificate.issued_at).toLocaleString()}</div>
                   <div>ID: {certificate.certificate_id}</div>
+          {certificate.download_url && (
+                    <div className="mt-1">
+            <a href={`${certificate.download_url}?v=${encodeURIComponent(certificate.certificate_id || Date.now())}`} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">Download PDF</a>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

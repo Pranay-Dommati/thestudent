@@ -43,6 +43,7 @@ import TermsAndConditions from './components/Legal/TermsAndConditions';
 import PrivacyPolicy from './components/Legal/PrivacyPolicy';
 import FeedbackPage from './components/Feedback/FeedbackPage';  // Add feedback import
 import './utils/axios';
+import CertificatePreview from './components/Certificates/CertificatePreview';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -226,6 +227,7 @@ const App = () => {
             <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
+            <Route path="/courses/:courseId/certificate" element={<ProtectedRoute><CertificatePreview /></ProtectedRoute>} />
             <Route path="/learning-hub" element={
               <ProtectedRoute>
                 <LearningHubWrapper />

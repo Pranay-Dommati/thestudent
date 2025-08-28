@@ -343,21 +343,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       toast.error('Please log in to claim your certificate');
       return;
     }
-    if ((progressPercent || Math.round((completedLessons / Math.max(1,totalLessons)) * 100)) < 100) {
-      toast.error('Complete the course to earn your certificate');
-      return;
-    }
-    try {
-      setIssuingCert(true);
-      const res = await axiosInstance.post(`/courses/${course.id}/certificate/`);
-      setCertificate(res.data);
-      toast.success('Certificate issued!');
-    } catch (e) {
-      const msg = e.response?.data?.error || 'Failed to issue certificate';
-      toast.error(msg);
-    } finally {
-      setIssuingCert(false);
-    }
+    // Navigate to the certificate page; it will issue if eligible
+    navigate(`/courses/${course.id}/certificate`, { state: { courseTitle: course?.title } });
   };
 
   // Handle chapter toggling
