@@ -5,9 +5,10 @@ import HeroSection from './HeroSection/HeroSection';
 import ActiveCourses from './ActiveCourses/ActiveCourses';
 import AILearningPlans from './AILearningPlans/AILearningPlans';
 import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
+import Certificates from '../Profile/tabs/Certificates';
 import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { FaRocket, FaBookOpen, FaBrain, FaGraduationCap } from 'react-icons/fa';
+import { FaRocket, FaBookOpen, FaBrain, FaGraduationCap, FaCertificate } from 'react-icons/fa';
 import { getLearningStats } from '../../services/activityTracker';
 import axios from 'axios';
 
@@ -192,6 +193,25 @@ const LearningHubPage = () => {
                   </span>
                 </div>
                 <AILearningPlans />
+              </section>
+              
+              {/* Certificates Section */}
+              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center">
+                    <div className="bg-gradient-to-r from-yellow-500 to-orange-600 p-3 rounded-xl mr-4 shadow-lg">
+                      <FaCertificate className="text-white text-xl" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-800">My Certificates</h2>
+                      <p className="text-sm text-gray-500 mt-1">Your learning achievements and accomplishments</p>
+                    </div>
+                  </div>
+                  <span className="bg-yellow-50 text-yellow-700 px-4 py-2 rounded-full text-sm font-medium">
+                    Achievements
+                  </span>
+                </div>
+                <Certificates />
               </section>
               
               {/* Minimalistic Call-to-Action Buttons Section */}

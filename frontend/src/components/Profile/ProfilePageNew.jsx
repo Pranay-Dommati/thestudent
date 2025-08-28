@@ -4,7 +4,7 @@ import {
   FaUser, FaLock, FaRegUser, FaRegEnvelope, FaEye, FaEyeSlash,
   FaEdit, FaCheck, FaTimes, FaSpinner, FaSignOutAlt, FaHome,
   FaGoogle, FaUnlink, FaCamera, FaGraduationCap,
-  FaBookOpen, FaCertificate
+  FaBookOpen
 } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -468,81 +468,242 @@ const ProfilePage = () => {
         </div>
       </nav>
 
+      {/* Tab Navigation */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-8 overflow-x-auto">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+                    isActive
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       <div className="profile-content">
         <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8">
-          {/* Profile Information Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="profile-card"
-          >
-            {/* Mobile-responsive header */}
-            <div className="profile-header">
-              <div className="flex-1">
-                <h2 className="profile-title">Personal Information</h2>
-                <p className="profile-subtitle">Update your personal details and preferences</p>
-              </div>
-              <div className="profile-actions">
-                {isEditing ? (
-                  <>
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={handleCancel}
-                      className="profile-button profile-button-secondary touch-button"
-                    >
-                      <FaTimes className="w-4 h-4" />
-                      <span className="hidden sm:inline">Cancel</span>
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={handleSave}
-                      disabled={isSaving}
-                      className="profile-button profile-button-primary touch-button disabled:opacity-70"
-                    >
-                      {isSaving ? (
-                        <>
-                          <FaSpinner className="w-4 h-4 animate-spin" />
-                          <span className="hidden sm:inline">Saving...</span>
-                        </>
-                      ) : (
-                        <>
-                          <FaCheck className="w-4 h-4" />
-                          <span className="hidden sm:inline">Save</span>
-                        </>
-                      )}
-                    </motion.button>
-                  </>
-                ) : (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setIsEditing(true)}
-                    className="profile-button profile-button-primary touch-button"
-                  >
-                    <FaEdit className="w-4 h-4" />
-                    <span className="hidden sm:inline">Edit Profile</span>
-                  </motion.button>
-                )}
-              </div>
-            </div>
-
-            {/* Mobile-responsive form grid */}
-            <div className="profile-form-grid">
-              {formFields.map((field) => (
-                <div key={field.id} className="profile-field">
-                  <label className="profile-label">
-                    {field.label}
-                  </label>
-                  {renderFormField(field)}
+          {/* Profile Information Tab */}
+          {activeTab === 'profile' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="profile-card"
+            >
+              {/* Mobile-responsive header */}
+              <div className="profile-header">
+                <div className="flex-1">
+                  <h2 className="profile-title">Personal Information</h2>
+                  <p className="profile-subtitle">Update your personal details and preferences</p>
                 </div>
-              ))}
-            </div>
-          </motion.div>
+                <div className="profile-actions">
+                  {isEditing ? (
+                    <>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleCancel}
+                        className="profile-button profile-button-secondary touch-button"
+                      >
+                        <FaTimes className="w-4 h-4" />
+                        <span className="hidden sm:inline">Cancel</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="profile-button profile-button-primary touch-button disabled:opacity-70"
+                      >
+                        {isSaving ? (
+                          <>
+                            <FaSpinner className="w-4 h-4 animate-spin" />
+                            <span className="hidden sm:inline">Saving...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FaCheck className="w-4 h-4" />
+                            <span className="hidden sm:inline">Save</span>
+                          </>
+                        )}
+                      </motion.button>
+                    </>
+                  ) : (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setIsEditing(true)}
+                      className="profile-button profile-button-primary touch-button"
+                    >
+                      <FaEdit className="w-4 h-4" />
+                      <span className="hidden sm:inline">Edit Profile</span>
+                    </motion.button>
+                  )}
+                </div>
+              </div>
+
+              {/* Mobile-responsive form grid */}
+              <div className="profile-form-grid">
+                {formFields.map((field) => (
+                  <div key={field.id} className="profile-field">
+                    <label className="profile-label">
+                      {field.label}
+                    </label>
+                    {renderFormField(field)}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
           
-          {/* Social Connections Card - Mobile optimized */}
-          {Object.keys(socialAccounts).length > 0 && (
+          {/* Certificates Tab */}
+          {activeTab === 'certificates' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Certificates />
+            </motion.div>
+          )}
+          
+          {/* Security Tab */}
+          {activeTab === 'security' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="profile-card"
+            >
+              <div className="profile-header">
+                <div>
+                  <h2 className="profile-title">Security & Password</h2>
+                  <p className="profile-subtitle">Manage your account security settings</p>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900">Password</h3>
+                      <p className="text-sm text-gray-600">Update your password regularly for better security</p>
+                    </div>
+                    <button
+                      onClick={() => setShowPasswordForm(!showPasswordForm)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      Change Password
+                    </button>
+                  </div>
+                  
+                  {showPasswordForm && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-4 p-4 border border-gray-200 rounded-lg"
+                    >
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Current Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPasswords.current ? 'text' : 'password'}
+                            value={passwordData.currentPassword}
+                            onChange={(e) => setPasswordData(prev => ({...prev, currentPassword: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter current password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility('current')}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                          >
+                            {showPasswords.current ? <FaEyeSlash /> : <FaEye />}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          New Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPasswords.new ? 'text' : 'password'}
+                            value={passwordData.newPassword}
+                            onChange={(e) => setPasswordData(prev => ({...prev, newPassword: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter new password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility('new')}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                          >
+                            {showPasswords.new ? <FaEyeSlash /> : <FaEye />}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Confirm New Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPasswords.confirm ? 'text' : 'password'}
+                            value={passwordData.confirmPassword}
+                            onChange={(e) => setPasswordData(prev => ({...prev, confirmPassword: e.target.value}))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Confirm new password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility('confirm')}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                          >
+                            {showPasswords.confirm ? <FaEyeSlash /> : <FaEye />}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-3 pt-4">
+                        <button
+                          onClick={handleCancelPasswordChange}
+                          className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handlePasswordChange}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Update Password
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+          
+          {/* Social Connections Card - Mobile optimized - Only show in profile tab */}
+          {activeTab === 'profile' && Object.keys(socialAccounts).length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

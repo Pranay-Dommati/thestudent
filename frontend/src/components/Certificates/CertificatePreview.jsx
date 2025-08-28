@@ -30,6 +30,7 @@ const CertificatePreview = () => {
   const [progressPct, setProgressPct] = useState(0);
   const [pdfError, setPdfError] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(true);
+  const [pdfRetryCount, setPdfRetryCount] = useState(0);
 
   const learnerName = useMemo(() => {
     return (
@@ -46,6 +47,8 @@ const CertificatePreview = () => {
       try {
         setLoading(true);
         setPdfError(false); // Reset PDF error state on reload
+        setPdfLoading(true); // Reset PDF loading state
+        setPdfRetryCount(0); // Reset retry count
 
         // 1) Get progress summary (includes certificate if already issued)
         const progressRes = await axiosInstance.get(`/courses/${courseId}/progress/`);
@@ -70,7 +73,7 @@ const CertificatePreview = () => {
             setCourseTitle(issueRes.data.course.title);
           }
           
-          toast.success('Certificate updated');
+          // Remove the duplicate toast - only show on manual actions, not on page load
         } else {
           setError('Complete the course to generate your certificate.');
         }
@@ -273,19 +276,29 @@ const CertificatePreview = () => {
                           
                           {!pdfError ? (
                             <iframe
-                              src={`${certificate.download_url}?v=${encodeURIComponent(certificate.certificate_id || Date.now())}`}
+                              key={pdfRetryCount} // Force re-render on retry
+                              src={`${certificate.download_url}?v=${encodeURIComponent(certificate.certificate_id || Date.now())}&retry=${pdfRetryCount}`}
                               className={`w-full h-[600px] border-0 transition-opacity duration-300 ${
                                 pdfLoading ? 'opacity-50' : 'opacity-100'
                               }`}
                               title="Certificate Preview"
                               onError={() => {
-                                console.log('PDF iframe error detected');
-                                setPdfError(true);
-                                setPdfLoading(false);
+                                console.log('PDF iframe error detected, retry count:', pdfRetryCount);
+                                if (pdfRetryCount < 2) {
+                                  // Retry up to 2 times
+                                  setTimeout(() => {
+                                    setPdfRetryCount(prev => prev + 1);
+                                    setPdfLoading(true);
+                                  }, 1000);
+                                } else {
+                                  setPdfError(true);
+                                  setPdfLoading(false);
+                                }
                               }}
                               onLoad={(e) => {
                                 console.log('PDF iframe loaded successfully');
                                 setPdfLoading(false);
+                                setPdfError(false);
                               }}
                             />
                           ) : (
@@ -315,6 +328,7 @@ const CertificatePreview = () => {
                                     onClick={() => {
                                       setPdfError(false);
                                       setPdfLoading(true);
+                                      setPdfRetryCount(0); // Reset retry count
                                     }}
                                     className="block mx-auto text-sm text-blue-600 hover:text-blue-800 underline transition-colors"
                                   >

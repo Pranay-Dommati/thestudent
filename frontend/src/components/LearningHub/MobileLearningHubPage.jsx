@@ -8,11 +8,13 @@ import {
   FaBrain, 
   FaChartLine, 
   FaGraduationCap,
-  FaFire
+  FaFire,
+  FaCertificate
 } from 'react-icons/fa';
 import ActiveCourses from './ActiveCourses/ActiveCourses';
 import AILearningPlans from './AILearningPlans/AILearningPlans';
 import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
+import Certificates from '../Profile/tabs/Certificates';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8000';
@@ -29,6 +31,12 @@ const MobileLearningHubPage = () => {
       label: 'My Courses', 
       icon: FaGraduationCap,
       description: 'Continue your learning'
+    },
+    { 
+      id: 'certificates', 
+      label: 'Certificates', 
+      icon: FaCertificate,
+      description: 'Your achievements'
     },
     { 
       id: 'ai', 
@@ -95,6 +103,8 @@ const MobileLearningHubPage = () => {
     switch (activeTab) {
       case 'enrolled':
         return <ActiveCourses />;
+      case 'certificates':
+        return <Certificates />;
       case 'ai':
         return <AILearningPlans />;
       case 'analytics':
@@ -190,7 +200,7 @@ const MobileLearningHubPage = () => {
       {/* Tab Navigation */}
       <div className="px-4 pt-4 pb-2">
         <div className="bg-white rounded-2xl p-1.5 shadow-lg border border-gray-200">
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-4 gap-1">
             {tabs.map((tab, index) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
