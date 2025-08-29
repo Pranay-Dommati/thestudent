@@ -159,10 +159,87 @@ const ProLearningPage = () => {
         return;
       }
 
+      // Helper function to handle URL-based topic selection
+      const handleTopicSelection = (topics) => {
+        if (!topics || topics.length === 0) return;
+        
+        let matchingTopicIndex = -1;
+        
+        if (topicParam) {
+          // Handle case where topicParam might contain multiple topics (comma-separated)
+          const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
+          
+          // Strategy 1: Exact match (case insensitive)
+          matchingTopicIndex = topics.findIndex(topic => 
+            topic.name.toLowerCase().trim() === actualTopic.toLowerCase().trim()
+          );
+          
+          // Strategy 2: Partial match
+          if (matchingTopicIndex === -1) {
+            matchingTopicIndex = topics.findIndex(topic => 
+              topic.name.toLowerCase().includes(actualTopic.toLowerCase()) ||
+              actualTopic.toLowerCase().includes(topic.name.toLowerCase())
+            );
+          }
+        }
+        
+        // If no match found or no topicParam, use first topic
+        if (matchingTopicIndex === -1) {
+          matchingTopicIndex = 0;
+        }
+        
+        const selectedTopicObject = topics[matchingTopicIndex];
+        
+        // Update topics with active state
+        const updatedTopics = topics.map((topic, index) => ({
+          ...topic,
+          isActive: index === matchingTopicIndex
+        }));
+        
+        // Update the topics list with active state
+        setTopicsList(updatedTopics);
+        setSelectedTopic(selectedTopicObject);
+        
+        // Update URL if needed
+        const selectedTopicName = selectedTopicObject.name;
+        const currentTopicParam = topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null;
+        
+        if (selectedTopicName !== currentTopicParam) {
+          const newSearchParams = new URLSearchParams(window.location.search);
+          newSearchParams.set("topic", selectedTopicName);
+          navigate(`/pro-learning/${currentCourseId}?${newSearchParams.toString()}`, { replace: true });
+        }
+        
+        // Handle tab parameter from URL
+        const currentTabParam = new URLSearchParams(window.location.search).get("tab");
+        if (currentTabParam) {
+          setActiveTab(currentTabParam);
+        }
+        
+        // Auto-load content for the selected topic
+        setTimeout(() => {
+          loadTopicContent(selectedTopicName);
+        }, 100);
+      };
+
+      // Ensure ProContentManager cache is hydrated from IndexedDB before any synchronous getters
+      try {
+        await proContentManager.initializeCourse(currentCourseId);
+        // Cache initialized; synchronous getters will now return data reliably
+      } catch (e) {
+        // If initialization fails, continue with other fallbacks below
+      }
+
       // Step 1: Check localStorage for course data
-      const storedTopics = proContentManager.getStoredTopics(currentCourseId);
+      const storedTopics = await proContentManager.getStoredTopics(currentCourseId);
+      console.log('🔍 Step 1 - Stored topics check:', {
+        courseId: currentCourseId,
+        topicsFound: storedTopics.length,
+        topics: storedTopics.map(t => t.name)
+      });
+      
       if (storedTopics.length > 0) {
-        setTopicsList(storedTopics);
+        handleTopicSelection(storedTopics);
         return;
       }
       
@@ -184,13 +261,23 @@ const ProLearningPage = () => {
           }
         }
         if (payload && payload.courseId === currentCourseId && Array.isArray(payload.topics) && payload.topics.length > 0) {
-          setTopicsList(payload.topics);
+          console.log('🔍 Step 2 - Batch generation data found:', {
+            courseId: currentCourseId,
+            topicsFound: payload.topics.length,
+            topics: payload.topics.map(t => t.name || t)
+          });
+          
+          // Use handleTopicSelection for batch topics too
+          handleTopicSelection(payload.topics);
           // Persist topics immediately so refresh shows them in sidebar
           try {
             const normalized = payload.topics.map((t, i) => ({ id: (t.id || i + 1), name: t.name || t }));
             proContentManager.setCourse(courseTitle || 'Generated Course', currentCourseId);
-            proContentManager.storeTopics(normalized, currentCourseId);
-          } catch (e) { }
+            await proContentManager.storeTopics(normalized, currentCourseId);
+            console.log('✅ Batch topics stored successfully');
+          } catch (e) {
+            console.error('❌ Failed to store batch topics:', e);
+          }
       foundFromBatch = true;
       return;
         }
@@ -210,6 +297,11 @@ const ProLearningPage = () => {
       if (databaseCourse) {
         // Transform database course data to the format expected by the UI
         if (databaseCourse.topics && databaseCourse.topics.length > 0) {
+          console.log('🔍 Step 3 - Database topics found:', {
+            courseId: currentCourseId,
+            topicsFound: databaseCourse.topics.length,
+            topics: databaseCourse.topics.map(t => t.topic_name)
+          });
           // Find the index of the first topic that matches URL parameter
           let activeTopicIndex = -1;
           if (topicParam) {
@@ -236,33 +328,18 @@ const ProLearningPage = () => {
             topics: transformedTopics.map(t => ({ name: t.name, isActive: t.isActive }))
           });
           
-          setTopicsList(transformedTopics);
+          // Use handleTopicSelection for database topics
+          handleTopicSelection(transformedTopics);
           // Persist DB topics so they’re available on refresh
           try {
             const normalized = transformedTopics.map(t => ({ id: t.id, name: t.name }));
             proContentManager.setCourse(databaseCourse.course_name || courseTitle || 'Database Course', currentCourseId);
-            proContentManager.storeTopics(normalized, currentCourseId);
-          } catch (e) { }
-          
-          // Set selectedTopic immediately if we have an active topic
-          const activeTopic = transformedTopics.find(t => t.isActive);
-          if (activeTopic) {
-            setSelectedTopic(activeTopic);
-            
-            // Automatically load content for the active topic from database
-            console.log('🚀 Auto-loading content for database topic:', activeTopic.name);
-            setTimeout(() => {
-              loadTopicContent(activeTopic.name);
-            }, 100); // Small delay to ensure state is set
-          }
-          
-          // CRITICAL: Set course context in ProContentManager for database-loaded courses
+            await proContentManager.storeTopics(normalized, currentCourseId);
+            console.log('✅ Database topics stored successfully');
+          } catch (e) {
+            console.error('❌ Failed to store database topics:', e);
+          }          // CRITICAL: Set course context in ProContentManager for database-loaded courses
           proContentManager.setCourse(databaseCourse.course_name, currentCourseId);
-          
-          // Set course title if not already set
-          if (!courseTitle && databaseCourse.course_name) {
-            // We might need to set the course title state if it exists
-          }
           
           return;
         }
@@ -277,18 +354,11 @@ const ProLearningPage = () => {
             const derivedTopics = topicNames.map((name, idx) => ({ 
               id: idx + 1, 
               name,
-              isActive: idx === 0 // Only first topic is active
+              isActive: false // Will be set by handleTopicSelection
             }));
-            setTopicsList(derivedTopics);
             
-            // Set the first topic as selected
-            setSelectedTopic(derivedTopics[0]);
-            
-            // Automatically load content for the first topic
-            console.log('🚀 Auto-loading content for URL-derived topic:', derivedTopics[0].name);
-            setTimeout(() => {
-              loadTopicContent(derivedTopics[0].name);
-            }, 100); // Small delay to ensure state is set
+            // Use handleTopicSelection for URL-derived topics
+            handleTopicSelection(derivedTopics);
             
             // Persist immediately so sidebar/progress work and refresh is safe
             try {
@@ -329,107 +399,11 @@ const ProLearningPage = () => {
       }
     };
 
-    initializeCourseData();
+    // Properly await the async initialization
+    initializeCourseData().catch(error => {
+      console.error('❌ Failed to initialize course data:', error);
+    });
   }, [courseTitle, courseId, topicParam]); // Add topicParam dependency for immediate sync
-  
-  // Unified useEffect to handle topic URL synchronization and selection
-  useEffect(() => {
-    if (topicsList.length === 0) return; // Wait for topics to be loaded
-    
-    // Only log when there are topics and a clear action is being taken
-    if (topicsList.length > 0) {
-      console.log('🎯 DEBUG: Unified useEffect - Topics available, checking for active topic');
-      console.log('🎯 DEBUG: topicParam:', topicParam, 'selectedTopic:', selectedTopic?.name);
-    }
-    
-    if (topicParam) {
-      // If we have a topic from URL, find and activate the matching topic
-      // Handle case where topicParam might contain multiple topics (comma-separated)
-      const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
-      
-      // Find the topic that matches the URL parameter with multiple matching strategies
-      let matchingTopicIndex = -1;
-      
-      // Strategy 1: Exact match (case insensitive)
-      matchingTopicIndex = topicsList.findIndex(topic => 
-        topic.name.toLowerCase().trim() === actualTopic.toLowerCase().trim()
-      );
-      
-      // Strategy 2: Partial match - check if topic name contains the URL topic
-      if (matchingTopicIndex === -1) {
-        matchingTopicIndex = topicsList.findIndex(topic => 
-          topic.name.toLowerCase().includes(actualTopic.toLowerCase()) ||
-          actualTopic.toLowerCase().includes(topic.name.toLowerCase())
-        );
-      }
-      
-      // Strategy 3: If still not found, just use the first topic
-      if (matchingTopicIndex === -1) {
-        console.log('⚠️ Topic from URL not found, using first topic as fallback');
-        matchingTopicIndex = 0;
-      }
-      
-      const selectedTopicName = topicsList[matchingTopicIndex].name;
-      const selectedTopicObject = topicsList[matchingTopicIndex];
-      
-      // Only update if this topic is not already selected and active
-      if (!selectedTopic || selectedTopic.name !== selectedTopicObject.name || !selectedTopicObject.isActive) {
-        // Set the selected topic state
-        setSelectedTopic(selectedTopicObject);
-        
-        // Set the matching topic as active in the topics list
-        setTopicsList(prevTopics => {
-          const updatedTopics = prevTopics.map((topic, index) => ({
-            ...topic,
-            isActive: index === matchingTopicIndex // Only matching topic is active
-          }));
-          
-          console.log('✅ Setting topic as active (URL match):', updatedTopics.map(t => ({ name: t.name, isActive: t.isActive })));
-          return updatedTopics;
-        });
-        
-        // Update URL to reflect the actual topic name (not the URL-encoded one) - only if different
-        if (selectedTopicName !== actualTopic) {
-          const newSearchParams = new URLSearchParams(searchParams);
-          newSearchParams.set("topic", selectedTopicName);
-          navigate(`/pro-learning/${courseId}?${newSearchParams.toString()}`, { replace: true });
-        }
-        
-        // Load content for the selected topic automatically
-        setTimeout(() => {
-          loadTopicContent(selectedTopicName);
-        }, 100); // Small delay to ensure state is updated
-      }
-    } else {
-      // If no topic is specified in URL and we have topics, select the first one
-      const firstTopic = topicsList[0];
-      if (firstTopic && (!selectedTopic || selectedTopic.name !== firstTopic.name || !firstTopic.isActive)) {
-        // Set the selected topic state
-        setSelectedTopic(firstTopic);
-        
-        // Set the first topic as active in the topics list
-        setTopicsList(prevTopics => {
-          const updatedTopics = prevTopics.map((topic, index) => ({
-            ...topic,
-            isActive: index === 0 // Only first topic is active
-          }));
-          
-          console.log('✅ Setting first topic as active (no URL):', updatedTopics.map(t => ({ name: t.name, isActive: t.isActive })));
-          return updatedTopics;
-        });
-        
-        // Update URL to include the first topic
-        const newSearchParams = new URLSearchParams(searchParams);
-        newSearchParams.set("topic", firstTopic.name);
-        navigate(`/pro-learning/${courseId}?${newSearchParams.toString()}`, { replace: true });
-        
-        // Load content for the first topic automatically
-        setTimeout(() => {
-          loadTopicContent(firstTopic.name);
-        }, 100); // Small delay to ensure state is updated
-      }
-    }
-  }, [topicsList.length, topicParam, courseId, navigate, searchParams, selectedTopic]); // Comprehensive dependency array
   
   // Content state
   const [content, setContent] = useState(null);
@@ -988,13 +962,13 @@ const ProLearningPage = () => {
       let storedContent = null;
       
       // Method 1: Try the ProContentManager method
-      storedContent = proContentManager.getStoredTopicContent(currentCourseId, topicName);
+      storedContent = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
       // Method 1 (ProContentManager): result
       
       // Method 2: Try direct storage access if Method 1 fails
       if (!storedContent) {
         try {
-          const courseContent = proContentManager.getStoredCourseContent(currentCourseId);
+          const courseContent = await proContentManager.getStoredCourseContent(currentCourseId);
           // Course content structure
           
           if (courseContent && courseContent.topics) {
@@ -1008,7 +982,7 @@ const ProLearningPage = () => {
       
       // Method 3: Try checking with different topic name formats if still not found
       if (!storedContent && topicName) {
-        const courseContent = proContentManager.getStoredCourseContent(currentCourseId);
+        const courseContent = await proContentManager.getStoredCourseContent(currentCourseId);
         if (courseContent && courseContent.topics) {
           // Try to find topic with similar names (case insensitive, trimmed)
           const topicKeys = Object.keys(courseContent.topics);
@@ -1027,13 +1001,28 @@ const ProLearningPage = () => {
         console.log('✅ Successfully found stored content for:', topicName);
         
         // Transform stored content to the expected format
-        setContent({
+        const transformedContent = {
           reading: storedContent.reading || 'Content not available',
           summary: storedContent.summary || 'Summary not available',
           quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
           videos: storedContent.videos || [],
           resources: storedContent.resources || []
-        });
+        };
+        
+        setContent(transformedContent);
+        
+        // Update available tabs for the topic based on loaded content
+        const availableTabs = [];
+        if (transformedContent.reading) availableTabs.push('reading');
+        if (transformedContent.summary) availableTabs.push('summary');
+        if (transformedContent.videos?.length > 0) availableTabs.push('videos');
+        if (transformedContent.quiz?.length > 0 || (transformedContent.quiz?.questions?.length > 0)) availableTabs.push('quiz');
+        if (transformedContent.resources?.length > 0) availableTabs.push('resources');
+        
+        setAvailableTabsForTopics(prev => ({
+          ...prev,
+          [topicName]: availableTabs
+        }));
         
         // Parse and set reading sections
         if (storedContent.reading) {
@@ -1051,18 +1040,69 @@ const ProLearningPage = () => {
         // CRITICAL: Set course context in ProContentManager before calling getTopicContent
         proContentManager.setCourse(courseTitle || "Database Course", currentCourseId);
         
-        // Try to get database topic data first
-        const databaseCourse = await fetchCourseFromDB(currentCourseId);
+        // Try to get database topic data - first check if it's already in the topics list
         let dbTopic = null;
-        if (databaseCourse?.topics) {
-          dbTopic = databaseCourse.topics.find(topic => topic.topic_name === topicName);
-          console.log('🗄️ Found database topic:', dbTopic);
+        const topicWithDbData = topicsList.find(t => t.name === topicName && t.dbTopic);
+        if (topicWithDbData) {
+          dbTopic = topicWithDbData.dbTopic;
+          console.log('🗄️ Using cached database topic:', {
+            topicName,
+            hasDbTopic: !!dbTopic,
+            dbTopicKeys: dbTopic ? Object.keys(dbTopic) : [],
+            hasReadingMaterial: !!dbTopic?.reading_material,
+            hasSummary: !!dbTopic?.summary,
+            hasVideos: !!dbTopic?.videos?.length,
+            hasQuiz: !!dbTopic?.quiz_questions?.length,
+            hasResources: !!dbTopic?.resources?.length
+          });
+        } else {
+          // Fallback: fetch from database if not cached
+          console.log('⚠️ No cached database topic found, fetching from database');
+          const databaseCourse = await fetchCourseFromDB(currentCourseId);
+          if (databaseCourse?.topics) {
+            dbTopic = databaseCourse.topics.find(topic => topic.topic_name === topicName);
+            console.log('🗄️ Fetched database topic:', dbTopic ? 'Found' : 'Not found');
+          }
         }
+        
+        console.log('🔄 Calling proContentManager.getTopicContent with:', {
+          topicName,
+          hasDbTopic: !!dbTopic,
+          hasGenerateCallback: !!generateProContent
+        });
         
         const result = await proContentManager.getTopicContent(topicName, generateProContent, dbTopic);
         
+        console.log('📝 ProContentManager result:', {
+          hasResult: !!result,
+          source: result?.source,
+          hasContent: !!result?.content,
+          contentKeys: result?.content ? Object.keys(result.content) : []
+        });
+        
         if (result && result.content) {
+          console.log('✅ Setting content from result:', {
+            hasReading: !!result.content.reading,
+            hasSummary: !!result.content.summary,
+            hasVideos: !!result.content.videos?.length,
+            hasQuiz: !!result.content.quiz?.length,
+            hasResources: !!result.content.resources?.length
+          });
+          
           setContent(result.content);
+          
+          // Update available tabs for the topic based on generated content
+          const availableTabs = [];
+          if (result.content.reading) availableTabs.push('reading');
+          if (result.content.summary) availableTabs.push('summary');
+          if (result.content.videos?.length > 0) availableTabs.push('videos');
+          if (result.content.quiz?.length > 0 || (result.content.quiz?.questions?.length > 0)) availableTabs.push('quiz');
+          if (result.content.resources?.length > 0) availableTabs.push('resources');
+          
+          setAvailableTabsForTopics(prev => ({
+            ...prev,
+            [topicName]: availableTabs
+          }));
           
           // Parse and set reading sections for generated content
           if (result.content && result.content.reading) {
@@ -1077,13 +1117,20 @@ const ProLearningPage = () => {
       }
     } catch (error) {
       console.error('❌ Failed to load topic content:', error);
-      setContent({
+      const errorContent = {
         reading: 'Failed to load content. Please try again.',
         summary: 'Failed to load summary.',
         quiz: { questions: [], currentQuestion: 0 },
         videos: [],
         resources: []
-      });
+      };
+      setContent(errorContent);
+      
+      // Even for error content, set the reading tab as available
+      setAvailableTabsForTopics(prev => ({
+        ...prev,
+        [topicName]: ['reading', 'summary'] // At least show reading/summary tabs for error content
+      }));
     } finally {
       setIsLoading(false);
       setLoadingStep('');
@@ -1344,7 +1391,7 @@ const ProLearningPage = () => {
       }
 
       // Get all course content from local storage
-      const courseContent = proContentManager.getStoredCourseContent(currentCourseId);
+      const courseContent = await proContentManager.getStoredCourseContent(currentCourseId);
       if (!courseContent || !courseContent.topics) {
         console.error('❌ No course content found in local storage');
         alert('Error: No course content found. Please generate content first.');
@@ -1536,7 +1583,7 @@ const ProLearningPage = () => {
           console.log('🔄 DEBUG: Fresh course creation mode - checking for fresh content for:', actualTopic);
           
           // Check if there's any freshly generated content
-          const storedContent = proContentManager.getStoredTopicContent(currentCourseId, actualTopic);
+          const storedContent = await proContentManager.getStoredTopicContent(currentCourseId, actualTopic);
           console.log('🔍 DEBUG: ProContentManager stored content:', !!storedContent);
           if (storedContent) {
             console.log('🔍 DEBUG: ProContentManager content details:', {
@@ -1565,7 +1612,7 @@ const ProLearningPage = () => {
         } else {
           console.log('📚 DEBUG: Normal mode - checking for any stored content for:', actualTopic);
           // Normal navigation - check if we have stored content for this topic
-          const storedContent = proContentManager.getStoredTopicContent(currentCourseId, actualTopic);
+          const storedContent = await proContentManager.getStoredTopicContent(currentCourseId, actualTopic);
           console.log('🔍 DEBUG: Found stored content:', !!storedContent);
         
           if (storedContent && storedContent.reading) {
@@ -1972,10 +2019,22 @@ const ProLearningPage = () => {
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('topic', newTopic);
     // Reset tab to reading when changing topics
-    newSearchParams.set('tab', 'reading');
-    updateActiveTab('reading');
-    setSearchParams(newSearchParams, { replace: true });
+  newSearchParams.set('tab', 'reading');
+  // Avoid double setSearchParams race: update activeTab state locally, then set both params once
+  setActiveTab('reading');
+  setSearchParams(newSearchParams, { replace: true });
   };
+
+  // Handle URL tab parameter changes (after topic initialization is complete)
+  useEffect(() => {
+    if (topicsList.length === 0 || !selectedTopic) return; // Wait for initialization to complete
+    
+    // Handle tab parameter from URL
+    const currentTab = searchParams.get("tab") || "reading";
+    if (currentTab !== activeTab) {
+      setActiveTab(currentTab);
+    }
+  }, [topicsList.length, selectedTopic, searchParams, activeTab]); // Minimal dependencies for tab handling only
 
   // Auto-switch to the first ready tab for current topic when content becomes available
   useEffect(() => {
@@ -2178,7 +2237,7 @@ const ProLearningPage = () => {
         // Topics to generate: topics
 
         // Check if content already exists for this course
-        const existingContent = proContentManager.getStoredCourseContent(batchCourseId);
+        const existingContent = await proContentManager.getStoredCourseContent(batchCourseId);
         if (existingContent && existingContent.metadata.status === 'completed') {
           console.log('✅ Course content already exists, loading from storage');
           setTopicsList(topics);

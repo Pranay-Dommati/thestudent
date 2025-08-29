@@ -10,6 +10,52 @@ class ProContentManager {
     this.currentCourse = null;
     this.currentCourseId = null;
     this.generationPromises = new Map(); // Track ongoing content generation
+    this.courseContentCache = new Map(); // In-memory cache for course content
+  }
+
+  /**
+   * Initialize course content from IndexedDB into cache
+   * @param {String} courseId - Course ID
+   * @returns {Promise<boolean>} - True if content was loaded
+   */
+  async initializeCourse(courseId) {
+    if (this.courseContentCache.has(courseId)) {
+      return true;
+    }
+
+    try {
+      const idbVal = await indexedDBService.getItem(`course_content_${courseId}`);
+      if (idbVal) {
+        this.courseContentCache.set(courseId, idbVal);
+        // Also update localStorage for faster subsequent loads (optional but good practice)
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(`course_content_${courseId}`, JSON.stringify(idbVal));
+          }
+        } catch (e) {
+          console.error('Failed to cache content to localStorage', e);
+        }
+        return true;
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize course content from IndexedDB:', error);
+    }
+    
+    // As a fallback, try to load from localStorage if IndexedDB fails
+    if (!this.courseContentCache.has(courseId)) {
+        try {
+            const cached = (typeof localStorage !== 'undefined') ? localStorage.getItem(`course_content_${courseId}`) : null;
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                this.courseContentCache.set(courseId, parsed);
+                return true;
+            }
+        } catch (e) {
+            console.error('Failed to load from localStorage fallback', e);
+        }
+    }
+
+    return false;
   }
 
   /**
@@ -130,7 +176,15 @@ class ProContentManager {
       try {
         // Step 1: Check for valid stored content first (localStorage)
         const storedContent = contentStorageService.getContentByTopicName(topicName, this.currentCourseId);
+        console.log('🔍 ContentStorageService check:', {
+          topicName,
+          courseId: this.currentCourseId,
+          hasStoredContent: !!storedContent,
+          hasReading: !!storedContent?.reading?.length
+        });
+        
         if (storedContent?.reading?.length > 0) {
+          console.log('✅ Using stored content from ContentStorageService');
           return {
             source: 'storage',
             content: storedContent,
@@ -140,7 +194,24 @@ class ProContentManager {
 
         // Step 2: Check for database content if dbTopic is provided
         if (dbTopic && (dbTopic.reading_material || dbTopic.summary || dbTopic.videos?.length > 0 || dbTopic.quiz_questions?.length > 0 || dbTopic.resources?.length > 0)) {
+          console.log('🗄️ Database topic found, transforming content:', {
+            topicName,
+            hasReadingMaterial: !!dbTopic.reading_material,
+            hasSummary: !!dbTopic.summary,
+            hasVideos: !!dbTopic.videos?.length,
+            hasQuiz: !!dbTopic.quiz_questions?.length,
+            hasResources: !!dbTopic.resources?.length
+          });
+          
           const transformedContent = this.transformDatabaseContent(dbTopic);
+          
+          console.log('🔄 Transformed database content:', {
+            hasReading: !!transformedContent?.reading,
+            hasSummary: !!transformedContent?.summary,
+            hasVideos: !!transformedContent?.videos?.length,
+            hasQuiz: !!transformedContent?.quiz?.length,
+            hasResources: !!transformedContent?.resources?.length
+          });
           
           if (transformedContent) {
             return {
@@ -264,7 +335,7 @@ class ProContentManager {
    * @param {String} forceCourseId - Optional course ID to use instead of generating a new one
    * @returns {Array} - Array of stored topic IDs
    */
-  storeTopics(topics, forceCourseId = null) {
+  async storeTopics(topics, forceCourseId = null) {
     // Use provided course ID or current one
     const courseId = forceCourseId || this.currentCourseId;
     if (!courseId) {
@@ -285,8 +356,66 @@ class ProContentManager {
 
     this.currentCourseId = courseId; // Update the current course ID
     
-    // Store the topics
-    return contentStorageService.storeTopics(courseId, topics);
+    // Store the topics in ContentStorageService
+    const topicIds = contentStorageService.storeTopics(courseId, topics);
+    
+    // CRITICAL: Also create/update the course_content structure in IndexedDB
+    // This ensures that getStoredTopics can find the topics on reload
+    try {
+      // Check if we already have course content
+      let courseContent = await this.getStoredCourseContent(courseId);
+      
+      if (!courseContent) {
+        // Create new course content structure
+        courseContent = {
+          courseId,
+          topics: {},
+          metadata: {
+            createdAt: new Date().toISOString(),
+            totalTopics: topics.length,
+            status: 'topics_stored'
+          }
+        };
+      }
+      
+      // Add/update topics in the course content structure
+      topics.forEach((topic, index) => {
+        const topicName = topic.name;
+        if (!courseContent.topics[topicName]) {
+          courseContent.topics[topicName] = {
+            id: topic.id || index + 1,
+            name: topicName,
+            content: {},
+            status: 'topic_created'
+          };
+        }
+      });
+      
+      // Update metadata
+      courseContent.metadata.updatedAt = new Date().toISOString();
+      courseContent.metadata.totalTopics = Object.keys(courseContent.topics).length;
+      
+      // Store in IndexedDB and update cache
+      await indexedDBService.setItem(`course_content_${courseId}`, courseContent);
+      this.courseContentCache.set(courseId, courseContent);
+      
+      // Also store in localStorage as fallback
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent));
+        }
+      } catch (e) {
+        console.warn('Failed to store course content in localStorage:', e);
+      }
+      
+      console.log('✅ Topics stored successfully in both ContentStorageService and IndexedDB');
+      
+    } catch (error) {
+      console.error('❌ Failed to store course content structure:', error);
+      // Continue with just ContentStorageService storage
+    }
+    
+    return topicIds;
   }
 
   /**
@@ -527,6 +656,7 @@ class ProContentManager {
     // Store the complete course structure
     try {
       await indexedDBService.setItem(`course_content_${courseId}`, courseContent);
+      this.courseContentCache.set(courseId, courseContent); // Update cache
       try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
       // Batch generated content stored successfully
     } catch (error) {
@@ -541,35 +671,52 @@ class ProContentManager {
   /**
    * Get stored course content by course ID
    * @param {String} courseId - Course ID
-   * @returns {Object|null} - Complete course content or null if not found
+   * @returns {Promise<Object|null>} - Complete course content or null if not found
    */
-  getStoredCourseContent(courseId) {
+  async getStoredCourseContent(courseId) {
+    // 1) Fast path: in-memory cache
+    const cached = this.courseContentCache.get(courseId);
+    if (cached) return cached;
+
+    // 2) Primary source: IndexedDB (wait for it)
     try {
-      // Return cached value synchronously for UI callers
-      const cached = (typeof localStorage !== 'undefined') ? localStorage.getItem(`course_content_${courseId}`) : null;
-      const parsed = cached ? JSON.parse(cached) : null;
-
-      // Refresh cache from IndexedDB in the background (non-blocking)
-      indexedDBService.getItem(`course_content_${courseId}`).then((idbVal) => {
-        if (idbVal && typeof localStorage !== 'undefined') {
-          try { localStorage.setItem(`course_content_${courseId}`, JSON.stringify(idbVal)); } catch {}
-        }
-      }).catch(() => {});
-
-      return parsed;
+      const idbVal = await indexedDBService.getItem(`course_content_${courseId}`);
+      if (idbVal) {
+        this.courseContentCache.set(courseId, idbVal);
+        // Update localStorage for faster future access
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(`course_content_${courseId}`, JSON.stringify(idbVal));
+          }
+        } catch (_) {}
+        return idbVal;
+      }
     } catch (error) {
-      console.error('❌ Failed to retrieve stored course content:', error);
-      return null;
+      console.warn('Failed to load from IndexedDB:', error);
     }
+
+    // 3) Fallback: localStorage only if IndexedDB fails
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(`course_content_${courseId}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          this.courseContentCache.set(courseId, parsed);
+          return parsed;
+        }
+      }
+    } catch (_) {}
+
+    return null;
   }
 
   /**
    * Get stored topics for a course
    * @param {String} courseId - Course ID
-   * @returns {Array} - Array of topic objects
+   * @returns {Promise<Array>} - Array of topic objects
    */
-  getStoredTopics(courseId) {
-    const courseContent = this.getStoredCourseContent(courseId);
+  async getStoredTopics(courseId) {
+    const courseContent = await this.getStoredCourseContent(courseId);
 
     // Primary path: aggregate cache from course_content_{courseId}
     if (courseContent && courseContent.topics) {
@@ -602,22 +749,28 @@ class ProContentManager {
    * @param {String} courseId - Course ID
    * @param {String} topicName - Topic name
    * @param {String} contentType - Content type (reading, summary, quiz, resources, videos)
-   * @returns {Object|null} - Specific content or null if not found
+   * @returns {Promise<Object|null>} - Specific content or null if not found
    */
-  getStoredTopicContent(courseId, topicName, contentType = null) {
-    const courseContent = this.getStoredCourseContent(courseId);
-    
-    if (!courseContent || !courseContent.topics[topicName]) {
+  async getStoredTopicContent(courseId, topicName, contentType = null) {
+    // Prefer aggregated course content if available
+    const courseContent = await this.getStoredCourseContent(courseId);
+    if (courseContent && courseContent.topics && courseContent.topics[topicName]) {
+      const topicData = courseContent.topics[topicName];
+      if (contentType) return topicData.content[contentType] || null;
+      return topicData.content;
+    }
+
+    // Fallback: read directly from ContentStorageService (progressive path / per-topic storage)
+    try {
+      const stored = contentStorageService.getContentByTopicName(topicName, courseId);
+      if (!stored) return null;
+      if (contentType) {
+        return stored[contentType] || null;
+      }
+      return stored;
+    } catch (_) {
       return null;
     }
-    
-    const topicData = courseContent.topics[topicName];
-    
-    if (contentType) {
-      return topicData.content[contentType] || null;
-    }
-    
-    return topicData.content;
   }
 
   /**
