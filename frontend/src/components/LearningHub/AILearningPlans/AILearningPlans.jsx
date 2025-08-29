@@ -182,7 +182,7 @@ const AILearningPlans = () => {
             pointerEvents: 'auto',
             cursor: 'pointer',
             position: 'relative',
-            zIndex: 50
+            zIndex: 10
           }}
           onClick={(e) => {
             console.log('Create Your First AI Course button clicked - navigating to /chat');
@@ -254,7 +254,7 @@ const AILearningPlans = () => {
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex items-center space-x-2 flex-shrink-0 relative z-20">
+                <div className="flex items-center space-x-2 flex-shrink-0 relative z-5">
                   {/* Continue/Start Button */}
                   <button
                     onClick={(e) => {
@@ -263,7 +263,7 @@ const AILearningPlans = () => {
                       console.log('Button clicked!', course.id);
                       handleStartCourse(course.id, course.course_name);
                     }}
-                    className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-md text-xs font-medium hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 flex items-center disabled:opacity-50 cursor-pointer relative z-30"
+                    className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-md text-xs font-medium hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 flex items-center disabled:opacity-50 cursor-pointer relative z-5"
                     style={{ cursor: 'pointer', pointerEvents: 'auto' }}
                     type="button"
                   >
@@ -279,7 +279,7 @@ const AILearningPlans = () => {
                       console.log('Delete button clicked!', course.id);
                       handleDeleteClick(course);
                     }}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all duration-200 cursor-pointer relative z-30"
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all duration-200 cursor-pointer relative z-5"
                     title="Delete course"
                     style={{ cursor: 'pointer', pointerEvents: 'auto' }}
                     type="button"

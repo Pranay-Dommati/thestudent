@@ -2534,3 +2534,47 @@ def get_course_by_id(request, course_id):
         return Response({
             'error': f'Failed to get course: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_certificates(request):
+    """
+    Get all certificates earned by the authenticated user
+    """
+    try:
+        user = request.user
+        
+        # Get all certificates for the user
+        certificates = Certification.objects.filter(user=user).select_related('course')
+        
+        certificates_data = []
+        for cert in certificates:
+            cert_data = {
+                'id': cert.id,
+                'certificate_id': str(cert.certificate_id),
+                'course': {
+                    'id': str(cert.course.id),
+                    'title': cert.course.title,
+                    'thumbnail': request.build_absolute_uri(cert.course.thumbnail.url) if cert.course.thumbnail else "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
+                    'category': getattr(cert.course, 'category', None) or getattr(cert.course, 'subject', 'Course'),
+                    'proficiency': getattr(cert.course, 'proficiency', 'Beginner')
+                },
+                'issued_at': cert.issued_at.isoformat(),
+                'download_url': request.build_absolute_uri(cert.file.url) if cert.file else None,
+                'preview_url': f"/certificate-preview/{cert.course.id}"
+            }
+            certificates_data.append(cert_data)
+        
+        return Response({
+            'success': True,
+            'certificates': certificates_data,
+            'total_count': len(certificates_data)
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in get_user_certificates: {str(e)}")
+        return Response({
+            'success': False,
+            'error': f'Failed to get user certificates: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

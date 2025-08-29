@@ -49,6 +49,7 @@ urlpatterns = [
 
     # Certification endpoints
     path('api/courses/<str:course_id>/certificate/', views.issue_engineering_certificate, name='issue-engineering-certificate'),
+    path('api/courses/certificates/', views.get_user_certificates, name='get-user-certificates'),
 
     # Generic course CRUD (placed AFTER specific routes to avoid conflicts)
     path('api/courses/<str:course_id>/', views.get_course_by_id, name='get-course-by-id'),
