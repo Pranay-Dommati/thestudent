@@ -18,3 +18,8 @@ __pycache__/
 *.log
 db.sqlite3
 local_settings.py
+
+# Python virtual environments (ignore local envs in backend)
+venv/
+.venv/
+env/
