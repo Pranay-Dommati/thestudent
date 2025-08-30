@@ -504,26 +504,31 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
   return (
     <div className="h-full bg-white flex flex-col">
-      {/* Mobile Header - Ultra Compact */}
+      {/* Mobile Header - Compact and well-aligned */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between px-2 py-1.5">
+        <div
+          className="flex items-center justify-between px-3 py-2"
+          style={{ paddingTop: `calc(env(safe-area-inset-top, 0px) + 8px)`, paddingBottom: '8px' }}
+        >
           <div className="flex items-center space-x-1.5 flex-1 min-w-0">
             <button
               onClick={() => navigate(-1)}
-              className="p-0.5 bg-gray-50 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+              className="h-9 w-9 inline-flex items-center justify-center bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0 border border-gray-200"
             >
-              <FaArrowLeft className="w-2.5 h-2.5 text-gray-600" />
+              <FaArrowLeft className="w-4 h-4 text-gray-700" />
             </button>
             <div className="flex-1 min-w-0">
-              <h1 className="text-xs font-semibold text-gray-900 truncate leading-tight">{currentLesson?.title || 'Course Learning'}</h1>
+              <h1 className="text-sm font-semibold text-gray-900 truncate leading-tight">{currentLesson?.title || 'Course Learning'}</h1>
               <p className="text-xs text-gray-500 truncate leading-tight">{currentChapter?.title}</p>
             </div>
           </div>
           <button
             onClick={() => setShowMobileMenu(true)}
-            className="ml-1.5 p-0.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors flex-shrink-0"
+            className="ml-2 h-9 w-9 inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm ring-1 ring-black/5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-white flex-shrink-0"
+            aria-label="Open course topics"
+            title="Topics"
           >
-            <FaList className="w-2.5 h-2.5" />
+            <FaList className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -548,21 +553,14 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             <FaChevronLeft className="w-3 h-3 mr-1" />
             Prev
           </button>
-          
+          {/* Center action: open course sidebar (topics) */}
           <button
-            onClick={() => toggleLessonCompletion(activeChapter, activeLesson)}
-            disabled={savingProgress}
-            className={`p-2 rounded-full ${
-              currentLesson?.completed
-                ? 'bg-green-600 hover:bg-green-700 text-white'
-                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-            } transition-colors`}
+            onClick={() => setShowMobileMenu(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+            aria-label="Open course topics"
           >
-            {savingProgress ? (
-              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
-            ) : (
-              <FaCheck className="w-3 h-3" />
-            )}
+            <FaList className="w-3 h-3" />
+            Topics
           </button>
           
           <button 
@@ -582,9 +580,10 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
       {/* Mobile Course Menu Overlay */}
       {showMobileMenu && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50" onClick={() => setShowMobileMenu(false)}>
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-40" onClick={() => setShowMobileMenu(false)}>
+          {/* Partial-width drawer to keep page content visible */}
           <div 
-            className="fixed inset-y-0 right-0 w-full max-w-sm bg-white shadow-xl transform transition-transform duration-300"
+            className="fixed inset-y-0 right-0 w-[85vw] max-w-[420px] bg-white shadow-2xl transform transition-transform duration-300 rounded-l-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Menu Header - Enhanced */}

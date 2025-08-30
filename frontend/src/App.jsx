@@ -67,13 +67,19 @@ const Layout = ({ children, excludePaths = [] }) => {
   // Check if the current route is related to mentoring
   const isMentoring = location.pathname.startsWith('/mentoring');
 
+  // Special cases: pages that should not show global navbars
+  const isCertificatePage = /^\/courses\/[^/]+\/certificate(\/|$)?/.test(location.pathname);
+  const isLearningPage = /^\/courses\/.+\/learning(\/|$)?/.test(location.pathname);
+
   // Check if the current route is in the excludePaths array or should be excluded
   const isExcluded = excludePaths.some(path => location.pathname.startsWith(path)) || 
-                     location.pathname.startsWith('/profile'); // Exclude profile page as it has its own navbar
+                     location.pathname.startsWith('/profile') ||
+                     isCertificatePage ||
+                     isLearningPage; // Exclude profile, certificate and learning pages for focused layout
 
   // Paths where we don't want mobile navigation (like auth, admin, chat, etc.)
   const noMobileNavPaths = ['/auth', '/admin-p', '/not-found', '/chat'];
-  const shouldShowMobileNav = !noMobileNavPaths.some(path => location.pathname.startsWith(path));
+  const shouldShowMobileNav = !noMobileNavPaths.some(path => location.pathname.startsWith(path)) && !isCertificatePage && !isLearningPage;
 
   // Determine the navbar style based on the current route
   const getNavbarStyle = () => {
