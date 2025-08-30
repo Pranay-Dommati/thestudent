@@ -1,6 +1,13 @@
 """
 Rate limiting system for ProLearning topic creation
-Implements daily and per-request limits for topic generation with enhanced security
+
+Implements:
+- Rolling 24-hour window limit (max topics over last 24h)
+- Per-request limit
+- Secure, cache-backed, and concurrency-safe updates
+
+This behaves like ChatGPT’s quota system: usage spreads across a rolling
+24-hour window and slots free up as timestamps expire.
 """
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -10,6 +17,7 @@ from datetime import datetime, timedelta
 import json
 import re
 import logging
+from typing import List, Tuple
 
 # Configure logging for rate limiting
 logger = logging.getLogger(__name__)
@@ -17,8 +25,14 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 # Rate limiting constants - configurable via environment
+# Max topics per rolling 24-hour window
 MAX_TOPICS_PER_DAY = int(getattr(settings, 'MAX_TOPICS_PER_DAY', 16))
+# Max topics per single API request
 MAX_TOPICS_PER_REQUEST = int(getattr(settings, 'MAX_TOPICS_PER_REQUEST', 4))
+
+# Rolling window config
+ROLLING_WINDOW_SECONDS = 24 * 60 * 60  # 24 hours
+USAGE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60  # keep usage keys for up to 7 days
 
 # Security constants
 MAX_CACHE_KEY_LENGTH = 250  # Memcached limit
@@ -59,18 +73,25 @@ def sanitize_cache_key(key):
     return key
 
 class TopicRateLimiter:
-    """Rate limiter for topic creation in ProLearning with enhanced security"""
-    
+    """Rate limiter for topic creation with rolling 24-hour window.
+
+    Storage model (per user or IP):
+    - cache key: topic_usage:{user_id} | topic_usage:ip_{ip}
+    - value: list of ISO8601 timestamp strings for each topic creation
+
+    Concurrency:
+    - A simple distributed lock via cache.add(lock_key, '1', timeout=5)
+      ensures atomic read-modify-write in concurrent requests.
+    """
+
     def __init__(self, user=None, user_ip=None):
         self.user = user
         self.user_ip = user_ip or '127.0.0.1'
-        self.cache_key_prefix = "topic_rate_limit"
-        
-        # Validate inputs
+        self.cache_key_prefix = "topic_usage"
         if user_ip and not self._is_valid_ip(user_ip):
             logger.warning(f"Invalid IP address provided: {user_ip}")
             self.user_ip = '127.0.0.1'
-    
+
     def _is_valid_ip(self, ip):
         """Validate IP address format"""
         import ipaddress
@@ -79,242 +100,192 @@ class TopicRateLimiter:
             return True
         except ValueError:
             return False
-    
-    def get_cache_key(self, suffix=""):
-        """Generate secure cache key for rate limiting"""
-        if self.user and self.user.is_authenticated:
+
+    def get_cache_key(self, suffix: str = "") -> str:
+        """Generate secure cache key for rate limiting (no date component)."""
+        if self.user and getattr(self.user, 'is_authenticated', False):
             identifier = f"user_{self.user.id}"
         else:
             identifier = f"ip_{self.user_ip}"
-        
-        today = timezone.now().strftime('%Y-%m-%d')
-        cache_key = f"{self.cache_key_prefix}_{identifier}_{today}{suffix}"
-        
-        # Sanitize the cache key
+        cache_key = f"{self.cache_key_prefix}:{identifier}{suffix}"
         return sanitize_cache_key(cache_key)
-    
-    def get_daily_usage(self):
-        """Get current daily usage for the user/IP with strict time-based validation"""
-        cache_key = self.get_cache_key("_daily")
-        now = timezone.now()
-        
+
+    # -------- Internal helpers for rolling window --------
+    def _lock_key(self) -> str:
+        return self.get_cache_key(":lock")
+
+    def _acquire_lock(self, timeout: int = 5) -> bool:
+        """Attempt to acquire a short-lived lock for atomic updates."""
         try:
-            usage_data = cache.get(cache_key)
-            
-            # If no data exists or data is corrupted, initialize new usage data
-            if not usage_data or not isinstance(usage_data, dict):
-                logger.warning(f"Invalid or missing cache data for key {cache_key}")
-                return self._initialize_usage_data(now)
-            
-            # Check if the stored data is from a previous day
-            first_request_time = usage_data.get('first_request')
-            if first_request_time:
-                try:
-                    first_request_dt = datetime.fromisoformat(first_request_time)
-                    if first_request_dt.date() < now.date():
-                        logger.info(f"Resetting usage data for new day for {cache_key}")
-                        return self._initialize_usage_data(now)
-                except (ValueError, TypeError) as e:
-                    logger.error(f"Invalid timestamp format in usage data: {e}")
-                    return self._initialize_usage_data(now)
-            
-            # Ensure all required fields exist with proper types
-            usage_data = {
-                'count': max(0, int(usage_data.get('count', 0))),
-                'requests': usage_data.get('requests', [])[-20:],  # Keep last 20 requests
-                'first_request': usage_data.get('first_request') or now.isoformat(),
-                'last_reset': usage_data.get('last_reset') or now.isoformat()
-            }
-            
-            return usage_data
-            
+            return cache.add(self._lock_key(), "1", timeout=timeout)
         except Exception as e:
-            logger.error(f"Error retrieving usage data: {e}")
-            return self._initialize_usage_data(now)
-            
-    def _initialize_usage_data(self, timestamp):
-        """Initialize fresh usage data with proper timestamps"""
-        return {
-            'count': 0,
-            'requests': [],
-            'first_request': timestamp.isoformat(),
-            'last_reset': timestamp.isoformat()
-        }
-    
+            logger.warning(f"Failed to acquire cache lock: {e}")
+            return False
+
+    def _release_lock(self) -> None:
+        try:
+            cache.delete(self._lock_key())
+        except Exception:
+            pass
+
+    def _load_timestamps(self) -> List[str]:
+        """Load the list of ISO timestamps from cache, fallback to []."""
+        key = self.get_cache_key("")
+        try:
+            data = cache.get(key)
+            if not data:
+                return []
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict) and 'timestamps' in data:
+                return list(data.get('timestamps') or [])
+            if isinstance(data, dict) and 'requests' in data:
+                reqs = data.get('requests') or []
+                ts: List[str] = []
+                for r in reqs:
+                    t = r.get('timestamp')
+                    n = int(r.get('topics', 0) or 0)
+                    if t and n > 0:
+                        ts.extend([t] * n)
+                return ts
+            return []
+        except Exception as e:
+            logger.error(f"Error loading timestamps: {e}")
+            return []
+
+    def _prune_old(self, timestamps: List[str], now_dt: datetime) -> List[str]:
+        """Remove timestamps older than the rolling 24-hour window."""
+        window_start = now_dt - timedelta(seconds=ROLLING_WINDOW_SECONDS)
+        pruned: List[str] = []
+        for ts in timestamps:
+            try:
+                dt = datetime.fromisoformat(ts)
+            except Exception:
+                continue
+            if dt >= window_start:
+                pruned.append(ts)
+        return pruned
+
+    def _save_timestamps(self, timestamps: List[str]) -> None:
+        key = self.get_cache_key("")
+        try:
+            cache.set(key, timestamps, timeout=USAGE_CACHE_TTL_SECONDS)
+        except Exception as e:
+            logger.error(f"Error saving timestamps: {e}")
+
+    # -------- Request validation --------
     def check_request_limit(self, requested_topics):
         """Check if the current request exceeds per-request limit"""
         try:
             validate_topic_input(requested_topics)
         except ValueError as e:
             return False, str(e)
-        
         if len(requested_topics) > MAX_TOPICS_PER_REQUEST:
-            return False, f"Maximum {MAX_TOPICS_PER_REQUEST} topics allowed per request. You requested {len(requested_topics)} topics."
+            return False, (
+                f"Maximum {MAX_TOPICS_PER_REQUEST} topics allowed per request. "
+                f"You requested {len(requested_topics)} topics."
+            )
         return True, ""
-    
+
     def check_daily_limit(self, requested_topics):
-        """Check if the request would exceed daily limit"""
-        usage_data = self.get_daily_usage()
-        current_count = max(0, int(usage_data.get('count', 0)))  # Ensure non-negative
-        new_total = current_count + len(requested_topics)
-        
+        """Check rolling 24-hour limit based on timestamp list."""
+        now_dt = timezone.now()
+        timestamps = self._prune_old(self._load_timestamps(), now_dt)
+        current_count = len(timestamps)
+        requested_count = len(requested_topics)
+        new_total = current_count + requested_count
         if new_total > MAX_TOPICS_PER_DAY:
             remaining = max(0, MAX_TOPICS_PER_DAY - current_count)
-            return False, f"Daily limit exceeded. You have {remaining} topics remaining today. You requested {len(requested_topics)} topics."
-        
+            return False, (
+                f"Rolling 24h limit exceeded. You have {remaining} topic(s) remaining in the last 24 hours. "
+                f"You requested {requested_count} topic(s)."
+            )
         return True, ""
-    
+
     def is_request_allowed(self, requested_topics):
-        """Check if the request is allowed based on both limits"""
-        # Check per-request limit
+        """Check if the request is allowed based on per-request and rolling 24h limits."""
         allowed, message = self.check_request_limit(requested_topics)
         if not allowed:
             logger.warning(f"Request limit exceeded for {self.get_cache_key()}: {message}")
-            return False, message, self.get_daily_usage()
-        
-        # Check daily limit
+            return False, message, self.get_usage_stats()
         allowed, message = self.check_daily_limit(requested_topics)
         if not allowed:
-            logger.warning(f"Daily limit exceeded for {self.get_cache_key()}: {message}")
-            return False, message, self.get_daily_usage()
-        
-        return True, "", self.get_daily_usage()
-    
+            logger.warning(f"Rolling limit exceeded for {self.get_cache_key()}: {message}")
+            return False, message, self.get_usage_stats()
+        return True, "", self.get_usage_stats()
+
     def record_usage(self, topics_created):
-        """Record topic creation usage with enhanced security and time validation"""
+        """Record topic creation with rolling 24-hour window and atomic update."""
         try:
             validate_topic_input(topics_created)
         except ValueError as e:
             logger.error(f"Invalid topics in record_usage: {e}")
             raise
-        
-        cache_key = self.get_cache_key("_daily")
-        usage_data = self.get_daily_usage()  # This already handles day transitions
-        
-        # Update usage data with atomic operations
-        now = timezone.now()
+        now_dt = timezone.now()
         topics_count = len(topics_created)
-        
-        # Double-check daily limits before recording
-        new_count = max(0, int(usage_data.get('count', 0)) + topics_count)
-        if new_count > MAX_TOPICS_PER_DAY:
-            logger.warning(f"Attempted to exceed daily limit for {cache_key}")
-            raise ValueError(f"Daily limit exceeded. Limit: {MAX_TOPICS_PER_DAY}, Attempted: {new_count}")
-        
-        usage_data['count'] = new_count
-        
-        # Sanitize topic names for storage with strict validation
-        sanitized_topics = []
-        for topic in topics_created:
-            if isinstance(topic, dict):
-                name = str(topic.get('name', 'Unknown'))
-            else:
-                name = str(topic)
-            
-            # Strict validation of topic names
-            if not name or len(name) > MAX_TOPIC_NAME_LENGTH:
-                name = name[:MAX_TOPIC_NAME_LENGTH] if name else 'Unknown'
-            if not ALLOWED_TOPIC_NAME_PATTERN.match(name):
-                name = re.sub(r'[^\w\s\-\+\#\.\(\)]', '', name) or 'Invalid_Name'
-            sanitized_topics.append(name)
-        
-        # Record request with precise timestamp
-        request_record = {
-            'timestamp': now.isoformat(),
-            'topics': topics_count,
-            'topic_names': sanitized_topics
-        }
-        
-        # Update request history with rotation
-        usage_data['requests'] = (usage_data.get('requests', []) + [request_record])[-20:]
-        
-        # Update first request if not set
-        if not usage_data.get('first_request'):
-            usage_data['first_request'] = now.isoformat()
-        
-        # Calculate precise cache timeout
-        # Store until next day's midnight plus a small buffer for timezone variations
-        tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=5, second=0, microsecond=0)
-        cache_timeout = int((tomorrow - now).total_seconds())
-        
+        if topics_count > MAX_TOPICS_PER_REQUEST:
+            raise ValueError(f"Too many topics: maximum {MAX_TOPICS_PER_REQUEST} allowed")
+        if not self._acquire_lock():
+            logger.warning("Proceeding without lock due to contention")
         try:
-            cache.set(cache_key, usage_data, timeout=cache_timeout)
-            logger.info(f"Recorded usage for {self.get_cache_key()}: {topics_count} topics")
-        except Exception as e:
-            logger.error(f"Failed to cache usage data: {e}")
-        
-        return usage_data
-    
+            timestamps = self._prune_old(self._load_timestamps(), now_dt)
+            if len(timestamps) + topics_count > MAX_TOPICS_PER_DAY:
+                remaining = max(0, MAX_TOPICS_PER_DAY - len(timestamps))
+                raise ValueError(
+                    f"Rolling 24h limit exceeded. You have {remaining} topic(s) remaining in the last 24 hours."
+                )
+            now_iso = now_dt.isoformat()
+            timestamps.extend([now_iso] * topics_count)
+            self._save_timestamps(timestamps)
+        finally:
+            self._release_lock()
+        return {"count": len(timestamps)}
+
     def get_usage_stats(self):
-        """Get detailed usage statistics with time-based information"""
-        usage_data = self.get_daily_usage()
-        now = timezone.now()
-        
-        # Calculate time-based metrics
-        reset_info = self._get_reset_time()
-        first_request_time = usage_data.get('first_request')
-        
-        try:
-            first_request_dt = datetime.fromisoformat(first_request_time) if first_request_time else now
-            usage_duration = (now - first_request_dt).total_seconds()
-        except (ValueError, TypeError):
-            usage_duration = 0
-            first_request_time = now.isoformat()
-        
-        # Get recent requests with proper ordering
-        recent_requests = sorted(
-            usage_data.get('requests', [])[-5:],
-            key=lambda x: x.get('timestamp', ''),
-            reverse=True
-        )
-        
+        """Return usage statistics for the rolling 24-hour window."""
+        now_dt = timezone.now()
+        timestamps = self._prune_old(self._load_timestamps(), now_dt)
+        used = len(timestamps)
+        remaining = max(0, MAX_TOPICS_PER_DAY - used)
+        if used > 0:
+            try:
+                oldest_dt = min(datetime.fromisoformat(ts) for ts in timestamps)
+                elapsed = (now_dt - oldest_dt).total_seconds()
+                reset_in = max(0, int(ROLLING_WINDOW_SECONDS - elapsed))
+            except Exception:
+                reset_in = 0
+        else:
+            reset_in = 0
+        recent = sorted(timestamps[-5:], reverse=True)
         return {
-            'daily_used': usage_data['count'],
+            'topics_used_24h': used,
+            'topics_remaining': remaining,
+            'reset_in': reset_in,
+            'daily_used': used,
             'daily_limit': MAX_TOPICS_PER_DAY,
-            'daily_remaining': max(0, MAX_TOPICS_PER_DAY - usage_data['count']),
+            'daily_remaining': remaining,
             'per_request_limit': MAX_TOPICS_PER_REQUEST,
-            'request_count_today': len(usage_data.get('requests', [])),
-            'first_request_today': first_request_time,
-            'usage_duration_seconds': int(usage_duration),
-            'recent_requests': recent_requests,
-            'reset_info': reset_info,
-            'current_time': now.isoformat(),
+            'request_count_today': used,
+            'first_request_today': (min(recent) if recent else None),
+            'usage_duration_seconds': (ROLLING_WINDOW_SECONDS - reset_in) if used > 0 else 0,
+            'recent_requests': [
+                {'timestamp': ts, 'topics': 1, 'topic_names': []} for ts in recent[::-1]
+            ],
+            'current_time': now_dt.isoformat(),
             'rate_limits': {
                 'daily': {
                     'limit': MAX_TOPICS_PER_DAY,
-                    'remaining': max(0, MAX_TOPICS_PER_DAY - usage_data['count']),
-                    'used': usage_data['count'],
-                    'percent_used': round((usage_data['count'] / MAX_TOPICS_PER_DAY) * 100, 2)
+                    'remaining': remaining,
+                    'used': used,
+                    'percent_used': round((used / MAX_TOPICS_PER_DAY) * 100, 2) if MAX_TOPICS_PER_DAY else 0.0,
                 },
                 'per_request': {
                     'limit': MAX_TOPICS_PER_REQUEST,
-                    'remaining': MAX_TOPICS_PER_REQUEST
-                }
-            }
+                    'remaining': MAX_TOPICS_PER_REQUEST,
+                },
+            },
         }
-    
-    def _get_reset_time(self):
-        """Get precise time when limits reset (next midnight) with timezone handling"""
-        now = timezone.now()
-        
-        # Get next midnight in user's timezone
-        # Add 1 minute buffer to ensure we're in the next day
-        tomorrow = (now + timedelta(days=1)).replace(
-            hour=0,
-            minute=1,
-            second=0,
-            microsecond=0
-        )
-        
-        # Calculate seconds until reset
-        self.seconds_until_reset = int((tomorrow - now).total_seconds())
-        
-        # Include timezone information in the reset time
-        return {
-            'reset_at': tomorrow.isoformat(),
-            'seconds_remaining': self.seconds_until_reset,
-            'timezone': str(timezone.get_current_timezone())
-        }
+    # Midnight reset helper removed: rolling window uses dynamic reset based on oldest entry
 
 def get_user_ip(request):
     """Extract user IP address from request with security validation"""
