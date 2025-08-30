@@ -12,4 +12,6 @@ urlpatterns = [
     path('classify-topics/', views.classify_topics, name='ai-classify-topics-alt'),
     path('create-course-topics/', views.create_course_topics, name='ai-create-course-topics'),
     path('rate-limit-status/', views.get_topic_rate_limit_status, name='ai-rate-limit-status'),
+    path('get-topic-rate-limit-status/', views.get_topic_rate_limit_status, name='ai-get-topic-rate-limit-status'),
+    path('debug-rate-limit-cache/', views.debug_rate_limit_cache, name='ai-debug-rate-limit-cache'),
 ] 

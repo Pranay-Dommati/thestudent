@@ -1,1 +1,3 @@
 WARNING 2025-08-23 15:20:14,184 log 10904 32112 Unauthorized: /api/courses/enroll/
+WARNING 2025-08-30 18:53:27,551 rate_limiter 5420 19892 Invalid or missing cache data for key topic_rate_limit_user_1_2025-08-30_daily
+WARNING 2025-08-30 18:53:27,560 rate_limiter 5420 19892 Invalid or missing cache data for key topic_rate_limit_user_3_2025-08-30_daily

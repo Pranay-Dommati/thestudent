@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Browser Rate Limit Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .test-step {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .button {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,123,255,0.3);
+        }
+        .button.danger { background: linear-gradient(45deg, #dc3545, #c82333); }
+        .button.success { background: linear-gradient(45deg, #28a745, #218838); }
+        .button.warning { background: linear-gradient(45deg, #ffc107, #e0a800); }
+        .log-area {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .user-panel {
+            border: 2px solid #007bff;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .browser-info {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+        .status-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .stat-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 10px;
+            color: #6c757d;
+        }
+        .error { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; }
+        .warning { background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Multi-Browser Rate Limit Investigation</h1>
+            <p>This tool helps investigate rate limiting behavior across different browsers</p>
+        </div>
+
+        <div class="browser-info">
+            <strong>Current Browser:</strong> <span id="browserInfo"></span><br>
+            <strong>User Agent:</strong> <span id="userAgent"></span><br>
+            <strong>Session ID:</strong> <span id="sessionId"></span>
+        </div>
+
+        <div class="section">
+            <h3>🧪 Test Sequence</h3>
+            <div class="test-step">
+                <h4>Step 1: Login & Authenticate</h4>
+                <input type="email" id="email" placeholder="Email" style="margin: 5px; padding: 8px; width: 200px;">
+                <input type="password" id="password" placeholder="Password" style="margin: 5px; padding: 8px; width: 200px;">
+                <button class="button success" onclick="performLogin()">🔑 Login</button>
+                <button class="button danger" onclick="performLogout()">🚪 Logout</button>
+                <div id="loginStatus"></div>
+            </div>
+
+            <div class="test-step">
+                <h4>Step 2: Check Current Status</h4>
+                <button class="button" onclick="checkCompleteStatus()">📊 Check All Status</button>
+                <button class="button warning" onclick="simulateTopicCreation()">🧪 Create 2 Topics (Test)</button>
+                <div id="statusDisplay" class="status-display"></div>
+            </div>
+
+            <div class="test-step">
+                <h4>Step 3: Advanced Debugging</h4>
+                <button class="button" onclick="checkBackendCacheKeys()">🔑 Check Backend Cache</button>
+                <button class="button" onclick="testDirectRateLimitAPI()">🔗 Test Rate Limit API</button>
+                <button class="button danger" onclick="clearAllData()">🗑️ Clear All Data</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>📋 Test Log</h3>
+            <div id="testLog" class="log-area">Ready to start testing...\nUse this tool in both Edge and Chrome to compare behavior.\n</div>
+            <button class="button" onclick="clearLog()">🗑️ Clear Log</button>
+            <button class="button success" onclick="exportLog()">📥 Export Log</button>
+        </div>
+
+        <div class="section">
+            <h3>📝 Instructions for Cross-Browser Testing</h3>
+            <ol>
+                <li><strong>Edge Browser:</strong> Login with User A, create some topics, note the usage count</li>
+                <li><strong>Chrome Browser:</strong> Login with User B, check if usage count starts from 0</li>
+                <li><strong>Compare Results:</strong> If User B shows the same usage as User A, there's a backend issue</li>
+                <li><strong>Document Everything:</strong> Use the export log feature to save results</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        let sessionId = Math.random().toString(36).substr(2, 9);
+        
+        // Initialize browser info
+        document.getElementById('sessionId').textContent = sessionId;
+        document.getElementById('userAgent').textContent = navigator.userAgent;
+        
+        // Detect browser
+        function getBrowserName() {
+            const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+            const isEdge = /Edg/.test(navigator.userAgent);
+            const isFirefox = /Firefox/.test(navigator.userAgent);
+            const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+            
+            if (isEdge) return 'Microsoft Edge';
+            if (isChrome) return 'Google Chrome';
+            if (isFirefox) return 'Mozilla Firefox';
+            if (isSafari) return 'Safari';
+            return 'Unknown Browser';
+        }
+        
+        document.getElementById('browserInfo').textContent = getBrowserName();
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const browser = getBrowserName().split(' ')[0]; // First word only
+            const logArea = document.getElementById('testLog');
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            logArea.textContent += `[${timestamp}] [${browser}] ${prefix} ${message}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('testLog').textContent = '';
+            addLog('Log cleared for new test session');
+        }
+
+        function exportLog() {
+            const logContent = document.getElementById('testLog').textContent;
+            const blob = new Blob([logContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `rate-limit-test-${getBrowserName().replace(' ', '-')}-${new Date().getTime()}.txt`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            addLog('Log exported successfully', 'success');
+        }
+
+        async function performLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                addLog('Please enter both email and password', 'error');
+                return;
+            }
+
+            addLog(`Attempting login for: ${email}`);
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem('accessToken', data.access);
+                    localStorage.setItem('refreshToken', data.refresh);
+                    
+                    document.getElementById('loginStatus').innerHTML = 
+                        `<div class="success">✅ Logged in as: ${data.user.email} (ID: ${data.user.id})</div>`;
+                    
+                    addLog(`Login successful - User: ${data.user.email} (ID: ${data.user.id})`, 'success');
+                    
+                    // Automatically check status after login
+                    setTimeout(checkCompleteStatus, 1000);
+                } else {
+                    document.getElementById('loginStatus').innerHTML = 
+                        `<div class="error">❌ Login failed: ${data.error || 'Unknown error'}</div>`;
+                    addLog(`Login failed: ${data.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                document.getElementById('loginStatus').innerHTML = 
+                    `<div class="error">❌ Network error during login</div>`;
+                addLog(`Login network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function performLogout() {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            
+            document.getElementById('loginStatus').innerHTML = 
+                '<div class="warning">⚠️ Logged out - all tokens cleared</div>';
+            document.getElementById('statusDisplay').innerHTML = '';
+            
+            addLog('Logout complete - all authentication data cleared', 'warning');
+        }
+
+        async function checkCompleteStatus() {
+            addLog('Checking complete authentication and rate limit status...');
+            
+            const accessToken = localStorage.getItem('accessToken');
+            
+            if (!accessToken) {
+                addLog('No access token found - please login first', 'error');
+                return;
+            }
+
+            try {
+                // Check user profile
+                const profileResponse = await fetch(`${API_BASE}/auth/profile/`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                let userInfo = null;
+                if (profileResponse.ok) {
+                    userInfo = await profileResponse.json();
+                    addLog(`Profile verified - User: ${userInfo.email} (ID: ${userInfo.id})`, 'success');
+                } else {
+                    addLog('Profile verification failed - token might be invalid', 'error');
+                    return;
+                }
+
+                // Check rate limits
+                const rateLimitResponse = await fetch(`${API_BASE}/ai/get-topic-rate-limit-status/`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (rateLimitResponse.ok) {
+                    const rateLimitData = await rateLimitResponse.json();
+                    const stats = rateLimitData.rate_limit_info;
+                    
+                    document.getElementById('statusDisplay').innerHTML = `
+                        <div class="stat-card">
+                            <div class="stat-number">${userInfo.id}</div>
+                            <div class="stat-label">User ID</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${userInfo.email.split('@')[0]}</div>
+                            <div class="stat-label">Username</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${stats.daily_used || 0}</div>
+                            <div class="stat-label">Topics Used</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${stats.daily_limit || 16}</div>
+                            <div class="stat-label">Daily Limit</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">${(stats.daily_limit || 16) - (stats.daily_used || 0)}</div>
+                            <div class="stat-label">Remaining</div>
+                        </div>
+                    `;
+                    
+                    addLog(`Rate limits - Used: ${stats.daily_used || 0}/${stats.daily_limit || 16}`, 'success');
+                } else {
+                    addLog('Failed to get rate limit status', 'error');
+                }
+
+            } catch (error) {
+                addLog(`Status check error: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateTopicCreation() {
+            addLog('Simulating topic creation (2 topics)...');
+            
+            const accessToken = localStorage.getItem('accessToken');
+            if (!accessToken) {
+                addLog('Please login first', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/ai/topics/`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: 'Create test topics for debugging rate limits - this is a test query'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const topicCount = data.topics ? data.topics.length : 0;
+                    addLog(`Topic creation successful - Created ${topicCount} topics`, 'success');
+                    
+                    if (data.usage_stats) {
+                        addLog(`Updated usage: ${data.usage_stats.daily_used}/${data.usage_stats.daily_limit}`, 'info');
+                    }
+                    
+                    // Refresh status display
+                    setTimeout(checkCompleteStatus, 500);
+                } else if (response.status === 429) {
+                    addLog(`Rate limit exceeded: ${data.message || 'Rate limit reached'}`, 'warning');
+                } else {
+                    addLog(`Topic creation failed: ${response.status} - ${data.error || 'Unknown error'}`, 'error');
+                }
+
+            } catch (error) {
+                addLog(`Topic creation error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDirectRateLimitAPI() {
+            addLog('Testing rate limit API directly...');
+            
+            const accessToken = localStorage.getItem('accessToken');
+            
+            try {
+                // Test with auth token
+                if (accessToken) {
+                    const authResponse = await fetch(`${API_BASE}/ai/get-topic-rate-limit-status/`, {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (authResponse.ok) {
+                        const authData = await authResponse.json();
+                        addLog(`Authenticated API call - Status: ${authResponse.status}`, 'success');
+                        addLog(`Response: ${JSON.stringify(authData.rate_limit_info, null, 2)}`, 'info');
+                    } else {
+                        addLog(`Authenticated API call failed - Status: ${authResponse.status}`, 'error');
+                    }
+                }
+                
+                // Test without auth token (anonymous)
+                const anonResponse = await fetch(`${API_BASE}/ai/get-topic-rate-limit-status/`, {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (anonResponse.ok) {
+                    const anonData = await anonResponse.json();
+                    addLog(`Anonymous API call - Status: ${anonResponse.status}`, 'info');
+                    addLog(`Anonymous response: ${JSON.stringify(anonData.rate_limit_info, null, 2)}`, 'info');
+                } else {
+                    addLog(`Anonymous API call failed - Status: ${anonResponse.status}`, 'warning');
+                }
+
+            } catch (error) {
+                addLog(`Direct API test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkBackendCacheKeys() {
+            addLog('Checking backend cache keys and debug information...');
+            
+            const accessToken = localStorage.getItem('accessToken');
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/ai/debug-rate-limit-cache/`, {
+                    headers
+                });
+
+                if (response.ok) {
+                    const debugData = await response.json();
+                    const info = debugData.debug_info;
+                    
+                    addLog('=== BACKEND DEBUG INFORMATION ===', 'success');
+                    addLog(`User authenticated: ${info.request_info.user_authenticated}`, 'info');
+                    addLog(`User ID: ${info.request_info.user_id}`, 'info');
+                    addLog(`User email: ${info.request_info.user_email}`, 'info');
+                    addLog(`User IP: ${info.request_info.user_ip}`, 'info');
+                    addLog(`Cache key: ${info.request_info.cache_key}`, 'info');
+                    addLog(`Cache data exists: ${info.cache_info.cache_key_exists}`, 'info');
+                    
+                    if (info.cache_info.cache_data) {
+                        addLog(`Cache data: ${JSON.stringify(info.cache_info.cache_data, null, 2)}`, 'info');
+                    }
+                    
+                    addLog(`All topic cache keys: ${JSON.stringify(info.cache_info.all_topic_cache_keys, null, 2)}`, 'info');
+                    addLog(`Cache backend: ${info.cache_info.cache_backend}`, 'info');
+                    addLog('=================================', 'success');
+                    
+                } else {
+                    addLog(`Debug endpoint failed: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addLog(`Debug endpoint error: ${error.message}`, 'error');
+            }
+        }
+
+        function clearAllData() {
+            localStorage.clear();
+            sessionStorage.clear();
+            document.getElementById('statusDisplay').innerHTML = '';
+            document.getElementById('loginStatus').innerHTML = '';
+            addLog('All browser data cleared (localStorage, sessionStorage)', 'warning');
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            addLog(`Rate limit testing tool loaded in ${getBrowserName()}`);
+            addLog('Session ID: ' + sessionId);
+            addLog('Ready for testing...');
+        });
+    </script>
+</body>
+</html>

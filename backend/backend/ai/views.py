@@ -100,6 +100,87 @@ def get_topic_rate_limit_status(request):
         return JsonResponse({'error': 'Internal server error'}, status=500) 
 
 @csrf_exempt
+@require_http_methods(["GET"])
+def debug_rate_limit_cache(request):
+    """DEBUG: Get detailed cache information for rate limiting investigation"""
+    if not settings.DEBUG:
+        return JsonResponse({'error': 'Debug endpoint only available in development'}, status=403)
+    
+    try:
+        from django.core.cache import cache
+        from .rate_limiter import TopicRateLimiter, get_user_ip
+        from django.contrib.auth import get_user_model
+        
+        # Try to get authenticated user
+        user = None
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+            try:
+                import jwt
+                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload.get('user_id')
+                if user_id:
+                    User = get_user_model()
+                    user = User.objects.get(id=user_id)
+            except Exception:
+                user = getattr(request, 'user', None)
+        else:
+            user = getattr(request, 'user', None)
+        
+        user_ip = get_user_ip(request)
+        
+        # Create limiter and get cache key
+        limiter = TopicRateLimiter(user=user, user_ip=user_ip)
+        cache_key = limiter.get_cache_key("_daily")
+        
+        # Get raw cache data
+        cache_data = cache.get(cache_key)
+        
+        # Get all cache keys (if possible)
+        try:
+            # This might not work with all cache backends
+            from django.core.cache.backends.locmem import LocMemCache
+            if isinstance(cache, LocMemCache):
+                all_keys = list(cache._cache.keys())
+                topic_keys = [k for k in all_keys if 'topic_rate_limit' in str(k)]
+            else:
+                topic_keys = ["Cache backend doesn't support key listing"]
+        except Exception:
+            topic_keys = ["Unable to list cache keys"]
+        
+        debug_info = {
+            'request_info': {
+                'user_authenticated': user and user.is_authenticated,
+                'user_id': getattr(user, 'id', None),
+                'user_email': getattr(user, 'email', None),
+                'user_ip': user_ip,
+                'cache_key': cache_key,
+                'request_meta_keys': list(request.META.keys()),
+                'authorization_header': bool(auth_header),
+            },
+            'cache_info': {
+                'cache_key_exists': cache_data is not None,
+                'cache_data': cache_data,
+                'all_topic_cache_keys': topic_keys,
+                'cache_backend': str(type(cache)),
+            },
+            'system_info': {
+                'debug_mode': settings.DEBUG,
+                'cache_timeout': getattr(settings, 'CACHE_TIMEOUT', 'default'),
+            }
+        }
+        
+        return JsonResponse({
+            'status': 'success',
+            'debug_info': debug_info
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in debug endpoint: {e}")
+        return JsonResponse({'error': f'Debug error: {str(e)}'}, status=500) 
+
+@csrf_exempt
 @require_http_methods(["POST"])
 def classify_topics(request):
     """Classify topics from user query with enhanced security and rate limiting"""

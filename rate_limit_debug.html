@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rate Limiting Debug Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .auth-status {
+            border-left-color: #28a745;
+        }
+        .rate-limit-status {
+            border-left-color: #ffc107;
+        }
+        .debug-info {
+            border-left-color: #17a2b8;
+        }
+        .button {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,123,255,0.3);
+        }
+        .button.danger {
+            background: linear-gradient(45deg, #dc3545, #c82333);
+        }
+        .button.success {
+            background: linear-gradient(45deg, #28a745, #218838);
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .status-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .status-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .status-label {
+            color: #6c757d;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .log-area {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Chat Rate Limiting Debug Tool</h1>
+            <p>This tool helps diagnose rate limiting issues between different user accounts</p>
+        </div>
+
+        <div class="section auth-status">
+            <h3>🔐 Authentication Status</h3>
+            <div id="authStatus">Loading...</div>
+            <div class="status-grid" id="authGrid"></div>
+            <button class="button" onclick="checkAuthStatus()">🔄 Refresh Auth Status</button>
+            <button class="button danger" onclick="clearAuthData()">🗑️ Clear Auth Data</button>
+        </div>
+
+        <div class="section rate-limit-status">
+            <h3>⏱️ Rate Limiting Status</h3>
+            <div id="rateLimitStatus">Loading...</div>
+            <div class="status-grid" id="rateLimitGrid"></div>
+            <button class="button" onclick="checkRateLimit()">📊 Check Rate Limits</button>
+            <button class="button success" onclick="testTopicCreation()">🧪 Test Topic Creation</button>
+        </div>
+
+        <div class="section debug-info">
+            <h3>🔧 Debug Information</h3>
+            <div id="debugLog" class="log-area">Click "Start Debug Session" to begin...\n</div>
+            <button class="button" onclick="startDebugSession()">🚀 Start Debug Session</button>
+            <button class="button" onclick="clearDebugLog()">🗑️ Clear Log</button>
+        </div>
+
+        <div class="warning">
+            <h4>⚠️ Common Issues & Solutions:</h4>
+            <ul>
+                <li><strong>Same localStorage:</strong> Browser tabs share localStorage. Use different browsers or incognito windows.</li>
+                <li><strong>Cached tokens:</strong> Old authentication tokens might persist. Clear auth data and re-login.</li>
+                <li><strong>Server cache:</strong> Backend is using local memory cache which is process-specific.</li>
+                <li><strong>Session persistence:</strong> Make sure you're actually logging out and logging in as different users.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logArea = document.getElementById('debugLog');
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            logArea.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function clearDebugLog() {
+            document.getElementById('debugLog').textContent = '';
+            addLog('Debug log cleared');
+        }
+
+        async function checkAuthStatus() {
+            addLog('Checking authentication status...');
+            
+            try {
+                // Check localStorage tokens
+                const accessToken = localStorage.getItem('accessToken');
+                const refreshToken = localStorage.getItem('refreshToken');
+                
+                const authGrid = document.getElementById('authGrid');
+                authGrid.innerHTML = `
+                    <div class="status-card">
+                        <div class="status-number">${accessToken ? '✅' : '❌'}</div>
+                        <div class="status-label">Access Token</div>
+                    </div>
+                    <div class="status-card">
+                        <div class="status-number">${refreshToken ? '✅' : '❌'}</div>
+                        <div class="status-label">Refresh Token</div>
+                    </div>
+                `;
+
+                if (!accessToken) {
+                    document.getElementById('authStatus').innerHTML = '<div class="error">❌ No access token found. Please login first.</div>';
+                    addLog('No access token found in localStorage', 'error');
+                    return null;
+                }
+
+                // Try to get user profile
+                const response = await fetch(`${API_BASE}/auth/profile/`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    document.getElementById('authStatus').innerHTML = `
+                        <div class="success">
+                            ✅ Authenticated as: <strong>${userData.email}</strong> (ID: ${userData.id})
+                        </div>
+                    `;
+                    
+                    authGrid.innerHTML += `
+                        <div class="status-card">
+                            <div class="status-number">${userData.id}</div>
+                            <div class="status-label">User ID</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-number">${userData.email.split('@')[0]}</div>
+                            <div class="status-label">Username</div>
+                        </div>
+                    `;
+                    
+                    addLog(`Successfully authenticated as ${userData.email} (ID: ${userData.id})`, 'success');
+                    return userData;
+                } else {
+                    document.getElementById('authStatus').innerHTML = '<div class="error">❌ Authentication failed. Token might be expired.</div>';
+                    addLog(`Authentication failed: ${response.status} ${response.statusText}`, 'error');
+                    return null;
+                }
+            } catch (error) {
+                document.getElementById('authStatus').innerHTML = '<div class="error">❌ Error checking authentication</div>';
+                addLog(`Auth check error: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        async function checkRateLimit() {
+            addLog('Checking rate limit status...');
+            
+            try {
+                const accessToken = localStorage.getItem('accessToken');
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                if (accessToken) {
+                    headers['Authorization'] = `Bearer ${accessToken}`;
+                }
+
+                const response = await fetch(`${API_BASE}/ai/get-topic-rate-limit-status/`, {
+                    headers
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const rateLimitInfo = data.rate_limit_info;
+                    
+                    const rateLimitGrid = document.getElementById('rateLimitGrid');
+                    rateLimitGrid.innerHTML = `
+                        <div class="status-card">
+                            <div class="status-number">${rateLimitInfo.daily_used || 0}</div>
+                            <div class="status-label">Topics Used Today</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-number">${rateLimitInfo.daily_limit || 16}</div>
+                            <div class="status-label">Daily Limit</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-number">${(rateLimitInfo.daily_limit || 16) - (rateLimitInfo.daily_used || 0)}</div>
+                            <div class="status-label">Remaining Today</div>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-number">${rateLimitInfo.per_request?.limit || 4}</div>
+                            <div class="status-label">Max Per Request</div>
+                        </div>
+                    `;
+
+                    document.getElementById('rateLimitStatus').innerHTML = `
+                        <div class="success">
+                            ✅ Rate limit status retrieved successfully
+                        </div>
+                    `;
+                    
+                    addLog(`Rate limits: ${rateLimitInfo.daily_used}/${rateLimitInfo.daily_limit} daily, ${rateLimitInfo.per_request?.limit || 4} per request`, 'success');
+                    return rateLimitInfo;
+                } else {
+                    const errorData = await response.json();
+                    document.getElementById('rateLimitStatus').innerHTML = '<div class="error">❌ Failed to get rate limit status</div>';
+                    addLog(`Rate limit check failed: ${response.status} - ${errorData.error || 'Unknown error'}`, 'error');
+                    return null;
+                }
+            } catch (error) {
+                document.getElementById('rateLimitStatus').innerHTML = '<div class="error">❌ Error checking rate limits</div>';
+                addLog(`Rate limit check error: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        async function testTopicCreation() {
+            addLog('Testing topic creation...');
+            
+            try {
+                const accessToken = localStorage.getItem('accessToken');
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                if (accessToken) {
+                    headers['Authorization'] = `Bearer ${accessToken}`;
+                }
+
+                const response = await fetch(`${API_BASE}/ai/topics/`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        query: 'Test query for debugging rate limits'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addLog(`Topic creation test successful. Found ${data.topics?.length || 0} topics`, 'success');
+                    if (data.usage_stats) {
+                        addLog(`Updated usage: ${data.usage_stats.daily_used}/${data.usage_stats.daily_limit}`, 'info');
+                    }
+                } else if (response.status === 429) {
+                    addLog(`Rate limit exceeded: ${data.message || 'Rate limit reached'}`, 'warning');
+                } else {
+                    addLog(`Topic creation failed: ${response.status} - ${data.error || 'Unknown error'}`, 'error');
+                }
+                
+                // Refresh rate limit status after test
+                await checkRateLimit();
+                
+            } catch (error) {
+                addLog(`Topic creation test error: ${error.message}`, 'error');
+            }
+        }
+
+        function clearAuthData() {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            localStorage.removeItem('adminAuth');
+            
+            // Clear any other auth-related items
+            const keys = Object.keys(localStorage);
+            keys.forEach(key => {
+                if (key.includes('auth') || key.includes('token') || key.includes('user')) {
+                    localStorage.removeItem(key);
+                }
+            });
+            
+            document.getElementById('authStatus').innerHTML = '<div class="warning">⚠️ All authentication data cleared. Please login again.</div>';
+            document.getElementById('authGrid').innerHTML = '';
+            document.getElementById('rateLimitGrid').innerHTML = '';
+            
+            addLog('All authentication data cleared', 'warning');
+        }
+
+        async function startDebugSession() {
+            addLog('🚀 Starting comprehensive debug session...');
+            addLog('==========================================');
+            
+            // Step 1: Check authentication
+            addLog('Step 1: Checking authentication...');
+            const userData = await checkAuthStatus();
+            
+            // Step 2: Check rate limits
+            addLog('Step 2: Checking rate limits...');
+            const rateLimitData = await checkRateLimit();
+            
+            // Step 3: Browser/session analysis
+            addLog('Step 3: Analyzing browser session...');
+            addLog(`Browser: ${navigator.userAgent}`, 'info');
+            addLog(`localStorage keys: ${Object.keys(localStorage).length}`, 'info');
+            addLog(`sessionStorage keys: ${Object.keys(sessionStorage).length}`, 'info');
+            
+            // Step 4: Recommendations
+            addLog('Step 4: Analysis complete');
+            addLog('==========================================');
+            
+            if (!userData) {
+                addLog('❌ ISSUE: Not authenticated properly', 'error');
+                addLog('💡 SOLUTION: Login first, then try again', 'warning');
+            } else if (rateLimitData && rateLimitData.daily_used >= rateLimitData.daily_limit) {
+                addLog('❌ ISSUE: Daily rate limit reached', 'error');
+                addLog('💡 SOLUTION: Wait until tomorrow or test with different user', 'warning');
+            } else {
+                addLog('✅ System appears to be working correctly', 'success');
+                addLog('💡 If you see shared limits between users, try:', 'info');
+                addLog('  1. Use different browsers (Chrome vs Firefox)', 'info');
+                addLog('  2. Use incognito/private windows', 'info');
+                addLog('  3. Clear auth data between users', 'info');
+                addLog('  4. Verify you are logging in as different users', 'info');
+            }
+        }
+
+        // Initialize page
+        window.addEventListener('load', () => {
+            addLog('Rate limiting debug tool loaded');
+            checkAuthStatus();
+            checkRateLimit();
+        });
+    </script>
+</body>
+</html>
