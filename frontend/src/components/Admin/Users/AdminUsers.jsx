@@ -28,8 +28,11 @@ const AdminUsers = () => {
         const err = await resp.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to fetch users');
       }
-      const data = await resp.json();
-      setUsers(data.results || []);
+  const data = await resp.json();
+  const results = Array.isArray(data.results) ? data.results : [];
+  // Ensure admins show on top even if backend ordering changes
+  results.sort((a, b) => (b.is_superuser === true) - (a.is_superuser === true));
+  setUsers(results);
       setStats(data.stats || { total_users: 0, active_users: 0, new_this_month: 0, inactive_users: 0 });
     } catch (e) {
       console.error('Fetch users error:', e);
@@ -148,7 +151,14 @@ const AdminUsers = () => {
                         <FaUserGraduate className="h-10 w-10 text-gray-400" />
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                        <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                          <span>{user.name}</span>
+                          {user.is_superuser && (
+                            <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+                              Admin
+                            </span>
+                          )}
+                        </div>
                         <div className="text-sm text-gray-500">{user.email}</div>
                       </div>
                     </div>
