@@ -47,9 +47,41 @@ const AdminUsers = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedFilter, currentPage]);
 
-  const handleUserAction = (userId, action) => {
-    console.log(`${action} user ${userId}`);
-    // Implement user actions
+  const handleUserAction = async (userId, action) => {
+    try {
+      if (action === 'delete') {
+        const confirmed = window.confirm('Are you sure you want to delete this user? This cannot be undone.');
+        if (!confirmed) return;
+        const resp = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/auth/users/${userId}/`, { method: 'DELETE' });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to delete user');
+        }
+        await fetchUsers();
+        return;
+      }
+      if (action === 'edit') {
+        const newName = window.prompt('Enter new full name (leave blank to keep):');
+        const newEmail = window.prompt('Enter new email (leave blank to keep):');
+        const makeAdmin = window.confirm('Make this user admin? Click OK for Yes, Cancel for No.');
+        const payload = {};
+        if (newName) payload.full_name = newName;
+        if (newEmail) payload.email = newEmail;
+        payload.is_superuser = makeAdmin;
+        const resp = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/auth/users/${userId}/`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to update user');
+        }
+        await fetchUsers();
+        return;
+      }
+    } catch (e) {
+      alert(e.message || 'Operation failed');
+    }
   };
 
   return (

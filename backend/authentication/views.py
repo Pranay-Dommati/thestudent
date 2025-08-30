@@ -317,6 +317,82 @@ def admin_list_users(request):
         logger.error(f"Admin users list error: {str(e)}")
         return Response({"error": "Failed to fetch users"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+@api_view(['GET', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def admin_user_detail(request, user_id: int):
+    """Admin-only: get, update, or delete a user."""
+    try:
+        if not request.user.is_superuser:
+            return Response({"error": "Access denied. Superuser privileges required."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            target = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method == 'GET':
+            data = {
+                'id': target.id,
+                'email': target.email,
+                'full_name': target.full_name,
+                'is_active': target.is_active,
+                'is_superuser': target.is_superuser,
+                'date_joined': target.date_joined.isoformat() if target.date_joined else None,
+            }
+            return Response(data, status=status.HTTP_200_OK)
+
+        if request.method == 'PATCH':
+            payload = request.data or {}
+            allowed_fields = ['full_name', 'email', 'is_active', 'is_superuser']
+            updated = False
+
+            # Prevent removing your own superuser status accidentally
+            if 'is_superuser' in payload and request.user.id == target.id and not bool(payload['is_superuser']):
+                return Response({"error": "You cannot remove your own admin privileges."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Apply updates
+            if 'full_name' in payload:
+                target.full_name = str(payload['full_name']).strip() or target.full_name
+                updated = True
+            if 'email' in payload and payload['email']:
+                new_email = str(payload['email']).strip().lower()
+                if new_email != target.email and User.objects.filter(email=new_email).exclude(pk=target.pk).exists():
+                    return Response({"error": "Email already in use"}, status=status.HTTP_400_BAD_REQUEST)
+                target.email = new_email
+                updated = True
+            if 'is_active' in payload:
+                target.is_active = bool(payload['is_active'])
+                updated = True
+            if 'is_superuser' in payload:
+                target.is_superuser = bool(payload['is_superuser'])
+                # ensure staff flag follows superuser
+                if target.is_superuser:
+                    target.is_staff = True
+                updated = True
+
+            if updated:
+                target.save()
+
+            return Response({"success": True}, status=status.HTTP_200_OK)
+
+        if request.method == 'DELETE':
+            # Guard: don't delete yourself
+            if request.user.id == target.id:
+                return Response({"error": "You cannot delete your own account."}, status=status.HTTP_400_BAD_REQUEST)
+            # Guard: ensure at least one superuser remains
+            if target.is_superuser and User.objects.filter(is_superuser=True).count() <= 1:
+                return Response({"error": "Cannot delete the last remaining admin."}, status=status.HTTP_400_BAD_REQUEST)
+
+            target.delete()
+            return Response({"success": True}, status=status.HTTP_200_OK)
+
+        return Response({"error": "Method not allowed"}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    except Exception as e:
+        logger.error(f"Admin user detail error: {str(e)}")
+        return Response({"error": "Operation failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 @authentication_classes([])
