@@ -1,23 +1,48 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FaSearch, FaFilter, FaEllipsisV, FaUserGraduate } from 'react-icons/fa';
+import authService from '../../../services/authService';
+
+const API_BASE_URL = 'http://localhost:8000/api';
 
 const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [users, setUsers] = useState([]);
+  const [stats, setStats] = useState({ total_users: 0, active_users: 0, new_this_month: 0, inactive_users: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Mock data - replace with actual API call
-  const users = [
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john@example.com',
-      role: 'student',
-      status: 'active',
-      enrolledCourses: 3,
-      joinDate: '2024-01-15'
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const params = new URLSearchParams({
+        q: searchQuery,
+        status: selectedFilter,
+        page: String(currentPage),
+        page_size: '10',
+      });
+      const resp = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/auth/users/?${params.toString()}`);
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to fetch users');
+      }
+      const data = await resp.json();
+      setUsers(data.results || []);
+      setStats(data.stats || { total_users: 0, active_users: 0, new_this_month: 0, inactive_users: 0 });
+    } catch (e) {
+      console.error('Fetch users error:', e);
+      setError(e.message || 'Failed to fetch users');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  useEffect(() => {
+    fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, selectedFilter, currentPage]);
 
   const handleUserAction = (userId, action) => {
     console.log(`${action} user ${userId}`);
@@ -39,19 +64,19 @@ const AdminUsers = () => {
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-blue-600">1,234</div>
+          <div className="text-2xl font-bold text-blue-600">{stats.total_users}</div>
           <div className="text-sm text-gray-500">Total Users</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-green-600">892</div>
+          <div className="text-2xl font-bold text-green-600">{stats.active_users}</div>
           <div className="text-sm text-gray-500">Active Users</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-yellow-600">156</div>
+          <div className="text-2xl font-bold text-yellow-600">{stats.new_this_month}</div>
           <div className="text-sm text-gray-500">New This Month</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-red-600">45</div>
+          <div className="text-2xl font-bold text-red-600">{stats.inactive_users}</div>
           <div className="text-sm text-gray-500">Inactive Users</div>
         </div>
       </div>
@@ -105,7 +130,17 @@ const AdminUsers = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user) => (
+              {loading && (
+                <tr>
+                  <td className="px-6 py-6 text-center text-sm text-gray-500" colSpan={5}>Loading users…</td>
+                </tr>
+              )}
+              {!loading && users.length === 0 && (
+                <tr>
+                  <td className="px-6 py-6 text-center text-sm text-gray-500" colSpan={5}>{error || 'No users found'}</td>
+                </tr>
+              )}
+              {!loading && users.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -128,7 +163,7 @@ const AdminUsers = () => {
                     {user.enrolledCourses}
                   </td>
                   <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(user.joinDate).toLocaleDateString()}
+                    {user.joinDate ? new Date(user.joinDate).toLocaleDateString() : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end items-center space-x-3">
@@ -156,7 +191,7 @@ const AdminUsers = () => {
       {/* Pagination */}
       <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
         <p className="text-sm text-gray-700">
-          Showing 1 to 10 of {users.length} results
+          Showing page {currentPage}
         </p>
         <div className="flex space-x-2">
           <button

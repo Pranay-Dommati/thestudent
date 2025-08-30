@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 import logging
 import requests
 from django.core.mail import send_mail
+from django.db.models import Q
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -230,6 +231,89 @@ def verify_admin_token(request):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_list_users(request):
+    """
+    Admin-only endpoint to list users with basic filters and pagination.
+    Query params:
+      - q: search string (matches email or full_name)
+      - status: active|inactive|all
+      - page: 1-based page index (default 1)
+      - page_size: page size (default 10, max 100)
+    """
+    try:
+      # Ensure only superusers can access
+      if not request.user.is_superuser:
+          return Response({"error": "Access denied. Superuser privileges required."}, status=status.HTTP_403_FORBIDDEN)
+
+      q = (request.GET.get('q') or '').strip()
+      status_filter = (request.GET.get('status') or 'all').strip().lower()
+      try:
+          page = max(int(request.GET.get('page', '1') or '1'), 1)
+      except Exception:
+          page = 1
+      try:
+          page_size = int(request.GET.get('page_size', '10') or '10')
+      except Exception:
+          page_size = 10
+      page_size = max(1, min(page_size, 100))
+
+      queryset = User.objects.all().order_by('-date_joined')
+
+      if q:
+          queryset = queryset.filter(Q(email__icontains=q) | Q(full_name__icontains=q))
+
+      if status_filter == 'active':
+          queryset = queryset.filter(is_active=True)
+      elif status_filter == 'inactive':
+          queryset = queryset.filter(is_active=False)
+
+      total = queryset.count()
+      start = (page - 1) * page_size
+      end = start + page_size
+      items = list(queryset[start:end])
+
+      # Stats
+      total_users = User.objects.count()
+      active_users = User.objects.filter(is_active=True).count()
+      from django.utils import timezone
+      now = timezone.now()
+      new_this_month = User.objects.filter(date_joined__year=now.year, date_joined__month=now.month).count()
+      inactive_users = total_users - active_users
+
+      payload = {
+          'results': [
+              {
+                  'id': u.id,
+                  'name': (u.full_name or '').strip() or u.email,
+                  'email': u.email,
+                  'status': 'active' if u.is_active else 'inactive',
+                  'enrolledCourses': 0,
+                  'joinDate': u.date_joined.isoformat() if getattr(u, 'date_joined', None) else None,
+              }
+              for u in items
+          ],
+          'pagination': {
+              'page': page,
+              'page_size': page_size,
+              'total': total,
+              'has_next': end < total,
+              'has_prev': start > 0,
+          },
+          'stats': {
+              'total_users': total_users,
+              'active_users': active_users,
+              'new_this_month': new_this_month,
+              'inactive_users': inactive_users,
+          },
+      }
+
+      return Response(payload, status=status.HTTP_200_OK)
+    except Exception as e:
+      logger.error(f"Admin users list error: {str(e)}")
+      return Response({"error": "Failed to fetch users"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

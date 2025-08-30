@@ -200,6 +200,18 @@ class AuthService {
     }
   }
 
+  async fetchAdminUsers(params = {}) {
+    const API = `${API_BASE_URL}/auth/users/`;
+    const search = new URLSearchParams(params).toString();
+    const url = search ? `${API}?${search}` : API;
+    const response = await this.makeAuthenticatedRequest(url);
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Failed to fetch users');
+    }
+    return response.json();
+  }
+
   logout() {
     this.clearAuthData();
   }

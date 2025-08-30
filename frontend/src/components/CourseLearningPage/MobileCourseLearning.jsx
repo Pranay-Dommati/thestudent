@@ -477,6 +477,33 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     }
   };
 
+  // Safer back navigation: go back if we have in-app history, otherwise fall back to a course page or courses list
+  const handleBack = () => {
+    try {
+      const hasHistory = window.history.length > 1;
+      const sameOriginReferrer = document.referrer && (() => {
+        try { return new URL(document.referrer).origin === window.location.origin; } catch { return false; }
+      })();
+
+      if (hasHistory && sameOriginReferrer) {
+        navigate(-1);
+        return;
+      }
+
+      // Build a sensible fallback URL
+      let fallback = '/courses';
+      const parts = (pathname || '').split('/').filter(Boolean);
+      const engIdx = parts.indexOf('engineering');
+      if (engIdx !== -1 && parts[engIdx + 1]) {
+        const id = parts[engIdx + 1] || courseId;
+        fallback = `/courses/engineering/${id}`;
+      }
+      navigate(fallback, { replace: true });
+    } catch {
+      navigate('/courses', { replace: true });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -505,15 +532,17 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   return (
     <div className="h-full bg-white flex flex-col">
       {/* Mobile Header - Compact and well-aligned */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200">
+  <div className="flex-shrink-0 bg-white border-b border-gray-200 relative z-10">
         <div
           className="flex items-center justify-between px-3 py-2"
           style={{ paddingTop: `calc(env(safe-area-inset-top, 0px) + 8px)`, paddingBottom: '8px' }}
         >
           <div className="flex items-center space-x-1.5 flex-1 min-w-0">
             <button
-              onClick={() => navigate(-1)}
+      onClick={handleBack}
               className="h-9 w-9 inline-flex items-center justify-center bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0 border border-gray-200"
+      aria-label="Go back"
+      title="Back"
             >
               <FaArrowLeft className="w-4 h-4 text-gray-700" />
             </button>

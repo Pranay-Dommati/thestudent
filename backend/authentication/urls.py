@@ -6,6 +6,7 @@ from .views import (
     user_profile, 
     admin_login, 
     verify_admin_token,
+    admin_list_users,
     google_auth_url,
     google_auth_callback,
     google_auth_token,
@@ -19,6 +20,7 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('admin-login/', admin_login, name='admin_login'),
     path('verify-admin/', verify_admin_token, name='verify_admin_token'),
+    path('users/', admin_list_users, name='admin_list_users'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('profile/', user_profile, name='user_profile'),
     
