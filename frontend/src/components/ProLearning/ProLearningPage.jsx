@@ -2302,12 +2302,18 @@ const ProLearningPage = () => {
   const [completedTabs, setCompletedTabs] = useState([]); // Track completed tabs
   const [quizSubmitted, setQuizSubmitted] = useState(false); // Track if quiz is submitted
 
+  // Guard to avoid double-switching when URL sync is pending
+  const tabUrlSyncPendingRef = useRef(false);
+
   // Update URL when activeTab changes
   const updateActiveTab = (newTab) => {
-    setActiveTab(newTab);
+  tabUrlSyncPendingRef.current = true;
+  setActiveTab(newTab);
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('tab', newTab);
-    setSearchParams(newSearchParams, { replace: true });
+  setSearchParams(newSearchParams, { replace: true });
+  // Clear the pending flag on next tick
+  setTimeout(() => { tabUrlSyncPendingRef.current = false; }, 0);
   };
 
   // Debounced version for desktop to prevent rapid clicking issues
@@ -2320,6 +2326,7 @@ const ProLearningPage = () => {
     }
     
     // Immediately update the UI
+    tabUrlSyncPendingRef.current = true;
     setActiveTab(newTab);
     
     // Debounce the URL update to prevent excessive navigation
@@ -2327,6 +2334,7 @@ const ProLearningPage = () => {
       const newSearchParams = new URLSearchParams(searchParams);
       newSearchParams.set('tab', newTab);
       setSearchParams(newSearchParams, { replace: true });
+      tabUrlSyncPendingRef.current = false;
     }, 100); // 100ms debounce
   };
 
@@ -2344,13 +2352,14 @@ const ProLearningPage = () => {
   // Handle URL tab parameter changes (after topic initialization is complete)
   useEffect(() => {
     if (topicsList.length === 0 || !selectedTopic) return; // Wait for initialization to complete
-    
-    // Handle tab parameter from URL
+    // If a local click just updated state and a debounced URL sync is pending, don't override state
+    if (tabUrlSyncPendingRef.current) return;
+
     const currentTab = searchParams.get("tab") || "reading";
     if (currentTab !== activeTab) {
       setActiveTab(currentTab);
     }
-  }, [topicsList.length, selectedTopic, searchParams, activeTab]); // Minimal dependencies for tab handling only
+  }, [topicsList.length, selectedTopic, searchParams]); // Avoid activeTab here to prevent flip/flop
 
   // Auto-switch to the first ready tab for current topic when content becomes available
   useEffect(() => {
