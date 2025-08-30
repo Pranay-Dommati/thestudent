@@ -3,6 +3,96 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import axiosInstance from '../../utils/axios';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-hot-toast';
+import PDFCanvasViewer from './PDFCanvasViewer';
+
+// Simple and reliable PDF viewer component
+const PDFViewer = ({ url, onError, onLoad, loading, retryCount }) => {
+  const [displayMethod, setDisplayMethod] = useState('iframe'); // 'iframe', 'object', 'link'
+  
+  const pdfUrl = url;
+  
+  const handleError = () => {
+    console.log('PDF display failed with method:', displayMethod);
+    if (displayMethod === 'iframe') {
+      setDisplayMethod('object');
+      return;
+    }
+    if (displayMethod === 'object') {
+      setDisplayMethod('link');
+      if (onError) onError();
+      return;
+    }
+  };
+
+  const handleLoad = () => {
+    console.log('PDF loaded successfully with method:', displayMethod);
+    if (onLoad) onLoad();
+  };
+
+  if (displayMethod === 'link') {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-lg">
+        <div className="text-center max-w-sm px-6">
+          <div className="w-20 h-20 mx-auto mb-6 bg-blue-100 rounded-full flex items-center justify-center">
+            <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Certificate Ready!</h3>
+          <p className="text-gray-600 mb-6 text-sm">Your certificate is ready for viewing. Click below to open it.</p>
+          <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105 font-medium shadow-lg"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            View Certificate
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full relative overflow-hidden bg-white rounded border">
+      {displayMethod === 'iframe' ? (
+        <iframe
+          key={`iframe-${retryCount}`}
+          src={pdfUrl}
+          className="w-full h-full border-0"
+          title="Certificate Preview"
+          style={{ 
+            background: 'white',
+            display: 'block',
+            width: '100%',
+            height: '100%'
+          }}
+          onError={handleError}
+          onLoad={handleLoad}
+        />
+      ) : (
+        <object
+          key={`object-${retryCount}`}
+          data={pdfUrl}
+          type="application/pdf"
+          className="w-full h-full"
+          style={{ width: '100%', height: '100%' }}
+          onError={handleError}
+        >
+          <p className="p-4 text-center">
+            Unable to display PDF. 
+            <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline ml-1">
+              Click here to view
+            </a>
+          </p>
+        </object>
+      )}
+    </div>
+  );
+};
 
 const InfoRow = ({ label, value }) => (
   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 border-b border-gray-100 last:border-b-0 gap-1 sm:gap-0">
@@ -401,87 +491,28 @@ const CertificatePreview = () => {
               <div className="p-4 sm:p-6 lg:p-8">
                 {certificate?.download_url ? (
                   <div className="space-y-4 lg:space-y-6">
-                    {/* Mobile-Optimized PDF Preview */}
-                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                      {/* PDF Preview with enhanced mobile UX */}
-                      <div className="relative">
-                          {/* Loading overlay */}
-                          {pdfLoading && !pdfError && (
-                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white bg-opacity-90 rounded-lg">
-                              <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-blue-600 mb-4"></div>
-                              <p className="text-gray-600 font-medium text-sm sm:text-base">Loading your certificate...</p>
-                              <p className="text-gray-500 text-xs sm:text-sm mt-1 text-center px-4">Please wait while we prepare your PDF</p>
-                            </div>
-                          )}
-                          
-                          {!pdfError ? (
-                            <iframe
-                              key={pdfRetryCount} // Force re-render on retry
-                              src={`${certificate.download_url}?v=${encodeURIComponent(certificate.certificate_id || Date.now())}&retry=${pdfRetryCount}`}
-                              className={`w-full h-[300px] sm:h-[400px] lg:h-[600px] border-0 transition-opacity duration-300 ${
-                                pdfLoading ? 'opacity-50' : 'opacity-100'
-                              }`}
-                              title="Certificate Preview"
-                              onError={() => {
-                                console.log('PDF iframe error detected, retry count:', pdfRetryCount);
-                                if (pdfRetryCount < 2) {
-                                  // Retry up to 2 times
-                                  setTimeout(() => {
-                                    setPdfRetryCount(prev => prev + 1);
-                                    setPdfLoading(true);
-                                  }, 1000);
-                                } else {
-                                  setPdfError(true);
-                                  setPdfLoading(false);
-                                }
-                              }}
-                              onLoad={(e) => {
-                                console.log('PDF iframe loaded successfully');
-                                setPdfLoading(false);
-                                setPdfError(false);
-                              }}
-                            />
-                          ) : (
-                            /* Enhanced Mobile Fallback */
-                            <div className="flex flex-col items-center justify-center h-[300px] sm:h-[400px] lg:h-[600px] bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-300 rounded-lg">
-                              <div className="text-center max-w-xs sm:max-w-md px-4 sm:px-6">
-                                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 bg-red-100 rounded-full flex items-center justify-center">
-                                  <svg className="w-8 h-8 sm:w-10 sm:h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                  </svg>
-                                </div>
-                                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Certificate Preview Unavailable</h3>
-                                <p className="text-gray-600 mb-4 sm:mb-6 text-sm sm:text-base">Your certificate is ready, but we can't display it inline. Don't worry - you can still view and download it!</p>
-                                <div className="space-y-3">
-                                  <a
-                                    href={`${certificate.download_url}?v=${encodeURIComponent(certificate.certificate_id || Date.now())}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 px-4 sm:px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105 font-medium shadow-lg text-sm sm:text-base"
-                                  >
-                                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                    </svg>
-                                    Open in New Tab
-                                  </a>
-                                  <button
-                                    onClick={() => {
-                                      setPdfError(false);
-                                      setPdfLoading(true);
-                                      setPdfRetryCount(0); // Reset retry count
-                                    }}
-                                    className="block mx-auto text-xs sm:text-sm text-blue-600 hover:text-blue-800 underline transition-colors"
-                                  >
-                                    Try loading preview again
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                    {/* Canvas-based PDF Preview (fast & fills frame) */}
+                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                      <div className="relative w-full bg-gray-50 rounded">
+                        <PDFCanvasViewer url={certificate.download_url} className="h-auto" />
+                        {/* Action Overlay */}
+                        <div className="absolute top-3 right-3 flex gap-2">
+                          <a
+                            href={certificate.download_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-opacity-90 transition-all shadow-lg backdrop-blur-sm"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            Full View
+                          </a>
                         </div>
+                      </div>
                     </div>
 
-                    {/* Mobile-Optimized Certificate Info Preview */}
+                    {/* Certificate Info Preview */}
                     <div className="bg-gray-50 rounded-lg p-4 sm:p-6">
                       <div className="text-center space-y-3 sm:space-y-4">
                         <h2 className="text-lg sm:text-xl font-bold text-gray-900">Certificate of Completion</h2>
@@ -492,20 +523,17 @@ const CertificatePreview = () => {
                       </div>
                     </div>
                   </div>
-                ) : error ? (
-                  <div className="text-center py-8 sm:py-12">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 bg-yellow-100 rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Certificate Not Available</h3>
-                    <p className="text-gray-600 text-sm sm:text-base px-4">{error}</p>
-                  </div>
                 ) : (
-                  <div className="text-center py-8 sm:py-12">
-                    <div className="animate-spin w-6 h-6 sm:w-8 sm:h-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-                    <p className="text-gray-600 text-sm sm:text-base">{issuing ? 'Generating certificate...' : 'Loading...'}</p>
+                  <div className="flex flex-col items-center justify-center h-[300px] sm:h-[400px] lg:h-[600px] bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-300 rounded-lg">
+                    <div className="text-center max-w-xs sm:max-w-md px-4 sm:px-6">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 bg-blue-100 rounded-full flex items-center justify-center">
+                        <svg className="w-8 h-8 sm:w-10 sm:h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Certificate not available</h3>
+                      <p className="text-gray-600 mb-4 sm:mb-6 text-sm sm:text-base">Complete the course to generate your certificate.</p>
+                    </div>
                   </div>
                 )}
               </div>
