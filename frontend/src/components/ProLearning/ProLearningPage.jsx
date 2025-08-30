@@ -1156,8 +1156,22 @@ const ProLearningPage = () => {
     // First topic (index 0) is never blocked - it gets progressive generation
     const topicIndex = topicsList.findIndex(topic => topic.name === topicName || topic === topicName);
     if (topicIndex === 0) return false;
-    
-    // All other topics are blocked until entire course generation is complete
+
+    // If this topic already has content stored (from previous session or DB), do not block
+    try {
+      const id = getCourseId();
+      const stored = id ? contentStorageService.getContentByTopicName(topicName, id) : null;
+      const hasReady = stored && (
+        (typeof stored.reading === 'string' && stored.reading.trim()) ||
+        (typeof stored.summary === 'string' && stored.summary.trim()) ||
+        (Array.isArray(stored.videos) && stored.videos.length > 0) ||
+        (Array.isArray(stored.quiz) ? stored.quiz.length > 0 : (stored?.quiz?.questions?.length > 0)) ||
+        (Array.isArray(stored.resources) && stored.resources.length > 0)
+      );
+      if (hasReady) return false;
+    } catch {}
+
+    // Otherwise, topics after the first are blocked until course generation completes
     return !allTopicsGenerated;
   };
 
@@ -1396,7 +1410,16 @@ const ProLearningPage = () => {
       const shouldSkipOld = shouldSkipOldCachedContent();
       console.log('🔍 DEBUG: Should skip old content:', shouldSkipOld);
       
-      // Get content from progressive generator
+      // Get content from progressive generator (ensure generator knows courseId)
+      if (!getProgressiveGenerationStatus()?.courseId) {
+        try {
+          // Best-effort nudge: initialize internal courseId for the generator without restarting
+          const cid = getCourseId();
+          if (cid) {
+            await initializeProgressiveGeneration(courseTitle || 'Pro Learning Course', topicsList.length ? topicsList : [{ name: topicName }], {}, { courseId: cid });
+          }
+        } catch {}
+      }
       const progressiveContent = getProgressiveTopicContent(topicName);
       console.log('🔍 DEBUG: Progressive content found:', !!progressiveContent);
       if (progressiveContent) {

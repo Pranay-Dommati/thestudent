@@ -341,10 +341,21 @@ class ContentStorageService {
    */
   getContentByTopicName(topicName, courseId) {
     console.log('🔍 STORAGE DEBUG: Looking for content - Topic:', topicName, 'Course:', courseId);
-    const topic = this.getTopicByName(topicName, courseId);
+    let topic = null;
+    if (courseId) {
+      topic = this.getTopicByName(topicName, courseId);
+    }
+    // Best-effort fallback: search across all topics when courseId is missing (e.g., after hard reload)
+    if (!topic) {
+      for (const [id, t] of this.storage.topics) {
+        if (t.name === topicName) {
+          topic = { ...t, id };
+          break;
+        }
+      }
+    }
     console.log('🔍 STORAGE DEBUG: Found topic for', topicName, ':', !!topic, topic ? topic.id : 'none');
     if (!topic) return null;
-    
     const content = this.getTopicContent(topic.id);
     console.log('🔍 STORAGE DEBUG: Found content for topic', topicName, ':', !!content);
     return content;

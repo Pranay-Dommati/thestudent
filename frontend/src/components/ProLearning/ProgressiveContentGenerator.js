@@ -356,6 +356,23 @@ export class ProgressiveContentGenerator {
    * Get existing content for a topic
    */
   getExistingTopicContent(topicName) {
+  // Ensure we always have a valid courseId on reloads before looking up content
+  if (!this.courseId) {
+    try {
+      // 1) Prefer currentCourseId persisted by the app
+      const fallbackId = typeof localStorage !== 'undefined' ? localStorage.getItem('currentCourseId') : null;
+      if (fallbackId) {
+        this.courseId = fallbackId;
+      }
+    } catch {}
+  }
+
+  if (!this.courseId && this.courseTitle) {
+    // 2) Fallback to course lookup by title (best-effort)
+    const course = contentStorageService.getCourseByTitle(this.courseTitle);
+    if (course?.id) this.courseId = course.id;
+  }
+
   console.log('🔍 PROG GEN DEBUG: getExistingTopicContent', topicName, 'courseId:', this.courseId);
   return contentStorageService.getContentByTopicName(topicName, this.courseId);
   }
