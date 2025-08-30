@@ -152,6 +152,158 @@ const ProLearningPage = () => {
       }
       return null;
     };
+    
+    // Simple content loader for reload mode - no generation, just load from storage
+    const loadContentForReloadMode = async (topicName) => {
+      const currentCourseId = getCourseId();
+      if (!currentCourseId || !topicName) return;
+
+      console.log('⚡ Reload mode: Loading content for topic:', topicName);
+
+      try {
+        const storedContent = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
+        
+        if (storedContent && storedContent.reading) {
+          console.log('✅ Reload mode: Found content for topic:', topicName);
+          
+          // Set content directly
+          setContent({
+            reading: storedContent.reading,
+            summary: storedContent.summary || 'Summary not available',
+            quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
+            videos: storedContent.videos || [],
+            resources: storedContent.resources || []
+          });
+
+          // Set reading sections
+          if (storedContent.reading) {
+            const sections = parseReadingSections(storedContent.reading);
+            setReadingSections(sections);
+            setReadingSectionIndex(0);
+          }
+
+          console.log('✅ Reload mode: Content loaded successfully for:', topicName);
+          
+          // Clear loading states
+          setIsLoading(false);
+          setLoadingStep('');
+        } else {
+          console.warn('⚠️ Reload mode: No content found for topic:', topicName);
+          setContent({
+            reading: 'Content not available. Please regenerate the course.',
+            summary: 'Summary not available',
+            quiz: { questions: [], currentQuestion: 0 },
+            videos: [],
+            resources: []
+          });
+          
+          // Clear loading states for fallback content
+          setIsLoading(false);
+          setLoadingStep('');
+        }
+      } catch (error) {
+        console.error('❌ Reload mode: Error loading content for topic:', topicName, error);
+        setContent({
+          reading: 'Error loading content. Please try again.',
+          summary: 'Error loading summary',
+          quiz: { questions: [], currentQuestion: 0 },
+          videos: [],
+          resources: []
+        });
+        
+        // Clear loading states for error content
+        setIsLoading(false);
+        setLoadingStep('');
+      }
+    };
+    
+    // Handle reload scenario - content already exists, load quickly
+    const handleReloadScenario = async (courseId, handleTopicSelection) => {
+      console.log('⚡ Reload scenario: Loading existing content quickly');
+      setIsLoading(true);
+      setLoadingStep('Loading course content...');
+      
+      try {
+        // Get all stored topics
+        const storedTopics = await proContentManager.getStoredTopics(courseId);
+        
+        if (storedTopics.length > 0) {
+          console.log('✅ Found stored topics for reload:', storedTopics.map(t => t.name));
+          
+          // Populate available tabs for all topics at once
+          const tabsMap = {};
+          for (const topic of storedTopics) {
+            try {
+              const content = await proContentManager.getStoredTopicContent(courseId, topic.name);
+              if (content) {
+                const availableTabs = [];
+                if (content.reading) availableTabs.push('reading');
+                if (content.summary) availableTabs.push('summary');
+                if (content.videos?.length > 0) availableTabs.push('videos');
+                if (content.quiz?.length > 0 || (content.quiz?.questions?.length > 0)) availableTabs.push('quiz');
+                if (content.resources?.length > 0) availableTabs.push('resources');
+                
+                if (availableTabs.length > 0) {
+                  tabsMap[topic.name] = availableTabs;
+                }
+              }
+            } catch (error) {
+              console.warn(`Failed to load content for topic: ${topic.name}`, error);
+            }
+          }
+          
+          // Set all available tabs at once
+          if (Object.keys(tabsMap).length > 0) {
+            setAvailableTabsForTopics(tabsMap);
+            console.log('🎯 Set available tabs for reload:', Object.keys(tabsMap));
+          }
+          
+          // Handle topic selection (this will load the specific topic content)
+          handleTopicSelection(storedTopics);
+          
+          setIsLoading(false);
+          setLoadingStep('');
+          console.log('✅ Reload scenario completed successfully');
+        } else {
+          console.warn('⚠️ No stored topics found in reload scenario, falling back to generation');
+          setIsLoading(false);
+          return false; // Indicate fallback needed
+        }
+        return true;
+      } catch (error) {
+        console.error('❌ Error in reload scenario:', error);
+        setIsLoading(false);
+        return false; // Indicate fallback needed
+      }
+    };
+    
+    // Helper function to detect if this is first-time generation vs subsequent reload
+    const detectLoadScenario = async (courseId) => {
+      try {
+        // Check if we have topics stored with content in ProContentManager
+        const storedTopics = await proContentManager.getStoredTopics(courseId);
+        
+        if (storedTopics.length === 0) {
+          return 'first-time'; // No topics stored at all
+        }
+        
+        // Check if any topics have generated content
+        let hasGeneratedContent = false;
+        for (const topic of storedTopics) {
+          const content = await proContentManager.getStoredTopicContent(courseId, topic.name);
+          if (content && content.reading) {
+            hasGeneratedContent = true;
+            break;
+          }
+        }
+        
+        return hasGeneratedContent ? 'reload' : 'first-time';
+      } catch (error) {
+        console.error('Error detecting load scenario:', error);
+        return 'first-time'; // Default to first-time on error
+      }
+    };
+    
     const initializeCourseData = async () => {
       const currentCourseId = getCourseId();
       
@@ -200,6 +352,44 @@ const ProLearningPage = () => {
         setTopicsList(updatedTopics);
         setSelectedTopic(selectedTopicObject);
         
+        // CRITICAL: Populate available tabs for all topics that have content
+        const populateAvailableTabsForAllTopics = async () => {
+          const currentCourseId = getCourseId();
+          if (!currentCourseId) return;
+          
+          const tabsMap = {};
+          for (const topic of updatedTopics) {
+            try {
+              const storedContent = await proContentManager.getStoredTopicContent(currentCourseId, topic.name);
+              if (storedContent) {
+                const availableTabs = [];
+                if (storedContent.reading) availableTabs.push('reading');
+                if (storedContent.summary) availableTabs.push('summary');
+                if (storedContent.videos?.length > 0) availableTabs.push('videos');
+                if (storedContent.quiz?.length > 0 || (storedContent.quiz?.questions?.length > 0)) availableTabs.push('quiz');
+                if (storedContent.resources?.length > 0) availableTabs.push('resources');
+                
+                if (availableTabs.length > 0) {
+                  tabsMap[topic.name] = availableTabs;
+                }
+              }
+            } catch (error) {
+              console.warn(`Failed to check content for topic: ${topic.name}`, error);
+            }
+          }
+          
+          if (Object.keys(tabsMap).length > 0) {
+            setAvailableTabsForTopics(prev => ({
+              ...prev,
+              ...tabsMap
+            }));
+            console.log('🎯 Populated available tabs for topics:', Object.keys(tabsMap));
+          }
+        };
+        
+        // Run tab population asynchronously
+        populateAvailableTabsForAllTopics();
+        
         // Update URL if needed
         const selectedTopicName = selectedTopicObject.name;
         const currentTopicParam = topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null;
@@ -218,7 +408,13 @@ const ProLearningPage = () => {
         
         // Auto-load content for the selected topic
         setTimeout(() => {
-          loadTopicContent(selectedTopicName);
+          if (loadScenario === 'reload') {
+            // RELOAD MODE: Simple content loading without generation
+            loadContentForReloadMode(selectedTopicName);
+          } else {
+            // FIRST-TIME MODE: Full generation logic
+            loadTopicContent(selectedTopicName);
+          }
         }, 100);
       };
 
@@ -229,6 +425,24 @@ const ProLearningPage = () => {
       } catch (e) {
         // If initialization fails, continue with other fallbacks below
       }
+
+      // CRITICAL: Detect if this is first-time generation or subsequent reload
+      const detectedScenario = await detectLoadScenario(currentCourseId);
+      setLoadScenario(detectedScenario);
+      console.log('🔍 Load scenario detected:', detectedScenario);
+
+      if (detectedScenario === 'reload') {
+        // RELOAD SCENARIO: Content already exists, load quickly
+        const reloadSuccess = await handleReloadScenario(currentCourseId, handleTopicSelection);
+        if (reloadSuccess) {
+          return; // Successfully handled as reload
+        }
+        // If reload failed, fall through to first-time generation logic
+        console.log('🔄 Reload scenario failed, falling back to generation logic');
+      }
+
+      // FIRST-TIME SCENARIO: Continue with existing generation logic
+      console.log('🚀 First-time generation scenario - proceeding with generation flow');
 
       // Step 1: Check localStorage for course data
       const storedTopics = await proContentManager.getStoredTopics(currentCourseId);
@@ -429,6 +643,7 @@ const ProLearningPage = () => {
   const [progressiveGenerationProgress, setProgressiveGenerationProgress] = useState({});
   const [availableTabsForTopics, setAvailableTabsForTopics] = useState({});
   const [useProgressiveGeneration, setUseProgressiveGeneration] = useState(true); // Feature flag
+  const [loadScenario, setLoadScenario] = useState(null); // 'first-time' or 'reload'
   
   // Reading sections state
   const [readingSections, setReadingSections] = useState([]);
@@ -951,6 +1166,27 @@ const ProLearningPage = () => {
     const currentCourseId = getCourseId();
     if (!currentCourseId) return;
 
+    // OPTIMIZATION: Check if content is already loaded for this topic and user hasn't switched topics
+    if (selectedTopic?.name === topicName && content && content.reading && !isLoading) {
+      console.log('🚀 Content already loaded for topic:', topicName, '- updating tabs and skipping reload');
+      
+      // CRITICAL: Even if content is loaded, always update available tabs for the topic
+      const availableTabs = [];
+      if (content.reading) availableTabs.push('reading');
+      if (content.summary) availableTabs.push('summary');
+      if (content.videos?.length > 0) availableTabs.push('videos');
+      if (content.quiz?.length > 0 || (content.quiz?.questions?.length > 0)) availableTabs.push('quiz');
+      if (content.resources?.length > 0) availableTabs.push('resources');
+      
+      setAvailableTabsForTopics(prev => ({
+        ...prev,
+        [topicName]: availableTabs
+      }));
+      
+      console.log('🎯 Updated available tabs for already loaded topic:', topicName, availableTabs);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setLoadingStep(`Loading ${topicName} content...`);
@@ -1032,6 +1268,9 @@ const ProLearningPage = () => {
         }
         
         console.log('✅ Content loaded successfully from storage');
+        setIsLoading(false);
+        setLoadingStep('');
+        return; // CRITICAL: Exit here to avoid continuing to database fetch logic
       } else {
         // Fallback to generating content if not in storage
         // No stored content found, attempting database then generation
@@ -1073,7 +1312,7 @@ const ProLearningPage = () => {
         
         const result = await proContentManager.getTopicContent(topicName, generateProContent, dbTopic);
         
-        console.log('📝 ProContentManager result:', {
+        console.log('📝 ProContentManager result for topic:', topicName, {
           hasResult: !!result,
           source: result?.source,
           hasContent: !!result?.content,
@@ -1081,7 +1320,7 @@ const ProLearningPage = () => {
         });
         
         if (result && result.content) {
-          console.log('✅ Setting content from result:', {
+          console.log('✅ Setting content for topic:', topicName, {
             hasReading: !!result.content.reading,
             hasSummary: !!result.content.summary,
             hasVideos: !!result.content.videos?.length,
@@ -1110,6 +1349,11 @@ const ProLearningPage = () => {
             setReadingSections(sections);
             setReadingSectionIndex(0);
           }
+          
+          // Clear loading states after content is successfully set
+          setIsLoading(false);
+          setLoadingStep('');
+          
           // Content generated and loaded
         } else {
           throw new Error('Failed to generate or retrieve content');
@@ -1269,13 +1513,43 @@ const ProLearningPage = () => {
 
     // CRITICAL: Clear content immediately when switching topics to prevent cross-topic content display
     setContent(null);
-    setContentTopicName(null); // Clear topic association
     // Also clear reading sections so previous topic's text doesn't persist
     setReadingSections([]);
     setReadingSectionIndex(0);
     
     // Reset active tab to 'reading' for new topic
     setActiveTab('reading');
+
+    // CRITICAL: Always check and update available tabs for the selected topic
+    const updateTabsForTopic = async (topicName) => {
+      try {
+        const currentCourseId = getCourseId();
+        if (currentCourseId) {
+          const storedContent = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
+          if (storedContent) {
+            const availableTabs = [];
+            if (storedContent.reading) availableTabs.push('reading');
+            if (storedContent.summary) availableTabs.push('summary');
+            if (storedContent.videos?.length > 0) availableTabs.push('videos');
+            if (storedContent.quiz?.length > 0 || (storedContent.quiz?.questions?.length > 0)) availableTabs.push('quiz');
+            if (storedContent.resources?.length > 0) availableTabs.push('resources');
+            
+            if (availableTabs.length > 0) {
+              setAvailableTabsForTopics(prev => ({
+                ...prev,
+                [topicName]: availableTabs
+              }));
+              console.log('🎯 Updated tabs for selected topic:', topicName, availableTabs);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to update tabs for topic:', topicName, error);
+      }
+    };
+    
+    // Update tabs asynchronously
+    updateTabsForTopic(selectedTopic.name);
 
     // Check if this topic is blocked (2nd topic onwards until course completion)
     if (isTopicBlocked(selectedTopic.name)) {
@@ -1286,9 +1560,12 @@ const ProLearningPage = () => {
       return; // Exit early, content will show loading UI
     }
 
-    // Handle content loading for non-blocked topics (first topic only until course completion)
-    if (useProgressiveGeneration) {
-      // For progressive generation, load any available content for this topic
+    // Handle content loading for non-blocked topics
+    if (loadScenario === 'reload') {
+      // RELOAD MODE: Simple content loading
+      loadContentForReloadMode(selectedTopic.name);
+    } else if (useProgressiveGeneration) {
+      // FIRST-TIME MODE: Progressive generation
       loadProgressiveTopicContent(selectedTopic.name, { showLoader: false });
       
       // If no content is available yet for this topic, ensure we're in generation mode
@@ -1302,7 +1579,7 @@ const ProLearningPage = () => {
         setIsProgressiveGenerating(true);
       }
     } else {
-      // For batch generation, load if all topics are generated
+      // FIRST-TIME MODE: Batch generation
       if (allTopicsGenerated || hasTopicContent(selectedTopic.name)) {
         loadTopicContent(selectedTopic.name);
       } else {
@@ -1627,6 +1904,19 @@ const ProLearningPage = () => {
               resources: storedContent.resources || []
             });
             
+            // CRITICAL: Also update available tabs for this topic
+            const availableTabs = [];
+            if (storedContent.reading) availableTabs.push('reading');
+            if (storedContent.summary) availableTabs.push('summary');
+            if (storedContent.videos?.length > 0) availableTabs.push('videos');
+            if (storedContent.quiz?.length > 0 || (storedContent.quiz?.questions?.length > 0)) availableTabs.push('quiz');
+            if (storedContent.resources?.length > 0) availableTabs.push('resources');
+            
+            setAvailableTabsForTopics(prev => ({
+              ...prev,
+              [actualTopic]: availableTabs
+            }));
+            
             console.log('✅ DEBUG: Content loaded successfully for:', actualTopic);
           } else {
             console.log('🆕 DEBUG: No stored content found - will trigger generation for:', actualTopic);
@@ -1638,9 +1928,12 @@ const ProLearningPage = () => {
     };
 
     // Run after a small delay to ensure ProContentManager is initialized
-    const timer = setTimeout(loadInitialTopicContent, 100);
-    return () => clearTimeout(timer);
-  }, [topicParam]); // Only depend on topicParam to prevent loops
+    // Only run for first-time generation, not for reload scenarios
+    if (loadScenario === 'first-time' || loadScenario === null) {
+      const timer = setTimeout(loadInitialTopicContent, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [topicParam, loadScenario]); // Depend on loadScenario to control when this runs
 
   // Get currently active topic
   const getCurrentTopic = () => {
@@ -2443,6 +2736,26 @@ const ProLearningPage = () => {
       setLoadingStep('');
     }
   }, [content, isLoading, loadingStep, isBatchGenerating]);
+
+  // Debug: Log active tab's content whenever content, selectedTopic, or activeTab changes
+  useEffect(() => {
+    if (content && selectedTopic && activeTab) {
+      const activeTabContent = content[activeTab];
+      console.log('🎯 ACTIVE TAB CONTENT DEBUG:', {
+        topic: selectedTopic.name,
+        tab: activeTab,
+        hasContent: !!activeTabContent,
+        contentType: typeof activeTabContent,
+        contentLength: Array.isArray(activeTabContent) ? activeTabContent.length : 
+                      typeof activeTabContent === 'string' ? activeTabContent.length : 
+                      activeTabContent && typeof activeTabContent === 'object' ? Object.keys(activeTabContent).length : 0,
+        contentPreview: Array.isArray(activeTabContent) ? `Array with ${activeTabContent.length} items` :
+                       typeof activeTabContent === 'string' ? activeTabContent.substring(0, 100) + (activeTabContent.length > 100 ? '...' : '') :
+                       activeTabContent && typeof activeTabContent === 'object' ? Object.keys(activeTabContent).join(', ') : 
+                       String(activeTabContent)
+      });
+    }
+  }, [content, selectedTopic, activeTab]);
 
   // ...existing code...
 

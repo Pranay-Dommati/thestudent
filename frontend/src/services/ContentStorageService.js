@@ -340,13 +340,13 @@ class ContentStorageService {
    * @returns {Object|null} - Content data or null
    */
   getContentByTopicName(topicName, courseId) {
-    console.log('🔍 STORAGE DEBUG: Looking for content - topicName:', topicName, 'courseId:', courseId);
+    console.log('🔍 STORAGE DEBUG: Looking for content - Topic:', topicName, 'Course:', courseId);
     const topic = this.getTopicByName(topicName, courseId);
-    console.log('🔍 STORAGE DEBUG: Found topic:', !!topic, topic ? topic.id : 'none');
+    console.log('🔍 STORAGE DEBUG: Found topic for', topicName, ':', !!topic, topic ? topic.id : 'none');
     if (!topic) return null;
     
     const content = this.getTopicContent(topic.id);
-    console.log('🔍 STORAGE DEBUG: Found content for topic:', !!content);
+    console.log('🔍 STORAGE DEBUG: Found content for topic', topicName, ':', !!content);
     return content;
   }
 
