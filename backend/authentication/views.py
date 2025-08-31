@@ -393,6 +393,40 @@ def admin_user_detail(request, user_id: int):
         logger.error(f"Admin user detail error: {str(e)}")
         return Response({"error": "Operation failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_set_user_password(request, user_id: int):
+    """Admin-only endpoint to set/reset a user's password.
+    Request body: { "new_password": string }
+    """
+    try:
+        if not request.user.is_superuser:
+            return Response({"error": "Access denied. Superuser privileges required."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            target = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        payload = request.data or {}
+        new_password = (payload.get('new_password') or '').strip()
+        if not new_password:
+            return Response({"error": "New password is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if len(new_password) < 8:
+            return Response({"error": "Password must be at least 8 characters"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Basic weak password guard
+        weak = {"password", "12345678", "qwertyui", "letmein!", "abcdefgh"}
+        if new_password.lower() in weak:
+            return Response({"error": "Please choose a stronger password"}, status=status.HTTP_400_BAD_REQUEST)
+
+        target.set_password(new_password)
+        target.save()
+        return Response({"success": True}, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Admin set password error: {str(e)}")
+        return Response({"error": "Failed to update password"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 @authentication_classes([])
@@ -703,7 +737,7 @@ class AccountActivationTokenGenerator(PasswordResetTokenGenerator):
 token_generator = AccountActivationTokenGenerator()
 
 
-def send_password_reset_email(user_email, uid, token):
+def send_password_reset_email(user_email, uid, token, is_admin=False):
     """Send password reset email using Gmail SMTP"""
     try:
         # Email configuration
@@ -712,13 +746,18 @@ def send_password_reset_email(user_email, uid, token):
         sender_email = "easylearnova@gmail.com"
         sender_password = "cedr hdik avgu gllp"
         
-        # Create reset URL
+        # Create reset URL - different for admin vs regular users
         frontend_domain = getattr(settings, 'FRONTEND_DOMAIN', 'http://localhost:5173')
-        reset_url = f"{frontend_domain}/reset-password/{uid}/{token}"
+        if is_admin:
+            reset_url = f"{frontend_domain}/admin-p/reset-password/{uid}/{token}"
+            subject = "Admin Password Reset Request - EasyLearnova"
+            title = "🔐 Admin Password Reset"
+        else:
+            reset_url = f"{frontend_domain}/reset-password/{uid}/{token}"
+            subject = "Password Reset Request - EasyLearnova"
+            title = "🎓 Password Reset"
         
         # Email content
-        subject = "Password Reset Request - EasyLearnova"
-        
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -730,22 +769,25 @@ def send_password_reset_email(user_email, uid, token):
                 .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
                 .button {{ display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
                 .footer {{ text-align: center; margin-top: 20px; color: #666; font-size: 12px; }}
+                .admin-badge {{ background: #dc2626; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; }}
             </style>
         </head>
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>🎓 EasyLearnova</h1>
+                    <h1>{title}</h1>
+                    {f'<div class="admin-badge">ADMIN ACCOUNT</div>' if is_admin else ''}
                     <h2>Password Reset Request</h2>
                 </div>
                 <div class="content">
-                    <p>Hello!</p>
-                    <p>We received a request to reset your password for your EasyLearnova account.</p>
+                    <p>Hello{' Administrator' if is_admin else ''}!</p>
+                    <p>We received a request to reset your {'admin ' if is_admin else ''}password for your EasyLearnova account.</p>
                     <p>Click the button below to reset your password:</p>
                     <a href="{reset_url}" class="button">Reset Password</a>
                     <p>Or copy and paste this link in your browser:</p>
                     <p style="word-break: break-all; background: #e9e9e9; padding: 10px; border-radius: 5px;">{reset_url}</p>
                     <p><strong>Important:</strong> This link will expire in 1 hour for security reasons.</p>
+                    {f'<p><strong>Security Notice:</strong> This is an admin account reset. Please ensure you requested this change.</p>' if is_admin else ''}
                     <p>If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
                     <p>Best regards,<br>The EasyLearnova Team</p>
                 </div>
@@ -822,6 +864,54 @@ def forgot_password(request):
         
     except Exception as e:
         logger.error(f"Error in forgot_password: {str(e)}")
+        return Response({
+            'error': 'An error occurred. Please try again later.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def admin_forgot_password(request):
+    """Handle admin forgot password request - only for superuser accounts"""
+    try:
+        email = request.data.get('email', '').strip().lower()
+        
+        if not email:
+            return Response({
+                'error': 'Email is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Always return success message for security (don't reveal if email exists)
+        success_message = "If that email belongs to an admin account, we've sent a password reset link to your inbox."
+        
+        try:
+            # Check if user exists AND is a superuser
+            user = User.objects.get(email=email, is_superuser=True)
+            
+            # Generate token and uid
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = token_generator.make_token(user)
+            
+            # Send admin-specific email
+            email_sent = send_password_reset_email(user.email, uid, token, is_admin=True)
+            
+            if email_sent:
+                logger.info(f"Admin password reset initiated for user: {email}")
+            else:
+                logger.error(f"Failed to send admin reset email for user: {email}")
+                
+        except User.DoesNotExist:
+            # Don't reveal that email doesn't exist or isn't an admin - security best practice
+            logger.info(f"Admin password reset attempted for non-existent/non-admin email: {email}")
+            pass
+        
+        return Response({
+            'message': success_message
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error in admin_forgot_password: {str(e)}")
         return Response({
             'error': 'An error occurred. Please try again later.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
