@@ -158,6 +158,16 @@ const MobileFirstCourses = () => {
     }, []);
 
     useEffect(() => {
+        // Derive selected level from URL so back/forward navigation renders correct child
+        const segments = location.pathname.split('/').filter(Boolean);
+        if (segments[0] === 'courses' && segments[1]) {
+            const levelId = segments[1];
+            if (allEducationLevels.some(l => l.id === levelId)) {
+                setSelectedLevel(levelId);
+                return;
+            }
+        }
+
         if (location.pathname === '/courses') {
             setSelectedLevel(null);
         }

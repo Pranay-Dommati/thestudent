@@ -130,6 +130,18 @@ const Courses = () => {
     };
 
     useEffect(() => {
+        // Derive selected level from URL so back/forward navigation renders correct child
+        const segments = location.pathname.split('/').filter(Boolean);
+        // segments example: ['courses', '6th', 'cbse']
+        if (segments[0] === 'courses' && segments[1]) {
+            const levelId = segments[1];
+            if (allEducationLevels.some(l => l.id === levelId)) {
+                setSelectedLevel(levelId);
+                return;
+            }
+        }
+
+        // If exactly /courses, show top-level chooser
         if (location.pathname === '/courses') {
             setSelectedLevel(null);
         }
