@@ -69,6 +69,7 @@ const TwelfthStandard = () => {
       setShowStateBoards(false);
     } else if (selectedBoard) {
       setSelectedBoard(null);
+      navigate('/courses/12th');
     } else {
       navigate('/courses');
     }

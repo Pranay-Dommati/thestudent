@@ -141,6 +141,7 @@ const EleventhStandard = () => {
       setShowStateBoards(false);
     } else if (selectedBoard) {
       setSelectedBoard(null);
+      navigate('/courses/11th');
     } else {
       navigate('/courses');
     }

@@ -166,6 +166,7 @@ const TenthStandard = () => {
       setShowStateBoards(false);
     } else if (selectedBoard) {
       setSelectedBoard(null);
+      navigate('/courses/10th');
     } else {
       navigate('/courses');
     }

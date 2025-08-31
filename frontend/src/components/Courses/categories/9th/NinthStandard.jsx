@@ -125,6 +125,7 @@ const NinthStandard = () => {
       setShowStateBoards(false);
     } else if (selectedBoard) {
       setSelectedBoard(null);
+      navigate('/courses/9th');
     } else {
       navigate('/courses');
     }

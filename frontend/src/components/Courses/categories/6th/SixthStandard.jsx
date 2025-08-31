@@ -138,6 +138,7 @@ const SixthStandard = () => {
       setShowStateBoards(false);
     } else if (selectedBoard) {
       setSelectedBoard(null);
+      navigate('/courses/6th');
     } else {
       navigate('/courses');
     }

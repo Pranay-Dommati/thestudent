@@ -125,6 +125,7 @@ const EighthStandard = () => {
       setShowStateBoards(false);
     } else if (selectedBoard) {
       setSelectedBoard(null);
+      navigate('/courses/8th');
     } else {
       navigate('/courses');
     }
