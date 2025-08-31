@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
+import { checkBoardAvailability } from '../../../../utils/courseAvailability';
 
 const SUBJECT_ICONS = {
   'Mathematics': '📐',
@@ -19,21 +20,6 @@ const SUBJECT_ICONS = {
   'General': '📘'
 };
 
-const boards = [
-  { 
-    id: 'cbse', 
-    name: 'CBSE',
-    fullName: 'Central Board of Secondary Education',
-    available: true
-  },
-  { 
-    id: 'state', 
-    name: 'State Board',
-    fullName: 'State Board of Secondary and Higher Secondary Education',
-    available: true
-  }
-];
-
 const NinthStandard = () => {
   const navigate = useNavigate();
   const { boardId, stateId } = useParams();
@@ -42,6 +28,26 @@ const NinthStandard = () => {
   const [showStateBoards, setShowStateBoards] = useState(false);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [availableBoards, setAvailableBoards] = useState([]);
+  const [checkingAvailability, setCheckingAvailability] = useState(true);
+
+  // Check course availability for each board
+  useEffect(() => {
+    const checkAvailability = async () => {
+      setCheckingAvailability(true);
+      try {
+        const availableBoards = await checkBoardAvailability('9th');
+        setAvailableBoards(availableBoards);
+      } catch (error) {
+        console.error('Error checking board availability:', error);
+        setAvailableBoards([]);
+      } finally {
+        setCheckingAvailability(false);
+      }
+    };
+
+    checkAvailability();
+  }, []);
 
   // Set selected board based on URL
   useEffect(() => {
