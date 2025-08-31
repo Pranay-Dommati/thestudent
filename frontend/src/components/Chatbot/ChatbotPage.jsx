@@ -542,7 +542,8 @@ const ChatbotPage = () => {
   const messagesEndRef = useRef(null);
   const initialQueryProcessed = useRef(false);
   const { width } = useWindowSize();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Sidebar default: open on large desktop (>=1024px), closed otherwise
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const [chatSessions, setChatSessions] = useState([
     {
       id: 1,
@@ -680,9 +681,7 @@ const ChatbotPage = () => {
     }
   }, [initialQuery, navigate, searchParams]);
 
-  useEffect(() => {
-    setIsSidebarOpen(false);
-  }, [width]);
+  // Do not auto-close/open sidebar on resize; only set default on mount above.
 
   // Cleanup network error timeouts on unmount
   useEffect(() => {
@@ -977,7 +976,7 @@ const ChatbotPage = () => {
     if (showTopicConfirmation && !customMessage) {
       // Add cancellation message to chat history
       const cancellationMessage = {
-        id: chatHistory.length + 1,
+        id: generateMessageId(),
         type: "bot",
         content: "❌ **Course creation cancelled** - Processing your new request instead.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1134,7 +1133,7 @@ const ChatbotPage = () => {
             // If no topics available due to limits, don't show confirmation
             if (availableTopics.length === 0) {
               const limitResponse = {
-                id: chatHistory.length + 2,
+                id: generateMessageId(),
                 type: "bot",
                 content: limitMessage || "❌ You've reached your daily topic creation limit. Please try again tomorrow.",
                 timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1153,7 +1152,7 @@ const ChatbotPage = () => {
           } else {
             // No topics extracted - show error
             const errorResponse = {
-              id: chatHistory.length + 2,
+              id: generateMessageId(),
               type: "bot",
               content: "❌ I couldn't extract any learning topics from your query. Please try to be more specific about what you'd like to learn (e.g., 'JavaScript arrays and functions', 'Python data structures', etc.)",
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1210,7 +1209,7 @@ const ChatbotPage = () => {
           } else if (error.isRateLimit) {
             const rateLimitMessage = formatRateLimitMessage(error);
             const rateLimitResponse = {
-              id: chatHistory.length + 2,
+              id: generateMessageId(),
               type: "bot",
               content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 16 topics per day\n\nPlease try again later or contact support if you need higher limits.`,
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1226,7 +1225,7 @@ const ChatbotPage = () => {
           } else {
             // Generic error handling
             const errorResponse = {
-              id: chatHistory.length + 2,
+              id: generateMessageId(),
               type: "bot",
               content: `❌ Topic extraction failed: ${error.message}. Please try again with a clearer learning query.`,
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1388,7 +1387,7 @@ const ChatbotPage = () => {
     try {
       // First show an AI thinking message
       const thinkingResponse = {
-        id: chatHistory.length + 1,
+        id: generateMessageId(),
         type: "bot",
         content: "🤔 Let me analyze your learning context to create a personalized course plan...",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1418,9 +1417,9 @@ const ChatbotPage = () => {
       if (response.status === 429) {
         // Rate limit exceeded
         const botResponse = {
-          id: chatHistory.length + 1,
+          id: generateMessageId(),
           type: "bot",
-          message: `🚫 ${result.message}`,
+          content: `🚫 ${result.message}`,
           timestamp: new Date().toLocaleTimeString(),
           isRateLimit: true
         };
@@ -1463,7 +1462,7 @@ const ChatbotPage = () => {
       // Topic string for URL: topicString
     
       const proResponse = {
-        id: chatHistory.length + 1,
+        id: generateMessageId(),
         type: "bot",
         content: `🎓 Perfect! I'll create a comprehensive course on: **${topicNames.join(', ')}**. Click the card below to access your customized course materials. Content generation will begin automatically and you'll see a loading screen until all materials are ready.`,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1482,9 +1481,9 @@ const ChatbotPage = () => {
     } catch (error) {
       console.error('Error creating course:', error);
       const errorResponse = {
-        id: chatHistory.length + 1,
+        id: generateMessageId(),
         type: "bot",
-        message: `❌ Failed to create course: ${error.message}`,
+        content: `❌ Failed to create course: ${error.message}`,
         timestamp: new Date().toLocaleTimeString(),
       };
       setChatHistory(prev => [...prev, errorResponse]);
@@ -1496,7 +1495,7 @@ const ChatbotPage = () => {
 
   const handleTopicCancel = () => {
     const cancelResponse = {
-      id: chatHistory.length + 1,
+      id: generateMessageId(),
       type: "bot",
       content: "❌ Course creation cancelled. Feel free to ask me anything else or try again with a different query!",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -1509,18 +1508,25 @@ const ChatbotPage = () => {
   };
 
   const MessageBubble = ({ message, retryLastRequest, setLastFailedPrompt }) => {
+    // Use a safe text fallback for legacy messages that may have `message` instead of `content`
+    const contentText =
+      typeof message?.content === 'string'
+        ? message.content
+        : typeof message?.message === 'string'
+          ? message.message
+          : '';
     // More specific detection for course content - look for multiple sections with specific course structure
     const isCourseContent = (
-      message.content.includes("# ") && 
-      message.content.includes("## ") && 
-      (message.content.includes("### Reading Materials") || 
-       message.content.includes("### Summary") || 
-       message.content.includes("### Videos") ||
-       message.content.includes("### Quiz") ||
-       message.content.includes("### Resources"))
+      contentText.includes("# ") && 
+      contentText.includes("## ") && 
+      (contentText.includes("### Reading Materials") || 
+       contentText.includes("### Summary") || 
+       contentText.includes("### Videos") ||
+       contentText.includes("### Quiz") ||
+       contentText.includes("### Resources"))
     );
-    const sections = isCourseContent ? parseMarkdownResponse(message.content) : [];
-    const isLearningPlan = message.isLearningPlan || (message.content.includes("Learning Plan") && message.content.includes("Day "));
+    const sections = isCourseContent ? parseMarkdownResponse(contentText) : [];
+    const isLearningPlan = message.isLearningPlan || (contentText.includes("Learning Plan") && contentText.includes("Day "));
     const isProCard = message.isProCard || false;
 
     return (
@@ -1666,7 +1672,7 @@ const ChatbotPage = () => {
                       },
                     }}
                   >
-                    {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
+                    {typeof contentText === 'string' ? contentText : JSON.stringify(contentText)}
                   </ReactMarkdown>
                 </div>
               )}
