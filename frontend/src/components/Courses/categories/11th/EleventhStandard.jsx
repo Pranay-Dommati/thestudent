@@ -148,7 +148,7 @@ const EleventhStandard = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 pt-28">
+    <div className="container mx-auto px-4 pt-20 md:pt-0">
       {!selectedBoard && !showStateBoards ? (
         <>
           <BackButton 

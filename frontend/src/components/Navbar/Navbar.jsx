@@ -69,10 +69,11 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   }, [isMobileMenuOpen, isAuthMenuOpen]);
 
   // Check if current route is a course level selection page (like /courses/6th, /courses/7th, etc.)
-  // but NOT a course detail page (like /courses/6th/state/ts/social%20science)
-  const isCourseSelectionPage = location.pathname.match(/^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)$/) && 
-                               !location.pathname.includes('/state/') && 
-                               !location.pathname.includes('/cbse');
+  // or a course board selection page (like /courses/6th/cbse, /courses/6th/state/ts)
+  // but NOT a course detail page (like /courses/6th/cbse/telugu)
+  const isCourseSelectionPage = location.pathname.match(/^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)$/) ||
+                               (location.pathname.match(/^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/(cbse|state)/) && 
+                                !location.pathname.match(/^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/(cbse|state\/[^/]+)\/[^/]+/));
 
   let backgroundClass = '';
   if (isScrolled) {
