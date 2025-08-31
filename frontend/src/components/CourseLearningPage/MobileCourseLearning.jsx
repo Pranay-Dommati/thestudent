@@ -194,7 +194,12 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         };
 
         setCourse(transformedCourse);
-        if (transformedCourse.chapters.length > 0) setExpandedChapters({ 0: true });
+        if (transformedCourse.chapters.length > 0) {
+          setExpandedChapters({ 0: true });
+          // Ensure first lesson is selected so content type reflects its type (video/reading/resources/quiz)
+          setActiveChapter(0);
+          setActiveLesson(0);
+        }
       } catch (error) {
         console.error('❌ Error fetching course data:', error);
         const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
@@ -275,6 +280,40 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     setShowMobileMenu(false); // Close mobile menu when lesson is selected
     setActiveTab('about');
   };
+
+  // Keep contentType in sync with the currently selected lesson (parity with desktop)
+  useEffect(() => {
+    if (!course || !course.chapters || course.chapters.length === 0) return;
+    const lesson = course.chapters[activeChapter]?.lessons?.[activeLesson];
+    if (!lesson) return;
+
+    const rawType = typeof lesson.type === 'string' ? lesson.type.toLowerCase() : '';
+    let derivedType = rawType;
+
+    // Heuristics if type is missing or ambiguous
+    if (!derivedType) {
+      if (lesson.quiz_questions?.length || lesson.quizQuestions?.length) derivedType = 'quiz';
+      else if (lesson.resources && !lesson.videoUrl) derivedType = 'resources';
+      else if (lesson.aboutLesson && !lesson.videoUrl) derivedType = 'instructions';
+      else derivedType = 'video';
+    }
+
+    switch (derivedType) {
+      case 'quiz':
+        setContentType('quiz');
+        break;
+      case 'reading':
+      case 'instructions':
+        setContentType('instructions');
+        break;
+      case 'resources':
+        setContentType('resources');
+        break;
+      default:
+        setContentType('video');
+        break;
+    }
+  }, [course, activeChapter, activeLesson]);
 
   const toggleChapter = (chapterIndex) => {
     setExpandedChapters(prev => ({
