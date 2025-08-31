@@ -576,8 +576,8 @@ const ProLearningPage = () => {
         }
       }
       
-      // Step 3.5: If no stored/batch/db topics, but URL has a topic list, derive topics from URL
-      // IMPORTANT: Only do this if we don't already have topics and if URL contains multiple topics
+      // Step 3.5: If no stored/batch/db topics, but URL has topic(s), derive topics from URL
+      // IMPORTANT: Handle both multiple topics (comma-separated) and single-topic URLs
       if (topicParam && topicParam.includes(',')) {
         try {
           const topicNames = topicParam.split(',').map(t => t.trim()).filter(Boolean);
@@ -598,6 +598,27 @@ const ProLearningPage = () => {
             } catch (e) {
             }
             return; // We’ve initialized topics from URL; stop here
+          }
+        } catch (e) {
+        }
+      }
+      // Single-topic URL: still initialize topics list so sidebar shows the current topic
+      else if (topicParam) {
+        try {
+          const actualTopic = (topicParam.includes(',') ? topicParam.split(',')[0] : topicParam).trim();
+          if (actualTopic) {
+            const derivedTopics = [{ id: 1, name: actualTopic, isActive: false }];
+
+            // Use handleTopicSelection to set active topic and sync URL/tab
+            handleTopicSelection(derivedTopics);
+
+            // Persist immediately so refresh shows topic in sidebar and progress isn’t 0/0
+            try {
+              proContentManager.setCourse(courseTitle || 'Generated Course', currentCourseId);
+              await proContentManager.storeTopics(derivedTopics, currentCourseId);
+            } catch (e) {
+            }
+            return; // Initialized from single-topic URL
           }
         } catch (e) {
         }
@@ -1518,6 +1539,20 @@ const ProLearningPage = () => {
             videos: formattedContent.videos,
             resources: formattedContent.resources
           });
+
+          // Immediately mark available tabs based on loaded progressive content
+          const newReady = [];
+          if (formattedContent.reading) newReady.push('reading');
+          if (formattedContent.summary) newReady.push('summary');
+          if ((formattedContent.videos?.length || 0) > 0) newReady.push('videos');
+          if ((Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) || (formattedContent?.quiz?.questions?.length > 0)) newReady.push('quiz');
+          if ((formattedContent.resources?.length || 0) > 0) newReady.push('resources');
+          if (newReady.length > 0) {
+            setAvailableTabsForTopics(prev => ({
+              ...prev,
+              [topicName]: Array.from(new Set([...(prev[topicName] || []), ...newReady]))
+            }));
+          }
           
           // Parse and set reading sections
           if (progressiveContent.reading) {
@@ -3147,7 +3182,15 @@ const ProLearningPage = () => {
         ((content.resources?.length || 0) > 0)
       );
       if (isBatchGenerating) return <LoadingComponent />;
-      if ((isGeneratingCourse || isLoading) && readyTabs.length === 0 && !hasAnyContent) {
+      // Don’t block UI if the active tab already has content even if readyTabs is empty
+      const activeHasContent = (
+        (activeTab === 'reading' && !!content?.reading) ||
+        (activeTab === 'summary' && !!content?.summary) ||
+        (activeTab === 'videos' && (content?.videos?.length || 0) > 0) ||
+        (activeTab === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
+        (activeTab === 'resources' && (content?.resources?.length || 0) > 0)
+      );
+      if ((isGeneratingCourse || isLoading) && readyTabs.length === 0 && !hasAnyContent && !activeHasContent) {
         return <LoadingComponent />;
       }
     } else {
@@ -3162,8 +3205,15 @@ const ProLearningPage = () => {
     if (isProgressiveGenerating) {
       const currentTopicName = selectedTopic?.name;
       const readyTabs = (currentTopicName && availableTabsForTopics[currentTopicName]) || [];
-  // In progressive mode, a tab is considered ready ONLY if it's in readyTabs for the current topic
-  const activeReady = readyTabs.includes(activeTab);
+      // Consider a tab ready if we already have content for it
+      const activeHasContent = (
+        (activeTab === 'reading' && !!content?.reading) ||
+        (activeTab === 'summary' && !!content?.summary) ||
+        (activeTab === 'videos' && (content?.videos?.length || 0) > 0) ||
+        (activeTab === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
+        (activeTab === 'resources' && (content?.resources?.length || 0) > 0)
+      );
+      const activeReady = readyTabs.includes(activeTab) || activeHasContent;
 
       if (!activeReady) {
         return <LoadingComponent />;
@@ -4517,9 +4567,18 @@ const ProLearningPage = () => {
                       // Check if current topic is blocked (2nd topic onwards)
                       const currentTopicBlocked = currentTopicName ? isTopicBlocked(currentTopicName) : false;
                       
+                      // Check if tab has content already (treat as available even if tabs map isn’t filled yet)
+                      const hasTabContent = !!content && (
+                        (tab.id === 'reading' && !!content?.reading && String(content.reading).trim().length > 0) ||
+                        (tab.id === 'summary' && !!content?.summary && String(content.summary).trim().length > 0) ||
+                        (tab.id === 'videos' && Array.isArray(content?.videos) && content.videos.length > 0) ||
+                        (tab.id === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
+                        (tab.id === 'resources' && Array.isArray(content?.resources) && content.resources.length > 0)
+                      );
+
                       // Check if tab content is available for progressive generation
                       const isTabAvailable = useProgressiveGeneration 
-                        ? (currentTopicName && availableTabsForTopics[currentTopicName]?.includes(tab.id)) 
+                        ? ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes(tab.id)) || hasTabContent)
                         : true; // For batch generation, all tabs are available once content is loaded
                       
                       // Tab is disabled if topic is blocked OR if progressive tab is not available
@@ -4742,6 +4801,11 @@ const ProLearningPage = () => {
                   <h3 className="font-semibold text-gray-900">
                     {topicsList.length > 1 ? 'Learning Topics' : 'Current Topic'}
                   </h3>
+                  {topicsList.length === 1 && (
+                    <p className="text-sm text-gray-700 mt-0.5 truncate max-w-[260px]">
+                      {topicsList[0]?.name}
+                    </p>
+                  )}
                 </div>
               </div>
               
@@ -4752,7 +4816,10 @@ const ProLearningPage = () => {
                     Select a topic to focus on:
                   </p>
                 )}
-                {topicsList.map((topicItem) => (
+                {(topicsList.length === 0 && topicParam) ? (
+                  // Edge case: no topics yet but URL has a topic — show a placeholder button
+                  <div className="text-sm text-gray-600">Loading topic…</div>
+                ) : topicsList.map((topicItem) => (
                   <button
                     key={topicItem.id}
                     onClick={() => handleTopicSelect(topicItem.id)}
