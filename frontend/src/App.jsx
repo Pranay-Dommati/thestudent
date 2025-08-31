@@ -34,6 +34,7 @@ import HelpCenter from './components/HelpCenter/HelpCenter';
 import StandaloneQuizPage from './components/CourseLearningPage/templ/StandaloneQuizPage';
 import NotFound from './components/NotFound/NotFound';
 import AdminForgotPassword from './components/Admin/AdminForgotPassword';
+import AdminResetPassword from './components/Admin/AdminResetPassword';
 import MentoringHome from './components/Mentoring/HomePage/MentoringHome';
 import IndustryExperts from './components/Mentoring/IndustryExperts/IndustryExperts';
 import AlumniMentorship from './components/Mentoring/AlumniMentorship/AlumniMentorship';
@@ -191,6 +192,7 @@ const App = () => {
             {/* Admin Routes */}
             <Route path="/admin-p/*" element={<AdminDashboard />} />
             <Route path="/admin-p/forgot-password" element={<AdminForgotPassword />} />
+            <Route path="/admin-p/reset-password/:uid/:token" element={<AdminResetPassword />} />
             
             {/* Course Routes */}
             <Route path="/courses" element={<CoursesWrapper />}>

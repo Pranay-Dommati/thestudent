@@ -212,6 +212,32 @@ class AuthService {
     return response.json();
   }
 
+  async adminSetUserPassword(userId, newPassword) {
+    const url = `${API_BASE_URL}/auth/users/${userId}/set-password/`;
+    const response = await this.makeAuthenticatedRequest(url, {
+      method: 'POST',
+      body: JSON.stringify({ new_password: newPassword }),
+    });
+
+    if (!response.ok) {
+      let message = 'Failed to update password';
+      try {
+        const data = await response.json();
+        message = data.error || message;
+      } catch {
+        try {
+          const text = await response.text();
+          if (text) message = text.slice(0, 200);
+        } catch {}
+      }
+      // Add status context
+      message = `${message} (HTTP ${response.status})`;
+      throw new Error(message);
+    }
+
+    return response.json().catch(() => ({}));
+  }
+
   logout() {
     this.clearAuthData();
   }

@@ -47,7 +47,7 @@ const AdminSettings = () => {
     setConfirmPassword('');
   };
 
-  const submitPasswordChange = (e) => {
+  const submitPasswordChange = async (e) => {
     e.preventDefault();
     if (!newPassword || newPassword.length < 8) {
       toast.error('Password must be at least 8 characters');
@@ -57,9 +57,17 @@ const AdminSettings = () => {
       toast.error('Passwords do not match');
       return;
     }
-    // Backend hook to be implemented next
-    toast.success('Password change request prepared (backend to be implemented)');
-    closePasswordModal();
+    if (!selectedAdmin) {
+      toast.error('No admin selected');
+      return;
+    }
+    try {
+      await authService.adminSetUserPassword(selectedAdmin.id, newPassword);
+      toast.success('Password updated successfully');
+      closePasswordModal();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update password');
+    }
   };
 
   return (

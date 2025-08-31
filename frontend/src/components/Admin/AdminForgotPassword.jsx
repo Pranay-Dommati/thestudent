@@ -22,15 +22,25 @@ const AdminForgotPassword = () => {
     setIsLoading(true);
     
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      
-      // In a real application, this would call an API endpoint
-      // For now, we just show a success message
-      setEmailSent(true);
-      toast.success('Password reset link sent to your email');
+      const response = await fetch('http://localhost:8000/api/auth/admin-forgot-password/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setEmailSent(true);
+        toast.success('Password reset link sent to your email');
+      } else {
+        toast.error(data.error || 'Something went wrong. Please try again later.');
+      }
     } catch (error) {
-      toast.error('Something went wrong. Please try again later.');
+      console.error('Admin forgot password error:', error);
+      toast.error('Network error. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
