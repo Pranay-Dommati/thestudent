@@ -384,11 +384,7 @@ const SchoolCourseDetails = () => {
               <button 
                 onClick={handleStartLearning}
                 disabled={checkingEnrollment}
-                className={`w-full sm:w-auto ${
-                  isEnrolled 
-                    ? 'bg-green-500 hover:bg-green-600' 
-                    : 'bg-indigo-500 hover:bg-indigo-600'
-                } text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-medium text-sm sm:text-base
+                className={`w-full sm:w-auto bg-indigo-500 hover:bg-indigo-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-medium text-sm sm:text-base
                          flex items-center justify-center sm:justify-start space-x-2 transform transition hover:scale-105
                          ${checkingEnrollment ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
