@@ -4277,12 +4277,15 @@ const ProLearningPage = () => {
                       const IconComponent = tab.icon;
                       const isActive = activeTab === tab.id;
                       
+                      // Derive current topic name (fallback to URL param for single-topic flows)
+                      const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null);
+                      
                       // Check if current topic is blocked (2nd topic onwards)
-                      const currentTopicBlocked = selectedTopic?.name && isTopicBlocked(selectedTopic.name);
+                      const currentTopicBlocked = currentTopicName ? isTopicBlocked(currentTopicName) : false;
                       
                       // Check if tab content is available for progressive generation
                       const isTabAvailable = useProgressiveGeneration 
-                        ? (selectedTopic?.name && availableTabsForTopics[selectedTopic.name]?.includes(tab.id)) 
+                        ? (currentTopicName && availableTabsForTopics[currentTopicName]?.includes(tab.id)) 
                         : true; // For batch generation, all tabs are available once content is loaded
                       
                       // Tab is disabled if topic is blocked OR if progressive tab is not available
@@ -4295,9 +4298,9 @@ const ProLearningPage = () => {
                             if (!isTabDisabled) {
                               updateActiveTabDesktop(tab.id); // Use debounced version for desktop
                               // Only reload content if progressive generation is enabled AND content is not already available
-                              if (useProgressiveGeneration && selectedTopic?.name && isTabAvailable && !content?.[tab.id]) {
+                              if (useProgressiveGeneration && currentTopicName && isTabAvailable && !content?.[tab.id]) {
                                 // Only refresh if this specific tab content doesn't exist yet
-                                loadProgressiveTopicContent(selectedTopic.name, { showLoader: false });
+                                loadProgressiveTopicContent(currentTopicName, { showLoader: false });
                               }
                             }
                           }}
@@ -4377,6 +4380,7 @@ const ProLearningPage = () => {
                 selectedTopic={selectedTopic}
                 isProgressiveGenerating={isProgressiveGenerating}
                 progressiveGenerationProgress={progressiveGenerationProgress}
+                currentTopicName={selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null)}
               />
 
               {/* Save to Learning Hub Button - Desktop Version */}
