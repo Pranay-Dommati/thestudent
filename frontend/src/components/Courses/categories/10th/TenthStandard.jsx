@@ -51,20 +51,20 @@ const TenthStandard = () => {
     checkAvailability();
   }, []);
 
-  // Set selected board based on URL and reset on base route
+  // Sync selected board with URL; also reset on base route
   useEffect(() => {
-    if (location.pathname.includes('/state/')) {
+    const path = location.pathname;
+    if (path.includes('/state/')) {
       setSelectedBoard(`state-${stateId}`);
       setShowStateBoards(false);
-    } else if (location.pathname.includes('/cbse')) {
+    } else if (path.includes('/cbse')) {
       setSelectedBoard('cbse');
       setShowStateBoards(false);
     } else {
-      // Base route: reset local selection UI
       setSelectedBoard(null);
       setShowStateBoards(false);
     }
-  }, [location, stateId]);
+  }, [location.pathname, stateId]);
 
   // Fetch courses when board/state is selected
   useEffect(() => {

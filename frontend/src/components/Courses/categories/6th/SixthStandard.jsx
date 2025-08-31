@@ -51,14 +51,21 @@ const SixthStandard = () => {
     checkAvailability();
   }, []);
 
-  // Set selected board based on URL
+  // Sync selected board with URL; also reset on /courses/6th
   useEffect(() => {
-    if (location.pathname.includes('/state/')) {
+    const path = location.pathname;
+    if (path.includes('/state/')) {
       setSelectedBoard(`state-${stateId}`);
-    } else if (location.pathname.includes('/cbse')) {
+      setShowStateBoards(false);
+    } else if (path.includes('/cbse')) {
       setSelectedBoard('cbse');
+      setShowStateBoards(false);
+    } else {
+      // e.g., /courses/6th -> clear selection so board grid shows
+      setSelectedBoard(null);
+      setShowStateBoards(false);
     }
-  }, [location, stateId]);
+  }, [location.pathname, stateId]);
 
   // Fetch courses when board/state is selected
   useEffect(() => {

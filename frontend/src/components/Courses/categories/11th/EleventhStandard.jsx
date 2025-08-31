@@ -28,13 +28,20 @@ const EleventhStandard = () => {
   const [loading, setLoading] = useState(false);
   const [courses, setCourses] = useState([]);
 
+  // Sync selected board with URL; also reset on base route
   useEffect(() => {
-    if (location.pathname.includes('/state/')) {
+    const path = location.pathname;
+    if (path.includes('/state/')) {
       setSelectedBoard(`state-${stateId}`);
-    } else if (location.pathname.includes('/cbse')) {
+      setShowStateBoards(false);
+    } else if (path.includes('/cbse')) {
       setSelectedBoard('cbse');
+      setShowStateBoards(false);
+    } else {
+      setSelectedBoard(null);
+      setShowStateBoards(false);
     }
-  }, [location, stateId]);
+  }, [location.pathname, stateId]);
 
   useEffect(() => {
     if (selectedBoard) {
