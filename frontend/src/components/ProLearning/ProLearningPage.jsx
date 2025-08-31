@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useSearchParams, useNavigate, useParams } from "react-router-dom";
+import { toast } from 'react-hot-toast';
 import { 
   IoHome, IoChevronBack, IoPlayCircle, IoBookmark, IoDownload, 
   IoCheckmarkCircle, IoTime, IoEye, IoStar, IoSparkles, IoRocket, 
@@ -87,6 +88,9 @@ const ProLearningPage = () => {
   const activeTabParam = searchParams.get("tab") || "reading"; // Get active tab from URL
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [topicsList, setTopicsList] = useState([]);
+  const [savedToHub, setSavedToHub] = useState(false); // Track if course is saved
+  const [sectionGenerating, setSectionGenerating] = useState(false);
+  const [generatingTopics, setGeneratingTopics] = useState([]);
   
   // Function to fetch course data from database
   const fetchCourseFromDB = async (courseId) => {
@@ -137,6 +141,19 @@ const ProLearningPage = () => {
       stopLearningTracking();
     };
   }, []); // Empty dependency array - run once on mount/unmount
+
+  // Check if course is already saved when loading
+  useEffect(() => {
+    const checkIfCourseSaved = async () => {
+      if (!courseId) return;
+      const databaseCourse = await fetchCourseFromDB(courseId);
+      if (databaseCourse) {
+        setSavedToHub(true);
+        console.log('✅ Course found in database, marked as saved');
+      }
+    };
+    checkIfCourseSaved();
+  }, [courseId]);
 
   // Set default topics and initialize with consistent course ID
   useEffect(() => {
@@ -657,7 +674,38 @@ const ProLearningPage = () => {
   
   // Save to Learning Hub functionality
   const [isSavingToHub, setIsSavingToHub] = useState(false);
-  const [savedToHub, setSavedToHub] = useState(false);
+  // Save button visibility after refresh
+  const [forceShowSave, setForceShowSave] = useState(() => {
+    try {
+      const id = typeof window !== 'undefined' ? window.location.pathname.split('/')[2] : null;
+      if (!id) return false;
+      return typeof localStorage !== 'undefined' && localStorage.getItem(`proLearning_courseReady_${id}`) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Derived: does any topic have any generated tab available?
+  const hasAnyContent = useMemo(() => {
+    // Check tabs availability map first
+    if (topicsList && topicsList.length > 0) {
+      for (const t of topicsList) {
+        const tabs = availableTabsForTopics?.[t?.name];
+        if (Array.isArray(tabs) && tabs.length > 0) return true;
+      }
+    }
+    // Fallback to immediate content state
+    const c = content;
+    if (c) {
+      if (typeof c.reading === 'string' && c.reading.trim().length > 0) return true;
+      if (typeof c.summary === 'string' && c.summary.trim().length > 0) return true;
+      if (Array.isArray(c.videos) && c.videos.length > 0) return true;
+      if (Array.isArray(c.resources) && c.resources.length > 0) return true;
+      if (Array.isArray(c.quiz) && c.quiz.length > 0) return true;
+      if (c.quiz && Array.isArray(c.quiz?.questions) && c.quiz.questions.length > 0) return true;
+    }
+    return false;
+  }, [topicsList, availableTabsForTopics, content]);
   
   // Completion tracking
   const [completedTopics, setCompletedTopics] = useState(() => {
@@ -907,12 +955,16 @@ const ProLearningPage = () => {
           // If not in batch generation and no stored content, load from ProContentManager
           setIsLoading(true);
           setShowSkeletons(true);
+          setSectionGenerating(true);
+          setGeneratingTopics(prev => [...prev, activeTopic.name]);
           
           // Pass database topic data if available
           const dbTopic = activeTopic?.dbTopic || null;
           
           proContentManager.getTopicContent(activeTopic.name, generateProContent, dbTopic)
             .then(result => {
+              setSectionGenerating(false);
+              setGeneratingTopics(prev => prev.filter(t => t !== activeTopic.name));
               if (result && result.content) {
                 setContent(result.content);
                 
@@ -1658,24 +1710,23 @@ const ProLearningPage = () => {
     if (fallbackTitle && fallbackTitle !== 'AI Generated Course') {
       return fallbackTitle;
     }
-    
-    if (!topicsData || Object.keys(topicsData).length === 0) {
+    // Normalize topicsData to an array of topic objects with name property
+    let topicArray = [];
+    if (Array.isArray(topicsData)) {
+      topicArray = topicsData;
+    } else if (topicsData && typeof topicsData === 'object') {
+      topicArray = Object.keys(topicsData).map(name => ({ name }));
+    }
+    if (topicArray.length === 0) {
       return 'AI Generated Course';
     }
-    
-    const topicNames = Object.keys(topicsData);
-    
-    // Option 1: Single topic - use topic name
+    const topicNames = topicArray.map(t => t?.name).filter(Boolean);
     if (topicNames.length === 1) {
       return `AI Course: ${topicNames[0]}`;
     }
-    
-    // Option 2: Multiple topics - create summary
     if (topicNames.length <= 3) {
       return `AI Course: ${topicNames.join(' + ')}`;
     }
-    
-    // Option 3: Many topics - show first 3 + ellipsis
     return `AI Course: ${topicNames.slice(0, 3).join(' + ')} + ...`;
   };
 
@@ -1683,53 +1734,199 @@ const ProLearningPage = () => {
     try {
       setIsSavingToHub(true);
       
-      const currentCourseId = getCourseId();
+      // Try to get course ID from multiple sources
+      let currentCourseId = getCourseId();
+      
+      if (!currentCourseId && currentCourse?.id) {
+        currentCourseId = currentCourse.id;
+        console.log('📝 Using course ID from current course:', currentCourseId);
+      }
+      
+      // Try getting from local storage
       if (!currentCourseId) {
-        console.error('❌ Missing course ID');
-        alert('Error: Course ID not found. Please refresh and try again.');
-        return;
+        const savedCourseId = localStorage.getItem('currentCourseId');
+        if (savedCourseId) {
+          currentCourseId = savedCourseId;
+          console.log('📝 Using course ID from localStorage:', currentCourseId);
+        }
       }
 
-      // Get all course content from local storage
-      const courseContent = await proContentManager.getStoredCourseContent(currentCourseId);
-      if (!courseContent || !courseContent.topics) {
-        console.error('❌ No course content found in local storage');
+      // If still no ID, create a new one
+      if (!currentCourseId) {
+        currentCourseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem('currentCourseId', currentCourseId);
+        console.log('📝 Generated new course ID:', currentCourseId);
+      }
+
+  // Initialize course content gathering
+      let courseContent = null;
+      let topicsWithContent = [];
+  const sanitizeTopicName = (name) => (name || '').toString().replace(/\s*:\s*true$/i, '').trim();
+      
+      // First try to get topics from current state
+      if (Array.isArray(topicsList) && topicsList.length > 0) {
+        console.log('📝 Using topics from current state:', topicsList.length, 'topics');
+        
+        // Try to gather content for each topic in the current state
+        for (const topic of topicsList) {
+          try {
+            const rawName = typeof topic === 'string' ? topic : topic?.name;
+            const topicName = sanitizeTopicName(rawName);
+            if (!topicName) continue;
+
+            let content = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
+            // Fallback: search without courseId (global scan) if not found
+            if (!content) {
+              content = await proContentManager.getStoredTopicContent(null, topicName);
+            }
+            if (content) {
+              topicsWithContent.push({
+                name: topicName,
+                content: {
+                  reading: content.reading || content.readingMaterial || '',
+                  summary: content.summary || content.topicSummary || '',
+                  videos: Array.isArray(content.videos) ? content.videos : [],
+                  quiz: Array.isArray(content.quiz) ? content.quiz : (Array.isArray(content.quizQuestions) ? content.quizQuestions : []),
+                  resources: Array.isArray(content.resources) ? content.resources : []
+                }
+              });
+              console.log('📝 Added content for topic:', topic.name);
+            }
+          } catch (e) {
+            console.warn('Failed to get content for topic:', topic.name, e);
+          }
+        }
+      }
+      
+      // If still nothing and we have a selectedTopic, try to fetch just that one
+      if (topicsWithContent.length === 0 && selectedTopic) {
+        try {
+          const rawName = typeof selectedTopic === 'string' ? selectedTopic : selectedTopic?.name;
+          const topicName = sanitizeTopicName(rawName);
+          if (topicName) {
+            let content = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
+            if (!content) content = await proContentManager.getStoredTopicContent(null, topicName);
+            if (content) {
+              topicsWithContent.push({
+                name: topicName,
+                content: {
+                  reading: content.reading || content.readingMaterial || '',
+                  summary: content.summary || content.topicSummary || '',
+                  videos: Array.isArray(content.videos) ? content.videos : [],
+                  quiz: Array.isArray(content.quiz) ? content.quiz : (Array.isArray(content.quizQuestions) ? content.quizQuestions : []),
+                  resources: Array.isArray(content.resources) ? content.resources : []
+                }
+              });
+              console.log('📝 Added content from selectedTopic:', topicName);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to get content for selectedTopic:', e);
+        }
+      }
+
+      // If we already have topics from current state, use them
+      if (topicsWithContent.length > 0 && !courseContent) {
+        courseContent = { topics: topicsWithContent };
+        console.log('📝 Using course content from current state topics:', topicsWithContent.length);
+      }
+
+      // If no content found from current state, try storage methods
+      if (topicsWithContent.length === 0) {
+        try {
+          // Try getting complete course content first
+          courseContent = await proContentManager.getStoredCourseContent(currentCourseId);
+          console.log('📝 Retrieved stored course content:', courseContent ? 'found' : 'not found');
+          
+          // If no course content, try assembling from stored topics
+          if (!courseContent || !courseContent.topics) {
+            const storedTopics = await proContentManager.getStoredTopics(currentCourseId);
+            console.log('📝 Retrieved stored topics:', storedTopics?.length || 0);
+            
+            if (Array.isArray(storedTopics) && storedTopics.length > 0) {
+              for (const topic of storedTopics) {
+                try {
+                  const topicName = sanitizeTopicName(topic?.name);
+                  let topicContent = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
+                  if (!topicContent) {
+                    topicContent = await proContentManager.getStoredTopicContent(null, topicName);
+                  }
+                  if (topicContent) {
+                    topicsWithContent.push({
+                      name: topicName,
+                      content: {
+                        reading: topicContent.reading || topicContent.readingMaterial || '',
+                        summary: topicContent.summary || topicContent.topicSummary || '',
+                        videos: Array.isArray(topicContent.videos) ? topicContent.videos : [],
+                        quiz: Array.isArray(topicContent.quiz) ? topicContent.quiz : 
+                              Array.isArray(topicContent.quizQuestions) ? topicContent.quizQuestions : [],
+                        resources: Array.isArray(topicContent.resources) ? topicContent.resources : []
+                      }
+                    });
+                    console.log('📝 Assembled content for stored topic:', topic.name);
+                  }
+                } catch (e) {
+                  console.warn('Failed to get content for stored topic:', topic.name, e);
+                }
+              }
+              
+              if (topicsWithContent.length > 0) {
+                courseContent = { topics: topicsWithContent };
+                console.log('📝 Successfully assembled course content from stored topics');
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to get content from storage:', e);
+        }
+      }
+      
+      const topicsEmpty = !courseContent || !courseContent.topics ||
+        (Array.isArray(courseContent.topics) ? courseContent.topics.length === 0 : Object.keys(courseContent.topics).length === 0);
+      if (topicsEmpty) {
+        console.error('❌ No course content found in local storage (after fallback)');
         alert('Error: No course content found. Please generate content first.');
         return;
       }
 
-      // Generate a unique course ID for database storage (different from session ID)
-      const uniqueDbCourseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
       // Generate smart course name based on topics
       const smartCourseName = generateSmartCourseName(courseContent.topics, courseTitle);
       
-      console.log('📤 Preparing to save course to database:', {
-        sessionCourseId: currentCourseId,
-        dbCourseId: uniqueDbCourseId,
-        originalTitle: courseTitle,
-        smartCourseName,
-        topicsCount: Object.keys(courseContent.topics).length,
-        topics: Object.keys(courseContent.topics)
-      });
+      // Prepare course data for working Django endpoint (expects topics as object)
+      const topicsObject = Array.isArray(courseContent.topics)
+        ? Object.fromEntries(courseContent.topics.map((t, idx) => [
+            sanitizeTopicName(t.name),
+            { content: t.content, order: idx }
+          ]))
+        : courseContent.topics;
 
-      // Prepare the data for the POST request
       const courseData = {
-        course_id: uniqueDbCourseId, // Use unique ID for database
+        course_id: currentCourseId, // identifier
         title: smartCourseName,
-        topics: courseContent.topics
+        topics: topicsObject
       };
 
-      // Get auth token (using the correct key from AuthContext)
-      const token = localStorage.getItem('accessToken');
+      // Get auth token (with IndexedDB fallback)
+      let token = null;
+      try {
+        const { default: idb } = await import('../../services/IndexedDBService.js');
+        token = await idb.getItem('accessToken');
+        if (!token && typeof localStorage !== 'undefined') {
+          token = localStorage.getItem('accessToken');
+          if (token) await idb.setItem('accessToken', token);
+        }
+      } catch {
+        token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      }
+      
       if (!token) {
         console.error('❌ No authentication token found');
         alert('Please log in to save courses to your Learning Hub.');
         return;
       }
 
-      // Make API call to save course - Using direct endpoint that bypasses DRF
-      const response = await fetch('http://localhost:8000/api/courses/pro-learning-direct/save/', {
+      // Save to SQLite using Django endpoint
+  const response = await fetch('/api/courses/pro-learning-direct/save/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1743,9 +1940,9 @@ const ProLearningPage = () => {
       if (response.ok) {
         setSavedToHub(true);
         console.log('✅ Course saved to Learning Hub successfully!', responseData);
-        alert('✅ Course saved to your Learning Hub successfully!');
+        toast.success('✅ Course saved to your Learning Hub successfully!');
         
-        // Update localStorage to track saved courses permanently
+        // Update course saved status
         const courseKey = `${currentCourseId}_${smartCourseName}`;
         const savedStatus = localStorage.getItem('coursesSavedToHub');
         let savedCourses = [];
@@ -1763,24 +1960,35 @@ const ProLearningPage = () => {
           localStorage.setItem('coursesSavedToHub', JSON.stringify(savedCourses));
         }
         
-        // Hide the entire save section after 3 seconds
-        setTimeout(() => {
-          setSavedToHub('hidden');
-        }, 3000);
+        // Mark course as ready and show save button
+        localStorage.setItem(`proLearning_courseReady_${currentCourseId}`, 'true');
+        setForceShowSave(true);
+        
       } else {
         console.error('❌ Failed to save course:', responseData);
         if (response.status === 401) {
-          alert('Authentication failed. Please log in again.');
+          toast.error('Authentication failed. Please log in again.');
         } else if (response.status === 409) {
-          alert('This course already exists in your Learning Hub.');
+          toast.warning('This course already exists in your Learning Hub.');
+          // Mark as saved locally to reflect existing state
+          try {
+            const courseKey = `${currentCourseId}_${smartCourseName}`;
+            const savedStatus = localStorage.getItem('coursesSavedToHub');
+            const savedCourses = savedStatus ? JSON.parse(savedStatus) : [];
+            if (!savedCourses.includes(courseKey)) {
+              savedCourses.push(courseKey);
+              localStorage.setItem('coursesSavedToHub', JSON.stringify(savedCourses));
+            }
+            setSavedToHub(true);
+          } catch {}
         } else {
-          alert(`Failed to save course: ${responseData.error || 'Unknown error'}`);
+          toast.error(responseData.error || 'Failed to save course');
         }
       }
 
     } catch (error) {
       console.error('❌ Failed to save course to Learning Hub:', error);
-      alert('Network error. Please check your connection and try again.');
+      toast.error('Network error. Please check your connection and try again.');
     } finally {
       setIsSavingToHub(false);
     }
@@ -2474,9 +2682,34 @@ const ProLearningPage = () => {
     }
     result.topicsComplete = completeCount;
     result.allComplete = completeCount === topicsList.length && topicsList.length > 0;
-    result.shouldShowSaveButton = result.allComplete && savedToHub !== 'hidden';
+    // The Save button should ONLY show if:
+    // 1. We have topics AND
+    // 2. Either:
+    //    a) Course is not yet saved AND all topics are complete AND no content generation is in progress
+    //    OR
+    //    b) Course was previously saved (loaded from database) but needs to be regenerated
+    const hasTopics = topicsList.length > 0;
+    const allTopicsComplete = result.allComplete;
+    const noActiveGeneration = !sectionGenerating;
+    const noGeneratingTopics = generatingTopics.length === 0;
+    const readyToSave = hasTopics && allTopicsComplete && noActiveGeneration && noGeneratingTopics;
+    
+    // Hide save button if course is already saved to the hub
+    result.shouldShowSaveButton = !savedToHub && readyToSave;
     return result;
-  }, [topicsList, availableTabsForTopics, content, savedToHub, courseId]);
+  }, [topicsList, availableTabsForTopics, content, savedToHub, courseId, forceShowSave, hasAnyContent, sectionGenerating, generatingTopics]);
+
+  // Persist the "course ready" flag once all topics are complete so the Save button stays visible after refresh
+  useEffect(() => {
+    try {
+      const id = getCourseId();
+      if (!id) return;
+    if (courseCompletionStatus.allComplete || savedToHub || hasAnyContent) {
+        localStorage.setItem(`proLearning_courseReady_${id}`, 'true');
+        setForceShowSave(true);
+      }
+    } catch {}
+  }, [courseCompletionStatus.allComplete, savedToHub, hasAnyContent]);
 
   // Check if current course was previously saved to Learning Hub
   useEffect(() => {
@@ -2498,12 +2731,13 @@ const ProLearningPage = () => {
       } catch {
         savedStatus = typeof localStorage !== 'undefined' ? localStorage.getItem('coursesSavedToHub') : null;
       }
-      if (savedStatus) {
+    if (savedStatus) {
         try {
           const savedCourses = JSON.parse(savedStatus);
           // Check if any saved course key contains current course ID
-          const isSaved = savedCourses.some(courseKey => courseKey.includes(currentCourseId));
-          setSavedToHub(isSaved ? 'hidden' : false);
+      // Use a strict prefix match to avoid false positives
+      const isSaved = savedCourses.some(courseKey => typeof courseKey === 'string' && courseKey.startsWith(`${currentCourseId}_`));
+          setSavedToHub(isSaved ? true : false);
         } catch (error) {
           console.error('Error parsing saved courses from localStorage:', error);
         }
@@ -4421,7 +4655,16 @@ const ProLearningPage = () => {
                         ) : (
                           <>
                             <FaBookmark className="text-lg" />
-                            <span>Save to Learning Hub</span>
+                            <span>
+                              {sectionGenerating 
+                                ? "⌛ Generating content..."
+                                : !topicsList.length 
+                                  ? "No topics added yet"
+                                  : !courseCompletionStatus.allComplete
+                                    ? `${courseCompletionStatus.topicsComplete}/${courseCompletionStatus.totalTopics} topics complete`
+                                    : "Save to Learning Hub"
+                              }
+                            </span>
                           </>
                         )}
                       </button>

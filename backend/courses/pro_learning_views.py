@@ -206,43 +206,48 @@ def get_course_progress(request, course_id):
 def save_course_from_localStorage(request):
     """
     POST /api/courses/pro-learning/save-from-storage/
-    Save course content from localStorage to database
+    Save course content from localStorage to database with proper topic structure
     """
     try:
-        course_id = request.data.get('course_id')
-        title = request.data.get('title')
-        topics_data = request.data.get('topics', {})
+        data = request.data
+        title = data.get('title')
+        description = data.get('description')
+        proficiency = data.get('proficiency', 'beginner')
+        category = data.get('category', 'AI Generated')
+        topics = data.get('topics', [])
+        learning_points = data.get('learning_points', [])
+        requirements = data.get('requirements', [])
         
-        if not course_id or not title:
+        if not title or not topics:
             return Response(
-                {'error': 'course_id and title are required'},
+                {'error': 'title and topics are required'},
                 status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Check if course already exists
-        if ProLearningCourse.objects.filter(
-            course_id=course_id,
-            user=request.user
-        ).exists():
-            return Response(
-                {'error': 'Course already exists in your Learning Hub'},
-                status=status.HTTP_409_CONFLICT
             )
         
         # Create course using the create serializer
         serializer = ProLearningCourseCreateSerializer(
             data={
-                'course_id': course_id,
                 'title': title,
-                'description': f'AI-generated course on {title}',
-                'topics_data': topics_data
+                'description': description,
+                'proficiency': proficiency,
+                'category': category,
+                'learning_points': learning_points,
+                'requirements': requirements,
+                'is_published': True,
+                'topics_data': [
+                    {
+                        'name': topic['name'],
+                        'content': topic['content'],
+                        'order': idx
+                    } for idx, topic in enumerate(topics)
+                ]
             },
             context={'request': request}
         )
         
         if serializer.is_valid():
             with transaction.atomic():
-                course = serializer.save()
+                course = serializer.save(user=request.user)
                 return Response(
                     {
                         'message': 'Course saved successfully to Learning Hub!',
