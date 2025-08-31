@@ -1378,6 +1378,17 @@ const ChatbotPage = () => {
     setPendingTopics([...pendingTopics, newTopic]);
   };
 
+  // Sanitize topic names for backend validation (allow apostrophes visually but strip for backend)
+  const sanitizeTopicName = (name) => {
+    if (!name) return '';
+    // Remove straight and curly quotes/backticks; normalize spaces
+    const cleaned = String(name)
+      .replace(/[’'`]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return cleaned;
+  };
+
   const handleTopicConfirm = async () => {
     if (pendingTopics.length === 0) {
       alert("Please add at least one topic to create a course.");
@@ -1406,7 +1417,11 @@ const ChatbotPage = () => {
           ...(token && { 'Authorization': `Bearer ${token}` })
         },
         body: JSON.stringify({
-          topics: pendingTopics,
+          // Send sanitized topic names to avoid backend "invalid characters" errors (e.g., apostrophes)
+          topics: pendingTopics.map(t => ({
+            ...t,
+            name: sanitizeTopicName(t.name) || String(t.name || '').trim()
+          })),
           learningContext: learningContext,
           originalPrompt: originalPrompt
         })
