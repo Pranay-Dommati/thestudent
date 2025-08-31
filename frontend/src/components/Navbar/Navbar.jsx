@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaUserPlus, FaSignInAlt } from 'react-icons/fa';
 import { HiBookOpen } from 'react-icons/hi2';
 import { useAuth } from '../../context/AuthContext';
@@ -7,9 +7,22 @@ import { useAuth } from '../../context/AuthContext';
 const Navbar = ({ initialStyle = "transparent" }) => {
   const { isLoggedIn, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -55,6 +68,9 @@ const Navbar = ({ initialStyle = "transparent" }) => {
     };
   }, [isMobileMenuOpen, isAuthMenuOpen]);
 
+  // Check if current route is a course detail page (like /courses/6th, /courses/7th, etc.)
+  const isCourseDetailPage = location.pathname.match(/^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)/);
+
   let backgroundClass = '';
   if (isScrolled) {
     backgroundClass = 'bg-white/95 backdrop-blur-md shadow-md';
@@ -62,12 +78,15 @@ const Navbar = ({ initialStyle = "transparent" }) => {
     backgroundClass = 'bg-gradient-to-r from-indigo-600 to-purple-700';
   } else if (initialStyle === 'light') {
     backgroundClass = 'bg-white shadow-sm';
+  } else if (isMobile && isCourseDetailPage) {
+    // For mobile course detail pages, use light background for visibility
+    backgroundClass = 'bg-white shadow-sm';
   } else {
     // Transparent navbar for hero sections
     backgroundClass = 'bg-transparent';
   }
 
-  const textColor = (isScrolled || initialStyle === 'light') 
+  const textColor = (isScrolled || initialStyle === 'light' || (isMobile && isCourseDetailPage)) 
     ? 'text-gray-700 hover:text-blue-600' 
     : 'text-white hover:text-blue-200';
   const handleLogout = () => {
@@ -91,7 +110,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white">
                 <HiBookOpen className="text-sm" />
               </div>
-              <span className={`font-bold text-lg ${isScrolled || initialStyle === 'light' ? 'text-gray-800' : 'text-white'}`}>EasyLearnova</span>
+              <span className={`font-bold text-lg ${isScrolled || initialStyle === 'light' || (isMobile && isCourseDetailPage) ? 'text-gray-800' : 'text-white'}`}>EasyLearnova</span>
             </Link>
           </div>
           
@@ -145,13 +164,17 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <div className="hidden md:flex items-center space-x-4">
                 <Link to="/auth?mode=login" 
                   className={`px-4 py-2 rounded-full font-medium transition-all duration-300 
-                    ${isScrolled || initialStyle === 'light' ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' : 'text-white border border-white hover:bg-white/10'}`}
+                    ${isScrolled || initialStyle === 'light' || (isMobile && isCourseDetailPage) ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' : 'text-white border border-white hover:bg-white/10'}`}
                 >
                   Log In
                 </Link>
                 <Link 
                   to="/auth?mode=signup" 
-                  className="px-4 py-2 rounded-full font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-shadow"
+                  className={`px-4 py-2 rounded-full font-medium transition-all duration-300 ${
+                    isScrolled || initialStyle === 'light' || (isMobile && isCourseDetailPage) 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                      : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg'
+                  }`}
                 >
                   Sign Up
                 </Link>
