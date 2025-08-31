@@ -13,6 +13,7 @@ import {
 } from 'react-icons/fa';
 import Footer from "../Footer/Footer";
 import '../../styles/mobile-courses.css';
+import logger from '../../utils/logger';
 
 const MobileFirstCourses = () => {
     const navigate = useNavigate();
@@ -118,7 +119,7 @@ const MobileFirstCourses = () => {
                         }
                     }
                 } catch (error) {
-                    console.error(`Error checking courses for ${level.apiClass}:`, error);
+                    logger.error(`Error checking courses for ${level.apiClass}:`, error);
                 }
             }
 
@@ -135,12 +136,12 @@ const MobileFirstCourses = () => {
                     }
                 }
             } catch (error) {
-                console.error('Error checking engineering courses:', error);
+                logger.error('Error checking engineering courses:', error);
             }
 
             setAvailableLevels(levelsWithCourses);
         } catch (error) {
-            console.error('Error checking course availability:', error);
+            logger.error('Error checking course availability:', error);
             // Fallback: show all levels if API fails
             setAvailableLevels(allEducationLevels);
         } finally {

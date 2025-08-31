@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import logger from '../../utils/logger';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight, FaList, FaTimes, FaPlay, FaCheck, FaBook, FaQuestionCircle, FaDownload, FaGlobe, FaArrowLeft } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
@@ -40,7 +41,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         setLoading(true);
         await fetchRegularCourse(pathParts);
       } catch (error) {
-        console.error('❌ Error fetching course data:', error);
+        logger.error('❌ Error fetching course data:', error);
         setError(error.message || 'Failed to load course data');
         setContentType('notFound');
       } finally {
@@ -115,7 +116,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               // Decode subject from URL (handles cases like "social%20science"), normalize to lowercase, then re-encode
               const subj = decodeURIComponent(subjectId || '').toLowerCase();
               apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&state=${encodeURIComponent(stateParam)}&subject=${encodeURIComponent(subj)}`;
-              console.log('🔍 Mobile: state board query URL', apiUrl);
+              logger.log('🔍 Mobile: state board query URL', apiUrl);
             } else {
               throw new Error('Invalid state board URL format');
             }
@@ -124,7 +125,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             const subjectId = pathParts[subjectIndex];
             const subj = decodeURIComponent(subjectId || '').toLowerCase();
             apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&subject=${encodeURIComponent(subj)}`;
-            console.log('📚 Mobile: CBSE query URL', apiUrl);
+            logger.log('📚 Mobile: CBSE query URL', apiUrl);
           }
         } else {
           apiUrl = `${API_BASE_URL}/courses/engineering/${courseId}/`;
@@ -132,7 +133,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
         if (!apiUrl) throw new Error('Could not determine API URL from path');
 
-        console.log('🔥 Fetching course list/details from:', apiUrl);
+  logger.log('🔥 Fetching course list/details from:', apiUrl);
         // Use shared axios instance for auth/interceptors
         const response = await axiosInstance.get(apiUrl);
 
@@ -201,7 +202,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           setActiveLesson(0);
         }
       } catch (error) {
-        console.error('❌ Error fetching course data:', error);
+        logger.error('❌ Error fetching course data:', error);
         const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
         setError(errorMessage);
         setCourse(null);
@@ -256,7 +257,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         setCourse(updatedCourse);
         
       } catch (error) {
-        console.error('❌ Error fetching user progress:', error);
+        logger.error('❌ Error fetching user progress:', error);
       }
     };
 
@@ -348,7 +349,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         toast.success(lesson.completed ? 'Lesson marked as incomplete' : 'Lesson completed!');
       }
     } catch (error) {
-      console.error('❌ Error updating lesson completion:', error);
+      logger.error('❌ Error updating lesson completion:', error);
       toast.error('Failed to update lesson progress');
     } finally {
       setSavingProgress(false);

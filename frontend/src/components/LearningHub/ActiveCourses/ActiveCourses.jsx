@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../../utils/logger';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import axios from 'axios';
@@ -32,7 +33,7 @@ const ActiveCourses = () => {
           }
         });
 
-        console.log('Enrolled courses response:', response.data);
+  logger.log('Enrolled courses response:', response.data);
 
         if (response.data.success) {
           // Format the courses for display
@@ -41,8 +42,8 @@ const ActiveCourses = () => {
             const courseType = enrollment.school_course ? 'school' : 'engineering';
             
             // Debug course data
-            console.log('🖼️ [COURSE IMAGE] Processing course:', course.title);
-            console.log('🖼️ [COURSE IMAGE] Course thumbnail from API:', course.thumbnail);
+            logger.log('🖼️ [COURSE IMAGE] Processing course:', course.title);
+            logger.log('🖼️ [COURSE IMAGE] Course thumbnail from API:', course.thumbnail);
             
             // Calculate time since enrollment for "last accessed"
             const startedDate = new Date(enrollment.started_at);
@@ -67,7 +68,7 @@ const ActiveCourses = () => {
             // Use the thumbnail URL directly from the API (backend should handle absolute URLs)
             const imageUrl = course.thumbnail || "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80";
             
-            console.log('🖼️ [COURSE IMAGE] Final image URL for', course.title, ':', imageUrl);
+            logger.log('🖼️ [COURSE IMAGE] Final image URL for', course.title, ':', imageUrl);
 
             return {
               id: course.id,
@@ -89,7 +90,7 @@ const ActiveCourses = () => {
           setEnrolledCourses(formattedCourses);
         }
       } catch (error) {
-        console.error('Error fetching enrolled courses:', error);
+        logger.error('Error fetching enrolled courses:', error);
         if (error.response?.status !== 401) {
           toast.error('Failed to load enrolled courses');
         }
@@ -102,17 +103,17 @@ const ActiveCourses = () => {
   }, [isLoggedIn]);
 
   const handleSortChange = () => {
-    console.log('🔄 Sort button clicked! Current sort:', sortBy);
+    logger.log('🔄 Sort button clicked! Current sort:', sortBy);
     const newSort = sortBy === 'recent' ? 'alphabetical' : 'recent';
     setSortBy(newSort);
-    console.log('🔄 New sort applied:', newSort);
+    logger.log('🔄 New sort applied:', newSort);
     toast.success(`Sorted by ${newSort === 'recent' ? 'Recent' : 'Alphabetical'}`);
   };
 
   const handleViewAll = () => {
-    console.log('👁️ View all button clicked! Current showAll:', showAll);
+    logger.log('👁️ View all button clicked! Current showAll:', showAll);
     setShowAll(!showAll);
-    console.log('👁️ New showAll state:', !showAll);
+    logger.log('👁️ New showAll state:', !showAll);
     toast.success(`${showAll ? 'Showing limited courses' : 'Showing all courses'}`);
   };
 
@@ -136,7 +137,7 @@ const ActiveCourses = () => {
       setEnrolledCourses(prev => prev.filter(course => course.enrollmentId !== enrollmentId));
       toast.success(`Successfully removed "${courseTitle}" from your courses`);
     } catch (error) {
-      console.error('Error removing course:', error);
+  logger.error('Error removing course:', error);
       if (error.response?.status === 404) {
         toast.error('Course enrollment not found');
       } else {
@@ -235,7 +236,7 @@ const ActiveCourses = () => {
                       alt={course.title}
                       className="w-full h-full object-cover transform transition-transform duration-300 group-hover:scale-105"
                       onError={(e) => {
-                        console.log('🖼️ [IMAGE ERROR] Failed to load image:', e.target.src, 'for course:', course.title);
+                        logger.log('🖼️ [IMAGE ERROR] Failed to load image:', e.target.src, 'for course:', course.title);
                         e.target.onerror = null;
                         
                         const fallbackImages = [
@@ -254,7 +255,7 @@ const ActiveCourses = () => {
                         }
                       }}
                       onLoad={() => {
-                        console.log('🖼️ [IMAGE SUCCESS] Successfully loaded image for course:', course.title);
+                        logger.log('🖼️ [IMAGE SUCCESS] Successfully loaded image for course:', course.title);
                       }}
                     />
                   </div>
@@ -322,7 +323,7 @@ const ActiveCourses = () => {
                           transition-colors flex items-center justify-center group-hover:shadow-md cursor-pointer relative z-10 flex-shrink-0"
                           style={{ pointerEvents: 'auto' }}
                           onClick={(e) => {
-                            console.log('Start/Continue Learning clicked for:', course.course_name, 'URL:', course.learningUrl);
+                            logger.log('Start/Continue Learning clicked for:', course.course_name, 'URL:', course.learningUrl);
                           }}
                         >
                           {course.progress > 0 ? 'Continue' : 'Start'}
@@ -379,7 +380,7 @@ const ActiveCourses = () => {
                 zIndex: 50
               }}
               onClick={(e) => {
-                console.log('Browse Courses button clicked - navigating to /courses');
+                logger.log('Browse Courses button clicked - navigating to /courses');
                 // Ensure navigation happens
                 e.stopPropagation();
               }}

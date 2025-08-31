@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../../../utils/logger';
 import { motion } from 'framer-motion';
 import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -39,7 +40,7 @@ const NinthStandard = () => {
         const availableBoards = await checkBoardAvailability('9th');
         setAvailableBoards(availableBoards);
       } catch (error) {
-        console.error('Error checking board availability:', error);
+        logger.error('Error checking board availability:', error);
         setAvailableBoards([]);
       } finally {
         setCheckingAvailability(false);
@@ -77,14 +78,13 @@ const NinthStandard = () => {
             const stateValue = stateCode === 'ts' ? 'Telangana' : 
                              stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
             
-            console.log(`Fetching state board courses: class=9th, board=state, state=${stateValue}`);
+            logger.log(`Fetching state board courses: class=9th, board=state, state=${stateValue}`);
             data = await getSchoolCourses('9th', 'state', stateValue);
           } else {
-            console.log(`Fetching courses: class=9th, board=${selectedBoard}`);
+            logger.log(`Fetching courses: class=9th, board=${selectedBoard}`);
             data = await getSchoolCourses('9th', selectedBoard);
           }
-
-          console.log('API returned courses:', data);
+          logger.log('API returned courses:', data);
 
           const filteredCourses = data.filter(course => {
             const classMatch = course.class_level === '9th';
@@ -102,7 +102,7 @@ const NinthStandard = () => {
 
           setCourses(filteredCourses);
         } catch (error) {
-          console.error('Error fetching courses:', error);
+          logger.error('Error fetching courses:', error);
           setCourses([]);
         }
         setLoading(false);

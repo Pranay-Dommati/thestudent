@@ -16,6 +16,7 @@ import AILearningPlans from './AILearningPlans/AILearningPlans';
 import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
 import Certificates from '../Profile/tabs/Certificates';
 import axios from 'axios';
+import logger from '../../utils/logger';
 
 const API_URL = 'http://localhost:8000';
 
@@ -84,7 +85,7 @@ const MobileLearningHubPage = () => {
           setLearningStats(response.data.analytics);
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        logger.error('Error fetching data:', error);
       }
     };
 

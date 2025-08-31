@@ -8,6 +8,7 @@ import Navbar from '../Navbar/Navbar';
 import Footer from '../Footer/Footer';
 import { useAuth } from '../../context/AuthContext';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
+import logger from '../../utils/logger';
 
 const API_URL = 'http://localhost:8000';
 
@@ -61,10 +62,10 @@ const SchoolCourseDetails = () => {
 
       setIsEnrolled(response.data.is_enrolled || false);
     } catch (error) {
-      console.error('Error checking enrollment status:', error);
+      logger.error('Error checking enrollment status:', error);
       // If the enrollment status endpoint doesn't exist yet, assume not enrolled
       if (error.response?.status === 404 || error.response?.status === 401) {
-        console.log('Enrollment status endpoint not available, assuming not enrolled');
+        logger.log('Enrollment status endpoint not available, assuming not enrolled');
         setIsEnrolled(false);
       } else {
         setIsEnrolled(false);
@@ -89,7 +90,7 @@ const SchoolCourseDetails = () => {
         const subject = subjectId || '';
         const state = stateId || '';
 
-        console.log('Fetching course with params:', { classLevel, board, subject, state });
+  logger.log('Fetching course with params:', { classLevel, board, subject, state });
         
         // Build API URL to fetch courses matching the parameters
         let apiUrl = `${API_URL}/api/courses/school/?class=${classLevel}`;
@@ -106,11 +107,11 @@ const SchoolCourseDetails = () => {
           apiUrl += `&state=${stateValue}`;
         }
         
-        console.log('API URL:', apiUrl);
+  logger.log('API URL:', apiUrl);
         
         // Fetch courses matching these parameters
-        const response = await axios.get(apiUrl);
-        console.log('API response:', response.data);
+  const response = await axios.get(apiUrl);
+  logger.log('API response:', response.data);
         
         // Find the course matching the subject
         let courseData = null;
@@ -118,17 +119,17 @@ const SchoolCourseDetails = () => {
           courseData = response.data.find(c => 
             c.subject.toLowerCase() === subject.toLowerCase()
           );
-          console.log('Found matching course:', courseData);
+          logger.log('Found matching course:', courseData);
         }
         
         if (!courseData) {
-          console.warn('No matching course found');
+          logger.warn('No matching course found');
           throw new Error('Course not found');
         }
         
         // Debug key topics and learning points specifically
-        console.log('Key Topics Raw:', courseData.key_topics);
-        console.log('Learning Points Raw:', courseData.learning_points);
+        logger.log('Key Topics Raw:', courseData.key_topics);
+        logger.log('Learning Points Raw:', courseData.learning_points);
         
         // Format the board display value properly
         let displayBoard = courseData.board.toUpperCase();
@@ -153,7 +154,7 @@ const SchoolCourseDetails = () => {
           try {
             keyTopics = JSON.parse(keyTopics);
           } catch (e) {
-            console.error('Error parsing key_topics:', e);
+            logger.error('Error parsing key_topics:', e);
             keyTopics = [];
           }
         }
@@ -162,7 +163,7 @@ const SchoolCourseDetails = () => {
           try {
             learningPoints = JSON.parse(learningPoints);
           } catch (e) {
-            console.error('Error parsing learning_points:', e);
+            logger.error('Error parsing learning_points:', e);
             learningPoints = [];
           }
         }
@@ -201,8 +202,8 @@ const SchoolCourseDetails = () => {
         };
         
         // Debug key topics and learning points after processing
-        console.log('Processed Key Topics:', formattedCourse.keyTopics);
-        console.log('Processed Learning Points:', formattedCourse.whatYouLearn);
+  logger.log('Processed Key Topics:', formattedCourse.keyTopics);
+  logger.log('Processed Learning Points:', formattedCourse.whatYouLearn);
         
         setCourse(formattedCourse);
         
@@ -211,7 +212,7 @@ const SchoolCourseDetails = () => {
           checkEnrollmentStatus(formattedCourse.id);
         }
       } catch (error) {
-        console.error('Error fetching course:', error);
+        logger.error('Error fetching course:', error);
         toast.error('Failed to load course details');
         
         // Fallback to dummy data in case of error
@@ -260,13 +261,13 @@ const SchoolCourseDetails = () => {
   // Activity tracking for learning time
   useEffect(() => {
     if (isLoggedIn) {
-      console.log('🎯 Starting activity tracking for School Course Details page');
+      logger.log('🎯 Starting activity tracking for School Course Details page');
       startLearningTracking();
     }
 
     return () => {
       if (isLoggedIn) {
-        console.log('🛑 Stopping activity tracking for School Course Details page');
+        logger.log('🛑 Stopping activity tracking for School Course Details page');
         stopLearningTracking();
       }
     };
@@ -282,7 +283,7 @@ const SchoolCourseDetails = () => {
     try {
       // If user is already enrolled, navigate directly to learning page
       if (isEnrolled) {
-        console.log('User already enrolled, navigating directly to learning page');
+        logger.log('User already enrolled, navigating directly to learning page');
         toast.success('Welcome back! Continuing your learning journey.');
         navigate(`${location.pathname}/learning`);
         return;
@@ -306,7 +307,7 @@ const SchoolCourseDetails = () => {
         subject: subject
       };
 
-      console.log('Enrolling in course with data:', enrollmentData);
+  logger.log('Enrolling in course with data:', enrollmentData);
 
       const token = localStorage.getItem('accessToken');
       const response = await axios.post(`${API_URL}/api/courses/enroll/`, enrollmentData, {
@@ -328,7 +329,7 @@ const SchoolCourseDetails = () => {
         navigate(`${location.pathname}/learning`);
       }
     } catch (error) {
-      console.error('Error enrolling in course:', error);
+      logger.error('Error enrolling in course:', error);
       if (error.response?.data?.error) {
         toast.error(error.response.data.error);
       } else {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCheck, FaSync } from 'react-icons/fa';
 import proContentManager from '../../../services/ProContentManager.js';
+import logger from '../../../utils/logger';
 
 const SavedPlaylists = () => {
   const [activeTab, setActiveTab] = useState('courses');
@@ -38,7 +39,7 @@ const SavedPlaylists = () => {
 
       if (response.ok) {
         const coursesData = await response.json();
-        console.log('📊 Fetched Pro Learning courses:', coursesData);
+        logger.log('📊 Fetched Pro Learning courses:', coursesData);
         setLearningPlans(coursesData);
         setRetryCount(0); // Reset retry count on success
       } else if (response.status === 401) {
@@ -51,11 +52,11 @@ const SavedPlaylists = () => {
       }
       
     } catch (err) {
-      console.error('❌ Error loading Pro Learning courses:', err);
+      logger.error('❌ Error loading Pro Learning courses:', err);
       
       // Retry logic
       if (currentRetry < MAX_RETRIES) {
-        console.log(`🔄 Retrying... Attempt ${currentRetry + 1}/${MAX_RETRIES}`);
+        logger.log(`🔄 Retrying... Attempt ${currentRetry + 1}/${MAX_RETRIES}`);
         setTimeout(() => {
           fetchStoredCourses(currentRetry + 1);
         }, 1000 * (currentRetry + 1)); // Exponential backoff

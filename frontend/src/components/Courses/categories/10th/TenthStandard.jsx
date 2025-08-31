@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../../../utils/logger';
 import { motion } from 'framer-motion';
 import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -41,7 +42,7 @@ const TenthStandard = () => {
         const availableBoards = await checkBoardAvailability('10th');
         setAvailableBoards(availableBoards);
       } catch (error) {
-        console.error('Error checking board availability:', error);
+        logger.error('Error checking board availability:', error);
         setAvailableBoards([]);
       } finally {
         setCheckingAvailability(false);
@@ -82,14 +83,13 @@ const TenthStandard = () => {
             const stateValue = stateCode === 'ts' ? 'Telangana' : 
                              stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
             
-            console.log(`Fetching state board courses: class=10th, board=state, state=${stateValue}`);
+            logger.log(`Fetching state board courses: class=10th, board=state, state=${stateValue}`);
             data = await getSchoolCourses('10th', 'state', stateValue);
           } else {
-            console.log(`Fetching courses: class=10th, board=${selectedBoard}`);
+            logger.log(`Fetching courses: class=10th, board=${selectedBoard}`);
             data = await getSchoolCourses('10th', selectedBoard);
           }
-
-          console.log('API returned courses:', data);
+          logger.log('API returned courses:', data);
 
           // Filter courses for exact matches but do not double-filter by board
           // since the API should already return correct board courses
@@ -105,7 +105,7 @@ const TenthStandard = () => {
               stateMatch = course.state === stateValue;
             }
             
-            console.log(`Filtering course:`, {
+            logger.log(`Filtering course:`, {
               course: course.title,
               class: course.class_level,
               board: course.board,
@@ -120,10 +120,10 @@ const TenthStandard = () => {
             return classMatch && stateMatch;
           });
 
-          console.log('Filtered courses:', filteredCourses);
+          logger.log('Filtered courses:', filteredCourses);
           setCourses(filteredCourses);
         } catch (error) {
-          console.error("Error fetching courses:", error);
+          logger.error("Error fetching courses:", error);
         } finally {
           setLoading(false);
         }
@@ -141,7 +141,7 @@ const TenthStandard = () => {
         setAvailableStates(availableStates);
         setShowStateBoards(true);
       } catch (error) {
-        console.error('Error checking state availability:', error);
+        logger.error('Error checking state availability:', error);
         setAvailableStates([]);
         setShowStateBoards(true);
       } finally {
@@ -154,9 +154,7 @@ const TenthStandard = () => {
   };
 
   const handleStateSelect = (stateId) => {
-    console.log('State selected:', stateId);
     const to = `/courses/10th/state/${stateId}`;
-    console.log('Navigating to:', to);
     navigate(to);
     setShowStateBoards(false);
   };

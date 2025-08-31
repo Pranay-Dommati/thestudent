@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { FaBrain, FaGraduationCap, FaChartLine } from 'react-icons/fa';
 import { getLearningStats } from '../../services/activityTracker';
 import axios from 'axios';
+import logger from '../../utils/logger';
 
 const API_URL = 'http://localhost:8000';
 
@@ -50,7 +51,7 @@ const MobileLearningHubPage = () => {
           setLearningStats(stats);
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        logger.error('Error fetching data:', error);
       }
     };
 

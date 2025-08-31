@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { FaRocket, FaBookOpen, FaBrain, FaGraduationCap, FaCertificate } from 'react-icons/fa';
 import { getLearningStats } from '../../services/activityTracker';
 import axios from 'axios';
+import logger from '../../utils/logger';
 
 const API_URL = 'http://localhost:8000';
 
@@ -24,34 +25,34 @@ const LearningHubPage = () => {
   });
   
   // Track component renders
-  console.log('🎯 [COMPONENT] LearningHubPage rendered - timestamp:', new Date().toISOString());
-  console.log('🎯 [COMPONENT] Current isLoggedIn:', isLoggedIn);
-  console.log('🎯 [COMPONENT] Current authUser:', authUser);
-  console.log('🎯 [COMPONENT] Current learningStats:', learningStats);
+  logger.log('🎯 [COMPONENT] LearningHubPage rendered - timestamp:', new Date().toISOString());
+  logger.log('🎯 [COMPONENT] Current isLoggedIn:', isLoggedIn);
+  logger.log('🎯 [COMPONENT] Current authUser:', authUser);
+  logger.log('🎯 [COMPONENT] Current learningStats:', learningStats);
   
   // Track when learningStats state changes
   useEffect(() => {
-    console.log('📊 [STATE CHANGE] learningStats state changed:', learningStats);
-    console.log('📊 [STATE CHANGE] weekly_hours:', learningStats.weekly_hours);
-    console.log('📊 [STATE CHANGE] current_streak:', learningStats.current_streak);
+  logger.log('📊 [STATE CHANGE] learningStats state changed:', learningStats);
+  logger.log('📊 [STATE CHANGE] weekly_hours:', learningStats.weekly_hours);
+  logger.log('📊 [STATE CHANGE] current_streak:', learningStats.current_streak);
   }, [learningStats]);
   
   useEffect(() => {
     const fetchData = async () => {
-      console.log('🔥 [LEARNING HUB] ========== FETCH DATA START ==========');
-      console.log('🔥 [LEARNING HUB] isLoggedIn:', isLoggedIn);
-      console.log('🔥 [LEARNING HUB] authUser:', authUser);
+  logger.log('🔥 [LEARNING HUB] ========== FETCH DATA START ==========');
+  logger.log('🔥 [LEARNING HUB] isLoggedIn:', isLoggedIn);
+  logger.log('🔥 [LEARNING HUB] authUser:', authUser);
       
       if (!isLoggedIn) {
-        console.log('🔥 [LEARNING HUB] ❌ User not logged in - skipping data fetch');
+  logger.log('🔥 [LEARNING HUB] ❌ User not logged in - skipping data fetch');
         return;
       }
 
       try {
         // Check token availability first
         const token = localStorage.getItem('accessToken');
-        console.log('🔥 [LEARNING HUB] Access token available:', !!token);
-        console.log('🔥 [LEARNING HUB] Token preview:', token ? `${token.substring(0, 20)}...` : 'null');
+  logger.log('🔥 [LEARNING HUB] Access token available:', !!token);
+  logger.log('🔥 [LEARNING HUB] Token preview:', token ? `${token.substring(0, 20)}...` : 'null');
         
         // Fetch enrolled courses count
         const coursesResponse = await axios.get(`${API_URL}/api/courses/enrolled/`, {
@@ -66,22 +67,22 @@ const LearningHubPage = () => {
         }
 
         // Fetch learning statistics
-        console.log('🔥 [LEARNING HUB] Fetching learning statistics...');
-        console.log('🔥 [LEARNING HUB] Current learningStats state before fetch:', learningStats);
+        logger.log('🔥 [LEARNING HUB] Fetching learning statistics...');
+        logger.log('🔥 [LEARNING HUB] Current learningStats state before fetch:', learningStats);
         const stats = await getLearningStats();
-        console.log('🔥 [LEARNING HUB] Learning stats received from API:', stats);
-        console.log('🔥 [LEARNING HUB] stats object type:', typeof stats);
-        console.log('🔥 [LEARNING HUB] stats.weekly_hours:', stats?.weekly_hours);
-        console.log('🔥 [LEARNING HUB] stats.current_streak:', stats?.current_streak);
+        logger.log('🔥 [LEARNING HUB] Learning stats received from API:', stats);
+        logger.log('🔥 [LEARNING HUB] stats object type:', typeof stats);
+        logger.log('🔥 [LEARNING HUB] stats.weekly_hours:', stats?.weekly_hours);
+        logger.log('🔥 [LEARNING HUB] stats.current_streak:', stats?.current_streak);
         if (stats) {
-          console.log('🔥 [LEARNING HUB] ✅ About to call setLearningStats with:', stats);
+          logger.log('🔥 [LEARNING HUB] ✅ About to call setLearningStats with:', stats);
           setLearningStats(stats);
-          console.log('🔥 [LEARNING HUB] ✅ setLearningStats called - state should update on next render');
+          logger.log('🔥 [LEARNING HUB] ✅ setLearningStats called - state should update on next render');
         } else {
-          console.log('🔥 [LEARNING HUB] ⚠️ No learning stats received - API returned null');
+          logger.log('🔥 [LEARNING HUB] ⚠️ No learning stats received - API returned null');
         }
       } catch (error) {
-        console.error('❌ Error fetching data:', error);
+        logger.error('❌ Error fetching data:', error);
       }
     };
 
@@ -98,23 +99,23 @@ const LearningHubPage = () => {
     currentStreak: learningStats?.current_streak ?? 0
   };
 
-  console.log('🔥 [USER OBJECT] ========== USER OBJECT CREATION ==========');
-  console.log('🔥 [USER OBJECT] Auth user (authUser):', authUser);
-  console.log('🔥 [USER OBJECT] 🚨 Does authUser contain hoursThisWeek?:', authUser?.hoursThisWeek);
-  console.log('🔥 [USER OBJECT] 🚨 Does authUser contain currentStreak?:', authUser?.currentStreak);
-  console.log('🔥 [USER OBJECT] 🚨 Does authUser contain weekly_hours?:', authUser?.weekly_hours);
-  console.log('🔥 [USER OBJECT] 🚨 Does authUser contain current_streak?:', authUser?.current_streak);
-  console.log('🔥 [USER OBJECT] isLoggedIn:', isLoggedIn);
-  console.log('🔥 [USER OBJECT] enrolledCoursesCount:', enrolledCoursesCount);
-  console.log('🔥 [USER OBJECT] Learning stats in state (learningStats):', learningStats);
-  console.log('🔥 [USER OBJECT] learningStats.weekly_hours (raw):', learningStats?.weekly_hours);
-  console.log('🔥 [USER OBJECT] learningStats.current_streak (raw):', learningStats?.current_streak);
-  console.log('🔥 [USER OBJECT] typeof learningStats.weekly_hours:', typeof learningStats?.weekly_hours);
-  console.log('🔥 [USER OBJECT] typeof learningStats.current_streak:', typeof learningStats?.current_streak);
-  console.log('🔥 [USER OBJECT] user.hoursThisWeek after nullish coalescing (??):', user.hoursThisWeek);
-  console.log('🔥 [USER OBJECT] user.currentStreak after nullish coalescing (??):', user.currentStreak);
-  console.log('🔥 [USER OBJECT] 🎯 FINAL USER OBJECT (this goes to HeroSection):', user);
-  console.log('🔥 [USER OBJECT] ===================================================');
+  logger.log('🔥 [USER OBJECT] ========== USER OBJECT CREATION ==========');
+  logger.log('🔥 [USER OBJECT] Auth user (authUser):', authUser);
+  logger.log('🔥 [USER OBJECT] 🚨 Does authUser contain hoursThisWeek?:', authUser?.hoursThisWeek);
+  logger.log('🔥 [USER OBJECT] 🚨 Does authUser contain currentStreak?:', authUser?.currentStreak);
+  logger.log('🔥 [USER OBJECT] 🚨 Does authUser contain weekly_hours?:', authUser?.weekly_hours);
+  logger.log('🔥 [USER OBJECT] 🚨 Does authUser contain current_streak?:', authUser?.current_streak);
+  logger.log('🔥 [USER OBJECT] isLoggedIn:', isLoggedIn);
+  logger.log('🔥 [USER OBJECT] enrolledCoursesCount:', enrolledCoursesCount);
+  logger.log('🔥 [USER OBJECT] Learning stats in state (learningStats):', learningStats);
+  logger.log('🔥 [USER OBJECT] learningStats.weekly_hours (raw):', learningStats?.weekly_hours);
+  logger.log('🔥 [USER OBJECT] learningStats.current_streak (raw):', learningStats?.current_streak);
+  logger.log('🔥 [USER OBJECT] typeof learningStats.weekly_hours:', typeof learningStats?.weekly_hours);
+  logger.log('🔥 [USER OBJECT] typeof learningStats.current_streak:', typeof learningStats?.current_streak);
+  logger.log('🔥 [USER OBJECT] user.hoursThisWeek after nullish coalescing (??):', user.hoursThisWeek);
+  logger.log('🔥 [USER OBJECT] user.currentStreak after nullish coalescing (??):', user.currentStreak);
+  logger.log('🔥 [USER OBJECT] 🎯 FINAL USER OBJECT (this goes to HeroSection):', user);
+  logger.log('🔥 [USER OBJECT] ===================================================');
 
   return (
     <>
@@ -132,9 +133,9 @@ const LearningHubPage = () => {
             hoursThisWeek: learningStats?.weekly_hours ?? 0,
             currentStreak: learningStats?.current_streak ?? 0
           };
-          console.log('🎯 [FINAL] User object being passed to HeroSection:', finalUserObject);
-          console.log('🎯 [FINAL] hoursThisWeek value:', finalUserObject.hoursThisWeek);
-          console.log('🎯 [FINAL] currentStreak value:', finalUserObject.currentStreak);
+          logger.log('🎯 [FINAL] User object being passed to HeroSection:', finalUserObject);
+          logger.log('🎯 [FINAL] hoursThisWeek value:', finalUserObject.hoursThisWeek);
+          logger.log('🎯 [FINAL] currentStreak value:', finalUserObject.currentStreak);
           return null; // This is just for logging
         })()}
         
@@ -239,7 +240,7 @@ const LearningHubPage = () => {
                         zIndex: 50
                       }}
                       onClick={(e) => {
-                        console.log('Start button clicked - navigating to /chat');
+                        logger.log('Start button clicked - navigating to /chat');
                         // Ensure navigation happens
                         e.stopPropagation();
                       }}
@@ -271,7 +272,7 @@ const LearningHubPage = () => {
                         zIndex: 50
                       }}
                       onClick={(e) => {
-                        console.log('Browse button clicked - navigating to /courses');
+                        logger.log('Browse button clicked - navigating to /courses');
                         // Ensure navigation happens
                         e.stopPropagation();
                       }}

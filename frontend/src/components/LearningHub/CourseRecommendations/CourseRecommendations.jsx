@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import logger from '../../../utils/logger';
 import { Link } from 'react-router-dom';
 
 // Mock data for recommended courses
@@ -253,7 +254,7 @@ const CourseRecommendations = () => {
               position: 'relative'
             }}
             onClick={() => {
-              console.log('🔥 [VIEW ALL] Course recommendations link clicked - navigating to /courses');
+              logger.log('🔥 [VIEW ALL] Course recommendations link clicked - navigating to /courses');
             }}
           >
             View all recommendations

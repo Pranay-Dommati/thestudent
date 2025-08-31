@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { FaGraduationCap, FaBook, FaUniversity, FaLaptopCode } from 'react-icons/fa';
 import Footer from "../Footer/Footer";
 import CourseHero from "./CourseHero/CourseHero";
+import logger from '../../utils/logger';
 
 const Courses = () => {
     const navigate = useNavigate();
@@ -90,7 +91,7 @@ const Courses = () => {
                         }
                     }
                 } catch (error) {
-                    console.error(`Error checking courses for ${level.apiClass}:`, error);
+                    logger.error(`Error checking courses for ${level.apiClass}:`, error);
                 }
             }
 
@@ -107,12 +108,12 @@ const Courses = () => {
                     }
                 }
             } catch (error) {
-                console.error('Error checking engineering courses:', error);
+                logger.error('Error checking engineering courses:', error);
             }
 
             setAvailableLevels(levelsWithCourses);
         } catch (error) {
-            console.error('Error checking course availability:', error);
+            logger.error('Error checking course availability:', error);
             // Fallback: show all levels if API fails
             setAvailableLevels(allEducationLevels);
         } finally {

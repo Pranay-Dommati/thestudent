@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { getEngineeringCourses } from '../../../../../services/courseApi';
+import logger from '../../../../../utils/logger';
 import CourseCard from '../CourseCard/CourseCard';
 
 const API_URL = 'http://localhost:8000';
@@ -16,10 +17,10 @@ const CourseListings = ({ category, filters }) => {
             setError(null);
             try {
                 const data = await getEngineeringCourses(category);
-                console.log('Fetched courses:', data);
+                logger.log('Fetched courses:', data);
                 setCourses(Array.isArray(data) ? data : []);
             } catch (error) {
-                console.error('Error fetching courses:', error);
+                logger.error('Error fetching courses:', error);
                 setError('Failed to load courses');
                 toast.error(error.response?.data?.details || 'Failed to load courses');
             } finally {

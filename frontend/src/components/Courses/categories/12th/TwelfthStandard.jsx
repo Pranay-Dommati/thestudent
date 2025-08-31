@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../../../utils/logger';
 import { motion } from 'framer-motion';
 import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -94,14 +95,13 @@ const TwelfthStandard = () => {
             const stateValue = stateCode === 'ts' ? 'Telangana' : 
                              stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
             
-            console.log(`Fetching state board courses: class=12th, board=state, state=${stateValue}`);
+            logger.log(`Fetching state board courses: class=12th, board=state, state=${stateValue}`);
             data = await getSchoolCourses('12th', 'state', stateValue);
           } else {
-            console.log(`Fetching courses: class=12th, board=${selectedBoard}`);
+            logger.log(`Fetching courses: class=12th, board=${selectedBoard}`);
             data = await getSchoolCourses('12th', selectedBoard);
           }
-
-          console.log('API returned courses:', data);
+          logger.log('API returned courses:', data);
           
           const filteredCourses = data.filter(course => {
             const classMatch = course.class_level === '12th';
@@ -117,10 +117,10 @@ const TwelfthStandard = () => {
             return classMatch && stateMatch;
           });
 
-          console.log('Filtered courses:', filteredCourses);
+          logger.log('Filtered courses:', filteredCourses);
           setCourses(filteredCourses);
         } catch (error) {
-          console.error("Error fetching 12th standard courses:", error);
+          logger.error("Error fetching 12th standard courses:", error);
         } finally {
           setLoading(false);
         }
@@ -207,8 +207,6 @@ const TwelfthStandard = () => {
           ) : courses.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {courses.map((course) => {
-                console.log("Rendering course:", course.subject, course.board, course.state);
-                
                 return (
                   <Link 
                     to={selectedBoard.includes('state') 
