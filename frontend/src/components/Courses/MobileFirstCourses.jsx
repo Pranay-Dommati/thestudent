@@ -29,8 +29,8 @@ const MobileFirstCourses = () => {
             id: '6th', 
             name: '6th Standard', 
             icon: FaBook,
-            description: 'Foundation courses for 6th grade',
-            subjects: ['Math', 'Science', 'English'],
+            description: 'Board-wise Preparation',
+            subjects: ['CBSE', 'State Boards'],
             difficulty: 'Beginner',
             apiClass: '6th'
         },
@@ -38,8 +38,8 @@ const MobileFirstCourses = () => {
             id: '7th', 
             name: '7th Standard', 
             icon: FaBook,
-            description: 'Foundation courses for 7th grade',
-            subjects: ['Math', 'Science', 'English', 'Social'],
+            description: 'Board-wise Preparation',
+            subjects: ['CBSE', 'State Boards'],
             difficulty: 'Beginner',
             apiClass: '7th'
         },
@@ -47,8 +47,8 @@ const MobileFirstCourses = () => {
             id: '8th', 
             name: '8th Standard', 
             icon: FaBook,
-            description: 'Foundation courses for 8th grade',
-            subjects: ['Math', 'Science', 'English', 'Social'],
+            description: 'Board-wise Preparation',
+            subjects: ['CBSE', 'State Boards'],
             difficulty: 'Beginner',
             apiClass: '8th'
         },
@@ -56,8 +56,8 @@ const MobileFirstCourses = () => {
             id: '9th', 
             name: '9th Standard', 
             icon: FaGraduationCap,
-            description: 'Foundation courses for 9th grade',
-            subjects: ['Math', 'Physics', 'Chemistry', 'Biology'],
+            description: 'Board-wise Preparation',
+            subjects: ['CBSE', 'State Boards'],
             difficulty: 'Intermediate',
             apiClass: '9th'
         },
@@ -65,8 +65,8 @@ const MobileFirstCourses = () => {
             id: '10th', 
             name: '10th Standard', 
             icon: FaBook,
-            description: 'Board exam preparation',
-            subjects: ['Math', 'Physics', 'Chemistry', 'Biology'],
+            description: 'Board-wise Preparation',
+            subjects: ['CBSE', 'State Boards'],
             difficulty: 'Intermediate',
             apiClass: '10th'
         },
@@ -74,8 +74,8 @@ const MobileFirstCourses = () => {
             id: '11th', 
             name: '11th Standard', 
             icon: FaGraduationCap,
-            description: 'Advanced courses for 11th grade',
-            subjects: ['Math', 'Physics', 'Chemistry', 'Biology'],
+            description: 'Board-wise Preparation',
+            subjects: ['CBSE', 'State Boards'],
             difficulty: 'Advanced',
             apiClass: '11th'
         },
@@ -83,8 +83,8 @@ const MobileFirstCourses = () => {
             id: '12th', 
             name: '12th Standard', 
             icon: FaUniversity,
-            description: 'Board & entrance exam prep',
-            subjects: ['Math', 'Physics', 'Chemistry', 'Biology'],
+            description: 'Board-wise Preparation',
+            subjects: ['CBSE', 'State Boards'],
             difficulty: 'Advanced',
             apiClass: '12th'
         },
@@ -359,6 +359,11 @@ const MobileFirstCourses = () => {
                             {subject}
                         </span>
                     ))}
+                    {level.id !== 'engineering' && (
+                        <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-medium">
+                            + More
+                        </span>
+                    )}
                     {level.subjects.length > 3 && (
                         <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-md text-xs">
                             +{level.subjects.length - 3}
