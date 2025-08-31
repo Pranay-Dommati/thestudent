@@ -31,12 +31,11 @@ const FeaturedPlaylists = () => {
           getEngineeringCourses('all') // Get all engineering courses
         ]);
         
-        console.log('Fetched school courses:', schoolCourses);
-        console.log('Fetched engineering courses:', engineeringCourses);
+  // Removed debug logs for production
         
         // Transform school courses to match our display format
         const transformedSchoolCourses = schoolCourses.map(course => {
-          console.log('Raw school course data:', course); // Debug log
+          // Removed debug log
           
           // Determine category based on class_level
           let category = 'other';
@@ -113,7 +112,7 @@ const FeaturedPlaylists = () => {
 
         // Transform engineering courses to match our display format
         const transformedEngineeringCourses = Array.isArray(engineeringCourses) ? engineeringCourses.map(course => {
-          console.log('Raw engineering course data:', course); // Debug log
+          // Removed debug log
           
           // Handle duration
           let duration = 'Duration TBA';
@@ -137,12 +136,11 @@ const FeaturedPlaylists = () => {
 
         // Combine both types of courses
         const allCourses = [...transformedSchoolCourses, ...transformedEngineeringCourses];
-        console.log('Combined courses:', allCourses);
-        console.log('Engineering courses count:', transformedEngineeringCourses.length);
+  // Removed debug logs
         
         setCourses(allCourses);
       } catch (error) {
-        console.error('Error fetching courses:', error);
+  // Swallow error in production UI; optionally report to monitoring
         // Fallback to a few sample courses if API fails
         setCourses([
           {
@@ -167,12 +165,12 @@ const FeaturedPlaylists = () => {
   
   // Function to handle course card click and navigate to course page
   const handleCourseClick = (course) => {
-    console.log('Course clicked:', course); // Debug log
+  // Removed debug log
     
     // Handle engineering courses differently
     if (course.courseType === 'engineering') {
       const navigationPath = `/courses/engineering/${course.id}`;
-      console.log('Engineering course navigation path:', navigationPath);
+  // Removed debug log
       navigate(navigationPath);
       return;
     }
@@ -181,7 +179,7 @@ const FeaturedPlaylists = () => {
     // Extract class level from course data - handle different formats
     let classPath = '';
     if (course.class_level) {
-      console.log('Class level:', course.class_level); // Debug log
+  // Removed debug log
       
       // Handle different formats: "12th", "Class 12", "12", etc.
       const classLevel = course.class_level.toLowerCase();
@@ -234,13 +232,13 @@ const FeaturedPlaylists = () => {
       navigationPath = `/courses/${classPath}/${boardPath}/${subjectPath}`;
     }
     
-    console.log('School course navigation path:', navigationPath); // Debug log
+  // Removed debug log
     
     // Navigate to course page
     if (classPath) {
       navigate(navigationPath);
     } else {
-      console.error('Could not determine class path for navigation');
+  // Navigation path not determined; no console output in production
     }
   };
   

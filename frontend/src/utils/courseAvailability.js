@@ -1,5 +1,6 @@
 import { getSchoolCourses } from '../services/courseApi';
 import { stateBoards } from '../components/Courses/data/states';
+import logger from './logger';
 
 /**
  * Check if courses are available for specific board and class combinations
@@ -39,7 +40,7 @@ export const checkBoardAvailability = async (classLevel) => {
       availableBoards.push({ ...stateBoard, available: true });
     }
   } catch (error) {
-    console.error('Error checking board availability:', error);
+    logger.error('Error checking board availability:', error);
     // Fallback: return empty array instead of showing all boards
     return [];
   }
@@ -69,7 +70,7 @@ export const checkStateAvailability = async (classLevel) => {
       }
     }
   } catch (error) {
-    console.error('Error checking state availability:', error);
+    logger.error('Error checking state availability:', error);
     // Fallback: return all states if API fails
     return stateBoards.map(state => ({ ...state, available: true }));
   }

@@ -35,7 +35,7 @@ const AIGeneratedLearningPath = () => {
       const encodedMessage = encodeURIComponent(fullPrompt);
       navigate(`/chat?mode=createCourse&message=${encodedMessage}&prefill=true`);
     } catch (error) {
-      console.error('Error generating learning path:', error);
+  // Suppressed in production: error while generating learning path
     } finally {
       setIsGenerating(false);
     }

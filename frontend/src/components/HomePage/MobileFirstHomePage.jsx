@@ -135,7 +135,7 @@ const TrendingCourses = () => {
         const allCourses = await getSchoolCourses('', '', '');
         setCourses(allCourses.slice(0, 6));
       } catch (error) {
-        console.error('Error fetching courses:', error);
+  // Suppressed in production: error fetching courses
       } finally {
         setLoading(false);
       }

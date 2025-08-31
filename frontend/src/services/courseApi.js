@@ -1,16 +1,17 @@
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import logger from '../utils/logger';
 
 const API_URL = 'http://localhost:8000'; // Adjust this to your Django backend URL
 
 export const createCourse = async (formData) => {
   try {
     // Log the data being sent for debugging
-    console.log("Sending course data to API");
+    logger.log("Sending course data to API");
 
     // Extract class_level to identify the course type
-    const courseType = formData.get('class_level') ? 'school' : 'engineering';
-    console.log(`Creating ${courseType} course...`);
+  const courseType = formData.get('class_level') ? 'school' : 'engineering';
+    logger.log(`Creating ${courseType} course...`);
     
     const response = await axios.post(`${API_URL}/api/courses/create/`, formData, {
       headers: {
@@ -19,10 +20,10 @@ export const createCourse = async (formData) => {
       withCredentials: true, // Important for CORS
     });
     
-    console.log("API response:", response.data);
+  logger.log("API response:", response.data);
     return response.data;
   } catch (error) {
-    console.error('Error creating course:', error);
+  logger.error('Error creating course:', error);
     
     if (error.response?.status === 403) {
       toast.error('Permission denied. Please check your authentication.');
@@ -43,33 +44,33 @@ export const createCourse = async (formData) => {
 export const getCourses = async () => {
   try {
     const response = await axios.get(`${API_URL}/api/courses/`);
-    return response.data;
+  return response.data;
   } catch (error) {
-    console.error('Error fetching courses:', error);
+  logger.error('Error fetching courses:', error);
     throw error;
   }
 };
 
 export const getEngineeringCourses = async (category = 'all') => {
   try {
-    console.log('Fetching courses for category:', category);
+  logger.log('Fetching courses for category:', category);
     const response = await axios.get(`${API_URL}/api/courses/engineering/?category=${category}`);
-    console.log('Course data received:', response.data);
+  logger.log('Course data received:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error fetching courses:', error);
+  logger.error('Error fetching courses:', error);
     throw error;
   }
 };
 
 export const getEngineeringCourseById = async (courseId) => {
   try {
-    console.log('Fetching course details for ID:', courseId);
+  logger.log('Fetching course details for ID:', courseId);
     const response = await axios.get(`${API_URL}/api/courses/engineering/${courseId}/`);
-    console.log('Course details received:', response.data);
+  logger.log('Course details received:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error fetching course details:', error);
+  logger.error('Error fetching course details:', error);
     throw error;
   }
 };
@@ -78,51 +79,51 @@ export const getAllCourses = async (category = 'all') => {
   try {
     // Remove any colon prefix from category if present (e.g., ":1" becomes "1")
     const cleanCategory = category.toString().replace(/^:/, '');
-    console.log('Fetching all courses for category:', cleanCategory);
+  logger.log('Fetching all courses for category:', cleanCategory);
     const response = await axios.get(`${API_URL}/api/courses/all/?category=${cleanCategory}`);
-    console.log('Course data received:', response.data);
+  logger.log('Course data received:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error fetching courses:', error);
+  logger.error('Error fetching courses:', error);
     throw error;
   }
 };
 
 export const getSchoolCourses = async (classLevel, board, state = '') => {
   try {
-    console.log(`API call: getSchoolCourses(${classLevel}, ${board}, ${state})`);
+  logger.log(`API call: getSchoolCourses(${classLevel}, ${board}, ${state})`);
     
     let url = `${API_URL}/api/courses/school/?class=${classLevel}&board=${board}`;
     if (board === 'state' && state) {
       url += `&state=${state}`;
     }
     
-    console.log(`Requesting URL: ${url}`);
+  logger.log(`Requesting URL: ${url}`);
     const response = await axios.get(url);
-    console.log(`Received ${response.data.length} courses from API`); 
+  logger.log(`Received ${response.data.length} courses from API`); 
     return response.data;
   } catch (error) {
-    console.error('Error fetching school courses:', error);
+  logger.error('Error fetching school courses:', error);
     return [];
   }
 };
 
 export const getCourseById = async (courseId) => {
   try {
-    console.log('Fetching course by ID:', courseId);
+  logger.log('Fetching course by ID:', courseId);
     const response = await axios.get(`${API_URL}/api/courses/${courseId}/`);
-    console.log('Course data received:', response.data);
+  logger.log('Course data received:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error fetching course by ID:', error);
+  logger.error('Error fetching course by ID:', error);
     throw error;
   }
 };
 
 export const updateCourse = async (courseId, formData) => {
   try {
-    console.log("Updating course with ID:", courseId);
-    console.log("Update data:", formData);
+  logger.log("Updating course with ID:", courseId);
+  logger.log("Update data:", formData);
     
     const response = await axios.put(`${API_URL}/api/courses/${courseId}/update/`, formData, {
       headers: {
@@ -131,10 +132,10 @@ export const updateCourse = async (courseId, formData) => {
       withCredentials: true,
     });
     
-    console.log("Update API response:", response.data);
+  logger.log("Update API response:", response.data);
     return response.data;
   } catch (error) {
-    console.error('Error updating course:', error);
+  logger.error('Error updating course:', error);
     
     if (error.response?.status === 403) {
       toast.error('Permission denied. Please check your authentication.');
@@ -156,16 +157,16 @@ export const updateCourse = async (courseId, formData) => {
 
 export const deleteCourse = async (courseId) => {
   try {
-    console.log("Deleting course with ID:", courseId);
+  logger.log("Deleting course with ID:", courseId);
     
     const response = await axios.delete(`${API_URL}/api/courses/${courseId}/delete/`, {
       withCredentials: true,
     });
     
-    console.log("Delete API response:", response.data);
+  logger.log("Delete API response:", response.data);
     return response.data;
   } catch (error) {
-    console.error('Error deleting course:', error);
+  logger.error('Error deleting course:', error);
     
     if (error.response?.status === 403) {
       toast.error('Permission denied. Please check your authentication.');
