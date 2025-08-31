@@ -68,8 +68,11 @@ const Navbar = ({ initialStyle = "transparent" }) => {
     };
   }, [isMobileMenuOpen, isAuthMenuOpen]);
 
-  // Check if current route is a course detail page (like /courses/6th, /courses/7th, etc.)
-  const isCourseDetailPage = location.pathname.match(/^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)/);
+  // Check if current route is a course level selection page (like /courses/6th, /courses/7th, etc.)
+  // but NOT a course detail page (like /courses/6th/state/ts/social%20science)
+  const isCourseSelectionPage = location.pathname.match(/^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)$/) && 
+                               !location.pathname.includes('/state/') && 
+                               !location.pathname.includes('/cbse');
 
   let backgroundClass = '';
   if (isScrolled) {
@@ -78,15 +81,15 @@ const Navbar = ({ initialStyle = "transparent" }) => {
     backgroundClass = 'bg-gradient-to-r from-indigo-600 to-purple-700';
   } else if (initialStyle === 'light') {
     backgroundClass = 'bg-white shadow-sm';
-  } else if (isMobile && isCourseDetailPage) {
-    // For mobile course detail pages, use light background for visibility
+  } else if (isMobile && isCourseSelectionPage) {
+    // For mobile course selection pages only (not course detail pages), use light background for visibility
     backgroundClass = 'bg-white shadow-sm';
   } else {
     // Transparent navbar for hero sections
     backgroundClass = 'bg-transparent';
   }
 
-  const textColor = (isScrolled || initialStyle === 'light' || (isMobile && isCourseDetailPage)) 
+  const textColor = (isScrolled || initialStyle === 'light' || (isMobile && isCourseSelectionPage)) 
     ? 'text-gray-700 hover:text-blue-600' 
     : 'text-white hover:text-blue-200';
   const handleLogout = () => {
@@ -110,7 +113,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white">
                 <HiBookOpen className="text-sm" />
               </div>
-              <span className={`font-bold text-lg ${isScrolled || initialStyle === 'light' || (isMobile && isCourseDetailPage) ? 'text-gray-800' : 'text-white'}`}>EasyLearnova</span>
+              <span className={`font-bold text-lg ${isScrolled || initialStyle === 'light' || (isMobile && isCourseSelectionPage) ? 'text-gray-800' : 'text-white'}`}>EasyLearnova</span>
             </Link>
           </div>
           
@@ -164,14 +167,14 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               <div className="hidden md:flex items-center space-x-4">
                 <Link to="/auth?mode=login" 
                   className={`px-4 py-2 rounded-full font-medium transition-all duration-300 
-                    ${isScrolled || initialStyle === 'light' || (isMobile && isCourseDetailPage) ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' : 'text-white border border-white hover:bg-white/10'}`}
+                    ${isScrolled || initialStyle === 'light' || (isMobile && isCourseSelectionPage) ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' : 'text-white border border-white hover:bg-white/10'}`}
                 >
                   Log In
                 </Link>
                 <Link 
                   to="/auth?mode=signup" 
                   className={`px-4 py-2 rounded-full font-medium transition-all duration-300 ${
-                    isScrolled || initialStyle === 'light' || (isMobile && isCourseDetailPage) 
+                    isScrolled || initialStyle === 'light' || (isMobile && isCourseSelectionPage) 
                       ? 'bg-blue-600 text-white hover:bg-blue-700' 
                       : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg'
                   }`}
