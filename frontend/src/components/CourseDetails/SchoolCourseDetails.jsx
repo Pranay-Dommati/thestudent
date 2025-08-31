@@ -347,7 +347,7 @@ const SchoolCourseDetails = () => {
     
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-20">
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-24 md:pt-20 pb-10 sm:pb-12">
         <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-center">
             <div className="space-y-4 sm:space-y-6">
@@ -430,7 +430,7 @@ const SchoolCourseDetails = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-12">
+  <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-8 md:py-12 pb-16 md:pb-12">
         {/* Course Features */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8 md:mb-12">
           {course.features.map((feature, index) => (

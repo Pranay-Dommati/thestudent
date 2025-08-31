@@ -130,8 +130,15 @@ const TwelfthStandard = () => {
     }
   }, [selectedBoard, stateId]);
 
+  // Add breathing room on selection screens (mobile)
+  const isBoardSelection = !selectedBoard && !showStateBoards;
+  const isStateSelection = showStateBoards;
+  const containerPadding = (isBoardSelection || isStateSelection)
+    ? 'pt-24 pb-16 md:pt-0 md:pb-0'
+    : 'pt-24 pb-24 md:pt-0 md:pb-0';
+
   return (
-    <div className="container mx-auto px-4 pt-20 md:pt-0">
+    <div className={`container mx-auto px-4 ${containerPadding}`}>
       {!selectedBoard && !showStateBoards ? (
         <>
           <BackButton 
