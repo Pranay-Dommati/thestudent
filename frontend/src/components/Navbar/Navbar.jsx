@@ -68,12 +68,16 @@ const Navbar = ({ initialStyle = "transparent" }) => {
     };
   }, [isMobileMenuOpen, isAuthMenuOpen]);
 
-  // Check if current route is a course level selection page (like /courses/6th, /courses/7th, etc.)
-  // or a course board selection page (like /courses/6th/cbse, /courses/6th/state/ts)
-  // but NOT a course detail page (like /courses/6th/cbse/telugu)
-  const isCourseSelectionPage = location.pathname.match(/^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)$/) ||
-                               (location.pathname.match(/^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/(cbse|state)/) && 
-                                !location.pathname.match(/^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/(cbse|state\/[^/]+)\/[^/]+/));
+  // Determine if current route is a course selection page (grade/board/state pickers),
+  // where the navbar should be solid (white) even at the top of the page.
+  // Includes optional trailing slashes and excludes subject/detail pages.
+  const selectionMatchers = [
+    /^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/?$/,                 // /courses/10th[/]
+    /^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/cbse\/?$/,          // /courses/10th/cbse[/]
+    /^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/state\/?$/,         // /courses/10th/state[/]
+    /^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/state\/[^/]+\/?$/   // /courses/7th/state/ap[/]
+  ];
+  const isCourseSelectionPage = selectionMatchers.some((rx) => rx.test(location.pathname));
 
   let backgroundClass = '';
   if (isScrolled) {
@@ -83,7 +87,8 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   } else if (initialStyle === 'light') {
     backgroundClass = 'bg-white shadow-sm';
   } else if (isMobile && isCourseSelectionPage) {
-    // For mobile course selection pages only (not course detail pages), use light background for visibility
+    // For course selection pages on mobile (grade/board/state), use light background for visibility.
+    // Desktop keeps the blended transparent navbar with the hero.
     backgroundClass = 'bg-white shadow-sm';
   } else {
     // Transparent navbar for hero sections

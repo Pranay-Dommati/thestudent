@@ -154,8 +154,15 @@ const EleventhStandard = () => {
     }
   };
 
+  // Add breathing room on selection screens (mobile)
+  const isBoardSelection = !selectedBoard && !showStateBoards;
+  const isStateSelection = showStateBoards;
+  const containerPadding = (isBoardSelection || isStateSelection)
+    ? 'pt-24 pb-16 md:pt-0 md:pb-0'
+    : 'pt-24 pb-24 md:pt-0 md:pb-0';
+
   return (
-    <div className="container mx-auto px-4 pt-20 md:pt-0">
+    <div className={`container mx-auto px-4 ${containerPadding}`}>
       {!selectedBoard && !showStateBoards ? (
         <>
           <BackButton 
@@ -224,37 +231,33 @@ const EleventhStandard = () => {
               <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
             </div>
           ) : courses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {courses.map((course) => {
-                console.log("Rendering course:", course.subject, course.board, course.state);
-                
+                const to = selectedBoard.includes('state')
+                  ? `/courses/11th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}`
+                  : `/courses/11th/${selectedBoard}/${course.subject.toLowerCase()}`;
                 return (
-                  <Link 
-                    to={selectedBoard.includes('state') 
-                      ? `/courses/11th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
-                      : `/courses/11th/${selectedBoard}/${course.subject.toLowerCase()}`} 
-                    key={course.id}
-                  >
+                  <Link to={to} key={`${course.id}-${course.subject}`}>
                     <motion.div 
                       whileHover={{ y: -5 }} 
-                      className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
+                      className="bg-white rounded-lg md:rounded-xl shadow-sm md:hover:shadow-lg transition-all duration-300 cursor-pointer h-full border border-gray-100"
                     >
-                      <div className="relative p-6 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-xl text-white">
+                      <div className="relative p-4 md:p-5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-lg md:rounded-t-xl text-white">
                         <div className="flex items-center justify-between">
-                          <span className="text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
-                          <FaPlay className="opacity-75" />
+                          <span className="text-xl md:text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
+                          <FaPlay className="opacity-75 text-sm md:text-base" />
                         </div>
-                        <h3 className="text-xl font-bold mt-2">{course.subject}</h3>
-                        <p className="text-white/80 text-sm mt-1">{course.duration}+ hours of content</p>
+                        <h3 className="text-lg md:text-xl font-bold mt-1 md:mt-2">{course.subject}</h3>
+                        <p className="text-white/80 text-xs md:text-sm mt-1">{course.duration}+ hours of content</p>
                       </div>
-                      <div className="p-6">
-                        <p className="text-gray-600 text-sm mb-4">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
+                      <div className="p-4 md:p-5">
+                        <p className="text-gray-600 text-sm md:text-base mb-3 md:mb-4">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             <FaBookReader className="text-indigo-600" />
                             <span className="text-sm text-gray-600">Structured Learning</span>
                           </div>
-                          <span className="text-indigo-600 text-sm font-medium">Preview Course →</span>
+                          <span className="text-indigo-600 text-xs md:text-sm font-medium">Preview Course →</span>
                         </div>
                       </div>
                     </motion.div>

@@ -51,90 +51,155 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const fetchRegularCourse = async (pathParts = pathname ? pathname.split('/').filter(Boolean) : []) => {
       try {
         const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
-        
+
         let apiUrl;
         let isSchoolCourse = false;
-        
+
         if (pathParts.includes('6th') || pathParts.includes('7th') || pathParts.includes('8th') || pathParts.includes('9th') || pathParts.includes('10th') || pathParts.includes('11th') || pathParts.includes('12th')) {
           isSchoolCourse = true;
           const classLevel = pathParts.find(part => ['6th', '7th', '8th', '9th', '10th', '11th', '12th'].includes(part));
           const board = pathParts.find(part => ['cbse', 'state'].includes(part));
-          
+
           if (board === 'state') {
             const stateIndex = pathParts.indexOf('state');
-            if (stateIndex !== -1 && stateIndex + 1 < pathParts.length) {
+            if (stateIndex !== -1 && stateIndex + 2 < pathParts.length) {
               const stateId = pathParts[stateIndex + 1];
               const subjectId = pathParts[stateIndex + 2];
               const stateMap = {
-                'ts': 'Telangana', 'ap': 'Andhra Pradesh', 'ka': 'Karnataka', 'tn': 'Tamil Nadu', 'kl': 'Kerala',
-                'mh': 'Maharashtra', 'gj': 'Gujarat', 'rj': 'Rajasthan', 'ga': 'Goa',
-                'dl': 'Delhi', 'pb': 'Punjab', 'hr': 'Haryana', 'hp': 'Himachal Pradesh', 'up': 'Uttar Pradesh', 'uk': 'Uttarakhand', 'jk': 'Jammu and Kashmir',
-                'wb': 'West Bengal', 'bh': 'Bihar', 'jh': 'Jharkhand', 'or': 'Odisha', 'as': 'Assam', 'ml': 'Meghalaya', 'mn': 'Manipur', 'mz': 'Mizoram', 'nl': 'Nagaland', 'tr': 'Tripura', 'sk': 'Sikkim', 'ar': 'Arunachal Pradesh',
-                'mp': 'Madhya Pradesh', 'cg': 'Chhattisgarh'
+                // Southern States
+                ts: 'Telangana',
+                ap: 'Andhra Pradesh',
+                ka: 'Karnataka',
+                tn: 'Tamil Nadu',
+                kl: 'Kerala',
+                // Western States
+                mh: 'Maharashtra',
+                gj: 'Gujarat',
+                rj: 'Rajasthan',
+                ga: 'Goa',
+                // Northern States
+                dl: 'Delhi',
+                pb: 'Punjab',
+                hr: 'Haryana',
+                hp: 'Himachal Pradesh',
+                up: 'Uttar Pradesh',
+                uk: 'Uttarakhand',
+                jk: 'Jammu and Kashmir',
+                // Eastern/Central
+                wb: 'West Bengal',
+                br: 'Bihar',
+                or: 'Odisha',
+                jh: 'Jharkhand',
+                mp: 'Madhya Pradesh',
+                cg: 'Chhattisgarh',
+                // North East
+                as: 'Assam',
+                sk: 'Sikkim',
+                nl: 'Nagaland',
+                mn: 'Manipur',
+                ml: 'Meghalaya',
+                tr: 'Tripura',
+                ar: 'Arunachal Pradesh',
+                mz: 'Mizoram',
+                // UTs
+                ch: 'Chandigarh',
+                an: 'Andaman and Nicobar Islands',
+                dn: 'Dadra and Nagar Haveli and Daman and Diu',
+                ld: 'Lakshadweep',
+                py: 'Puducherry',
+                la: 'Ladakh',
               };
-              const stateName = stateMap[stateId] || stateId;
-              apiUrl = `${API_BASE_URL}/courses/school/${classLevel}/${board}/${stateName}/${subjectId}/`;
+
+              const stateCode = (stateId || '').toLowerCase();
+              const stateParam = stateMap[stateCode] || stateId;
+              // Decode subject from URL (handles cases like "social%20science"), normalize to lowercase, then re-encode
+              const subj = decodeURIComponent(subjectId || '').toLowerCase();
+              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&state=${encodeURIComponent(stateParam)}&subject=${encodeURIComponent(subj)}`;
+              console.log('🔍 Mobile: state board query URL', apiUrl);
             } else {
               throw new Error('Invalid state board URL format');
             }
           } else {
-            const subjectId = pathParts[pathParts.indexOf(board) + 1];
-            apiUrl = `${API_BASE_URL}/courses/school/${classLevel}/${board}/${subjectId}/`;
+            const subjectIndex = pathParts.indexOf(board) + 1;
+            const subjectId = pathParts[subjectIndex];
+            const subj = decodeURIComponent(subjectId || '').toLowerCase();
+            apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&subject=${encodeURIComponent(subj)}`;
+            console.log('📚 Mobile: CBSE query URL', apiUrl);
           }
         } else {
           apiUrl = `${API_BASE_URL}/courses/engineering/${courseId}/`;
         }
 
-        console.log('🔥 Fetching course data from:', apiUrl);
-        const response = await axios.get(apiUrl);
-        const courseData = response.data;
+        if (!apiUrl) throw new Error('Could not determine API URL from path');
+
+        console.log('🔥 Fetching course list/details from:', apiUrl);
+        // Use shared axios instance for auth/interceptors
+        const response = await axiosInstance.get(apiUrl);
+
+        let courseData;
+        if (isSchoolCourse) {
+          if (Array.isArray(response.data) && response.data.length > 0) {
+            const picked = response.data.find(c => !!c) || response.data[0];
+            const detail = await axiosInstance.get(`/courses/school/${picked.id}/`);
+            courseData = detail.data;
+          } else {
+            throw new Error('No courses found for the specified criteria.');
+          }
+        } else {
+          courseData = response.data;
+        }
+
+        if (!courseData || (!courseData.chapters && !courseData.sections)) {
+          throw new Error('No course data found or unexpected format');
+        }
 
         const transformedCourse = {
           id: courseData.id,
           title: courseData.title || courseData.name,
           description: courseData.description,
           instructor: courseData.instructor,
-          chapters: courseData.chapters ? 
-            courseData.chapters.map((chapter) => ({
-              title: chapter.name,
-              lessons: chapter.lessons.map((lesson) => ({
-                id: lesson.id,
-                title: lesson.title,
-                type: lesson.type,
-                videoUrl: lesson.video_url,
-                description: lesson.description,
-                aboutLesson: lesson.about_lesson || lesson.aboutLesson,
-                completed: lesson.completed || false,
-                isAIGenerated: false,
-                quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
-                quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
-                resources: lesson.resources || { downloadable: [], internet: [] }
+          chapters: courseData.chapters
+            ? courseData.chapters.map((chapter) => ({
+                title: chapter.name,
+                lessons: chapter.lessons.map((lesson) => ({
+                  id: lesson.id,
+                  title: lesson.title,
+                  type: lesson.type,
+                  videoUrl: lesson.video_url,
+                  description: lesson.description,
+                  aboutLesson: lesson.about_lesson || lesson.aboutLesson,
+                  completed: lesson.completed || false,
+                  isAIGenerated: false,
+                  quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
+                  quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
+                  resources: lesson.resources || { downloadable: [], internet: [] },
+                })),
+              }))
+            : courseData.sections.map((section) => ({
+                title: section.name,
+                lessons: section.lessons.map((lesson) => ({
+                  id: lesson.id,
+                  title: lesson.title,
+                  type: lesson.type,
+                  videoUrl: lesson.video_url,
+                  description: lesson.description,
+                  aboutLesson: lesson.about_lesson || lesson.aboutLesson,
+                  completed: lesson.completed || false,
+                  isAIGenerated: false,
+                  quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
+                  quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
+                  resources: lesson.resources || { downloadable: [], internet: [] },
+                })),
               })),
-            }))
-          : courseData.sections.map((section) => ({
-              title: section.name,
-              lessons: section.lessons.map((lesson) => ({
-                id: lesson.id,
-                title: lesson.title,
-                type: lesson.type,
-                videoUrl: lesson.video_url,
-                description: lesson.description,
-                aboutLesson: lesson.about_lesson || lesson.aboutLesson,
-                completed: lesson.completed || false,
-                isAIGenerated: false,
-                quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
-                quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
-                resources: lesson.resources || { downloadable: [], internet: [] }
-              })),
-            }))
         };
 
         setCourse(transformedCourse);
-        
         if (transformedCourse.chapters.length > 0) {
           setExpandedChapters({ 0: true });
+          // Ensure first lesson is selected so content type reflects its type (video/reading/resources/quiz)
+          setActiveChapter(0);
+          setActiveLesson(0);
         }
-        
       } catch (error) {
         console.error('❌ Error fetching course data:', error);
         const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
@@ -215,6 +280,40 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     setShowMobileMenu(false); // Close mobile menu when lesson is selected
     setActiveTab('about');
   };
+
+  // Keep contentType in sync with the currently selected lesson (parity with desktop)
+  useEffect(() => {
+    if (!course || !course.chapters || course.chapters.length === 0) return;
+    const lesson = course.chapters[activeChapter]?.lessons?.[activeLesson];
+    if (!lesson) return;
+
+    const rawType = typeof lesson.type === 'string' ? lesson.type.toLowerCase() : '';
+    let derivedType = rawType;
+
+    // Heuristics if type is missing or ambiguous
+    if (!derivedType) {
+      if (lesson.quiz_questions?.length || lesson.quizQuestions?.length) derivedType = 'quiz';
+      else if (lesson.resources && !lesson.videoUrl) derivedType = 'resources';
+      else if (lesson.aboutLesson && !lesson.videoUrl) derivedType = 'instructions';
+      else derivedType = 'video';
+    }
+
+    switch (derivedType) {
+      case 'quiz':
+        setContentType('quiz');
+        break;
+      case 'reading':
+      case 'instructions':
+        setContentType('instructions');
+        break;
+      case 'resources':
+        setContentType('resources');
+        break;
+      default:
+        setContentType('video');
+        break;
+    }
+  }, [course, activeChapter, activeLesson]);
 
   const toggleChapter = (chapterIndex) => {
     setExpandedChapters(prev => ({
