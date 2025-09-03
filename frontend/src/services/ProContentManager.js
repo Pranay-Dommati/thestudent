@@ -23,36 +23,40 @@ class ProContentManager {
       return true;
     }
 
+    // Prefer loading from backend DB now
+    try {
+      const dbCourse = await this.fetchCourseFromDB(courseId);
+      if (dbCourse && dbCourse.topics) {
+        const aggregated = this.aggregateDatabaseCourse(dbCourse, courseId);
+        this.courseContentCache.set(courseId, aggregated);
+        try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(aggregated)); } catch {}
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed to initialize from backend DB, will fallback to local storage/IDB:', e);
+    }
+
+    // Fallback path: IndexedDB then localStorage for legacy data
     try {
       const idbVal = await indexedDBService.getItem(`course_content_${courseId}`);
       if (idbVal) {
         this.courseContentCache.set(courseId, idbVal);
-        // Also update localStorage for faster subsequent loads (optional but good practice)
-        try {
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(`course_content_${courseId}`, JSON.stringify(idbVal));
-          }
-        } catch (e) {
-          console.error('Failed to cache content to localStorage', e);
-        }
+        try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(idbVal)); } catch {}
         return true;
       }
     } catch (error) {
       console.error('❌ Failed to initialize course content from IndexedDB:', error);
     }
-    
-    // As a fallback, try to load from localStorage if IndexedDB fails
-    if (!this.courseContentCache.has(courseId)) {
-        try {
-            const cached = (typeof localStorage !== 'undefined') ? localStorage.getItem(`course_content_${courseId}`) : null;
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                this.courseContentCache.set(courseId, parsed);
-                return true;
-            }
-        } catch (e) {
-            console.error('Failed to load from localStorage fallback', e);
-        }
+
+    try {
+      const cached = (typeof localStorage !== 'undefined') ? localStorage.getItem(`course_content_${courseId}`) : null;
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        this.courseContentCache.set(courseId, parsed);
+        return true;
+      }
+    } catch (e) {
+      console.error('Failed to load from localStorage fallback', e);
     }
 
     return false;
@@ -150,6 +154,61 @@ class ProContentManager {
       order: q.order || 0,
       userAnswer: null // Initialize as null for quiz functionality
     }));
+  }
+
+  /**
+   * Fetch a Pro Learning course from backend
+   */
+  async fetchCourseFromDB(courseId) {
+    try {
+      // Try to read token from IndexedDB, then localStorage
+      let token = null;
+      try {
+        token = await indexedDBService.getItem('accessToken');
+      } catch {}
+      if (!token && typeof localStorage !== 'undefined') {
+        token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      }
+      if (!token) return null;
+
+      const resp = await fetch(`http://localhost:8000/api/courses/pro-learning/${courseId}/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Convert backend course shape into aggregated course_content structure
+   */
+  aggregateDatabaseCourse(dbCourse, courseId) {
+    const topicsObj = {};
+    const topics = Array.isArray(dbCourse.topics) ? dbCourse.topics : [];
+    topics.forEach((t, idx) => {
+      const name = t.topic_name || t.name || `Topic ${idx + 1}`;
+      topicsObj[name] = {
+        id: t.id || idx + 1,
+        name,
+        content: this.transformDatabaseContent(t) || {},
+        status: 'completed'
+      };
+    });
+    return {
+      courseId,
+      topics: topicsObj,
+      metadata: {
+        source: 'database',
+        updatedAt: new Date().toISOString(),
+        totalTopics: Object.keys(topicsObj).length
+      }
+    };
   }
 
   /**
@@ -359,26 +418,18 @@ class ProContentManager {
     // Store the topics in ContentStorageService
     const topicIds = contentStorageService.storeTopics(courseId, topics);
     
-    // CRITICAL: Also create/update the course_content structure in IndexedDB
-    // This ensures that getStoredTopics can find the topics on reload
+    // Create/update aggregated structure in memory (DB-first approach)
     try {
-      // Check if we already have course content
-      let courseContent = await this.getStoredCourseContent(courseId);
-      
-      if (!courseContent) {
-        // Create new course content structure
-        courseContent = {
-          courseId,
-          topics: {},
-          metadata: {
-            createdAt: new Date().toISOString(),
-            totalTopics: topics.length,
-            status: 'topics_stored'
-          }
-        };
-      }
-      
-      // Add/update topics in the course content structure
+      let courseContent = this.courseContentCache.get(courseId) || {
+        courseId,
+        topics: {},
+        metadata: {
+          createdAt: new Date().toISOString(),
+          totalTopics: topics.length,
+          status: 'topics_stored'
+        }
+      };
+
       topics.forEach((topic, index) => {
         const topicName = topic.name;
         if (!courseContent.topics[topicName]) {
@@ -390,29 +441,42 @@ class ProContentManager {
           };
         }
       });
-      
-      // Update metadata
+
       courseContent.metadata.updatedAt = new Date().toISOString();
       courseContent.metadata.totalTopics = Object.keys(courseContent.topics).length;
-      
-      // Store in IndexedDB and update cache
-      await indexedDBService.setItem(`course_content_${courseId}`, courseContent);
       this.courseContentCache.set(courseId, courseContent);
-      
-      // Also store in localStorage as fallback
+
+      // Opportunistically create a minimal course in backend if not present
       try {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent));
+        const existing = await this.fetchCourseFromDB(courseId);
+        if (!existing) {
+          let token = null;
+          try { token = await indexedDBService.getItem('accessToken'); } catch {}
+          if (!token && typeof localStorage !== 'undefined') {
+            token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+          }
+          if (token) {
+            const payload = {
+              course_id: courseId,
+              title: this.currentCourse || 'AI Generated Course',
+              topics: topics.reduce((acc, t) => {
+                acc[t.name] = { content: { reading: '', summary: '', videos: [], quiz: [], resources: [] } };
+                return acc;
+              }, {})
+            };
+            await fetch('http://localhost:8000/api/courses/pro-learning-direct/save/', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            }).catch(() => {});
+          }
         }
-      } catch (e) {
-        console.warn('Failed to store course content in localStorage:', e);
-      }
-      
-      console.log('✅ Topics stored successfully in both ContentStorageService and IndexedDB');
-      
+      } catch {}
+
+      // Keep a small localStorage cache as a fallback only
+      try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
     } catch (error) {
-      console.error('❌ Failed to store course content structure:', error);
-      // Continue with just ContentStorageService storage
+      console.error('❌ Failed to update in-memory course content structure:', error);
     }
     
     return topicIds;
@@ -653,16 +717,33 @@ class ProContentManager {
     courseContent.metadata.status = 'completed';
     courseContent.metadata.completedAt = new Date().toISOString();
     
-    // Store the complete course structure
+    // Persist aggregated content to backend (DB-first); keep local cache as fallback
     try {
-      await indexedDBService.setItem(`course_content_${courseId}`, courseContent);
-      this.courseContentCache.set(courseId, courseContent); // Update cache
-      try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
-      // Batch generated content stored successfully
-    } catch (error) {
-      try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
-      console.error('❌ Failed to store batch generated content in IndexedDB, cached in localStorage:', error);
+      // Try to upsert via direct save endpoint
+      let token = null;
+      try { token = await indexedDBService.getItem('accessToken'); } catch {}
+      if (!token && typeof localStorage !== 'undefined') {
+        token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+      }
+      if (token) {
+        const payload = {
+          course_id: courseId,
+          title: this.currentCourse || 'AI Generated Course',
+          topics: Object.fromEntries(Object.entries(courseContent.topics).map(([name, t]) => [name, { content: t.content }]))
+        };
+        await fetch('http://localhost:8000/api/courses/pro-learning-direct/save/', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Failed to persist batch to backend, will rely on cache/local fallback:', e);
     }
+
+    // Always update in-memory cache and a tiny localStorage fallback
+    this.courseContentCache.set(courseId, courseContent);
+    try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
     
     // Batch content generation completed
     return courseContent;
@@ -678,24 +759,29 @@ class ProContentManager {
     const cached = this.courseContentCache.get(courseId);
     if (cached) return cached;
 
-    // 2) Primary source: IndexedDB (wait for it)
+    // 2) Primary source: Backend DB
+    try {
+      const dbCourse = await this.fetchCourseFromDB(courseId);
+      if (dbCourse && dbCourse.topics) {
+        const aggregated = this.aggregateDatabaseCourse(dbCourse, courseId);
+        this.courseContentCache.set(courseId, aggregated);
+        try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(aggregated)); } catch {}
+        return aggregated;
+      }
+    } catch (e) {
+      console.warn('Failed to load course from backend DB:', e);
+    }
+
+    // 3) Legacy fallback: IndexedDB then localStorage
     try {
       const idbVal = await indexedDBService.getItem(`course_content_${courseId}`);
       if (idbVal) {
         this.courseContentCache.set(courseId, idbVal);
-        // Update localStorage for faster future access
-        try {
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(`course_content_${courseId}`, JSON.stringify(idbVal));
-          }
-        } catch (_) {}
+        try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(idbVal)); } catch {}
         return idbVal;
       }
-    } catch (error) {
-      console.warn('Failed to load from IndexedDB:', error);
-    }
+    } catch (_) {}
 
-    // 3) Fallback: localStorage only if IndexedDB fails
     try {
       if (typeof localStorage !== 'undefined') {
         const raw = localStorage.getItem(`course_content_${courseId}`);

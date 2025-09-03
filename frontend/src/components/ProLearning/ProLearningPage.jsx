@@ -911,6 +911,11 @@ const ProLearningPage = () => {
 
   // Load content for initially active topic using new storage system
   useEffect(() => {
+    // If this page was opened for an already-saved course (DB reload),
+    // skip this effect entirely to avoid kicking off any new generation.
+    if (loadScenario === 'reload') {
+      return;
+    }
     // Skip if we're handling URL-based topic loading directly or during direct URL generation
     if (isDirectUrlGeneration || (topicParam && !topicsList.length)) {
       return; // Let the URL topic loading useEffect handle this

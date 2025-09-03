@@ -13,6 +13,7 @@ import ErrorBoundary from '../Common/ErrorBoundary';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
 import proLearningHistoryService from '../../services/ProLearningHistoryService';
+import indexedDBService from '../../services/IndexedDBService.js';
 
 // Custom CSS - added for DeepSeek-like UI
 import './mobileChatStyles.css';
@@ -142,6 +143,7 @@ const MobileChatbotPage = () => {
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
   const [showNavMenu, setShowNavMenu] = useState(false);
   const [proLearningHistory, setProLearningHistory] = useState([]);
+  const [proLearningCourses, setProLearningCourses] = useState([]);
 
   // Check if user has visited chat page before
   useEffect(() => {
@@ -152,14 +154,34 @@ const MobileChatbotPage = () => {
     }
   }, []);
 
-  // Load ProLearning history on component mount
+  // Load ProLearning history on component mount and fetch backend courses
   useEffect(() => {
     const loadHistory = () => {
       const history = proLearningHistoryService.getHistory();
       setProLearningHistory(history);
     };
+    const loadBackendCourses = async () => {
+      try {
+        let token = null;
+        try { token = await indexedDBService.getItem('accessToken'); } catch {}
+        if (!token) {
+          token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
+        }
+        if (!token) return;
+        const resp = await fetch('http://localhost:8000/api/courses/pro-learning/', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (Array.isArray(data)) setProLearningCourses(data);
+      } catch (e) {
+        console.warn('Failed to load backend ProLearning courses (mobile):', e);
+      }
+    };
     
     loadHistory();
+    loadBackendCourses();
     
     // Listen for storage changes to update history in real-time
     const handleStorageChange = () => {
@@ -1011,7 +1033,7 @@ const MobileChatbotPage = () => {
           </div>
         </div>
         
-        {/* Quick Action Suggestions - only show when chat is empty */}
+  {/* Quick Action Suggestions - only show when chat is empty */}
         {!showTopicConfirmation && chatHistory.length === 0 && (
           <div className="px-3 pb-2 border-t border-gray-100">
             <div className="flex items-center justify-center space-x-3 py-2">
@@ -1075,6 +1097,39 @@ const MobileChatbotPage = () => {
       {/* Chat messages container */}
       <div className="flex-1 overflow-y-auto px-4 py-4 pt-20 pb-32 bg-white chat-container">
         <div className="min-h-full">
+          {/* Backend ProLearning courses preview list */}
+          {proLearningCourses && proLearningCourses.length > 0 && (
+            <div className="mb-3">
+              <div className="flex items-center mb-2">
+                <div className="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-md flex items-center justify-center mr-2">
+                  <IoSchoolOutline className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-medium text-gray-700">Your ProLearning Courses</span>
+              </div>
+              <div className="space-y-2">
+                {proLearningCourses.slice(0, 5).map((course) => {
+                  const firstTopic = Array.isArray(course.topics) && course.topics.length > 0 ? course.topics[0] : null;
+                  const topicParam = firstTopic ? `?topic=${encodeURIComponent(firstTopic.topic_name || firstTopic.name || '')}&tab=reading` : '';
+                  const href = `/pro-learning/${course.id}${topicParam}`;
+                  return (
+                    <a key={course.id} href={href} className="block p-3 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-indigo-50 rounded-lg p-2">
+                          <IoBook className="w-4 h-4 text-indigo-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm text-gray-800 truncate">{course.course_name || course.title || 'ProLearning Course'}</div>
+                          <div className="text-[10px] text-gray-500">
+                            {new Date(course.created_at).toLocaleDateString()} • {new Date(course.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {chatHistory.map((chat) => (
             <ErrorBoundary key={`error-boundary-${chat.id}`}>
               <MessageBubble key={chat.id} message={chat} />

@@ -12,6 +12,7 @@ import AuthModal from '../Common/AuthModal';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
 import proLearningHistoryService from '../../services/ProLearningHistoryService';
+import indexedDBService from '../../services/IndexedDBService.js';
 
 // Extract learning context from user's prompt
 const extractLearningContext = (prompt) => {
@@ -526,7 +527,8 @@ const ChatbotPage = () => {
   const [retryingMessageId, setRetryingMessageId] = useState(null); // Track which specific message is being retried
   const networkErrorTimeouts = useRef({}); // Store timeout IDs for network error messages
   const cancelledRetriesRef = useRef(new Set()); // Track message IDs whose retries were cancelled by a new prompt
-  const [proLearningHistory, setProLearningHistory] = useState([]); // ProLearning course history
+  const [proLearningHistory, setProLearningHistory] = useState([]); // Legacy local history (fallback)
+  const [proLearningCourses, setProLearningCourses] = useState([]); // Backend DB courses
 
   // Generate unique message ID
   const generateMessageId = () => Date.now() + Math.random();
@@ -599,14 +601,48 @@ const ChatbotPage = () => {
     }
   }, []);
 
-  // Load ProLearning history on component mount
+  // Helper to get auth token
+  const getAuthToken = async () => {
+    try {
+      const t = await indexedDBService.getItem('accessToken');
+      if (t) return t;
+    } catch {}
+    try {
+      return (
+        localStorage.getItem('accessToken') ||
+        localStorage.getItem('access_token') ||
+        localStorage.getItem('token') ||
+        null
+      );
+    } catch {
+      return null;
+    }
+  };
+
+  // Load ProLearning history (fallback) and backend courses on mount
   useEffect(() => {
     const loadHistory = () => {
       const history = proLearningHistoryService.getHistory();
       setProLearningHistory(history);
     };
-    
+    const loadBackendCourses = async () => {
+      try {
+        const token = await getAuthToken();
+        if (!token) return;
+        const resp = await fetch('http://localhost:8000/api/courses/pro-learning/', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (Array.isArray(data)) setProLearningCourses(data);
+      } catch (e) {
+        console.warn('Failed to load ProLearning courses from backend:', e);
+      }
+    };
+
     loadHistory();
+    loadBackendCourses();
     
     // Listen for storage changes to update history in real-time
     const handleStorageChange = () => {
@@ -614,9 +650,7 @@ const ChatbotPage = () => {
     };
     
     // Listen for custom history update events
-    const handleHistoryUpdate = () => {
-      loadHistory();
-    };
+  const handleHistoryUpdate = () => { loadHistory(); };
     
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('prolearning-history-updated', handleHistoryUpdate);
@@ -1890,7 +1924,7 @@ const ChatbotPage = () => {
           </button>
         </div>
         
-        {/* ProLearning Courses Section */}
+        {/* ProLearning Courses Section (from backend DB) */}
         <div className="p-4">
           <div className="bg-blue-50/80 border border-blue-200/50 rounded-xl p-4 mb-4">
             <div className="flex items-center mb-3">
@@ -1901,28 +1935,13 @@ const ChatbotPage = () => {
                 ProLearning Courses
               </h3>
             </div>
-            {proLearningHistory.length > 0 ? (
+            {proLearningCourses && proLearningCourses.length > 0 ? (
               <div className="text-sm text-gray-600 mb-1">
-                <span>Courses are <span className="text-blue-600 font-medium">temporarily stored</span>. Visit each course to save to your Learning Hub.</span>
+                <span>Your saved courses from the Learning Hub.</span>
               </div>
             ) : (
-              <div className="text-center py-2">
-                <p className="text-sm text-gray-600">
-                  Create your first customized course
-                </p>
-                <div className="mt-3 space-y-2">
-                  <p className="text-xs text-gray-500">
-                    Click 
-                    <button
-                      type="button"
-                      className="inline-block px-2 py-1 border border-indigo-200 text-indigo-600 rounded-md font-medium mx-1 hover:bg-indigo-50 focus:outline-none focus:ring-1 focus:ring-indigo-300 transition"
-                      onClick={handleCreateCourse}
-                    >
-                      Create Course
-                    </button>
-                    button to enable course creation mode
-                  </p>
-                </div>
+              <div className="text-sm text-gray-600 mb-1">
+                <span>No saved courses found. Create and save a course to see it here.</span>
               </div>
             )}
           </div>
@@ -1930,46 +1949,45 @@ const ChatbotPage = () => {
         
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto px-4 pb-4">
-          {proLearningHistory.length === 0 ? (
-            <div></div>
-          ) : (
+          {proLearningCourses && proLearningCourses.length > 0 ? (
             <div className="space-y-3">
-              {proLearningHistory.slice(0, 8).map((item, index) => (
-                <a
-                  key={item.id}
-                  href={item.url}
-                  className="block p-3 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200 group"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-indigo-50 rounded-lg p-2">
-                        <IoBook className="w-5 h-5 text-indigo-600" />
+              {proLearningCourses.slice(0, 8).map((course) => {
+                const firstTopic = Array.isArray(course.topics) && course.topics.length > 0 ? course.topics[0] : null;
+                const topicParam = firstTopic ? `?topic=${encodeURIComponent(firstTopic.topic_name || firstTopic.name || '')}&tab=reading` : '';
+                const href = `/pro-learning/${course.id}${topicParam}`;
+                return (
+                  <a
+                    key={course.id}
+                    href={href}
+                    className="block p-3 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200 group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-indigo-50 rounded-lg p-2">
+                          <IoBook className="w-5 h-5 text-indigo-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm text-gray-800 group-hover:text-blue-600">
+                            {course.course_name || course.title || 'ProLearning Course'}
+                          </div>
+                          <div className="text-xs text-gray-500 flex items-center mt-1">
+                            <span>{new Date(course.created_at).toLocaleDateString()}</span>
+                            <span className="mx-1.5">•</span>
+                            <span>{new Date(course.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-600 text-xs rounded-md">Saved</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-medium text-sm text-gray-800 group-hover:text-blue-600">
-                          {item.topic}
-                        </div>
-                        <div className="text-xs text-gray-500 flex items-center mt-1">
-                          <span>{item.dateCreated}</span>
-                          <span className="mx-1.5">•</span>
-                          <span>{item.timeCreated}</span>
-                          <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-600 text-xs rounded-md">Ready</span>
-                        </div>
+                      <div className="text-gray-400">
+                        <IoChevronForward size={18} className="group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all" />
                       </div>
                     </div>
-                    <div className="text-gray-400">
-                      <IoChevronForward size={18} className="group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all" />
-                    </div>
-                  </div>
-                </a>
-              ))}
-              
-              {proLearningHistory.length > 8 && (
-                <div className="text-xs text-gray-500 text-center py-3 border-t border-gray-200 mt-4">
-                  +{proLearningHistory.length - 8} more courses
-                </div>
-              )}
+                  </a>
+                );
+              })}
             </div>
+          ) : (
+            <div></div>
           )}
         </div>
       </div>
