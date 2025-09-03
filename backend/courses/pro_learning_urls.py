@@ -8,7 +8,6 @@ from .pro_learning_views import (
     get_course_progress,
     save_course_from_localStorage
 )
-from .simple_test_view import simple_test_view
 from .simple_django_view import save_course_from_localStorage_simple
 from .working_views import save_pro_learning_course, test_endpoint
 
@@ -36,6 +35,5 @@ urlpatterns = [
     path('save-course/', save_pro_learning_course, name='save-course'),
     path('test/', test_endpoint, name='test'),
     
-    # Simple test endpoint
-    path('test-post/', simple_test_view, name='test-post'),
+    # Simple test endpoint removed (module not present)
 ]

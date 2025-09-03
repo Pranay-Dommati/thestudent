@@ -1,8 +1,6 @@
 // ContentStorageService.js
 // Database-like content storage service for Pro Learning system
-// Internally persists to IndexedDB with a localStorage fallback
-
-import indexedDBService from './IndexedDBService.js';
+// DB-only mode: No persistence to localStorage or IndexedDB.
 
 class ContentStorageService {
   constructor() {
@@ -14,8 +12,8 @@ class ContentStorageService {
       metadata: new Map()      // general metadata storage
     };
     
-  // Initialize by loading from IndexedDB, falling back to localStorage
-  this.loadFromPersistence();
+  // DB-only: skip loading from any client persistence
+  // this.loadFromPersistence();
   }
 
   // ==================== COURSE MANAGEMENT ====================
@@ -38,7 +36,7 @@ class ContentStorageService {
     };
     
     this.storage.courses.set(courseId, course);
-  this.persistToStorage();
+  // DB-only: no client persistence
     
     return courseId;
   }
@@ -106,7 +104,7 @@ class ContentStorageService {
       console.log('📝 STORAGE DEBUG: Course updated with topicIds:', topicIds);
     }
 
-  this.persistToStorage();
+  // DB-only: no client persistence
     return topicIds;
   }
 
@@ -248,13 +246,12 @@ class ContentStorageService {
     this.storage.topics.set(topicId, topic);
     console.log('💾 STORAGE DEBUG: Topic updated with contentId:', contentId, 'topic name:', topic.name);
 
-    // Persist changes asynchronously (best-effort)
-    try { this.persistToStorage(); } catch {}
+  // DB-only: no client persistence
     } else {
       console.error('❌ STORAGE DEBUG: Topic not found for ID:', topicId);
     }
 
-  this.persistToStorage();
+  // DB-only: no client persistence
     return contentId;
   }
 
@@ -282,7 +279,7 @@ class ContentStorageService {
       topic.updatedAt = new Date().toISOString();
       this.storage.topics.set(topicId, topic);
     }
-    this.persistToStorage();
+  // DB-only: no client persistence
   }
 
   /**
@@ -433,57 +430,12 @@ class ContentStorageService {
   /**
    * Save storage to IndexedDB (preferred) with localStorage fallback
    */
-  async persistToStorage() {
-    const storageData = {
-      courses: Object.fromEntries(this.storage.courses),
-      topics: Object.fromEntries(this.storage.topics),
-      contents: Object.fromEntries(this.storage.contents),
-      metadata: Object.fromEntries(this.storage.metadata),
-      lastUpdated: new Date().toISOString()
-    };
-
-    try {
-      const ok = await indexedDBService.setItem('proLearning_storage', storageData);
-      if (!ok && typeof localStorage !== 'undefined') {
-        localStorage.setItem('proLearning_storage', JSON.stringify(storageData));
-      }
-    } catch (error) {
-      try {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('proLearning_storage', JSON.stringify(storageData));
-        }
-      } catch (inner) {
-        console.warn('Failed to persist storage (IndexedDB and localStorage):', inner || error);
-      }
-    }
-  }
+  async persistToStorage() { /* no-op in DB-only mode */ }
 
   /**
    * Load storage from IndexedDB, with localStorage fallback and auto-migration
    */
-  async loadFromPersistence() {
-    try {
-      let storageData = await indexedDBService.getItem('proLearning_storage');
-      if (!storageData && typeof localStorage !== 'undefined') {
-        const saved = localStorage.getItem('proLearning_storage');
-        storageData = saved ? JSON.parse(saved) : null;
-        if (storageData) {
-          // Backfill IndexedDB
-          await indexedDBService.setItem('proLearning_storage', storageData);
-        }
-      }
-
-      if (storageData) {
-        this.storage.courses = new Map(Object.entries(storageData.courses || {}));
-        this.storage.topics = new Map(Object.entries(storageData.topics || {}));
-        this.storage.contents = new Map(Object.entries(storageData.contents || {}));
-        this.storage.metadata = new Map(Object.entries(storageData.metadata || {}));
-        // Storage loaded from persistence
-      }
-    } catch (error) {
-      console.warn('Failed to load storage from persistence:', error);
-    }
-  }
+  async loadFromPersistence() { /* no-op in DB-only mode */ }
 
   /**
    * Clear all storage (for testing/reset)
@@ -494,8 +446,8 @@ class ContentStorageService {
     this.storage.contents.clear();
     this.storage.metadata.clear();
     
-    localStorage.removeItem('proLearning_storage');
-    console.log('🗑️ Storage cleared');
+  // DB-only: no client persistence to clear
+  console.log('🗑️ Storage cleared (memory only)');
   }
 
   /**
@@ -536,7 +488,7 @@ class ContentStorageService {
     this.storage.contents = new Map(Object.entries(storageData.contents || {}));
     this.storage.metadata = new Map(Object.entries(storageData.metadata || {}));
     
-  this.persistToStorage();
+  // DB-only: no client persistence
     // Storage imported successfully
   }
 }

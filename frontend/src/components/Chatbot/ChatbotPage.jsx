@@ -11,7 +11,7 @@ import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclas
 import AuthModal from '../Common/AuthModal';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
-import proLearningHistoryService from '../../services/ProLearningHistoryService';
+import api from '../../utils/axios';
 
 // Extract learning context from user's prompt
 const extractLearningContext = (prompt) => {
@@ -599,33 +599,48 @@ const ChatbotPage = () => {
     }
   }, []);
 
-  // Load ProLearning history on component mount
+  // Load ProLearning history from backend on component mount
   useEffect(() => {
-    const loadHistory = () => {
-      const history = proLearningHistoryService.getHistory();
-      setProLearningHistory(history);
+  const loadHistoryFromDB = async () => {
+      try {
+        const { data } = await api.get('/courses/pro-learning/');
+        // Map API courses to sidebar history items
+        const mapped = (Array.isArray(data) ? data : []).map((course) => {
+          const firstTopic = (course.topics && course.topics[0]) ? (course.topics[0].topic_name || course.topics[0].name) : null;
+          const title = course.course_name || course.title || (firstTopic ? `ProLearning: ${firstTopic}` : 'ProLearning Course');
+          const ts = course.updated_at || course.created_at;
+          return {
+            id: course.id,
+            courseId: course.id,
+            topic: firstTopic || title,
+            url: `/pro-learning/${course.id}${firstTopic ? `?topic=${encodeURIComponent(firstTopic)}&tab=reading` : ''}`,
+            title,
+            timestamp: ts ? new Date(ts).getTime() : Date.now(),
+          };
+        }).sort((a, b) => b.timestamp - a.timestamp);
+        setProLearningHistory(mapped);
+      } catch (e) {
+        console.error('Failed to load ProLearning history from DB', e);
+        setProLearningHistory([]);
+      }
     };
-    
-    loadHistory();
-    
-    // Listen for storage changes to update history in real-time
-    const handleStorageChange = () => {
-      loadHistory();
-    };
-    
-    // Listen for custom history update events
-    const handleHistoryUpdate = () => {
-      loadHistory();
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('prolearning-history-updated', handleHistoryUpdate);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('prolearning-history-updated', handleHistoryUpdate);
-    };
+
+    loadHistoryFromDB();
+    // expose refresher for manual triggers
+    setRefreshProHistory(() => loadHistoryFromDB);
   }, []);
+
+  // State + handler for manual refresh
+  const [refreshingProHistory, setRefreshingProHistory] = useState(false);
+  const [refreshProHistory, setRefreshProHistory] = useState(() => async () => {});
+  const handleRefreshHistory = async () => {
+    try {
+      setRefreshingProHistory(true);
+      await refreshProHistory();
+    } finally {
+      setRefreshingProHistory(false);
+    }
+  };
 
   // Handle ESC key to close welcome message
   useEffect(() => {
@@ -1717,42 +1732,6 @@ const ChatbotPage = () => {
                     <Link 
                       to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
                       className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1 backdrop-blur-sm"
-                      onClick={() => {
-                        // Store the topics and course data for batch generation
-                        try {
-                          const batchGenerationData = {
-                            courseId: message.courseId,
-                            topics: message.extractedTopics || [],
-                            topicString: message.topic,
-                            triggerBatchGeneration: true,
-                            timestamp: Date.now()
-                          };
-                          
-                          try {
-                            // Prefer IndexedDB for full payload; use a tiny localStorage marker to avoid quota issues
-                            void import('../../services/IndexedDBService.js')
-                              .then(({ default: idb }) => idb.setItem('proLearning_batchGeneration', batchGenerationData))
-                              .catch(() => {});
-                            // Remove any legacy large item and set a lightweight marker for navigation handoff
-                            try { localStorage.removeItem('proLearning_batchGeneration'); } catch {}
-                            localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
-                          } catch (_) {
-                            // As a last resort, store only a minimal marker
-                            try { localStorage.removeItem('proLearning_batchGeneration'); } catch {}
-                            localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
-                          }
-                          // Pro Learning Experience button clicked - batch generation data stored
-                          
-                          // Track in ProLearning history
-                          proLearningHistoryService.trackCourseCreation(message.courseId, message.topic);
-                          
-                          // Refresh history state
-                          setProLearningHistory(proLearningHistoryService.getHistory());
-                          
-                        } catch (error) {
-                          console.error('Failed to store batch generation data:', error);
-                        }
-                      }}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -1881,13 +1860,22 @@ const ChatbotPage = () => {
             </div>
             ProLearning History
           </h2>
-          <button
-            onClick={() => setIsSidebarOpen(false)}
-            className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700 transition-all duration-200"
-            aria-label="Close sidebar"
-          >
-            <IoChevronBack size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefreshHistory}
+              className={`px-3 py-1.5 text-xs rounded-md border ${refreshingProHistory ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'} text-gray-700 border-gray-200`}
+              disabled={refreshingProHistory}
+            >
+              {refreshingProHistory ? 'Refreshing…' : 'Refresh'}
+            </button>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700 transition-all duration-200"
+              aria-label="Close sidebar"
+            >
+              <IoChevronBack size={20} />
+            </button>
+          </div>
         </div>
         
         {/* ProLearning Courses Section */}
@@ -1903,7 +1891,7 @@ const ChatbotPage = () => {
             </div>
             {proLearningHistory.length > 0 ? (
               <div className="text-sm text-gray-600 mb-1">
-                <span>Courses are <span className="text-blue-600 font-medium">temporarily stored</span>. Visit each course to save to your Learning Hub.</span>
+                <span>Courses auto-save to your Learning Hub after full generation.</span>
               </div>
             ) : (
               <div className="text-center py-2">
@@ -1922,6 +1910,14 @@ const ChatbotPage = () => {
                     </button>
                     button to enable course creation mode
                   </p>
+                  <div className="pt-2">
+                    <a
+                      href="/pro-learning?tab=reading"
+                      className="inline-block px-3 py-1.5 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
+                    >
+                      Start a new Pro Learning course
+                    </a>
+                  </div>
                 </div>
               </div>
             )}

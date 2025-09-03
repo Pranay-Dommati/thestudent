@@ -5,7 +5,7 @@ import {
   IoChevronDown, IoSchoolOutline, IoHeart, IoHeartOutline,
   IoCheckmark, IoEllipsisHorizontal
 } from "react-icons/io5";
-import { FaBookmark, FaCheck, FaTrophy } from "react-icons/fa";
+import { FaTrophy } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import { Link } from "react-router-dom";
 
@@ -17,10 +17,6 @@ const ProLearningMobile = ({
   completedTopics,
   toggleTopicCompletion,
   handleTopicSelect,
-  handleSaveToLearningHub,
-  isSavingToHub,
-  savedToHub,
-  shouldShowSaveButton, // NEW: gate display of Save button
   tabs,
   renderTabContent,
   courseTitle,
@@ -110,37 +106,6 @@ const ProLearningMobile = ({
           
           <h1 className="text-lg font-semibold text-gray-900">AI Pro</h1>
           
-          {/* Simple Save Button - Only essential action in header */}
-          {(shouldShowSaveButton ?? true) && (
-            <button
-              onClick={handleSaveToLearningHub}
-              disabled={isSavingToHub || savedToHub}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                savedToHub
-                  ? "bg-green-100 text-green-700"
-                  : isSavingToHub
-                  ? "bg-gray-100 text-gray-400"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
-              }`}
-            >
-              {isSavingToHub ? (
-                <>
-                  <BiLoaderAlt className="animate-spin" size={16} />
-                  <span>Saving...</span>
-                </>
-              ) : savedToHub ? (
-                <>
-                  <FaCheck size={14} />
-                  <span>Saved</span>
-                </>
-              ) : (
-                <>
-                  <FaBookmark size={14} />
-                  <span>Save</span>
-                </>
-              )}
-            </button>
-          )}
         </div>
       </header>
 

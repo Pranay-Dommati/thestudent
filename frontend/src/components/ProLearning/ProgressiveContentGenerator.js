@@ -8,7 +8,7 @@ import {
   generateQuizContent,
   generateResourcesContent
 } from './services/index.js';
-import contentStorageService from '../../services/ContentStorageService.js';
+// In-memory, session-scoped storage only. No local/IndexedDB persistence.
 
 /**
  * Progressive content generator that generates content one tab at a time
@@ -24,6 +24,8 @@ export class ProgressiveContentGenerator {
     this.courseId = null;
     this.courseTitle = null;
     this.callbacks = {};
+  // Session-only content store keyed by topic name
+  this._contentByTopic = new Map(); // topicName -> { reading, summary, videos, quiz, resources, metadata }
     
     // Tab generation order
     this.tabOrder = [
@@ -54,25 +56,15 @@ export class ProgressiveContentGenerator {
       onError: callbacks.onError || (() => {})
     };
 
-    // Initialize course context
-    // If caller provides a courseId, prefer that to avoid picking an older course by title
+    // Initialize course context: only use the provided courseId; do not persist locally
     if (options && options.courseId) {
       this.courseId = options.courseId;
     } else {
-      // Fallback to title-based lookup (may return an older course if titles clash)
-      let course = contentStorageService.getCourseByTitle(courseTitle);
-      if (!course) {
-        this.courseId = contentStorageService.storeCourse({
-          title: courseTitle,
-          description: `AI-generated course: ${courseTitle}`
-        });
-      } else {
-        this.courseId = course.id;
-      }
+      this.courseId = null; // optional; saving to DB handled by the page once complete
     }
 
-  // Store topics
-    contentStorageService.storeTopics(this.courseId, this.topics);
+    // Reset in-memory content for these topics for a fresh session
+    this._contentByTopic.clear();
 
     return { success: true, courseId: this.courseId };
   }
@@ -299,9 +291,7 @@ export class ProgressiveContentGenerator {
    */
   async storeTabContent(topic, tabType, content) {
     const topicName = topic.name || topic;
-    console.log('💾 PROG GEN DEBUG: Storing tab content:', { topicName, tabType, courseId: this.courseId, contentLength: typeof content === 'string' ? content.length : (Array.isArray(content) ? content.length : 'object') });
-    
-    // Get existing content for this topic
+    // Get existing content for this topic from in-memory store
     let existingContent = this.getExistingTopicContent(topicName) || {
       reading: '',
       summary: '',
@@ -320,35 +310,8 @@ export class ProgressiveContentGenerator {
       lastUpdated: new Date().toISOString()
     };
 
-    // Find existing topic first - try multiple approaches
-    let topicData = null;
-    
-    // Approach 1: Look in current course topics
-    const courseTopics = contentStorageService.getTopicsForCourse(this.courseId);
-    topicData = courseTopics.find(t => t.name === topicName);
-    
-    // Approach 2: Direct lookup by name and course
-    if (!topicData) {
-      topicData = contentStorageService.getTopicByName(topicName, this.courseId);
-    }
-    
-    // Approach 3: Only create if absolutely necessary
-    if (!topicData) {
-      console.log('⚠️ PROG GEN DEBUG: Topic not found, creating new topic for:', topicName);
-      const topicId = contentStorageService.createTopic(topicName, this.courseId);
-      topicData = { id: topicId, name: topicName };
-    } else {
-      console.log('✅ PROG GEN DEBUG: Using existing topic:', topicData.id, 'for:', topicName);
-    }
-    
-    console.log('💾 PROG GEN DEBUG: Storing content for topic ID:', topicData.id);
-    const contentId = contentStorageService.storeTopicContent(topicData.id, existingContent);
-    console.log('💾 PROG GEN DEBUG: Content stored with ID:', contentId);
-
-    // Verify storage worked
-    const verifyContent = contentStorageService.getContentByTopicName(topicName, this.courseId);
-    console.log('✅ PROG GEN DEBUG: Verification - content retrieved:', !!verifyContent, verifyContent ? `has ${tabType}: ${!!(verifyContent[tabType])}` : 'none');
-
+    // Store back into in-memory map
+    this._contentByTopic.set(topicName, existingContent);
     return existingContent;
   }
 
@@ -356,25 +319,8 @@ export class ProgressiveContentGenerator {
    * Get existing content for a topic
    */
   getExistingTopicContent(topicName) {
-  // Ensure we always have a valid courseId on reloads before looking up content
-  if (!this.courseId) {
-    try {
-      // 1) Prefer currentCourseId persisted by the app
-      const fallbackId = typeof localStorage !== 'undefined' ? localStorage.getItem('currentCourseId') : null;
-      if (fallbackId) {
-        this.courseId = fallbackId;
-      }
-    } catch {}
-  }
-
-  if (!this.courseId && this.courseTitle) {
-    // 2) Fallback to course lookup by title (best-effort)
-    const course = contentStorageService.getCourseByTitle(this.courseTitle);
-    if (course?.id) this.courseId = course.id;
-  }
-
-  console.log('🔍 PROG GEN DEBUG: getExistingTopicContent', topicName, 'courseId:', this.courseId);
-  return contentStorageService.getContentByTopicName(topicName, this.courseId);
+  // Session-only: fetch from in-memory store
+  return this._contentByTopic.get(topicName) || null;
   }
 
   /**

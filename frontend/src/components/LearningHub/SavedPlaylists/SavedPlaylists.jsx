@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCheck, FaSync } from 'react-icons/fa';
-import proContentManager from '../../../services/ProContentManager.js';
 import logger from '../../../utils/logger';
 
 const SavedPlaylists = () => {

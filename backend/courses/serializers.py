@@ -243,71 +243,11 @@ class ProLearningCourseSerializer(serializers.ModelSerializer):
 
 
 class ProLearningCourseCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating a new Pro Learning course with nested topics and content"""
+    """Serializer for creating a new Pro Learning course with nested data"""
     topics_data = serializers.JSONField(write_only=True)
     
     class Meta:
         model = ProLearningCourse
-        fields = [
-            'id', 'title', 'description', 'user', 'topics_data', 
-            'proficiency', 'category', 'learning_points', 'requirements',
-            'is_published', 'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'user', 'created_at', 'updated_at']
-    
-    def create(self, validated_data):
-        topics_data = validated_data.pop('topics_data', [])
-        
-        # Create course
-        course = ProLearningCourse.objects.create(**validated_data)
-        
-        # Create topics with content
-        for topic_data in topics_data:
-            content = topic_data.get('content', {})
-            topic = ProLearningTopic.objects.create(
-                course=course,
-                name=topic_data['name'],
-                order=topic_data.get('order', 0),
-                reading_material=content.get('reading', ''),
-                summary=content.get('summary', ''),
-                is_completed=False
-            )
-            
-            # Create quiz questions
-            quiz_data = content.get('quiz', [])
-            if quiz_data and isinstance(quiz_data, list):
-                for quiz_item in quiz_data:
-                    ProLearningQuizQuestion.objects.create(
-                        topic=topic,
-                        question=quiz_item.get('question', ''),
-                        options=quiz_item.get('options', []),
-                        correct_answer=quiz_item.get('correct_answer', '')
-                    )
-            
-            # Create videos
-            videos_data = content.get('videos', [])
-            if videos_data and isinstance(videos_data, list):
-                for video_data in videos_data:
-                    ProLearningVideo.objects.create(
-                        topic=topic,
-                        title=video_data.get('title', ''),
-                        url=video_data.get('url', ''),
-                        source=video_data.get('source', '')
-                    )
-            
-            # Create resources
-            resources_data = content.get('resources', [])
-            if resources_data and isinstance(resources_data, list):
-                for resource_data in resources_data:
-                    ProLearningResource.objects.create(
-                        topic=topic,
-                        title=resource_data.get('title', ''),
-                        url=resource_data.get('url', ''),
-                        resource_type=resource_data.get('type', 'link'),
-                        description=resource_data.get('description', '')
-                    )
-        
-        return course
         fields = ['course_id', 'title', 'description', 'topics_data']
     
     def create(self, validated_data):

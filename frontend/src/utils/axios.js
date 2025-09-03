@@ -1,5 +1,4 @@
 import axios from 'axios';
-import indexedDBService from '../services/IndexedDBService.js';
 
 const instance = axios.create({
   baseURL: 'http://localhost:8000/api',  // Your Django backend URL with /api prefix
@@ -12,19 +11,8 @@ const instance = axios.create({
 // Note: Axios request interceptors can be async to await token from IndexedDB
 instance.interceptors.request.use(
   async (config) => {
-    // Prefer the freshest token from localStorage and keep IndexedDB in sync.
-    let token = null;
-    if (typeof localStorage !== 'undefined') {
-      token = localStorage.getItem('accessToken');
-      if (token) {
-        // Always sync latest token into IndexedDB to avoid stale values
-        indexedDBService.setItem('accessToken', token);
-      }
-    }
-    // Fallback to IndexedDB only if nothing in localStorage
-    if (!token) {
-      token = await indexedDBService.getItem('accessToken');
-    }
+  // Prefer the freshest token from localStorage only (no IndexedDB persistence)
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
@@ -103,7 +91,6 @@ instance.interceptors.response.use(
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('accessToken', newAccess);
         }
-        indexedDBService.setItem('accessToken', newAccess);
 
         // Notify queued subscribers
         onRefreshed(newAccess);
@@ -118,7 +105,6 @@ instance.interceptors.response.use(
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
         }
-        indexedDBService.removeItem('accessToken');
         onRefreshed(null);
         return Promise.reject(refreshErr);
       } finally {

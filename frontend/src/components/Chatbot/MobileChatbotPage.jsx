@@ -12,7 +12,7 @@ import AuthModal from '../Common/AuthModal';
 import ErrorBoundary from '../Common/ErrorBoundary';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
-import proLearningHistoryService from '../../services/ProLearningHistoryService';
+import api from '../../utils/axios';
 
 // Custom CSS - added for DeepSeek-like UI
 import './mobileChatStyles.css';
@@ -142,6 +142,7 @@ const MobileChatbotPage = () => {
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
   const [showNavMenu, setShowNavMenu] = useState(false);
   const [proLearningHistory, setProLearningHistory] = useState([]);
+  const [refreshingProHistory, setRefreshingProHistory] = useState(false);
 
   // Check if user has visited chat page before
   useEffect(() => {
@@ -152,33 +153,45 @@ const MobileChatbotPage = () => {
     }
   }, []);
 
-  // Load ProLearning history on component mount
+  // Load ProLearning history from backend on component mount
   useEffect(() => {
-    const loadHistory = () => {
-      const history = proLearningHistoryService.getHistory();
-      setProLearningHistory(history);
+  const loadHistoryFromDB = async () => {
+      try {
+        const { data } = await api.get('/courses/pro-learning/');
+        const mapped = (Array.isArray(data) ? data : []).map((course) => {
+          const firstTopic = (course.topics && course.topics[0]) ? (course.topics[0].topic_name || course.topics[0].name) : null;
+          const title = course.course_name || course.title || (firstTopic ? `ProLearning: ${firstTopic}` : 'ProLearning Course');
+          const ts = course.updated_at || course.created_at;
+          return {
+            id: course.id,
+            courseId: course.id,
+            topic: firstTopic || title,
+            url: `/pro-learning/${course.id}${firstTopic ? `?topic=${encodeURIComponent(firstTopic)}&tab=reading` : ''}`,
+            title,
+            timestamp: ts ? new Date(ts).getTime() : Date.now(),
+          };
+        }).sort((a, b) => b.timestamp - a.timestamp);
+        setProLearningHistory(mapped);
+      } catch (e) {
+        console.error('Failed to load ProLearning history from DB', e);
+        setProLearningHistory([]);
+      }
     };
-    
-    loadHistory();
-    
-    // Listen for storage changes to update history in real-time
-    const handleStorageChange = () => {
-      loadHistory();
-    };
-    
-    // Listen for custom history update events
-    const handleHistoryUpdate = () => {
-      loadHistory();
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('prolearning-history-updated', handleHistoryUpdate);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('prolearning-history-updated', handleHistoryUpdate);
-    };
+    loadHistoryFromDB();
+
+    // Expose a local refresh handler
+    setRefreshProHistory(() => loadHistoryFromDB);
   }, []);
+
+  const [refreshProHistory, setRefreshProHistory] = useState(() => async () => {});
+  const handleRefreshHistory = async () => {
+    try {
+      setRefreshingProHistory(true);
+      await refreshProHistory();
+    } finally {
+      setRefreshingProHistory(false);
+    }
+  };
 
   // Random course placeholder texts - Topic focused (same as desktop)
   const coursePlaceholders = [
@@ -852,41 +865,6 @@ const MobileChatbotPage = () => {
                     <Link 
                       to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
                       className="block w-full p-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg"
-                      onClick={() => {
-                        // Store the topics and course data for batch generation (same as desktop)
-                        try {
-                          const batchGenerationData = {
-                            courseId: message.courseId,
-                            topics: message.extractedTopics || [],
-                            topicString: message.topic,
-                            triggerBatchGeneration: true,
-                            timestamp: Date.now()
-                          };
-                          
-                          try {
-                            void import('../../services/IndexedDBService.js')
-                              .then(({ default: idb }) => idb.setItem('proLearning_batchGeneration', batchGenerationData))
-                              .catch(() => {});
-                            // Remove legacy large item and set a lightweight marker for navigation handoff
-                            try { localStorage.removeItem('proLearning_batchGeneration'); } catch {}
-                            localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
-                          } catch (_) {
-                            // As a last resort, store only a minimal marker
-                            try { localStorage.removeItem('proLearning_batchGeneration'); } catch {}
-                            localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
-                          }
-                          console.log('🚀 Mobile Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
-                          
-                          // Track in ProLearning history
-                          proLearningHistoryService.trackCourseCreation(message.courseId, message.topic);
-                          
-                          // Refresh history state
-                          setProLearningHistory(proLearningHistoryService.getHistory());
-                          
-                        } catch (error) {
-                          console.error('Failed to store batch generation data:', error);
-                        }
-                      }}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -981,8 +959,22 @@ const MobileChatbotPage = () => {
                       <span className="font-medium text-sm text-gray-700">ProLearning History</span>
                     </div>
                     
+                    <div className="flex items-center justify-between ml-6 mb-2">
+                      <div className="text-xs text-gray-500">{proLearningHistory.length === 0 ? 'No history yet' : 'Your saved courses'}</div>
+                      <button
+                        onClick={async () => { setRefreshingProHistory(true); await loadHistoryFromDB(); setRefreshingProHistory(false); setShowNavMenu(false); }}
+                        className={`text-xs px-2 py-1 rounded-md border ${refreshingProHistory ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'} text-gray-700 border-gray-200`}
+                        disabled={refreshingProHistory}
+                      >
+                        {refreshingProHistory ? 'Refreshing…' : 'Refresh'}
+                      </button>
+                    </div>
                     {proLearningHistory.length === 0 ? (
-                      <div className="text-xs text-gray-500 ml-6">No history yet</div>
+                      <div className="ml-6 mt-1">
+                        <a href="/pro-learning?tab=reading" className="inline-block px-3 py-1.5 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700">
+                          Start a new Pro Learning course
+                        </a>
+                      </div>
                     ) : (
                       <div className="ml-6 max-h-64 overflow-y-auto">
                         {proLearningHistory.slice(0, 10).map((item, index) => (
