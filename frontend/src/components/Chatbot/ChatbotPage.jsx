@@ -1862,13 +1862,6 @@ const ChatbotPage = () => {
           </h2>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleRefreshHistory}
-              className={`px-3 py-1.5 text-xs rounded-md border ${refreshingProHistory ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'} text-gray-700 border-gray-200`}
-              disabled={refreshingProHistory}
-            >
-              {refreshingProHistory ? 'Refreshing…' : 'Refresh'}
-            </button>
-            <button
               onClick={() => setIsSidebarOpen(false)}
               className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700 transition-all duration-200"
               aria-label="Close sidebar"
@@ -1889,7 +1882,7 @@ const ChatbotPage = () => {
                 ProLearning Courses
               </h3>
             </div>
-            {proLearningHistory.length > 0 ? (
+    {proLearningHistory.length > 0 ? (
               <div className="text-sm text-gray-600 mb-1">
                 <span>Courses auto-save to your Learning Hub after full generation.</span>
               </div>
@@ -1910,14 +1903,7 @@ const ChatbotPage = () => {
                     </button>
                     button to enable course creation mode
                   </p>
-                  <div className="pt-2">
-                    <a
-                      href="/pro-learning?tab=reading"
-                      className="inline-block px-3 py-1.5 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
-                    >
-                      Start a new Pro Learning course
-                    </a>
-                  </div>
+      {/* Removed extra start button to avoid duplication */}
                 </div>
               </div>
             )}

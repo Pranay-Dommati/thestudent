@@ -961,20 +961,9 @@ const MobileChatbotPage = () => {
                     
                     <div className="flex items-center justify-between ml-6 mb-2">
                       <div className="text-xs text-gray-500">{proLearningHistory.length === 0 ? 'No history yet' : 'Your saved courses'}</div>
-                      <button
-                        onClick={async () => { setRefreshingProHistory(true); await loadHistoryFromDB(); setRefreshingProHistory(false); setShowNavMenu(false); }}
-                        className={`text-xs px-2 py-1 rounded-md border ${refreshingProHistory ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'} text-gray-700 border-gray-200`}
-                        disabled={refreshingProHistory}
-                      >
-                        {refreshingProHistory ? 'Refreshing…' : 'Refresh'}
-                      </button>
                     </div>
                     {proLearningHistory.length === 0 ? (
-                      <div className="ml-6 mt-1">
-                        <a href="/pro-learning?tab=reading" className="inline-block px-3 py-1.5 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700">
-                          Start a new Pro Learning course
-                        </a>
-                      </div>
+                      <div className="ml-6 mt-1 text-xs text-gray-500">No courses yet</div>
                     ) : (
                       <div className="ml-6 max-h-64 overflow-y-auto">
                         {proLearningHistory.slice(0, 10).map((item, index) => (
