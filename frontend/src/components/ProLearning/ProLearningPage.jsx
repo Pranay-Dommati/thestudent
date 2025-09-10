@@ -1215,6 +1215,9 @@ const ProLearningPage = () => {
 
   // Helper function to determine if a topic should be blocked
   const isTopicBlocked = (topicName) => {
+  // In reload mode (content already saved in DB), never block topics
+  if (loadScenario === 'reload') return false;
+
     if (!topicsList || topicsList.length === 0) return false;
     
     // First topic (index 0) is never blocked - it gets progressive generation
