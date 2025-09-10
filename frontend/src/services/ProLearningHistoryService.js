@@ -1,6 +1,5 @@
 // ProLearningHistoryService.js
-// Service to manage ProLearning course history with IndexedDB-backed persistence
-import indexedDBService from './IndexedDBService.js';
+// Service to manage ProLearning course history with localStorage-backed persistence (IndexedDB removed)
 
 class ProLearningHistoryService {
   constructor() {
@@ -34,7 +33,7 @@ class ProLearningHistoryService {
       // Limit history size
       const limitedHistory = filteredHistory.slice(0, this.maxHistoryItems);
       
-  // Save using IndexedDB (fallback to localStorage)
+  // Save using localStorage
   this._set(limitedHistory);
       
       // Dispatch a custom event to notify other tabs about the history update
@@ -73,7 +72,7 @@ class ProLearningHistoryService {
       });
       const history = [];
       
-      // Sort by timestamp (newest first)
+  // Sort by timestamp (newest first)
       return history.sort((a, b) => b.timestamp - a.timestamp);
     } catch (error) {
       console.error('Error getting ProLearning history:', error);
@@ -173,33 +172,23 @@ export default proLearningHistoryService;
 // Export the class as well for direct instantiation if needed
 export { ProLearningHistoryService };
 
-// Private helpers
+// Private helpers (localStorage only)
 ProLearningHistoryService.prototype._get = async function () {
-  // Try IndexedDB, then migrate from localStorage if present
-  let data = await indexedDBService.getItem(this.storageKey);
-  if (!data && typeof localStorage !== 'undefined') {
+  try {
+    if (typeof localStorage === 'undefined') return [];
     const raw = localStorage.getItem(this.storageKey);
-    if (raw) {
-      try {
-        data = JSON.parse(raw);
-        await indexedDBService.setItem(this.storageKey, data);
-      } catch (_) {
-        data = [];
-      }
-    }
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch (_) {
+    return [];
   }
-  return Array.isArray(data) ? data : [];
 };
 
 ProLearningHistoryService.prototype._set = async function (value) {
   try {
-    await indexedDBService.setItem(this.storageKey, value);
-  } finally {
-    // Keep a small local cache to make getHistory synchronous
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(this.storageKey, JSON.stringify(value));
-      }
-    } catch {}
-  }
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(this.storageKey, JSON.stringify(value));
+    }
+  } catch {}
 };

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import indexedDBService from '../services/IndexedDBService.js';
 
 const instance = axios.create({
   baseURL: 'http://localhost:8000/api',  // Your Django backend URL with /api prefix
@@ -9,21 +8,12 @@ const instance = axios.create({
 });
 
 // Request interceptor
-// Note: Axios request interceptors can be async to await token from IndexedDB
 instance.interceptors.request.use(
   async (config) => {
-    // Prefer the freshest token from localStorage and keep IndexedDB in sync.
+    // Prefer the freshest token from localStorage only.
     let token = null;
     if (typeof localStorage !== 'undefined') {
       token = localStorage.getItem('accessToken');
-      if (token) {
-        // Always sync latest token into IndexedDB to avoid stale values
-        indexedDBService.setItem('accessToken', token);
-      }
-    }
-    // Fallback to IndexedDB only if nothing in localStorage
-    if (!token) {
-      token = await indexedDBService.getItem('accessToken');
     }
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
@@ -99,11 +89,10 @@ instance.interceptors.response.use(
         const newAccess = data?.access;
         if (!newAccess) throw new Error('No access token in refresh response');
 
-        // Persist new token in both storages
+  // Persist new token
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('accessToken', newAccess);
         }
-        indexedDBService.setItem('accessToken', newAccess);
 
         // Notify queued subscribers
         onRefreshed(newAccess);
@@ -113,12 +102,11 @@ instance.interceptors.response.use(
         originalRequest.headers['Authorization'] = `Bearer ${newAccess}`;
         return instance(originalRequest);
       } catch (refreshErr) {
-        // Cleanup tokens on hard failure
+  // Cleanup tokens on hard failure
         if (typeof localStorage !== 'undefined') {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
         }
-        indexedDBService.removeItem('accessToken');
         onRefreshed(null);
         return Promise.reject(refreshErr);
       } finally {

@@ -52,14 +52,7 @@ class ActivityTracker {
   // Send activity update to backend
   async sendActivityUpdate(minutes) {
     try {
-      let token = null;
-      try {
-        const { default: idb } = await import('./IndexedDBService.js');
-        token = await idb.getItem('accessToken');
-        if (!token && typeof localStorage !== 'undefined') token = localStorage.getItem('accessToken');
-      } catch {
-        token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      }
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
       if (!token) {
         // No auth token found, skipping activity tracking
         return;
@@ -128,14 +121,7 @@ class ActivityTracker {
   // Get learning statistics
   static async getLearningStats() {
     try {
-      let token = null;
-      try {
-        const { default: idb } = await import('./IndexedDBService.js');
-        token = await idb.getItem('accessToken');
-        if (!token && typeof localStorage !== 'undefined') token = localStorage.getItem('accessToken');
-      } catch {
-        token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      }
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
       console.log('🔥 [LEARNING STATS] Token available:', !!token);
       console.log('🔥 [LEARNING STATS] Token preview:', token ? `${token.substring(0, 20)}...` : 'null');
       console.log('🔥 [LEARNING STATS] All localStorage keys:', Object.keys(localStorage));
@@ -182,14 +168,7 @@ class ActivityTracker {
   // Manual activity tracking (for specific actions)
   static async trackMinutes(minutes) {
     try {
-      let token = null;
-      try {
-        const { default: idb } = await import('./IndexedDBService.js');
-        token = await idb.getItem('accessToken');
-        if (!token && typeof localStorage !== 'undefined') token = localStorage.getItem('accessToken');
-      } catch {
-        token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      }
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
       if (!token) return false;
 
       const response = await axios.post(`${API_URL}/api/courses/track-activity/`, {

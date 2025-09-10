@@ -12,7 +12,7 @@ import AuthModal from '../Common/AuthModal';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
 import proLearningHistoryService from '../../services/ProLearningHistoryService';
-import indexedDBService from '../../services/IndexedDBService.js';
+// Removed IndexedDBService usage for Pro Learning flows
 
 // Extract learning context from user's prompt
 const extractLearningContext = (prompt) => {
@@ -603,10 +603,6 @@ const ChatbotPage = () => {
 
   // Helper to get auth token
   const getAuthToken = async () => {
-    try {
-      const t = await indexedDBService.getItem('accessToken');
-      if (t) return t;
-    } catch {}
     try {
       return (
         localStorage.getItem('accessToken') ||
@@ -1763,18 +1759,11 @@ const ChatbotPage = () => {
                           };
                           
                           try {
-                            // Prefer IndexedDB for full payload; use a tiny localStorage marker to avoid quota issues
-                            void import('../../services/IndexedDBService.js')
-                              .then(({ default: idb }) => idb.setItem('proLearning_batchGeneration', batchGenerationData))
-                              .catch(() => {});
-                            // Remove any legacy large item and set a lightweight marker for navigation handoff
+                            // Store batch payload only in localStorage (IDB removed)
                             try { localStorage.removeItem('proLearning_batchGeneration'); } catch {}
+                            localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData));
                             localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
-                          } catch (_) {
-                            // As a last resort, store only a minimal marker
-                            try { localStorage.removeItem('proLearning_batchGeneration'); } catch {}
-                            localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
-                          }
+                          } catch (_) {}
                           // Pro Learning Experience button clicked - batch generation data stored
                           
                           // Track in ProLearning history

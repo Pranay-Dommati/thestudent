@@ -2,7 +2,7 @@
 // Database-like content storage service for Pro Learning system
 // Internally persists to IndexedDB with a localStorage fallback
 
-import indexedDBService from './IndexedDBService.js';
+// IndexedDB removed for Pro Learning; using in-memory + localStorage only
 
 class ContentStorageService {
   constructor() {
@@ -420,57 +420,40 @@ class ContentStorageService {
   }
 
   /**
-   * Save storage to IndexedDB (preferred) with localStorage fallback
+   * Persist storage to localStorage only (best-effort)
    */
   async persistToStorage() {
-    const storageData = {
-      courses: Object.fromEntries(this.storage.courses),
-      topics: Object.fromEntries(this.storage.topics),
-      contents: Object.fromEntries(this.storage.contents),
-      metadata: Object.fromEntries(this.storage.metadata),
-      lastUpdated: new Date().toISOString()
-    };
-
     try {
-      const ok = await indexedDBService.setItem('proLearning_storage', storageData);
-      if (!ok && typeof localStorage !== 'undefined') {
-        localStorage.setItem('proLearning_storage', JSON.stringify(storageData));
-      }
+      if (typeof localStorage === 'undefined') return;
+      const storageData = {
+        courses: Object.fromEntries(this.storage.courses),
+        topics: Object.fromEntries(this.storage.topics),
+        contents: Object.fromEntries(this.storage.contents),
+        metadata: Object.fromEntries(this.storage.metadata),
+        lastUpdated: new Date().toISOString()
+      };
+      localStorage.setItem('proLearning_storage', JSON.stringify(storageData));
     } catch (error) {
-      try {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('proLearning_storage', JSON.stringify(storageData));
-        }
-      } catch (inner) {
-        console.warn('Failed to persist storage (IndexedDB and localStorage):', inner || error);
-      }
+      console.warn('Failed to persist storage (localStorage):', error);
     }
   }
 
   /**
-   * Load storage from IndexedDB, with localStorage fallback and auto-migration
+   * Load storage from localStorage only
    */
   async loadFromPersistence() {
     try {
-      let storageData = await indexedDBService.getItem('proLearning_storage');
-      if (!storageData && typeof localStorage !== 'undefined') {
-        const saved = localStorage.getItem('proLearning_storage');
-        storageData = saved ? JSON.parse(saved) : null;
-        if (storageData) {
-          // Backfill IndexedDB
-          await indexedDBService.setItem('proLearning_storage', storageData);
-        }
-      }
-
+      if (typeof localStorage === 'undefined') return;
+      const saved = localStorage.getItem('proLearning_storage');
+      const storageData = saved ? JSON.parse(saved) : null;
       if (storageData) {
         this.storage.courses = new Map(Object.entries(storageData.courses || {}));
         this.storage.topics = new Map(Object.entries(storageData.topics || {}));
         this.storage.contents = new Map(Object.entries(storageData.contents || {}));
         this.storage.metadata = new Map(Object.entries(storageData.metadata || {}));
-        // Storage loaded from persistence
       }
     } catch (error) {
-      console.warn('Failed to load storage from persistence:', error);
+      console.warn('Failed to load storage (localStorage):', error);
     }
   }
 

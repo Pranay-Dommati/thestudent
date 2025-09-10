@@ -13,7 +13,6 @@ import ErrorBoundary from '../Common/ErrorBoundary';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
 import proLearningHistoryService from '../../services/ProLearningHistoryService';
-import indexedDBService from '../../services/IndexedDBService.js';
 
 // Custom CSS - added for DeepSeek-like UI
 import './mobileChatStyles.css';
@@ -160,13 +159,9 @@ const MobileChatbotPage = () => {
       const history = proLearningHistoryService.getHistory();
       setProLearningHistory(history);
     };
-    const loadBackendCourses = async () => {
+  const loadBackendCourses = async () => {
       try {
-        let token = null;
-        try { token = await indexedDBService.getItem('accessToken'); } catch {}
-        if (!token) {
-          token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
-        }
+    const token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
         if (!token) return;
         const resp = await fetch('http://localhost:8000/api/courses/pro-learning/', {
           method: 'GET',
@@ -871,7 +866,7 @@ const MobileChatbotPage = () => {
                 <div className="w-full">
                   <div className="bg-gradient-to-br from-purple-50/80 to-blue-50/80 backdrop-blur-sm border border-purple-200/50 rounded-lg p-3 mb-2">
                     <div className="text-sm text-gray-700 mb-3">{message.content}</div>
-                    <Link 
+        <Link 
                       to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
                       className="block w-full p-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg"
                       onClick={() => {
@@ -884,19 +879,9 @@ const MobileChatbotPage = () => {
                             triggerBatchGeneration: true,
                             timestamp: Date.now()
                           };
-                          
-                          try {
-                            void import('../../services/IndexedDBService.js')
-                              .then(({ default: idb }) => idb.setItem('proLearning_batchGeneration', batchGenerationData))
-                              .catch(() => {});
-                            // Remove legacy large item and set a lightweight marker for navigation handoff
-                            try { localStorage.removeItem('proLearning_batchGeneration'); } catch {}
-                            localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
-                          } catch (_) {
-                            // As a last resort, store only a minimal marker
-                            try { localStorage.removeItem('proLearning_batchGeneration'); } catch {}
-                            localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
-                          }
+          // Store in localStorage only (no IndexedDB)
+          try { localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData)); } catch {}
+          localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
                           console.log('🚀 Mobile Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
                           
                           // Track in ProLearning history

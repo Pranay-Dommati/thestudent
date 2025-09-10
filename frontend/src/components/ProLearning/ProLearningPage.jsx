@@ -94,20 +94,8 @@ const ProLearningPage = () => {
   // Function to fetch course data from database
   const fetchCourseFromDB = async (courseId) => {
     try {
-      let token = null;
-      try {
-        const { default: idb } = await import('../../services/IndexedDBService.js');
-        token = await idb.getItem('accessToken');
-        if (!token && typeof localStorage !== 'undefined') {
-          token = localStorage.getItem('accessToken');
-          if (token) await idb.setItem('accessToken', token);
-        }
-      } catch {
-        token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      }
-      if (!token) {
-        return null;
-      }
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (!token) return null;
 
       const response = await fetch(`http://localhost:8000/api/courses/pro-learning/${courseId}/`, {
         method: 'GET',
@@ -118,10 +106,7 @@ const ProLearningPage = () => {
       });
 
       if (response.ok) {
-        const courseData = await response.json();
-        return courseData;
-      } else if (response.status === 404) {
-        return null;
+        return await response.json();
       } else {
         console.error('❌ Failed to fetch course from database:', response.status);
         return null;
@@ -155,18 +140,7 @@ const ProLearningPage = () => {
 
   // Set default topics and initialize with consistent course ID
   useEffect(() => {
-    // Helper: wait briefly for an IndexedDB item to appear (handles navigation race)
-    const waitForIDBItem = async (key, attempts = 10, interval = 120) => {
-      for (let i = 0; i < attempts; i++) {
-        try {
-          const { default: idb } = await import('../../services/IndexedDBService.js');
-          const val = await idb.getItem(key);
-          if (val) return val;
-        } catch {}
-        await new Promise(r => setTimeout(r, interval));
-      }
-      return null;
-    };
+    // Removed IndexedDB waits; Pro Learning no longer relies on IDB
     
     // Simple content loader for reload mode - no generation, just load from storage
     const loadContentForReloadMode = async (topicName) => {
@@ -433,7 +407,7 @@ const ProLearningPage = () => {
         }, 100);
       };
 
-      // Ensure ProContentManager cache is hydrated from IndexedDB before any synchronous getters
+  // Ensure ProContentManager cache is hydrated from backend/local storage before any synchronous getters
       try {
         await proContentManager.initializeCourse(currentCourseId);
         // Cache initialized; synchronous getters will now return data reliably
@@ -472,30 +446,23 @@ const ProLearningPage = () => {
         return;
       }
       
-      // Step 2: Check batch generation data (IndexedDB first; legacy localStorage payload fallback)
-    let foundFromBatch = false;
-    try {
-        const { default: idb } = await import('../../services/IndexedDBService.js');
-        const idbVal = await idb.getItem('proLearning_batchGeneration');
-        let payload = idbVal;
-        if (!payload && typeof localStorage !== 'undefined') {
-          // Backward compatibility: legacy payload in localStorage
+      // Step 2: Check batch generation data (localStorage only; legacy payload)
+      let foundFromBatch = false;
+      try {
+        let payload = null;
+        if (typeof localStorage !== 'undefined') {
           const legacy = localStorage.getItem('proLearning_batchGeneration');
           if (legacy) {
             try { payload = JSON.parse(legacy); } catch {}
           }
-          // If no legacy payload but a marker exists, wait for IDB write to land
-          if (!payload && localStorage.getItem('proLearning_batchMarker')) {
-            payload = await waitForIDBItem('proLearning_batchGeneration');
-          }
         }
         if (payload && payload.courseId === currentCourseId && Array.isArray(payload.topics) && payload.topics.length > 0) {
-          console.log('🔍 Step 2 - Batch generation data found:', {
+          console.log('🔍 Step 2 - Batch generation data found (localStorage):', {
             courseId: currentCourseId,
             topicsFound: payload.topics.length,
             topics: payload.topics.map(t => t.name || t)
           });
-          
+
           // Use handleTopicSelection for batch topics too
           handleTopicSelection(payload.topics);
           // Persist topics immediately so refresh shows them in sidebar
@@ -507,10 +474,11 @@ const ProLearningPage = () => {
           } catch (e) {
             console.error('❌ Failed to store batch topics:', e);
           }
-      foundFromBatch = true;
-      return;
+          foundFromBatch = true;
+          return;
         }
       } catch (error) {
+        // ignore and continue
       }
 
   // Step 3: Try to fetch from database
@@ -2163,18 +2131,8 @@ const ProLearningPage = () => {
         topics: topicsObject
       };
 
-      // Get auth token (with IndexedDB fallback)
-      let token = null;
-      try {
-        const { default: idb } = await import('../../services/IndexedDBService.js');
-        token = await idb.getItem('accessToken');
-        if (!token && typeof localStorage !== 'undefined') {
-          token = localStorage.getItem('accessToken');
-          if (token) await idb.setItem('accessToken', token);
-        }
-      } catch {
-        token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      }
+  // Get auth token from localStorage only (no IndexedDB)
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
       
       if (!token) {
         console.error('❌ AUTO-SAVE: No authentication token found for auto-save');
@@ -2450,18 +2408,8 @@ const ProLearningPage = () => {
         topics: topicsObject
       };
 
-      // Get auth token (with IndexedDB fallback)
-      let token = null;
-      try {
-        const { default: idb } = await import('../../services/IndexedDBService.js');
-        token = await idb.getItem('accessToken');
-        if (!token && typeof localStorage !== 'undefined') {
-          token = localStorage.getItem('accessToken');
-          if (token) await idb.setItem('accessToken', token);
-        }
-      } catch {
-        token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      }
+  // Get auth token from localStorage only (no IndexedDB)
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
       
       if (!token) {
         console.error('❌ No authentication token found');
@@ -3165,10 +3113,6 @@ const ProLearningPage = () => {
   };
 
   const setAndNavigateToCourseId = async (id) => {
-    try {
-      const { default: idb } = await import('../../services/IndexedDBService.js');
-      await idb.setItem('currentCourseId', id);
-    } catch {}
     try { if (typeof localStorage !== 'undefined') localStorage.setItem('currentCourseId', id); } catch {}
     navigate(`/pro-learning/${id}${window.location.search}`, { replace: true });
   };
@@ -3233,34 +3177,14 @@ const ProLearningPage = () => {
   useEffect(() => {
     const handleContentGeneration = async () => {
       try {
-        // Use small localStorage marker for fast check, fetch real payload from IndexedDB
+        // Read batch payload from localStorage only
         const marker = typeof localStorage !== 'undefined' ? localStorage.getItem('proLearning_batchMarker') : null;
         let payload = null;
-        try {
-          const { default: idb } = await import('../../services/IndexedDBService.js');
-          payload = await idb.getItem('proLearning_batchGeneration');
-        } catch {}
-        // Backward compatibility: if no IDB payload, try legacy localStorage payload
-        if (!payload && typeof localStorage !== 'undefined') {
+        if (typeof localStorage !== 'undefined') {
           const legacy = localStorage.getItem('proLearning_batchGeneration');
           if (legacy) {
             try { payload = JSON.parse(legacy); } catch {}
           }
-        }
-        if (!payload && marker) {
-          // Wait briefly for IDB write to land after navigation
-          const wait = async () => {
-            for (let i = 0; i < 8; i++) {
-              try {
-                const { default: idb } = await import('../../services/IndexedDBService.js');
-                const val = await idb.getItem('proLearning_batchGeneration');
-                if (val) return val;
-              } catch {}
-              await new Promise(r => setTimeout(r, 120));
-            }
-            return null;
-          };
-          payload = await wait();
         }
         if (!payload) return;
 
@@ -3416,11 +3340,6 @@ const ProLearningPage = () => {
         }
         
         // Clear the trigger so it doesn't run again
-        try {
-          void import('../../services/IndexedDBService.js')
-            .then(({ default: idb }) => idb.removeItem('proLearning_batchGeneration'))
-            .catch(() => {});
-        } catch {}
         try {
           if (typeof localStorage !== 'undefined') {
             localStorage.removeItem('proLearning_batchGeneration'); // legacy
@@ -4977,12 +4896,12 @@ const ProLearningPage = () => {
               transform: translateY(100%);
               opacity: 0;
             }
-            to {
-              transform: translateY(0);
-              opacity: 1;
-            }
-          }
-          .animate-slide-up {
+            try {
+              if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem('proLearning_batchGeneration');
+                localStorage.removeItem('proLearning_batchMarker');
+              }
+            } catch {}
             animation: slide-up 0.3s ease-out forwards;
           }
         `}</style>

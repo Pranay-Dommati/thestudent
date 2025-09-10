@@ -3,7 +3,6 @@
 // Acts as an interface between UI components and ContentStorageService
 
 import contentStorageService from './ContentStorageService.js';
-import indexedDBService from './IndexedDBService.js';
 
 class ProContentManager {
   constructor() {
@@ -33,19 +32,7 @@ class ProContentManager {
         return true;
       }
     } catch (e) {
-      console.warn('Failed to initialize from backend DB, will fallback to local storage/IDB:', e);
-    }
-
-    // Fallback path: IndexedDB then localStorage for legacy data
-    try {
-      const idbVal = await indexedDBService.getItem(`course_content_${courseId}`);
-      if (idbVal) {
-        this.courseContentCache.set(courseId, idbVal);
-        try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(idbVal)); } catch {}
-        return true;
-      }
-    } catch (error) {
-      console.error('❌ Failed to initialize course content from IndexedDB:', error);
+      console.warn('Failed to initialize from backend DB, will fallback to local storage:', e);
     }
 
     try {
@@ -160,24 +147,43 @@ class ProContentManager {
    * Fetch a Pro Learning course from backend
    */
   async fetchCourseFromDB(courseId) {
-    try {
-      // Try to read token from IndexedDB, then localStorage
-      let token = null;
-      try {
-        token = await indexedDBService.getItem('accessToken');
-      } catch {}
-      if (!token && typeof localStorage !== 'undefined') {
-        token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-      }
-      if (!token) return null;
-
+    const tryFetch = async (accessToken) => {
       const resp = await fetch(`http://localhost:8000/api/courses/pro-learning/${courseId}/`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
         }
       });
+      return resp;
+    };
+
+    try {
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (!token) return null;
+
+      let resp = await tryFetch(token);
+      // If unauthorized, try a one-time refresh using refreshToken from localStorage
+      if (resp.status === 401) {
+        const refresh = typeof localStorage !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+        if (refresh) {
+          try {
+            const r = await fetch('http://localhost:8000/api/auth/token/refresh/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refresh })
+            });
+            if (r.ok) {
+              const data = await r.json();
+              if (data?.access) {
+                try { localStorage.setItem('accessToken', data.access); } catch {}
+                resp = await tryFetch(data.access);
+              }
+            }
+          } catch {}
+        }
+      }
+
       if (!resp.ok) return null;
       return await resp.json();
     } catch (e) {
@@ -697,14 +703,10 @@ class ProContentManager {
     this.courseContentCache.set(courseId, courseContent);
     try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
     
-    // Then persist aggregated content to backend (DB-first)
+  // Then persist aggregated content to backend (DB-first)
     try {
-      // Persist via working endpoint that creates course with full topics/content
-      let token = null;
-      try { token = await indexedDBService.getItem('accessToken'); } catch {}
-      if (!token && typeof localStorage !== 'undefined') {
-        token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-      }
+  // Persist via working endpoint that creates course with full topics/content
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
       if (token) {
         console.log('🚀 ProContentManager: Saving batch to backend with full content...');
         console.log('📊 Course Data Preview:', {
@@ -749,7 +751,7 @@ class ProContentManager {
           )
         };
         
-        const response = await fetch('/api/courses/pro-learning/save-course/', {
+  const response = await fetch('/api/courses/pro-learning/save-course/', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -794,17 +796,8 @@ class ProContentManager {
       console.warn('Failed to load course from backend DB:', e);
     }
 
-    // 3) Legacy fallback: IndexedDB then localStorage
-    try {
-      const idbVal = await indexedDBService.getItem(`course_content_${courseId}`);
-      if (idbVal) {
-        this.courseContentCache.set(courseId, idbVal);
-        try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(idbVal)); } catch {}
-        return idbVal;
-      }
-    } catch (_) {}
-
-    try {
+  // 3) Fallback: localStorage only (IndexedDB removed)
+  try {
       if (typeof localStorage !== 'undefined') {
         const raw = localStorage.getItem(`course_content_${courseId}`);
         if (raw) {
