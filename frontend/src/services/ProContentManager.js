@@ -446,32 +446,8 @@ class ProContentManager {
       courseContent.metadata.totalTopics = Object.keys(courseContent.topics).length;
       this.courseContentCache.set(courseId, courseContent);
 
-      // Opportunistically create a minimal course in backend if not present
-      try {
-        const existing = await this.fetchCourseFromDB(courseId);
-        if (!existing) {
-          let token = null;
-          try { token = await indexedDBService.getItem('accessToken'); } catch {}
-          if (!token && typeof localStorage !== 'undefined') {
-            token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-          }
-          if (token) {
-            const payload = {
-              course_id: courseId,
-              title: this.currentCourse || 'AI Generated Course',
-              topics: topics.reduce((acc, t) => {
-                acc[t.name] = { content: { reading: '', summary: '', videos: [], quiz: [], resources: [] } };
-                return acc;
-              }, {})
-            };
-            await fetch('http://localhost:8000/api/courses/pro-learning-direct/save/', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            }).catch(() => {});
-          }
-        }
-      } catch {}
+  // Do not auto-create minimal backend records with empty content.
+  // We persist to the database only when full content is available or the user explicitly saves.
 
       // Keep a small localStorage cache as a fallback only
       try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
@@ -717,33 +693,79 @@ class ProContentManager {
     courseContent.metadata.status = 'completed';
     courseContent.metadata.completedAt = new Date().toISOString();
     
-    // Persist aggregated content to backend (DB-first); keep local cache as fallback
+    // Always update in-memory cache and a tiny localStorage fallback FIRST
+    this.courseContentCache.set(courseId, courseContent);
+    try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
+    
+    // Then persist aggregated content to backend (DB-first)
     try {
-      // Try to upsert via direct save endpoint
+      // Persist via working endpoint that creates course with full topics/content
       let token = null;
       try { token = await indexedDBService.getItem('accessToken'); } catch {}
       if (!token && typeof localStorage !== 'undefined') {
         token = localStorage.getItem('accessToken') || localStorage.getItem('token');
       }
       if (token) {
-        const payload = {
-          course_id: courseId,
+        console.log('🚀 ProContentManager: Saving batch to backend with full content...');
+        console.log('📊 Course Data Preview:', {
+          courseId,
           title: this.currentCourse || 'AI Generated Course',
-          topics: Object.fromEntries(Object.entries(courseContent.topics).map(([name, t]) => [name, { content: t.content }]))
+          topicCount: Object.keys(courseContent.topics).length,
+          topicNames: Object.keys(courseContent.topics),
+          sampleTopic: Object.keys(courseContent.topics)[0] ? {
+            name: Object.keys(courseContent.topics)[0],
+            hasReading: !!(courseContent.topics[Object.keys(courseContent.topics)[0]]?.content?.reading),
+            hasResources: !!(courseContent.topics[Object.keys(courseContent.topics)[0]]?.content?.resources?.length > 0)
+          } : null
+        });
+        
+        const payload = {
+          course_name: courseId, // used for idempotency check server-side
+          title: this.currentCourse || 'AI Generated Course',
+          overwrite: true,
+          topics: Object.fromEntries(
+            Object.entries(courseContent.topics).map(([name, t]) => {
+              const c = t?.content ?? t ?? {};
+              // Normalize fields
+              const reading = c.reading || c.readingMaterial || '';
+              const summary = c.summary || c.topicSummary || '';
+              const videos = Array.isArray(c.videos) ? c.videos : [];
+              let quiz = [];
+              if (Array.isArray(c.quiz)) quiz = c.quiz;
+              else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
+              else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
+              const resources = Array.isArray(c.resources) ? c.resources : [];
+              return [name, {
+                // Nested format
+                content: { reading, summary, videos, quiz, resources },
+                // Flat format for backward-compat on backend
+                readingMaterial: reading,
+                summary,
+                videos,
+                quiz,
+                resources
+              }];
+            })
+          )
         };
-        await fetch('http://localhost:8000/api/courses/pro-learning-direct/save/', {
+        
+        const response = await fetch('/api/courses/pro-learning/save-course/', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
-        }).catch(() => {});
+        });
+        
+        if (response.ok) {
+          console.log('✅ ProContentManager: Batch successfully saved to backend database');
+        } else {
+          console.error('❌ ProContentManager: Failed to save batch to backend:', await response.text());
+        }
+      } else {
+        console.warn('⚠️ ProContentManager: No auth token available, skipping backend save');
       }
     } catch (e) {
-      console.warn('Failed to persist batch to backend, will rely on cache/local fallback:', e);
+      console.error('❌ ProContentManager: Failed to persist batch to backend:', e);
     }
-
-    // Always update in-memory cache and a tiny localStorage fallback
-    this.courseContentCache.set(courseId, courseContent);
-    try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
     
     // Batch content generation completed
     return courseContent;

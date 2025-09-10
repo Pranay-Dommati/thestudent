@@ -15,6 +15,14 @@ from .working_views import save_pro_learning_course, test_endpoint
 app_name = 'pro_learning'
 
 urlpatterns = [
+    # WORKING ENDPOINTS - Place static routes BEFORE dynamic ones
+    path('save-course/', save_pro_learning_course, name='save-course'),
+    path('save-from-storage/', save_course_from_localStorage, name='save-from-storage'),
+    path('save-from-storage', save_course_from_localStorage, name='save-from-storage-no-slash'),
+    path('save-from-storage-simple/', save_course_from_localStorage_simple, name='save-from-storage-simple'),
+    path('test/', test_endpoint, name='test'),
+    path('test-post/', simple_test_view, name='test-post'),
+
     # Course management
     path('', ProLearningCourseListCreateView.as_view(), name='course-list-create'),
     path('<str:id>/', ProLearningCourseDetailView.as_view(), name='course-detail'),
@@ -24,18 +32,4 @@ urlpatterns = [
     path('<str:id>/topics/', ProLearningTopicListView.as_view(), name='topic-list'),
     path('<str:id>/topics/<int:topic_id>/', ProLearningTopicDetailView.as_view(), name='topic-detail'),
     path('<str:id>/topics/<int:topic_id>/complete/', mark_topic_complete, name='topic-complete'),
-    
-    # Special endpoint for saving from localStorage
-    path('save-from-storage/', save_course_from_localStorage, name='save-from-storage'),
-    path('save-from-storage', save_course_from_localStorage, name='save-from-storage-no-slash'),
-    
-    # Alternative simple implementation for testing
-    path('save-from-storage-simple/', save_course_from_localStorage_simple, name='save-from-storage-simple'),
-    
-    # WORKING ENDPOINTS - Use these!
-    path('save-course/', save_pro_learning_course, name='save-course'),
-    path('test/', test_endpoint, name='test'),
-    
-    # Simple test endpoint
-    path('test-post/', simple_test_view, name='test-post'),
 ]

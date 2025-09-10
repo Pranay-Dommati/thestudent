@@ -115,7 +115,9 @@ export class ProgressiveContentGenerator {
     if (!this.isGenerating || this.currentTopic >= this.topics.length) {
       // All content generated
       this.isGenerating = false;
+      console.log('🔥 PROG GEN DEBUG: Calling onAllComplete callback!');
       this.callbacks.onAllComplete();
+      console.log('🔥 PROG GEN DEBUG: onAllComplete callback finished');
       // All progressive content generation completed!
       return;
     }

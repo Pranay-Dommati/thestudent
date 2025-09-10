@@ -88,7 +88,6 @@ const ProLearningPage = () => {
   const activeTabParam = searchParams.get("tab") || "reading"; // Get active tab from URL
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [topicsList, setTopicsList] = useState([]);
-  const [savedToHub, setSavedToHub] = useState(false); // Track if course is saved
   const [sectionGenerating, setSectionGenerating] = useState(false);
   const [generatingTopics, setGeneratingTopics] = useState([]);
   
@@ -148,8 +147,7 @@ const ProLearningPage = () => {
       if (!courseId) return;
       const databaseCourse = await fetchCourseFromDB(courseId);
       if (databaseCourse) {
-        setSavedToHub(true);
-        console.log('✅ Course found in database, marked as saved');
+        console.log('✅ Course found in database');
       }
     };
     checkIfCourseSaved();
@@ -525,7 +523,7 @@ const ProLearningPage = () => {
         courseName: databaseCourse?.course_name
       });
       
-      if (databaseCourse) {
+  if (databaseCourse) {
         // Transform database course data to the format expected by the UI
         if (databaseCourse.topics && databaseCourse.topics.length > 0) {
           console.log('🔍 Step 3 - Database topics found:', {
@@ -559,7 +557,8 @@ const ProLearningPage = () => {
             topics: transformedTopics.map(t => ({ name: t.name, isActive: t.isActive }))
           });
           
-          // Use handleTopicSelection for database topics
+          // Use handleTopicSelection for database topics (but force reload mode logic)
+          setLoadScenario('reload');
           handleTopicSelection(transformedTopics);
           // Persist DB topics so they’re available on refresh
           try {
@@ -692,19 +691,6 @@ const ProLearningPage = () => {
   
   // Copy code functionality
   const [copySuccessMap, setCopySuccessMap] = useState({});
-  
-  // Save to Learning Hub functionality
-  const [isSavingToHub, setIsSavingToHub] = useState(false);
-  // Save button visibility after refresh
-  const [forceShowSave, setForceShowSave] = useState(() => {
-    try {
-      const id = typeof window !== 'undefined' ? window.location.pathname.split('/')[2] : null;
-      if (!id) return false;
-      return typeof localStorage !== 'undefined' && localStorage.getItem(`proLearning_courseReady_${id}`) === 'true';
-    } catch {
-      return false;
-    }
-  });
 
   // Derived: does any topic have any generated tab available?
   const hasAnyContent = useMemo(() => {
@@ -1770,9 +1756,290 @@ const ProLearningPage = () => {
     return `AI Course: ${topicNames.slice(0, 3).join(' + ')} + ...`;
   };
 
+  // Auto-save function for post-generation saves (no UI state updates)
+  const autoSaveToBackend = async () => {
+    try {
+      console.log('🤖 AUTO-SAVE: Starting auto-save process...');
+      
+      // Try to get course ID from multiple sources
+      let currentCourseId = getCourseId();
+      console.log('🤖 AUTO-SAVE: Course ID from getCourseId():', currentCourseId);
+      
+      if (!currentCourseId && currentCourse?.id) {
+        currentCourseId = currentCourse.id;
+        console.log('📝 Using course ID from current course:', currentCourseId);
+      }
+      
+      // Try getting from local storage
+      if (!currentCourseId) {
+        const savedCourseId = localStorage.getItem('currentCourseId');
+        if (savedCourseId) {
+          currentCourseId = savedCourseId;
+          console.log('📝 Using course ID from localStorage:', currentCourseId);
+        }
+      }
+
+      if (!currentCourseId) {
+        currentCourseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem('currentCourseId', currentCourseId);
+        console.log('🤖 AUTO-SAVE: Generated new course ID:', currentCourseId);
+      }
+
+      console.log('🤖 AUTO-SAVE: Final course ID:', currentCourseId);
+
+      // Initialize course content gathering
+      let courseContent = null;
+      let topicsWithContent = [];
+      const sanitizeTopicName = (name) => (name || '').toString().replace(/\s*:\s*true$/i, '').trim();
+      
+      console.log('🤖 AUTO-SAVE: Checking topics list:', topicsList?.length, 'topics');
+      
+      // First try to get topics from current state
+      if (Array.isArray(topicsList) && topicsList.length > 0) {
+        console.log('🤖 AUTO-SAVE: Using topics from current state:', topicsList.length, 'topics');
+        
+        // Try to gather content for each topic in the current state
+        for (const topic of topicsList) {
+          try {
+            const rawName = typeof topic === 'string' ? topic : topic?.name;
+            const topicName = sanitizeTopicName(rawName);
+            if (!topicName) continue;
+
+            let content = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
+            // Fallback: search without courseId (global scan) if not found
+            if (!content) {
+              content = await proContentManager.getStoredTopicContent(null, topicName);
+            }
+            if (content) {
+              topicsWithContent.push({
+                name: topicName,
+                content: {
+                  reading: content.reading || content.readingMaterial || '',
+                  summary: content.summary || content.topicSummary || '',
+                  videos: Array.isArray(content.videos) ? content.videos : [],
+                  quiz: Array.isArray(content.quiz) ? content.quiz : (Array.isArray(content.quizQuestions) ? content.quizQuestions : []),
+                  resources: Array.isArray(content.resources) ? content.resources : []
+                }
+              });
+              console.log('📝 Added content for topic:', topicName);
+            }
+          } catch (e) {
+            console.warn('Failed to get content for topic:', topic.name, e);
+          }
+        }
+      }
+      
+      // If still nothing and we have a selectedTopic, try to fetch just that one
+      if (topicsWithContent.length === 0 && selectedTopic) {
+        try {
+          const rawName = typeof selectedTopic === 'string' ? selectedTopic : selectedTopic?.name;
+          const topicName = sanitizeTopicName(rawName);
+          if (topicName) {
+            let content = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
+            if (!content) content = await proContentManager.getStoredTopicContent(null, topicName);
+            if (content) {
+              topicsWithContent.push({
+                name: topicName,
+                content: {
+                  reading: content.reading || content.readingMaterial || '',
+                  summary: content.summary || content.topicSummary || '',
+                  videos: Array.isArray(content.videos) ? content.videos : [],
+                  quiz: Array.isArray(content.quiz) ? content.quiz : (Array.isArray(content.quizQuestions) ? content.quizQuestions : []),
+                  resources: Array.isArray(content.resources) ? content.resources : []
+                }
+              });
+              console.log('📝 Added content from selectedTopic:', topicName);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to get content for selectedTopic:', e);
+        }
+      }
+
+      // If we already have topics from current state, use them
+      if (topicsWithContent.length > 0 && !courseContent) {
+        courseContent = { topics: topicsWithContent };
+        console.log('📝 Using course content from current state topics:', topicsWithContent.length);
+      }
+
+      // If no content found from current state, try storage methods
+      if (topicsWithContent.length === 0) {
+        try {
+          // Try getting complete course content first
+          courseContent = await proContentManager.getStoredCourseContent(currentCourseId);
+          console.log('📝 Retrieved stored course content:', courseContent ? 'found' : 'not found');
+          
+          // If no course content, try assembling from stored topics
+          if (!courseContent || !courseContent.topics) {
+            const storedTopics = await proContentManager.getStoredTopics(currentCourseId);
+            console.log('📝 Retrieved stored topics:', storedTopics?.length || 0);
+            
+            if (Array.isArray(storedTopics) && storedTopics.length > 0) {
+              for (const topic of storedTopics) {
+                try {
+                  const topicName = sanitizeTopicName(topic?.name);
+                  let topicContent = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
+                  if (!topicContent) {
+                    topicContent = await proContentManager.getStoredTopicContent(null, topicName);
+                  }
+                  if (topicContent) {
+                    topicsWithContent.push({
+                      name: topicName,
+                      content: {
+                        reading: topicContent.reading || topicContent.readingMaterial || '',
+                        summary: topicContent.summary || topicContent.topicSummary || '',
+                        videos: Array.isArray(topicContent.videos) ? topicContent.videos : [],
+                        quiz: Array.isArray(topicContent.quiz) ? topicContent.quiz : 
+                              Array.isArray(topicContent.quizQuestions) ? topicContent.quizQuestions : [],
+                        resources: Array.isArray(topicContent.resources) ? topicContent.resources : []
+                      }
+                    });
+                    console.log('📝 Assembled content for stored topic:', topicName);
+                  }
+                } catch (e) {
+                  console.warn('Failed to get content for stored topic:', topic.name, e);
+                }
+              }
+              
+              if (topicsWithContent.length > 0) {
+                courseContent = { topics: topicsWithContent };
+                console.log('📝 Successfully assembled course content from stored topics');
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to get content from storage:', e);
+        }
+      }
+      
+      const topicsEmpty = !courseContent || !courseContent.topics ||
+        (Array.isArray(courseContent.topics) ? courseContent.topics.length === 0 : Object.keys(courseContent.topics).length === 0);
+      if (topicsEmpty) {
+        console.error('❌ AUTO-SAVE: No course content found for auto-save');
+        console.log('🤖 AUTO-SAVE: Debug info:', {
+          hasCourseContent: !!courseContent,
+          hasTopics: !!(courseContent?.topics),
+          topicsIsArray: Array.isArray(courseContent?.topics),
+          topicsLength: Array.isArray(courseContent?.topics) ? courseContent.topics.length : Object.keys(courseContent?.topics || {}).length
+        });
+        return; // Silently fail for auto-save
+      }
+
+      console.log('🤖 AUTO-SAVE: Found course content with', 
+        Array.isArray(courseContent.topics) ? courseContent.topics.length : Object.keys(courseContent.topics).length, 
+        'topics');
+
+      // Generate smart course name based on topics
+      const smartCourseName = generateSmartCourseName(courseContent.topics, courseTitle);
+      
+      // Prepare course data for working Django endpoint (expects topics as object)
+      const topicsObject = Array.isArray(courseContent.topics)
+        ? Object.fromEntries(courseContent.topics.map((t, idx) => {
+            const c = t?.content ?? t ?? {};
+            const reading = c.reading || c.readingMaterial || '';
+            const summary = c.summary || c.topicSummary || '';
+            const videos = Array.isArray(c.videos) ? c.videos : [];
+            let quiz = [];
+            if (Array.isArray(c.quiz)) quiz = c.quiz;
+            else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
+            else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
+            const resources = Array.isArray(c.resources) ? c.resources : [];
+            return [
+              sanitizeTopicName(t.name),
+              {
+                content: { reading, summary, videos, quiz, resources },
+                order: idx,
+                readingMaterial: reading,
+                summary,
+                videos,
+                quiz,
+                resources
+              }
+            ]
+          }))
+        : Object.fromEntries(Object.entries(courseContent.topics).map(([name, t], idx) => {
+            const c = t?.content ?? t ?? {};
+            const reading = c.reading || c.readingMaterial || '';
+            const summary = c.summary || c.topicSummary || '';
+            const videos = Array.isArray(c.videos) ? c.videos : [];
+            let quiz = [];
+            if (Array.isArray(c.quiz)) quiz = c.quiz;
+            else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
+            else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
+            const resources = Array.isArray(c.resources) ? c.resources : [];
+            return [
+              sanitizeTopicName(name),
+              {
+                content: { reading, summary, videos, quiz, resources },
+                order: idx,
+                readingMaterial: reading,
+                summary,
+                videos,
+                quiz,
+                resources
+              }
+            ];
+          }));
+
+      const courseData = {
+        course_name: currentCourseId, // stable identifier used by backend
+        title: smartCourseName,
+        overwrite: true,
+        topics: topicsObject
+      };
+
+      // Get auth token (with IndexedDB fallback)
+      let token = null;
+      try {
+        const { default: idb } = await import('../../services/IndexedDBService.js');
+        token = await idb.getItem('accessToken');
+        if (!token && typeof localStorage !== 'undefined') {
+          token = localStorage.getItem('accessToken');
+          if (token) await idb.setItem('accessToken', token);
+        }
+      } catch {
+        token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      }
+      
+      if (!token) {
+        console.error('❌ AUTO-SAVE: No authentication token found for auto-save');
+        return; // Silently fail for auto-save
+      }
+
+      console.log('🤖 AUTO-SAVE: Found auth token, preparing to save...');
+
+      // Save to backend using Django endpoint
+      console.log('🤖 AUTO-SAVE: Sending POST request to /api/courses/pro-learning/save-course/');
+      const response = await fetch('/api/courses/pro-learning/save-course/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(courseData)
+      });
+
+      const responseData = await response.json();
+
+      if (response.ok) {
+        console.log('✅ AUTO-SAVE: Course auto-saved to backend successfully!', responseData);
+        
+        // Mark course as ready (but don't force UI updates)
+        localStorage.setItem(`proLearning_courseReady_${currentCourseId}`, 'true');
+        
+      } else {
+        console.error('❌ AUTO-SAVE: Failed to auto-save course. Status:', response.status, 'Response:', responseData);
+        // Don't show UI errors for auto-save failures
+      }
+
+    } catch (error) {
+      console.error('❌ AUTO-SAVE: Failed to auto-save course to backend:', error);
+      // Silently fail for auto-save
+    }
+  };
+
   const handleSaveToLearningHub = async () => {
     try {
-      setIsSavingToHub(true);
       
       // Try to get course ID from multiple sources
       let currentCourseId = getCourseId();
@@ -1934,15 +2201,57 @@ const ProLearningPage = () => {
       
       // Prepare course data for working Django endpoint (expects topics as object)
       const topicsObject = Array.isArray(courseContent.topics)
-        ? Object.fromEntries(courseContent.topics.map((t, idx) => [
-            sanitizeTopicName(t.name),
-            { content: t.content, order: idx }
-          ]))
-        : courseContent.topics;
+        ? Object.fromEntries(courseContent.topics.map((t, idx) => {
+            const c = t?.content ?? t ?? {};
+            const reading = c.reading || c.readingMaterial || '';
+            const summary = c.summary || c.topicSummary || '';
+            const videos = Array.isArray(c.videos) ? c.videos : [];
+            let quiz = [];
+            if (Array.isArray(c.quiz)) quiz = c.quiz;
+            else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
+            else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
+            const resources = Array.isArray(c.resources) ? c.resources : [];
+            return [
+              sanitizeTopicName(t.name),
+              {
+                content: { reading, summary, videos, quiz, resources },
+                order: idx,
+                readingMaterial: reading,
+                summary,
+                videos,
+                quiz,
+                resources
+              }
+            ]
+          }))
+        : Object.fromEntries(Object.entries(courseContent.topics).map(([name, t], idx) => {
+            const c = t?.content ?? t ?? {};
+            const reading = c.reading || c.readingMaterial || '';
+            const summary = c.summary || c.topicSummary || '';
+            const videos = Array.isArray(c.videos) ? c.videos : [];
+            let quiz = [];
+            if (Array.isArray(c.quiz)) quiz = c.quiz;
+            else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
+            else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
+            const resources = Array.isArray(c.resources) ? c.resources : [];
+            return [
+              sanitizeTopicName(name),
+              {
+                content: { reading, summary, videos, quiz, resources },
+                order: idx,
+                readingMaterial: reading,
+                summary,
+                videos,
+                quiz,
+                resources
+              }
+            ];
+          }));
 
       const courseData = {
-        course_id: currentCourseId, // identifier
+        course_name: currentCourseId, // stable identifier used by backend
         title: smartCourseName,
+        overwrite: true,
         topics: topicsObject
       };
 
@@ -1966,7 +2275,7 @@ const ProLearningPage = () => {
       }
 
       // Save to SQLite using Django endpoint
-  const response = await fetch('/api/courses/pro-learning-direct/save/', {
+  const response = await fetch('/api/courses/pro-learning/save-course/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1978,7 +2287,6 @@ const ProLearningPage = () => {
       const responseData = await response.json();
 
       if (response.ok) {
-        setSavedToHub(true);
         console.log('✅ Course saved to Learning Hub successfully!', responseData);
         toast.success('✅ Course saved to your Learning Hub successfully!');
         
@@ -2000,9 +2308,8 @@ const ProLearningPage = () => {
           localStorage.setItem('coursesSavedToHub', JSON.stringify(savedCourses));
         }
         
-        // Mark course as ready and show save button
+        // Mark course as ready
         localStorage.setItem(`proLearning_courseReady_${currentCourseId}`, 'true');
-        setForceShowSave(true);
         
       } else {
         console.error('❌ Failed to save course:', responseData);
@@ -2019,7 +2326,6 @@ const ProLearningPage = () => {
               savedCourses.push(courseKey);
               localStorage.setItem('coursesSavedToHub', JSON.stringify(savedCourses));
             }
-            setSavedToHub(true);
           } catch {}
         } else {
           toast.error(responseData.error || 'Failed to save course');
@@ -2029,8 +2335,6 @@ const ProLearningPage = () => {
     } catch (error) {
       console.error('❌ Failed to save course to Learning Hub:', error);
       toast.error('Network error. Please check your connection and try again.');
-    } finally {
-      setIsSavingToHub(false);
     }
   };
 
@@ -2315,6 +2619,10 @@ const ProLearningPage = () => {
           },
           onTopicComplete: () => {},
           onAllComplete: () => {
+            console.log('🔥 DEBUG: onAllComplete callback triggered!');
+            console.log('🔥 DEBUG: topicsList.length:', topicsList.length);
+            console.log('🔥 DEBUG: remainingTopics will be:', topicsList.slice(1));
+            
             // First topic progressive generation complete, now generate remaining topics
             const remainingTopics = topicsList.slice(1); // All topics except the first
             if (remainingTopics.length > 0) {
@@ -2328,11 +2636,14 @@ const ProLearningPage = () => {
                     setCourseGenerationProgress(Math.round((1 + progress * (topicsList.length - 1)) / topicsList.length * 100));
                     setCourseGenerationStatus(`📈 Generating ${contentType} for ${topicName}`);
                   },
-                  onComplete: () => {
+                  onComplete: async () => {
                     setAllTopicsGenerated(true);
                     setIsProgressiveGenerating(false);
                     setIsLoading(false); // Clear loading state when all topics are ready
                     setCourseGenerationStatus('✅ All topics generated successfully!');
+                    
+                    // Auto-save is now handled directly in generateAllContentBatch
+                    console.log('✅ Generation completed with auto-save');
                     
                     // Clear the batch marker since generation is complete
                     try {
@@ -2357,6 +2668,12 @@ const ProLearningPage = () => {
               setAllTopicsGenerated(true);
               setIsLoading(false); // Clear loading state when single topic is ready
               setCourseGenerationStatus('✅ Course generated successfully!');
+              
+              // Auto-save for single topic completion
+              console.log('🚀 Single topic completed, triggering auto-save...');
+              autoSaveToBackend().catch(error => {
+                console.warn('Auto-save failed:', error);
+              });
               
               // Clear the batch marker since generation is complete
               try {
@@ -2679,17 +2996,11 @@ const ProLearningPage = () => {
     const id = getCourseId();
   }, []);
 
-  // Compute course readiness: show Save button only when ALL topics have ALL tabs
-  const courseCompletionStatus = useMemo(() => {
+  // Derive the count of completed topics for display purposes
+  const completedTopicsCount = useMemo(() => {
     const currentCourseId = getCourseId();
-    const result = {
-      totalTopics: topicsList?.length || 0,
-      topicsComplete: 0,
-      allComplete: false,
-      shouldShowSaveButton: false,
-    };
     if (!currentCourseId || !topicsList || topicsList.length === 0) {
-      return result;
+      return 0;
     }
 
     const isTopicComplete = (topic) => {
@@ -2720,72 +3031,8 @@ const ProLearningPage = () => {
     for (const t of topicsList) {
       if (isTopicComplete(t)) completeCount += 1;
     }
-    result.topicsComplete = completeCount;
-    result.allComplete = completeCount === topicsList.length && topicsList.length > 0;
-    // The Save button should ONLY show if:
-    // 1. We have topics AND
-    // 2. Either:
-    //    a) Course is not yet saved AND all topics are complete AND no content generation is in progress
-    //    OR
-    //    b) Course was previously saved (loaded from database) but needs to be regenerated
-    const hasTopics = topicsList.length > 0;
-    const allTopicsComplete = result.allComplete;
-    const noActiveGeneration = !sectionGenerating;
-    const noGeneratingTopics = generatingTopics.length === 0;
-    const readyToSave = hasTopics && allTopicsComplete && noActiveGeneration && noGeneratingTopics;
-    
-    // Hide save button if course is already saved to the hub
-    result.shouldShowSaveButton = !savedToHub && readyToSave;
-    return result;
-  }, [topicsList, availableTabsForTopics, content, savedToHub, courseId, forceShowSave, hasAnyContent, sectionGenerating, generatingTopics]);
-
-  // Persist the "course ready" flag once all topics are complete so the Save button stays visible after refresh
-  useEffect(() => {
-    try {
-      const id = getCourseId();
-      if (!id) return;
-    if (courseCompletionStatus.allComplete || savedToHub || hasAnyContent) {
-        localStorage.setItem(`proLearning_courseReady_${id}`, 'true');
-        setForceShowSave(true);
-      }
-    } catch {}
-  }, [courseCompletionStatus.allComplete, savedToHub, hasAnyContent]);
-
-  // Check if current course was previously saved to Learning Hub
-  useEffect(() => {
-    const checkSavedStatus = () => {
-      const currentCourseId = getCourseId();
-      if (!currentCourseId) return;
-      
-      let savedStatus = null;
-      try {
-        void import('../../services/IndexedDBService.js')
-          .then(({ default: idb }) => idb.getItem('coursesSavedToHub'))
-          .then((val) => {
-            if (val && typeof localStorage !== 'undefined') {
-              try { localStorage.setItem('coursesSavedToHub', JSON.stringify(val)); } catch {}
-            }
-          })
-          .catch(() => {});
-        savedStatus = typeof localStorage !== 'undefined' ? localStorage.getItem('coursesSavedToHub') : null;
-      } catch {
-        savedStatus = typeof localStorage !== 'undefined' ? localStorage.getItem('coursesSavedToHub') : null;
-      }
-    if (savedStatus) {
-        try {
-          const savedCourses = JSON.parse(savedStatus);
-          // Check if any saved course key contains current course ID
-      // Use a strict prefix match to avoid false positives
-      const isSaved = savedCourses.some(courseKey => typeof courseKey === 'string' && courseKey.startsWith(`${currentCourseId}_`));
-          setSavedToHub(isSaved ? true : false);
-        } catch (error) {
-          console.error('Error parsing saved courses from localStorage:', error);
-        }
-      }
-    };
-    
-    checkSavedStatus();
-  }, [courseId]); // Recheck when courseId changes
+    return completeCount;
+  }, [topicsList, availableTabsForTopics, content, courseId, hasAnyContent, sectionGenerating, generatingTopics]);
 
   // Handle batch generation from ChatbotPage
   useEffect(() => {
@@ -2919,6 +3166,12 @@ const ProLearningPage = () => {
               // All progressive content generation completed!
               setIsProgressiveGenerating(false);
               setAllTopicsGenerated(true);
+              
+              // Auto-save for progressive generation completion
+              console.log('🚀 Progressive generation completed, triggering auto-save...');
+              autoSaveToBackend().catch(error => {
+                console.warn('Auto-save failed:', error);
+              });
             },
             onError: (error) => {
               console.error('❌ Progressive generation error:', error);
@@ -2953,6 +3206,9 @@ const ProLearningPage = () => {
           setAllTopicsGenerated(true);
           setBatchGenerationProgress(100);
           setBatchGenerationStatus('Course generation completed!');
+          
+          // Auto-save is now handled directly in generateAllContentBatch
+          console.log('✅ Legacy batch generation completed with auto-save');
         }
         
         // Auto-load the first topic or topic from URL for batch generation
@@ -4665,10 +4921,6 @@ const ProLearningPage = () => {
                 completedTopics={completedTopics}
                 toggleTopicCompletion={toggleTopicCompletion}
                 handleTopicSelect={handleTopicSelect}
-                handleSaveToLearningHub={handleSaveToLearningHub}
-                isSavingToHub={isSavingToHub}
-                savedToHub={savedToHub}
-                shouldShowSaveButton={courseCompletionStatus.shouldShowSaveButton}
                 tabs={tabs}
                 renderTabContent={renderTabContent}
                 courseTitle={courseTitle}
@@ -4680,62 +4932,6 @@ const ProLearningPage = () => {
                 progressiveGenerationProgress={progressiveGenerationProgress}
                 currentTopicName={selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null)}
               />
-
-              {/* Save to Learning Hub Button - Desktop Version */}
-              {courseCompletionStatus.shouldShowSaveButton && (
-                <div className="mb-6 hidden lg:block">
-                  <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 shadow-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-xl flex items-center justify-center shadow-lg mr-3">
-                          <FaBookmark className="text-lg" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-900">Course Ready!</h3>
-                          <p className="text-sm text-gray-600">Save this AI-generated course to your Learning Hub</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handleSaveToLearningHub}
-                        disabled={isSavingToHub || savedToHub === true}
-                        className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center space-x-2 ${
-                          savedToHub === true
-                            ? 'bg-green-500 text-white cursor-default'
-                            : isSavingToHub
-                            ? 'bg-gray-400 text-white cursor-not-allowed'
-                            : 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white hover:from-emerald-700 hover:to-teal-800 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
-                        }`}
-                      >
-                        {savedToHub === true ? (
-                          <>
-                            <FaCheck className="text-lg" />
-                            <span>Saved to Hub!</span>
-                          </>
-                        ) : isSavingToHub ? (
-                          <>
-                            <BiLoaderAlt className="text-lg animate-spin" />
-                            <span>Saving...</span>
-                          </>
-                        ) : (
-                          <>
-                            <FaBookmark className="text-lg" />
-                            <span>
-                              {sectionGenerating 
-                                ? "⌛ Generating content..."
-                                : !topicsList.length 
-                                  ? "No topics added yet"
-                                  : !courseCompletionStatus.allComplete
-                                    ? `${courseCompletionStatus.topicsComplete}/${courseCompletionStatus.totalTopics} topics complete`
-                                    : "Save to Learning Hub"
-                              }
-                            </span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Desktop Tab Content */}
               <div className="hidden lg:block bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border overflow-hidden">

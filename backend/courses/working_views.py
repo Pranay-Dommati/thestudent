@@ -27,11 +27,36 @@ from django.views.decorators.cache import never_cache
 import json
 import jwt
 from django.conf import settings
+from builtins import print, len, str, bool, list, Exception, enumerate
 
 # Get the custom User model
 User = get_user_model()
 
 from .models import ProLearningCourse, ProLearningTopic, ProLearningVideo, ProLearningQuizQuestion, ProLearningResource
+
+
+def _is_course_effectively_empty(course: ProLearningCourse) -> bool:
+    """Return True if course has no meaningful content stored yet.
+
+    Meaning: no topics OR all topics have empty reading/summary AND no videos/resources/quiz.
+    """
+    try:
+        topics = list(course.topics.all())
+        if not topics:
+            return True
+        for t in topics:
+            has_text = bool((t.reading_material or '').strip()) or bool((t.summary or '').strip())
+            has_children = (
+                ProLearningVideo.objects.filter(topic=t).exists() or
+                ProLearningResource.objects.filter(topic=t).exists() or
+                ProLearningQuizQuestion.objects.filter(topic=t).exists()
+            )
+            if has_text or has_children:
+                return False
+        return True
+    except Exception:
+        # If anything goes wrong, be conservative and report not-empty to avoid accidental overwrite
+        return False
 
 def get_user_from_token(request):
     """Extract user from JWT token"""
@@ -113,16 +138,21 @@ def save_pro_learning_course(request):
 
         # Check for existing course AFTER user is validated
         existing_course = ProLearningCourse.objects.filter(course_name=course_name, user=user).first()
-        if existing_course:
-            print(f"❌ Duplicate course found: {existing_course.course_name} created at {existing_course.created_at}")
-            return JsonResponse({
-                'error': 'Course already exists in your Learning Hub',
-                'course_name': title,
-                'existing_course_name': course_name,
-                'created_at': existing_course.created_at
-            }, status=409)
+        overwrite_flag = data.get('overwrite') or data.get('update_if_exists')
+        if existing_course and not overwrite_flag:
+            # Allow silent update when existing course is effectively empty
+            if _is_course_effectively_empty(existing_course):
+                print("🛠️ Existing course is empty – will overwrite in-place with new content")
+            else:
+                print(f"❌ Duplicate course found: {existing_course.course_name} created at {existing_course.created_at}")
+                return JsonResponse({
+                    'error': 'Course already exists in your Learning Hub',
+                    'course_name': title,
+                    'existing_course_name': course_name,
+                    'created_at': existing_course.created_at
+                }, status=409)
 
-        print(f"✅ No duplicate found, proceeding with course creation...")
+        print(f"✅ Proceeding with course save (create or overwrite)...")
 
         # Debug: Print topic structure to understand data format
         for topic_name, topic_content in topics_data.items():
@@ -142,16 +172,34 @@ def save_pro_learning_course(request):
         with transaction.atomic():
             # Generate a more descriptive course name using the first topic
             first_topic_name = list(topics_data.keys())[0] if topics_data else "AI Course"
-            descriptive_course_name = f"{first_topic_name} Course" if title == f'AI Generated Course - {course_name}' else title
-            
-            print(f"📝 Using course name: '{descriptive_course_name}' (from first topic: '{first_topic_name}')")
-            
-            # Create the course using correct field names
-            course = ProLearningCourse.objects.create(
-                course_name=descriptive_course_name,  # Use descriptive name instead of generic title
-                description=f'AI-generated course covering {len(topics_data)} topics: {", ".join(list(topics_data.keys())[:3])}{"..." if len(topics_data) > 3 else ""}',
-                user=user
-            )
+            descriptive_label = f"{first_topic_name} Course" if title == f'AI Generated Course - {course_name}' else title
+
+            print(f"📝 Using identifier: '{course_name}' with label: '{descriptive_label}' (first topic: '{first_topic_name}')")
+
+            if existing_course and (overwrite_flag or _is_course_effectively_empty(existing_course)):
+                # Overwrite in-place: clear previous topics and children, update course fields
+                print("♻️ Overwriting existing course content in-place")
+                ProLearningVideo.objects.filter(topic__course=existing_course).delete()
+                ProLearningResource.objects.filter(topic__course=existing_course).delete()
+                ProLearningQuizQuestion.objects.filter(topic__course=existing_course).delete()
+                ProLearningTopic.objects.filter(course=existing_course).delete()
+                # Preserve course_name as the stable identifier; update description only
+                existing_course.description = (
+                    f"AI-generated course covering {len(topics_data)} topics: "
+                    f"{', '.join(list(topics_data.keys())[:3])}{'...' if len(topics_data) > 3 else ''}"
+                )
+                existing_course.save(update_fields=["description"])
+                course = existing_course
+            else:
+                # Create a new course
+                course = ProLearningCourse.objects.create(
+                    course_name=course_name,
+                    description=(
+                        f"AI-generated course covering {len(topics_data)} topics: "
+                        f"{', '.join(list(topics_data.keys())[:3])}{'...' if len(topics_data) > 3 else ''}"
+                    ),
+                    user=user
+                )
             
             # Create topics, videos, quizzes, resources, reading material, and summary
             for topic_name, topic_content in topics_data.items():
