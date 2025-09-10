@@ -98,7 +98,14 @@ def save_pro_learning_course(request):
         topics_data = data.get('topics', {})
 
         print(f"🔍 Received data: course_name={course_name}, title='{title}', topics_count={len(topics_data)}")
-        print(f"🔑 Authorization header: {request.META.get('HTTP_AUTHORIZATION', 'None')[:50]}...")
+        print(f"� Topics data structure: {topics_data}")
+        print(f"�🔑 Authorization header: {request.META.get('HTTP_AUTHORIZATION', 'None')[:50]}...")
+        
+        # Debug first topic to see structure
+        if topics_data:
+            first_topic_name = list(topics_data.keys())[0]
+            first_topic_data = topics_data[first_topic_name]
+            print(f"🔍 First topic '{first_topic_name}' structure: {first_topic_data}")
 
         # Validate required fields first
         if not course_name:

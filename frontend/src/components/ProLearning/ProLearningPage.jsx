@@ -1786,6 +1786,10 @@ const ProLearningPage = () => {
       }
 
       console.log('🤖 AUTO-SAVE: Final course ID:', currentCourseId);
+      
+      // Wait a moment for content to be fully saved to storage
+      console.log('🤖 AUTO-SAVE: Waiting 3 seconds for content stabilization...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       // Initialize course content gathering
       let courseContent = null;
@@ -1793,9 +1797,29 @@ const ProLearningPage = () => {
       const sanitizeTopicName = (name) => (name || '').toString().replace(/\s*:\s*true$/i, '').trim();
       
       console.log('🤖 AUTO-SAVE: Checking topics list:', topicsList?.length, 'topics');
+      console.log('🤖 AUTO-SAVE: Checking content state:', content ? 'has content' : 'no content');
       
-      // First try to get topics from current state
-      if (Array.isArray(topicsList) && topicsList.length > 0) {
+      // Try to get content from multiple sources
+      // First check if we have current content in state
+      if (content && Object.keys(content).length > 0) {
+        console.log('🤖 AUTO-SAVE: Found content in current state');
+        // Convert current content state to topics format
+        topicsWithContent.push({
+          name: selectedTopic || 'Current Topic',
+          content: {
+            reading: content.reading || content.readingMaterial || '',
+            summary: content.summary || content.topicSummary || '',
+            videos: Array.isArray(content.videos) ? content.videos : [],
+            quiz: Array.isArray(content.quiz) ? content.quiz : 
+                  Array.isArray(content.quizQuestions) ? content.quizQuestions : [],
+            resources: Array.isArray(content.resources) ? content.resources : []
+          }
+        });
+        console.log(`🤖 AUTO-SAVE: Added current content (reading: ${content.reading?.length || 0} chars, summary: ${content.summary?.length || 0} chars)`);
+      }
+      
+      // If no content from current state, try topics list approach
+      if (topicsWithContent.length === 0 && Array.isArray(topicsList) && topicsList.length > 0) {
         console.log('🤖 AUTO-SAVE: Using topics from current state:', topicsList.length, 'topics');
         
         // Try to gather content for each topic in the current state
@@ -1821,11 +1845,88 @@ const ProLearningPage = () => {
                   resources: Array.isArray(content.resources) ? content.resources : []
                 }
               });
-              console.log('📝 Added content for topic:', topicName);
+              console.log(`📝 Added content for topic: ${topicName} (reading: ${content.reading?.length || 0} chars, summary: ${content.summary?.length || 0} chars)`);
             }
           } catch (e) {
             console.warn('Failed to get content for topic:', topic.name, e);
           }
+        }
+      }
+      
+      // If still nothing, try a more comprehensive storage scan
+      if (topicsWithContent.length === 0) {
+        try {
+          console.log('🤖 AUTO-SAVE: Doing comprehensive storage scan...');
+          
+          // Try getting complete course content first
+          const storedCourseContent = await proContentManager.getStoredCourseContent(currentCourseId);
+          if (storedCourseContent && storedCourseContent.topics) {
+            console.log('🤖 AUTO-SAVE: Found stored course content with topics');
+            // Evaluate if storedCourseContent actually has non-empty topics
+            const tmp = (() => {
+              const topics = storedCourseContent.topics;
+              const entries = Array.isArray(topics) ? topics : Object.values(topics);
+              const nonEmpty = entries.filter(t => {
+                const c = (t?.content ?? t) || {};
+                const r = c.reading || c.readingMaterial || '';
+                const s = c.summary || c.topicSummary || '';
+                return (r && String(r).trim().length) || (s && String(s).trim().length);
+              }).length;
+              return { count: nonEmpty };
+            })();
+            if (tmp.count > 0) {
+              courseContent = storedCourseContent;
+            } else {
+              console.log('🤖 AUTO-SAVE: Stored course content has 0 non-empty topics, will try per-topic scan');
+            }
+          }
+          if (!courseContent) {
+            // Try to get any stored topics for this course
+            const allStoredTopics = await proContentManager.getStoredTopics(currentCourseId);
+            console.log('🤖 AUTO-SAVE: Found stored topics:', allStoredTopics?.length || 0);
+            
+            if (Array.isArray(allStoredTopics) && allStoredTopics.length > 0) {
+              for (const topic of allStoredTopics) {
+                try {
+                  const topicName = sanitizeTopicName(topic?.name);
+                  // Probe multiple name variants to avoid key mismatches
+                  const nameVariants = [
+                    topicName,
+                    topicName.toLowerCase(),
+                    topicName.toUpperCase(),
+                    topicName.replace(/\s+/g, ' ').trim(),
+                  ];
+                  let topicContent = null;
+                  for (const n of nameVariants) {
+                    topicContent = await proContentManager.getStoredTopicContent(currentCourseId, n);
+                    if (topicContent && (topicContent.reading || topicContent.summary)) break;
+                  }
+                  if (topicContent && (topicContent.reading || topicContent.summary)) {
+                    topicsWithContent.push({
+                      name: topicName,
+                      content: {
+                        reading: topicContent.reading || topicContent.readingMaterial || '',
+                        summary: topicContent.summary || topicContent.topicSummary || '',
+                        videos: Array.isArray(topicContent.videos) ? topicContent.videos : [],
+                        quiz: Array.isArray(topicContent.quiz) ? topicContent.quiz : [],
+                        resources: Array.isArray(topicContent.resources) ? topicContent.resources : []
+                      }
+                    });
+                    console.log(`🤖 AUTO-SAVE: Found content for "${topicName}" (reading: ${topicContent.reading?.length || 0}, summary: ${topicContent.summary?.length || 0})`);
+                  }
+                } catch (e) {
+                  console.warn('Error getting content for topic:', topic.name, e);
+                }
+              }
+              
+              if (topicsWithContent.length > 0) {
+                courseContent = { topics: topicsWithContent };
+                console.log('🤖 AUTO-SAVE: Assembled course content from stored topics');
+              }
+            }
+          }
+        } catch (e) {
+          console.error('🤖 AUTO-SAVE: Error in comprehensive storage scan:', e);
         }
       }
       
@@ -1928,14 +2029,25 @@ const ProLearningPage = () => {
       console.log('🤖 AUTO-SAVE: Found course content with', 
         Array.isArray(courseContent.topics) ? courseContent.topics.length : Object.keys(courseContent.topics).length, 
         'topics');
+      
+      console.log('🤖 AUTO-SAVE: Raw course content structure:', {
+        hasTopics: Array.isArray(courseContent.topics),
+        topicsCount: courseContent.topics?.length || 0,
+        sampleTopic: courseContent.topics?.[0],
+        fullCourseContent: courseContent
+      });
 
       // Generate smart course name based on topics
       const smartCourseName = generateSmartCourseName(courseContent.topics, courseTitle);
-      
-      // Prepare course data for working Django endpoint (expects topics as object)
-      const topicsObject = Array.isArray(courseContent.topics)
-        ? Object.fromEntries(courseContent.topics.map((t, idx) => {
-            const c = t?.content ?? t ?? {};
+
+      // Helper to build topics object and compute non-empty stats
+      const buildTopicsObjectAndStats = (cc) => {
+        let nonEmpty = 0;
+        if (!cc || !cc.topics) return { topicsObj: {}, nonEmpty };
+
+        if (Array.isArray(cc.topics)) {
+          const topicsObj = Object.fromEntries(cc.topics.map((t, idx) => {
+            let c = t?.content ?? t ?? {};
             const reading = c.reading || c.readingMaterial || '';
             const summary = c.summary || c.topicSummary || '';
             const videos = Array.isArray(c.videos) ? c.videos : [];
@@ -1944,42 +2056,102 @@ const ProLearningPage = () => {
             else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
             else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
             const resources = Array.isArray(c.resources) ? c.resources : [];
+
+            let finalReading = reading;
+            let finalSummary = summary;
+            // If empty, attempt to enrich from ContentStorageService
+      if (!(finalReading && finalReading.trim().length) && !(finalSummary && finalSummary.trim().length)) {
+              try {
+        let stored = contentStorageService.getContentByTopicName(sanitizeTopicName(t.name), currentCourseId);
+        if (!stored) stored = contentStorageService.getContentByTopicName(sanitizeTopicName(t.name));
+                if (stored) {
+                  finalReading = stored.reading || finalReading;
+                  finalSummary = stored.summary || finalSummary;
+                }
+              } catch {}
+            }
+
+            if ((finalReading && finalReading.trim().length) || (finalSummary && finalSummary.trim().length)) nonEmpty++;
+
+            console.log(`🤖 AUTO-SAVE: Processing topic "${t.name}":`, {
+              hasReading: !!finalReading,
+              readingLength: finalReading?.length || 0,
+              readingPreview: finalReading?.substring(0, 100) + '...',
+              hasSummary: !!finalSummary,
+              summaryLength: finalSummary?.length || 0,
+              summaryPreview: finalSummary?.substring(0, 100) + '...',
+              videosCount: videos.length,
+              quizCount: quiz.length,
+              resourcesCount: resources.length,
+              rawContent: c
+            });
+
             return [
               sanitizeTopicName(t.name),
-              {
-                content: { reading, summary, videos, quiz, resources },
-                order: idx,
-                readingMaterial: reading,
-                summary,
-                videos,
-                quiz,
-                resources
-              }
-            ]
-          }))
-        : Object.fromEntries(Object.entries(courseContent.topics).map(([name, t], idx) => {
-            const c = t?.content ?? t ?? {};
-            const reading = c.reading || c.readingMaterial || '';
-            const summary = c.summary || c.topicSummary || '';
-            const videos = Array.isArray(c.videos) ? c.videos : [];
-            let quiz = [];
-            if (Array.isArray(c.quiz)) quiz = c.quiz;
-            else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
-            else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
-            const resources = Array.isArray(c.resources) ? c.resources : [];
-            return [
-              sanitizeTopicName(name),
-              {
-                content: { reading, summary, videos, quiz, resources },
-                order: idx,
-                readingMaterial: reading,
-                summary,
-                videos,
-                quiz,
-                resources
-              }
+              { content: { reading: finalReading, summary: finalSummary, videos, quiz, resources }, order: idx, readingMaterial: finalReading, summary: finalSummary, videos, quiz, resources }
             ];
           }));
+          return { topicsObj, nonEmpty };
+        }
+
+        const topicsObj = Object.fromEntries(Object.entries(cc.topics).map(([name, t], idx) => {
+          let c = t?.content ?? t ?? {};
+          let reading = c.reading || c.readingMaterial || '';
+          let summary = c.summary || c.topicSummary || '';
+          const videos = Array.isArray(c.videos) ? c.videos : [];
+          let quiz = [];
+          if (Array.isArray(c.quiz)) quiz = c.quiz;
+          else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
+          else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
+          const resources = Array.isArray(c.resources) ? c.resources : [];
+
+      if (!(reading && reading.trim().length) && !(summary && summary.trim().length)) {
+            try {
+        let stored = contentStorageService.getContentByTopicName(sanitizeTopicName(name), currentCourseId);
+        if (!stored) stored = contentStorageService.getContentByTopicName(sanitizeTopicName(name));
+              if (stored) {
+                reading = stored.reading || reading;
+                summary = stored.summary || summary;
+              }
+            } catch {}
+          }
+
+          if ((reading && reading.trim().length) || (summary && summary.trim().length)) nonEmpty++;
+
+          return [
+            sanitizeTopicName(name),
+            { content: { reading, summary, videos, quiz, resources }, order: idx, readingMaterial: reading, summary, videos, quiz, resources }
+          ];
+        }));
+        return { topicsObj, nonEmpty };
+      };
+
+      // Retry loop: ensure we have at least one non-empty topic before POST
+      let topicsObject = {};
+      let nonEmptyCount = 0;
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        const built = buildTopicsObjectAndStats(courseContent);
+        topicsObject = built.topicsObj;
+        nonEmptyCount = built.nonEmpty;
+        console.log(`🤖 AUTO-SAVE: Build attempt ${attempt}/5 -> nonEmptyTopics=${nonEmptyCount}`);
+        if (nonEmptyCount > 0) break;
+        console.warn(`⏳ AUTO-SAVE: All topics empty on attempt ${attempt}. Retrying after 1500ms...`);
+        await new Promise(r => setTimeout(r, 1500));
+        try {
+          const refreshed = await proContentManager.getStoredCourseContent(currentCourseId);
+          if (refreshed && refreshed.topics) {
+            courseContent = refreshed;
+            console.log('🔁 AUTO-SAVE: Refreshed course content from storage');
+          }
+        } catch (e) {
+          console.warn('🔁 AUTO-SAVE: Failed to refresh stored course content', e);
+        }
+      }
+
+      if (nonEmptyCount === 0) {
+        console.error('❌ AUTO-SAVE: Aborting POST — all topics have empty reading/summary after retries');
+        return; // avoid saving empty topics
+      }
 
       const courseData = {
         course_name: currentCourseId, // stable identifier used by backend
@@ -2010,6 +2182,26 @@ const ProLearningPage = () => {
 
       // Save to backend using Django endpoint
       console.log('🤖 AUTO-SAVE: Sending POST request to /api/courses/pro-learning/save-course/');
+      console.log('🤖 AUTO-SAVE: Final course data being sent:', JSON.stringify(courseData, null, 2));
+      console.log('🤖 AUTO-SAVE: POST payload size:', JSON.stringify(courseData).length, 'characters');
+      console.log('🤖 AUTO-SAVE: Topics in payload:', Object.keys(courseData.topics || {}));
+      
+      // Log each topic's content in detail
+      if (courseData.topics) {
+        Object.entries(courseData.topics).forEach(([topicName, topicData]) => {
+          console.log(`🤖 AUTO-SAVE: Topic "${topicName}" payload:`, {
+            hasContent: !!topicData.content,
+            reading: topicData.content?.reading || 'EMPTY',
+            readingLength: (topicData.content?.reading || '').length,
+            summary: topicData.content?.summary || 'EMPTY', 
+            summaryLength: (topicData.content?.summary || '').length,
+            fullTopicData: topicData
+          });
+        });
+      }
+
+      console.log('🤖 AUTO-SAVE: Making POST request to /api/courses/pro-learning/save-course/...');
+      
       const response = await fetch('/api/courses/pro-learning/save-course/', {
         method: 'POST',
         headers: {

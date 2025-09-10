@@ -862,10 +862,34 @@ class ProContentManager {
   async getStoredTopicContent(courseId, topicName, contentType = null) {
     // Prefer aggregated course content if available
     const courseContent = await this.getStoredCourseContent(courseId);
-    if (courseContent && courseContent.topics && courseContent.topics[topicName]) {
-      const topicData = courseContent.topics[topicName];
-      if (contentType) return topicData.content[contentType] || null;
-      return topicData.content;
+    // Helper to decide if content is meaningful
+    const hasMeaningful = (c) => !!((c?.reading && String(c.reading).trim().length) || (c?.summary && String(c.summary).trim().length));
+
+    if (courseContent && courseContent.topics) {
+      // Try exact key first
+      let topicEntry = courseContent.topics[topicName];
+      // If not found, try case-insensitive match
+      if (!topicEntry) {
+        const matchKey = Object.keys(courseContent.topics).find(k => k.toLowerCase().trim() === String(topicName).toLowerCase().trim());
+        if (matchKey) topicEntry = courseContent.topics[matchKey];
+      }
+
+      if (topicEntry) {
+        const c = topicEntry.content || {};
+        // If DB/aggregated content is meaningful, return it directly
+        if (hasMeaningful(c)) {
+          return contentType ? (c[contentType] ?? null) : c;
+        }
+        // Otherwise, attempt to enrich from local ContentStorageService
+        try {
+          const stored = contentStorageService.getContentByTopicName(topicName, courseId);
+          if (stored && hasMeaningful(stored)) {
+            return contentType ? (stored[contentType] ?? null) : stored;
+          }
+        } catch (_) {}
+        // Fall back to original (potentially empty) content
+        return contentType ? (c[contentType] ?? null) : c;
+      }
     }
 
     // Fallback: read directly from ContentStorageService (progressive path / per-topic storage)
