@@ -1,8 +1,6 @@
 // ContentStorageService.js
 // Database-like content storage service for Pro Learning system
-// Internally persists to IndexedDB with a localStorage fallback
-
-// IndexedDB removed for Pro Learning; using in-memory + localStorage only
+// IndexedDB removed: using in-memory + localStorage only
 
 class ContentStorageService {
   constructor() {
@@ -14,7 +12,7 @@ class ContentStorageService {
       metadata: new Map()      // general metadata storage
     };
     
-  // Initialize by loading from IndexedDB, falling back to localStorage
+  // Initialize by loading from localStorage
   this.loadFromPersistence();
   }
 
