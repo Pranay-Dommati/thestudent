@@ -73,8 +73,8 @@ const Sidebar = ({
             </div>
           </div>
 
-          {/* Certificate CTA */}
-          {isLoggedIn && (
+          {/* Certificate CTA - Only show for engineering courses */}
+          {isLoggedIn && location.pathname.includes('/courses/engineering/') && (
             <div className="mt-4">
               {certificate ? (
                 <button

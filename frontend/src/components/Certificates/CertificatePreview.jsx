@@ -135,6 +135,12 @@ const CertificatePreview = () => {
   useEffect(() => {
     const init = async () => {
       try {
+        // Don't try to get certificate for school courses
+        if (!location.pathname.includes('/courses/engineering/')) {
+          setLoading(false);
+          return;
+        }
+
         setLoading(true);
         setPdfError(false); // Reset PDF error state on reload
         setPdfLoading(true); // Reset PDF loading state
@@ -544,7 +550,7 @@ const CertificatePreview = () => {
       </div>
 
       {/* Mobile-Optimized Certificate Generation Button for Edge Case */}
-      {!certificate && !loading && progressPct >= 100 && !issuing && (
+      {!certificate && !loading && progressPct >= 100 && !issuing && location.pathname.includes('/courses/engineering/') && (
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4">
           <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
             <button

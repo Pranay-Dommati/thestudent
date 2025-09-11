@@ -21,6 +21,7 @@
     "framer-motion": "^12.4.10",
     "lucide-react": "^0.483.0",
     "openai": "^4.89.0",
+    "pdfjs-dist": "^5.4.149",
     "quill": "^2.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
