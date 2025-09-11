@@ -1,5 +1,6 @@
-// Simple logger utility. Enable logs by setting VITE_DEBUG_LOGS=true in your env.
-const isDebug = import.meta.env.VITE_DEBUG_LOGS === 'true';
+// Simple logger utility. Logs are DISABLED in production regardless of env flag.
+// To enable logs locally, set VITE_DEBUG_LOGS=true when running in development.
+const isDebug = (import.meta.env.MODE !== 'production') && (import.meta.env.VITE_DEBUG_LOGS === 'true');
 
 export const log = (...args) => { if (isDebug) console.log(...args); };
 export const info = (...args) => { if (isDebug) console.info?.(...args); };
