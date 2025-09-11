@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import logger from '../../../utils/logger';
+// logger removed for production cleanliness
 import { Link } from 'react-router-dom';
 
 // Mock data for recommended courses
@@ -253,9 +253,7 @@ const CourseRecommendations = () => {
               zIndex: 10,
               position: 'relative'
             }}
-            onClick={() => {
-              logger.log('🔥 [VIEW ALL] Course recommendations link clicked - navigating to /courses');
-            }}
+            onClick={() => {}}
           >
             View all recommendations
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

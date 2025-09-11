@@ -1,3 +1,4 @@
+import logger from '../utils/logger';
 // Utility for making authenticated API requests with proper token validation
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -13,7 +14,7 @@ class AuthService {
       const authData = localStorage.getItem('adminAuth');
       this.authData = authData ? JSON.parse(authData) : null;
     } catch (error) {
-      console.error('Error loading auth data:', error);
+  logger.error('Error loading auth data:', error);
       this.authData = null;
     }
   }
@@ -94,7 +95,7 @@ class AuthService {
       
       return data.access;
     } catch (error) {
-      console.error('Token refresh error:', error);
+  logger.error('Token refresh error:', error);
       this.clearAuthData();
       throw error;
     }
@@ -136,7 +137,7 @@ class AuthService {
 
       return response;
     } catch (error) {
-      console.error('Authenticated request error:', error);
+  logger.error('Authenticated request error:', error);
       throw error;
     }
   }
@@ -162,7 +163,7 @@ class AuthService {
 
       return data;
     } catch (error) {
-      console.error('Admin verification error:', error);
+  logger.error('Admin verification error:', error);
       this.clearAuthData();
       throw error;
     }
@@ -195,7 +196,7 @@ class AuthService {
       this.saveAuthData(authData);
       return data;
     } catch (error) {
-      console.error('Admin login error:', error);
+  logger.error('Admin login error:', error);
       throw error;
     }
   }

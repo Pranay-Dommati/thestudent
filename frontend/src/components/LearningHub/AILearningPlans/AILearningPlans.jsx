@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import logger from '../../../utils/logger';
+// logger removed for production cleanliness
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { FaBrain, FaPlay, FaCheckCircle, FaClock, FaChartLine, FaTrash, FaEllipsisV, FaSpinner } from 'react-icons/fa';
@@ -30,7 +30,7 @@ const AILearningPlans = () => {
         return;
       }
 
-  logger.log('🔥 [AI COURSES] Fetching Pro Learning courses...');
+  
       const response = await axios.get(`${API_URL}/api/courses/pro-learning/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -38,11 +38,11 @@ const AILearningPlans = () => {
         }
       });
 
-  logger.log('🔥 [AI COURSES] Pro courses response:', response.data);
+  
       setProCourses(response.data.results || response.data || []);
       setError(null);
     } catch (error) {
-  logger.error('❌ [AI COURSES] Error fetching pro courses:', error);
+  
       if (error.response?.status === 401) {
         setError('Please log in to view your AI-created courses');
       } else {
@@ -54,7 +54,7 @@ const AILearningPlans = () => {
   };
 
   const handleStartCourse = async (courseId, courseName) => {
-  logger.log('🎯 Start button clicked for course:', courseId, courseName);
+  
     try {
       // Add loading toast
       toast.loading(`Loading ${courseName}...`, { id: `loading-${courseId}` });
@@ -74,7 +74,7 @@ const AILearningPlans = () => {
         navigate(`/pro-learning/${courseId}`);
       }
     } catch (error) {
-  logger.error('❌ Error accessing course:', error);
+  
       if (error.response?.status === 404) {
         toast.error('Course not found. It may have been deleted.', { id: `loading-${courseId}` });
         // Refresh the course list
@@ -102,7 +102,7 @@ const AILearningPlans = () => {
       setProCourses(prevCourses => prevCourses.filter(course => course.id !== courseId));
       toast.success(`"${courseName}" has been deleted successfully`);
     } catch (error) {
-  logger.error('❌ Error deleting course:', error);
+  
       toast.error('Failed to delete course. Please try again.');
     } finally {
       setDeleteLoading(null);
@@ -110,7 +110,7 @@ const AILearningPlans = () => {
   };
 
   const handleDeleteClick = (course) => {
-  logger.log('🗑️ Delete button clicked for course:', course.id, course.course_name);
+  
     deleteCourse(course.id, course.course_name);
   };
 
@@ -204,7 +204,6 @@ const AILearningPlans = () => {
             zIndex: 10
           }}
           onClick={(e) => {
-            logger.log('Create Your First AI Course button clicked - navigating to /chat');
             // Ensure navigation happens
             e.stopPropagation();
           }}
@@ -219,10 +218,7 @@ const AILearningPlans = () => {
   const coursesToDisplay = showMore ? proCourses : proCourses.slice(0, COURSES_TO_SHOW);
 
   // Debug logging for Load More functionality
-  logger.log('🔥 [LOAD MORE] Show more state:', showMore);
-  logger.log('🔥 [LOAD MORE] Total courses available:', proCourses.length);
-  logger.log('🔥 [LOAD MORE] Courses to display:', coursesToDisplay.length);
-  logger.log('🔥 [LOAD MORE] Should show Load More button:', proCourses.length > COURSES_TO_SHOW);
+  
 
   return (
     <>
@@ -279,7 +275,6 @@ const AILearningPlans = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      logger.log('Button clicked!', course.id);
                       handleStartCourse(course.id, formatCourseName(course));
                     }}
                     className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-md text-xs font-medium hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 flex items-center disabled:opacity-50 cursor-pointer relative z-5"
@@ -295,7 +290,6 @@ const AILearningPlans = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      logger.log('Delete button clicked!', course.id);
                       handleDeleteClick(course);
                     }}
                     className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all duration-200 cursor-pointer relative z-5"
@@ -317,11 +311,7 @@ const AILearningPlans = () => {
         <div className="text-center mt-6">
           <button
             onClick={() => {
-              logger.log('🔥 [LOAD MORE] Button clicked. Current showMore:', showMore);
-              logger.log('🔥 [LOAD MORE] Total courses:', proCourses.length);
-              logger.log('🔥 [LOAD MORE] Courses to show initially:', COURSES_TO_SHOW);
               setShowMore(!showMore);
-              logger.log('🔥 [LOAD MORE] New showMore will be:', !showMore);
             }}
             className="btn-clickable inline-flex items-center justify-center h-11 min-h-[44px] px-5 rounded-full border border-indigo-200 text-indigo-700 bg-white/80 backdrop-blur-sm hover:bg-white 
                        transition-all duration-200 font-medium text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"

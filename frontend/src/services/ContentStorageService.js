@@ -1,6 +1,7 @@
 // ContentStorageService.js
 // Database-like content storage service for Pro Learning system
 // IndexedDB removed: using in-memory + localStorage only
+import logger from '../utils/logger';
 
 class ContentStorageService {
   constructor() {
@@ -73,7 +74,7 @@ class ContentStorageService {
    * @returns {Array} - Array of stored topic IDs
    */
   storeTopics(courseId, topicsList) {
-    console.log('📝 STORAGE DEBUG: Storing topics for course:', courseId, 'topics:', topicsList.map(t => t.name || t));
+  logger.log('📝 STORAGE DEBUG: Storing topics for course:', courseId);
     const topicIds = [];
     
     topicsList.forEach(topic => {
@@ -92,7 +93,7 @@ class ContentStorageService {
       
       this.storage.topics.set(topicId, topicData);
       topicIds.push(topicId);
-      console.log('📝 STORAGE DEBUG: Stored topic:', topicId, 'name:', topic.name);
+  logger.log('📝 STORAGE DEBUG: Stored topic');
     });
 
     // Update course with topic IDs
@@ -101,7 +102,7 @@ class ContentStorageService {
       course.topicIds = topicIds;
       course.updatedAt = new Date().toISOString();
       this.storage.courses.set(courseId, course);
-      console.log('📝 STORAGE DEBUG: Course updated with topicIds:', topicIds);
+  logger.log('📝 STORAGE DEBUG: Course updated with topicIds');
     }
 
   this.persistToStorage();
@@ -116,7 +117,7 @@ class ContentStorageService {
   getTopicsForCourse(courseId) {
     const course = this.storage.courses.get(courseId);
     if (!course) {
-      console.log('🔍 STORAGE DEBUG: Course not found for ID:', courseId);
+  logger.log('🔍 STORAGE DEBUG: Course not found for ID:', courseId);
       return [];
     }
 
@@ -124,7 +125,7 @@ class ContentStorageService {
       this.storage.topics.get(topicId)
     ).filter(Boolean);
     
-    console.log('🔍 STORAGE DEBUG: getTopicsForCourse result:', {
+    logger.log('🔍 STORAGE DEBUG: getTopicsForCourse result:', {
       courseId,
       topicIds: course.topicIds,
       foundTopics: topics.length,
@@ -193,7 +194,7 @@ class ContentStorageService {
    * @returns {String} - Content ID
    */
   storeTopicContent(topicId, contentData) {
-    console.log('💾 STORAGE DEBUG: Storing content for topic ID:', topicId, 'contentData keys:', Object.keys(contentData || {}));
+  logger.log('💾 STORAGE DEBUG: Storing content for topic ID:', topicId, 'contentData keys:', Object.keys(contentData || {}));
     const contentId = this.generateId('content');
     const isProgressive = !!(contentData && contentData.metadata);
     const content = {
@@ -235,7 +236,7 @@ class ContentStorageService {
     };
 
   this.storage.contents.set(contentId, content);
-  console.log('💾 STORAGE DEBUG: Content stored in contents map with ID:', contentId);
+  logger.log('💾 STORAGE DEBUG: Content stored in contents map with ID:', contentId);
 
     // Update topic to reference this content
     const topic = this.storage.topics.get(topicId);
@@ -243,16 +244,16 @@ class ContentStorageService {
       topic.contentGenerated = true;
       topic.contentId = contentId;
       topic.updatedAt = new Date().toISOString();
-    this.storage.topics.set(topicId, topic);
-    console.log('💾 STORAGE DEBUG: Topic updated with contentId:', contentId, 'topic name:', topic.name);
+  this.storage.topics.set(topicId, topic);
+  logger.log('💾 STORAGE DEBUG: Topic updated with contentId:', contentId);
 
     // Persist changes asynchronously (best-effort)
     try { this.persistToStorage(); } catch {}
     } else {
-      console.error('❌ STORAGE DEBUG: Topic not found for ID:', topicId);
+      logger.error('❌ STORAGE DEBUG: Topic not found for ID:', topicId);
     }
 
-  this.persistToStorage();
+    this.persistToStorage();
     return contentId;
   }
 
@@ -338,13 +339,13 @@ class ContentStorageService {
    * @returns {Object|null} - Content data or null
    */
   getContentByTopicName(topicName, courseId) {
-    console.log('🔍 STORAGE DEBUG: Looking for content - Topic:', topicName, 'Course:', courseId);
+  logger.log('🔍 STORAGE DEBUG: Looking for content - Topic:', topicName, 'Course:', courseId);
     const topic = this.getTopicByName(topicName, courseId);
-    console.log('🔍 STORAGE DEBUG: Found topic for', topicName, ':', !!topic, topic ? topic.id : 'none');
+  logger.log('🔍 STORAGE DEBUG: Found topic for', topicName, ':', !!topic, topic ? topic.id : 'none');
     if (!topic) return null;
     
     const content = this.getTopicContent(topic.id);
-    console.log('🔍 STORAGE DEBUG: Found content for topic', topicName, ':', !!content);
+  logger.log('🔍 STORAGE DEBUG: Found content for topic', topicName, ':', !!content);
     return content;
   }
 
@@ -432,7 +433,7 @@ class ContentStorageService {
       };
       localStorage.setItem('proLearning_storage', JSON.stringify(storageData));
     } catch (error) {
-      console.warn('Failed to persist storage (localStorage):', error);
+  logger.warn('Failed to persist storage (localStorage):', error);
     }
   }
 
@@ -451,7 +452,7 @@ class ContentStorageService {
         this.storage.metadata = new Map(Object.entries(storageData.metadata || {}));
       }
     } catch (error) {
-      console.warn('Failed to load storage (localStorage):', error);
+  logger.warn('Failed to load storage (localStorage):', error);
     }
   }
 
@@ -464,8 +465,8 @@ class ContentStorageService {
     this.storage.contents.clear();
     this.storage.metadata.clear();
     
-    localStorage.removeItem('proLearning_storage');
-    console.log('🗑️ Storage cleared');
+  localStorage.removeItem('proLearning_storage');
+  logger.log('🗑️ Storage cleared');
   }
 
   /**

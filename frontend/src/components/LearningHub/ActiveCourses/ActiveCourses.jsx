@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import logger from '../../../utils/logger';
+// logger removed for production cleanliness
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import axios from 'axios';
@@ -33,7 +33,7 @@ const ActiveCourses = () => {
           }
         });
 
-  logger.log('Enrolled courses response:', response.data);
+  
 
         if (response.data.success) {
           // Format the courses for display
@@ -42,8 +42,7 @@ const ActiveCourses = () => {
             const courseType = enrollment.school_course ? 'school' : 'engineering';
             
             // Debug course data
-            logger.log('🖼️ [COURSE IMAGE] Processing course:', course.title);
-            logger.log('🖼️ [COURSE IMAGE] Course thumbnail from API:', course.thumbnail);
+            
             
             // Calculate time since enrollment for "last accessed"
             const startedDate = new Date(enrollment.started_at);
@@ -68,7 +67,7 @@ const ActiveCourses = () => {
             // Use the thumbnail URL directly from the API (backend should handle absolute URLs)
             const imageUrl = course.thumbnail || "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80";
             
-            logger.log('🖼️ [COURSE IMAGE] Final image URL for', course.title, ':', imageUrl);
+            
 
             return {
               id: course.id,
@@ -90,7 +89,7 @@ const ActiveCourses = () => {
           setEnrolledCourses(formattedCourses);
         }
       } catch (error) {
-        logger.error('Error fetching enrolled courses:', error);
+  // silently handle in production
         if (error.response?.status !== 401) {
           toast.error('Failed to load enrolled courses');
         }
@@ -103,17 +102,17 @@ const ActiveCourses = () => {
   }, [isLoggedIn]);
 
   const handleSortChange = () => {
-    logger.log('🔄 Sort button clicked! Current sort:', sortBy);
+    
     const newSort = sortBy === 'recent' ? 'alphabetical' : 'recent';
     setSortBy(newSort);
-    logger.log('🔄 New sort applied:', newSort);
+    
     toast.success(`Sorted by ${newSort === 'recent' ? 'Recent' : 'Alphabetical'}`);
   };
 
   const handleViewAll = () => {
-    logger.log('👁️ View all button clicked! Current showAll:', showAll);
+    
     setShowAll(!showAll);
-    logger.log('👁️ New showAll state:', !showAll);
+    
     toast.success(`${showAll ? 'Showing limited courses' : 'Showing all courses'}`);
   };
 
@@ -137,7 +136,7 @@ const ActiveCourses = () => {
       setEnrolledCourses(prev => prev.filter(course => course.enrollmentId !== enrollmentId));
       toast.success(`Successfully removed "${courseTitle}" from your courses`);
     } catch (error) {
-  logger.error('Error removing course:', error);
+  
       if (error.response?.status === 404) {
         toast.error('Course enrollment not found');
       } else {
@@ -236,7 +235,7 @@ const ActiveCourses = () => {
                       alt={course.title}
                       className="w-full h-full object-cover transform transition-transform duration-300 group-hover:scale-105"
                       onError={(e) => {
-                        logger.log('🖼️ [IMAGE ERROR] Failed to load image:', e.target.src, 'for course:', course.title);
+                        
                         e.target.onerror = null;
                         
                         const fallbackImages = [
@@ -254,9 +253,7 @@ const ActiveCourses = () => {
                           e.target.src = fallbackImages[fallbackImages.length - 1];
                         }
                       }}
-                      onLoad={() => {
-                        logger.log('🖼️ [IMAGE SUCCESS] Successfully loaded image for course:', course.title);
-                      }}
+                      onLoad={() => {}}
                     />
                   </div>
                   <div className="absolute inset-0 bg-black/5 group-hover:bg-black/10 transition-colors"></div>
@@ -322,9 +319,7 @@ const ActiveCourses = () => {
                           className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 
                           transition-colors flex items-center justify-center group-hover:shadow-md cursor-pointer relative z-10 flex-shrink-0"
                           style={{ pointerEvents: 'auto' }}
-                          onClick={(e) => {
-                            logger.log('Start/Continue Learning clicked for:', course.course_name, 'URL:', course.learningUrl);
-                          }}
+                          onClick={(e) => {}}
                         >
                           {course.progress > 0 ? 'Continue' : 'Start'}
                         </Link>
@@ -380,7 +375,6 @@ const ActiveCourses = () => {
                 zIndex: 50
               }}
               onClick={(e) => {
-                logger.log('Browse Courses button clicked - navigating to /courses');
                 // Ensure navigation happens
                 e.stopPropagation();
               }}

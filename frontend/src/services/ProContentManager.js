@@ -3,6 +3,7 @@
 // Acts as an interface between UI components and ContentStorageService
 
 import contentStorageService from './ContentStorageService.js';
+import logger from '../utils/logger';
 
 class ProContentManager {
   constructor() {
@@ -32,7 +33,7 @@ class ProContentManager {
         return true;
       }
     } catch (e) {
-      console.warn('Failed to initialize from backend DB, will fallback to local storage:', e);
+  logger.warn('Failed to initialize from backend DB, will fallback to local storage:', e);
     }
 
     try {
@@ -43,7 +44,7 @@ class ProContentManager {
         return true;
       }
     } catch (e) {
-      console.error('Failed to load from localStorage fallback', e);
+  logger.error('Failed to load from localStorage fallback', e);
     }
 
     return false;
@@ -241,7 +242,7 @@ class ProContentManager {
       try {
         // Step 1: Check for valid stored content first (localStorage)
         const storedContent = contentStorageService.getContentByTopicName(topicName, this.currentCourseId);
-        console.log('🔍 ContentStorageService check:', {
+  logger.log('🔍 ContentStorageService check:', {
           topicName,
           courseId: this.currentCourseId,
           hasStoredContent: !!storedContent,
@@ -249,7 +250,7 @@ class ProContentManager {
         });
         
         if (storedContent?.reading?.length > 0) {
-          console.log('✅ Using stored content from ContentStorageService');
+          logger.log('✅ Using stored content from ContentStorageService');
           return {
             source: 'storage',
             content: storedContent,
@@ -259,7 +260,7 @@ class ProContentManager {
 
         // Step 2: Check for database content if dbTopic is provided
         if (dbTopic && (dbTopic.reading_material || dbTopic.summary || dbTopic.videos?.length > 0 || dbTopic.quiz_questions?.length > 0 || dbTopic.resources?.length > 0)) {
-          console.log('🗄️ Database topic found, transforming content:', {
+          logger.log('🗄️ Database topic found, transforming content:', {
             topicName,
             hasReadingMaterial: !!dbTopic.reading_material,
             hasSummary: !!dbTopic.summary,
@@ -270,7 +271,7 @@ class ProContentManager {
           
           const transformedContent = this.transformDatabaseContent(dbTopic);
           
-          console.log('🔄 Transformed database content:', {
+          logger.log('🔄 Transformed database content:', {
             hasReading: !!transformedContent?.reading,
             hasSummary: !!transformedContent?.summary,
             hasVideos: !!transformedContent?.videos?.length,
@@ -299,7 +300,7 @@ class ProContentManager {
             if (!resolved) {
               resolved = true;
               const elapsed = (Date.now() - generationStartTime) / 1000;
-              console.error(`⏰ Content generation timeout after ${elapsed}s for topic: ${topicName}`);
+              logger.error(`⏰ Content generation timeout after ${elapsed}s for topic: ${topicName}`);
               reject(new Error('Content generation timeout - this usually means the setContent callback was not called properly'));
             }
           }, 300000); // Increased to 5 minutes for AI content generation with retry logic
@@ -356,7 +357,7 @@ class ProContentManager {
         };
 
       } catch (error) {
-        console.error('❌ Content generation/storage failed:', error);
+  logger.error('❌ Content generation/storage failed:', error);
         throw error;
       } finally {
         // Always clean up the generation promise
@@ -458,7 +459,7 @@ class ProContentManager {
       // Keep a small localStorage cache as a fallback only
       try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
     } catch (error) {
-      console.error('❌ Failed to update in-memory course content structure:', error);
+  logger.error('❌ Failed to update in-memory course content structure:', error);
     }
     
     return topicIds;
@@ -512,7 +513,7 @@ class ProContentManager {
           
           // Validate topic name
           if (!topicName || typeof topicName !== 'string' || topicName.trim().length === 0) {
-            console.error(`❌ Invalid topic name received: "${topicName}"`);
+            logger.error(`❌ Invalid topic name received: "${topicName}"`);
             throw new Error(`Invalid topic name: ${topicName}`);
           }
           // Use the existing content generation logic from ProLearningLogic
@@ -665,7 +666,7 @@ class ProContentManager {
               // Generated contentType for topic
               
             } catch (error) {
-              console.error(`❌ Failed to generate ${contentType} for ${topic.name}:`, error);
+              logger.error(`❌ Failed to generate ${contentType} for ${topic.name}:`, error);
               currentStep++;
               // Continue with next content type instead of failing completely
             }
@@ -676,7 +677,7 @@ class ProContentManager {
             // Calling setContent with generated content
             params.setContent(generatedContent);
           } else {
-            console.warn('⚠️ No setContent callback available');
+            logger.warn('⚠️ No setContent callback available');
           }
           
           return generatedContent;
@@ -689,7 +690,7 @@ class ProContentManager {
         // Completed all content for topic
         
       } catch (error) {
-        console.error(`❌ Failed to generate content for topic ${topic.name}:`, error);
+  logger.error(`❌ Failed to generate content for topic ${topic.name}:`, error);
         courseContent.topics[topic.name].status = 'failed';
         courseContent.topics[topic.name].error = error.message;
       }
@@ -708,8 +709,8 @@ class ProContentManager {
   // Persist via working endpoint that creates course with full topics/content
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
       if (token) {
-        console.log('🚀 ProContentManager: Saving batch to backend with full content...');
-        console.log('📊 Course Data Preview:', {
+  logger.log('🚀 ProContentManager: Saving batch to backend with full content...');
+  logger.log('📊 Course Data Preview:', {
           courseId,
           title: this.currentCourse || 'AI Generated Course',
           topicCount: Object.keys(courseContent.topics).length,
@@ -776,15 +777,15 @@ class ProContentManager {
         });
         
         if (response.ok) {
-          console.log('✅ ProContentManager: Batch successfully saved to backend database');
+          logger.log('✅ ProContentManager: Batch successfully saved to backend database');
         } else {
-          console.error('❌ ProContentManager: Failed to save batch to backend:', await response.text());
+          logger.error('❌ ProContentManager: Failed to save batch to backend:', await response.text());
         }
       } else {
-        console.warn('⚠️ ProContentManager: No auth token available, skipping backend save');
+  logger.warn('⚠️ ProContentManager: No auth token available, skipping backend save');
       }
     } catch (e) {
-      console.error('❌ ProContentManager: Failed to persist batch to backend:', e);
+  logger.error('❌ ProContentManager: Failed to persist batch to backend:', e);
     }
     
     // Batch content generation completed
@@ -811,7 +812,7 @@ class ProContentManager {
         return aggregated;
       }
     } catch (e) {
-      console.warn('Failed to load course from backend DB:', e);
+  logger.warn('Failed to load course from backend DB:', e);
     }
 
   // 3) Fallback: localStorage only (IndexedDB removed)

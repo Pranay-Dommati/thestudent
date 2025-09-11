@@ -1,4 +1,5 @@
 import axios from 'axios';
+import logger from '../utils/logger';
 
 const API_URL = 'http://localhost:8000';
 
@@ -45,8 +46,8 @@ class ActivityTracker {
       this.sendActivityUpdate(this.sessionMinutes);
     }
     
-    this.removeActivityListeners();
-    console.log('⏹️ Stopped learning activity tracking');
+  this.removeActivityListeners();
+  logger.log('⏹️ Stopped learning activity tracking');
   }
 
   // Send activity update to backend
@@ -68,10 +69,10 @@ class ActivityTracker {
       });
 
       if (response.data.success) {
-        // Tracked learning activity and total hours
+        // tracked
       }
     } catch (error) {
-      console.error('❌ Error tracking learning activity:', error);
+      logger.error('❌ Error tracking learning activity:', error);
     }
   }
 
@@ -84,7 +85,7 @@ class ActivityTracker {
     
     // If user has been inactive for more than 10 minutes, don't count this interval
     if (timeSinceLastActivity > 10 * 60 * 1000) {
-      console.log('🚫 User inactive for more than 10 minutes, not tracking this interval');
+      logger.log('🚫 User inactive for more than 10 minutes, not tracking this interval');
       this.lastActivityTime = now;
       return;
     }
@@ -121,17 +122,17 @@ class ActivityTracker {
   // Get learning statistics
   static async getLearningStats() {
     try {
-      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      console.log('🔥 [LEARNING STATS] Token available:', !!token);
-      console.log('🔥 [LEARNING STATS] Token preview:', token ? `${token.substring(0, 20)}...` : 'null');
-      console.log('🔥 [LEARNING STATS] All localStorage keys:', Object.keys(localStorage));
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  logger.log('🔥 [LEARNING STATS] Token available:', !!token);
+  logger.log('🔥 [LEARNING STATS] Token preview:', token ? `${token.substring(0, 20)}...` : 'null');
+  logger.log('🔥 [LEARNING STATS] All localStorage keys:', Object.keys(localStorage));
       
       if (!token) {
-        console.error('🔥 [LEARNING STATS] ❌ No access token found in localStorage');
+        logger.error('🔥 [LEARNING STATS] ❌ No access token found in localStorage');
         return null;
       }
 
-      console.log('🔥 [LEARNING STATS] Making request to:', `${API_URL}/api/courses/learning-stats/`);
+      logger.log('🔥 [LEARNING STATS] Making request to:', `${API_URL}/api/courses/learning-stats/`);
       const response = await axios.get(`${API_URL}/api/courses/learning-stats/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -139,28 +140,28 @@ class ActivityTracker {
         }
       });
 
-      console.log('🔥 [LEARNING STATS] API Response status:', response.status);
-      console.log('🔥 [LEARNING STATS] API Response data (full):', response.data);
-      console.log('🔥 [LEARNING STATS] response.data.success:', response.data.success);
-      console.log('🔥 [LEARNING STATS] response.data.data:', response.data.data);
-      console.log('🔥 [LEARNING STATS] Type of response.data.data:', typeof response.data.data);
+      logger.log('🔥 [LEARNING STATS] API Response status:', response.status);
+      logger.log('🔥 [LEARNING STATS] API Response data (full):', response.data);
+      logger.log('🔥 [LEARNING STATS] response.data.success:', response.data.success);
+      logger.log('🔥 [LEARNING STATS] response.data.data:', response.data.data);
+      logger.log('🔥 [LEARNING STATS] Type of response.data.data:', typeof response.data.data);
       
       if (response.data.success && response.data.data) {
         // Learning stats success response
-        console.log('🔥 [LEARNING STATS] response.data.data.weekly_hours:', response.data.data.weekly_hours);
-        console.log('🔥 [LEARNING STATS] response.data.data.current_streak:', response.data.data.current_streak);
-        console.log('🔥 [LEARNING STATS] Type of weekly_hours:', typeof response.data.data.weekly_hours);
-        console.log('🔥 [LEARNING STATS] Type of current_streak:', typeof response.data.data.current_streak);
+        logger.log('🔥 [LEARNING STATS] response.data.data.weekly_hours:', response.data.data.weekly_hours);
+        logger.log('🔥 [LEARNING STATS] response.data.data.current_streak:', response.data.data.current_streak);
+        logger.log('🔥 [LEARNING STATS] Type of weekly_hours:', typeof response.data.data.weekly_hours);
+        logger.log('🔥 [LEARNING STATS] Type of current_streak:', typeof response.data.data.current_streak);
       }
       
       const finalData = response.data.success ? response.data.data : null;
-      console.log('🔥 [LEARNING STATS] Final data to return:', finalData);
-      console.log('🔥 [LEARNING STATS] Final data type:', typeof finalData);
+      logger.log('🔥 [LEARNING STATS] Final data to return:', finalData);
+      logger.log('🔥 [LEARNING STATS] Final data type:', typeof finalData);
       return finalData;
     } catch (error) {
-      console.error('🔥 [LEARNING STATS] ❌ Error fetching learning stats:', error);
-      console.error('🔥 [LEARNING STATS] ❌ Error response status:', error.response?.status);
-      console.error('🔥 [LEARNING STATS] ❌ Error response data:', error.response?.data);
+      logger.error('🔥 [LEARNING STATS] ❌ Error fetching learning stats:', error);
+      logger.error('🔥 [LEARNING STATS] ❌ Error response status:', error.response?.status);
+      logger.error('🔥 [LEARNING STATS] ❌ Error response data:', error.response?.data);
       return null;
     }
   }
@@ -180,9 +181,9 @@ class ActivityTracker {
         }
       });
 
-      return response.data.success;
+  return response.data.success;
     } catch (error) {
-      console.error('Error tracking minutes:', error);
+  logger.error('Error tracking minutes:', error);
       return false;
     }
   }

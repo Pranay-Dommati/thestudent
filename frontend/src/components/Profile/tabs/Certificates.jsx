@@ -20,23 +20,21 @@ const Certificates = () => {
 
   const fetchCertificates = async () => {
     try {
-      console.log('🔄 Fetching certificates...');
+      
       setLoading(true);
       setError('');
       
       const response = await axiosInstance.get('/courses/certificates/');
-      console.log('📋 Certificates API response:', response.data);
+      
       
       if (response.data.success) {
         setCertificates(response.data.certificates);
-        console.log('✅ Certificates loaded:', response.data.certificates.length);
+        
       } else {
-        const errorMsg = response.data.error || 'Failed to fetch certificates';
-        console.log('❌ API error:', errorMsg);
+  const errorMsg = response.data.error || 'Failed to fetch certificates';
         setError(errorMsg);
       }
     } catch (err) {
-      console.error('💥 Error fetching certificates:', err);
       setError('Failed to fetch certificates. Please try again.');
     } finally {
       setLoading(false);
@@ -71,17 +69,13 @@ const Certificates = () => {
   };
 
   const handlePreview = (certificate) => {
-    console.log('🔍 Certificate preview clicked!');
-    console.log('Certificate data:', certificate);
-    console.log('Course ID:', certificate.course.id);
-    console.log('Course title:', certificate.course.title);
+    
     
     try {
-      const url = `/courses/${certificate.course.id}/certificate`;
-      console.log('Navigating to:', url);
+  const url = `/courses/${certificate.course.id}/certificate`;
       navigate(url, { state: { courseTitle: certificate.course.title } });
     } catch (error) {
-      console.error('Navigation failed, using window.location:', error);
+      
       window.location.href = `/courses/${certificate.course.id}/certificate`;
     }
   };
@@ -131,7 +125,7 @@ const Certificates = () => {
         <p className="text-gray-600 mb-4">{error}</p>
         <button
           onClick={(e) => {
-            console.log('🖱️ Try Again button clicked!');
+            
             e.preventDefault();
             e.stopPropagation();
             fetchCertificates();
@@ -228,13 +222,9 @@ const Certificates = () => {
               <div className="flex relative z-50" style={{ pointerEvents: 'auto' }}>
                 <div
                   onClick={(e) => {
-                    console.log('🔥 DIV CLICKED!');
-                    console.log('Event:', e);
-                    console.log('Target:', e.target);
                     handlePreview(certificate);
                   }}
                   onMouseDown={(e) => {
-                    console.log('🖱️ DIV Mouse down detected');
                     e.stopPropagation();
                   }}
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors text-sm font-medium shadow-lg cursor-pointer"

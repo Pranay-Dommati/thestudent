@@ -1,3 +1,4 @@
+import logger from '../utils/logger';
 // Add this function to your API service
 
 export const createCourse = async (formData) => {
@@ -15,7 +16,7 @@ export const createCourse = async (formData) => {
 
     return await response.json();
   } catch (error) {
-    console.error('Error creating course:', error);
+  logger.error('Error creating course:', error);
     throw error;
   }
 };

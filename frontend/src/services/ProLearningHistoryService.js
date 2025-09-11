@@ -1,3 +1,4 @@
+import logger from '../utils/logger';
 // ProLearningHistoryService.js
 // Service to manage ProLearning course history with localStorage-backed persistence (IndexedDB removed)
 
@@ -43,7 +44,7 @@ class ProLearningHistoryService {
       
       return historyItem;
     } catch (error) {
-      console.error('Error adding to ProLearning history:', error);
+  logger.error('Error adding to ProLearning history:', error);
       return null;
     }
   }
@@ -75,7 +76,7 @@ class ProLearningHistoryService {
   // Sort by timestamp (newest first)
       return history.sort((a, b) => b.timestamp - a.timestamp);
     } catch (error) {
-      console.error('Error getting ProLearning history:', error);
+  logger.error('Error getting ProLearning history:', error);
       return [];
     }
   }
@@ -89,7 +90,7 @@ class ProLearningHistoryService {
   this._set(filteredHistory);
       return true;
     } catch (error) {
-      console.error('Error removing from ProLearning history:', error);
+  logger.error('Error removing from ProLearning history:', error);
       return false;
     }
   }
@@ -100,7 +101,7 @@ class ProLearningHistoryService {
       this._set([]);
       return true;
     } catch (error) {
-      console.error('Error clearing ProLearning history:', error);
+  logger.error('Error clearing ProLearning history:', error);
       return false;
     }
   }

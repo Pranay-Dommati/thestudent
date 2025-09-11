@@ -1,17 +1,10 @@
 import React from 'react';
-import logger from '../../../utils/logger';
+// logger removed for production cleanliness
 import { Link } from 'react-router-dom';
 import { FaRocket, FaBookOpen } from 'react-icons/fa';
 
 const HeroSection = ({ user }) => {
-  // Add comprehensive logging
-  logger.log('🚀 [HERO SECTION] Props received - user object:', user);
-  logger.log('🚀 [HERO SECTION] user.name:', user?.name);
-  logger.log('🚀 [HERO SECTION] user.totalCoursesEnrolled:', user?.totalCoursesEnrolled);
-  logger.log('🚀 [HERO SECTION] user.hoursThisWeek:', user?.hoursThisWeek);
-  logger.log('🚀 [HERO SECTION] user.currentStreak:', user?.currentStreak);
-  logger.log('🚀 [HERO SECTION] Type of hoursThisWeek:', typeof user?.hoursThisWeek);
-  logger.log('🚀 [HERO SECTION] Type of currentStreak:', typeof user?.currentStreak);
+  
   
   return (
     <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-16 pb-16 relative overflow-hidden">
@@ -58,7 +51,6 @@ const HeroSection = ({ user }) => {
                 zIndex: 50
               }}
               onClick={(e) => {
-                logger.log('Create Custom Course button clicked - navigating to /chat');
                 e.stopPropagation();
               }}
             >
@@ -77,7 +69,6 @@ const HeroSection = ({ user }) => {
                 zIndex: 50
               }}
               onClick={(e) => {
-                logger.log('Explore Expert Courses button clicked - navigating to /courses');
                 e.stopPropagation();
               }}
             >
