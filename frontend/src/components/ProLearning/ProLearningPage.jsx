@@ -1181,32 +1181,59 @@ const ProLearningPage = () => {
     return !!hasGenerationTimestamps;
   };
 
+  // Helper functions for progressive gating
+  const isFirstTopicComplete = () => {
+    if (!topicsList || topicsList.length === 0) return false;
+    const first = topicsList[0];
+    const firstName = first?.name || first;
+    // During an active progressive run, only trust the in-session tabs map
+    const ready = availableTabsForTopics[firstName] || [];
+    const allReady = ['reading','summary','videos','quiz','resources'].every(t => ready.includes(t));
+    if (isProgressiveGenerating) {
+      return allReady;
+    }
+    // Otherwise (e.g., revisits), allow storage fallback
+    if (allReady) return true;
+    try {
+      const id = getCourseId();
+      const stored = id ? contentStorageService.getContentByTopicName(firstName, id) : null;
+      return !!(stored && typeof stored.reading === 'string' && stored.reading.trim() &&
+        typeof stored.summary === 'string' && stored.summary.trim() &&
+        Array.isArray(stored.videos) && stored.videos.length > 0 &&
+        (Array.isArray(stored.quiz) ? stored.quiz.length > 0 : (stored?.quiz?.questions?.length > 0)) &&
+        Array.isArray(stored.resources) && stored.resources.length > 0);
+    } catch { return false; }
+  };
+
   // Helper function to determine if a topic should be blocked
   const isTopicBlocked = (topicName) => {
-  // In reload mode (content already saved in DB), never block topics
-  if (loadScenario === 'reload') return false;
+    // In reload mode (content already saved in DB), never block topics
+    if (loadScenario === 'reload') return false;
 
     if (!topicsList || topicsList.length === 0) return false;
-    
+
     // First topic (index 0) is never blocked - it gets progressive generation
     const topicIndex = topicsList.findIndex(topic => topic.name === topicName || topic === topicName);
     if (topicIndex === 0) return false;
 
-    // If this topic already has content stored (from previous session or DB), do not block
+    // During an active progressive session, keep later topics blocked until FIRST topic completes
+    if (useProgressiveGeneration && isProgressiveGenerating) {
+      return !isFirstTopicComplete();
+    }
+
+    // Otherwise (e.g., revisits/older sessions), allow unblocking if this topic already has full content
     try {
       const id = getCourseId();
       const stored = id ? contentStorageService.getContentByTopicName(topicName, id) : null;
-      const hasReady = stored && (
-        (typeof stored.reading === 'string' && stored.reading.trim()) ||
-        (typeof stored.summary === 'string' && stored.summary.trim()) ||
-        (Array.isArray(stored.videos) && stored.videos.length > 0) ||
-        (Array.isArray(stored.quiz) ? stored.quiz.length > 0 : (stored?.quiz?.questions?.length > 0)) ||
-        (Array.isArray(stored.resources) && stored.resources.length > 0)
-      );
-      if (hasReady) return false;
+      const hasFull = stored && typeof stored.reading === 'string' && stored.reading.trim() &&
+        typeof stored.summary === 'string' && stored.summary.trim() &&
+        Array.isArray(stored.videos) && stored.videos.length > 0 &&
+        (Array.isArray(stored.quiz) ? stored.quiz.length > 0 : (stored?.quiz?.questions?.length > 0)) &&
+        Array.isArray(stored.resources) && stored.resources.length > 0;
+      if (hasFull) return false;
     } catch {}
 
-    // Otherwise, topics after the first are blocked until course generation completes
+    // Fallback: block until entire course completes
     return !allTopicsGenerated;
   };
 
@@ -2762,71 +2789,26 @@ const ProLearningPage = () => {
           },
           onTopicComplete: () => {},
           onAllComplete: () => {
-            console.log('🔥 DEBUG: onAllComplete callback triggered!');
-            console.log('🔥 DEBUG: topicsList.length:', topicsList.length);
-            console.log('🔥 DEBUG: remainingTopics will be:', topicsList.slice(1));
-            
-            // First topic progressive generation complete, now generate remaining topics
-            const remainingTopics = topicsList.slice(1); // All topics except the first
-            if (remainingTopics.length > 0) {
-              // Start batch generation for remaining topics
-              console.log('🚀 First topic complete, generating remaining topics:', remainingTopics.map(t => t.name || t));
-              proContentManager.generateAllContentBatch(
-                remainingTopics,
-                courseTitle || 'Pro Learning Course',
-                {
-                  onProgress: (progress, contentType, topicName) => {
-                    setCourseGenerationProgress(Math.round((1 + progress * (topicsList.length - 1)) / topicsList.length * 100));
-                    setCourseGenerationStatus(`📈 Generating ${contentType} for ${topicName}`);
-                  },
-                  onComplete: async () => {
-                    setAllTopicsGenerated(true);
-                    setIsProgressiveGenerating(false);
-                    setIsLoading(false); // Clear loading state when all topics are ready
-                    setCourseGenerationStatus('✅ All topics generated successfully!');
-                    
-                    // Auto-save is now handled directly in generateAllContentBatch
-                    console.log('✅ Generation completed with auto-save');
-                    
-                    // Clear the batch marker since generation is complete
-                    try {
-                      if (typeof localStorage !== 'undefined') {
-                        localStorage.removeItem('proLearning_batchMarker');
-                        console.log('🧹 DEBUG: Batch marker cleared after full course generation completion');
-                      }
-                    } catch (error) {
-                      console.warn('⚠️ DEBUG: Failed to clear batch marker:', error);
-                    }
-                  },
-                  onError: (error) => {
-                    console.error('❌ Remaining topics generation error:', error);
-                    setIsProgressiveGenerating(false);
-                  }
-                },
-                getCourseId()
-              );
-            } else {
-              // Only one topic in course
-              setIsProgressiveGenerating(false);
-              setAllTopicsGenerated(true);
-              setIsLoading(false); // Clear loading state when single topic is ready
-              setCourseGenerationStatus('✅ Course generated successfully!');
-              
-              // Auto-save for single topic completion
-              console.log('🚀 Single topic completed, triggering auto-save...');
-              autoSaveToBackend().catch(error => {
-                console.warn('Auto-save failed:', error);
-              });
-              
-              // Clear the batch marker since generation is complete
-              try {
-                if (typeof localStorage !== 'undefined') {
-                  localStorage.removeItem('proLearning_batchMarker');
-                  console.log('🧹 DEBUG: Batch marker cleared after single topic completion');
-                }
-              } catch (error) {
-                console.warn('⚠️ DEBUG: Failed to clear batch marker:', error);
+            // Progressive generation across ALL topics has finished
+            console.log('🔥 DEBUG: Progressive generation completed for all topics');
+            setIsProgressiveGenerating(false);
+            setAllTopicsGenerated(true);
+            setIsLoading(false);
+            setCourseGenerationStatus('✅ All topics generated successfully!');
+
+            // Auto-save after full progressive completion
+            autoSaveToBackend().catch(error => {
+              console.warn('Auto-save failed:', error);
+            });
+
+            // Clear the batch marker since generation is complete
+            try {
+              if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem('proLearning_batchMarker');
+                console.log('🧹 DEBUG: Batch marker cleared after progressive completion');
               }
+            } catch (error) {
+              console.warn('⚠️ DEBUG: Failed to clear batch marker:', error);
             }
           },
           onError: (err) => {
@@ -2839,11 +2821,8 @@ const ProLearningPage = () => {
         // Do not block the UI with the generic loader; tabs should appear as they become ready
         setIsGeneratingCourse(false);
         
-        // Only start progressive generation for the first topic
-        const firstTopic = topicsList[0];
-        if (firstTopic) {
-          await startProgressiveGeneration([firstTopic]); // Only generate first topic progressively
-        }
+  // Start progressive generation across ALL topics (do not await)
+  startProgressiveGeneration();
 
         // Load first topic immediately (hydrate without blocking loader)
         const topicToLoad = topicParam || topicsList[0]?.name;
@@ -3058,16 +3037,46 @@ const ProLearningPage = () => {
   };
 
   // Handle URL tab parameter changes (after topic initialization is complete)
+  // Coerce invalid/unready tabs to the first available tab for the current topic
   useEffect(() => {
     if (topicsList.length === 0 || !selectedTopic) return; // Wait for initialization to complete
-    // If a local click just updated state and a debounced URL sync is pending, don't override state
-    if (tabUrlSyncPendingRef.current) return;
+    if (tabUrlSyncPendingRef.current) return; // Skip while a local sync is pending
 
-    const currentTab = searchParams.get("tab") || "reading";
-    if (currentTab !== activeTab) {
-      setActiveTab(currentTab);
+    const requestedTab = searchParams.get('tab') || 'reading';
+
+    // In progressive mode, only allow tabs that are ready for the selected topic
+    if (useProgressiveGeneration) {
+      const topicName = selectedTopic.name;
+      const ready = [...(availableTabsForTopics[topicName] || [])];
+      // Treat already-loaded content as ready
+      if (content) {
+        if (content.reading && !ready.includes('reading')) ready.push('reading');
+        if (content.summary && !ready.includes('summary')) ready.push('summary');
+        if ((content.videos?.length || 0) > 0 && !ready.includes('videos')) ready.push('videos');
+        if (((Array.isArray(content.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0)) && !ready.includes('quiz')) ready.push('quiz');
+        if ((content.resources?.length || 0) > 0 && !ready.includes('resources')) ready.push('resources');
+      }
+
+      if (ready.length > 0 && !ready.includes(requestedTab)) {
+        const preferredOrder = ['reading', 'summary', 'videos', 'quiz', 'resources'];
+        const fallbackTab = preferredOrder.find(t => ready.includes(t)) || ready[0];
+        if (fallbackTab) {
+          tabUrlSyncPendingRef.current = true;
+          setActiveTab(fallbackTab);
+          const sp = new URLSearchParams(searchParams);
+          sp.set('tab', fallbackTab);
+          setSearchParams(sp, { replace: true });
+          setTimeout(() => { tabUrlSyncPendingRef.current = false; }, 0);
+        }
+        return;
+      }
     }
-  }, [topicsList.length, selectedTopic, searchParams]); // Avoid activeTab here to prevent flip/flop
+
+    // Non-progressive or valid progressive tab: sync state if different
+    if (requestedTab !== activeTab) {
+      setActiveTab(requestedTab);
+    }
+  }, [topicsList.length, selectedTopic, searchParams, useProgressiveGeneration, availableTabsForTopics, content]);
 
   // Auto-switch to the first ready tab for current topic when content becomes available
   useEffect(() => {
@@ -3753,6 +3762,10 @@ const ProLearningPage = () => {
 
     switch (activeTab) {
       case "reading":
+        // BLOCK CHECK: If topic is blocked, don't show empty content panels
+        if (currentTopicName && isTopicBlocked(currentTopicName)) {
+          return <LoadingComponent />;
+        }
         
         // Additional fallback: if content exists but reading is empty, try to show other content
         const hasAnyContent = content && (content.reading || content.summary || content.videos?.length || content.quiz?.length || content.resources?.length);
@@ -4197,6 +4210,11 @@ const ProLearningPage = () => {
         );
 
       case "summary":
+        // BLOCK CHECK: If topic is blocked, don't show empty content panels
+        if (currentTopicName && isTopicBlocked(currentTopicName)) {
+          return <LoadingComponent />;
+        }
+        
         return (
           <div className="max-w-none pt-6">
             {/* Compact Summary Header */}
@@ -4311,6 +4329,11 @@ const ProLearningPage = () => {
         );
 
       case "videos":
+        // BLOCK CHECK: If topic is blocked, don't show empty content panels
+        if (currentTopicName && isTopicBlocked(currentTopicName)) {
+          return <LoadingComponent />;
+        }
+        
         return (
           <div className="pt-6">
             {/* Compact Videos Header */}
@@ -4533,6 +4556,11 @@ const ProLearningPage = () => {
         );
 
       case "quiz":
+        // BLOCK CHECK: If topic is blocked, don't show empty content panels
+        if (currentTopicName && isTopicBlocked(currentTopicName)) {
+          return <LoadingComponent />;
+        }
+        
         const answeredQuestions = content.quiz.filter(q => q.userAnswer !== null).length;
         const correctAnswers = content.quiz.filter(q => q.userAnswer === q.correct).length;
         const quizProgress = (answeredQuestions / content.quiz.length) * 100;
@@ -4797,6 +4825,11 @@ const ProLearningPage = () => {
         );
 
       case "resources":
+        // BLOCK CHECK: If topic is blocked, don't show empty content panels
+        if (currentTopicName && isTopicBlocked(currentTopicName)) {
+          return <LoadingComponent />;
+        }
+        
         return (
           <div className="space-y-6 pt-6">
             {/* Compact Resources Header */}
@@ -4859,6 +4892,10 @@ const ProLearningPage = () => {
         );
 
       default:
+        // BLOCK CHECK: If topic is blocked, don't show any content
+        if (currentTopicName && isTopicBlocked(currentTopicName)) {
+          return <LoadingComponent />;
+        }
         return null;
     }
   };
@@ -4952,9 +4989,15 @@ const ProLearningPage = () => {
                       );
 
                       // Check if tab content is available for progressive generation
-                      const isTabAvailable = useProgressiveGeneration 
-                        ? ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes(tab.id)) || hasTabContent)
-                        : true; // For batch generation, all tabs are available once content is loaded
+                      let isTabAvailable = true;
+                      if (useProgressiveGeneration) {
+                        // If the current topic is blocked, nothing should be available, even if some stale content exists
+                        if (currentTopicBlocked) {
+                          isTabAvailable = false;
+                        } else {
+                          isTabAvailable = ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes(tab.id)) || hasTabContent);
+                        }
+                      }
                       
                       // Tab is disabled if topic is blocked OR if progressive tab is not available
                       const isTabDisabled = currentTopicBlocked || (useProgressiveGeneration && !isTabAvailable && !isLoading);
@@ -4963,7 +5006,7 @@ const ProLearningPage = () => {
                         <button
                           key={tab.id}
                           onClick={() => {
-                            if (!isTabDisabled) {
+                            if (!isTabDisabled && !currentTopicBlocked) {
                               updateActiveTabDesktop(tab.id); // Use debounced version for desktop
                               // Only reload content if progressive generation is enabled AND content is not already available
                               if (useProgressiveGeneration && currentTopicName && isTabAvailable && !content?.[tab.id]) {
@@ -5045,6 +5088,7 @@ const ProLearningPage = () => {
                 isProgressiveGenerating={isProgressiveGenerating}
                 progressiveGenerationProgress={progressiveGenerationProgress}
                 currentTopicName={selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null)}
+                currentTopicBlocked={selectedTopic?.name ? isTopicBlocked(selectedTopic.name) : false}
               />
 
               {/* Desktop Tab Content */}

@@ -30,7 +30,8 @@ const ProLearningMobile = ({
   availableTabsForTopics,
   selectedTopic,
   isProgressiveGenerating,
-  progressiveGenerationProgress
+  progressiveGenerationProgress,
+  currentTopicBlocked
 }) => {
   // Sync currentSection with activeTab prop
   useEffect(() => {
@@ -211,7 +212,9 @@ const ProLearningMobile = ({
             const isTabAvailable = useProgressiveGeneration 
               ? (selectedTopic?.name && availableTabsForTopics?.[selectedTopic.name]?.includes(tab.id)) 
               : true;
-            const isDisabled = useProgressiveGeneration && !isTabAvailable && !isLoading;
+            // Disable all tabs if this topic is blocked (multi-topic gating)
+            const isDisabledByTopic = !!currentTopicBlocked;
+            const isDisabled = (useProgressiveGeneration && !isTabAvailable && !isLoading) || isDisabledByTopic;
             
             return (
               <button
@@ -236,7 +239,7 @@ const ProLearningMobile = ({
                 }`}>
                   {tab.label}
                 </span>
-                {isDisabled && isProgressiveGenerating && progressiveGenerationProgress?.topic === selectedTopic?.name && progressiveGenerationProgress?.tabType === tab.id && (
+                {isDisabled && !isDisabledByTopic && isProgressiveGenerating && progressiveGenerationProgress?.topic === selectedTopic?.name && progressiveGenerationProgress?.tabType === tab.id && (
                   <span className="text-[10px] leading-none text-blue-600 mt-0.5" aria-live="polite">Loading…</span>
                 )}
               </button>
