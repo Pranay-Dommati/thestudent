@@ -22,11 +22,25 @@ const generateResourcesWithGoogleSearch = async (topic) => {
       return cached.resources;
     }
 
+    // Prepare auth/CSRF headers if available
+    let token = null;
+    try { if (typeof localStorage !== 'undefined') token = localStorage.getItem('accessToken'); } catch {}
+    let csrfToken = null;
+    try {
+      if (typeof document !== 'undefined' && document.cookie) {
+        const m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+        csrfToken = m ? decodeURIComponent(m[1]) : null;
+      }
+    } catch {}
+
     // Call our backend API that uses Google Search
     const response = await fetch('/api/resources/', {
       method: 'POST',
+      credentials: 'include', // allow cookies if backend uses session/csrf
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {})
       },
       body: JSON.stringify({
         topic: topic,
