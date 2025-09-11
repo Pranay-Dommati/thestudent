@@ -721,9 +721,27 @@ class ProContentManager {
           } : null
         });
         
+        // Derive a smart title from topics if currentCourse looks generic
+        const topicKeys = Object.keys(courseContent.topics || {});
+        const topicNames = topicKeys.map(k => k).filter(Boolean);
+        const isGenericTitle = (t) => !t || /^(AI Course:|AI Generated Course:?|ProLearning Course|Generated Course|Database Course)$/i.test(String(t).trim());
+        let smartTitle = this.currentCourse;
+        if (isGenericTitle(smartTitle) || !smartTitle) {
+          if (topicNames.length > 0) {
+            const first = topicNames[0];
+            const additional = Math.max(0, topicNames.length - 1);
+            if (additional === 0) smartTitle = first;
+            else if (additional === 1) smartTitle = `${first} +1`;
+            else if (additional === 2) smartTitle = `${first} +1 +2`;
+            else if (additional === 3) smartTitle = `${first} +1 +2 +3`;
+            else smartTitle = `${first} +1 +2 +3 +...`;
+          } else {
+            smartTitle = 'AI Generated Course';
+          }
+        }
         const payload = {
           course_name: courseId, // used for idempotency check server-side
-          title: this.currentCourse || 'AI Generated Course',
+          title: smartTitle,
           overwrite: true,
           topics: Object.fromEntries(
             Object.entries(courseContent.topics).map(([name, t]) => {

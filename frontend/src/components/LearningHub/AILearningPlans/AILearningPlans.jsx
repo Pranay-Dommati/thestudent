@@ -128,21 +128,39 @@ const AILearningPlans = () => {
     });
   };
 
-  const formatCourseName = (courseName) => {
-    // Remove all AI-related prefixes and clean up the course name
-    let cleanName = courseName
-      .replace(/^AI Course:\s*/i, '')           // Remove "AI Course: " prefix
-      .replace(/^AI Generated Course:\s*/i, '') // Remove "AI Generated Course: " prefix
-      .replace(/^AI Generated Course$/i, '')    // Remove standalone "AI Generated Course"
-      .replace(/^AI\s+/i, '')                   // Remove "AI " at the beginning
-      .trim();
-    
-    // If the cleaned name is empty or just generic text, provide a fallback
-    if (!cleanName || cleanName.toLowerCase() === 'course') {
-      return 'Untitled Course';
+  const formatCourseName = (course) => {
+    if (!course) return 'Untitled Course';
+    const isIdLike = typeof course.course_name === 'string' && /^course_[a-z0-9_]+$/i.test(course.course_name);
+    const isGenericTitle = (t) => !t || /^(AI Course:|AI Generated Course:?|ProLearning Course|Generated Course|Database Course)$/i.test(String(t).trim());
+    // Prefer a non-generic title
+    if (course.title && !isGenericTitle(course.title) && course.title !== course.course_name) {
+      return String(course.title).trim();
     }
-    
-    return cleanName;
+    // If course_name isn't an internal ID and looks fine, use it after cleaning prefixes
+    let base = !isIdLike && course.course_name ? String(course.course_name) : '';
+    base = base
+      .replace(/^AI Course:\s*/i, '')
+      .replace(/^AI Generated Course:\s*/i, '')
+      .replace(/^AI Generated Course$/i, '')
+      .replace(/^AI\s+/i, '')
+      .trim();
+    if (base && base.toLowerCase() !== 'course') {
+      return base;
+    }
+    // As a last resort, try topic-based name if topics are provided on this page in future
+    if (Array.isArray(course.topics) && course.topics.length > 0) {
+      const names = course.topics.map(t => (t.topic_name || t.name || '').trim()).filter(Boolean);
+      if (names.length > 0) {
+        const first = names[0];
+        const additional = Math.max(0, names.length - 1);
+        if (additional === 0) return first;
+        if (additional === 1) return `${first} +1`;
+        if (additional === 2) return `${first} +1 +2`;
+        if (additional === 3) return `${first} +1 +2 +3`;
+        return `${first} +1 +2 +3 +...`;
+      }
+    }
+    return 'Untitled Course';
   };
 
   if (loading) {
@@ -227,7 +245,7 @@ const AILearningPlans = () => {
                   {/* Course Details */}
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-gray-900 truncate mb-1">
-                      {formatCourseName(course.course_name)}
+                      {formatCourseName(course)}
                     </h3>
                     <div className="flex items-center text-xs text-gray-500 space-x-3">
                       <span>Created {formatDate(course.created_at)}</span>
@@ -262,7 +280,7 @@ const AILearningPlans = () => {
                       e.preventDefault();
                       e.stopPropagation();
                       logger.log('Button clicked!', course.id);
-                      handleStartCourse(course.id, course.course_name);
+                      handleStartCourse(course.id, formatCourseName(course));
                     }}
                     className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-md text-xs font-medium hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 flex items-center disabled:opacity-50 cursor-pointer relative z-5"
                     style={{ cursor: 'pointer', pointerEvents: 'auto' }}

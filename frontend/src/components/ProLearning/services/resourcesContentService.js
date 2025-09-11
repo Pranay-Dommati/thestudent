@@ -75,10 +75,8 @@ const generateResourcesWithGoogleSearch = async (topic) => {
 
   } catch (error) {
     console.error('❌ Error generating resources with Google Search:', error);
-    
-    // Fallback to basic resources if Google Search fails
-    console.log('🔄 Falling back to basic resources');
-    return generateFallbackResources(topic);
+    // Do NOT fallback; return empty to force dynamic-only behavior
+    return [];
   }
 };
 
@@ -226,11 +224,13 @@ export async function generateResourcesContent(setContent, topic = '', options =
       }
     }
     
-    // Generate resources using Google Programmable Search API
+    // Generate resources using Google Programmable Search API (no fallback)
     const searchResources = await generateResourcesWithGoogleSearch(topic);
     
-    // Validate and enhance resources
-    const validatedResources = validateAndEnhanceResources(searchResources, topic);
+    // If API returned no resources, intentionally set empty content
+    const validatedResources = Array.isArray(searchResources) && searchResources.length > 0
+      ? validateAndEnhanceResources(searchResources, topic)
+      : [];
     
     const metadata = {
       generatedAt: new Date().toISOString(),
@@ -261,43 +261,20 @@ export async function generateResourcesContent(setContent, topic = '', options =
     
   } catch (error) {
     console.error('❌ Error generating resources:', error);
-    
-    try {
-      // Fallback to basic resources
-      const fallbackResources = generateFallbackResources(topic);
-      const validatedFallback = validateAndEnhanceResources(fallbackResources, topic);
-      
-      const errorMetadata = {
+    // Set empty results with error metadata; no fallback
+    setContent({
+      resources: [],
+      resourcesMetadata: {
         generatedAt: new Date().toISOString(),
-        totalResources: validatedFallback.length,
-        categories: extractResourceCategories(validatedFallback),
-        types: extractResourceTypes(validatedFallback),
+        totalResources: 0,
+        categories: [],
+        types: [],
         topic: topic,
         fromCache: false,
-        source: 'fallback',
-        error: error.message
-      };
-      
-      console.log('🔄 Using fallback resources due to error:', error.message);
-      setContent({
-        resources: validatedFallback,
-        resourcesMetadata: errorMetadata
-      });
-    } catch (fallbackError) {
-      console.error('❌ Even fallback failed:', fallbackError);
-      // Ensure we ALWAYS call setContent, even with empty results
-      setContent({
-        resources: [],
-        resourcesMetadata: {
-          generatedAt: new Date().toISOString(),
-          totalResources: 0,
-          topic: topic,
-          fromCache: false,
-          source: 'error',
-          error: `Both main and fallback failed: ${error.message}`
-        }
-      });
-    }
+        source: 'error',
+        error: error.message || 'Failed to fetch resources'
+      }
+    });
   }
 }
 

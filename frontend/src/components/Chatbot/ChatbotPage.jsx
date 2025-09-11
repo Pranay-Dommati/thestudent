@@ -1940,10 +1940,41 @@ const ChatbotPage = () => {
         <div className="flex-1 overflow-y-auto px-4 pb-4">
           {proLearningCourses && proLearningCourses.length > 0 ? (
             <div className="space-y-3">
-              {proLearningCourses.slice(0, 8).map((course) => {
+              {proLearningCourses
+                // sort newest first if created_at exists
+                .slice() // shallow copy before sort
+                .sort((a, b) => {
+                  const da = a.created_at ? new Date(a.created_at).getTime() : 0;
+                  const db = b.created_at ? new Date(b.created_at).getTime() : 0;
+                  return db - da;
+                })
+                .map((course) => {
                 const firstTopic = Array.isArray(course.topics) && course.topics.length > 0 ? course.topics[0] : null;
                 const topicParam = firstTopic ? `?topic=${encodeURIComponent(firstTopic.topic_name || firstTopic.name || '')}&tab=reading` : '';
                 const href = `/pro-learning/${course.id}${topicParam}`;
+                // Compute friendly display name:
+                // 1) If title is present and not generic/ID-like, use it
+                // 2) Else build from topics: FirstTopic +1 +2 +3 (+...) style
+                // 3) Never show raw course_name when it looks like an internal ID (course_...)
+                const topics = Array.isArray(course.topics) ? course.topics : [];
+                const topicNames = topics.map(t => (t.topic_name || t.name || '').trim()).filter(Boolean);
+                const isIdLike = typeof course.course_name === 'string' && /^course_[a-z0-9_]+$/i.test(course.course_name);
+                const isGenericTitle = (t) => !t || /^(AI Course:|AI Generated Course:?|ProLearning Course|Generated Course|Database Course)$/i.test(String(t).trim());
+                let friendlyName = 'ProLearning Course';
+                if (course.title && !isGenericTitle(course.title) && course.title !== course.course_name) {
+                  friendlyName = course.title.trim();
+                } else if (topicNames.length > 0) {
+                  const first = topicNames[0];
+                  const additional = Math.max(0, topicNames.length - 1);
+                  if (additional === 0) friendlyName = first;
+                  else if (additional === 1) friendlyName = `${first} +1`;
+                  else if (additional === 2) friendlyName = `${first} +1 +2`;
+                  else if (additional === 3) friendlyName = `${first} +1 +2 +3`;
+                  else friendlyName = `${first} +1 +2 +3 +...`;
+                } else if (!isIdLike && course.course_name && !isGenericTitle(course.course_name)) {
+                  // Fall back to non-ID course_name if it's human friendly
+                  friendlyName = course.course_name.trim();
+                }
                 return (
                   <a
                     key={course.id}
@@ -1957,7 +1988,7 @@ const ChatbotPage = () => {
                         </div>
                         <div>
                           <div className="font-medium text-sm text-gray-800 group-hover:text-blue-600">
-                            {course.course_name || course.title || 'ProLearning Course'}
+                            {friendlyName}
                           </div>
                           <div className="text-xs text-gray-500 flex items-center mt-1">
                             <span>{new Date(course.created_at).toLocaleDateString()}</span>

@@ -1750,27 +1750,30 @@ const ProLearningPage = () => {
 
   // Save to Learning Hub functionality
   const generateSmartCourseName = (topicsData, fallbackTitle) => {
-    if (fallbackTitle && fallbackTitle !== 'AI Generated Course') {
+    // If explicit non-generic title exists, prefer it
+    if (fallbackTitle && !/^AI Course:|^ProLearning Course|^Generated Course|^Database Course/i.test(fallbackTitle)) {
       return fallbackTitle;
     }
-    // Normalize topicsData to an array of topic objects with name property
+    // Normalize topicsData to an array of { name }
     let topicArray = [];
     if (Array.isArray(topicsData)) {
       topicArray = topicsData;
     } else if (topicsData && typeof topicsData === 'object') {
       topicArray = Object.keys(topicsData).map(name => ({ name }));
     }
-    if (topicArray.length === 0) {
+    if (!topicArray || topicArray.length === 0) {
       return 'AI Generated Course';
     }
-    const topicNames = topicArray.map(t => t?.name).filter(Boolean);
-    if (topicNames.length === 1) {
-      return `AI Course: ${topicNames[0]}`;
-    }
-    if (topicNames.length <= 3) {
-      return `AI Course: ${topicNames.join(' + ')}`;
-    }
-    return `AI Course: ${topicNames.slice(0, 3).join(' + ')} + ...`;
+    const names = topicArray.map(t => (t?.name || '').trim()).filter(Boolean);
+    if (names.length === 0) return 'AI Generated Course';
+    // Build: FirstTopic +2 +3 (+...)
+    const first = names[0];
+    const additional = Math.max(0, names.length - 1);
+    if (additional === 0) return first;
+    if (additional === 1) return `${first} +1`;
+    if (additional === 2) return `${first} +1 +2`;
+    // For more than 2 additional, show first two increments then ellipsis
+    return `${first} +1 +2 +...`;
   };
 
   // Auto-save function for post-generation saves (no UI state updates)
@@ -3279,10 +3282,21 @@ const ProLearningPage = () => {
             onTabComplete: (tabInfo) => {
               console.log(`✅ Tab completed: ${tabInfo.tabName} for ${tabInfo.topic}`);
               
-              // Update available tabs
+              // Update available tabs ONLY if content is meaningful for this tab
               setAvailableTabsForTopics(prev => {
                 const topicTabs = prev[tabInfo.topic] || [];
-                if (!topicTabs.includes(tabInfo.tabType)) {
+                const c = tabInfo.content;
+                const hasMeaningful = (tabType, content) => {
+                  switch (tabType) {
+                    case 'reading': return typeof content === 'string' && content.trim().length > 0;
+                    case 'summary': return typeof content === 'string' && content.trim().length > 0;
+                    case 'videos': return Array.isArray(content) && content.length > 0;
+                    case 'quiz': return Array.isArray(content) && content.length > 0;
+                    case 'resources': return Array.isArray(content) && content.length > 0;
+                    default: return false;
+                  }
+                };
+                if (!topicTabs.includes(tabInfo.tabType) && hasMeaningful(tabInfo.tabType, c)) {
                   return {
                     ...prev,
                     [tabInfo.topic]: [...topicTabs, tabInfo.tabType]
@@ -4858,8 +4872,12 @@ const ProLearningPage = () => {
           </div>
         );
 
-      case "resources":
-        // BLOCK CHECK: If topic is blocked, don't show empty content panels
+      case 'resources':
+        // Resources Renderer: Grid of resource cards with icons and descriptions
+        // If resources are not yet available, keep showing the loader
+        if (!Array.isArray(content?.resources) || content.resources.length === 0) {
+          return <LoadingComponent />;
+        }
         if (currentTopicName && isTopicBlocked(currentTopicName)) {
           return <LoadingComponent />;
         }
@@ -5043,19 +5061,23 @@ const ProLearningPage = () => {
                       }
                       
                       // Tab is disabled if topic is blocked OR if progressive tab is not available
-                      const isTabDisabled = currentTopicBlocked || (useProgressiveGeneration && !isTabAvailable && !isLoading);
+                      const isTabDisabled = currentTopicBlocked || (useProgressiveGeneration && !isTabAvailable);
                       
                       return (
                         <button
                           key={tab.id}
                           onClick={() => {
-                            if (!isTabDisabled && !currentTopicBlocked) {
+                            if (!currentTopicBlocked && !isTabDisabled) {
                               updateActiveTabDesktop(tab.id); // Use debounced version for desktop
                               // Only reload content if progressive generation is enabled AND content is not already available
                               if (useProgressiveGeneration && currentTopicName && isTabAvailable && !content?.[tab.id]) {
                                 // Only refresh if this specific tab content doesn't exist yet
                                 loadProgressiveTopicContent(currentTopicName, { showLoader: false });
                               }
+                            } else if (!currentTopicBlocked && useProgressiveGeneration && !isTabAvailable) {
+                              // If disabled due to not ready, show skeletons briefly to convey loading
+                              setShowSkeletons(true);
+                              setLoadingStep(`Preparing ${tab.label}...`);
                             }
                           }}
                           disabled={isLoading || isTabDisabled}

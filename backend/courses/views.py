@@ -1168,10 +1168,11 @@ def get_resources(request):
             return Response({
                 'error': 'Topic is required'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Your Google Programmable Search API credentials
-        API_KEY = 'AIzaSyCoZJC3kzWosQEJpbb0Q2QmoQpMUuBpVlI'
-        SEARCH_ENGINE_ID = '2593cd20d7e52429f'
+
+        # Google Programmable Search API credentials (from settings or env)
+        from django.conf import settings as dj_settings
+        API_KEY = getattr(dj_settings, 'GOOGLE_SEARCH_API_KEY', None) or getattr(dj_settings, 'GEMINI_API_KEY', '')
+        SEARCH_ENGINE_ID = getattr(dj_settings, 'GOOGLE_SEARCH_ENGINE_ID', '')
         
         print(f"🔍 Getting resources for topic: {topic}")
         print(f"🎛️ Exclude YouTube: {exclude_youtube}")
@@ -1180,53 +1181,58 @@ def get_resources(request):
         
         # Define trusted educational sites for specific searches
         trusted_sites = [
-            'freecodecamp.org',
-            'geeksforgeeks.org', 
-            'developer.mozilla.org',
-            'w3schools.com',
-            'stackoverflow.com',
-            'github.com',
-            'coursera.org',
-            'edx.org',
-            'khanacademy.org',
-            'codecademy.com',
-            'udemy.com',
-            'tutorialspoint.com',
-            'programiz.com',
-            'javatpoint.com',
-            'leetcode.com',
-            'hackerrank.com',
-            'codewars.com',
-            'realpython.com',
-            'python.org',
-            'java.com',
-            'cplusplus.com'
+            # General education / science
+            'khanacademy.org', 'britannica.com', 'nationalgeographic.com', 'bbc.co.uk', 'bbc.com',
+            'ck12.org', 'openstax.org', 'quizlet.com', 'sciencedaily.com', 'nature.com', 'nih.gov',
+            'nasa.gov', 'noaa.gov', 'mit.edu', 'harvard.edu', 'stanford.edu',
+            # Programming / CS
+            'freecodecamp.org', 'geeksforgeeks.org', 'developer.mozilla.org', 'w3schools.com',
+            'stackoverflow.com', 'github.com', 'tutorialspoint.com', 'programiz.com', 'javatpoint.com',
+            # Courses/platforms
+            'coursera.org', 'edx.org', 'codecademy.com', 'udemy.com',
         ]
         
-        # Create highly targeted search queries for the specific topic
-        # Make sure queries are precise and topic-focused
-        search_queries = [
-            f'{topic} programming tutorial',
-            f'{topic} data structure tutorial',
-            f'{topic} algorithm tutorial', 
-            f'learn {topic} programming',
-            f'{topic} implementation examples',
-            f'{topic} coding practice problems',
-            f'{topic} programming guide',
-            f'how to use {topic} in programming'
+        # Classify topic to choose appropriate queries (simple heuristic)
+        topic_l = topic.lower()
+        programming_keywords = [
+            'programming', 'algorithm', 'data structure', 'python', 'java', 'javascript', 'arrays',
+            'linked list', 'tree', 'graph', 'sorting', 'searching', 'recursion', 'oop', 'sql', 'database'
         ]
-        
-        # Enhanced search queries with site restrictions for quality
-        enhanced_queries = []
-        for base_query in search_queries[:4]:  # Use top 4 most relevant queries
-            enhanced_queries.extend([
-                f'{base_query} site:geeksforgeeks.org OR site:freecodecamp.org',
-                f'{base_query} site:tutorialspoint.com OR site:w3schools.com',
-                f'{base_query} site:programiz.com OR site:javatpoint.com'
-            ])
-        
-        # Use the enhanced queries
-        search_queries = enhanced_queries[:6]  # Limit to 6 queries to avoid too many API calls
+        is_programming = any(k in topic_l for k in programming_keywords)
+
+        # Create targeted search queries
+        if is_programming:
+            base_queries = [
+                f'{topic} tutorial',
+                f'learn {topic}',
+                f'{topic} examples',
+                f'{topic} practice problems'
+            ]
+            enhanced_queries = []
+            for bq in base_queries:
+                enhanced_queries.extend([
+                    f'{bq} site:geeksforgeeks.org OR site:freecodecamp.org',
+                    f'{bq} site:tutorialspoint.com OR site:w3schools.com',
+                    f'{bq} site:programiz.com OR site:javatpoint.com'
+                ])
+            search_queries = enhanced_queries[:6]
+        else:
+            base_queries = [
+                f'{topic} study guide',
+                f'what is {topic}',
+                f'{topic} notes pdf',
+                f'{topic} explanation',
+                f'{topic} examples',
+                f'learn {topic}'
+            ]
+            enhanced_queries = []
+            for bq in base_queries[:4]:
+                enhanced_queries.extend([
+                    f'{bq} site:khanacademy.org OR site:britannica.com',
+                    f'{bq} site:bbc.co.uk OR site:nationalgeographic.com',
+                    f'{bq} site:ck12.org OR site:openstax.org'
+                ])
+            search_queries = enhanced_queries[:6]
         
         for query in search_queries:
             try:
@@ -1237,7 +1243,7 @@ def get_resources(request):
                     'key': API_KEY,
                     'cx': SEARCH_ENGINE_ID,
                     'q': query,
-                    'num': 3,  # Get 3 results per query type
+                    'num': 4,  # Slightly more per query for better coverage
                     'safe': 'active'
                 }
                 
@@ -1460,11 +1466,19 @@ def is_topic_relevant(title, description, topic):
         'programming', 'code', 'coding', 'algorithm', 'data structure', 
         'computer science', 'software', 'development'
     ]
+    science_keywords = [
+        'biology','chemistry','physics','science','ecosystem','plant','animal','cell','photosynthesis','respiration','human body','organism','energy','light','chlorophyll','glucose','oxygen'
+    ]
     
     has_programming_context = any(keyword in content for keyword in programming_keywords)
+    has_science_context = any(keyword in content for keyword in science_keywords)
     has_topic_mention = any(variation in content for variation in variations)
-    
-    return has_programming_context and has_topic_mention
+
+    # Accept if topic is explicitly mentioned regardless of context
+    if has_topic_mention:
+        return True
+    # Otherwise require a domain context
+    return has_programming_context or has_science_context
 
 
 def categorize_resource_type(title, domain):
@@ -1511,7 +1525,8 @@ def is_free_resource(domain):
     free_domains = [
         'freecodecamp.org', 'w3schools.com', 'developer.mozilla.org',
         'geeksforgeeks.org', 'stackoverflow.com', 'github.com',
-        'khanacademy.org', 'tutorialspoint.com', 'medium.com', 'dev.to'
+        'khanacademy.org', 'tutorialspoint.com', 'medium.com', 'dev.to',
+        'britannica.com', 'ck12.org', 'openstax.org', 'bbc.co.uk', 'bbc.com'
     ]
     return any(free_domain in domain.lower() for free_domain in free_domains)
 
