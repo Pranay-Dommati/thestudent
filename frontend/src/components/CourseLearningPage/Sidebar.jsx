@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaSearch, FaChevronRight, FaChevronLeft, FaRobot, FaBook } from 'react-icons/fa';
+import { FaSearch, FaChevronRight, FaChevronLeft, FaRobot, FaBook, FaCertificate, FaCheckCircle, FaDownload } from 'react-icons/fa';
 
 const Sidebar = ({ 
   isSidebarOpen, 
@@ -73,36 +73,77 @@ const Sidebar = ({
             </div>
           </div>
 
-          {/* Certificate CTA - Only show for engineering courses */}
+          {/* Certificate CTA */}
           {isLoggedIn && location.pathname.includes('/courses/engineering/') && (
-            <div className="mt-4">
-              {certificate ? (
+            <div className="mt-5">
+              {/* Not completed state */}
+              {(!certificate && progressPercent < 100) && (
+                <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 p-4 text-center">
+                  <div className="flex items-center justify-center mb-2 text-gray-400">
+                    <FaCertificate className="w-6 h-6" />
+                  </div>
+                  <p className="text-sm text-gray-600 font-medium">Complete the course to unlock your certificate</p>
+                  <p className="text-xs text-gray-500 mt-1">Finish all lessons to enable generation.</p>
+                </div>
+              )}
+
+              {/* Ready to generate (100% complete, no certificate yet) */}
+              {(!certificate && progressPercent >= 100) && (
                 <button
+                  disabled={issuingCert}
                   onClick={() => navigate(`/courses/${course?.id}/certificate`, { state: { courseTitle: course?.title } })}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 transition"
-                >
-                  Certificate earned ✅
-                </button>
-              ) : (
-                <button
-                  disabled={(progressPercent < 100) || issuingCert}
-                  onClick={() => navigate(`/courses/${course?.id}/certificate`, { state: { courseTitle: course?.title } })}
-                  className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md transition text-white ${
-                    (progressPercent < 100) || issuingCert ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+                  className={`group w-full relative overflow-hidden inline-flex items-center justify-center gap-2 px-4 py-3 rounded-md font-medium text-sm text-white transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 shadow ${
+                    issuingCert ? 'bg-indigo-400 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600'
                   }`}
                 >
-                  {issuingCert ? 'Opening…' : '🎓 Generate Certificate'}
+                  <FaCertificate className="w-4 h-4" />
+                  {issuingCert ? 'Opening…' : 'Generate Certificate'}
                 </button>
               )}
+
+              {/* Certificate issued */}
               {certificate && (
-                <div className="mt-2 text-xs text-gray-500">
-                  <div>Issued: {new Date(certificate.issued_at).toLocaleString()}</div>
-                  <div>ID: {certificate.certificate_id}</div>
-          {certificate.download_url && (
-                    <div className="mt-1">
-            <a href={`${certificate.download_url}?v=${encodeURIComponent(certificate.certificate_id || Date.now())}`} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">Download PDF</a>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => navigate(`/courses/${course?.id}/certificate`, { state: { courseTitle: course?.title } })}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-md bg-green-600 text-white hover:bg-green-700 transition font-medium text-sm shadow"
+                  >
+                    <FaCheckCircle className="w-4 h-4" />
+                    View Certificate
+                  </button>
+                  <div className="rounded-md bg-green-50 p-3 text-xs text-green-700 border border-green-200">
+                    <div className="flex items-center gap-2">
+                      <FaCertificate className="w-3.5 h-3.5" />
+                      <span>ID: {certificate.certificate_id}</span>
                     </div>
-                  )}
+                    <div className="mt-1">Issued: {new Date(certificate.issued_at).toLocaleString()}</div>
+                    {certificate.download_url && (
+                      <div className="mt-2">
+                        <button
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            try {
+                              const res = await fetch(certificate.download_url);
+                              const blob = await res.blob();
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `certificate-${(course?.title || 'course').replace(/\s+/g,'-').toLowerCase()}.pdf`;
+                              document.body.appendChild(a);
+                              a.click();
+                              a.remove();
+                              window.URL.revokeObjectURL(url);
+                            } catch (err) {
+                              // non-fatal; optionally show toast if available
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-green-300 text-green-700 hover:bg-green-100 text-xs font-medium transition"
+                        >
+                          <FaDownload className="w-3 h-3" /> Download PDF
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
