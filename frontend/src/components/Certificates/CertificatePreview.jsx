@@ -6,13 +6,20 @@ import { toast } from 'react-hot-toast';
 import PDFCanvasViewer from './PDFCanvasViewer';
 
 // Simple and reliable PDF viewer component
+// Internal debug helper (stripped/minimized in production builds by tree-shaking if unused)
+const __debug = (...args) => {
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.debug('[Certificate]', ...args);
+  }
+};
 const PDFViewer = ({ url, onError, onLoad, loading, retryCount }) => {
   const [displayMethod, setDisplayMethod] = useState('iframe'); // 'iframe', 'object', 'link'
   
   const pdfUrl = url;
   
   const handleError = () => {
-    console.log('PDF display failed with method:', displayMethod);
+  __debug('PDF display failed with method', displayMethod);
     if (displayMethod === 'iframe') {
       setDisplayMethod('object');
       return;
@@ -25,7 +32,7 @@ const PDFViewer = ({ url, onError, onLoad, loading, retryCount }) => {
   };
 
   const handleLoad = () => {
-    console.log('PDF loaded successfully with method:', displayMethod);
+  __debug('PDF loaded successfully with method', displayMethod);
     if (onLoad) onLoad();
   };
 
@@ -107,11 +114,6 @@ const CertificatePreview = () => {
   const location = useLocation();
   const { user } = useAuth();
   
-  // Debug logging
-  console.log('CertificatePreview - courseId:', courseId);
-  console.log('CertificatePreview - navigate function:', typeof navigate);
-  console.log('CertificatePreview - user:', user);
-  
   const [loading, setLoading] = useState(true);
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState('');
@@ -121,6 +123,13 @@ const CertificatePreview = () => {
   const [pdfError, setPdfError] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfRetryCount, setPdfRetryCount] = useState(0);
+  
+  // Debug logging moved to useEffect
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+  __debug('Init courseId', courseId, 'user', user?.id);
+    }
+  }, [courseId, user]);
 
   const learnerName = useMemo(() => {
     return (
@@ -134,60 +143,61 @@ const CertificatePreview = () => {
 
   useEffect(() => {
     const init = async () => {
+      if (!courseId) {
+        setError('Invalid course ID');
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Don't try to get certificate for school courses
-        if (!location.pathname.includes('/courses/engineering/')) {
-          setLoading(false);
+        setLoading(true);
+        setPdfError(false);
+        setPdfLoading(true);
+        setPdfRetryCount(0);
+
+        // First get course details to check eligibility
+        const courseRes = await axiosInstance.get(`/courses/${courseId}/`);
+        const course = courseRes.data;
+        
+        if (!course) {
+          setError('Course not found');
+          return;
+        }
+        
+        setCourseTitle(course.title);
+
+        // Then get progress data
+        const progressRes = await axiosInstance.get(`/courses/${courseId}/progress/`);
+        const progress = progressRes.data?.progress;
+        const pct = progress?.percentage ?? 0;
+        setProgressPct(pct);
+
+        // Check if user has completed required modules/lessons
+        const hasCompletedCourse = pct >= 100;
+        if (!hasCompletedCourse) {
+          setError('Complete the course to generate your certificate.');
           return;
         }
 
-        setLoading(true);
-        setPdfError(false); // Reset PDF error state on reload
-        setPdfLoading(true); // Reset PDF loading state
-        setPdfRetryCount(0); // Reset retry count
-
-        // 1) Get progress summary (includes certificate if already issued)
-        const progressRes = await axiosInstance.get(`/courses/${courseId}/progress/`);
-        console.log('Progress API response:', progressRes.data);
-        const pct = progressRes.data?.progress?.percentage ?? 0;
-        setProgressPct(pct);
-        if (progressRes.data?.course?.title && !courseTitle) {
-          console.log('Setting course title:', progressRes.data.course.title);
-          setCourseTitle(progressRes.data.course.title);
-        }
-
-        // Always (re)issue when eligible to ensure we use the latest template
-        if (pct >= 100) {
-          setIssuing(true);
-          const issueRes = await axiosInstance.post(`/courses/${courseId}/certificate/`);
-          console.log('Certificate API response:', issueRes.data);
-          setCertificate(issueRes.data);
-          
-          // Try to get course title from certificate response if not already set
-          if (issueRes.data?.course?.title && !courseTitle) {
-            console.log('Setting course title from certificate:', issueRes.data.course.title);
-            setCourseTitle(issueRes.data.course.title);
+        // Check if certificate already exists
+        try {
+          const existingCertRes = await axiosInstance.get(`/courses/${courseId}/certificate/`);
+          if (existingCertRes.data) {
+            setCertificate(existingCertRes.data);
+            return;
           }
-          
-          // Remove the duplicate toast - only show on manual actions, not on page load
-        } else {
-          setError('Complete the course to generate your certificate.');
+        } catch (certError) {
+          // No existing certificate, continue to issue new one
+          __debug('No existing certificate present; issuing new');
         }
 
-        // If we still don't have a course title, try fetching course details directly
-        if (!courseTitle) {
-          try {
-            console.log('Fetching course details directly...');
-            const courseRes = await axiosInstance.get(`/courses/${courseId}/`);
-            console.log('Course details API response:', courseRes.data);
-            if (courseRes.data?.title) {
-              console.log('Setting course title from course details:', courseRes.data.title);
-              setCourseTitle(courseRes.data.title);
-            }
-          } catch (courseError) {
-            console.log('Failed to fetch course details:', courseError);
-          }
+        // Issue new certificate
+        setIssuing(true);
+        const issueRes = await axiosInstance.post(`/courses/${courseId}/certificate/`);
+        if (!issueRes.data) {
+          throw new Error('Failed to generate certificate');
         }
+        setCertificate(issueRes.data);
       } catch (e) {
         const msg = e.response?.data?.error || e.response?.data?.detail || 'Failed to load certificate info';
         setError(msg);
@@ -227,14 +237,14 @@ const CertificatePreview = () => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('Back to Course clicked, courseId:', courseId);
+                __debug('Back clicked', courseId);
                 try {
                   // Try to navigate to the specific course page first
                   if (courseId) {
-                    console.log('Navigating to course:', `/courses/${courseId}`);
+                    __debug('Navigate explicit course page');
                     navigate(`/courses/${courseId}`);
                   } else {
-                    console.log('Navigating back in history');
+                    __debug('Navigate history back');
                     navigate(-1);
                   }
                 } catch (error) {
@@ -263,7 +273,7 @@ const CertificatePreview = () => {
                 onClick={async (e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('Share button clicked');
+                  __debug('Top share attempt');
                   try {
                     const shareData = {
                       title: 'My Certificate of Completion',
@@ -271,19 +281,19 @@ const CertificatePreview = () => {
                       url: window.location.href
                     };
                     
-                    console.log('Attempting to share:', shareData);
+                    __debug('Share data', shareData);
                     
                     if (navigator.share) {
-                      console.log('Using Web Share API');
+                      __debug('Using Web Share API');
                       await navigator.share(shareData);
                       // Removed automatic toast - let the system handle share feedback
                     } else {
-                      console.log('Web Share not available, using clipboard');
+                      __debug('Web Share unavailable; clipboard fallback');
                       await navigator.clipboard.writeText(window.location.href);
                       toast.success('Certificate link copied to clipboard!');
                     }
                   } catch (error) {
-                    console.log('Share/clipboard failed:', error);
+                    __debug('Share failed', error);
                     // Manual fallback
                     const textArea = document.createElement('textarea');
                     textArea.value = window.location.href;
@@ -310,24 +320,47 @@ const CertificatePreview = () => {
               
               {/* Download button - Mobile optimized */}
               {certificate?.download_url ? (
-                <a
-                  href={`${certificate.download_url}?v=${encodeURIComponent(certificate.certificate_id || Date.now())}`}
-                  download={`certificate-${learnerName.replace(/\s+/g, '-').toLowerCase()}.pdf`}
-                  onClick={(e) => {
+                <button
+                  onClick={async (e) => {
+                    e.preventDefault();
                     e.stopPropagation();
-                    console.log('Download button clicked');
-                    console.log('Download URL:', certificate.download_url);
-                    toast.success('Certificate download started!');
+                    
+                    try {
+                      toast.loading('Starting download...');
+                      
+                      // Fetch the PDF
+                      const response = await fetch(certificate.download_url);
+                      const blob = await response.blob();
+                      
+                      // Create a download link
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.style.display = 'none';
+                      a.href = url;
+                      a.download = `certificate-${learnerName.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+                      
+                      // Trigger download
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                      
+                      toast.dismiss();
+                      toast.success('Download started!');
+                    } catch (error) {
+                      console.error('Download error:', error);
+                      toast.dismiss();
+                      toast.error('Download failed. Please try again.');
+                    }
                   }}
                   className="flex items-center gap-1 sm:gap-2 px-3 sm:px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 font-medium shadow-lg cursor-pointer relative z-10 text-sm sm:text-base"
-                  style={{ pointerEvents: 'auto' }}
                 >
                   <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <span className="hidden xs:inline">Download</span>
                   <span className="hidden sm:inline">PDF</span>
-                </a>
+                </button>
               ) : (
                 <button
                   disabled
@@ -396,8 +429,18 @@ const CertificatePreview = () => {
               <div className="p-4 sm:p-6">
                 <div className="space-y-4">
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-base sm:text-lg">{courseTitle || 'Course Title'}</h3>
-                    <p className="text-gray-600 mt-1 text-sm sm:text-base">Instructor: EasyLearnova Team</p>
+                    <h3 className="font-semibold text-gray-900 text-base sm:text-lg">
+                    {courseTitle || 'Course Title'}
+                  </h3>
+                  <p className="text-gray-600 mt-1 text-sm sm:text-base">Instructor: EasyLearnova Team</p>
+                  {progressPct < 100 && (
+                    <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        Complete all course requirements to unlock your certificate.
+                        Current progress: {progressPct}%
+                      </p>
+                    </div>
+                  )}
                   </div>
                   
                   <div className="flex items-center flex-wrap gap-2 sm:space-x-4 text-sm text-gray-600">
@@ -417,28 +460,44 @@ const CertificatePreview = () => {
 
                   <div className="pt-4 space-y-3">
                     {certificate?.download_url && (
-                      <a
-                        href={`${certificate?.download_url}?v=${encodeURIComponent(certificate?.certificate_id || Date.now())}`}
-                        download={`certificate-${learnerName.replace(/\s+/g, '-').toLowerCase()}.pdf`}
-                        onClick={(e) => {
+                      <button
+                        onClick={async (e) => {
+                          e.preventDefault();
                           e.stopPropagation();
-                          console.log('Sidebar Download button clicked');
-                          toast.success('Certificate download started!');
+                          try {
+                            toast.loading('Preparing download...');
+                            const res = await fetch(certificate.download_url);
+                            if (!res.ok) throw new Error('Network response was not ok');
+                            const blob = await res.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `certificate-${learnerName.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            window.URL.revokeObjectURL(url);
+                            toast.dismiss();
+                            toast.success('Download started');
+                          } catch (err) {
+                            console.error('Sidebar download failed:', err);
+                            toast.dismiss();
+                            toast.error('Download failed');
+                          }
                         }}
                         className="w-full bg-yellow-400 text-gray-900 px-4 py-3 rounded-lg font-medium hover:bg-yellow-500 transition-all duration-200 transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg cursor-pointer relative z-10 text-sm sm:text-base"
-                        style={{ pointerEvents: 'auto' }}
                       >
                         <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         Download Certificate
-                      </a>
+                      </button>
                     )}
                     <button 
                       onClick={async (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        console.log('Sidebar Share button clicked');
+                        __debug('Sidebar share clicked');
                         try {
                           if (navigator.share) {
                             await navigator.share({
@@ -452,7 +511,7 @@ const CertificatePreview = () => {
                             toast.success('Certificate link copied to clipboard!');
                           }
                         } catch (error) {
-                          console.log('Sidebar share failed:', error);
+                          __debug('Sidebar share failed', error);
                           toast.error('Unable to share. Please try again.');
                         }
                       }}

@@ -17,6 +17,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const refreshToken = localStorage.getItem('refreshToken');
       if (!refreshToken) {
+        console.error('No refresh token found');
+        handleAuthFailure();
         throw new Error('No refresh token');
       }
 
@@ -25,57 +27,61 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (response.data.access) {
-  localStorage.setItem('accessToken', response.data.access);
+        localStorage.setItem('accessToken', response.data.access);
+        if (response.data.refresh) {
+          localStorage.setItem('refreshToken', response.data.refresh);
+        }
         return true;
       }
       return false;
     } catch (error) {
       console.error('Token refresh failed:', error);
-      return false;
+      handleAuthFailure();
+      throw error;
     }
   };
 
   // Function to validate current auth state
   const validateAuth = async () => {
     const token = localStorage.getItem('accessToken');
+    const refreshToken = localStorage.getItem('refreshToken');
     const now = Date.now();
     
-    // Only check if we haven't checked in the last minute
-    if (now - lastChecked < 60000) {
-      return isLoggedIn;
+    // Only check if we haven't checked in the last minute and we're already logged in
+    if (now - lastChecked < 60000 && isLoggedIn) {
+      return true;
     }
 
-    if (!token) {
-      setIsLoggedIn(false);
-      setUser(null);
+    if (!token || !refreshToken) {
+      handleAuthFailure();
       return false;
     }
 
     try {
-      const response = await axiosInstance.get('/auth/profile/');
-      setUser(response.data);
-      setIsLoggedIn(true);
-      setLastChecked(now);
-      return true;
-    } catch (error) {
-      // If token is invalid, try to refresh it
-      const refreshed = await refreshAccessToken();
-      if (refreshed) {
-        // Retry the profile fetch with new token
-        try {
+      // First try with current access token
+      try {
+        const response = await axiosInstance.get('/auth/profile/');
+        setUser(response.data);
+        setIsLoggedIn(true);
+        setLastChecked(now);
+        return true;
+      } catch (error) {
+        if (error.response?.status === 401) {
+          // Token expired, try to refresh
+          await refreshAccessToken();
+          // Retry with new token
           const retryResponse = await axiosInstance.get('/auth/profile/');
           setUser(retryResponse.data);
           setIsLoggedIn(true);
           setLastChecked(now);
           return true;
-        } catch (retryError) {
-          handleAuthFailure();
-          return false;
         }
-      } else {
-        handleAuthFailure();
-        return false;
+        throw error;
       }
+    } catch (error) {
+      console.error('Auth validation failed:', error);
+      handleAuthFailure();
+      return false;
     }
   };
 
@@ -162,8 +168,12 @@ export const AuthProvider = ({ children }) => {
       
       const { user, access, refresh } = response.data;
       
-  localStorage.setItem('accessToken', access);
-  localStorage.setItem('refreshToken', refresh);
+      if (!access || !refresh) {
+        throw new Error('Invalid response: missing tokens');
+      }
+      
+      localStorage.setItem('accessToken', access);
+      localStorage.setItem('refreshToken', refresh);
       
       setUser(user);
       setIsLoggedIn(true);
