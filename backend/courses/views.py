@@ -910,10 +910,14 @@ def _render_certificate_file(user, course, certificate_obj):
             return None
 
 
-@api_view(['POST'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def issue_engineering_certificate(request, course_id):
-    """Issue a certificate for the user if progress is 100%."""
+    """Singleton certificate resource for an engineering course.
+
+    GET: Return existing certificate if issued (404 if not yet issued).
+    POST: Issue (or re-issue) certificate if user has 100% progress.
+    """
     try:
         user = request.user
         try:
@@ -921,7 +925,18 @@ def issue_engineering_certificate(request, course_id):
         except EngineeringCourse.DoesNotExist:
             return Response({"error": "Course not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Compute progress
+        if request.method == 'GET':
+            cert = Certification.objects.filter(user=user, course=course).first()
+            if not cert:
+                return Response({"detail": "Certificate not issued"}, status=status.HTTP_404_NOT_FOUND)
+            data = CertificationSerializer(cert, context={'request': request}).data
+            data.update({
+                'course_name': course.title,
+                'user_name': getattr(user, 'full_name', None) or getattr(user, 'username', None) or user.email,
+            })
+            return Response(data, status=status.HTTP_200_OK)
+
+        # POST flow: compute progress
         total_lessons = Lesson.objects.filter(section__engineering_course=course).count()
         if total_lessons == 0:
             return Response({"error": "Course has no lessons"}, status=status.HTTP_400_BAD_REQUEST)
@@ -938,10 +953,9 @@ def issue_engineering_certificate(request, course_id):
         # Get or create certificate (enforce single per user/course)
         cert, created = Certification.objects.get_or_create(user=user, course=course)
 
-        # Always (re)generate the personalized PDF to ensure latest template/text
+        # Always (re)generate PDF so template updates reflect
         rel_path = _render_certificate_file(user, course, cert)
         if rel_path:
-            # Delete old file if different
             old_path = None
             if cert.file and cert.file.name and cert.file.name != rel_path:
                 old_path = os.path.join(settings.MEDIA_ROOT, cert.file.name)
