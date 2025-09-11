@@ -4,6 +4,24 @@ import logger from '../utils/logger';
 
 const API_URL = 'http://localhost:8000'; // Adjust this to your Django backend URL
 
+// Helper to read CSRF cookie set by Django (if present)
+function getCookie(name) {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\[\]\\\/+^])/g, '\\$1') + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+// Get best-available access token from localStorage
+function getAccessToken() {
+  if (typeof localStorage === 'undefined') return null;
+  return (
+    localStorage.getItem('accessToken') ||
+    localStorage.getItem('access_token') ||
+    localStorage.getItem('token') ||
+    null
+  );
+}
+
 export const createCourse = async (formData) => {
   try {
     // Log the data being sent for debugging
@@ -13,11 +31,18 @@ export const createCourse = async (formData) => {
   const courseType = formData.get('class_level') ? 'school' : 'engineering';
     logger.log(`Creating ${courseType} course...`);
     
+    const token = getAccessToken();
+    const csrfToken = getCookie('csrftoken');
     const response = await axios.post(`${API_URL}/api/courses/create/`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
       },
-      withCredentials: true, // Important for CORS
+      // Ensure axios uses Django's CSRF names if cookie is present
+      xsrfCookieName: 'csrftoken',
+      xsrfHeaderName: 'X-CSRFToken',
+      withCredentials: true, // allow cookies if a session exists
     });
     
   logger.log("API response:", response.data);
@@ -125,10 +150,16 @@ export const updateCourse = async (courseId, formData) => {
   logger.log("Updating course with ID:", courseId);
   logger.log("Update data:", formData);
     
+    const token = getAccessToken();
+    const csrfToken = getCookie('csrftoken');
     const response = await axios.put(`${API_URL}/api/courses/${courseId}/update/`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
       },
+      xsrfCookieName: 'csrftoken',
+      xsrfHeaderName: 'X-CSRFToken',
       withCredentials: true,
     });
     
@@ -159,7 +190,15 @@ export const deleteCourse = async (courseId) => {
   try {
   logger.log("Deleting course with ID:", courseId);
     
+    const token = getAccessToken();
+    const csrfToken = getCookie('csrftoken');
     const response = await axios.delete(`${API_URL}/api/courses/${courseId}/delete/`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+      },
+      xsrfCookieName: 'csrftoken',
+      xsrfHeaderName: 'X-CSRFToken',
       withCredentials: true,
     });
     

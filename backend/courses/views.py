@@ -4,7 +4,8 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, parser_classes, permission_classes, authentication_classes
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource, LearningActivity, UserStartedPredefinedCourse, Certification
 from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer, CertificationSerializer
 from django.utils import timezone
@@ -26,10 +27,13 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
+from django.views.decorators.csrf import csrf_exempt
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
-@permission_classes([AllowAny])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminUser])
+@csrf_exempt
 def create_course(request):
     """
     Creates a new course based on the education level
@@ -38,6 +42,26 @@ def create_course(request):
     print("Received data:", data)  # Debug print
     
     try:
+        # Helper to parse list-like fields coming from JSON or multipart forms
+        def _parse_list_field(val, default=None):
+            if default is None:
+                default = []
+            if val is None:
+                return list(default)
+            # If already a list/tuple, return as list
+            if isinstance(val, (list, tuple)):
+                return list(val)
+            # If it's a string, try to json.loads it
+            if isinstance(val, str):
+                try:
+                    parsed = json.loads(val)
+                    if isinstance(parsed, (list, tuple)):
+                        return list(parsed)
+                    return list(default)
+                except Exception:
+                    return list(default)
+            # Fallback
+            return list(default)
         # For School courses (10th, 11th, 12th)
         if 'class_level' in data:
             # Extract the form data
@@ -55,29 +79,13 @@ def create_course(request):
             # Handle key_topics and learning_points
             # Accept both key_topics/learning_points (snake_case) and keyTopics/learningPoints (camelCase) 
             # for backwards compatibility with existing code
-            if 'key_topics' in data:
-                try:
-                    course_data['key_topics'] = json.loads(data.get('key_topics', '[]'))
-                except json.JSONDecodeError:
-                    course_data['key_topics'] = []
-            elif 'keyTopics' in data:
-                try:
-                    course_data['key_topics'] = json.loads(data.get('keyTopics', '[]'))
-                except json.JSONDecodeError:
-                    course_data['key_topics'] = []
+            if 'key_topics' in data or 'keyTopics' in data:
+                course_data['key_topics'] = _parse_list_field(data.get('key_topics', data.get('keyTopics')))
             else:
                 course_data['key_topics'] = []
-                
-            if 'learning_points' in data:
-                try:
-                    course_data['learning_points'] = json.loads(data.get('learning_points', '[]'))
-                except json.JSONDecodeError:
-                    course_data['learning_points'] = []
-            elif 'learningPoints' in data:
-                try:
-                    course_data['learning_points'] = json.loads(data.get('learningPoints', '[]'))
-                except json.JSONDecodeError:
-                    course_data['learning_points'] = []
+
+            if 'learning_points' in data or 'learningPoints' in data:
+                course_data['learning_points'] = _parse_list_field(data.get('learning_points', data.get('learningPoints')))
             else:
                 course_data['learning_points'] = []
             
@@ -107,19 +115,16 @@ def create_course(request):
                 course = serializer.save()
                 
                 # Process chapters
-                chapters_data = json.loads(data.get('chapters', '[]'))
+                chapters_data = _parse_list_field(data.get('chapters', []))
                 
                 # Extract resource files info if available
                 resource_files_info = {}
                 if 'resourceFilesInfo' in data:
-                    try:
-                        resource_file_ids = json.loads(data.get('resourceFilesInfo', '[]'))
-                        # Create a mapping of file IDs to actual file objects
-                        for file_id in resource_file_ids:
-                            if file_id in request.FILES:
-                                resource_files_info[file_id] = request.FILES[file_id]
-                    except json.JSONDecodeError:
-                        print("Error parsing resourceFilesInfo")
+                    resource_file_ids = _parse_list_field(data.get('resourceFilesInfo', []))
+                    # Create a mapping of file IDs to actual file objects
+                    for file_id in resource_file_ids:
+                        if file_id in request.FILES:
+                            resource_files_info[file_id] = request.FILES[file_id]
                 
                 for idx, chapter_data in enumerate(chapters_data):
                     if not chapter_data.get('name'):
@@ -210,8 +215,8 @@ def create_course(request):
                 'certificate_given': data.get('certificateGiven') in ['true', True, 'True'],
                 'project_based': data.get('projectBased') in ['true', True, 'True'],
                 'last_updated': data.get('lastUpdated', None),
-                'learning_points': json.loads(data.get('learningPoints', '[]')),
-                'requirements': json.loads(data.get('requirements', '[]')),
+                'learning_points': _parse_list_field(data.get('learningPoints', [])),
+                'requirements': _parse_list_field(data.get('requirements', [])),
                 'category': data.get('category', ''),  # Make sure to set the category
                 'is_published': True,  # Set it as published by default
             }
@@ -225,19 +230,16 @@ def create_course(request):
                 course = serializer.save()
                 
                 # Process sections
-                sections_data = json.loads(data.get('sections', '[]'))
+                sections_data = _parse_list_field(data.get('sections', []))
                 
                 # Extract resource files info if available
                 resource_files_info = {}
                 if 'resourceFilesInfo' in data:
-                    try:
-                        resource_file_ids = json.loads(data.get('resourceFilesInfo', '[]'))
-                        # Create a mapping of file IDs to actual file objects
-                        for file_id in resource_file_ids:
-                            if file_id in request.FILES:
-                                resource_files_info[file_id] = request.FILES[file_id]
-                    except json.JSONDecodeError:
-                        print("Error parsing resourceFilesInfo")
+                    resource_file_ids = _parse_list_field(data.get('resourceFilesInfo', []))
+                    # Create a mapping of file IDs to actual file objects
+                    for file_id in resource_file_ids:
+                        if file_id in request.FILES:
+                            resource_files_info[file_id] = request.FILES[file_id]
                 
                 for idx, section_data in enumerate(sections_data):
                     section = course.sections.create(
@@ -1164,6 +1166,7 @@ def submit_school_quiz(request, quiz_id):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def get_resources(request):
     """
     Get high-quality learning resources using Google Programmable Search API
@@ -2114,7 +2117,9 @@ def get_learning_stats(request):
 
 
 @api_view(['DELETE'])
-@permission_classes([AllowAny])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminUser])
+@csrf_exempt
 def delete_course(request, course_id):
     """
     Delete a course (both school and engineering courses)
@@ -2159,7 +2164,9 @@ def delete_course(request, course_id):
 
 @api_view(['PUT', 'PATCH'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
-@permission_classes([AllowAny])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminUser])
+@csrf_exempt
 def update_course(request, course_id):
     """
     Update a course (both school and engineering courses)
