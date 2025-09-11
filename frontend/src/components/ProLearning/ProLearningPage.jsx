@@ -1216,9 +1216,18 @@ const ProLearningPage = () => {
     const topicIndex = topicsList.findIndex(topic => topic.name === topicName || topic === topicName);
     if (topicIndex === 0) return false;
 
-    // During an active progressive session, keep later topics blocked until FIRST topic completes
-    if (useProgressiveGeneration && isProgressiveGenerating) {
-      return !isFirstTopicComplete();
+    // During a fresh progressive session, keep topics after the first FULLY BLOCKED
+    // until the entire course generation completes (all topics, all tabs)
+    if (useProgressiveGeneration) {
+      let fresh = false;
+      try {
+        if (typeof localStorage !== 'undefined') {
+          fresh = !!localStorage.getItem('proLearning_batchMarker');
+        }
+      } catch {}
+      if (isProgressiveGenerating || fresh) {
+        return !allTopicsGenerated; // block until everything is done
+      }
     }
 
     // Otherwise (e.g., revisits/older sessions), allow unblocking if this topic already has full content
@@ -2742,16 +2751,24 @@ const ProLearningPage = () => {
             setCourseGenerationStatus(`Generating ${progress.tabName} for ${progress.topic}...`);
           },
           onTabComplete: (tabInfo) => {
-            // Make this tab clickable immediately for this topic
-            setAvailableTabsForTopics(prev => {
-              const topicTabs = prev[tabInfo.topic] || [];
-              return topicTabs.includes(tabInfo.tabType)
-                ? prev
-                : { ...prev, [tabInfo.topic]: [...topicTabs, tabInfo.tabType] };
-            });
+            // In fresh progressive runs, don't expose tab readiness for topics after the first
+            let fresh = false;
+            try { if (typeof localStorage !== 'undefined') fresh = !!localStorage.getItem('proLearning_batchMarker'); } catch {}
+            const isAfterFirst = topicsList.findIndex(t => (t.name || t) === tabInfo.topic) > 0;
+            const shouldSuppress = useProgressiveGeneration && (isProgressiveGenerating || fresh) && isAfterFirst && !allTopicsGenerated;
+
+            if (!shouldSuppress) {
+              // Make this tab clickable immediately for this topic
+              setAvailableTabsForTopics(prev => {
+                const topicTabs = prev[tabInfo.topic] || [];
+                return topicTabs.includes(tabInfo.tabType)
+                  ? prev
+                  : { ...prev, [tabInfo.topic]: [...topicTabs, tabInfo.tabType] };
+              });
+            }
 
             // Immediately update content if this is the currently selected topic
-            if (selectedTopic?.name === tabInfo.topic) {
+            if (!shouldSuppress && selectedTopic?.name === tabInfo.topic) {
               console.log(`📝 DEBUG: Tab ${tabInfo.tabName} completed for ${tabInfo.topic} - updating content immediately`);
               
               // Get the fresh content and update immediately
@@ -3096,13 +3113,19 @@ const ProLearningPage = () => {
 
     if (readyTabs.length === 0) return;
 
+    // Only enforce auto-switching for the FIRST topic while progressive generation is active,
+    // to avoid exposing later topics prematurely.
+    const firstTopicName = topicsList?.[0]?.name || topicsList?.[0];
+    const isFirstTopic = topicName === firstTopicName;
+    if (!isFirstTopic && isProgressiveGenerating && !allTopicsGenerated) return;
+
     // If the current tab isn't ready, switch to the first ready tab
     if (!readyTabs.includes(activeTab)) {
       const preferredOrder = ['reading', 'summary', 'videos', 'quiz', 'resources'];
       const firstReady = preferredOrder.find(t => readyTabs.includes(t)) || readyTabs[0];
       if (firstReady) updateActiveTab(firstReady);
     }
-  }, [availableTabsForTopics, selectedTopic?.name, content, useProgressiveGeneration]); // Remove activeTab to prevent loops
+  }, [availableTabsForTopics, selectedTopic?.name, content, useProgressiveGeneration, isProgressiveGenerating, allTopicsGenerated, topicsList]); // Remove activeTab to prevent loops
 
   // Cleanup debounced timer on unmount
   useEffect(() => {
@@ -3547,7 +3570,8 @@ const ProLearningPage = () => {
   );
 
   const renderTabContent = () => {
-    const currentTopicName = selectedTopic?.name;
+    // Derive current topic name robustly (fallback to URL param if selectedTopic not yet set)
+    const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null);
     
     // CRITICAL: Check if current topic is blocked (2nd topic onwards until course completion)
     if (currentTopicName && isTopicBlocked(currentTopicName)) {
@@ -3587,7 +3611,7 @@ const ProLearningPage = () => {
     // Decide whether to show the progressive generation card or the actual content
     // Show the status card only when the active tab is not ready and has no data yet
     if (isProgressiveGenerating) {
-      const currentTopicName = selectedTopic?.name;
+  const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null);
       const readyTabs = (currentTopicName && availableTabsForTopics[currentTopicName]) || [];
       // Consider a tab ready if we already have content for it
       const activeHasContent = (
@@ -4991,10 +5015,19 @@ const ProLearningPage = () => {
                       // Check if tab content is available for progressive generation
                       let isTabAvailable = true;
                       if (useProgressiveGeneration) {
-                        // If the current topic is blocked, nothing should be available, even if some stale content exists
+                        // During a fresh progressive run, only allow the FIRST topic to surface tabs progressively.
+                        // All later topics remain blocked (no tabs) until allTopicsGenerated is true.
+                        let fresh = false;
+                        try { if (typeof localStorage !== 'undefined') fresh = !!localStorage.getItem('proLearning_batchMarker'); } catch {}
+                        const topicIndex = topicsList.findIndex(t => (t.name || t) === currentTopicName);
+                        const isFirstTopic = topicIndex === 0;
                         if (currentTopicBlocked) {
                           isTabAvailable = false;
+                        } else if ((isProgressiveGenerating || fresh) && !allTopicsGenerated && !isFirstTopic) {
+                          // Not first topic during active generation: keep tabs hidden
+                          isTabAvailable = false;
                         } else {
+                          // First topic (progressive) or post-generation: honor readiness/content
                           isTabAvailable = ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes(tab.id)) || hasTabContent);
                         }
                       }
