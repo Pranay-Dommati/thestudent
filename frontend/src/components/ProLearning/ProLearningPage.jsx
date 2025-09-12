@@ -138,12 +138,57 @@ const ProLearningPage = () => {
     checkIfCourseSaved();
   }, [courseId]);
 
+  // Reload-mode content loader (DB/in-memory only, no generation)
+  const loadContentForReloadMode = async (topicName) => {
+    const currentCourseId = getCourseId();
+    if (!currentCourseId || !topicName) return;
+
+    try {
+      const storedContent = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
+      if (storedContent && storedContent.reading) {
+        setContent({
+          reading: storedContent.reading,
+          summary: storedContent.summary || 'Summary not available',
+          quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
+          videos: storedContent.videos || [],
+          resources: storedContent.resources || []
+        });
+
+        if (storedContent.reading) {
+          const sections = parseReadingSections(storedContent.reading);
+          setReadingSections(sections);
+          setReadingSectionIndex(0);
+        }
+      } else {
+        setContent({
+          reading: 'Content not available. Please regenerate the course.',
+          summary: 'Summary not available',
+          quiz: { questions: [], currentQuestion: 0 },
+          videos: [],
+          resources: []
+        });
+      }
+    } catch (error) {
+      console.error('Reload mode content load failed:', error);
+      setContent({
+        reading: 'Error loading content. Please try again.',
+        summary: 'Error loading summary',
+        quiz: { questions: [], currentQuestion: 0 },
+        videos: [],
+        resources: []
+      });
+    } finally {
+      setIsLoading(false);
+      setLoadingStep('');
+    }
+  };
+
   // Set default topics and initialize with consistent course ID
   useEffect(() => {
     // Removed IndexedDB waits; Pro Learning no longer relies on IDB
     
     // Simple content loader for reload mode - no generation, just load from storage
-    const loadContentForReloadMode = async (topicName) => {
+    const loadContentForReloadModeEffect = async (topicName) => {
       const currentCourseId = getCourseId();
       if (!currentCourseId || !topicName) return;
 
@@ -405,7 +450,7 @@ const ProLearningPage = () => {
         setTimeout(() => {
           if (loadScenario === 'reload') {
             // RELOAD MODE: Simple content loading without generation
-            loadContentForReloadMode(selectedTopicName);
+            loadContentForReloadModeEffect(selectedTopicName);
           } else {
             // FIRST-TIME MODE: Full generation logic
             loadTopicContent(selectedTopicName);
@@ -1680,11 +1725,12 @@ const ProLearningPage = () => {
 
     // Check if this topic is blocked (2nd topic onwards until course completion)
     if (isTopicBlocked(selectedTopic.name)) {
-      // For blocked topics, set loading state with appropriate message
+      // Instead of hard-blocking, begin progressive generation for this topic
+      console.log('⏳ Topic gated – starting progressive generation for:', selectedTopic.name);
       setIsLoading(true);
-      setLoadingStep(`Loading ${selectedTopic.name} content...`);
-      console.log('🚫 Topic is blocked until course completion:', selectedTopic.name);
-      return; // Exit early, content will show loading UI
+      setLoadingStep(`Preparing ${selectedTopic.name}...`);
+      loadProgressiveTopicContent(selectedTopic.name, { showLoader: false });
+      return;
     }
 
     // Handle content loading for non-blocked topics
@@ -3159,22 +3205,68 @@ const ProLearningPage = () => {
   };
 
   const setAndNavigateToCourseId = async (id) => {
-    try { if (typeof localStorage !== 'undefined') localStorage.setItem('currentCourseId', id); } catch {}
     navigate(`/pro-learning/${id}${window.location.search}`, { replace: true });
   };
 
-  // Effect to handle course ID generation and redirection
+  // Effect: if temporary ID (course_...), create a persisted course shell and redirect to UUID
   useEffect(() => {
-    if (!courseId) {
-      const existingId = getCourseId();
-      if (existingId) {
-        setAndNavigateToCourseId(existingId);
-      } else {
-        const newId = generateCourseId();
-        setAndNavigateToCourseId(newId);
-      }
-    }
-  }, [courseId, navigate]);
+    const persistAndRedirect = async () => {
+      if (!courseId || !courseId.startsWith('course_')) return;
+      try {
+        const token = window.localStorage?.getItem('accessToken');
+        if (!token) return; // user not logged in → skip
+
+        // Try to gather any already-generated content in memory for this temp courseId
+        let topicsPayload = {};
+        try {
+          const storedCourse = await proContentManager.getStoredCourseContent(courseId);
+          if (storedCourse && storedCourse.topics) {
+            topicsPayload = Object.fromEntries(
+              Object.entries(storedCourse.topics).map(([name, t], idx) => {
+                const c = t?.content ?? {};
+                const reading = c.reading || c.readingMaterial || '';
+                const summary = c.summary || c.topicSummary || '';
+                const videos = Array.isArray(c.videos) ? c.videos : [];
+                let quiz = [];
+                if (Array.isArray(c.quiz)) quiz = c.quiz;
+                else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
+                else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
+                const resources = Array.isArray(c.resources) ? c.resources : [];
+                return [name, { content: { reading, summary, videos, quiz, resources }, order: idx }];
+              })
+            );
+          }
+        } catch {}
+
+        // Build payload: use whatever we have; if empty, backend still creates a shell
+        const payload = {
+          course_name: courseId,
+          title: courseTitle || 'AI Generated Course',
+          overwrite: true,
+          topics: topicsPayload
+        };
+
+        // Ensure ProContentManager uses stable course_name for idempotency
+        try { proContentManager.setPersistName(courseId); } catch {}
+
+        const res = await fetch('/api/courses/pro-learning/save-course/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        const newId = data?.course?.id;
+        if (res.ok && newId) {
+          // Redirect to permanent UUID keeping current query
+          navigate(`/pro-learning/${newId}${window.location.search}`, { replace: true });
+        }
+      } catch {}
+    };
+    persistAndRedirect();
+  }, [courseId, courseTitle, navigate]);
 
   // Initialize course ID on first render
   useEffect(() => {

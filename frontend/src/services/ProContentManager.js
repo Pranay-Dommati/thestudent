@@ -26,8 +26,10 @@ class ProContentManager {
   constructor() {
     this.currentCourse = null;
     this.currentCourseId = null;
+    this.persistName = null; // stable course_name for backend idempotency
     this.generationPromises = new Map(); // Track ongoing content generation
     this.courseContentCache = new Map(); // In-memory cache for course content
+    this._lastPersistAt = new Map(); // courseId -> timestamp
   }
 
   /**
@@ -69,6 +71,12 @@ class ProContentManager {
     } else {
       const course = contentStorageService.getCourseByTitle(courseTitle);
       this.currentCourseId = course ? course.id : null;
+    }
+  }
+
+  setPersistName(stableName) {
+    if (stableName && typeof stableName === 'string') {
+      this.persistName = stableName;
     }
   }
 
@@ -363,6 +371,23 @@ class ProContentManager {
           if (!storedContent?.reading) {
             throw new Error('Content storage verification failed');
           }
+
+          // Update in-memory aggregate cache for this course
+          let aggregate = this.courseContentCache.get(this.currentCourseId) || {
+            courseId: this.currentCourseId,
+            topics: {},
+            metadata: { source: 'generated', updatedAt: new Date().toISOString() }
+          };
+          aggregate.topics[topic.name] = {
+            id: topic.id,
+            name: topic.name,
+            content: storedContent
+          };
+          aggregate.metadata.updatedAt = new Date().toISOString();
+          this.courseContentCache.set(this.currentCourseId, aggregate);
+          
+          // Best-effort: persist partial progress to backend (debounced)
+          this._persistPartialToBackend(this.currentCourseId).catch(() => {});
         }
         
         return {
@@ -384,6 +409,49 @@ class ProContentManager {
     this.generationPromises.set(generationKey, contentPromise);
     
     return contentPromise;
+  }
+
+  async _persistPartialToBackend(courseId) {
+    const now = Date.now();
+    const last = this._lastPersistAt.get(courseId) || 0;
+    if (now - last < 4000) return; // debounce ~4s
+    this._lastPersistAt.set(courseId, now);
+
+    const token = getAuthToken();
+    if (!token) return;
+
+    const aggregate = this.courseContentCache.get(courseId);
+    if (!aggregate || !aggregate.topics || Object.keys(aggregate.topics).length === 0) return;
+
+    const topicsPayload = Object.fromEntries(
+      Object.entries(aggregate.topics).map(([name, t], idx) => {
+        const c = t?.content ?? {};
+        const reading = c.reading || c.readingMaterial || '';
+        const summary = c.summary || c.topicSummary || '';
+        const videos = Array.isArray(c.videos) ? c.videos : [];
+        let quiz = [];
+        if (Array.isArray(c.quiz)) quiz = c.quiz;
+        else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
+        else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
+        const resources = Array.isArray(c.resources) ? c.resources : [];
+        return [name, { content: { reading, summary, videos, quiz, resources }, order: idx }];
+      })
+    );
+
+    const payload = {
+      course_name: this.persistName || courseId,
+      title: this.currentCourse || 'AI Generated Course',
+      overwrite: true,
+      topics: topicsPayload
+    };
+
+    try {
+      await fetch('/api/courses/pro-learning/save-course/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+    } catch {}
   }
 
   /**
