@@ -7,6 +7,7 @@ urlpatterns = [
     path('reading/', views.reading, name='ai-reading'),
     path('resources/', views.resources, name='ai-resources'),
     path('videos/', views.videos, name='ai-videos'),
+    path('youtube_search/', views.youtube_search, name='ai-youtube-search'),
     path('topics/', views.topics, name='ai-topics'),
     path('classify_topics/', views.classify_topics, name='ai-classify-topics'),
     path('classify-topics/', views.classify_topics, name='ai-classify-topics-alt'),

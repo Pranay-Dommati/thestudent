@@ -12,6 +12,8 @@ from .rate_limiter import check_topic_rate_limit, record_topic_creation
 import json
 import logging
 from .ai_service import call_gemini_api, NetworkError
+import requests
+from .youtube import handle_youtube_search
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -39,6 +41,11 @@ def resources(request):
 @csrf_exempt
 def videos(request):
     return handle_videos(request)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def youtube_search(request):
+    return handle_youtube_search(request)
 
 @csrf_exempt
 def topics(request):

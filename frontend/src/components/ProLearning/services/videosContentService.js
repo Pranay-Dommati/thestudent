@@ -10,22 +10,31 @@ export async function generateVideosContent(setContent, topic = '') {
   console.log('🎥 Fetching top YouTube educational videos...');
   
   try {
-    // First try to get real YouTube videos
-    const videoContent = await fetchTopYouTubeVideos(topic);
+    // First try backend YouTube proxy (server-side API key)
+    let source = 'backend_youtube';
+    let videoContent = await fetchFromBackendYouTube(topic);
+    
+    // If backend returns no videos, fallback to client-side YouTube API
+    if (!videoContent || videoContent.length === 0) {
+      videoContent = await fetchTopYouTubeVideos(topic);
+      source = 'youtube_api';
+    }
+    // Normalize fields for UI
+    const normalized = normalizeVideosForUI(videoContent, topic);
     
     setContent({
-      videos: videoContent,
+      videos: normalized,
       videosMetadata: {
         generatedAt: new Date().toISOString(),
-        totalVideos: videoContent.length,
-        totalDuration: calculateTotalDuration(videoContent),
-        categories: extractVideoCategories(videoContent),
-        source: 'youtube_api',
-        avgViewCount: calculateAverageViews(videoContent)
+        totalVideos: normalized.length,
+        totalDuration: calculateTotalDuration(normalized),
+        categories: extractVideoCategories(normalized),
+        source,
+        avgViewCount: calculateAverageViews(normalized)
       }
     });
     
-    console.log(`✅ Found ${videoContent.length} top YouTube videos with ${calculateTotalViews(videoContent)} total views`);
+    console.log(`✅ Found ${normalized.length} top YouTube videos with ${calculateTotalViews(normalized)} total views`);
     
   } catch (error) {
     console.error('🚨 YouTube API failed, trying AI recommendations:', error);
@@ -47,6 +56,67 @@ export async function generateVideosContent(setContent, topic = '') {
       throw new Error('Video generation failed');
     }
   }
+}
+
+// Try server-side YouTube Data API via backend to avoid exposing API key
+async function fetchFromBackendYouTube(topic) {
+  const url = 'http://localhost:8000/ai/youtube_search/';
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, maxResults: 10 })
+    });
+    if (!resp.ok) {
+      const err = await safeJson(resp);
+      throw new Error(`Backend YouTube search failed: ${resp.status} ${JSON.stringify(err)}`);
+    }
+    const data = await resp.json();
+    const vids = Array.isArray(data?.videos) ? data.videos : [];
+    return vids;
+  } catch (e) {
+    console.warn('Backend YouTube search error:', e);
+    throw e; // Let caller fallback
+  }
+}
+
+async function safeJson(resp) {
+  try {
+    return await resp.json();
+  } catch {
+    return { message: 'non-JSON error body' };
+  }
+}
+
+// Normalize YouTube API results (backend/client) for our UI expectations
+function normalizeVideosForUI(videos, topic) {
+  if (!Array.isArray(videos)) return [];
+  return videos.map((v, idx) => {
+    const id = v.id || v.videoId || `video_${idx + 1}`;
+    const title = v.title || '';
+    const description = v.description || '';
+    const url = v.url || (id ? `https://www.youtube.com/watch?v=${id}` : generateVideoUrl(topic, idx));
+    const channel = v.channel || v.channelTitle || '';
+    const thumbnail = v.thumbnail || v.thumbnails?.high?.url || v.thumbnails?.medium?.url || v.thumbnails?.default?.url || '';
+    const viewCount = typeof v.viewCount === 'number' ? v.viewCount : (parseInt(v.views || 0) || 0);
+    // Duration: handle ISO 8601 (PT...) or minutes number
+    const minutes = typeof v.duration === 'string' ? parseDuration(v.duration) : (v.duration || 0);
+    return {
+      id,
+      title,
+      description,
+      url,
+      thumbnail,
+      channel,
+      channelTitle: channel,
+      viewCount,
+      formattedViewCount: formatViewCount(viewCount),
+      duration: minutes,
+      formattedDuration: formatDuration(minutes),
+      isEducationalChannel: isEducationalChannelName(channel),
+      keyTopics: extractKeyTopics(title, description, topic),
+    };
+  });
 }
 
 // Generate curated video recommendations based on topic
