@@ -5,6 +5,23 @@
 import contentStorageService from './ContentStorageService.js';
 import logger from '../utils/logger';
 
+// Helper to get auth token from global localStorage (not shadowed by module scope)
+const getAuthToken = () => {
+  try {
+    return window.localStorage?.getItem('accessToken') || null;
+  } catch {
+    return null;
+  }
+};
+
+const getRefreshToken = () => {
+  try {
+    return window.localStorage?.getItem('refreshToken') || null;
+  } catch {
+    return null;
+  }
+};
+
 class ProContentManager {
   constructor() {
     this.currentCourse = null;
@@ -29,24 +46,13 @@ class ProContentManager {
       if (dbCourse && dbCourse.topics) {
         const aggregated = this.aggregateDatabaseCourse(dbCourse, courseId);
         this.courseContentCache.set(courseId, aggregated);
-        try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(aggregated)); } catch {}
         return true;
       }
     } catch (e) {
-  logger.warn('Failed to initialize from backend DB, will fallback to local storage:', e);
+  logger.warn('Failed to initialize from backend DB:', e);
     }
 
-    try {
-      const cached = (typeof localStorage !== 'undefined') ? localStorage.getItem(`course_content_${courseId}`) : null;
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        this.courseContentCache.set(courseId, parsed);
-        return true;
-      }
-    } catch (e) {
-  logger.error('Failed to load from localStorage fallback', e);
-    }
-
+    // No localStorage fallback - rely on backend only
     return false;
   }
 
@@ -160,13 +166,17 @@ class ProContentManager {
     };
 
     try {
-      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      if (!token) return null;
+      const token = getAuthToken();
+      if (!token) {
+        logger.log('❌ No auth token available for fetching course:', courseId);
+        return null;
+      }
 
+      logger.log('🔄 Fetching course from DB:', courseId);
       let resp = await tryFetch(token);
-      // If unauthorized, try a one-time refresh using refreshToken from localStorage
+      // If unauthorized, try a one-time refresh using refreshToken
       if (resp.status === 401) {
-        const refresh = typeof localStorage !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+        const refresh = getRefreshToken();
         if (refresh) {
           try {
             const r = await fetch('http://localhost:8000/api/auth/token/refresh/', {
@@ -177,7 +187,7 @@ class ProContentManager {
             if (r.ok) {
               const data = await r.json();
               if (data?.access) {
-                try { localStorage.setItem('accessToken', data.access); } catch {}
+                try { window.localStorage.setItem('accessToken', data.access); } catch {}
                 resp = await tryFetch(data.access);
               }
             }
@@ -185,8 +195,13 @@ class ProContentManager {
         }
       }
 
-      if (!resp.ok) return null;
-      return await resp.json();
+      if (!resp.ok) {
+        logger.log('❌ Course fetch failed with status:', resp.status, courseId);
+        return null;
+      }
+      const courseData = await resp.json();
+      logger.log('✅ Course fetched successfully:', courseId, 'topics:', courseData.topics?.length || 0);
+      return courseData;
     } catch (e) {
       return null;
     }
@@ -456,8 +471,7 @@ class ProContentManager {
   // Do not auto-create minimal backend records with empty content.
   // We persist to the database only when full content is available or the user explicitly saves.
 
-      // Keep a small localStorage cache as a fallback only
-      try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
+      // No localStorage caching
     } catch (error) {
   logger.error('❌ Failed to update in-memory course content structure:', error);
     }
@@ -700,14 +714,13 @@ class ProContentManager {
     courseContent.metadata.status = 'completed';
     courseContent.metadata.completedAt = new Date().toISOString();
     
-    // Always update in-memory cache and a tiny localStorage fallback FIRST
+    // Always update in-memory cache
     this.courseContentCache.set(courseId, courseContent);
-    try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(courseContent)); } catch {}
     
   // Then persist aggregated content to backend (DB-first)
     try {
   // Persist via working endpoint that creates course with full topics/content
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  const token = getAuthToken();
       if (token) {
   logger.log('🚀 ProContentManager: Saving batch to backend with full content...');
   logger.log('📊 Course Data Preview:', {
@@ -808,7 +821,6 @@ class ProContentManager {
       if (dbCourse && dbCourse.topics) {
         const aggregated = this.aggregateDatabaseCourse(dbCourse, courseId);
         this.courseContentCache.set(courseId, aggregated);
-        try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(aggregated)); } catch {}
         return aggregated;
       }
     } catch (e) {

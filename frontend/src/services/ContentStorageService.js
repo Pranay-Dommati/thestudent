@@ -1,6 +1,6 @@
 // ContentStorageService.js
 // Database-like content storage service for Pro Learning system
-// IndexedDB removed: using in-memory + localStorage only
+// IndexedDB and localStorage persistence removed; in-memory only for session
 import logger from '../utils/logger';
 
 class ContentStorageService {
@@ -13,8 +13,8 @@ class ContentStorageService {
       metadata: new Map()      // general metadata storage
     };
     
-  // Initialize by loading from localStorage
-  this.loadFromPersistence();
+  // No persistence; start with empty in-memory storage
+  // this.loadFromPersistence();
   }
 
   // ==================== COURSE MANAGEMENT ====================
@@ -37,7 +37,7 @@ class ContentStorageService {
     };
     
     this.storage.courses.set(courseId, course);
-  this.persistToStorage();
+    // No persistence layer in production
     
     return courseId;
   }
@@ -105,7 +105,7 @@ class ContentStorageService {
   logger.log('📝 STORAGE DEBUG: Course updated with topicIds');
     }
 
-  this.persistToStorage();
+    // No persistence layer in production
     return topicIds;
   }
 
@@ -181,7 +181,7 @@ class ContentStorageService {
       this.storage.courses.set(courseId, course);
     }
 
-  this.persistToStorage();
+    // No persistence layer in production
     return topicId;
   }
 

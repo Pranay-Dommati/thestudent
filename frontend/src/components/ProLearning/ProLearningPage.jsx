@@ -269,10 +269,13 @@ const ProLearningPage = () => {
     // Helper function to detect if this is first-time generation vs subsequent reload
     const detectLoadScenario = async (courseId) => {
       try {
+        console.log('🔍 Detecting load scenario for courseId:', courseId);
         // Check if we have topics stored with content in ProContentManager
         const storedTopics = await proContentManager.getStoredTopics(courseId);
+        console.log('📝 Found stored topics:', storedTopics.length, storedTopics.map(t => t.name));
         
         if (storedTopics.length === 0) {
+          console.log('❌ No stored topics found - returning first-time');
           return 'first-time'; // No topics stored at all
         }
         
@@ -280,13 +283,16 @@ const ProLearningPage = () => {
         let hasGeneratedContent = false;
         for (const topic of storedTopics) {
           const content = await proContentManager.getStoredTopicContent(courseId, topic.name);
+          console.log('📖 Content for topic', topic.name, ':', !!content, !!content?.reading);
           if (content && content.reading) {
             hasGeneratedContent = true;
             break;
           }
         }
         
-        return hasGeneratedContent ? 'reload' : 'first-time';
+        const scenario = hasGeneratedContent ? 'reload' : 'first-time';
+        console.log('🎯 Load scenario determined:', scenario);
+        return scenario;
       } catch (error) {
         console.error('Error detecting load scenario:', error);
         return 'first-time'; // Default to first-time on error
@@ -407,11 +413,14 @@ const ProLearningPage = () => {
         }, 100);
       };
 
-  // Ensure ProContentManager cache is hydrated from backend/local storage before any synchronous getters
+  // Ensure ProContentManager cache is hydrated from backend before any synchronous getters
       try {
-        await proContentManager.initializeCourse(currentCourseId);
+        console.log('🔄 Initializing course from backend:', currentCourseId);
+        const initialized = await proContentManager.initializeCourse(currentCourseId);
+        console.log('✅ Course initialization result:', initialized);
         // Cache initialized; synchronous getters will now return data reliably
       } catch (e) {
+        console.error('❌ Course initialization failed:', e);
         // If initialization fails, continue with other fallbacks below
       }
 
