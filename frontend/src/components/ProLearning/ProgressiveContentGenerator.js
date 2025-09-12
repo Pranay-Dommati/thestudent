@@ -33,6 +33,9 @@ export class ProgressiveContentGenerator {
       { id: 'quiz', name: 'Quiz', generator: generateQuizContent },
       { id: 'resources', name: 'Resources', generator: generateResourcesContent }
     ];
+
+    // Transient in-memory aggregation (no localStorage)
+    this.aggregate = { courseId: null, topics: {} };
   }
 
   /**
@@ -73,6 +76,9 @@ export class ProgressiveContentGenerator {
 
   // Store topics
     contentStorageService.storeTopics(this.courseId, this.topics);
+
+    // Reset in-memory aggregate for this session
+    this.aggregate = { courseId: this.courseId, topics: {} };
 
     return { success: true, courseId: this.courseId };
   }
@@ -351,6 +357,12 @@ export class ProgressiveContentGenerator {
     const verifyContent = contentStorageService.getContentByTopicName(topicName, this.courseId);
     console.log('✅ PROG GEN DEBUG: Verification - content retrieved:', !!verifyContent, verifyContent ? `has ${tabType}: ${!!(verifyContent[tabType])}` : 'none');
 
+    // Update in-memory aggregate to persist at completion only
+    const orderIndex = (this.topics || []).findIndex(t => (t.name || t) === topicName);
+    const aggTopic = this.aggregate.topics[topicName] || { id: topicData.id, name: topicName, order: orderIndex >= 0 ? orderIndex : 0, content: { reading: '', summary: '', videos: [], quiz: [], resources: [] } };
+    aggTopic.content = { ...aggTopic.content, [tabType]: content };
+    this.aggregate.topics[topicName] = aggTopic;
+
     return existingContent;
   }
 
@@ -436,6 +448,26 @@ export class ProgressiveContentGenerator {
     }
     
     return availableTabs;
+  }
+
+  // Return aggregated payload for backend save
+  getAggregatedPayload() {
+    const entries = Object.entries(this.aggregate.topics || {});
+    const topicsObj = Object.fromEntries(entries.map(([name, t]) => [name, {
+      content: {
+        reading: t.content?.reading || '',
+        summary: t.content?.summary || '',
+        videos: Array.isArray(t.content?.videos) ? t.content.videos : [],
+        quiz: Array.isArray(t.content?.quiz) ? t.content.quiz : (Array.isArray(t.content?.quiz?.questions) ? t.content.quiz.questions : []),
+        resources: Array.isArray(t.content?.resources) ? t.content.resources : []
+      },
+      order: typeof t.order === 'number' ? t.order : 0
+    }]));
+    return { topics: topicsObj, count: entries.length };
+  }
+
+  clearAggregate() {
+    this.aggregate = { courseId: this.courseId, topics: {} };
   }
 }
 

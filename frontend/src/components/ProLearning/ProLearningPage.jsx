@@ -2401,54 +2401,64 @@ const ProLearningPage = () => {
       // Generate smart course name based on topics
       const smartCourseName = generateSmartCourseName(courseContent.topics, courseTitle);
       
-      // Prepare course data for working Django endpoint (expects topics as object)
-      const topicsObject = Array.isArray(courseContent.topics)
-        ? Object.fromEntries(courseContent.topics.map((t, idx) => {
-            const c = t?.content ?? t ?? {};
-            const reading = c.reading || c.readingMaterial || '';
-            const summary = c.summary || c.topicSummary || '';
-            const videos = Array.isArray(c.videos) ? c.videos : [];
-            let quiz = [];
-            if (Array.isArray(c.quiz)) quiz = c.quiz;
-            else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
-            else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
-            const resources = Array.isArray(c.resources) ? c.resources : [];
-            return [
-              sanitizeTopicName(t.name),
-              {
-                content: { reading, summary, videos, quiz, resources },
-                order: idx,
-                readingMaterial: reading,
-                summary,
-                videos,
-                quiz,
-                resources
-              }
-            ]
-          }))
-        : Object.fromEntries(Object.entries(courseContent.topics).map(([name, t], idx) => {
-            const c = t?.content ?? t ?? {};
-            const reading = c.reading || c.readingMaterial || '';
-            const summary = c.summary || c.topicSummary || '';
-            const videos = Array.isArray(c.videos) ? c.videos : [];
-            let quiz = [];
-            if (Array.isArray(c.quiz)) quiz = c.quiz;
-            else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
-            else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
-            const resources = Array.isArray(c.resources) ? c.resources : [];
-            return [
-              sanitizeTopicName(name),
-              {
-                content: { reading, summary, videos, quiz, resources },
-                order: idx,
-                readingMaterial: reading,
-                summary,
-                videos,
-                quiz,
-                resources
-              }
-            ];
-          }));
+      // Prefer progressive in-memory aggregate when available
+      let topicsObject;
+      try {
+        const agg = progressiveContentGenerator.getAggregatedPayload();
+        if (agg && agg.count > 0) {
+          topicsObject = agg.topics;
+        }
+      } catch {}
+      if (!topicsObject) {
+        // Fallback to previously constructed courseContent shape
+        topicsObject = Array.isArray(courseContent.topics)
+          ? Object.fromEntries(courseContent.topics.map((t, idx) => {
+              const c = t?.content ?? t ?? {};
+              const reading = c.reading || c.readingMaterial || '';
+              const summary = c.summary || c.topicSummary || '';
+              const videos = Array.isArray(c.videos) ? c.videos : [];
+              let quiz = [];
+              if (Array.isArray(c.quiz)) quiz = c.quiz;
+              else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
+              else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
+              const resources = Array.isArray(c.resources) ? c.resources : [];
+              return [
+                sanitizeTopicName(t.name),
+                {
+                  content: { reading, summary, videos, quiz, resources },
+                  order: idx,
+                  readingMaterial: reading,
+                  summary,
+                  videos,
+                  quiz,
+                  resources
+                }
+              ]
+            }))
+          : Object.fromEntries(Object.entries(courseContent.topics).map(([name, t], idx) => {
+              const c = t?.content ?? t ?? {};
+              const reading = c.reading || c.readingMaterial || '';
+              const summary = c.summary || c.topicSummary || '';
+              const videos = Array.isArray(c.videos) ? c.videos : [];
+              let quiz = [];
+              if (Array.isArray(c.quiz)) quiz = c.quiz;
+              else if (c.quiz && Array.isArray(c.quiz.questions)) quiz = c.quiz.questions;
+              else if (Array.isArray(c.quizQuestions)) quiz = c.quizQuestions;
+              const resources = Array.isArray(c.resources) ? c.resources : [];
+              return [
+                sanitizeTopicName(name),
+                {
+                  content: { reading, summary, videos, quiz, resources },
+                  order: idx,
+                  readingMaterial: reading,
+                  summary,
+                  videos,
+                  quiz,
+                  resources
+                }
+              ];
+            }));
+      }
 
       const courseData = {
         course_name: currentCourseId, // stable identifier used by backend
@@ -2481,6 +2491,7 @@ const ProLearningPage = () => {
       if (response.ok) {
         console.log('✅ Course saved to Learning Hub successfully!', responseData);
         toast.success('✅ Course saved to your Learning Hub successfully!');
+        try { progressiveContentGenerator.clearAggregate(); } catch {}
         
         // Update course saved status
         const courseKey = `${currentCourseId}_${smartCourseName}`;
