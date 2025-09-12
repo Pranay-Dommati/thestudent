@@ -163,6 +163,7 @@ const ProLearningPage = () => {
             videos: storedContent.videos || [],
             resources: storedContent.resources || []
           });
+          setContentTopicName(topicName);
 
           // Set reading sections
           if (storedContent.reading) {
@@ -185,6 +186,7 @@ const ProLearningPage = () => {
             videos: [],
             resources: []
           });
+          setContentTopicName(topicName);
           
           // Clear loading states for fallback content
           setIsLoading(false);
@@ -199,6 +201,7 @@ const ProLearningPage = () => {
           videos: [],
           resources: []
         });
+        setContentTopicName(topicName);
         
         // Clear loading states for error content
         setIsLoading(false);
@@ -626,6 +629,8 @@ const ProLearningPage = () => {
   
   // Content state
   const [content, setContent] = useState(null);
+  // Track which topic the current `content` belongs to to prevent cross-topic leaks
+  const [contentTopicName, setContentTopicName] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showSkeletons, setShowSkeletons] = useState(false);
   const [loadingStep, setLoadingStep] = useState("");
@@ -1264,6 +1269,7 @@ const ProLearningPage = () => {
     // OPTIMIZATION: Check if content is already loaded for this topic and user hasn't switched topics
     if (selectedTopic?.name === topicName && content && content.reading && !isLoading) {
       console.log('🚀 Content already loaded for topic:', topicName, '- updating tabs and skipping reload');
+      setContentTopicName(topicName);
       
       // CRITICAL: Even if content is loaded, always update available tabs for the topic
       const availableTabs = [];
@@ -1340,7 +1346,8 @@ const ProLearningPage = () => {
           resources: storedContent.resources || []
         };
         
-        setContent(transformedContent);
+  setContent(transformedContent);
+  setContentTopicName(topicName);
         
         // Update available tabs for the topic based on loaded content
         const availableTabs = [];
@@ -1424,6 +1431,7 @@ const ProLearningPage = () => {
           });
           
           setContent(result.content);
+          setContentTopicName(topicName);
           
           // Update available tabs for the topic based on generated content
           const availableTabs = [];
@@ -1463,7 +1471,8 @@ const ProLearningPage = () => {
         videos: [],
         resources: []
       };
-      setContent(errorContent);
+  setContent(errorContent);
+  setContentTopicName(topicName);
       
       // Even for error content, set the reading tab as available
       setAvailableTabsForTopics(prev => ({
@@ -1547,6 +1556,7 @@ const ProLearningPage = () => {
             videos: formattedContent.videos,
             resources: formattedContent.resources
           });
+          setContentTopicName(topicName);
 
           // Immediately mark available tabs based on loaded progressive content
           const newReady = [];
@@ -1582,6 +1592,7 @@ const ProLearningPage = () => {
             videos: [],
             resources: []
           });
+          setContentTopicName(topicName);
         }
         
       } else {
@@ -1594,6 +1605,7 @@ const ProLearningPage = () => {
           videos: [],
           resources: []
         });
+        setContentTopicName(topicName);
   setReadingSections([]);
   setReadingSectionIndex(0);
       }
@@ -1606,6 +1618,7 @@ const ProLearningPage = () => {
         videos: [],
         resources: []
       });
+      setContentTopicName(topicName);
     } finally {
       if (showLoader) setIsLoading(false);
       setLoadingStep('');
@@ -1631,6 +1644,7 @@ const ProLearningPage = () => {
 
     // CRITICAL: Clear content immediately when switching topics to prevent cross-topic content display
     setContent(null);
+  setContentTopicName(null);
     // Also clear reading sections so previous topic's text doesn't persist
     setReadingSections([]);
     setReadingSectionIndex(0);
@@ -3070,8 +3084,8 @@ const ProLearningPage = () => {
     if (useProgressiveGeneration) {
       const topicName = selectedTopic.name;
       const ready = [...(availableTabsForTopics[topicName] || [])];
-      // Treat already-loaded content as ready
-      if (content) {
+      // Treat already-loaded content as ready ONLY if it belongs to this topic
+      if (content && contentTopicName === topicName) {
         if (content.reading && !ready.includes('reading')) ready.push('reading');
         if (content.summary && !ready.includes('summary')) ready.push('summary');
         if ((content.videos?.length || 0) > 0 && !ready.includes('videos')) ready.push('videos');
@@ -3079,9 +3093,10 @@ const ProLearningPage = () => {
         if ((content.resources?.length || 0) > 0 && !ready.includes('resources')) ready.push('resources');
       }
 
-      if (ready.length > 0 && !ready.includes(requestedTab)) {
+      // If the requested tab isn't ready (or nothing is ready yet), force a valid fallback
+      if (!ready.includes(requestedTab)) {
         const preferredOrder = ['reading', 'summary', 'videos', 'quiz', 'resources'];
-        const fallbackTab = preferredOrder.find(t => ready.includes(t)) || ready[0];
+        const fallbackTab = preferredOrder.find(t => ready.includes(t)) || 'reading';
         if (fallbackTab) {
           tabUrlSyncPendingRef.current = true;
           setActiveTab(fallbackTab);
@@ -3598,7 +3613,7 @@ const ProLearningPage = () => {
     // Show loading thoughtfully: in progressive mode, enforce reading-first for non-first topics
     if (useProgressiveGeneration) {
       const readyTabs = (currentTopicName && availableTabsForTopics[currentTopicName]) || [];
-      const hasAnyContent = !!content && (
+      const hasAnyContent = !!content && contentTopicName === currentTopicName && (
         (content.reading && content.reading.trim()) ||
         (content.summary && content.summary.trim()) ||
         ((content.videos?.length || 0) > 0) ||
@@ -3606,8 +3621,8 @@ const ProLearningPage = () => {
         ((content.resources?.length || 0) > 0)
       );
       if (isBatchGenerating) return <LoadingComponent />;
-      // Don’t block UI if the active tab already has content even if readyTabs is empty
-      const activeHasContent = (
+      // Only treat active tab as ready if its content belongs to this topic
+      const activeHasContent = (contentTopicName === currentTopicName) && (
         (activeTab === 'reading' && !!content?.reading) ||
         (activeTab === 'summary' && !!content?.summary) ||
         (activeTab === 'videos' && (content?.videos?.length || 0) > 0) ||
@@ -3616,13 +3631,13 @@ const ProLearningPage = () => {
       );
       // If viewing a non-reading tab for a later topic while generating, require reading readiness
       const topicIndex = topicsList.findIndex(t => (t.name || t) === currentTopicName);
-      const readingReady = readyTabs.includes('reading') || (content && !!content.reading);
+  const readingReady = readyTabs.includes('reading') || (content && contentTopicName === currentTopicName && !!content.reading);
       const enforceReadingFirst = (isProgressiveGenerating && topicIndex > 0 && activeTab !== 'reading' && !readingReady);
       if (enforceReadingFirst) {
         return <LoadingComponent />;
       }
 
-      if ((isGeneratingCourse || isLoading) && readyTabs.length === 0 && !hasAnyContent && !activeHasContent) {
+      if ((isGeneratingCourse || isLoading) && !readyTabs.includes(activeTab) && !activeHasContent) {
         return <LoadingComponent />;
       }
     } else {
@@ -3638,7 +3653,7 @@ const ProLearningPage = () => {
   const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null);
       const readyTabs = (currentTopicName && availableTabsForTopics[currentTopicName]) || [];
       // Consider a tab ready if we already have content for it
-      const activeHasContent = (
+      const activeHasContent = (contentTopicName === currentTopicName) && (
         (activeTab === 'reading' && !!content?.reading) ||
         (activeTab === 'summary' && !!content?.summary) ||
         (activeTab === 'videos' && (content?.videos?.length || 0) > 0) ||
@@ -5032,7 +5047,7 @@ const ProLearningPage = () => {
                       const currentTopicBlocked = currentTopicName ? isTopicBlocked(currentTopicName) : false;
                       
                       // Check if tab has content already (treat as available even if tabs map isn’t filled yet)
-                      const hasTabContent = !!content && (
+                      const hasTabContent = !!content && contentTopicName === currentTopicName && (
                         (tab.id === 'reading' && !!content?.reading && String(content.reading).trim().length > 0) ||
                         (tab.id === 'summary' && !!content?.summary && String(content.summary).trim().length > 0) ||
                         (tab.id === 'videos' && Array.isArray(content?.videos) && content.videos.length > 0) ||
@@ -5048,7 +5063,7 @@ const ProLearningPage = () => {
                         try { if (typeof localStorage !== 'undefined') fresh = !!localStorage.getItem('proLearning_batchMarker'); } catch {}
                         // Reading-first rule: require reading to be ready before exposing other tabs while generating
                         const readingReady = ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes('reading')) ||
-                          (content && typeof content.reading === 'string' && content.reading.trim().length > 0));
+                          (content && contentTopicName === currentTopicName && typeof content.reading === 'string' && content.reading.trim().length > 0));
 
                         if (currentTopicBlocked) {
                           isTabAvailable = false;
