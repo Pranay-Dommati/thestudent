@@ -80,6 +80,91 @@ const ProLearningPage = () => {
   
   // UI state
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  // Video modal state
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [currentVideo, setCurrentVideo] = useState(null);
+
+  // Helpers to support in-app video playback
+  const extractYouTubeId = (urlOrId) => {
+    if (!urlOrId) return '';
+    // If it's already a likely YouTube ID
+    if (typeof urlOrId === 'string' && /^[\w-]{11}$/.test(urlOrId)) return urlOrId;
+    // Try to extract from URL
+    const match = String(urlOrId).match(/(?:youtube\.com\/(?:watch\?v=|v\/|embed\/)|youtu\.be\/)([\w-]{11})/);
+    return match && match[1] ? match[1] : '';
+  };
+
+  const getEmbedUrlForVideo = (video) => {
+    if (!video) return '';
+    const id = extractYouTubeId(video.id || video.url || '');
+    return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0` : '';
+  };
+
+  const openVideoModal = (video) => {
+    setCurrentVideo(video);
+    setIsVideoModalOpen(true);
+  };
+
+  const closeVideoModal = () => {
+    // Clear current video to stop playback when closing
+    setIsVideoModalOpen(false);
+    setCurrentVideo(null);
+  };
+
+  // Inline modal for playing videos inside the platform
+  const VideoPlayerModal = () => {
+    if (!isVideoModalOpen || !currentVideo) return null;
+    const embedUrl = getEmbedUrlForVideo(currentVideo);
+    return (
+      <div className="fixed inset-0 z-[60]">
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/60" onClick={closeVideoModal} />
+        {/* Modal container */}
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <div className="flex items-center gap-2">
+                <FaYoutube className="text-red-500" />
+                <h3 className="font-semibold text-gray-900 line-clamp-1">{currentVideo?.title || 'Video'}</h3>
+              </div>
+              <button onClick={closeVideoModal} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="Close video">
+                <IoClose className="w-5 h-5" />
+              </button>
+            </div>
+            {/* Player */}
+            <div className="relative w-full" style={{ aspectRatio: '16 / 9' }}>
+              {embedUrl ? (
+                <iframe
+                  src={embedUrl}
+                  title={currentVideo?.title || 'Video player'}
+                  className="absolute top-0 left-0 w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  frameBorder="0"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                  <p className="text-gray-600">Unable to play this video</p>
+                </div>
+              )}
+            </div>
+            {/* Footer actions */}
+            <div className="px-4 py-3 border-t flex items-center justify-between">
+              <div className="text-sm text-gray-600 truncate">
+                {currentVideo?.channel || currentVideo?.channelTitle}
+              </div>
+              {currentVideo?.url && (
+                <a href={currentVideo.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
+                  Open on YouTube
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Course and topic management with enhanced URL structure
   const courseId = params.courseId; // Get courseId from URL path
@@ -4475,7 +4560,7 @@ const ProLearningPage = () => {
                 <div key={video.id} className="group bg-white border border-gray-200 rounded-2xl hover:shadow-xl transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
                   <div className="flex flex-col">
                     {/* Video Thumbnail */}
-                    <div className="relative h-48 overflow-hidden">
+                    <div className="relative h-48 overflow-hidden cursor-pointer" onClick={() => openVideoModal(video)}>
                       <img 
                         src={video.thumbnail} 
                         alt={video.title}
@@ -4568,15 +4653,13 @@ const ProLearningPage = () => {
                       
                       {/* Action buttons */}
                       <div className="flex items-center space-x-2">
-                        <a 
-                          href={video.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button 
+                          onClick={() => openVideoModal(video)}
                           className="flex-1 flex items-center justify-center px-3 py-2 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg text-sm"
                         >
                           <IoPlayCircle className="mr-1" />
                           Watch
-                        </a>
+                        </button>
                         <button className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
                           <IoBookmark className="text-lg" />
                         </button>
@@ -5352,6 +5435,8 @@ const ProLearningPage = () => {
           </div>
         </div>
       </div>
+      {/* Global video modal */}
+      <VideoPlayerModal />
     </>
   );
 };
