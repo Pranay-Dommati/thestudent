@@ -93,16 +93,57 @@ class ProContentManager {
    */
   transformVideos(dbVideos) {
     if (!dbVideos || dbVideos.length === 0) return [];
-    
-    return dbVideos.map(video => ({
-      id: video.id,
-      title: video.title,
-      url: video.video_url,
-      description: video.description || '',
-      duration: video.duration || '',
-      is_watched: video.is_watched || false,
-      order: video.order || 0
-    }));
+    // Helper to extract YouTube ID
+    const extractYouTubeId = (url) => {
+      if (!url) return '';
+      const match = String(url).match(/(?:youtube\.com\/(?:watch\?v=|v\/|embed\/)|youtu\.be\/)([\w-]{11})/);
+      return match && match[1] ? match[1] : '';
+    };
+    // Build YouTube thumbnail URL
+    const buildYouTubeThumb = (id) => id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : '';
+    // Parse simple duration strings into minutes (supports "HH:MM:SS", "MM:SS", "54 min")
+    const parseMinutes = (val) => {
+      if (val == null) return 0;
+      const s = String(val).trim();
+      if (!s) return 0;
+      // 54 min
+      const m1 = s.match(/(\d+)\s*min/i);
+      if (m1) return parseInt(m1[1], 10) || 0;
+      // HH:MM:SS or MM:SS
+      if (s.includes(':')) {
+        const parts = s.split(':').map(p => parseInt(p, 10) || 0);
+        if (parts.length === 3) {
+          return parts[0] * 60 + parts[1] + Math.round(parts[2] / 60);
+        }
+        if (parts.length === 2) {
+          return parts[0] + Math.round(parts[1] / 60);
+        }
+      }
+      // Plain number interpreted as minutes
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    return dbVideos.map(video => {
+      const url = video.video_url || video.url || '';
+      const idFromUrl = extractYouTubeId(url);
+      const thumbnail = video.thumbnail_url || video.thumbnail || buildYouTubeThumb(idFromUrl);
+      const minutes = typeof video.duration === 'number' ? video.duration : parseMinutes(video.duration);
+      return {
+        id: video.id,
+        title: video.title,
+        url,
+        thumbnail,
+        description: video.description || '',
+        duration: minutes,
+        formattedDuration: minutes > 0 ? (minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes} min`) : undefined,
+        // DB currently doesn't store views/channel; provide safe fallbacks to avoid "undefined"
+        channel: video.channel || video.channel_title || '',
+        formattedViewCount: (typeof video.view_count === 'number' && video.view_count > 0) ? undefined : '0 views',
+        is_watched: video.is_watched || false,
+        order: video.order || 0
+      };
+    });
   }
 
   /**
