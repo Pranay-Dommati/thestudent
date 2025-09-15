@@ -85,18 +85,24 @@ const ProLearningPage = () => {
   const [currentVideo, setCurrentVideo] = useState(null);
 
   // Helpers to support in-app video playback
-  const extractYouTubeId = (urlOrId) => {
-    if (!urlOrId) return '';
-    // If it's already a likely YouTube ID
-    if (typeof urlOrId === 'string' && /^[\w-]{11}$/.test(urlOrId)) return urlOrId;
-    // Try to extract from URL
-    const match = String(urlOrId).match(/(?:youtube\.com\/(?:watch\?v=|v\/|embed\/)|youtu\.be\/)([\w-]{11})/);
+  const extractYouTubeId = (value) => {
+    if (!value) return '';
+    const s = String(value);
+    // If it's already a likely YouTube video ID
+    if (/^[\w-]{11}$/.test(s)) return s;
+    // Try to extract from common URL formats including shorts
+    const match = s.match(
+      /(?:youtube\.com\/(?:watch\?v=|v\/|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/
+    );
     return match && match[1] ? match[1] : '';
   };
 
   const getEmbedUrlForVideo = (video) => {
     if (!video) return '';
-    const id = extractYouTubeId(video.id || video.url || '');
+    // Prefer extracting from URL; DB 'id' is a UUID, not a YouTube ID
+    const idFromUrl = extractYouTubeId(video.url || video.video_url || '');
+    const idFallback = extractYouTubeId(video.videoId || video.youtubeId || '');
+    const id = idFromUrl || idFallback;
     return id ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0` : '';
   };
 

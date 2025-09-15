@@ -20,7 +20,19 @@ export async function generateVideosContent(setContent, topic = '') {
       source = 'youtube_api';
     }
     // Normalize fields for UI
-    const normalized = normalizeVideosForUI(videoContent, topic);
+    let normalized = normalizeVideosForUI(videoContent, topic);
+    // Filter out YouTube Shorts and ultra-short clips (< 2 minutes)
+    const MIN_DURATION_MINUTES = 2;
+    const filtered = normalized.filter(v => {
+      const url = v.url || '';
+      const isShortsUrl = /youtube\.com\/shorts\//i.test(url);
+      const hasDuration = typeof v.duration === 'number' && Number.isFinite(v.duration);
+      const tooShort = hasDuration ? v.duration < MIN_DURATION_MINUTES : false;
+      return !isShortsUrl && !tooShort;
+    });
+    if (filtered.length > 0) {
+      normalized = filtered;
+    }
     
     setContent({
       videos: normalized,
@@ -329,8 +341,11 @@ async function fetchTopYouTubeVideos(topic) {
   const MAX_RESULTS = 10;
 
   try {
+    // Use videoDuration=medium/long to avoid shorts (shorts are typically < 60s)
     const response = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${sanitizedQuery}&type=video&maxResults=${MAX_RESULTS}&videoEmbeddable=true&relevanceLanguage=en&safeSearch=strict&key=${YOUTUBE_API_KEY}`
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${sanitizedQuery}` +
+      `&type=video&maxResults=${MAX_RESULTS}&videoEmbeddable=true&relevanceLanguage=en&safeSearch=strict` +
+      `&videoDuration=any&key=${YOUTUBE_API_KEY}`
     );
 
     if (!response.ok) {
@@ -358,8 +373,11 @@ async function fetchTopYouTubeVideos(topic) {
     const detailsData = await detailsResponse.json();
     
     // Map video details to our format
-    return data.items.map((item, index) => {
+    // Map and filter out shorts by duration (< 120 seconds)
+    const mapped = data.items.map((item, index) => {
       const details = detailsData.items[index];
+      const isoDur = details?.contentDetails?.duration || '';
+      const seconds = parseISODurationToSeconds(isoDur);
       return {
         id: item.id.videoId,
         title: item.snippet.title,
@@ -367,11 +385,13 @@ async function fetchTopYouTubeVideos(topic) {
         thumbnail: item.snippet.thumbnails.high.url,
         channelTitle: item.snippet.channelTitle,
         publishedAt: item.snippet.publishedAt,
-        duration: details?.contentDetails?.duration || 'N/A',
+        duration: isoDur || 'N/A',
         viewCount: parseInt(details?.statistics?.viewCount) || 0,
         quality: calculateVideoQuality(details)
       };
     });
+    // Keep videos that are at least 120s (2 minutes)
+    return mapped.filter(v => parseISODurationToSeconds(v.duration) >= 120);
   } catch (error) {
     console.error('YouTube API request failed:', error);
     throw error;
@@ -399,6 +419,17 @@ function parseDuration(duration) {
   const seconds = parseInt(match[3]) || 0;
   
   return hours * 60 + minutes + Math.round(seconds / 60);
+}
+
+// Parse ISO 8601 duration into seconds (e.g., PT1H2M3S)
+function parseISODurationToSeconds(iso) {
+  if (!iso || typeof iso !== 'string') return 0;
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return 0;
+  const h = parseInt(m[1] || '0', 10);
+  const min = parseInt(m[2] || '0', 10);
+  const s = parseInt(m[3] || '0', 10);
+  return h * 3600 + min * 60 + s;
 }
 
 // Categorize video difficulty based on title and description
