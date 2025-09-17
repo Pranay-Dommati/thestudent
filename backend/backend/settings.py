@@ -278,17 +278,16 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
-# API Keys for third-party services
-# In production, these should be set as environment variables
-HUGGINGFACE_API_TOKEN = os.environ.get('HUGGINGFACE_API_TOKEN', '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')
-YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', 'AIzaSyBK8JXhEc4HLz5_Mbv0ta0JnriW1YSSqNY')
+# API Keys for third-party services (MUST come from env; no hardcoded fallbacks)
+HUGGINGFACE_API_TOKEN = os.environ.get('HUGGINGFACE_API_TOKEN', '')
+YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', '')
 
-# Gemini API key for AI services
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyCoZJC3kzWosQEJpbb0Q2QmoQpMUuBpVlI')
+# Gemini API key for AI services (from env only)
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
 # Google Programmable Search API for Resources
-GOOGLE_SEARCH_API_KEY = os.environ.get('GOOGLE_SEARCH_API_KEY', 'AIzaSyCoZJC3kzWosQEJpbb0Q2QmoQpMUuBpVlI')
-GOOGLE_SEARCH_ENGINE_ID = os.environ.get('GOOGLE_SEARCH_ENGINE_ID', '2593cd20d7e52429f')
+GOOGLE_SEARCH_API_KEY = os.environ.get('GOOGLE_SEARCH_API_KEY', '')
+GOOGLE_SEARCH_ENGINE_ID = os.environ.get('GOOGLE_SEARCH_ENGINE_ID', 'b5d49b623e0054ad9')
 
 # Google OAuth2 Settings
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.environ.get('GOOGLE_OAUTH2_CLIENT_ID', '')

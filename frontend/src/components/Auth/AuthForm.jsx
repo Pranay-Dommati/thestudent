@@ -69,7 +69,7 @@ export default function AuthForm() {
   const { register, login, googleLogin } = useAuth();
   
   // Google Sign-In configuration
-  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "687560214105-crh52mqf0nt8f1dauvrhog8vko33rimq.apps.googleusercontent.com";
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   
   // Initialize Google Sign-In
   useEffect(() => {
