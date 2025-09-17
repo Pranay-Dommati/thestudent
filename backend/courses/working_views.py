@@ -269,6 +269,9 @@ def save_pro_learning_course(request):
                         topic=topic,
                         title=resource_data.get('title', f'Resource {i+1}'),
                         url=resource_data.get('url', ''),
+                        # Persist description and resource type if provided
+                        description=resource_data.get('description', ''),
+                        resource_type=resource_data.get('type', 'link'),
                         order=i + 1
                     )
         
