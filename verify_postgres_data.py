@@ -5,10 +5,13 @@ Verify PostgreSQL Data Migration
 
 import os
 import sys
+from pathlib import Path
 import django
 
-# Add backend to path
-sys.path.append('backend')
+# Add backend to path (absolute path relative to this file)
+REPO_ROOT = Path(__file__).resolve().parent
+BACKEND_PATH = REPO_ROOT / 'backend'
+sys.path.insert(0, str(BACKEND_PATH))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django.setup()
 
@@ -26,8 +29,9 @@ def verify_data():
             print(f"📊 Database: PostgreSQL")
             print(f"📋 Version: {db_version.split(',')[0]}")
         
-        # Check custom User model
-        from authentication.models import User
+        # Check custom User model via apps registry
+        from django.apps import apps
+        User = apps.get_model('authentication', 'User')
         user_count = User.objects.count()
         print(f"\n👤 Users in PostgreSQL: {user_count}")
         
@@ -40,25 +44,25 @@ def verify_data():
         print(f"\n📊 Data in PostgreSQL:")
         
         try:
-            from courses.models import SchoolCourse
+            SchoolCourse = apps.get_model('courses', 'SchoolCourse')
             course_count = SchoolCourse.objects.count()
             print(f"   - School Courses: {course_count}")
-        except:
-            print("   - School Courses: Model not available")
+        except Exception as e:
+            print(f"   - School Courses: Model not available ({e})")
         
         try:
-            from feedback.models import Feedback
+            Feedback = apps.get_model('feedback', 'Feedback')
             feedback_count = Feedback.objects.count()
             print(f"   - Feedback: {feedback_count}")
-        except:
-            print("   - Feedback: Model not available")
+        except Exception as e:
+            print(f"   - Feedback: Model not available ({e})")
         
         try:
-            from newsletter.models import NewsletterSubscription
+            NewsletterSubscription = apps.get_model('newsletter', 'NewsletterSubscription')
             newsletter_count = NewsletterSubscription.objects.count()
             print(f"   - Newsletter Subscriptions: {newsletter_count}")
-        except:
-            print("   - Newsletter: Model not available")
+        except Exception as e:
+            print(f"   - Newsletter: Model not available ({e})")
         
         print(f"\n✅ PostgreSQL verification completed!")
         print(f"🎉 Your data has been successfully migrated to PostgreSQL!")
@@ -76,5 +80,5 @@ def verify_data():
         return False
 
 if __name__ == "__main__":
-    os.chdir("C:/Users/banny/OneDrive/Documents/Desktop/STUDENTSHUB/SHPRO/thestudent")
+    # Run verification in the current repository context (no hard-coded paths)
     verify_data()

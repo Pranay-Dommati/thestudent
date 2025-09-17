@@ -1,4 +1,8 @@
 from django.http import JsonResponse
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
@@ -21,6 +25,48 @@ logger = logging.getLogger(__name__)
 # Input validation constants
 MAX_QUERY_LENGTH = 1000
 MAX_TOPICS_PER_REQUEST = 4
+
+
+class AIChatThrottle(UserRateThrottle):
+    rate = '30/min'  # tune per needs
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AIChatThrottle])
+def chat(request):
+    """Secure chat endpoint that proxies Gemini via server-side key."""
+    try:
+        message = (request.data or {}).get('message', '').strip()
+        if not message:
+            return Response({'error': 'Message is required'}, status=400)
+        if len(message) > 2000:
+            return Response({'error': 'Message too long'}, status=400)
+
+        # Call faster flash model for chat if available, else fallback to pro
+        try:
+            from .ai_service import call_gemini_flash_api
+            resp = call_gemini_flash_api(message)
+        except Exception:
+            resp = call_gemini_api(message)
+
+        # Extract text from Gemini response shape
+        text = None
+        try:
+            if 'candidates' in resp and resp['candidates']:
+                parts = resp['candidates'][0].get('content', {}).get('parts', [])
+                if parts:
+                    text = parts[0].get('text')
+        except Exception:
+            text = None
+
+        if not text:
+            return Response({'error': 'Empty AI response'}, status=502)
+        return Response({'text': text})
+    except NetworkError as ne:
+        return Response({'error': str(ne)}, status=503)
+    except Exception as e:
+        return Response({'error': 'AI service error'}, status=502)
 
 @csrf_exempt
 def quiz(request):

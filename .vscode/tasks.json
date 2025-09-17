@@ -1,0 +1,57 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Postgres integration tests",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"python -m pip install -r requirements.txt && cd backend && pytest backend/courses/tests/test_postgres_integration.py -q"
+			],
+			"problemMatcher": [
+				"$pytest"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run Postgres integration tests",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"python -m pip install -r requirements.txt && cd backend && pytest courses/tests/test_postgres_integration.py -q"
+			],
+			"problemMatcher": [
+				"$pytest"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run Postgres integration tests 2",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"python - << 'PY'\nimport sys, subprocess, os\n# show useful env bits\nprint('CWD:', os.getcwd())\nprint('DJANGO_SETTINGS_MODULE:', os.environ.get('DJANGO_SETTINGS_MODULE'))\nsubprocess.run(['python','-m','pip','install','-r','requirements.txt'], check=False)\nos.chdir('backend')\nsubprocess.run(['pytest','courses/tests/test_postgres_integration.py','-q'], check=False)\nPY"
+			],
+			"problemMatcher": [
+				"$pytest"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run Postgres integration tests 3",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"docker ps --format '{{.Names}}' | grep -q '^studentshub_postgres$' || docker compose up -d postgres; cd backend && pytest courses/tests/test_postgres_integration.py -q"
+			],
+			"problemMatcher": [
+				"$pytest"
+			],
+			"group": "build"
+		}
+	]
+}

@@ -17,40 +17,39 @@ import proLearningHistoryService from '../../services/ProLearningHistoryService'
 // Custom CSS - added for DeepSeek-like UI
 import './mobileChatStyles.css';
 
-// Simple Gemini API call for regular chat
-const callGeminiAPI = async (message) => {
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API key not found');
-  }
+// Centralized API base URLs
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api').replace(/\/$/, '');
+const ROOT_BASE = (
+  import.meta.env.VITE_ROOT_BASE_URL
+  || (import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace(/\/api\/?$/, '') : 'http://127.0.0.1:8000')
+).replace(/\/$/, '');
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: message }] }],
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
+// Secure backend chat proxy (uses JWT)
+const callChatBackend = async (message) => {
+  const token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
+  const res = await fetch(`${ROOT_BASE}/ai/chat/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) throw new Error(`Chat error: ${res.status}`);
+  const data = await res.json();
+  return data?.text || 'Sorry, I could not generate a response.';
 };
 
 // Vector bot API call for general educational responses
 const callVectorBotAPI = async (message) => {
   try {
     console.log('📤 Sending request to vector bot API:', message);
-    const response = await fetch('http://localhost:8000/api/chatbot/chat/general/', {
+    const token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
+    const response = await fetch(`${API_BASE}/chatbot/chat/general/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
         message: message
@@ -171,7 +170,7 @@ const MobileChatbotPage = () => {
       try {
     const token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
         if (!token) return;
-        const resp = await fetch('http://localhost:8000/api/courses/pro-learning/', {
+        const resp = await fetch(`${API_BASE}/courses/pro-learning/`, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
@@ -215,7 +214,7 @@ const MobileChatbotPage = () => {
         setIsLoadingCourses(true);
         const token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
         if (!token) return;
-        const resp = await fetch('http://localhost:8000/api/courses/pro-learning/', {
+        const resp = await fetch(`${API_BASE}/courses/pro-learning/`, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
@@ -287,11 +286,11 @@ const MobileChatbotPage = () => {
     
     try {
       console.log('📊 Fetching usage stats...');
-      const response = await fetch('http://localhost:8000/api/chatbot/usage-stats/', {
+      const response = await fetch(`${API_BASE}/chatbot/usage-stats/`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          ...(localStorage.getItem('access_token') ? { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` } : {}),
         },
       });
       
@@ -559,9 +558,20 @@ const MobileChatbotPage = () => {
           }
         }
       } else {
-        // Regular chatbot response using vector bot for educational topics
-        console.log('🔄 Calling vector bot API...');
-        const response = await callVectorBotAPI(messageToSend);
+        // Regular chatbot response using secure backend proxy
+        if (!isAuthenticated) {
+          setShowAuthModal(true);
+          const authPrompt = {
+            id: generateUniqueId(),
+            type: 'bot',
+            content: 'Please sign in to chat with the AI assistant.',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setChatHistory((prev) => [...prev, authPrompt]);
+          return;
+        }
+        console.log('🔄 Calling backend AI chat proxy...');
+        const response = await callChatBackend(messageToSend);
 
         const botResponse = {
           id: generateUniqueId(),
@@ -622,9 +632,9 @@ const MobileChatbotPage = () => {
     }
 
     try {
-      // Call the new backend endpoint to actually create the course with rate limiting
-      const token = localStorage.getItem('token');
-      const response = await fetch('/ai/create-course-topics/', {
+  // Call the new backend endpoint to actually create the course with rate limiting
+  const token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
+  const response = await fetch(`${ROOT_BASE}/ai/create-course-topics/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

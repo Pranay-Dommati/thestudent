@@ -14,6 +14,33 @@ import CompactRateLimitStatus from './CompactRateLimitStatus';
 import proLearningHistoryService from '../../services/ProLearningHistoryService';
 // Removed IndexedDBService usage for Pro Learning flows
 
+// Centralized API base URLs (no trailing slash)
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api').replace(/\/$/, '');
+const ROOT_BASE = (
+  import.meta.env.VITE_ROOT_BASE_URL
+  || (import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace(/\/api\/?$/, '') : 'http://127.0.0.1:8000')
+).replace(/\/$/, '');
+
+// Secure backend chat proxy (DRF-protected)
+const callChatBackend = async (message) => {
+  const token = (
+    localStorage.getItem('accessToken') ||
+    localStorage.getItem('access_token') ||
+    localStorage.getItem('token')
+  );
+  const res = await fetch(`${ROOT_BASE}/ai/chat/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) throw new Error(`Chat error: ${res.status}`);
+  const data = await res.json();
+  return data?.text || 'Sorry, I could not generate a response.';
+};
+
 // Extract learning context from user's prompt
 const extractLearningContext = (prompt) => {
   if (!prompt) return '';
@@ -68,39 +95,21 @@ const extractLearningContext = (prompt) => {
   return contexts.join(' • ');
 };
 
-// Simple Gemini API call for regular chat
-const callGeminiAPI = async (message) => {
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API key not found');
-  }
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: message }] }],
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
-};
+// Removed client-side Gemini usage in favor of backend proxy
 
 // Vector bot API call for general educational responses
 const callVectorBotAPI = async (message) => {
   try {
-    const response = await fetch('http://localhost:8000/api/chatbot/chat/general/', {
+    const token = (
+      localStorage.getItem('accessToken') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('token')
+    );
+    const response = await fetch(`${API_BASE}/chatbot/chat/general/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
         message: message
@@ -630,7 +639,7 @@ const ChatbotPage = () => {
           setIsLoadingCourses(false);
           return;
         }
-        const resp = await fetch('http://localhost:8000/api/courses/pro-learning/', {
+        const resp = await fetch(`${API_BASE}/courses/pro-learning/`, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
@@ -743,25 +752,21 @@ const ChatbotPage = () => {
   // Function to check actual connection to the backend
   const checkConnection = async () => {
     try {
-      // Try hitting the backend API to verify connection
-      const response = await fetch('/ai/classify_topics/', {
+      const token = (
+        localStorage.getItem('accessToken') ||
+        localStorage.getItem('access_token') ||
+        localStorage.getItem('token')
+      );
+      // Try hitting the backend AI chat endpoint to verify connection
+      const response = await fetch(`${ROOT_BASE}/ai/chat/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          query: 'test connection',
-          expectedTopics: 1
-        })
+        body: JSON.stringify({ message: 'test connection' })
       });
-      
-      // Only consider it successful if we get a 200-299 response
-      // 503 (Service Unavailable) means network/server issues
-      if (response.ok) {
-        return true;
-      } else {
-        return false;
-      }
+      return response.ok;
     } catch (error) {
       return false;
     }
@@ -884,8 +889,8 @@ const ChatbotPage = () => {
             );
           }
         } else {
-          // This is a regular chat request - call the vector bot API directly
-          const response = await callVectorBotAPI(promptToRetry);
+          // This is a regular chat request - call the backend AI chat proxy
+          const response = await callChatBackend(promptToRetry);
           
           // Replace the network error message with the bot response
           setChatHistory((prev) => 
@@ -1271,7 +1276,20 @@ const ChatbotPage = () => {
           }
         }
       } else {
-        // Regular chatbot response using vector bot for educational topics
+        // Regular chatbot response using backend AI chat proxy
+
+        if (!isAuthenticated()) {
+          setShowAuthModal(true);
+          const authPrompt = {
+            id: generateMessageId(),
+            type: 'bot',
+            content: 'Please sign in to chat with the AI assistant.',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setChatHistory((prev) => [...prev, authPrompt]);
+          setIsLoading(false);
+          return;
+        }
 
         // If the device is offline, use the network-lost UX instead of calling the local API
         if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
@@ -1314,7 +1332,7 @@ const ChatbotPage = () => {
         }
 
         try {
-          const response = await callVectorBotAPI(messageToSend);
+          const response = await callChatBackend(messageToSend);
           
           const botResponse = {
             id: generateMessageId(),
@@ -1446,8 +1464,12 @@ const ChatbotPage = () => {
       const learningContext = extractLearningContext(originalPrompt);
       
       // Call the new backend endpoint with context
-      const token = localStorage.getItem('token');
-      const response = await fetch('/ai/create-course-topics/', {
+      const token = (
+        localStorage.getItem('accessToken') ||
+        localStorage.getItem('access_token') ||
+        localStorage.getItem('token')
+      );
+      const response = await fetch(`${ROOT_BASE}/ai/create-course-topics/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1854,8 +1876,12 @@ const ChatbotPage = () => {
   // Fetch usage stats for rate limiting display
   const fetchUsageStats = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/ai/rate-limit-status/', {
+      const token = (
+        localStorage.getItem('accessToken') ||
+        localStorage.getItem('access_token') ||
+        localStorage.getItem('token')
+      );
+      const response = await fetch(`${ROOT_BASE}/ai/rate-limit-status/`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

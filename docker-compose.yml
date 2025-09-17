@@ -6,15 +6,22 @@ services:
   postgres:
     image: postgres:15
     container_name: studentshub_postgres
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: studentshub_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: studentshub123
+      POSTGRES_DB: ${DB_NAME:-studentshub_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-studentshub123}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-studentshub_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
