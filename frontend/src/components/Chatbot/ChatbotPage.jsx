@@ -529,6 +529,7 @@ const ChatbotPage = () => {
   const cancelledRetriesRef = useRef(new Set()); // Track message IDs whose retries were cancelled by a new prompt
   const [proLearningHistory, setProLearningHistory] = useState([]); // Legacy local history (fallback)
   const [proLearningCourses, setProLearningCourses] = useState([]); // Backend DB courses
+  const [isLoadingCourses, setIsLoadingCourses] = useState(false); // Loading state for sidebar courses
 
   // Generate unique message ID
   const generateMessageId = () => Date.now() + Math.random();
@@ -622,9 +623,13 @@ const ChatbotPage = () => {
       setProLearningHistory(history);
     };
     const loadBackendCourses = async () => {
+      setIsLoadingCourses(true);
       try {
         const token = await getAuthToken();
-        if (!token) return;
+        if (!token) {
+          setIsLoadingCourses(false);
+          return;
+        }
         const resp = await fetch('http://localhost:8000/api/courses/pro-learning/', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -634,6 +639,8 @@ const ChatbotPage = () => {
         if (Array.isArray(data)) setProLearningCourses(data);
       } catch (e) {
         console.warn('Failed to load ProLearning courses from backend:', e);
+      } finally {
+        setIsLoadingCourses(false);
       }
     };
 
@@ -1924,7 +1931,13 @@ const ChatbotPage = () => {
                 ProLearning Courses
               </h3>
             </div>
-            {proLearningCourses && proLearningCourses.length > 0 ? (
+            {isLoadingCourses ? (
+              <div className="space-y-2">
+                {[...Array(3)].map((_, idx) => (
+                  <div key={idx} className="h-4 bg-blue-100/60 rounded w-3/4 animate-pulse"></div>
+                ))}
+              </div>
+            ) : proLearningCourses && proLearningCourses.length > 0 ? (
               <div className="text-sm text-gray-600 mb-1">
                 <span>Your saved courses from the Learning Hub.</span>
               </div>
@@ -1938,7 +1951,30 @@ const ChatbotPage = () => {
         
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto px-4 pb-4">
-          {proLearningCourses && proLearningCourses.length > 0 ? (
+          {isLoadingCourses ? (
+            <div className="space-y-3">
+              {[...Array(4)].map((_, idx) => (
+                <div key={idx} className="p-3 rounded-xl bg-white border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="bg-indigo-50 rounded-lg p-2">
+                        <div className="w-5 h-5 bg-indigo-200 rounded animate-pulse"></div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-200 rounded w-2/3 mb-2 animate-pulse"></div>
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 bg-gray-100 rounded w-24 animate-pulse"></div>
+                          <span className="mx-1.5 text-gray-300">•</span>
+                          <div className="h-3 bg-gray-100 rounded w-16 animate-pulse"></div>
+                          <div className="h-4 bg-green-100 rounded w-12 ml-2 animate-pulse"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : proLearningCourses && proLearningCourses.length > 0 ? (
             <div className="space-y-3">
               {proLearningCourses
                 // sort newest first if created_at exists
