@@ -143,6 +143,8 @@ const MobileChatbotPage = () => {
   const [showNavMenu, setShowNavMenu] = useState(false);
   const [proLearningHistory, setProLearningHistory] = useState([]);
   const [proLearningCourses, setProLearningCourses] = useState([]);
+  // Feature flag: hide ProLearning courses preview in mobile chat by default
+  const [showMobileCoursesPreview, setShowMobileCoursesPreview] = useState(false);
 
   // Check if user has visited chat page before
   useEffect(() => {
@@ -1082,8 +1084,8 @@ const MobileChatbotPage = () => {
       {/* Chat messages container */}
       <div className="flex-1 overflow-y-auto px-4 py-4 pt-20 pb-32 bg-white chat-container">
         <div className="min-h-full">
-          {/* Backend ProLearning courses preview list */}
-          {proLearningCourses && proLearningCourses.length > 0 && (
+          {/* Backend ProLearning courses preview list (hidden by default on mobile chat) */}
+          {showMobileCoursesPreview && proLearningCourses && proLearningCourses.length > 0 && (
             <div className="mb-3">
               <div className="flex items-center mb-2">
                 <div className="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-md flex items-center justify-center mr-2">
