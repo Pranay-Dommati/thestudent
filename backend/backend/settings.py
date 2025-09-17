@@ -279,7 +279,6 @@ SIMPLE_JWT = {
 }
 
 # API Keys for third-party services (MUST come from env; no hardcoded fallbacks)
-HUGGINGFACE_API_TOKEN = os.environ.get('HUGGINGFACE_API_TOKEN', '')
 YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', '')
 
 # Gemini API key for AI services (from env only)

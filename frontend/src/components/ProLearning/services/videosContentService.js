@@ -10,14 +10,14 @@ export async function generateVideosContent(setContent, topic = '') {
   console.log('🎥 Fetching top YouTube educational videos...');
   
   try {
-    // First try backend YouTube proxy (server-side API key)
+    // Use backend YouTube proxy only (server-side API key, no client key exposure)
     let source = 'backend_youtube';
     let videoContent = await fetchFromBackendYouTube(topic);
-    
-    // If backend returns no videos, fallback to client-side YouTube API
+
+    // If backend returns no videos, fall back to AI-curated recommendations (still via backend)
     if (!videoContent || videoContent.length === 0) {
-      videoContent = await fetchTopYouTubeVideos(topic);
-      source = 'youtube_api';
+      source = 'backend_ai';
+      videoContent = await generateCuratedVideos(topic);
     }
     // Normalize fields for UI
     let normalized = normalizeVideosForUI(videoContent, topic);
@@ -49,10 +49,10 @@ export async function generateVideosContent(setContent, topic = '') {
     console.log(`✅ Found ${normalized.length} top YouTube videos with ${calculateTotalViews(normalized)} total views`);
     
   } catch (error) {
-    console.error('🚨 YouTube API failed, trying AI recommendations:', error);
+    console.error('🚨 Backend video fetch failed, trying AI recommendations:', error);
     
     try {
-      // Fallback to AI-generated recommendations with YouTube search links
+      // Fallback to AI-generated recommendations with YouTube search links (backend)
       const aiVideoContent = await generateCuratedVideos(topic);
       setContent({
         videos: aiVideoContent,
@@ -72,11 +72,19 @@ export async function generateVideosContent(setContent, topic = '') {
 
 // Try server-side YouTube Data API via backend to avoid exposing API key
 async function fetchFromBackendYouTube(topic) {
-  const url = 'http://localhost:8000/ai/youtube_search/';
+  const url = '/ai/youtube_search/';
   try {
+    const token = (
+      localStorage.getItem('accessToken') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('token')
+    );
     const resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ topic, maxResults: 10 })
     });
     if (!resp.ok) {
@@ -134,9 +142,17 @@ function normalizeVideosForUI(videos, topic) {
 // Generate curated video recommendations based on topic
 async function generateCuratedVideos(topic) {
   try {
-    const response = await fetch('http://localhost:8000/ai/videos/', {
+    const token = (
+      localStorage.getItem('accessToken') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('token')
+    );
+    const response = await fetch('/ai/videos/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ topic })
     });
     if (!response.ok) throw new Error('Backend AI videos endpoint failed');
@@ -326,76 +342,6 @@ export function getVideosByTopic(videos, topic) {
       t.toLowerCase().includes(topic.toLowerCase())
     )
   );
-}
-
-// Fetch top YouTube videos using YouTube Data API v3
-async function fetchTopYouTubeVideos(topic) {
-  // Sanitize the search query
-  const sanitizedQuery = topic
-    .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
-    .trim()                // Remove leading/trailing spaces
-    .replace(/[^\w\s-]/g, '') // Remove special characters except spaces and hyphens
-    .replace(/\s/g, '+');  // Replace spaces with + for URL
-
-  const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
-  const MAX_RESULTS = 10;
-
-  try {
-    // Use videoDuration=medium/long to avoid shorts (shorts are typically < 60s)
-    const response = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${sanitizedQuery}` +
-      `&type=video&maxResults=${MAX_RESULTS}&videoEmbeddable=true&relevanceLanguage=en&safeSearch=strict` +
-      `&videoDuration=any&key=${YOUTUBE_API_KEY}`
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('YouTube API Error:', errorData);
-      throw new Error(`YouTube API ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
-    }
-
-    const data = await response.json();
-    
-    if (!data.items?.length) {
-      throw new Error('No videos found');
-    }
-
-    // Get video details (duration, views, etc)
-    const videoIds = data.items.map(item => item.id.videoId).join(',');
-    const detailsResponse = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${videoIds}&key=${YOUTUBE_API_KEY}`
-    );
-
-    if (!detailsResponse.ok) {
-      throw new Error(`Failed to fetch video details: ${detailsResponse.status}`);
-    }
-
-    const detailsData = await detailsResponse.json();
-    
-    // Map video details to our format
-    // Map and filter out shorts by duration (< 120 seconds)
-    const mapped = data.items.map((item, index) => {
-      const details = detailsData.items[index];
-      const isoDur = details?.contentDetails?.duration || '';
-      const seconds = parseISODurationToSeconds(isoDur);
-      return {
-        id: item.id.videoId,
-        title: item.snippet.title,
-        description: item.snippet.description,
-        thumbnail: item.snippet.thumbnails.high.url,
-        channelTitle: item.snippet.channelTitle,
-        publishedAt: item.snippet.publishedAt,
-        duration: isoDur || 'N/A',
-        viewCount: parseInt(details?.statistics?.viewCount) || 0,
-        quality: calculateVideoQuality(details)
-      };
-    });
-    // Keep videos that are at least 120s (2 minutes)
-    return mapped.filter(v => parseISODurationToSeconds(v.duration) >= 120);
-  } catch (error) {
-    console.error('YouTube API request failed:', error);
-    throw error;
-  }
 }
 
 // Helper function to calculate video quality score

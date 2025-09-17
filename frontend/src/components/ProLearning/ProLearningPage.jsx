@@ -854,8 +854,8 @@ const ProLearningPage = () => {
     }
   }, [courseTitle, courseId]);
 
-  // Use environment variable for Gemini API key
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  // Frontend no longer holds Gemini API key; classification uses backend
+  const GEMINI_API_KEY = undefined;
 
   // Initialize course in ProContentManager when component mounts
   useEffect(() => {
@@ -891,7 +891,7 @@ const ProLearningPage = () => {
       }
       try {
 
-        const classified = await classifyTopicsWithGemini(courseTitle, GEMINI_API_KEY);
+  const classified = await classifyTopicsWithGemini(courseTitle, GEMINI_API_KEY);
         geminiCache.current[courseTitle] = classified;
         setTopicsList(classified);
         
