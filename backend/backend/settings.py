@@ -14,16 +14,22 @@ from pathlib import Path
 import os
 from datetime import timedelta
 
-# Load environment variables from .env file
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env files
+# Priority: root .env (used by docker-compose) first, then backend/.env without overriding
 try:
     from dotenv import load_dotenv
-    load_dotenv(os.path.join(Path(__file__).resolve().parent.parent, '.env'))
+    root_env = BASE_DIR.parent / '.env'
+    backend_env = BASE_DIR / '.env'
+    # Load root .env so Django matches docker-compose values
+    load_dotenv(dotenv_path=root_env, override=False)
+    # Load backend/.env but do not override already-set vars
+    load_dotenv(dotenv_path=backend_env, override=False)
 except ImportError:
     # python-dotenv not installed, environment variables should be set manually
     pass
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # Quick-start development settings - unsuitable for production
