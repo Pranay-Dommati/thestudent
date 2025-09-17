@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoBook, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline } from "react-icons/io5";
+import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoBook, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline, IoChevronForward, IoSearchOutline } from "react-icons/io5";
 import { FaRobot } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
@@ -143,6 +143,12 @@ const MobileChatbotPage = () => {
   const [showNavMenu, setShowNavMenu] = useState(false);
   const [proLearningHistory, setProLearningHistory] = useState([]);
   const [proLearningCourses, setProLearningCourses] = useState([]);
+  // Mobile ProLearning Courses drawer state
+  const [isCoursesDrawerOpen, setIsCoursesDrawerOpen] = useState(false);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(false);
+  const [visibleCoursesCount, setVisibleCoursesCount] = useState(10);
+  const drawerContentRef = useRef(null);
+  const [coursesSearch, setCoursesSearch] = useState("");
   // Feature flag: hide ProLearning courses preview in mobile chat by default
   const [showMobileCoursesPreview, setShowMobileCoursesPreview] = useState(false);
 
@@ -198,6 +204,54 @@ const MobileChatbotPage = () => {
       window.removeEventListener('prolearning-history-updated', handleHistoryUpdate);
     };
   }, []);
+
+  // Open drawer and ensure courses are fetched
+  const openCoursesDrawer = async () => {
+    setIsCoursesDrawerOpen(true);
+    setVisibleCoursesCount(10);
+    setCoursesSearch("");
+    if (!proLearningCourses || proLearningCourses.length === 0) {
+      try {
+        setIsLoadingCourses(true);
+        const token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
+        if (!token) return;
+        const resp = await fetch('http://localhost:8000/api/courses/pro-learning/', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (Array.isArray(data)) setProLearningCourses(data);
+      } catch (e) {
+        console.warn('Failed to (re)load ProLearning courses for drawer:', e);
+      } finally {
+        setIsLoadingCourses(false);
+      }
+    }
+  };
+
+  const closeCoursesDrawer = () => setIsCoursesDrawerOpen(false);
+
+  // Infinite scroll in drawer
+  const handleCoursesScroll = (e) => {
+    const el = e.currentTarget;
+    const threshold = 64;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - threshold) {
+      setVisibleCoursesCount((prev) => {
+        const total = proLearningCourses?.length || 0;
+        return Math.min(prev + 10, total);
+      });
+    }
+  };
+
+  // ESC to close drawer
+  useEffect(() => {
+    const onKey = (ev) => {
+      if (ev.key === 'Escape' && isCoursesDrawerOpen) setIsCoursesDrawerOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isCoursesDrawerOpen]);
 
   // Random course placeholder texts - Topic focused (same as desktop)
   const coursePlaceholders = [
@@ -965,58 +1019,12 @@ const MobileChatbotPage = () => {
           {/* Right: Menu Button */}
           <div className="relative">
             <button
-              onClick={() => setShowNavMenu(!showNavMenu)}
+              onClick={openCoursesDrawer}
               className="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-              title="Menu"
+              title="My Courses"
             >
               <IoMenuOutline size={18} className="text-gray-700" />
             </button>
-            
-            {/* Dropdown Menu */}
-            {showNavMenu && (
-              <>
-                {/* Backdrop */}
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setShowNavMenu(false)}
-                ></div>
-                
-                {/* Menu Items */}
-                <div className="absolute right-0 top-12 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                  {/* History Section */}
-                  <div className="px-4 py-2">
-                    <div className="flex items-center mb-2">
-                      <IoTimeOutline size={16} className="mr-2 text-purple-600" />
-                      <span className="font-medium text-sm text-gray-700">ProLearning History</span>
-                    </div>
-                    
-                    {proLearningHistory.length === 0 ? (
-                      <div className="text-xs text-gray-500 ml-6">No history yet</div>
-                    ) : (
-                      <div className="ml-6 max-h-64 overflow-y-auto">
-                        {proLearningHistory.slice(0, 10).map((item, index) => (
-                          <a
-                            key={item.id}
-                            href={item.url}
-                            className="block py-2 px-2 mb-1 text-xs text-gray-600 hover:bg-purple-50 hover:text-purple-700 rounded-md transition-colors border-l-2 border-purple-200 hover:border-purple-400"
-                            onClick={() => setShowNavMenu(false)}
-                          >
-                            <div className="font-medium truncate">{item.topic}</div>
-                            <div className="text-gray-400 text-xs">{item.dateCreated} • {item.timeCreated}</div>
-                          </a>
-                        ))}
-                        
-                        {proLearningHistory.length > 10 && (
-                          <div className="text-xs text-gray-400 text-center py-1">
-                            +{proLearningHistory.length - 10} more courses
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
           </div>
         </div>
         
@@ -1045,6 +1053,147 @@ const MobileChatbotPage = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Right-side Drawer: ProLearning Courses */}
+      <div className={`fixed inset-0 z-40 ${isCoursesDrawerOpen ? '' : 'pointer-events-none'}`} aria-hidden={!isCoursesDrawerOpen}>
+        {/* Overlay */}
+        <div
+          className={`absolute inset-0 bg-black/30 transition-opacity ${isCoursesDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
+          onClick={closeCoursesDrawer}
+        />
+        {/* Drawer */}
+        <div
+          className={`absolute right-0 top-0 h-full w-80 max-w-[88%] bg-white shadow-2xl border-l border-gray-200 transform transition-transform duration-300 ${isCoursesDrawerOpen ? 'translate-x-0' : 'translate-x-full'} rounded-l-2xl`}
+          role="dialog"
+          aria-label="ProLearning Courses"
+        >
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-white/95 backdrop-blur sticky top-0 z-10">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-700 rounded-xl flex items-center justify-center border border-indigo-200/60">
+                <IoSchoolOutline className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900">ProLearning Courses</div>
+                <div className="text-xs text-gray-500">Your saved courses</div>
+              </div>
+            </div>
+            <button
+              onClick={closeCoursesDrawer}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 transition"
+              aria-label="Close"
+            >
+              <IoClose className="text-gray-500" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div
+            ref={drawerContentRef}
+            onScroll={handleCoursesScroll}
+            className="h-[calc(100%-56px)] overflow-y-auto px-3 py-3"
+          >
+            {/* Search */}
+            <div className="mb-3">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={coursesSearch}
+                  onChange={(e)=>{ setCoursesSearch(e.target.value); setVisibleCoursesCount(10); }}
+                  placeholder="Search courses..."
+                  className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                />
+                <IoSearchOutline className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+            </div>
+
+            {isLoadingCourses ? (
+              <div className="space-y-3">
+                {[...Array(6)].map((_, idx) => (
+                  <div key={idx} className="p-3 rounded-xl bg-white border border-gray-200">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-indigo-50 rounded-lg p-2">
+                        <div className="w-4 h-4 bg-indigo-200 rounded animate-pulse"></div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-200 rounded w-2/3 mb-2 animate-pulse"></div>
+                        <div className="h-3 bg-gray-100 rounded w-32 animate-pulse"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : proLearningCourses && proLearningCourses.length > 0 ? (
+              <div className="space-y-2">
+                {proLearningCourses
+                  .slice()
+                  .sort((a,b)=>{
+                    const da = a.created_at ? new Date(a.created_at).getTime() : 0;
+                    const db = b.created_at ? new Date(b.created_at).getTime() : 0;
+                    return db - da;
+                  })
+                  .filter((course)=>{
+                    if (!coursesSearch.trim()) return true;
+                    const q = coursesSearch.toLowerCase();
+                    const title = (course.title || "").toLowerCase();
+                    const name = (course.course_name || "").toLowerCase();
+                    const topics = Array.isArray(course.topics) ? course.topics.map(t => (t.topic_name || t.name || '').toLowerCase()).join(' ') : '';
+                    return title.includes(q) || name.includes(q) || topics.includes(q);
+                  })
+                  .slice(0, visibleCoursesCount)
+                  .map((course) => {
+                  const firstTopic = Array.isArray(course.topics) && course.topics.length > 0 ? course.topics[0] : null;
+                  const topicParam = firstTopic ? `?topic=${encodeURIComponent(firstTopic.topic_name || firstTopic.name || '')}&tab=reading` : '';
+                  const href = `/pro-learning/${course.id}${topicParam}`;
+                  const topics = Array.isArray(course.topics) ? course.topics : [];
+                  const topicNames = topics.map(t => (t.topic_name || t.name || '').trim()).filter(Boolean);
+                  const isIdLike = typeof course.course_name === 'string' && /^course_[a-z0-9_]+$/i.test(course.course_name);
+                  const isGenericTitle = (t) => !t || /^(AI Course:|AI Generated Course:?|ProLearning Course|Generated Course|Database Course)$/i.test(String(t).trim());
+                  let friendlyName = 'ProLearning Course';
+                  if (course.title && !isGenericTitle(course.title) && course.title !== course.course_name) {
+                    friendlyName = course.title.trim();
+                  } else if (topicNames.length > 0) {
+                    const first = topicNames[0];
+                    const additional = Math.max(0, topicNames.length - 1);
+                    if (additional === 0) friendlyName = first;
+                    else if (additional === 1) friendlyName = `${first} +1`;
+                    else if (additional === 2) friendlyName = `${first} +1 +2`;
+                    else if (additional === 3) friendlyName = `${first} +1 +2 +3`;
+                    else friendlyName = `${first} +1 +2 +3 +...`;
+                  } else if (!isIdLike && course.course_name && !isGenericTitle(course.course_name)) {
+                    friendlyName = course.course_name.trim();
+                  }
+                  return (
+                    <Link key={course.id} to={href} onClick={closeCoursesDrawer} className="block p-3 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition-all">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="bg-indigo-50 rounded-lg p-2">
+                            <IoBook className="w-4 h-4 text-indigo-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm text-gray-900 truncate">{friendlyName}</div>
+                            <div className="text-[11px] text-gray-500">
+                              {new Date(course.created_at).toLocaleDateString()} • {new Date(course.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </div>
+                        <IoChevronForward className="text-gray-300" />
+                      </div>
+                    </Link>
+                  );
+                })}
+
+                {visibleCoursesCount < (proLearningCourses?.length || 0) && (
+                  <div className="py-3 text-center text-xs text-gray-500">Scroll to load more…</div>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-600">No saved courses found.</div>
+            )}
+            <div style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}></div>
+          </div>
+        </div>
       </div>
 
       {/* Welcome Message Popup for First-time Users */}
