@@ -130,31 +130,33 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# Try PostgreSQL first, fallback to SQLite for development
-try:
-    import psycopg2
-    # Test if PostgreSQL is available
-    import socket
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(1)
-    result = sock.connect_ex((os.getenv('DB_HOST', 'localhost'), int(os.getenv('DB_PORT', '5432'))))
-    sock.close()
-    
-    if result == 0:  # PostgreSQL is available
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': os.getenv('DB_NAME', 'studentshub_db'),
-                'USER': os.getenv('DB_USER', 'postgres'),
-                'PASSWORD': os.getenv('DB_PASSWORD', 'your_password'),
-                'HOST': os.getenv('DB_HOST', 'localhost'),
-                'PORT': os.getenv('DB_PORT', '5432'),
-            }
+# Environment-driven database configuration.
+# Use PostgreSQL when DB_ENGINE=postgresql (or DB_HOST is defined), otherwise fall back to SQLite.
+DB_ENGINE = os.getenv('DB_ENGINE', '').lower()
+DB_HOST = os.getenv('DB_HOST')
+DB_PORT = os.getenv('DB_PORT', '5432')
+DB_NAME = os.getenv('DB_NAME', 'studentshub_db')
+DB_USER = os.getenv('DB_USER', 'postgres')
+DB_PASSWORD = os.getenv('DB_PASSWORD', '')
+DB_SSL_REQUIRE = os.getenv('DB_SSL_REQUIRE', 'false').lower() in ('1', 'true', 'yes')
+DB_CONN_MAX_AGE = int(os.getenv('DB_CONN_MAX_AGE', '0'))  # seconds; 0 disables persistent connections
+
+if DB_ENGINE in ('postgres', 'postgresql') or DB_HOST:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': DB_NAME,
+            'USER': DB_USER,
+            'PASSWORD': DB_PASSWORD,
+            'HOST': DB_HOST or 'localhost',
+            'PORT': DB_PORT,
+            'CONN_MAX_AGE': DB_CONN_MAX_AGE,
+            'OPTIONS': {
+                **({'sslmode': 'require'} if DB_SSL_REQUIRE else {}),
+            },
         }
-    else:
-        raise ConnectionError("PostgreSQL not available")
-except (ImportError, ConnectionError):
-    # Fallback to SQLite for development
+    }
+else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
