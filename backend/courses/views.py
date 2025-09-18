@@ -2260,6 +2260,59 @@ def update_course(request, course_id):
                 school_course.thumbnail = request.FILES['thumbnail']
             
             school_course.save()
+
+            # Nested update: chapters and lessons (optional)
+            if 'chapters' in data:
+                try:
+                    chapters_payload = data.get('chapters', '[]')
+                    if isinstance(chapters_payload, str):
+                        chapters_data = json.loads(chapters_payload or '[]')
+                    else:
+                        chapters_data = chapters_payload or []
+                except Exception:
+                    chapters_data = []
+
+                for chapter_index, ch in enumerate(chapters_data):
+                    ch_id = ch.get('id')
+                    ch_name = ch.get('name', '').strip()
+                    if not ch_name:
+                        continue
+                    # Find existing chapter by id under this course
+                    chapter_obj = None
+                    if ch_id:
+                        chapter_obj = school_course.chapters.filter(id=ch_id).first()
+                    if not chapter_obj:
+                        chapter_obj = school_course.chapters.create(name=ch_name, order=chapter_index)
+                    else:
+                        chapter_obj.name = ch_name
+                        chapter_obj.order = chapter_index
+                        chapter_obj.save()
+
+                    # Update lessons in this chapter
+                    lessons = ch.get('lessons', []) or []
+                    for lesson_index, les in enumerate(lessons):
+                        les_id = les.get('id')
+                        title = (les.get('title') or '').strip()
+                        if not title:
+                            continue
+                        lesson_obj = None
+                        if les_id:
+                            lesson_obj = chapter_obj.lessons.filter(id=les_id).first()
+                        if not lesson_obj:
+                            lesson_obj = chapter_obj.lessons.create(
+                                title=title,
+                                type=les.get('type', 'video') or 'video',
+                                order=lesson_index
+                            )
+                        # Update fields
+                        lesson_obj.title = title
+                        lesson_obj.type = les.get('type', lesson_obj.type) or lesson_obj.type
+                        # Frontend sends camelCase videoUrl/aboutLesson
+                        lesson_obj.video_url = les.get('videoUrl', les.get('video_url', lesson_obj.video_url)) or ''
+                        lesson_obj.description = les.get('description', lesson_obj.description) or ''
+                        lesson_obj.about_lesson = les.get('aboutLesson', les.get('about_lesson', lesson_obj.about_lesson)) or ''
+                        lesson_obj.order = lesson_index
+                        lesson_obj.save()
             course = school_course
             
         # Update Engineering Course
@@ -2328,6 +2381,58 @@ def update_course(request, course_id):
                 engineering_course.thumbnail = request.FILES['thumbnail']
             
             engineering_course.save()
+
+            # Nested update: sections and lessons (optional)
+            if 'sections' in data:
+                try:
+                    sections_payload = data.get('sections', '[]')
+                    if isinstance(sections_payload, str):
+                        sections_data = json.loads(sections_payload or '[]')
+                    else:
+                        sections_data = sections_payload or []
+                except Exception:
+                    sections_data = []
+
+                for section_index, sec in enumerate(sections_data):
+                    sec_id = sec.get('id')
+                    sec_name = sec.get('name', '').strip()
+                    if not sec_name:
+                        continue
+                    # Find existing section by id under this course
+                    section_obj = None
+                    if sec_id:
+                        section_obj = engineering_course.sections.filter(id=sec_id).first()
+                    if not section_obj:
+                        section_obj = engineering_course.sections.create(name=sec_name, order=section_index)
+                    else:
+                        section_obj.name = sec_name
+                        section_obj.order = section_index
+                        section_obj.save()
+
+                    # Update lessons in this section
+                    lessons = sec.get('lessons', []) or []
+                    for lesson_index, les in enumerate(lessons):
+                        les_id = les.get('id')
+                        title = (les.get('title') or '').strip()
+                        if not title:
+                            continue
+                        lesson_obj = None
+                        if les_id:
+                            lesson_obj = section_obj.lessons.filter(id=les_id).first()
+                        if not lesson_obj:
+                            lesson_obj = section_obj.lessons.create(
+                                title=title,
+                                type=les.get('type', 'video') or 'video',
+                                order=lesson_index
+                            )
+                        # Update fields
+                        lesson_obj.title = title
+                        lesson_obj.type = les.get('type', lesson_obj.type) or lesson_obj.type
+                        lesson_obj.video_url = les.get('videoUrl', les.get('video_url', lesson_obj.video_url)) or ''
+                        lesson_obj.description = les.get('description', lesson_obj.description) or ''
+                        lesson_obj.about_lesson = les.get('aboutLesson', les.get('about_lesson', lesson_obj.about_lesson)) or ''
+                        lesson_obj.order = lesson_index
+                        lesson_obj.save()
             course = engineering_course
         
         # Return updated course data
