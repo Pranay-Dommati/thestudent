@@ -4,8 +4,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate, login
-from django.contrib.auth.models import User as DjangoUser
+from django.contrib.auth import authenticate, login, get_user_model
 from django.conf import settings
 from django.http import JsonResponse
 from urllib.parse import urlencode
@@ -126,17 +125,10 @@ def admin_login(request):
         )
     
     try:
-        # Try to authenticate using Django's built-in User model for superusers
-        user = authenticate(request=request, username=email, password=password)
-        
+        # Authenticate against the configured AUTH_USER_MODEL. Support both email and username params.
+        user = authenticate(request=request, email=email, password=password)
         if not user:
-            # Also try to find by email field
-            try:
-                django_user = DjangoUser.objects.get(email=email)
-                if django_user.check_password(password):
-                    user = django_user
-            except DjangoUser.DoesNotExist:
-                pass
+            user = authenticate(request=request, username=email, password=password)
         
         if not user:
             logger.error(f"Admin login failed - invalid credentials for: {email}")
@@ -146,7 +138,7 @@ def admin_login(request):
             )
         
         # Check if user is a superuser
-        if not user.is_superuser:
+        if not getattr(user, 'is_superuser', False):
             logger.error(f"Admin login failed - user {email} is not a superuser")
             return Response(
                 {"error": "Access denied. Only superusers can access the admin panel."},
@@ -168,12 +160,12 @@ def admin_login(request):
             'message': 'Admin login successful',
             'user': {
                 'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'is_superuser': user.is_superuser,
-                'is_staff': user.is_staff,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
+                'username': getattr(user, 'username', '') or getattr(user, 'email', ''),
+                'email': getattr(user, 'email', ''),
+                'is_superuser': bool(getattr(user, 'is_superuser', False)),
+                'is_staff': bool(getattr(user, 'is_staff', False)),
+                'first_name': getattr(user, 'first_name', ''),
+                'last_name': getattr(user, 'last_name', ''),
             },
             'tokens': {
                 'refresh': str(refresh),

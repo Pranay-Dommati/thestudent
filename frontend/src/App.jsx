@@ -35,11 +35,6 @@ import StandaloneQuizPage from './components/CourseLearningPage/templ/Standalone
 import NotFound from './components/NotFound/NotFound';
 import AdminForgotPassword from './components/Admin/AdminForgotPassword';
 import AdminResetPassword from './components/Admin/AdminResetPassword';
-import MentoringHome from './components/Mentoring/HomePage/MentoringHome';
-import IndustryExperts from './components/Mentoring/IndustryExperts/IndustryExperts';
-import AlumniMentorship from './components/Mentoring/AlumniMentorship/AlumniMentorship';
-import CollegeSeniors from './components/Mentoring/CollegeSeniors/CollegeSeniors';
-import MentoringNavbar from './components/Mentoring/MentoringNavbar';
 import TermsAndConditions from './components/Legal/TermsAndConditions';
 import PrivacyPolicy from './components/Legal/PrivacyPolicy';
 import FeedbackPage from './components/Feedback/FeedbackPage';  // Add feedback import
@@ -65,8 +60,7 @@ const CourseDetailsWrapper = () => {
 const Layout = ({ children, excludePaths = [] }) => {
   const location = useLocation();
 
-  // Check if the current route is related to mentoring
-  const isMentoring = location.pathname.startsWith('/mentoring');
+  // Mentoring routes have been removed; always use the main Navbar
 
   // Special cases: pages that should not show global navbars
   const isCertificatePage = /^\/courses\/[^/]+\/certificate(\/|$)?/.test(location.pathname);
@@ -107,8 +101,8 @@ const Layout = ({ children, excludePaths = [] }) => {
 
   return (
     <>
-      {/* Desktop Navigation */}
-      {!isExcluded && (isMentoring ? <MentoringNavbar /> : <Navbar initialStyle={getNavbarStyle()} />)}
+  {/* Desktop Navigation */}
+  {!isExcluded && <Navbar initialStyle={getNavbarStyle()} />}
       
       {/* Mobile Navigation */}
       {shouldShowMobileNav && (
@@ -309,11 +303,7 @@ const App = () => {
             <Route path="/courses/12th/state/:stateId/:subjectId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/12th/state/:stateId/:subjectId/learning/quiz" element={<StandaloneQuizPage />} />
 
-            {/* Mentoring Routes */}
-            {/* <Route path="/mentoring" element={<MentoringHome />} />
-            <Route path="/mentoring/college-seniors" element={<CollegeSeniors />} />
-            <Route path="/mentoring/industry-experts" element={<IndustryExperts />} />
-            <Route path="/mentoring/alumni-mentorship" element={<AlumniMentorship />} /> */}
+            {/* Mentoring routes removed */}
             
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -194,6 +194,16 @@ class AuthService {
       };
 
       this.saveAuthData(authData);
+
+      // Also persist tokens to common keys used by axios interceptors and other services
+      try {
+        if (typeof localStorage !== 'undefined') {
+          if (data.tokens?.access) localStorage.setItem('accessToken', data.tokens.access);
+          if (data.tokens?.refresh) localStorage.setItem('refreshToken', data.tokens.refresh);
+          // Backwards-compat common keys some code may read
+          if (data.tokens?.access) localStorage.setItem('access_token', data.tokens.access);
+        }
+      } catch {}
       return data;
     } catch (error) {
   logger.error('Admin login error:', error);

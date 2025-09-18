@@ -10,7 +10,8 @@ sys.path.insert(0, os.getcwd())
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django.setup()
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 def create_admin_user():
     """Create a Django superuser for admin panel access"""
@@ -32,14 +33,16 @@ def create_admin_user():
     # Get user input
     print("Creating new superuser...")
     username = input("Enter username (admin): ").strip() or "admin"
-    email = input("Enter email address: ").strip()
+    email = input("Enter email address: ").strip().lower()
     
     if not email:
         print("❌ Email is required!")
         return
     
     # Check if user already exists
-    if User.objects.filter(username=username).exists():
+    # Our custom User model uses email as the unique identifier; username may be None/ignored
+    # Warn if username exists only when model has username
+    if hasattr(User, 'username') and username and User.objects.filter(username=username).exists():
         print(f"❌ User with username '{username}' already exists!")
         return
     
@@ -62,15 +65,21 @@ def create_admin_user():
     
     try:
         # Create superuser
+        # Custom User model requires email and full_name at minimum
+        extra = {}
+        if hasattr(User, 'username'):
+            extra['username'] = username
         user = User.objects.create_superuser(
-            username=username,
             email=email,
-            password=password
+            full_name=username or email,
+            password=password,
+            **extra
         )
         
         print(f"\n✅ Superuser '{username}' created successfully!")
         print(f"   Email: {email}")
-        print(f"   Username: {username}")
+        if hasattr(User, 'username'):
+            print(f"   Username: {username}")
         print("\n🎉 You can now use these credentials to log into the admin panel at:")
         print("   http://localhost:5173/admin-p")
         
