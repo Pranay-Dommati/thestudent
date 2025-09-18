@@ -120,6 +120,39 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
     }
   };
   
+  // Adjust chapter count and reflect in chapters state
+  const handleChapterCountChange = (e) => {
+    const count = Math.max(1, parseInt(e.target.value) || 1);
+    // Update the visible count in basic info
+    setFormData(prev => ({ ...prev, chapterCount: count }));
+    // Grow or shrink the chapters array to match the count
+    setChapters(prev => {
+      if (count > prev.length) {
+        const toAdd = count - prev.length;
+        const newChapters = Array.from({ length: toAdd }, () => ({
+          id: null,
+          name: '',
+          lessons: [
+            {
+              id: null,
+              title: '',
+              type: 'video',
+              videoUrl: '',
+              aboutLesson: '',
+              hasResources: false,
+              resources: { downloadable: [], internet: [] },
+              quizQuestions: []
+            }
+          ]
+        }));
+        return [...prev, ...newChapters];
+      } else if (count < prev.length) {
+        return prev.slice(0, count);
+      }
+      return prev;
+    });
+  };
+
   // Event handler to work with standard React input events
   const handleInputChangeEvent = (e) => {
     const { name, value, type, checked } = e.target;
@@ -573,7 +606,7 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
             handleArrayFieldChange={handleArrayInputChange}
             addArrayField={addArrayItem}
             removeArrayField={removeArrayItem}
-            handleChapterCountChange={handleInputChangeEvent}
+            handleChapterCountChange={handleChapterCountChange}
             errors={errors}
             isDarkMode={isDarkMode}
             classLevel={formData.class_level}
