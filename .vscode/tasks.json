@@ -52,6 +52,15 @@
 				"$pytest"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Run dump.sh once to verify",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"./dump.sh && ls -lh db_backup.dump | cat"
+			]
 		}
 	]
 }

@@ -29,12 +29,17 @@ DB_PORT=${DB_PORT:-5432}
 
 echo "[load] Restoring to DB: $DB_NAME (user=$DB_USER host=$DB_HOST port=$DB_PORT)"
 
-if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q '^studentshub_postgres$'; then
+# Wrap docker to avoid Git Bash/MSYS path conversion on Windows
+docker_cmd() {
+  MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" docker "$@"
+}
+
+if command -v docker >/dev/null 2>&1 && docker_cmd ps --format '{{.Names}}' | grep -q '^studentshub_postgres$'; then
   echo "[load] Detected Docker container 'studentshub_postgres'. Restoring inside container..."
-  docker cp db_backup.dump studentshub_postgres:/tmp/db_backup.dump
-  docker exec -e PGPASSWORD="$DB_PASSWORD" studentshub_postgres \
+  docker_cmd cp db_backup.dump studentshub_postgres:/tmp/db_backup.dump
+  docker_cmd exec -e PGPASSWORD="$DB_PASSWORD" studentshub_postgres \
     pg_restore -U "$DB_USER" -d "$DB_NAME" --clean --create /tmp/db_backup.dump || true
-  docker exec studentshub_postgres rm -f /tmp/db_backup.dump >/dev/null 2>&1 || true
+  docker_cmd exec studentshub_postgres rm -f /tmp/db_backup.dump >/dev/null 2>&1 || true
 else
   echo "[load] Using local pg_restore (ensure PostgreSQL client tools are installed)..."
   PGPASSWORD="$DB_PASSWORD" pg_restore \

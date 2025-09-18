@@ -26,13 +26,18 @@ OUTPUT_FILE="db_backup.dump"
 
 echo "[dump] Target DB: $DB_NAME (user=$DB_USER host=$DB_HOST port=$DB_PORT)"
 
-if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q '^studentshub_postgres$'; then
+# Wrap docker to avoid Git Bash/MSYS path conversion on Windows
+docker_cmd() {
+  MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" docker "$@"
+}
+
+if command -v docker >/dev/null 2>&1 && docker_cmd ps --format '{{.Names}}' | grep -q '^studentshub_postgres$'; then
   echo "[dump] Detected Docker container 'studentshub_postgres'. Dumping inside container..."
-  docker exec -e PGPASSWORD="$DB_PASSWORD" studentshub_postgres \
+  docker_cmd exec -e PGPASSWORD="$DB_PASSWORD" studentshub_postgres \
     pg_dump -U "$DB_USER" -d "$DB_NAME" -F c -f /tmp/db_backup.dump
 
-  docker cp studentshub_postgres:/tmp/db_backup.dump "$OUTPUT_FILE"
-  docker exec studentshub_postgres rm -f /tmp/db_backup.dump >/dev/null 2>&1 || true
+  docker_cmd cp studentshub_postgres:/tmp/db_backup.dump "$OUTPUT_FILE"
+  docker_cmd exec studentshub_postgres rm -f /tmp/db_backup.dump >/dev/null 2>&1 || true
 else
   echo "[dump] Using local pg_dump (ensure PostgreSQL client tools are installed)..."
   PGPASSWORD="$DB_PASSWORD" pg_dump \
