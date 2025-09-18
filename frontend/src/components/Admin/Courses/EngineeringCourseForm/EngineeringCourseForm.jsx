@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -8,6 +8,8 @@ import { createCourse } from '../../../../services/courseApi';
 import { sanitizeFileName } from '../../../../utils/fileHelpers';
 
 const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
+  const STORAGE_KEY = 'draft_engineering_course';
+  const saveTimer = useRef(null);
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,6 +55,37 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     }
   ]);
   
+  // Load draft on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.courseInfo) setCourseInfo(ci => ({ ...ci, ...parsed.courseInfo, thumbnail: null }));
+        if (parsed.sections) setSections(parsed.sections);
+      }
+    } catch (_) { /* ignore */ }
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, []);
+
+  // Debounced autosave
+  const autosave = useMemo(() => (data) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try {
+        const sanitized = {
+          courseInfo: { ...data.courseInfo, thumbnail: null },
+          sections: data.sections
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+      } catch (e) { /* ignore */ }
+    }, 400);
+  }, []);
+
+  useEffect(() => {
+    autosave({ courseInfo, sections });
+  }, [courseInfo, sections, autosave]);
+
   // Errors for validation
   const [errors, setErrors] = useState({});
   // Handle thumbnail upload
@@ -538,6 +571,8 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
           color: 'white',
         }
       });
+      // Clear draft on success
+      try { localStorage.removeItem(STORAGE_KEY); } catch (_) { /* ignore */ }
       navigate('/admin-p/courses');
     } catch (error) {
       console.error('Error creating course:', error);

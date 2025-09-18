@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -8,6 +8,8 @@ import { createCourse } from '../../../../services/courseApi';
 import { sanitizeFileName } from '../../../../utils/fileHelpers';
 
 const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
+  const STORAGE_KEY = `draft_school_course_${classLevel || 'unknown'}`;
+  const saveTimer = useRef(null);
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,8 +29,8 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     learningPoints: ['', ''],
     chapterCount: 1
   });
-  
-  // Course Structure
+
+  // Course Structure (must be declared before effects that use it)
   const [chapters, setChapters] = useState([
     {
       name: '',
@@ -49,6 +51,39 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       ]
     }
   ]);
+  
+  // Load draft on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.courseInfo) setCourseInfo(ci => ({ ...ci, ...parsed.courseInfo, thumbnail: null }));
+        if (parsed.chapters) setChapters(parsed.chapters);
+      }
+    } catch (_) { /* ignore */ }
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [STORAGE_KEY]);
+
+  // Debounced autosave
+  const autosave = useMemo(() => (data) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try {
+        const sanitized = {
+          courseInfo: { ...data.courseInfo, thumbnail: null },
+          chapters: data.chapters
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+      } catch (e) { /* ignore */ }
+    }, 400);
+  }, [STORAGE_KEY]);
+
+  useEffect(() => {
+    autosave({ courseInfo, chapters });
+  }, [courseInfo, chapters, autosave]);
+  
+  
   
   // Errors for validation
   const [errors, setErrors] = useState({});
@@ -641,6 +676,8 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
           color: 'white',
         }
       });
+      // Clear draft on success
+      try { localStorage.removeItem(STORAGE_KEY); } catch (_) { /* ignore */ }
       navigate('/admin-p/courses');
     } catch (error) {
       console.error('Error creating course:', error);
