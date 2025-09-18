@@ -700,10 +700,8 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!validateStep(currentStep)) {
-      return;
-    }
+
+    // Save-in-the-middle: do not block submission based on current step validation
 
     setIsLoading(true);
     const token = localStorage.getItem('token');
@@ -751,8 +749,18 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
         submitData.append('thumbnail', thumbnailFile);
       }
 
-      // Add sections data
-      submitData.append('sections', JSON.stringify(sections));
+      // Add sections data only if there is valid content
+      const sectionsData = (sections || [])
+        .map(sec => {
+          const validLessons = (sec.lessons || []).filter(les => les.title && les.title.trim());
+          if (!sec.name || !sec.name.trim() || validLessons.length === 0) return null;
+          return { ...sec, lessons: validLessons };
+        })
+        .filter(Boolean);
+
+      if (sectionsData.length > 0) {
+        submitData.append('sections', JSON.stringify(sectionsData));
+      }
 
       // Add resource files
       sections.forEach((section, sectionIndex) => {

@@ -519,16 +519,9 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log("Form submit triggered, current step:", currentStep);
-    
-    // Validate all steps
-    for (let step = 1; step <= totalSteps; step++) {
-      if (!validateStep(step)) {
-        console.log("Validation failed at step", step, ", redirecting to that step");
-        setCurrentStep(step);
-        toast.error(`Please complete all required fields in step ${step}`);
-        return;
-      }
-    }
+
+    // Save-in-the-middle: do not block submission on step validations
+    // We allow updating even if step 2 (structure) isn't complete
 
     const submitFormData = new FormData();
     
@@ -546,8 +539,18 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
       }
     });
     
-    // Add chapters data
-    submitFormData.append('chapters', JSON.stringify(chapters));
+    // Add chapters data (only include valid chapters/lessons)
+    const chaptersData = (chapters || [])
+      .map(ch => {
+        const validLessons = (ch.lessons || []).filter(les => les.title && les.title.trim());
+        if (!ch.name || !ch.name.trim() || validLessons.length === 0) return null;
+        return { ...ch, lessons: validLessons };
+      })
+      .filter(Boolean);
+
+    if (chaptersData.length > 0) {
+      submitFormData.append('chapters', JSON.stringify(chaptersData));
+    }
     
     // Add thumbnail if changed
     if (thumbnailFile) {

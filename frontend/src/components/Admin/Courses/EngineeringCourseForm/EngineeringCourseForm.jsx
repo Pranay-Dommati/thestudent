@@ -473,7 +473,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    // Allow quick submit with safe defaults
     
     setIsSubmitting(true);
     try {
@@ -484,17 +484,17 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       if (courseInfo.thumbnail) {
         formData.append('thumbnail', courseInfo.thumbnail);
       }
-      formData.append('title', courseInfo.title);
-      formData.append('shortDescription', courseInfo.shortDescription);
-      formData.append('description', courseInfo.description);
-      formData.append('duration', courseInfo.duration);
-      formData.append('proficiency', courseInfo.proficiency);
+      formData.append('title', courseInfo.title || 'Untitled Engineering Course');
+      formData.append('shortDescription', courseInfo.shortDescription || '');
+      formData.append('description', courseInfo.description || '');
+      formData.append('duration', courseInfo.duration || '0');
+      formData.append('proficiency', courseInfo.proficiency || 'beginner');
       formData.append('certificateGiven', courseInfo.certificateGiven ? 'true' : 'false');
       formData.append('projectBased', courseInfo.projectBased ? 'true' : 'false');
-      formData.append('sources', courseInfo.sources);
-      formData.append('category', courseInfo.category);
-      formData.append('learningPoints', JSON.stringify(courseInfo.learningPoints));
-      formData.append('requirements', JSON.stringify(courseInfo.requirements));
+      formData.append('sources', courseInfo.sources || '');
+      formData.append('category', courseInfo.category || '');
+      formData.append('learningPoints', JSON.stringify(courseInfo.learningPoints || []));
+      formData.append('requirements', JSON.stringify(courseInfo.requirements || []));
       
       // Track resource files with unique identifiers
       let resourceFileCounter = 0;

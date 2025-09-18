@@ -553,20 +553,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate form data
-    const errors = validateForm();
-    if (Object.keys(errors).length > 0) {
-      setErrors(errors);
-      toast('Please fix the form errors', {
-        icon: '❌',
-        style: {
-          backgroundColor: '#EF4444',
-          color: 'white',
-        }
-      });
-      return;
-    }
+    // Allow quick submit with safe defaults instead of blocking
     
     setIsSubmitting(true);
     
@@ -574,23 +561,26 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       const formData = new FormData();
       
       // Add basic info
-      formData.append('title', courseInfo.title);
-      formData.append('short_description', courseInfo.title); // Use title as shortDescription
-      formData.append('description', `${courseInfo.title} - ${classLevel} - ${courseInfo.subject}`); // Generate a description
+      const title = courseInfo.title || 'Untitled School Course';
+      const board = courseInfo.board || 'cbse';
+      const subject = courseInfo.subject || 'general';
+      formData.append('title', title);
+      formData.append('short_description', title); // Use title as shortDescription
+      formData.append('description', courseInfo.description || `${title} - ${classLevel} - ${subject}`);
       formData.append('class_level', classLevel);
-      formData.append('board', courseInfo.board);
+      formData.append('board', board);
       
-      if (courseInfo.board === 'state') {
-        formData.append('state', courseInfo.state);
+      if (board === 'state') {
+        formData.append('state', courseInfo.state || '');
       }
       
-      formData.append('subject', courseInfo.subject);
-      formData.append('duration', courseInfo.duration);
-      formData.append('sources', courseInfo.sources);
+      formData.append('subject', subject);
+      formData.append('duration', courseInfo.duration || '0');
+      formData.append('sources', courseInfo.sources || '');
       
       // Add key topics and learning points - use the field names expected by the backend
-      const filteredKeyTopics = courseInfo.keyTopics.filter(topic => topic.trim() !== '');
-      const filteredLearningPoints = courseInfo.learningPoints.filter(point => point.trim() !== '');
+      const filteredKeyTopics = (courseInfo.keyTopics || []).filter(topic => (topic || '').trim() !== '');
+      const filteredLearningPoints = (courseInfo.learningPoints || []).filter(point => (point || '').trim() !== '');
       
       // Change from 'keyTopics' to 'key_topics' to match backend expectations
       formData.append('key_topics', JSON.stringify(filteredKeyTopics));
@@ -605,10 +595,14 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       let resourceFileCounter = 0;
       const resourceFiles = [];
       
-      // Process chapters data for API
-      const chaptersData = chapters.map(chapter => ({
-        name: chapter.name,
-        lessons: chapter.lessons.map(lesson => {
+      // Process chapters data for API (only include valid content)
+      const chaptersData = chapters.map(chapter => {
+        // Keep only lessons with a non-empty title
+        const validLessons = chapter.lessons.filter(lesson => (lesson.title || '').trim() !== '');
+
+        return {
+          name: (chapter.name || '').trim(),
+          lessons: validLessons.map(lesson => {
           // Process resources and handle file uploads
           let processedResources = { downloadable: [], internet: [] };
           
@@ -651,11 +645,14 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
             resources: lesson.hasResources || lesson.type === 'resources' ? processedResources : { downloadable: [], internet: [] },
             quizQuestions: lesson.quizQuestions || []
           };
-        })
-      }));
+          })
+        };
+      }).filter(ch => ch.name && ch.lessons.length > 0);
       
-      // Add chapters data
-      formData.append('chapters', JSON.stringify(chaptersData));
+      // Add chapters data only if there is valid content
+      if (chaptersData.length > 0) {
+        formData.append('chapters', JSON.stringify(chaptersData));
+      }
       
       // Append all resource files with their unique IDs
       resourceFiles.forEach(({ id, file }) => {
