@@ -1,1 +1,39 @@
+# Python virtual environments
 .venv/
+venv/
+env/
+.venv/Lib
+.venv/Lib
+# IDE settings
+.idea/
+.vscode/
+venv
+# Environment variables
+.env
+
+# Python compiled files and cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.class
+
+# Django specific
+db.sqlite3
+*.log
+local_settings.py
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Operating System files
+.DS_Store
+Thumbs.db
