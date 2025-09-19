@@ -2272,6 +2272,7 @@ def update_course(request, course_id):
                 except Exception:
                     chapters_data = []
 
+                kept_chapter_ids = []
                 for chapter_index, ch in enumerate(chapters_data):
                     ch_id = ch.get('id')
                     ch_name = ch.get('name', '').strip()
@@ -2287,9 +2288,11 @@ def update_course(request, course_id):
                         chapter_obj.name = ch_name
                         chapter_obj.order = chapter_index
                         chapter_obj.save()
+                    kept_chapter_ids.append(chapter_obj.id)
 
                     # Update lessons in this chapter
                     lessons = ch.get('lessons', []) or []
+                    kept_lesson_ids = []
                     for lesson_index, les in enumerate(lessons):
                         les_id = les.get('id')
                         title = (les.get('title') or '').strip()
@@ -2313,6 +2316,21 @@ def update_course(request, course_id):
                         lesson_obj.about_lesson = les.get('aboutLesson', les.get('about_lesson', lesson_obj.about_lesson)) or ''
                         lesson_obj.order = lesson_index
                         lesson_obj.save()
+                        kept_lesson_ids.append(lesson_obj.id)
+
+                    # Delete lessons not in payload for this chapter
+                    if kept_lesson_ids:
+                        chapter_obj.lessons.exclude(id__in=kept_lesson_ids).delete()
+                    else:
+                        # If no lessons kept, remove all lessons in this chapter
+                        chapter_obj.lessons.all().delete()
+
+                # Delete chapters not in payload
+                if kept_chapter_ids:
+                    school_course.chapters.exclude(id__in=kept_chapter_ids).delete()
+                else:
+                    # If none kept (empty payload), remove all chapters
+                    school_course.chapters.all().delete()
             course = school_course
             
         # Update Engineering Course
@@ -2393,6 +2411,7 @@ def update_course(request, course_id):
                 except Exception:
                     sections_data = []
 
+                kept_section_ids = []
                 for section_index, sec in enumerate(sections_data):
                     sec_id = sec.get('id')
                     sec_name = sec.get('name', '').strip()
@@ -2408,9 +2427,11 @@ def update_course(request, course_id):
                         section_obj.name = sec_name
                         section_obj.order = section_index
                         section_obj.save()
+                    kept_section_ids.append(section_obj.id)
 
                     # Update lessons in this section
                     lessons = sec.get('lessons', []) or []
+                    kept_lesson_ids = []
                     for lesson_index, les in enumerate(lessons):
                         les_id = les.get('id')
                         title = (les.get('title') or '').strip()
@@ -2433,6 +2454,19 @@ def update_course(request, course_id):
                         lesson_obj.about_lesson = les.get('aboutLesson', les.get('about_lesson', lesson_obj.about_lesson)) or ''
                         lesson_obj.order = lesson_index
                         lesson_obj.save()
+                        kept_lesson_ids.append(lesson_obj.id)
+
+                    # Delete lessons not in payload for this section
+                    if kept_lesson_ids:
+                        section_obj.lessons.exclude(id__in=kept_lesson_ids).delete()
+                    else:
+                        section_obj.lessons.all().delete()
+
+                # Delete sections not in payload
+                if kept_section_ids:
+                    engineering_course.sections.exclude(id__in=kept_section_ids).delete()
+                else:
+                    engineering_course.sections.all().delete()
             course = engineering_course
         
         # Return updated course data
