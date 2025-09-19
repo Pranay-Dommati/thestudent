@@ -749,18 +749,28 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
         submitData.append('thumbnail', thumbnailFile);
       }
 
-      // Add sections data only if there is valid content
-      const sectionsData = (sections || [])
-        .map(sec => {
-          const validLessons = (sec.lessons || []).filter(les => les.title && les.title.trim());
-          if (!sec.name || !sec.name.trim() || validLessons.length === 0) return null;
-          return { ...sec, lessons: validLessons };
-        })
-        .filter(Boolean);
+      // Pad sections to honor desired sectionCount, even if step 2 isn't complete
+      const desiredCount = Math.max(1, parseInt(formData.sectionCount || 1));
+      const paddedSections = Array.from({ length: desiredCount }, (_, i) => {
+        const existing = (sections || [])[i];
+        const name = (existing?.name || '').trim() || `Section ${i + 1}`;
+        const validLessons = (existing?.lessons || []).filter(les => les.title && les.title.trim());
+        const lessons = validLessons.length > 0
+          ? validLessons
+          : [
+              {
+                id: null,
+                title: 'Lesson 1',
+                type: 'video',
+                videoUrl: '',
+                description: '',
+                aboutLesson: ''
+              }
+            ];
+        return { id: existing?.id || null, name, lessons };
+      });
 
-      if (sectionsData.length > 0) {
-        submitData.append('sections', JSON.stringify(sectionsData));
-      }
+      submitData.append('sections', JSON.stringify(paddedSections));
 
       // Add resource files
       sections.forEach((section, sectionIndex) => {
@@ -850,8 +860,24 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
             handleThumbnailChange={handleThumbnailChange}
             thumbnailPreview={thumbnailPreview}
             handleSectionCountChange={(e) => {
-              const value = parseInt(e.target.value) || 1;
-              handleInputChange('sectionCount', value);
+              const count = Math.max(1, parseInt(e.target.value) || 1);
+              // Update the visible count in basic info
+              handleInputChange('sectionCount', count);
+              // Grow or shrink the sections array to match the count
+              setSections(prev => {
+                if (count > prev.length) {
+                  const toAdd = count - prev.length;
+                  const newSections = Array.from({ length: toAdd }, () => ({
+                    id: null,
+                    name: '',
+                    lessons: []
+                  }));
+                  return [...prev, ...newSections];
+                } else if (count < prev.length) {
+                  return prev.slice(0, count);
+                }
+                return prev;
+              });
             }}
             errors={errors}
             categories={[
