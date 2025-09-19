@@ -147,9 +147,8 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
           ]
         }));
         return [...prev, ...newChapters];
-      } else if (count < prev.length) {
-        return prev.slice(0, count);
       }
+      // Do NOT truncate on decrease; preserve data and just render fewer.
       return prev;
     });
   };
@@ -292,6 +291,8 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
   };
 
   const removeLesson = (chapterIndex, lessonIndex) => {
+    // Prevent removing from hidden chapters (preserve data when chapterCount is reduced)
+    if (chapterIndex >= (formData.chapterCount || chapters.length)) return;
     setChapters(prev => prev.map((chapter, i) => 
       i === chapterIndex 
         ? {
@@ -573,28 +574,19 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
       }
     });
     
-    // Add chapters data honoring desired chapter count by adding placeholders
+    // Add chapters data honoring desired chapter count without discarding existing hidden data
     const desiredCount = Math.max(1, parseInt(formData.chapterCount || 1));
-    const paddedChapters = Array.from({ length: desiredCount }, (_, i) => {
-      const existing = (chapters || [])[i];
-      const name = (existing?.name || '').trim() || `Chapter ${i + 1}`;
-      const validLessons = (existing?.lessons || []).filter(les => les.title && les.title.trim());
-      const lessons = validLessons.length > 0
-        ? validLessons
-        : [
-            {
-              id: null,
-              title: 'Lesson 1',
-              type: 'video',
-              videoUrl: '',
-              description: '',
-              aboutLesson: '',
-            }
-          ];
-      return { id: existing?.id || null, name, lessons };
-    });
+    const toSubmitChapters = (chapters || [])
+      .slice(0, desiredCount)
+      .map((existing, i) => {
+        const name = (existing?.name || '').trim() || `Chapter ${i + 1}`;
+        const lessons = (existing?.lessons || []).length > 0
+          ? existing.lessons
+          : [{ id: null, title: 'Lesson 1', type: 'video', videoUrl: '', aboutLesson: '' }];
+        return { id: existing?.id || null, name, lessons };
+      });
 
-    submitFormData.append('chapters', JSON.stringify(paddedChapters));
+    submitFormData.append('chapters', JSON.stringify(toSubmitChapters));
     
     // Add thumbnail if changed
     if (thumbnailFile) {
@@ -624,9 +616,11 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
           />
         );
       case 2:
+        // Render only the number of chapters requested, but keep the full state unmodified
+        const chaptersToRender = chapters.slice(0, formData.chapterCount || chapters.length);
         return (
           <CourseStructureStep
-            chapters={chapters}
+            chapters={chaptersToRender}
             handleChapterNameChange={handleChapterNameChange}
             addLesson={addLesson}
             removeLesson={removeLesson}
