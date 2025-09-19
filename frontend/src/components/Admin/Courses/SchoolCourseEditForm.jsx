@@ -702,15 +702,7 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
       </div>
 
       {/* Form Content */}
-      <form 
-        onSubmit={handleSubmit} 
-        onClick={(e) => {
-          // Prevent form submission if clicked outside a submit button
-          if (e.target.tagName !== 'BUTTON' || e.target.type !== 'submit') {
-            e.preventDefault();
-          }
-        }}
-      >
+      <form onSubmit={handleSubmit}>
         {renderStepContent()}
         
         {/* Navigation Buttons */}

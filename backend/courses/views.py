@@ -2363,22 +2363,24 @@ def update_course(request, course_id):
                 certificate_value = data.get('certificate', '')
                 engineering_course.certificate_given = bool(certificate_value and certificate_value != 'No Certificate')
                 
-            # Handle learning_objectives (map to learning_points in model)
-            if 'learning_objectives' in data:
+            # Handle learning outcomes/objectives (map to learning_points in model)
+            if 'learning_objectives' in data or 'learningObjectives' in data or 'learning_outcomes' in data or 'learningOutcomes' in data:
                 try:
-                    objectives_data = data.get('learning_objectives', '[]')
-                    if not objectives_data.strip():
-                        objectives_data = '[]'
-                    engineering_course.learning_points = json.loads(objectives_data)
-                except (json.JSONDecodeError, AttributeError):
-                    engineering_course.learning_points = []
-            elif 'learningObjectives' in data:
-                try:
-                    objectives_data = data.get('learningObjectives', '[]')
-                    if not objectives_data.strip():
-                        objectives_data = '[]'
-                    engineering_course.learning_points = json.loads(objectives_data)
-                except (json.JSONDecodeError, AttributeError):
+                    objectives_data = (
+                        data.get('learning_objectives')
+                        or data.get('learningObjectives')
+                        or data.get('learning_outcomes')
+                        or data.get('learningOutcomes')
+                        or '[]'
+                    )
+                    if isinstance(objectives_data, str):
+                        if not objectives_data.strip():
+                            objectives_data = '[]'
+                        engineering_course.learning_points = json.loads(objectives_data)
+                    else:
+                        # Already a list
+                        engineering_course.learning_points = list(objectives_data)
+                except (json.JSONDecodeError, AttributeError, TypeError):
                     engineering_course.learning_points = []
             
             # Handle prerequisites (map to requirements in model)
