@@ -8,10 +8,10 @@ import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
 import { useAuth } from '../../context/AuthContext';
 import { FaBrain, FaGraduationCap, FaChartLine } from 'react-icons/fa';
 import { getLearningStats } from '../../services/activityTracker';
-import axios from 'axios';
+import axiosInstance from '../../utils/axios';
 import logger from '../../utils/logger';
 
-const API_URL = 'http://localhost:8000';
+// Use relative API base via axiosInstance
 
 const MobileLearningHubPage = () => {
   const { user: authUser, isLoggedIn } = useAuth();
@@ -34,12 +34,7 @@ const MobileLearningHubPage = () => {
         const token = localStorage.getItem('accessToken');
         
         // Fetch enrolled courses count
-        const coursesResponse = await axios.get(`${API_URL}/api/courses/enrolled/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const coursesResponse = await axiosInstance.get(`/courses/enrolled/`);
 
         if (coursesResponse.data.success) {
           setEnrolledCoursesCount(coursesResponse.data.courses.length);

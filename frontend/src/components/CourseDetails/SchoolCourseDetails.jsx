@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { FaPlay, FaBookReader, FaClock, FaChalkboardTeacher, FaGlobe, FaBook, FaCheck } from 'react-icons/fa';
-import axios from 'axios';
+import axios from '../../utils/axios';
 import { toast } from 'react-hot-toast';
 import LoadingSpinner from './LoadingSpinner';
 import Navbar from '../Navbar/Navbar';
@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 import logger from '../../utils/logger';
 
-const API_URL = 'http://localhost:8000';
+// Use shared axios instance baseURL and dev proxy for API calls
 
 const SchoolCourseDetails = () => {
   const [course, setCourse] = useState(null);
@@ -51,14 +51,7 @@ const SchoolCourseDetails = () => {
         return;
       }
 
-      const response = await axios.get(
-        `${API_URL}/api/courses/enrollment-status/${courseId}/`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
+      const response = await axios.get(`/courses/enrollment-status/${courseId}/`);
 
       setIsEnrolled(response.data.is_enrolled || false);
     } catch (error) {
@@ -93,7 +86,7 @@ const SchoolCourseDetails = () => {
   logger.log('Fetching course with params:', { classLevel, board, subject, state });
         
         // Build API URL to fetch courses matching the parameters
-        let apiUrl = `${API_URL}/api/courses/school/?class=${classLevel}`;
+  let apiUrl = `/courses/school/?class=${classLevel}`;
         
         // Add board parameter only if it exists
         if (board) {
@@ -310,11 +303,8 @@ const SchoolCourseDetails = () => {
   logger.log('Enrolling in course with data:', enrollmentData);
 
       const token = localStorage.getItem('accessToken');
-      const response = await axios.post(`${API_URL}/api/courses/enroll/`, enrollmentData, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await axios.post(`/courses/enroll/`, enrollmentData, {
+        headers: { 'Content-Type': 'application/json' }
       });
 
       if (response.data.success) {

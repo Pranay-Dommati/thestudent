@@ -27,7 +27,7 @@ export default function AdminResetPassword() {
 
   const validateToken = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/auth/validate-reset-token/${uid}/${token}/`);
+  const response = await fetch(`/api/auth/validate-reset-token/${uid}/${token}/`);
       const data = await response.json();
 
       if (response.ok && data.valid) {
@@ -94,7 +94,7 @@ export default function AdminResetPassword() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/auth/reset-password/', {
+  const response = await fetch('/api/auth/reset-password/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

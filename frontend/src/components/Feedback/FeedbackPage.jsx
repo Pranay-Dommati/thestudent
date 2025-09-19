@@ -41,7 +41,7 @@ const FeedbackPage = () => {
     setError("");
 
     try {
-      const response = await fetch('http://localhost:8000/api/feedback/', {
+  const response = await fetch('/api/feedback/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

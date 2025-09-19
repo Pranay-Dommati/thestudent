@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { FaPlay, FaClock, FaUserGraduate, FaChartLine, FaCode, FaChevronDown, FaChevronUp, FaGlobe, FaCheck, FaVideo, FaDownload, FaMobile, FaChalkboardTeacher } from 'react-icons/fa';
-import axios from 'axios';
+import axios from '../../utils/axios';
 import LoadingSpinner from './LoadingSpinner';
 import Navbar from '../Navbar/Navbar';
 import Footer from '../Footer/Footer';
 import { getEngineeringCourseById } from '../../services/courseApi';
+import { toAbsoluteMedia } from '../../utils/apiOrigin';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
@@ -17,8 +18,6 @@ const formatDate = (dateString) => {
 };
 
 const CourseDetails = () => {
-  const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-  
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -40,14 +39,8 @@ const CourseDetails = () => {
 
         // Fix the image URL construction
         let imageUrl;
-        if (courseData.thumbnail?.startsWith('http')) {
-          // If it's already a full URL, use it as is
-          imageUrl = courseData.thumbnail;
-        } else if (courseData.thumbnail) {
-          // If it's a relative path, construct the full URL
-          // Make sure we don't have double slashes between API_URL and the path
-          const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-          imageUrl = baseUrl + (courseData.thumbnail.startsWith('/') ? courseData.thumbnail : `/${courseData.thumbnail}`);
+        if (courseData.thumbnail) {
+          imageUrl = toAbsoluteMedia(courseData.thumbnail);
         } else {
           // Fallback if no thumbnail is provided
           imageUrl = '/default-course-thumbnail.jpg';
@@ -140,10 +133,8 @@ const CourseDetails = () => {
 
       console.log('Enrolling in engineering course with data:', enrollmentData);
 
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.post(`${API_URL}/api/courses/enroll/`, enrollmentData, {
+      const response = await axios.post(`/courses/enroll/`, enrollmentData, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });

@@ -13,7 +13,7 @@ import { getLearningStats } from '../../services/activityTracker';
 import axios from 'axios';
 // logger removed for production cleanliness
 
-const API_URL = 'http://localhost:8000';
+// Use backend via proxy; axios instance used within children where needed
 
 const LearningHubPage = () => {
   const { user: authUser, isLoggedIn } = useAuth();

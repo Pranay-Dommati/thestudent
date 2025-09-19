@@ -182,28 +182,13 @@ const ProLearningPage = () => {
   const [sectionGenerating, setSectionGenerating] = useState(false);
   const [generatingTopics, setGeneratingTopics] = useState([]);
   
-  // Function to fetch course data from database
+  // Function to fetch course data from database (delegates to ProContentManager with deduping)
   const fetchCourseFromDB = async (courseId) => {
     try {
-      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      if (!token) return null;
-
-      const response = await fetch(`http://localhost:8000/api/courses/pro-learning/${courseId}/`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        return await response.json();
-      } else {
-        console.error('❌ Failed to fetch course from database:', response.status);
-        return null;
-      }
+      // Use the centralized manager which coalesces in-flight requests and negative-caches 404s
+      return await proContentManager.fetchCourseFromDB(courseId);
     } catch (error) {
-      console.error('❌ Error fetching course from database:', error);
+      console.error('❌ Error fetching course from database (manager):', error);
       return null;
     }
   };

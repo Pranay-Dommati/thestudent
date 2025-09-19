@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FaSave, FaTimes, FaSpinner, FaImage, FaPlus, FaTrash, FaUpload, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
+import { toAbsoluteMedia } from '../../../utils/apiOrigin';
 
 // Import the step components from creation form
 import BasicInfoStep from './SchoolCourseForm/BasicInfoStep';
@@ -90,7 +91,7 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
 
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState(
-    course.thumbnail ? `http://localhost:8000${course.thumbnail}` : null
+    course.thumbnail ? toAbsoluteMedia(course.thumbnail) : null
   );
   const [errors, setErrors] = useState({});
 

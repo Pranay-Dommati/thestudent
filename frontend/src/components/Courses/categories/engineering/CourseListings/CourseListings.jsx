@@ -3,8 +3,7 @@ import { toast } from 'react-hot-toast';
 import { getEngineeringCourses } from '../../../../../services/courseApi';
 import logger from '../../../../../utils/logger';
 import CourseCard from '../CourseCard/CourseCard';
-
-const API_URL = 'http://localhost:8000';
+import { toAbsoluteMedia } from '../../../../../utils/apiOrigin';
 
 const CourseListings = ({ category, filters }) => {
     const [courses, setCourses] = useState([]);
@@ -59,9 +58,7 @@ const CourseListings = ({ category, filters }) => {
                             key={course.id} 
                             course={{
                                 id: course.id,
-                                thumbnail: course.thumbnail?.startsWith('http') 
-                                    ? course.thumbnail 
-                                    : `${API_URL}${course.thumbnail}`,
+                                thumbnail: toAbsoluteMedia(course.thumbnail),
                                 title: course.title,
                                 instructor: course.sources,
                                 duration: course.duration,

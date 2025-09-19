@@ -83,7 +83,7 @@ const Courses = () => {
             
             for (const level of schoolLevels) {
                 try {
-                    const response = await fetch(`http://localhost:8000/api/courses/school/?class=${level.apiClass}`);
+                    const response = await fetch(`/api/courses/school/?class=${level.apiClass}`);
                     if (response.ok) {
                         const data = await response.json();
                         if (data && data.length > 0) {
@@ -97,7 +97,7 @@ const Courses = () => {
 
             // Check engineering courses
             try {
-                const engineeringResponse = await fetch('http://localhost:8000/api/courses/engineering/');
+                const engineeringResponse = await fetch('/api/courses/engineering/');
                 if (engineeringResponse.ok) {
                     const engineeringData = await engineeringResponse.json();
                     if (engineeringData && engineeringData.length > 0) {

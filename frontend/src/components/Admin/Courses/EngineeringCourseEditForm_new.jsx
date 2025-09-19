@@ -459,7 +459,7 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel, isLoading, set
       });
 
       const response = await axios.put(
-        `http://localhost:8000/api/courses/${course.id}/`,
+  `/api/courses/${course.id}/`,
         submitData,
         {
           headers: {

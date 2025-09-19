@@ -11,6 +11,9 @@ class ProContentManager {
     this.currentCourseId = null;
     this.generationPromises = new Map(); // Track ongoing content generation
     this.courseContentCache = new Map(); // In-memory cache for course content
+    // Prevent stampede of duplicate GETs and reduce noisy 404s
+    this.inflightCourseFetches = new Map(); // courseId -> Promise resolving to course JSON or null
+    this.notFoundCache = new Map(); // courseId -> timestamp of last 404 (ms)
   }
 
   /**
@@ -189,8 +192,28 @@ class ProContentManager {
    * Fetch a Pro Learning course from backend
    */
   async fetchCourseFromDB(courseId) {
+    // If the provided courseId is not a UUID (e.g., an ephemeral id like "course_..."),
+    // skip hitting the backend detail endpoint to avoid guaranteed 404s.
+    try {
+      const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidLike.test(String(courseId))) {
+        return null;
+      }
+    } catch {}
+    // Short-circuit if we recently got a 404 for this course to avoid spamming
+    try {
+      const last404 = this.notFoundCache.get(courseId);
+      if (last404 && Date.now() - last404 < 5000) { // 5s negative cache
+        return null;
+      }
+    } catch {}
+
+    // If a fetch is already in-flight for this course, return the same promise
+    const existing = this.inflightCourseFetches.get(courseId);
+    if (existing) return existing;
+
     const tryFetch = async (accessToken) => {
-      const resp = await fetch(`http://localhost:8000/api/courses/pro-learning/${courseId}/`, {
+      const resp = await fetch(`/api/courses/pro-learning/${courseId}/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -200,37 +223,61 @@ class ProContentManager {
       return resp;
     };
 
-    try {
-      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      if (!token) return null;
+    const fetchPromise = (async () => {
+      try {
+        const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
+        if (!token) return null;
 
-      let resp = await tryFetch(token);
-      // If unauthorized, try a one-time refresh using refreshToken from localStorage
-      if (resp.status === 401) {
-        const refresh = typeof localStorage !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-        if (refresh) {
-          try {
-            const r = await fetch('http://localhost:8000/api/auth/token/refresh/', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ refresh })
-            });
-            if (r.ok) {
-              const data = await r.json();
-              if (data?.access) {
-                try { localStorage.setItem('accessToken', data.access); } catch {}
-                resp = await tryFetch(data.access);
+        let resp = await tryFetch(token);
+        // If unauthorized, try a one-time refresh using refreshToken from localStorage
+        if (resp.status === 401) {
+          const refresh = typeof localStorage !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+          if (refresh) {
+            try {
+              const r = await fetch('/api/auth/token/refresh/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh })
+              });
+              if (r.ok) {
+                const data = await r.json();
+                if (data?.access) {
+                  try { localStorage.setItem('accessToken', data.access); } catch {}
+                  resp = await tryFetch(data.access);
+                }
               }
-            }
+            } catch {}
+          }
+        }
+
+        if (resp.status === 404) {
+          // Negative cache this 404 to reduce repeated requests during first-load
+          try { this.notFoundCache.set(courseId, Date.now()); } catch {}
+          return null;
+        }
+
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        // On success, warm the course content cache with aggregated structure
+        if (data && data.topics) {
+          try {
+            const aggregated = this.aggregateDatabaseCourse(data, courseId);
+            this.courseContentCache.set(courseId, aggregated);
+            try { if (typeof localStorage !== 'undefined') localStorage.setItem(`course_content_${courseId}`, JSON.stringify(aggregated)); } catch {}
           } catch {}
         }
+        return data;
+      } catch (e) {
+        return null;
+      } finally {
+        // Clear inflight marker when done
+        this.inflightCourseFetches.delete(courseId);
       }
+    })();
 
-      if (!resp.ok) return null;
-      return await resp.json();
-    } catch (e) {
-      return null;
-    }
+    // Record in-flight promise for coalescing
+    this.inflightCourseFetches.set(courseId, fetchPromise);
+    return fetchPromise;
   }
 
   /**

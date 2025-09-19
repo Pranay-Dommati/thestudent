@@ -18,7 +18,7 @@ import Certificates from '../Profile/tabs/Certificates';
 import axios from 'axios';
 // logger removed for production cleanliness
 
-const API_URL = 'http://localhost:8000';
+// API base is provided via axios instance or fetch with relative paths
 
 const MobileLearningHubPage = () => {
   const { user: authUser, isLoggedIn } = useAuth();

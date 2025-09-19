@@ -50,7 +50,7 @@ export async function generateQuizContent(setContent, topic = '', readingContent
 // Generate AI-powered quiz questions based on content
 async function generateAIQuizQuestions(topic, readingContent) {
   try {
-    const response = await fetch('http://localhost:8000/ai/quiz/', {
+  const response = await fetch('/ai/quiz/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic, reading_content: readingContent })

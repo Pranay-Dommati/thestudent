@@ -7,12 +7,9 @@ const DebugHindiCourse = () => {
     // Function to debug Hindi course
     const debugHindiCourse = async () => {
       try {
-        // Set API base URL
-        const API_BASE_URL = 'http://127.0.0.1:8000/api';
-        
-        // Try to fetch both Hindi and English courses for comparison
-        const hindiUrl = `${API_BASE_URL}/courses/school/?class=10th&board=cbse&subject=hindi`;
-        const englishUrl = `${API_BASE_URL}/courses/school/?class=10th&board=cbse&subject=english`;
+  // Build relative URLs so dev proxy handles routing
+  const hindiUrl = `/api/courses/school/?class=10th&board=cbse&subject=hindi`;
+  const englishUrl = `/api/courses/school/?class=10th&board=cbse&subject=english`;
         
         console.log('Fetching Hindi course from:', hindiUrl);
         const hindiResponse = await axiosInstance.get(hindiUrl);
@@ -27,7 +24,7 @@ const DebugHindiCourse = () => {
           const hindiCourseId = hindiResponse.data[0].id;
           console.log('Fetching Hindi course details with ID:', hindiCourseId);
           
-          const hindiDetailsUrl = `${API_BASE_URL}/courses/school/${hindiCourseId}/`;
+          const hindiDetailsUrl = `/api/courses/school/${hindiCourseId}/`;
           const hindiDetailsResponse = await axiosInstance.get(hindiDetailsUrl);
           console.log('Hindi course details:', hindiDetailsResponse.data);
         } else {

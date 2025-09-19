@@ -14,12 +14,9 @@ import CompactRateLimitStatus from './CompactRateLimitStatus';
 import proLearningHistoryService from '../../services/ProLearningHistoryService';
 // Removed IndexedDBService usage for Pro Learning flows
 
-// Centralized API base URLs (no trailing slash)
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api').replace(/\/$/, '');
-const ROOT_BASE = (
-  import.meta.env.VITE_ROOT_BASE_URL
-  || (import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace(/\/api\/?$/, '') : 'http://127.0.0.1:8000')
-).replace(/\/$/, '');
+// Use relative API paths; dev proxy routes to backend
+const API_BASE = '/api';
+const ROOT_BASE = '';
 
 // Secure backend chat proxy (DRF-protected)
 const callChatBackend = async (message) => {
@@ -28,7 +25,7 @@ const callChatBackend = async (message) => {
     localStorage.getItem('access_token') ||
     localStorage.getItem('token')
   );
-  const res = await fetch(`${ROOT_BASE}/ai/chat/`, {
+  const res = await fetch(`/ai/chat/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -105,7 +102,7 @@ const callVectorBotAPI = async (message) => {
       localStorage.getItem('access_token') ||
       localStorage.getItem('token')
     );
-    const response = await fetch(`${API_BASE}/chatbot/chat/general/`, {
+  const response = await fetch(`${API_BASE}/chatbot/chat/general/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,7 +1,5 @@
-import axios from 'axios';
+import axios from '../utils/axios';
 import logger from '../utils/logger';
-
-const API_URL = 'http://localhost:8000';
 
 class ActivityTracker {
   constructor() {
@@ -59,13 +57,8 @@ class ActivityTracker {
         return;
       }
 
-      const response = await axios.post(`${API_URL}/api/courses/track-activity/`, {
+      const response = await axios.post(`/courses/track-activity/`, {
         minutes: minutes
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
       });
 
       if (response.data.success) {
@@ -132,13 +125,8 @@ class ActivityTracker {
         return null;
       }
 
-      logger.log('🔥 [LEARNING STATS] Making request to:', `${API_URL}/api/courses/learning-stats/`);
-      const response = await axios.get(`${API_URL}/api/courses/learning-stats/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      logger.log('🔥 [LEARNING STATS] Making request to:', `/courses/learning-stats/`);
+      const response = await axios.get(`/courses/learning-stats/`);
 
       logger.log('🔥 [LEARNING STATS] API Response status:', response.status);
       logger.log('🔥 [LEARNING STATS] API Response data (full):', response.data);
@@ -172,13 +160,8 @@ class ActivityTracker {
       const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
       if (!token) return false;
 
-      const response = await axios.post(`${API_URL}/api/courses/track-activity/`, {
+      const response = await axios.post(`/courses/track-activity/`, {
         minutes: minutes
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
       });
 
   return response.data.success;

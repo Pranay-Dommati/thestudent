@@ -65,7 +65,7 @@ export async function generateSummaryContent(setContent, topic = '', readingCont
 // Generate topic-based summary with optional reading content context
 async function generateTopicBasedSummary(topic, readingContent = '') {
   try {
-    const response = await fetch('http://localhost:8000/ai/summary/', {
+  const response = await fetch('/ai/summary/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic, reading_content: readingContent })
@@ -84,7 +84,7 @@ async function generateAISummary(readingContent, topic = '') {
   // Sending reading content
   
   try {
-    const response = await fetch('http://localhost:8000/ai/summary/', {
+  const response = await fetch('/ai/summary/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic, reading_content: readingContent })

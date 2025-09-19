@@ -100,7 +100,7 @@ async function generateSingleTopicContent(topic) {
     // Starting AI content generation for topic
     // Frontend request details logged
     
-    const response = await fetch('http://localhost:8000/ai/reading/', {
+  const response = await fetch('/ai/reading/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic })

@@ -3,7 +3,7 @@ const fetchRegularCourse = async (
   isLearningPlanIdParam = false
 ) => {
   try {
-    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+  // axiosInstance has baseURL '/api'
 
     let apiUrl;
     let isSchoolCourse = false;
@@ -22,14 +22,14 @@ const fetchRegularCourse = async (
         if (stateIndex !== -1 && stateIndex + 2 < pathParts.length) {
           const stateId = pathParts[stateIndex + 1];
           const subjectId = pathParts[stateIndex + 2];
-          apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&state=${stateId}&subject=${subjectId}`;
+          apiUrl = `/courses/school/?class=${classLevel}&board=${board}&state=${stateId}&subject=${subjectId}`;
           console.log(`📚 Fetching state board course with: class=${classLevel}, board=${board}, state=${stateId}, subject=${subjectId}`);
         }
       } else {
         const subjectIndex = pathParts.indexOf(board) + 1;
         if (subjectIndex < pathParts.length) {
           const subjectId = pathParts[subjectIndex];
-          apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&subject=${subjectId}`;
+          apiUrl = `/courses/school/?class=${classLevel}&board=${board}&subject=${subjectId}`;
           console.log(`📚 Fetching school course with: class=${classLevel}, board=${board}, subject=${subjectId}`);
 
           // Make the API request
@@ -40,7 +40,7 @@ const fetchRegularCourse = async (
             console.log(`⚠️ No results found for subject: ${subjectId}, trying alternative case`);
             const altSubject = subjectId.charAt(0).toUpperCase() + subjectId.slice(1);
             console.log(`🔄 Trying with adjusted subject: ${altSubject}`);
-            const altUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&subject=${altSubject}`;
+            const altUrl = `/courses/school/?class=${classLevel}&board=${board}&subject=${altSubject}`;
             response = await axiosInstance.get(altUrl);
           }
 
@@ -50,7 +50,7 @@ const fetchRegularCourse = async (
     } else {
       // Engineering course (e.g., /courses/engineering/123/)
       const courseId = pathParts[pathParts.length - 1];
-      apiUrl = `${API_BASE_URL}/courses/engineering/${courseId}/`;
+  apiUrl = `/courses/engineering/${courseId}/`;
       const response = await axiosInstance.get(apiUrl);
       return response;
     }
