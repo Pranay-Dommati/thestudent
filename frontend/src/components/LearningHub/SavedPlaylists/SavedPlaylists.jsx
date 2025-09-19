@@ -29,7 +29,7 @@ const SavedPlaylists = () => {
       }
 
       // Fetch courses from database API
-      const response = await fetch('http://localhost:8000/api/courses/pro-learning/', {
+  const response = await fetch('/api/courses/pro-learning/', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

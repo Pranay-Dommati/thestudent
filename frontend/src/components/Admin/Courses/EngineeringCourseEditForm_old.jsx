@@ -1,3 +1,4 @@
+import { toAbsoluteMedia } from '../../../utils/apiOrigin';
 import React, { useState } from 'react';
 import { FaSave, FaTimes, FaSpinner, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
@@ -86,7 +87,7 @@ const EngineeringCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isD
 
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState(
-    course.thumbnail ? `http://localhost:8000${course.thumbnail}` : null
+  course.thumbnail ? toAbsoluteMedia(course.thumbnail) : null
   );
   const [errors, setErrors] = useState({});
 

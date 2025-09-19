@@ -9,7 +9,6 @@ import ResourcesPage from './templ/ResourcesPage';
 import QuizIntro from './templ/QuizIntro';
 import InstructionsPage from './templ/InstructionsPage';
 import Sidebar from './Sidebar';
-import axios from 'axios';
 import axiosInstance from '../../utils/axios';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
@@ -56,9 +55,9 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       }
     };
     
-    const fetchRegularCourse = async (pathParts = pathname ? pathname.split('/').filter(Boolean) : []) => {
+  const fetchRegularCourse = async (pathParts = pathname ? pathname.split('/').filter(Boolean) : []) => {
       try {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+    // axiosInstance already prefixes with '/api' via its baseURL
         
         // Extract proper course type and ID from URL path
         let apiUrl;
@@ -137,7 +136,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                 console.warn(`⚠️ Warning: State code "${stateCode}" not found in state mapping. Using raw value instead.`);
               }
               
-              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&state=${stateParam}&subject=${subjectId}`;
+              apiUrl = `/courses/school/?class=${classLevel}&board=${board}&state=${stateParam}&subject=${subjectId}`;
               console.log(`🔍 Looking for state board course: class=${classLevel}, state=${stateParam}, subject=${subjectId}`);
             }
           } else {
@@ -145,13 +144,13 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             if (subjectIndex < pathParts.length) {
               const subjectId = pathParts[subjectIndex];
               // Convert subjectId to lowercase to ensure case-insensitive matching with database
-              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&subject=${subjectId.toLowerCase()}`;
+              apiUrl = `/courses/school/?class=${classLevel}&board=${board}&subject=${subjectId.toLowerCase()}`;
               console.log(`📚 Fetching school course with: class=${classLevel}, board=${board}, subject=${subjectId.toLowerCase()}`);
             }
           }
         } else {
           // Engineering course
-          apiUrl = `${API_BASE_URL}/courses/engineering/${courseId}/`;
+          apiUrl = `/courses/engineering/${courseId}/`;
         }
         
         if (!apiUrl) {

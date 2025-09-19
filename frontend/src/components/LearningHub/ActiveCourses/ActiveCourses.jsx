@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 // logger removed for production cleanliness
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import axios from 'axios';
+import axios from '../../../utils/axios';
 import { toast } from 'react-hot-toast';
 import { FaTrash, FaTimes } from 'react-icons/fa';
 
-const API_URL = 'http://localhost:8000';
+// Use shared axios instance with baseURL
 const COURSES_PER_PAGE = 4; // Show 4 courses initially
 
 const ActiveCourses = () => {
@@ -25,13 +25,7 @@ const ActiveCourses = () => {
       }
 
       try {
-        const token = localStorage.getItem('accessToken');
-        const response = await axios.get(`${API_URL}/api/courses/enrolled/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await axios.get(`/courses/enrolled/`);
 
   
 
@@ -124,13 +118,7 @@ const ActiveCourses = () => {
     setRemovingCourseId(enrollmentId);
     
     try {
-      const token = localStorage.getItem('accessToken');
-      await axios.delete(`${API_URL}/api/courses/enrollment/${enrollmentId}/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      await axios.delete(`/courses/enrollment/${enrollmentId}/`);
 
       // Remove the course from the local state
       setEnrolledCourses(prev => prev.filter(course => course.enrollmentId !== enrollmentId));

@@ -8,7 +8,6 @@ import LessonVideo from './LessonVideo';
 import ResourcesPage from './templ/ResourcesPage';
 import QuizIntro from './templ/QuizIntro';
 import InstructionsPage from './templ/InstructionsPage';
-import axios from 'axios';
 import axiosInstance from '../../utils/axios';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
@@ -49,9 +48,9 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       }
     };
     
-    const fetchRegularCourse = async (pathParts = pathname ? pathname.split('/').filter(Boolean) : []) => {
+  const fetchRegularCourse = async (pathParts = pathname ? pathname.split('/').filter(Boolean) : []) => {
       try {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+    // axiosInstance already prefixes with '/api'
 
         let apiUrl;
         let isSchoolCourse = false;
@@ -115,7 +114,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               const stateParam = stateMap[stateCode] || stateId;
               // Decode subject from URL (handles cases like "social%20science"), normalize to lowercase, then re-encode
               const subj = decodeURIComponent(subjectId || '').toLowerCase();
-              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&state=${encodeURIComponent(stateParam)}&subject=${encodeURIComponent(subj)}`;
+              apiUrl = `/courses/school/?class=${classLevel}&board=${board}&state=${encodeURIComponent(stateParam)}&subject=${encodeURIComponent(subj)}`;
               logger.log('🔍 Mobile: state board query URL', apiUrl);
             } else {
               throw new Error('Invalid state board URL format');
@@ -124,11 +123,11 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             const subjectIndex = pathParts.indexOf(board) + 1;
             const subjectId = pathParts[subjectIndex];
             const subj = decodeURIComponent(subjectId || '').toLowerCase();
-            apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&subject=${encodeURIComponent(subj)}`;
+            apiUrl = `/courses/school/?class=${classLevel}&board=${board}&subject=${encodeURIComponent(subj)}`;
             logger.log('📚 Mobile: CBSE query URL', apiUrl);
           }
         } else {
-          apiUrl = `${API_BASE_URL}/courses/engineering/${courseId}/`;
+          apiUrl = `/courses/engineering/${courseId}/`;
         }
 
         if (!apiUrl) throw new Error('Could not determine API URL from path');

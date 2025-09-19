@@ -61,10 +61,8 @@ const ResourcesPage = ({ lessonResources }) => {
       
       // For resources with download_url (backend files), use the API endpoint
       if (resource.download_url && resource.download_url.startsWith('/api/resources/download/')) {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-        const fullDownloadUrl = `${API_BASE_URL}${resource.download_url}`;
-        
-        const response = await fetch(fullDownloadUrl);
+        // Use relative URL so Vite proxy handles it in dev
+        const response = await fetch(resource.download_url);
         
         if (!response.ok) {
           throw new Error('Failed to download file');
@@ -167,8 +165,7 @@ const ResourcesPage = ({ lessonResources }) => {
       // Fallback to opening in new tab
       const fallbackUrl = resource.download_url || resource.downloadUrl;
       if (fallbackUrl.startsWith('/api/')) {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-        window.open(`${API_BASE_URL}${fallbackUrl}`, '_blank');
+        window.open(fallbackUrl, '_blank');
       } else {
         window.open(fallbackUrl, '_blank');
       }

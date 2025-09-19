@@ -16,7 +16,7 @@ const AdminFeedbacks = ({ isDarkMode }) => {
   const fetchFeedbacks = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000/api/feedback/');
+  const response = await fetch('/api/feedback/');
       if (response.ok) {
         const data = await response.json();
         // Ensure data is an array
@@ -40,7 +40,7 @@ const AdminFeedbacks = ({ isDarkMode }) => {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/feedback/${id}/`, {
+      const response = await fetch(`/api/feedback/${id}/`, {
         method: 'DELETE',
       });
       

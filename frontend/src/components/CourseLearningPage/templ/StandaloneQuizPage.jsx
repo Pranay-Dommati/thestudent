@@ -207,7 +207,7 @@ const StandaloneQuizPage = () => {
         console.log('Submitting school course quiz:', { lessonId });
         
         response = await axiosInstance.post(
-          `http://127.0.0.1:8000/api/quiz/submit-school/${lessonId}/`,
+          `/api/quiz/submit-school/${lessonId}/`,
           { 
             answers: selectedAnswers,
             questions: quizData.questions // Send quiz questions for score calculation
@@ -218,7 +218,7 @@ const StandaloneQuizPage = () => {
         console.log('Submitting regular course quiz');
         
         response = await axiosInstance.post(
-            `http://127.0.0.1:8000/api/quiz/submit/${lessonId}/`,
+            `/api/quiz/submit/${lessonId}/`,
             { answers: selectedAnswers }
           );
       }

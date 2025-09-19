@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 // logger removed for production cleanliness
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../../../utils/axios';
 import { FaBrain, FaPlay, FaCheckCircle, FaClock, FaChartLine, FaTrash, FaEllipsisV, FaSpinner } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 
-const API_URL = 'http://localhost:8000';
+// Use axios baseURL and dev proxy
 
 const AILearningPlans = () => {
   const navigate = useNavigate();
@@ -31,7 +31,7 @@ const AILearningPlans = () => {
       }
 
   
-      const response = await axios.get(`${API_URL}/api/courses/pro-learning/`, {
+      const response = await axios.get(`/courses/pro-learning/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -61,7 +61,7 @@ const AILearningPlans = () => {
       
       // Optional: Check if course is accessible before navigation
       const token = localStorage.getItem('accessToken');
-      const response = await axios.get(`${API_URL}/api/courses/pro-learning/${courseId}/`, {
+      const response = await axios.get(`/courses/pro-learning/${courseId}/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -91,7 +91,7 @@ const AILearningPlans = () => {
     setDeleteLoading(courseId);
     try {
       const token = localStorage.getItem('accessToken');
-      await axios.delete(`${API_URL}/api/courses/pro-learning/${courseId}/`, {
+      await axios.delete(`/courses/pro-learning/${courseId}/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { FaSearch, FaFilter, FaEllipsisV, FaUserGraduate } from 'react-icons/fa';
 import authService from '../../../services/authService';
 
-const API_BASE_URL = 'http://localhost:8000/api';
-
 const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -23,7 +21,7 @@ const AdminUsers = () => {
         page: String(currentPage),
         page_size: '10',
       });
-      const resp = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/auth/users/?${params.toString()}`);
+  const resp = await authService.makeAuthenticatedRequest(`/api/auth/users/?${params.toString()}`);
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         throw new Error(err.error || 'Failed to fetch users');
@@ -52,7 +50,7 @@ const AdminUsers = () => {
       if (action === 'delete') {
         const confirmed = window.confirm('Are you sure you want to delete this user? This cannot be undone.');
         if (!confirmed) return;
-        const resp = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/auth/users/${userId}/`, { method: 'DELETE' });
+  const resp = await authService.makeAuthenticatedRequest(`/api/auth/users/${userId}/`, { method: 'DELETE' });
         if (!resp.ok) {
           const data = await resp.json().catch(() => ({}));
           throw new Error(data.error || 'Failed to delete user');
@@ -68,7 +66,7 @@ const AdminUsers = () => {
         if (newName) payload.full_name = newName;
         if (newEmail) payload.email = newEmail;
         payload.is_superuser = makeAdmin;
-        const resp = await authService.makeAuthenticatedRequest(`${API_BASE_URL}/auth/users/${userId}/`, {
+  const resp = await authService.makeAuthenticatedRequest(`/api/auth/users/${userId}/`, {
           method: 'PATCH',
           body: JSON.stringify(payload)
         });

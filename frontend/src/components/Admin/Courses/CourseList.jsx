@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { getAllCourses } from '../../../services/courseApi';
 import { toast } from 'react-hot-toast';
 
-const API_URL = 'http://localhost:8000';
+// Backend base resolved via proxy or env; prefer relative '/api' in requests
 
 const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshTrigger }) => {
   const [searchQuery, setSearchQuery] = useState('');

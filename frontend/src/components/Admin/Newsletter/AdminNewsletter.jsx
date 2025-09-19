@@ -14,7 +14,7 @@ const AdminNewsletter = ({ isDarkMode }) => {
   const fetchNewsletters = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000/api/newsletter/');
+  const response = await fetch('/api/newsletter/');
       if (response.ok) {
         const data = await response.json();
         // Ensure data is an array
@@ -38,7 +38,7 @@ const AdminNewsletter = ({ isDarkMode }) => {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/newsletter/${id}/`, {
+  const response = await fetch(`/api/newsletter/${id}/`, {
         method: 'DELETE',
       });
       
@@ -55,7 +55,7 @@ const AdminNewsletter = ({ isDarkMode }) => {
 
   const toggleNewsletterStatus = async (id, currentStatus) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/newsletter/${id}/`, {
+  const response = await fetch(`/api/newsletter/${id}/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
