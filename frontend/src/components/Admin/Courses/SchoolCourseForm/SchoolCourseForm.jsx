@@ -595,14 +595,28 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       let resourceFileCounter = 0;
       const resourceFiles = [];
       
-      // Process chapters data for API (only include valid content)
-      const chaptersData = chapters.map(chapter => {
+      // Process chapters honoring chapterCount by padding placeholders
+      const desiredCount = Math.max(1, parseInt(courseInfo.chapterCount || 1));
+      const chaptersData = Array.from({ length: desiredCount }, (_, i) => {
+        const chapter = chapters[i];
+        const name = (chapter?.name || '').trim() || `Chapter ${i + 1}`;
         // Keep only lessons with a non-empty title
-        const validLessons = chapter.lessons.filter(lesson => (lesson.title || '').trim() !== '');
+        const validLessons = (chapter?.lessons || []).filter(lesson => (lesson.title || '').trim() !== '');
 
-        return {
-          name: (chapter.name || '').trim(),
-          lessons: validLessons.map(lesson => {
+        const lessonsSource = validLessons.length > 0
+          ? validLessons
+          : [{
+              title: 'Lesson 1',
+              type: 'video',
+              videoUrl: '',
+              description: '',
+              aboutLesson: '',
+              hasResources: false,
+              resources: { downloadable: [], internet: [] },
+              quizQuestions: []
+            }];
+
+        const lessons = lessonsSource.map(lesson => {
           // Process resources and handle file uploads
           let processedResources = { downloadable: [], internet: [] };
           
@@ -618,16 +632,11 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
               // If there's a file attached, track it for upload
               if (resource.file) {
                 const fileId = `resource_file_${resourceFileCounter++}`;
-                resourceFiles.push({
-                  id: fileId,
-                  file: resource.file
-                });
+                resourceFiles.push({ id: fileId, file: resource.file });
                 processedResource.fileId = fileId;
               }
-              
               return processedResource;
             });
-            
             // Handle internet resources (no file uploads)
             processedResources.internet = lesson.resources.internet.map(resource => ({
               name: resource.name,
@@ -645,14 +654,13 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
             resources: lesson.hasResources || lesson.type === 'resources' ? processedResources : { downloadable: [], internet: [] },
             quizQuestions: lesson.quizQuestions || []
           };
-          })
-        };
-      }).filter(ch => ch.name && ch.lessons.length > 0);
-      
-      // Add chapters data only if there is valid content
-      if (chaptersData.length > 0) {
-        formData.append('chapters', JSON.stringify(chaptersData));
-      }
+        });
+
+        return { name, lessons };
+      });
+
+      // Always include chapters honoring the count
+      formData.append('chapters', JSON.stringify(chaptersData));
       
       // Append all resource files with their unique IDs
       resourceFiles.forEach(({ id, file }) => {

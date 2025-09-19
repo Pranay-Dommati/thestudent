@@ -556,7 +556,7 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
     // Save-in-the-middle: do not block submission on step validations
     // We allow updating even if step 2 (structure) isn't complete
 
-    const submitFormData = new FormData();
+  const submitFormData = new FormData();
     
     // Add all form fields
     Object.keys(formData).forEach(key => {
@@ -572,18 +572,28 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
       }
     });
     
-    // Add chapters data (only include valid chapters/lessons)
-    const chaptersData = (chapters || [])
-      .map(ch => {
-        const validLessons = (ch.lessons || []).filter(les => les.title && les.title.trim());
-        if (!ch.name || !ch.name.trim() || validLessons.length === 0) return null;
-        return { ...ch, lessons: validLessons };
-      })
-      .filter(Boolean);
+    // Add chapters data honoring desired chapter count by adding placeholders
+    const desiredCount = Math.max(1, parseInt(formData.chapterCount || 1));
+    const paddedChapters = Array.from({ length: desiredCount }, (_, i) => {
+      const existing = (chapters || [])[i];
+      const name = (existing?.name || '').trim() || `Chapter ${i + 1}`;
+      const validLessons = (existing?.lessons || []).filter(les => les.title && les.title.trim());
+      const lessons = validLessons.length > 0
+        ? validLessons
+        : [
+            {
+              id: null,
+              title: 'Lesson 1',
+              type: 'video',
+              videoUrl: '',
+              description: '',
+              aboutLesson: '',
+            }
+          ];
+      return { id: existing?.id || null, name, lessons };
+    });
 
-    if (chaptersData.length > 0) {
-      submitFormData.append('chapters', JSON.stringify(chaptersData));
-    }
+    submitFormData.append('chapters', JSON.stringify(paddedChapters));
     
     // Add thumbnail if changed
     if (thumbnailFile) {
