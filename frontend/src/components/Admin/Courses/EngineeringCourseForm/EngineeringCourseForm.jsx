@@ -12,6 +12,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   const saveTimer = useRef(null);
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(1);
+  const preventSubmitRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
   
@@ -460,8 +461,11 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   // Handle step navigation
   const handleNext = () => {
     if (validateForm()) {
+      // Prevent accidental submit when the button switches to a submit button under the cursor
+      preventSubmitRef.current = true;
       setActiveStep(activeStep + 1);
       window.scrollTo(0, 0);
+      setTimeout(() => { preventSubmitRef.current = false; }, 400);
     }
   };
   
@@ -473,6 +477,15 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (preventSubmitRef.current) {
+      // Ignore submits that happen immediately after advancing step
+      return;
+    }
+    // If not on the final step yet, treat submit as a Next action (e.g., Enter key pressed)
+    if (activeStep < 2) {
+      handleNext();
+      return;
+    }
     // Allow quick submit with safe defaults
     
     setIsSubmitting(true);
@@ -669,7 +682,12 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       </div>
       
       {/* Form Content */}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} onKeyDown={(e) => {
+        // Prevent Enter from submitting the form on step 1
+        if (e.key === 'Enter' && activeStep < 2) {
+          e.preventDefault();
+        }
+      }}>
         <AnimatePresence mode="sync">
           <motion.div
             key={activeStep}
