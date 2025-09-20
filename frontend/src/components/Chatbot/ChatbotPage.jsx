@@ -525,6 +525,7 @@ const ChatbotPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const initialQueryProcessed = useRef(false);
+  const autoSendProcessed = useRef(false); // Additional flag to prevent duplicate auto-sends
   const { width } = useWindowSize();
   // Sidebar default: open on large desktop (>=1024px), closed otherwise
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 1024);
@@ -669,16 +670,48 @@ const ChatbotPage = () => {
     const modeParam = searchParams.get("mode");
     const prefillParam = searchParams.get("prefill");
     
-    // Handle new format for generated course
-    if (messageParam && prefillParam === 'true') {
+    // If coming from Home with explicit createCourse mode, enable pro mode and set a helpful placeholder
+    if (modeParam === 'createCourse' && !proMode) {
+      // Pre-gate by rate limit if authenticated, same logic as manual toggle
+      const tryEnablePro = async () => {
+        setCoursePlaceholder(getRandomPlaceholder());
+        if (isAuthenticated && typeof isAuthenticated === 'function' && isAuthenticated()) {
+          const stats = await fetchUsageStats();
+          const remainingToday = stats ? (stats.daily_limit || 16) - (stats.daily_used || 0) : null;
+          if (remainingToday !== null && remainingToday <= 0) {
+            toast.error('Sorry, your daily limit is over. Please try again tomorrow.');
+            return; // don't enable pro mode
+          }
+        }
+        setProMode(true);
+        
+        // After enabling pro mode, check if we need to auto-send a message
+        if (messageParam && prefillParam === 'true' && !autoSendProcessed.current) {
+          const decodedMessage = decodeURIComponent(messageParam);
+          setMessage(decodedMessage);
+          initialQueryProcessed.current = true; // Set this immediately to prevent duplicate processing
+          autoSendProcessed.current = true; // Prevent any duplicate auto-sends
+          setTimeout(() => {
+            handleSendMessage(decodedMessage);
+          }, 100); // Small delay to ensure state updates
+          // Replace URL without parameters for cleaner history
+          navigate("/chat", { replace: true });
+        }
+      };
+      tryEnablePro();
+    }
+
+    // Handle new format for generated course (only if not in createCourse mode and not already processed)
+    else if (messageParam && prefillParam === 'true' && !autoSendProcessed.current) {
       const decodedMessage = decodeURIComponent(messageParam);
       setMessage(decodedMessage);
       initialQueryProcessed.current = true;
+      autoSendProcessed.current = true; // Prevent any duplicate auto-sends
       
-      // If we want to automatically send it, uncomment below
-      // setTimeout(() => {
-      //   handleSendMessage(decodedMessage);
-      // }, 100);
+      // Auto-send the message when coming from Home page
+      setTimeout(() => {
+        handleSendMessage(decodedMessage);
+      }, 500); // Slight delay to ensure pro mode is enabled first
       
       // Replace URL without parameters for cleaner history
       navigate("/chat", { replace: true });
@@ -693,6 +726,20 @@ const ChatbotPage = () => {
       navigate("/chat", { replace: true });
     }
   }, [initialQuery, navigate, searchParams]);
+
+  // Timeout fallback to prevent infinite "Loading stats..." when pro mode is enabled
+  useEffect(() => {
+    if (proMode && !usageStats) {
+      const timeoutId = setTimeout(() => {
+        if (!usageStats) {
+          console.warn('Stats loading timeout, setting fallback');
+          setUsageStats({ daily_used: 0, daily_limit: 16, per_request_limit: 4 });
+        }
+      }, 3000); // 3 second timeout
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [proMode, usageStats]);
 
   // Do not auto-close/open sidebar on resize; only set default on mount above.
 
@@ -951,6 +998,13 @@ const ChatbotPage = () => {
     const messageToSend = customMessage || message;
     if (!messageToSend.trim() || isLoading) return;
 
+    console.log('🔍 handleSendMessage called with:', { 
+      messageToSend, 
+      proMode, 
+      usageStats,
+      isAuthenticated: typeof isAuthenticated === 'function' ? isAuthenticated() : isAuthenticated
+    });
+
     // Hide all retry buttons (but keep messages) when a new prompt is sent
     setChatHistory((prev) => 
       prev.map(msg => {
@@ -1024,9 +1078,24 @@ const ChatbotPage = () => {
 
     try {
       if (proMode) {
+        // Check daily quota before processing
+        if (usageStats) {
+          const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
+          if (remainingToday <= 0) {
+            toast.error("🚫 Daily limit reached! You've used all your topic creation quota for today. Please try again tomorrow.", {
+              duration: 5000,
+              position: 'top-center'
+            });
+            setIsLoading(false);
+            return;
+          }
+        }
+
         // Pro mode - extract topics using AI first with rate limiting
         try {
+          console.log('🚀 Pro mode activated, calling classifyTopics with:', messageToSend);
           const result = await classifyTopics(messageToSend);
+          console.log('✅ classifyTopics result:', result);
           
           // Update usage stats from the response
           if (result.usage_stats) {
@@ -1157,6 +1226,12 @@ const ChatbotPage = () => {
           }
         } catch (error) {
           console.error('❌ Topic extraction failed:', error);
+          console.error('Error details:', { 
+            name: error.name, 
+            message: error.message, 
+            isRateLimit: error.isRateLimit,
+            stack: error.stack 
+          });
           
           // Handle network connection errors specifically (like ChatGPT)
           if (error.name === 'NetworkConnectionError') {
@@ -1202,6 +1277,8 @@ const ChatbotPage = () => {
             
             // Store the timeout ID in the ref
             networkErrorTimeouts.current[networkLoadingResponse.id] = timeoutId;
+            setIsLoading(false);
+            return;
           } else if (error.isRateLimit) {
             const rateLimitMessage = formatRateLimitMessage(error);
             const rateLimitResponse = {
@@ -1218,6 +1295,8 @@ const ChatbotPage = () => {
               duration: 5000,
               position: 'top-center',
             });
+            setIsLoading(false);
+            return;
           } else {
             // Generic error handling
             const errorResponse = {
@@ -1227,6 +1306,8 @@ const ChatbotPage = () => {
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             };
             setChatHistory((prev) => [...prev, errorResponse]);
+            setIsLoading(false);
+            return;
           }
         }
       } else {
@@ -1817,7 +1898,7 @@ const ChatbotPage = () => {
     );
   };
 
-  // Fetch usage stats for rate limiting display
+  // Fetch usage stats for rate limiting display (returns stats)
   const fetchUsageStats = async () => {
     try {
       const token = (
@@ -1826,30 +1907,41 @@ const ChatbotPage = () => {
         localStorage.getItem('token')
       );
       const { data: result } = await aiAxios.get('/rate-limit-status/');
-      
-      if (result?.rate_limit_info) {
-        setUsageStats(result.rate_limit_info);
-      }
+      const stats = result?.rate_limit_info || null;
+      if (stats) setUsageStats(stats);
+      return stats;
     } catch (error) {
       console.error('Failed to fetch usage stats:', error);
+      // Set fallback to prevent infinite "Loading stats..."
+      const fallback = { daily_used: 0, daily_limit: 16, per_request_limit: 4 };
+      setUsageStats(fallback);
+      return fallback;
     }
   };
 
   // Handle Create Course button with authentication check
   const handleCreateCourse = async () => {
+    // Toggle off if already enabled
+    if (proMode) {
+      setProMode(false);
+      return;
+    }
+
     if (!isAuthenticated()) {
       setShowAuthModal(true);
       return;
     }
-    
-    const newProMode = !proMode;
-    setProMode(newProMode);
-    
-    // Set random placeholder when entering pro mode
-    if (newProMode) {
-      setCoursePlaceholder(getRandomPlaceholder());
-      await fetchUsageStats();
+
+    // Gate enabling by daily limit
+    const stats = await fetchUsageStats();
+    const remainingToday = stats ? (stats.daily_limit || 16) - (stats.daily_used || 0) : null;
+    if (remainingToday !== null && remainingToday <= 0) {
+      toast.error('Sorry, your daily limit is over. Please try again tomorrow.');
+      return;
     }
+
+    setProMode(true);
+    setCoursePlaceholder(getRandomPlaceholder());
   };
 
   return (
@@ -2278,7 +2370,9 @@ const ChatbotPage = () => {
                   className={`absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg transition-all duration-200 backdrop-blur-sm ${
                     message.trim() && !isLoading 
                       ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:scale-105" 
-                      : "bg-gray-200/50 text-gray-400"
+                      : proMode && !isLoading
+                        ? "bg-gradient-to-r from-indigo-400 to-purple-500 text-white/80 cursor-not-allowed opacity-75"
+                        : "bg-gray-200/50 text-gray-400"
                   }`}
                 >
                   <IoSend size={18} />

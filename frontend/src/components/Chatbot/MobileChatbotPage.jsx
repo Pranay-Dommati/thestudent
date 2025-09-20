@@ -108,6 +108,7 @@ const MobileChatbotPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const initialQueryProcessed = useRef(false);
+  const autoSendProcessed = useRef(false); // Additional flag to prevent duplicate auto-sends
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
   const [showNavMenu, setShowNavMenu] = useState(false);
@@ -241,32 +242,28 @@ const MobileChatbotPage = () => {
     return coursePlaceholders[randomIndex];
   };
 
-  // Fetch usage stats when component mounts or when pro mode is enabled
+  // Fetch usage stats when component mounts or when pro mode is enabled (returns stats)
   const fetchUsageStats = async () => {
-    if (!isAuthenticated) return;
-    
     try {
-      console.log('📊 Fetching usage stats...');
+      if (!isLoggedIn) return null;
       const { data } = await apiAxios.get('/chatbot/usage-stats/');
       setUsageStats(data);
-      console.log('📊 Usage stats fetched:', data);
+      return data;
     } catch (error) {
       console.error('📊 Error fetching usage stats:', error);
-      // Set default stats if fetch fails
-      setUsageStats({
-        daily_used: 0,
-        daily_limit: 16,
-        per_request_limit: 4
-      });
+      // Fallback default
+      const fallback = { daily_used: 0, daily_limit: 16, per_request_limit: 4 };
+      setUsageStats(fallback);
+      return fallback;
     }
   };
 
   // Fetch usage stats when component mounts and when pro mode changes
   useEffect(() => {
-    if (proMode && isAuthenticated) {
+    if (proMode && isLoggedIn) {
       fetchUsageStats();
     }
-  }, [proMode, isAuthenticated]);
+  }, [proMode, isLoggedIn]);
 
   // Handle ESC key to close welcome message and navigation menu
   useEffect(() => {
@@ -329,11 +326,47 @@ const MobileChatbotPage = () => {
     const modeParam = searchParams.get("mode");
     const prefillParam = searchParams.get("prefill");
     
-    // Handle new format for generated course
-    if (messageParam && prefillParam === 'true') {
+    // If coming from Home with explicit createCourse mode, enable pro mode and set a helpful placeholder
+    if (modeParam === 'createCourse' && !proMode) {
+      const tryEnablePro = async () => {
+        setCoursePlaceholder(getRandomPlaceholder());
+        if (isLoggedIn) {
+          const stats = await fetchUsageStats();
+          const remainingToday = stats ? (stats.daily_limit || 16) - (stats.daily_used || 0) : null;
+          if (remainingToday !== null && remainingToday <= 0) {
+            toast.error('Sorry, your daily limit is over. Please try again tomorrow.');
+            return;
+          }
+        }
+        setProMode(true);
+        
+        // After enabling pro mode, check if we need to auto-send a message
+        if (messageParam && prefillParam === 'true' && !autoSendProcessed.current) {
+          const decodedMessage = decodeURIComponent(messageParam);
+          setMessage(decodedMessage);
+          initialQueryProcessed.current = true; // Set this immediately to prevent duplicate processing
+          autoSendProcessed.current = true; // Prevent any duplicate auto-sends
+          setTimeout(() => {
+            handleSendMessage(decodedMessage);
+          }, 100); // Small delay to ensure state updates
+          // Replace URL without parameters for cleaner history
+          navigate("/chat", { replace: true });
+        }
+      };
+      tryEnablePro();
+    }
+
+    // Handle new format for generated course (only if not in createCourse mode and not already processed)
+    else if (messageParam && prefillParam === 'true' && !autoSendProcessed.current) {
       const decodedMessage = decodeURIComponent(messageParam);
       setMessage(decodedMessage);
       initialQueryProcessed.current = true;
+      autoSendProcessed.current = true; // Prevent any duplicate auto-sends
+      
+      // Auto-send the message when coming from Home page
+      setTimeout(() => {
+        handleSendMessage(decodedMessage);
+      }, 500); // Slight delay to ensure pro mode is enabled first
       
       // Replace URL without parameters for cleaner history
       navigate("/chat", { replace: true });
@@ -349,9 +382,30 @@ const MobileChatbotPage = () => {
     }
   }, [initialQuery, navigate, searchParams]);
 
+  // Timeout fallback to prevent infinite "Loading stats..." when pro mode is enabled (mobile)
+  useEffect(() => {
+    if (proMode && !usageStats) {
+      const timeoutId = setTimeout(() => {
+        if (!usageStats) {
+          console.warn('Mobile stats loading timeout, setting fallback');
+          setUsageStats({ daily_used: 0, daily_limit: 16, per_request_limit: 4 });
+        }
+      }, 3000); // 3 second timeout
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [proMode, usageStats]);
+
   const handleSendMessage = async (customMessage = null) => {
     const messageToSend = customMessage || message;
     if (!messageToSend.trim() || isLoading) return;
+
+    console.log('📱 Mobile handleSendMessage called with:', { 
+      messageToSend, 
+      proMode, 
+      usageStats,
+      isLoggedIn
+    });
 
     const userMessageObj = {
       id: generateUniqueId(),
@@ -366,10 +420,24 @@ const MobileChatbotPage = () => {
 
     try {
       if (proMode) {
+        // Check daily quota before processing
+        if (usageStats) {
+          const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
+          if (remainingToday <= 0) {
+            toast.error("🚫 Daily limit reached! You've used all your topic creation quota for today. Please try again tomorrow.", {
+              duration: 5000,
+              position: 'top-center'
+            });
+            setIsLoading(false);
+            return;
+          }
+        }
+
         // Pro mode - extract topics using AI first with rate limiting
         try {
-          console.log('🚀 Starting topic extraction for:', messageToSend);
+          console.log('🚀 Mobile pro mode activated, calling classifyTopics with:', messageToSend);
           const result = await classifyTopics(messageToSend);
+          console.log('✅ Mobile classifyTopics result:', result);
           
           // Update usage stats from the response
           if (result.usage_stats) {
@@ -470,7 +538,13 @@ const MobileChatbotPage = () => {
             setChatHistory((prev) => [...prev, errorResponse]);
           }
         } catch (error) {
-          console.error('❌ Topic extraction failed:', error);
+          console.error('❌ Mobile topic extraction failed:', error);
+          console.error('Mobile error details:', { 
+            name: error.name, 
+            message: error.message, 
+            isRateLimit: error.isRateLimit,
+            stack: error.stack 
+          });
           
           // Handle rate limiting specifically
           if (error.isRateLimit) {
@@ -489,6 +563,8 @@ const MobileChatbotPage = () => {
               duration: 5000,
               position: 'top-center',
             });
+            setIsLoading(false);
+            return;
           } else {
             // Generic error handling
             const errorResponse = {
@@ -498,6 +574,8 @@ const MobileChatbotPage = () => {
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             };
             setChatHistory((prev) => [...prev, errorResponse]);
+            setIsLoading(false);
+            return;
           }
         }
       } else {
@@ -925,19 +1003,27 @@ const MobileChatbotPage = () => {
 
   // Handle Create Course button with authentication check
   const handleCreateCourse = async () => {
+    // Toggle off if currently enabled
+    if (proMode) {
+      setProMode(false);
+      return;
+    }
+
     if (!isLoggedIn) {
       setShowAuthModal(true);
       return;
     }
-    
-    const newProMode = !proMode;
-    setProMode(newProMode);
-    
-    // Set random placeholder when entering pro mode (same as desktop)
-    if (newProMode) {
-      setCoursePlaceholder(getRandomPlaceholder());
-      await fetchUsageStats();
+
+    // Check rate limits before enabling
+    const stats = await fetchUsageStats();
+    const remainingToday = stats ? (stats.daily_limit || 16) - (stats.daily_used || 0) : null;
+    if (remainingToday !== null && remainingToday <= 0) {
+      toast.error('Sorry, your daily limit is over. Please try again tomorrow.');
+      return;
     }
+
+    setProMode(true);
+    setCoursePlaceholder(getRandomPlaceholder());
   };
 
   return (
@@ -1423,7 +1509,9 @@ const MobileChatbotPage = () => {
                 className={`absolute right-2 p-2.5 rounded-xl transition-all ${
                   message.trim() && !isLoading 
                     ? "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 hover:shadow-md" 
-                    : "bg-gray-300 text-gray-500"
+                    : proMode && !isLoading
+                      ? "bg-indigo-500 text-white/80 cursor-not-allowed opacity-75"
+                      : "bg-gray-300 text-gray-500"
                 }`}
               >
                 <IoSend size={14} />

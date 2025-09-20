@@ -5,6 +5,28 @@ const AIGeneratedLearningPath = () => {
   const [inputValue, setInputValue] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  // Use the same style prompts as Chat page's "Create Course" flow
+  const coursePlaceholders = [
+    "Create course on arrays and strings",
+    "Create course about photosynthesis and water cycle",
+    "Create course on Newton's laws of motion",
+    "Create course about acids, bases, and salts",
+    "Create course on basic algebra and equations",
+    "Create course about ecosystem and food chain",
+    "Create course on React components and props",
+    "Create course on electric circuits and Ohm's law",
+    "Create course about cell structure and function",
+    "Create course on data structures like linked lists and stacks",
+    "Create course about solar system and planets",
+    "Create course on basic trigonometry",
+    "Create course on photosynthesis and transpiration",
+    "Create course about world war history (WWI & WWII)",
+    "Create course on cybersecurity and ethical hacking basics",
+    "Create course about types of reproduction in biology",
+    "Create course on financial literacy",
+    "Create course about AI and machine learning basics"
+  ];
+  const [placeholderText, setPlaceholderText] = useState(coursePlaceholders[0]);
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
 
@@ -21,6 +43,12 @@ const AIGeneratedLearningPath = () => {
     };
   }, []);
 
+  // Rotate placeholder to one of the chat prompts on mount
+  useEffect(() => {
+    const idx = Math.floor(Math.random() * coursePlaceholders.length);
+    setPlaceholderText(coursePlaceholders[idx]);
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -30,8 +58,11 @@ const AIGeneratedLearningPath = () => {
 
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
-      // Navigate to chat page with complete formatted message using SPA navigation
-      const fullPrompt = `Create a comprehensive course for: ${inputValue.trim()}`;
+      // Build prompt aligned with Chat page "Create Course" phrasing
+      const raw = inputValue.trim();
+      const fullPrompt = /^\s*create\s+course/i.test(raw)
+        ? raw
+        : `Create course on ${raw}`;
       const encodedMessage = encodeURIComponent(fullPrompt);
       navigate(`/chat?mode=createCourse&message=${encodedMessage}&prefill=true`);
     } catch (error) {
@@ -51,11 +82,8 @@ const AIGeneratedLearningPath = () => {
     setShowDropdown(false);
   };
 
-  const predefinedTopics = [
-    "Machine Learning",
-    "Digital Marketing",
-    "Data Science"
-  ];
+  // Use shared-style prompts for suggestions in dropdown
+  const predefinedTopics = coursePlaceholders;
 
   return (
     <section className="relative py-8 sm:py-20 xl:py-24 overflow-visible">
@@ -87,7 +115,7 @@ const AIGeneratedLearningPath = () => {
                   onChange={(e) => setInputValue(e.target.value)}
                   onFocus={() => setShowDropdown(true)}
                   onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-                  placeholder="Type any topic or select..."
+                  placeholder={placeholderText}
                   className="w-full px-4 py-3 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm"
                   disabled={isGenerating}
                   autoComplete="off"
@@ -185,7 +213,7 @@ const AIGeneratedLearningPath = () => {
                     type="text"
                     value={inputValue}
                     onChange={handleInputChange}
-                    placeholder="What would you like to learn today? (e.g., Machine Learning, React.js, Digital Marketing)"
+                    placeholder={placeholderText}
                     className="w-full px-8 py-6 text-lg bg-white/80 backdrop-blur-sm border-2 border-gray-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-300 shadow-lg placeholder-gray-400"
                     disabled={isGenerating}
                     onFocus={() => setShowDropdown(true)}

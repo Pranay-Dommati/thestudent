@@ -21,12 +21,8 @@ const AdminUsers = () => {
         page: String(currentPage),
         page_size: '10',
       });
-  const resp = await authService.makeAuthenticatedRequest(`/api/auth/users/?${params.toString()}`);
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to fetch users');
-      }
-  const data = await resp.json();
+  const resp = await authService.makeAuthenticatedRequest(`/auth/users/?${params.toString()}`);
+      const data = resp.data || {};
   const results = Array.isArray(data.results) ? data.results : [];
   // Ensure admins show on top even if backend ordering changes
   results.sort((a, b) => (b.is_superuser === true) - (a.is_superuser === true));
@@ -50,11 +46,7 @@ const AdminUsers = () => {
       if (action === 'delete') {
         const confirmed = window.confirm('Are you sure you want to delete this user? This cannot be undone.');
         if (!confirmed) return;
-  const resp = await authService.makeAuthenticatedRequest(`/api/auth/users/${userId}/`, { method: 'DELETE' });
-        if (!resp.ok) {
-          const data = await resp.json().catch(() => ({}));
-          throw new Error(data.error || 'Failed to delete user');
-        }
+  await authService.makeAuthenticatedRequest(`/auth/users/${userId}/`, { method: 'DELETE' });
         await fetchUsers();
         return;
       }
@@ -66,14 +58,11 @@ const AdminUsers = () => {
         if (newName) payload.full_name = newName;
         if (newEmail) payload.email = newEmail;
         payload.is_superuser = makeAdmin;
-  const resp = await authService.makeAuthenticatedRequest(`/api/auth/users/${userId}/`, {
+  const resp = await authService.makeAuthenticatedRequest(`/auth/users/${userId}/`, {
           method: 'PATCH',
           body: JSON.stringify(payload)
         });
-        if (!resp.ok) {
-          const data = await resp.json().catch(() => ({}));
-          throw new Error(data.error || 'Failed to update user');
-        }
+        // axios will throw on non-2xx; no manual ok/json checks needed
         await fetchUsers();
         return;
       }
