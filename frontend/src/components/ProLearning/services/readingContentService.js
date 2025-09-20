@@ -97,27 +97,15 @@ async function enforceRateLimit() {
 // Generate content for a single topic with enhanced error handling
 async function generateSingleTopicContent(topic) {
   try {
-    // Starting AI content generation for topic
-    // Frontend request details logged
-    
-  const response = await fetch('/ai/reading/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic })
-    });
-    
-    if (!response.ok) {
-      console.error(`❌ Backend AI reading endpoint failed with status: ${response.status}`);
-      throw new Error('Backend AI reading endpoint failed');
-    }
-    
-    const result = await response.json();
+    // Starting AI content generation for topic via secure backend proxy
+    const axiosAi = (await import('../../../utils/axiosAi')).default;
+    const { data: result } = await axiosAi.post('/reading/', { topic });
     
     // FRONTEND: Received AI response for topic
     // Response Analysis logged
     
     // Enhanced logging for AI prompt selection verification
-    if (result.topic_category) {
+  if (result.topic_category) {
       // Topic Classification and backend analysis logged
       
       // Log detailed prompt information if available
@@ -152,8 +140,8 @@ async function generateSingleTopicContent(topic) {
     }
     
     // Extract and analyze the generated content
-    const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 
-                         result?.content?.trim() || '';
+  const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 
+             result?.content?.trim() || '';
     
     // Content Generation Results logged
     

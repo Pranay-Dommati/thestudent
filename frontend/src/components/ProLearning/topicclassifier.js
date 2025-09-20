@@ -2,6 +2,7 @@
 // Handles topic extraction from user queries with rate limiting support
 
 import toast from 'react-hot-toast';
+import aiAxios from '../../utils/axiosAi';
 
 // Custom error class for network connection issues
 class NetworkConnectionError extends Error {
@@ -116,16 +117,7 @@ export const getRemainingLimits = (usageStats) => {
 // Get rate limit status from API
 export const getRateLimitStatus = async () => {
   try {
-    const token = localStorage.getItem('token');
-    const response = await fetch('/ai/rate-limit-status/', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` })
-      }
-    });
-    
-    const result = await response.json();
+    const { data: result } = await aiAxios.get('/rate-limit-status/');
     
     if (result.rate_limit_info) {
       return {
@@ -146,46 +138,28 @@ export const getRateLimitStatus = async () => {
 // Main topic classification function with enhanced rate limiting
 export const classifyTopics = async (query, expectedTopics = null) => {
   try {
-    const token = localStorage.getItem('token');
-    
     // Prepare request data
     const requestData = {
       query: query.trim(),
       ...(expectedTopics && { expected_topics: expectedTopics })
     };
-    
-        const response = await fetch('/ai/classify_topics/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` })
-      },
-      body: JSON.stringify(requestData)
-    });
-    
-    const result = await response.json();
-    
-    if (response.status === 429) {
-      // Rate limit exceeded
-      handleRateLimitError(result.error || 'Rate limit exceeded', result.usage_stats);
-      throw new Error('Rate limit exceeded');
-    }
-    
-    if (response.status === 503 && result.error === 'network_error') {
-      // Network connection lost - show proper message like ChatGPT
-      console.warn('🌐 Network connection lost. Attempting to reconnect...');
-      throw new NetworkConnectionError(result.message || 'Network connection lost. Attempting to reconnect...');
-    }
-    
-    if (!response.ok) {
-      throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
-    }
-    
-    // Handle successful response
+    const { data: result } = await aiAxios.post('/classify_topics/', requestData);
     return handleClassificationSuccess(result);
     
   } catch (error) {
-    if (error instanceof NetworkConnectionError) {
+    if (error.response) {
+      const status = error.response.status;
+      const result = error.response.data || {};
+      if (status === 429) {
+        handleRateLimitError(result.error || 'Rate limit exceeded', result.usage_stats);
+        throw new Error('Rate limit exceeded');
+      }
+      if (status === 503 && result.error === 'network_error') {
+        console.warn('🌐 Network connection lost. Attempting to reconnect...');
+        throw new NetworkConnectionError(result.message || 'Network connection lost. Attempting to reconnect...');
+      }
+      throw new Error(result.error || `HTTP ${status}`);
+    } else if (error instanceof NetworkConnectionError) {
       // Handle network errors specifically - don't show toast here, let ChatbotPage handle it
       console.error('🌐 Network error:', error.message);
       throw error;
@@ -287,21 +261,5 @@ export const formatRateLimitMessage = (error) => {
   if (error.message) {
     return error.message;
   }
-  
   return "Rate limit exceeded. Please try again later.";
-};
-
-export default {
-  classifyTopics,
-  classifyTopicsWithGemini,
-  getRateLimitStatus,
-  handleRateLimitError,
-  handleClassificationSuccess,
-  canCreateTopics,
-  getRemainingLimits,
-  formatUsageStats,
-  getStatusMessage,
-  formatRateLimitMessage,
-  MAX_TOPICS_PER_DAY,
-  MAX_TOPICS_PER_REQUEST
 };

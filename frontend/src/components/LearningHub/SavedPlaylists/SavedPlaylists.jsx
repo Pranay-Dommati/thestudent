@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCheck, FaSync } from 'react-icons/fa';
 import proContentManager from '../../../services/ProContentManager.js';
+import api from '../../../utils/axios';
 // logger removed for production cleanliness
 
 const SavedPlaylists = () => {
@@ -20,7 +21,7 @@ const SavedPlaylists = () => {
       setError(null);
       setRetryCount(currentRetry);
       
-      // Get auth token
+      // Ensure user is logged in (axios will attach token if present)
       const token = localStorage.getItem('accessToken');
       if (!token) {
         setError('Please log in to view your courses');
@@ -28,29 +29,12 @@ const SavedPlaylists = () => {
         return;
       }
 
-      // Fetch courses from database API
-  const response = await fetch('/api/courses/pro-learning/', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-  const coursesData = await response.json();
-        setLearningPlans(coursesData);
-        setRetryCount(0); // Reset retry count on success
-      } else if (response.status === 401) {
-        setError('Authentication failed. Please log in again.');
-        setLearningPlans([]);
-      } else {
-        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        setError(`Failed to load courses: ${errorData.detail || 'Server error'}`);
-        setLearningPlans([]);
-      }
+      // Fetch courses from database API via axios client
+      const { data } = await api.get('/courses/pro-learning/');
+      setLearningPlans(Array.isArray(data) ? data : []);
+      setRetryCount(0); // Reset retry count on success
       
-    } catch (err) {
+  } catch (err) {
       
       
       // Retry logic
@@ -60,7 +44,8 @@ const SavedPlaylists = () => {
           fetchStoredCourses(currentRetry + 1);
         }, 1000 * (currentRetry + 1)); // Exponential backoff
       } else {
-        setError('Failed to load courses. Please check your connection.');
+        const msg = err?.response?.data?.detail || err?.response?.data?.error || 'Failed to load courses. Please check your connection.';
+        setError(msg);
         setLearningPlans([]);
       }
     } finally {

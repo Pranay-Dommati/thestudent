@@ -15,7 +15,7 @@ import ActiveCourses from './ActiveCourses/ActiveCourses';
 import AILearningPlans from './AILearningPlans/AILearningPlans';
 import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
 import Certificates from '../Profile/tabs/Certificates';
-import axios from 'axios';
+import axios from '../../utils/axios';
 // logger removed for production cleanliness
 
 // API base is provided via axios instance or fetch with relative paths

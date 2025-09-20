@@ -50,13 +50,8 @@ export async function generateQuizContent(setContent, topic = '', readingContent
 // Generate AI-powered quiz questions based on content
 async function generateAIQuizQuestions(topic, readingContent) {
   try {
-  const response = await fetch('/ai/quiz/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, reading_content: readingContent })
-    });
-    if (!response.ok) throw new Error('Backend AI quiz endpoint failed');
-    const result = await response.json();
+    const axiosAi = (await import('../../../utils/axiosAi')).default;
+    const { data: result } = await axiosAi.post('/quiz/', { topic, reading_content: readingContent });
     // Parse backend AI response
     const quizText = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const parsed = parseQuizQuestions(quizText, topic);

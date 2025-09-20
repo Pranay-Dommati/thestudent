@@ -14,6 +14,7 @@ import {
 import Footer from "../Footer/Footer";
 import '../../styles/mobile-courses.css';
 import logger from '../../utils/logger';
+import api from '../../utils/axios';
 
 const MobileFirstCourses = () => {
     const navigate = useNavigate();
@@ -111,9 +112,8 @@ const MobileFirstCourses = () => {
             
             for (const level of schoolLevels) {
                 try {
-                    const response = await fetch(`/api/courses/school/?class=${level.apiClass}`);
-                    if (response.ok) {
-                        const data = await response.json();
+                    const { data } = await api.get(`/courses/school/`, { params: { class: level.apiClass } });
+                    if (data) {
                         if (data && data.length > 0) {
                             levelsWithCourses.push(level);
                         }
@@ -125,9 +125,8 @@ const MobileFirstCourses = () => {
 
             // Check engineering courses
             try {
-                const engineeringResponse = await fetch('/api/courses/engineering/');
-                if (engineeringResponse.ok) {
-                    const engineeringData = await engineeringResponse.json();
+                const { data: engineeringData } = await api.get('/courses/engineering/');
+                if (engineeringData) {
                     if (engineeringData && engineeringData.length > 0) {
                         const engineeringLevel = allEducationLevels.find(level => level.apiClass === 'engineering');
                         if (engineeringLevel) {

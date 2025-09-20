@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
 import { toast } from 'react-toastify';
-import axios from 'axios';
+import axios from '../../../utils/axios';
 import { CheckIcon } from '@heroicons/react/24/solid';
 import BasicInfoStep from './EngineeringCourseForm/BasicInfoStep';
 import CourseStructureStep from './EngineeringCourseForm/CourseStructureStep';

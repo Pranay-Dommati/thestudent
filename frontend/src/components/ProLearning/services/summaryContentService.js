@@ -65,13 +65,8 @@ export async function generateSummaryContent(setContent, topic = '', readingCont
 // Generate topic-based summary with optional reading content context
 async function generateTopicBasedSummary(topic, readingContent = '') {
   try {
-  const response = await fetch('/ai/summary/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, reading_content: readingContent })
-    });
-    if (!response.ok) throw new Error('Backend AI summary endpoint failed');
-    const result = await response.json();
+    const axiosAi = (await import('../../../utils/axiosAi')).default;
+    const { data: result } = await axiosAi.post('/summary/', { topic, reading_content: readingContent });
     return result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   } catch (error) {
     throw new Error('Summary generation failed');
@@ -84,20 +79,8 @@ async function generateAISummary(readingContent, topic = '') {
   // Sending reading content
   
   try {
-  const response = await fetch('/ai/summary/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, reading_content: readingContent })
-    });
-    
-    // AI Summary API response status
-    
-    if (!response.ok) {
-      console.error(`🚨 AI Summary API failed:`, response.status, response.statusText);
-      throw new Error('Backend AI summary endpoint failed');
-    }
-    
-    const result = await response.json();
+    const axiosAi = (await import('../../../utils/axiosAi')).default;
+    const { data: result } = await axiosAi.post('/summary/', { topic, reading_content: readingContent });
     // AI Summary API result
     
     const summaryText = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';

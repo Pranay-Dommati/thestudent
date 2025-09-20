@@ -3,6 +3,7 @@ import { FaPaperPlane, FaUser, FaCommentDots, FaCheckCircle } from "react-icons/
 import { IoHome, IoArrowBack } from "react-icons/io5";
 import { Link } from "react-router-dom";
 import Navbar from "../Navbar/Navbar";
+import api from "../../utils/axios";
 
 const FeedbackPage = () => {
   const [formData, setFormData] = useState({
@@ -41,27 +42,19 @@ const FeedbackPage = () => {
     setError("");
 
     try {
-  const response = await fetch('/api/feedback/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          message: formData.message.trim()
-        })
+      const { data } = await api.post('/feedback/', {
+        name: formData.name.trim(),
+        message: formData.message.trim()
       });
 
-      if (response.ok) {
+      if (data) {
         setIsSubmitted(true);
         setFormData({ name: "", message: "" });
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to submit feedback. Please try again.");
       }
-    } catch (error) {
-      console.error("Error submitting feedback:", error);
-      setError("Network error. Please check your connection and try again.");
+    } catch (err) {
+      console.error("Error submitting feedback:", err);
+      const msg = err?.response?.data?.error || err?.response?.data?.detail || 'Failed to submit feedback. Please try again.';
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }

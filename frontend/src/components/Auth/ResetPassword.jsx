@@ -5,6 +5,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { toast } from 'react-hot-toast';
 import AuthNav from './AuthNav';
 import AuthFooter from './AuthFooter';
+import api from '../../utils/axios';
 
 export default function ResetPassword() {
   const { uid, token } = useParams();
@@ -28,15 +29,13 @@ export default function ResetPassword() {
 
   const validateToken = async () => {
     try {
-  const response = await fetch(`/api/auth/validate-reset-token/${uid}/${token}/`);
-      const data = await response.json();
-
-      if (response.ok && data.valid) {
+      const { data } = await api.get(`/auth/validate-reset-token/${uid}/${token}/`);
+      if (data?.valid) {
         setTokenValid(true);
         setUserEmail(data.email);
       } else {
         setTokenValid(false);
-        toast.error(data.error || 'Invalid reset link');
+        toast.error(data?.error || 'Invalid reset link');
       }
     } catch (error) {
       console.error('Token validation error:', error);
@@ -95,33 +94,23 @@ export default function ResetPassword() {
     setIsLoading(true);
 
     try {
-  const response = await fetch('/api/auth/reset-password/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          uid,
-          token,
-          new_password: formData.newPassword,
-          confirm_password: formData.confirmPassword
-        }),
+      const { data } = await api.post('/auth/reset-password/', {
+        uid,
+        token,
+        new_password: formData.newPassword,
+        confirm_password: formData.confirmPassword
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
+      if (data) {
         setResetSuccess(true);
         toast.success('Password reset successfully!');
-      } else {
-        if (data.error.includes('Invalid or expired')) {
-          setTokenValid(false);
-        }
-        toast.error(data.error || 'Failed to reset password');
       }
     } catch (error) {
       console.error('Reset password error:', error);
-      toast.error('Network error. Please try again.');
+      const msg = error?.response?.data?.error || 'Failed to reset password';
+      if (String(msg).includes('Invalid or expired')) {
+        setTokenValid(false);
+      }
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }

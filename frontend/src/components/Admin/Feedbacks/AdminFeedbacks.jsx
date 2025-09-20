@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaSearch, FaFilter, FaCommentDots, FaUser, FaCalendarAlt, FaEye, FaTrash } from 'react-icons/fa';
+import api from '../../../utils/axios';
 
 const AdminFeedbacks = ({ isDarkMode }) => {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -16,9 +17,8 @@ const AdminFeedbacks = ({ isDarkMode }) => {
   const fetchFeedbacks = async () => {
     try {
       setLoading(true);
-  const response = await fetch('/api/feedback/');
-      if (response.ok) {
-        const data = await response.json();
+      const { data } = await api.get('/feedback/');
+      if (data) {
         // Ensure data is an array
         setFeedbacks(Array.isArray(data) ? data : []);
       } else {
@@ -40,11 +40,9 @@ const AdminFeedbacks = ({ isDarkMode }) => {
     }
 
     try {
-      const response = await fetch(`/api/feedback/${id}/`, {
-        method: 'DELETE',
-      });
+      await api.delete(`/feedback/${id}/`);
       
-      if (response.ok) {
+      if (true) {
         setFeedbacks(prev => prev.filter(feedback => feedback.id !== id));
         setShowModal(false);
       } else {

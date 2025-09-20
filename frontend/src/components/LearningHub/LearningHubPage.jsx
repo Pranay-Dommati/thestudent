@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { FaRocket, FaBookOpen, FaBrain, FaGraduationCap, FaCertificate } from 'react-icons/fa';
 import { getLearningStats } from '../../services/activityTracker';
-import axios from 'axios';
+import axios from '../../utils/axios';
 // logger removed for production cleanliness
 
 // Use backend via proxy; axios instance used within children where needed

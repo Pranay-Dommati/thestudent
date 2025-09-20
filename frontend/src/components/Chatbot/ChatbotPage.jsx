@@ -15,8 +15,8 @@ import proLearningHistoryService from '../../services/ProLearningHistoryService'
 // Removed IndexedDBService usage for Pro Learning flows
 
 // Use relative API paths; dev proxy routes to backend
-const API_BASE = '/api';
-const ROOT_BASE = '';
+import apiAxios from '../../utils/axios';
+import aiAxios from '../../utils/axiosAi';
 
 // Secure backend chat proxy (DRF-protected)
 const callChatBackend = async (message) => {
@@ -25,16 +25,7 @@ const callChatBackend = async (message) => {
     localStorage.getItem('access_token') ||
     localStorage.getItem('token')
   );
-  const res = await fetch(`/ai/chat/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ message }),
-  });
-  if (!res.ok) throw new Error(`Chat error: ${res.status}`);
-  const data = await res.json();
+  const { data } = await aiAxios.post('/chat/', { message });
   return data?.text || 'Sorry, I could not generate a response.';
 };
 
@@ -102,23 +93,7 @@ const callVectorBotAPI = async (message) => {
       localStorage.getItem('access_token') ||
       localStorage.getItem('token')
     );
-  const response = await fetch(`${API_BASE}/chatbot/chat/general/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        message: message
-      }),
-    });
-
-    if (!response.ok) {
-      // Non-network/server error; bubble up as a normal error
-      throw new Error(`Vector bot API error: ${response.status}`);
-    }
-
-    const data = await response.json();
+  const { data } = await apiAxios.post('/chatbot/chat/general/', { message });
     
     return data.response || 'Sorry, I could not generate a response.';
   } catch (error) {
@@ -636,12 +611,7 @@ const ChatbotPage = () => {
           setIsLoadingCourses(false);
           return;
         }
-        const resp = await fetch(`${API_BASE}/courses/pro-learning/`, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-        });
-        if (!resp.ok) return;
-        const data = await resp.json();
+        const { data } = await apiAxios.get('/courses/pro-learning/');
         if (Array.isArray(data)) setProLearningCourses(data);
       } catch (e) {
         console.warn('Failed to load ProLearning courses from backend:', e);
@@ -749,21 +719,8 @@ const ChatbotPage = () => {
   // Function to check actual connection to the backend
   const checkConnection = async () => {
     try {
-      const token = (
-        localStorage.getItem('accessToken') ||
-        localStorage.getItem('access_token') ||
-        localStorage.getItem('token')
-      );
-      // Try hitting the backend AI chat endpoint to verify connection
-      const response = await fetch(`${ROOT_BASE}/ai/chat/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ message: 'test connection' })
-      });
-      return response.ok;
+      const { status } = await aiAxios.post('/chat/', { message: 'test connection' });
+      return status >= 200 && status < 300;
     } catch (error) {
       return false;
     }
@@ -1466,26 +1423,16 @@ const ChatbotPage = () => {
         localStorage.getItem('access_token') ||
         localStorage.getItem('token')
       );
-      const response = await fetch(`${ROOT_BASE}/ai/create-course-topics/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        body: JSON.stringify({
-          // Send sanitized topic names to avoid backend "invalid characters" errors (e.g., apostrophes)
-          topics: pendingTopics.map(t => ({
-            ...t,
-            name: sanitizeTopicName(t.name) || String(t.name || '').trim()
-          })),
-          learningContext: learningContext,
-          originalPrompt: originalPrompt
-        })
+      const { data: result } = await aiAxios.post('/create-course-topics/', {
+        topics: pendingTopics.map(t => ({
+          ...t,
+          name: sanitizeTopicName(t.name) || String(t.name || '').trim()
+        })),
+        learningContext,
+        originalPrompt
       });
 
-      const result = await response.json();
-
-      if (response.status === 429) {
+      if (result?.status === 429) {
         // Rate limit exceeded
         const botResponse = {
           id: generateMessageId(),
@@ -1506,7 +1453,7 @@ const ChatbotPage = () => {
         return;
       }
 
-      if (!result.success) {
+      if (!result?.success) {
         throw new Error(result.error || 'Failed to create course');
       }
 
@@ -1878,17 +1825,9 @@ const ChatbotPage = () => {
         localStorage.getItem('access_token') ||
         localStorage.getItem('token')
       );
-      const response = await fetch(`${ROOT_BASE}/ai/rate-limit-status/`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        }
-      });
+      const { data: result } = await aiAxios.get('/rate-limit-status/');
       
-      const result = await response.json();
-      
-      if (result.rate_limit_info) {
+      if (result?.rate_limit_info) {
         setUsageStats(result.rate_limit_info);
       }
     } catch (error) {

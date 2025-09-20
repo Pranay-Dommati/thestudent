@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
 import AdminNav from './layout/AdminNav';
+import api from '../../utils/axios';
 
 const AdminForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -22,25 +23,13 @@ const AdminForgotPassword = () => {
     setIsLoading(true);
     
     try {
-  const response = await fetch('/api/auth/admin-forgot-password/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setEmailSent(true);
-        toast.success('Password reset link sent to your email');
-      } else {
-        toast.error(data.error || 'Something went wrong. Please try again later.');
-      }
+      await api.post('/auth/admin-forgot-password/', { email });
+      setEmailSent(true);
+      toast.success('Password reset link sent to your email');
     } catch (error) {
       console.error('Admin forgot password error:', error);
-      toast.error('Network error. Please check your connection and try again.');
+      const msg = error?.response?.data?.error || 'Something went wrong. Please try again later.';
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }

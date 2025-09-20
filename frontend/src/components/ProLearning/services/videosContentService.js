@@ -74,24 +74,8 @@ export async function generateVideosContent(setContent, topic = '') {
 async function fetchFromBackendYouTube(topic) {
   const url = '/ai/youtube_search/';
   try {
-    const token = (
-      localStorage.getItem('accessToken') ||
-      localStorage.getItem('access_token') ||
-      localStorage.getItem('token')
-    );
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ topic, maxResults: 10 })
-    });
-    if (!resp.ok) {
-      const err = await safeJson(resp);
-      throw new Error(`Backend YouTube search failed: ${resp.status} ${JSON.stringify(err)}`);
-    }
-    const data = await resp.json();
+    const axiosAi = (await import('../../../utils/axiosAi')).default;
+    const { data } = await axiosAi.post('/youtube_search/', { topic, maxResults: 10 });
     const vids = Array.isArray(data?.videos) ? data.videos : [];
     return vids;
   } catch (e) {
@@ -142,21 +126,8 @@ function normalizeVideosForUI(videos, topic) {
 // Generate curated video recommendations based on topic
 async function generateCuratedVideos(topic) {
   try {
-    const token = (
-      localStorage.getItem('accessToken') ||
-      localStorage.getItem('access_token') ||
-      localStorage.getItem('token')
-    );
-    const response = await fetch('/ai/videos/', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ topic })
-    });
-    if (!response.ok) throw new Error('Backend AI videos endpoint failed');
-    const result = await response.json();
+    const axiosAi = (await import('../../../utils/axiosAi')).default;
+    const { data: result } = await axiosAi.post('/videos/', { topic });
     const videoText = result?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
     return parseVideoRecommendations(videoText, topic);
   } catch (error) {

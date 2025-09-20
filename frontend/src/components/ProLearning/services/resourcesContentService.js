@@ -5,6 +5,7 @@
 // Cache for storing resources to avoid repeated API calls
 const resourcesCache = new Map();
 const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
+import api from '../../../utils/axios';
 
 /**
  * Generate resources using Google Programmable Search API
@@ -22,39 +23,8 @@ const generateResourcesWithGoogleSearch = async (topic) => {
       return cached.resources;
     }
 
-    // Prepare auth/CSRF headers if available
-    let token = null;
-    try { if (typeof localStorage !== 'undefined') token = localStorage.getItem('accessToken'); } catch {}
-    let csrfToken = null;
-    try {
-      if (typeof document !== 'undefined' && document.cookie) {
-        const m = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
-        csrfToken = m ? decodeURIComponent(m[1]) : null;
-      }
-    } catch {}
-
-    // Call our backend API that uses Google Search
-    const response = await fetch('/api/resources/', {
-      method: 'POST',
-      credentials: 'include', // allow cookies if backend uses session/csrf
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {})
-      },
-      body: JSON.stringify({
-        topic: topic,
-        excludeYoutube: true // Exclude YouTube since we have a dedicated Videos tab
-      })
-    });
-
-    if (!response.ok) {
-      console.error(`❌ API Error: ${response.status} ${response.statusText}`);
-      const errorText = await response.text().catch(() => 'Unknown error');
-      throw new Error(`API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
+    // Call our backend API that uses Google Search via axios client
+    const { data } = await api.post('/resources/', { topic, excludeYoutube: true }, { withCredentials: true });
     console.log('📊 Backend API Response:', data);
     
     if (!data.resources || !Array.isArray(data.resources)) {

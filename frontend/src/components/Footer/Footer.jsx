@@ -46,15 +46,7 @@ const Footer = () => {
     setMessage("");
 
     try {
-  const response = await fetch('/api/newsletter/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email.trim()
-        })
-      });
+        await axios.post('/newsletter/', { email: email.trim() });
 
       const data = await response.json();
 

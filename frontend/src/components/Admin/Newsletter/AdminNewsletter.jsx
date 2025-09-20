@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from '../../../utils/axios';
 import { FaSearch, FaEnvelope, FaCalendarAlt, FaUsers, FaTrash, FaToggleOn, FaToggleOff } from 'react-icons/fa';
 
 const AdminNewsletter = ({ isDarkMode }) => {
@@ -14,12 +15,11 @@ const AdminNewsletter = ({ isDarkMode }) => {
   const fetchNewsletters = async () => {
     try {
       setLoading(true);
-  const response = await fetch('/api/newsletter/');
-      if (response.ok) {
-        const data = await response.json();
+      try {
+        const { data } = await axios.get('/newsletter/');
         // Ensure data is an array
         setNewsletters(Array.isArray(data) ? data : []);
-      } else {
+      } catch (err) {
         setError('Failed to fetch newsletter subscriptions');
         setNewsletters([]);
       }
@@ -38,13 +38,10 @@ const AdminNewsletter = ({ isDarkMode }) => {
     }
 
     try {
-  const response = await fetch(`/api/newsletter/${id}/`, {
-        method: 'DELETE',
-      });
-      
-      if (response.ok) {
+      try {
+        await axios.delete(`/newsletter/${id}/`);
         setNewsletters(prev => prev.filter(newsletter => newsletter.id !== id));
-      } else {
+      } catch (err) {
         alert('Failed to delete newsletter subscription');
       }
     } catch (error) {
@@ -55,23 +52,14 @@ const AdminNewsletter = ({ isDarkMode }) => {
 
   const toggleNewsletterStatus = async (id, currentStatus) => {
     try {
-  const response = await fetch(`/api/newsletter/${id}/`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          is_active: !currentStatus
-        })
-      });
-      
-      if (response.ok) {
+      try {
+        await axios.patch(`/newsletter/${id}/`, { is_active: !currentStatus });
         setNewsletters(prev => prev.map(newsletter => 
           newsletter.id === id 
             ? { ...newsletter, is_active: !currentStatus }
             : newsletter
         ));
-      } else {
+      } catch (err) {
         alert('Failed to update newsletter status');
       }
     } catch (error) {

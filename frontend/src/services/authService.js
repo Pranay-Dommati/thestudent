@@ -1,4 +1,5 @@
 import logger from '../utils/logger';
+import apiAxios from '../utils/axios';
 // Utility for making authenticated API requests with proper token validation
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -73,25 +74,19 @@ class AuthService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/token/refresh/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          refresh: refreshToken
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Token refresh failed');
-      }
-
-      const data = await response.json();
+      // Call refresh endpoint using axios; interceptors may attach Authorization header, which backend should ignore here.
+      const { data } = await apiAxios.post(`/auth/token/refresh/`, { refresh: refreshToken });
       
       // Update the access token
       this.authData.tokens.access = data.access;
       this.saveAuthData(this.authData);
+      // Persist common keys used by axios interceptors
+      try {
+        if (typeof localStorage !== 'undefined' && data.access) {
+          localStorage.setItem('accessToken', data.access);
+          localStorage.setItem('access_token', data.access);
+        }
+      } catch {}
       
       return data.access;
     } catch (error) {
@@ -102,58 +97,24 @@ class AuthService {
   }
 
   async makeAuthenticatedRequest(url, options = {}) {
-    if (!this.isAuthenticated()) {
-      throw new Error('Not authenticated');
-    }
-
-    let accessToken = this.getAccessToken();
-    
-    const makeRequest = async (token) => {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...options.headers,
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      return response;
-    };
-
+    // Prefer centralized axios instance which handles Authorization + refresh
     try {
-      let response = await makeRequest(accessToken);
-
-      // If token is expired, try to refresh it
-      if (response.status === 401) {
-        try {
-          accessToken = await this.refreshAccessToken();
-          response = await makeRequest(accessToken);
-        } catch (refreshError) {
-          this.clearAuthData();
-          throw new Error('Authentication failed');
-        }
-      }
-
+      const method = (options.method || 'GET').toLowerCase();
+      const data = options.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : undefined;
+      const headers = options.headers || {};
+      const config = { url, method, headers };
+      if (data !== undefined) config.data = data;
+      const response = await apiAxios.request(config);
       return response;
     } catch (error) {
-  logger.error('Authenticated request error:', error);
+      logger.error('Authenticated request error:', error);
       throw error;
     }
   }
 
   async verifyAdminAccess() {
     try {
-      const response = await this.makeAuthenticatedRequest(
-        `${API_BASE_URL}/auth/verify-admin/`
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Admin verification failed');
-      }
-
-      const data = await response.json();
+      const { data } = await apiAxios.get(`/auth/verify-admin/`);
       
       // Update user data if verification is successful
       if (data.valid && data.user) {
@@ -171,19 +132,7 @@ class AuthService {
 
   async adminLogin(email, password) {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/admin-login/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
+      const { data } = await apiAxios.post(`/auth/admin-login/`, { email, password });
 
       // Save authentication data
       const authData = {
@@ -212,41 +161,23 @@ class AuthService {
   }
 
   async fetchAdminUsers(params = {}) {
-    const API = `${API_BASE_URL}/auth/users/`;
-    const search = new URLSearchParams(params).toString();
-    const url = search ? `${API}?${search}` : API;
-    const response = await this.makeAuthenticatedRequest(url);
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.error || 'Failed to fetch users');
-    }
-    return response.json();
+    const { data } = await apiAxios.get(`/auth/users/`, { params });
+    return data;
   }
 
   async adminSetUserPassword(userId, newPassword) {
-    const url = `${API_BASE_URL}/auth/users/${userId}/set-password/`;
-    const response = await this.makeAuthenticatedRequest(url, {
-      method: 'POST',
-      body: JSON.stringify({ new_password: newPassword }),
-    });
-
-    if (!response.ok) {
+    try {
+      const { data } = await apiAxios.post(`/auth/users/${userId}/set-password/`, { new_password: newPassword });
+      return data || {};
+    } catch (error) {
       let message = 'Failed to update password';
-      try {
-        const data = await response.json();
-        message = data.error || message;
-      } catch {
-        try {
-          const text = await response.text();
-          if (text) message = text.slice(0, 200);
-        } catch {}
-      }
-      // Add status context
-      message = `${message} (HTTP ${response.status})`;
+      const status = error?.response?.status;
+      const respData = error?.response?.data;
+      if (respData?.error) message = respData.error;
+      else if (typeof respData === 'string') message = respData.slice(0, 200);
+      if (status) message = `${message} (HTTP ${status})`;
       throw new Error(message);
     }
-
-    return response.json().catch(() => ({}));
   }
 
   logout() {

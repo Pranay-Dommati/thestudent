@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { toast } from 'react-hot-toast';
 import AuthNav from './AuthNav';
 import AuthFooter from './AuthFooter';
+import api from '../../utils/axios';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -33,25 +34,13 @@ export default function ForgotPassword() {
     setFormError('');
 
     try {
-  const response = await fetch('/api/auth/forgot-password/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setEmailSent(true);
-        toast.success('Instructions sent to your email!');
-      } else {
-        setFormError(data.error || 'An error occurred. Please try again.');
-      }
-    } catch (error) {
-      console.error('Forgot password error:', error);
-      setFormError('Network error. Please check your connection and try again.');
+      await api.post('/auth/forgot-password/', { email: email.trim().toLowerCase() });
+      setEmailSent(true);
+      toast.success('Instructions sent to your email!');
+    } catch (err) {
+      console.error('Forgot password error:', err);
+      const msg = err?.response?.data?.error || 'An error occurred. Please try again.';
+      setFormError(msg);
     } finally {
       setIsLoading(false);
     }

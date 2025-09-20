@@ -4,6 +4,7 @@
 
 import contentStorageService from './ContentStorageService.js';
 import logger from '../utils/logger';
+import axios from '../utils/axios';
 
 class ProContentManager {
   constructor() {
@@ -212,52 +213,19 @@ class ProContentManager {
     const existing = this.inflightCourseFetches.get(courseId);
     if (existing) return existing;
 
-    const tryFetch = async (accessToken) => {
-      const resp = await fetch(`/api/courses/pro-learning/${courseId}/`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      return resp;
+    const tryFetch = async () => {
+      // Use shared axios (adds Authorization header and handles token refresh)
+      const resp = await axios.get(`/courses/pro-learning/${courseId}/`);
+      return resp.data;
     };
 
     const fetchPromise = (async () => {
       try {
-        const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
-        if (!token) return null;
+        // Optionally skip if no token to avoid predictable 401 spam
+        const hasToken = typeof localStorage !== 'undefined' && !!localStorage.getItem('accessToken');
+        if (!hasToken) return null;
 
-        let resp = await tryFetch(token);
-        // If unauthorized, try a one-time refresh using refreshToken from localStorage
-        if (resp.status === 401) {
-          const refresh = typeof localStorage !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-          if (refresh) {
-            try {
-              const r = await fetch('/api/auth/token/refresh/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refresh })
-              });
-              if (r.ok) {
-                const data = await r.json();
-                if (data?.access) {
-                  try { localStorage.setItem('accessToken', data.access); } catch {}
-                  resp = await tryFetch(data.access);
-                }
-              }
-            } catch {}
-          }
-        }
-
-        if (resp.status === 404) {
-          // Negative cache this 404 to reduce repeated requests during first-load
-          try { this.notFoundCache.set(courseId, Date.now()); } catch {}
-          return null;
-        }
-
-        if (!resp.ok) return null;
-        const data = await resp.json();
+        const data = await tryFetch();
         // On success, warm the course content cache with aggregated structure
         if (data && data.topics) {
           try {
@@ -268,6 +236,11 @@ class ProContentManager {
         }
         return data;
       } catch (e) {
+        const status = e?.response?.status;
+        if (status === 404) {
+          try { this.notFoundCache.set(courseId, Date.now()); } catch {}
+          return null;
+        }
         return null;
       } finally {
         // Clear inflight marker when done
@@ -858,16 +831,12 @@ class ProContentManager {
           )
         };
         
-  const response = await fetch('/api/courses/pro-learning/save-course/', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        
-        if (response.ok) {
+        try {
+          await axios.post('/courses/pro-learning/save-course/', payload);
           logger.log('✅ ProContentManager: Batch successfully saved to backend database');
-        } else {
-          logger.error('❌ ProContentManager: Failed to save batch to backend:', await response.text());
+        } catch (err) {
+          const detail = err?.response?.data || err?.message || 'Unknown error';
+          logger.error('❌ ProContentManager: Failed to save batch to backend:', detail);
         }
       } else {
   logger.warn('⚠️ ProContentManager: No auth token available, skipping backend save');

@@ -2302,22 +2302,27 @@ const ProLearningPage = () => {
 
       console.log('🤖 AUTO-SAVE: Making POST request to /api/courses/pro-learning/save-course/...');
       
-      const response = await fetch('/api/courses/pro-learning/save-course/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(courseData)
-      });
+      const axios = (await import('../../utils/axios')).default;
+      const response = await axios.post('/courses/pro-learning/save-course/', courseData);
+      const responseData = response.data;
 
-      const responseData = await response.json();
-
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         console.log('✅ AUTO-SAVE: Course auto-saved to backend successfully!', responseData);
         
         // Mark course as ready (but don't force UI updates)
         localStorage.setItem(`proLearning_courseReady_${currentCourseId}`, 'true');
+
+        // Show a one-time notification that generation completed and was added to Learning Hub
+        try {
+          const notifiedKey = `proLearning_savedNotified_${currentCourseId}`;
+          const alreadyNotified = localStorage.getItem(notifiedKey) === 'true';
+          if (!alreadyNotified) {
+            toast.success('🎉 Course generation completed and added to your Learning Hub');
+            localStorage.setItem(notifiedKey, 'true');
+          }
+        } catch (_) {
+          // ignore toast/localStorage failures
+        }
         
       } else {
         console.error('❌ AUTO-SAVE: Failed to auto-save course. Status:', response.status, 'Response:', responseData);
@@ -2557,18 +2562,11 @@ const ProLearningPage = () => {
       }
 
       // Save to SQLite using Django endpoint
-  const response = await fetch('/api/courses/pro-learning/save-course/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(courseData)
-      });
+      const axios = (await import('../../utils/axios')).default;
+      const response = await axios.post('/courses/pro-learning/save-course/', courseData);
+      const responseData = response.data;
 
-      const responseData = await response.json();
-
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         console.log('✅ Course saved to Learning Hub successfully!', responseData);
         toast.success('✅ Course saved to your Learning Hub successfully!');
         
@@ -2590,8 +2588,11 @@ const ProLearningPage = () => {
           localStorage.setItem('coursesSavedToHub', JSON.stringify(savedCourses));
         }
         
-        // Mark course as ready
+        // Mark course as ready and mark notified to avoid duplicate toasts later
         localStorage.setItem(`proLearning_courseReady_${currentCourseId}`, 'true');
+        try {
+          localStorage.setItem(`proLearning_savedNotified_${currentCourseId}`, 'true');
+        } catch (_) {}
         
       } else {
         console.error('❌ Failed to save course:', responseData);
