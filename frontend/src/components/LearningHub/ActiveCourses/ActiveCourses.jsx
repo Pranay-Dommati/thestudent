@@ -5,6 +5,7 @@ import { useAuth } from '../../../context/AuthContext';
 import axios from '../../../utils/axios';
 import { toast } from 'react-hot-toast';
 import { FaTrash, FaTimes } from 'react-icons/fa';
+import { stateNameToCode } from '../../../utils/stateMapping';
 
 // Use shared axios instance with baseURL
 const COURSES_PER_PAGE = 4; // Show 4 courses initially
@@ -50,9 +51,22 @@ const ActiveCourses = () => {
             let courseUrl = '';
             if (courseType === 'school') {
               const classLevel = enrollment.class_level;
-              const board = enrollment.board;
-              const subject = enrollment.subject;
-              courseUrl = `/courses/${classLevel}/${board}/${subject}`;
+              const subject = enrollment.subject || course?.subject || '';
+              // Use enrollment.board first; fallback to nested course.board
+              const boardRaw = (enrollment.board && String(enrollment.board)) || (course?.board ? String(course.board) : '');
+              if (boardRaw === 'state') {
+                // When state board, include the state code segment in the route
+                const stateName = course?.state || '';
+                let stateCode = stateNameToCode(stateName);
+                if (!stateCode) {
+                  // safe slug fallback from the name
+                  stateCode = String(stateName).toLowerCase().replace(/\s+/g, '-');
+                }
+                courseUrl = `/courses/${classLevel}/state/${stateCode}/${subject}`;
+              } else {
+                const board = boardRaw || 'cbse'; // final fallback to keep URL valid
+                courseUrl = `/courses/${classLevel}/${board}/${subject}`;
+              }
             } else {
               // Engineering courses use course ID
               courseUrl = `/courses/engineering/${course.id}`;
@@ -63,12 +77,25 @@ const ActiveCourses = () => {
             
             
 
+            // Board label for display with fallbacks
+            let boardLabel;
+            if (courseType === 'school') {
+              const effectiveBoard = (enrollment.board || course?.board || '').toString();
+              if (effectiveBoard === 'state' && course?.state) {
+                boardLabel = `${course.state} State Board`;
+              } else {
+                boardLabel = effectiveBoard || 'CBSE';
+              }
+            } else {
+              boardLabel = course.category;
+            }
+
             return {
               id: course.id,
               enrollmentId: enrollment.id,
               title: course.title,
               subject: course.subject,
-              board: courseType === 'school' ? enrollment.board : course.category,
+              board: boardLabel,
               class: courseType === 'school' ? enrollment.class_level : `${course.proficiency} Level`,
               thumbnail: imageUrl,
               progress: enrollment.progress_percentage || 0,

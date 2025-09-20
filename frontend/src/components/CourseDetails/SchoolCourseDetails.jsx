@@ -9,6 +9,7 @@ import Footer from '../Footer/Footer';
 import { useAuth } from '../../context/AuthContext';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 import logger from '../../utils/logger';
+import { stateCodeToName } from '../../utils/stateMapping';
 
 // Use shared axios instance baseURL and dev proxy for API calls
 
@@ -94,9 +95,8 @@ const SchoolCourseDetails = () => {
         }
         
         if (state && (board === 'state' || board === '')) {
-          // Handle different state name formats
-          const stateValue = state === 'ts' ? 'Telangana' : 
-                           state === 'ap' ? 'Andhra Pradesh' : state;
+          // Convert short code (e.g., ts) to proper state name expected by backend filters
+          const stateValue = stateCodeToName(state);
           apiUrl += `&state=${stateValue}`;
         }
         
@@ -289,15 +289,18 @@ const SchoolCourseDetails = () => {
                         location.pathname.includes('/9th/') ? '9th' :
                         location.pathname.includes('/10th/') ? '10th' : 
                         location.pathname.includes('/11th/') ? '11th' : '12th';
-      const board = boardId || 'cbse';
+      const board = boardId || '';
       const subject = subjectId || course?.subject?.toLowerCase();
+      const stateName = stateId ? stateCodeToName(stateId) : '';
 
       const enrollmentData = {
         course_type: 'school',
         course_id: course?.id,
         class_level: classLevel,
         board: board,
-        subject: subject
+        subject: subject,
+        // Not currently persisted by backend, but included for clarity and future-proofing
+        ...(board === 'state' && stateName ? { state: stateName } : {})
       };
 
   logger.log('Enrolling in course with data:', enrollmentData);
