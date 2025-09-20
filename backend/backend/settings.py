@@ -221,18 +221,18 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]  # Where to look for static files
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')    # Where collectstatic will put files
+
+# Only include local static dir if it exists to avoid warnings in development
+STATICFILES_DIRS = []
+_backend_static = os.path.join(BASE_DIR, 'static')
+if os.path.isdir(_backend_static):
+    STATICFILES_DIRS.append(_backend_static)
 
 # Media files (uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-# For development only
-if DEBUG:
-    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Authentication settings
 AUTHENTICATION_BACKENDS = [

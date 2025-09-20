@@ -3,6 +3,7 @@
 
 import toast from 'react-hot-toast';
 import aiAxios from '../../utils/axiosAi';
+import logger from '../../utils/logger';
 
 // Custom error class for network connection issues
 class NetworkConnectionError extends Error {
@@ -18,7 +19,7 @@ export const MAX_TOPICS_PER_REQUEST = 4;
 
 // Enhanced error handling for rate limits
 export const handleRateLimitError = (error, usageStats = null) => {
-  console.error('Rate limit error:', error);
+  logger.error('Rate limit error:', error);
   
   if (usageStats) {
     const remainingDaily = usageStats.daily_limit - usageStats.daily_count;
@@ -130,7 +131,7 @@ export const getRateLimitStatus = async () => {
     
     return getRemainingLimits(null);
   } catch (error) {
-    console.error('Failed to fetch rate limit status:', error);
+  logger.error('Failed to fetch rate limit status:', error);
     return getRemainingLimits(null);
   }
 };
@@ -155,16 +156,16 @@ export const classifyTopics = async (query, expectedTopics = null) => {
         throw new Error('Rate limit exceeded');
       }
       if (status === 503 && result.error === 'network_error') {
-        console.warn('🌐 Network connection lost. Attempting to reconnect...');
+  logger.warn('🌐 Network connection lost. Attempting to reconnect...');
         throw new NetworkConnectionError(result.message || 'Network connection lost. Attempting to reconnect...');
       }
       throw new Error(result.error || `HTTP ${status}`);
     } else if (error instanceof NetworkConnectionError) {
       // Handle network errors specifically - don't show toast here, let ChatbotPage handle it
-      console.error('🌐 Network error:', error.message);
+  logger.error('🌐 Network error:', error.message);
       throw error;
     } else if (error.message !== 'Rate limit exceeded') {
-      console.error('Topic classification error:', error);
+  logger.error('Topic classification error:', error);
       // Don't show toast for network-related errors to avoid duplicate notifications
       if (!error.message.includes('Network') && !error.message.includes('connection')) {
         toast.error(`Failed to classify topics: ${error.message}`, { duration: 4000 });
@@ -212,7 +213,7 @@ export const getStatusMessage = (usageStats) => {
 // Wraps the new classifyTopics function to maintain backward compatibility
 export const classifyTopicsWithGemini = async (query, apiKey = null) => {
   try {
-    console.log('🔄 Using legacy classifyTopicsWithGemini wrapper for:', query);
+  logger.log('🔄 Using legacy classifyTopicsWithGemini wrapper for:', query);
     
     // Call the new rate-limited API instead of direct Gemini
     const result = await classifyTopics(query);
@@ -221,11 +222,11 @@ export const classifyTopicsWithGemini = async (query, apiKey = null) => {
     return result.topics || [];
     
   } catch (error) {
-    console.error('Legacy topic classification error:', error);
+  logger.error('Legacy topic classification error:', error);
     
     // For rate limit errors, return empty array to avoid breaking the UI
     if (error.message === 'Rate limit exceeded') {
-      console.warn('Rate limit exceeded in legacy function, returning empty array');
+  logger.warn('Rate limit exceeded in legacy function, returning empty array');
       return [];
     }
     
