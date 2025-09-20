@@ -30,7 +30,8 @@ const AdminUsers = () => {
       setStats(data.stats || { total_users: 0, active_users: 0, new_this_month: 0, inactive_users: 0 });
     } catch (e) {
       console.error('Fetch users error:', e);
-      setError(e.message || 'Failed to fetch users');
+      const serverMsg = e?.response?.data?.error;
+      setError(serverMsg || e.message || 'Failed to fetch users');
     } finally {
       setLoading(false);
     }
@@ -67,7 +68,8 @@ const AdminUsers = () => {
         return;
       }
     } catch (e) {
-      alert(e.message || 'Operation failed');
+      const serverMsg = e?.response?.data?.error;
+      alert(serverMsg || e.message || 'Operation failed');
     }
   };
 
