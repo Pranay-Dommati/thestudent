@@ -364,9 +364,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     }));
     
     // Scroll to video on mobile
-    if (window.innerWidth < 1024) {
-      videoRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+    // Always provide feedback by scrolling content area into view
+    videoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   // Mark lesson as complete (with backend integration)

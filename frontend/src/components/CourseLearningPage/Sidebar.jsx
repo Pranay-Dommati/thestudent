@@ -35,9 +35,13 @@ const Sidebar = ({
     }).filter(Boolean);
   };
 
+  // Refs for auto-scrolling behavior
+  const listRef = React.useRef(null);
+  const chapterRefs = React.useRef([]);
+
   return (
     <div 
-      className={`w-[400px] border-l border-gray-200 bg-white h-screen sticky top-0 overflow-hidden flex flex-col transform transition-transform duration-300 ${
+      className={`w-full border-l border-gray-200 bg-white h-full overflow-hidden flex flex-col transform transition-transform duration-300 ${
         isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
       }`}
     >
@@ -151,12 +155,35 @@ const Sidebar = ({
         </div>
         
         {/* Course chapters list with scroll */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+  <div className="flex-1 overflow-y-auto custom-scrollbar pb-24 pr-1" ref={listRef}>
           {filteredChapters()?.map((chapter, chapterIndex) => (
-            <div key={chapterIndex} className="border-b border-gray-200 last:border-b-0">
+            <div
+              key={chapterIndex}
+              className="border-b border-gray-200 last:border-b-0"
+              ref={(el) => (chapterRefs.current[chapterIndex] = el)}
+            >
               <button 
                 className="w-full p-4 flex justify-between items-center hover:bg-gray-50 transition-colors"
-                onClick={() => toggleChapter(chapterIndex)}
+                onClick={() => {
+                  // Toggle expand/collapse
+                  toggleChapter(chapterIndex);
+                  // After state update, scroll the expanded area into view
+                  // Use a short delay to allow DOM to render the expanded section
+                  setTimeout(() => {
+                    const container = listRef.current;
+                    const target = chapterRefs.current[chapterIndex];
+                    if (container && target) {
+                      const top = target.offsetTop;
+                      const targetHeight = target.offsetHeight || 0;
+                      const containerHeight = container.clientHeight || 0;
+                      // Try to ensure the bottom of the expanded area is visible, with some offset
+                      const desiredTop = Math.max(0, top + targetHeight - containerHeight + 80);
+                      // If content is small, still nudge a bit below the header
+                      const fallbackTop = Math.max(top - 80, 0);
+                      container.scrollTo({ top: Math.max(desiredTop, fallbackTop), behavior: 'smooth' });
+                    }
+                  }, 50);
+                }}
               >
                 <div className="flex items-center">
                   <span className="w-6 h-6 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs mr-3">
@@ -184,6 +211,11 @@ const Sidebar = ({
               
               {expandedChapters[chapterIndex] && (
                 <div>
+                  {chapter.lessons.length === 0 && (
+                    <div className="px-4 pb-4 pl-12 text-sm text-gray-500">
+                      No lessons are available in this chapter.
+                    </div>
+                  )}
                   {chapter.lessons.map((lesson, lessonIndex) => (
                     <div
                       key={lessonIndex}
