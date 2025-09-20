@@ -28,18 +28,19 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminUser])
-@csrf_exempt
 def create_course(request):
     """
     Creates a new course based on the education level
     """
     data = request.data
-    print("Received data:", data)  # Debug print
+    if settings.DEBUG:
+        print("Received data:", data)
     
     try:
         # Helper to parse list-like fields coming from JSON or multipart forms
@@ -199,7 +200,8 @@ def create_course(request):
                     status=status.HTTP_201_CREATED
                 )
             else:
-                print("Serializer errors:", serializer.errors)  # Debug print
+                if settings.DEBUG:
+                    print("Serializer errors:", serializer.errors)
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         # For Engineering courses
@@ -303,7 +305,8 @@ def create_course(request):
                     status=status.HTTP_201_CREATED
                 )
             else:
-                print("Serializer errors:", serializer.errors)  # Debug print
+                if settings.DEBUG:
+                    print("Serializer errors:", serializer.errors)
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         else:
@@ -313,7 +316,8 @@ def create_course(request):
             )
             
     except Exception as e:
-        print(traceback.format_exc())  # Debug print
+        if settings.DEBUG:
+            print(traceback.format_exc())
         return Response(
             {'error': str(e)}, 
             status=status.HTTP_400_BAD_REQUEST
@@ -325,14 +329,17 @@ def create_course(request):
 def list_engineering_courses(request):
     try:
         category = request.query_params.get('category', 'all')
-        print(f"Requested category: {category}")
+        if settings.DEBUG:
+            print(f"Requested category: {category}")
         
         queryset = EngineeringCourse.objects.all()
-        print(f"Total courses before filtering: {queryset.count()}")
+        if settings.DEBUG:
+            print(f"Total courses before filtering: {queryset.count()}")
         
         if category != 'all' and category != '':
             queryset = queryset.filter(category=category)
-            print(f"Courses after category filter: {queryset.count()}")
+            if settings.DEBUG:
+                print(f"Courses after category filter: {queryset.count()}")
 
         # Process course data
         courses_data = []
@@ -2119,7 +2126,6 @@ def get_learning_stats(request):
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminUser])
-@csrf_exempt
 def delete_course(request, course_id):
     """
     Delete a course (both school and engineering courses)
@@ -2166,14 +2172,14 @@ def delete_course(request, course_id):
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminUser])
-@csrf_exempt
 def update_course(request, course_id):
     """
     Update a course (both school and engineering courses)
     """
     try:
         data = request.data
-        print("Received update data:", data)  # Debug print
+        if settings.DEBUG:
+            print("Received update data:", data)
         
         # Try to find the course in SchoolCourse first
         school_course = None

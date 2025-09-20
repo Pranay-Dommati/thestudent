@@ -1,10 +1,12 @@
 from django.shortcuts import render
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
 import json
 import os
 import sys
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # Add the backend path to access ai_service
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -22,23 +24,24 @@ def initialize_bot():
         bot = EducationalVectorBot(vector_store_path)
     return bot
 
-@csrf_exempt
-@require_http_methods(["POST"])
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
 def chat_general(request):
     """
     Handle general educational chat using Gemini 1.5 Flash
     This provides fast, intelligent responses for normal conversations
     """
     try:
-        data = json.loads(request.body)
+        data = request.data if hasattr(request, 'data') else json.loads(request.body)
         message = data.get('message', '').strip()
         
         if not message:
-            return JsonResponse({
+            return Response({
                 'response': "Hi! I'm here to help you learn. What subject or topic would you like to explore today?",
                 'source': 'gemini_flash',
                 'status': 'success'
-            })
+            }, status=status.HTTP_200_OK)
         
         # Create a conversational prompt for educational assistance
         prompt = f"""You are a helpful, friendly AI educational assistant. You should:
@@ -78,11 +81,11 @@ Please provide a helpful, educational response formatted in clean, well-structur
                     response_text = candidate['content']['parts'][0]['text']
                     
                     print("✅ Generated response with Gemini 1.5 Flash")
-                    return JsonResponse({
+                    return Response({
                         'response': response_text,
                         'source': 'gemini_flash',
                         'status': 'success'
-                    })
+                    }, status=status.HTTP_200_OK)
             
             # Fallback if response format is unexpected
             raise Exception("Unexpected response format from Gemini")
@@ -94,66 +97,68 @@ Please provide a helpful, educational response formatted in clean, well-structur
             educational_bot = initialize_bot()
             response = educational_bot.get_best_response(message)
             
-            return JsonResponse({
+            return Response({
                 'response': response,
                 'source': 'vector_bot_fallback',
                 'status': 'success'
-            })
+            }, status=status.HTTP_200_OK)
         
     except json.JSONDecodeError:
-        return JsonResponse({
+        return Response({
             'response': "I'm having trouble understanding your message. Could you please try again?",
             'source': 'gemini_flash',
             'status': 'error'
-        }, status=400)
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     except Exception as e:
         print(f"Error in chat_general endpoint: {e}")
-        return JsonResponse({
+        return Response({
             'response': "I'm here to support your learning, but I'm having some technical difficulties. Please try asking about a specific subject like math, science, history, or study tips.",
             'source': 'gemini_flash',
             'status': 'error'
-        }, status=500)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@csrf_exempt
-@require_http_methods(["POST"])
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
 def analyze_subject(request):
     """
     Analyze what subject area the user is asking about
     """
     try:
-        data = json.loads(request.body)
+        data = request.data if hasattr(request, 'data') else json.loads(request.body)
         message = data.get('message', '')
         
         educational_bot = initialize_bot()
         subject = educational_bot.analyze_subject_area(message)
         
-        return JsonResponse({
+        return Response({
             'subject': subject,
             'status': 'success'
-        })
+        }, status=status.HTTP_200_OK)
     
     except Exception as e:
-        return JsonResponse({
+        return Response({
             'subject': 'general',
             'status': 'error',
             'error': str(e)
-        }, status=500)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@require_http_methods(["GET"])
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def health_check(request):
     """Health check endpoint"""
     try:
         educational_bot = initialize_bot()
-        return JsonResponse({
+        return Response({
             'status': 'healthy',
             'bot_initialized': bot is not None,
             'questions_loaded': len(educational_bot.questions) if educational_bot else 0
-        })
+        }, status=status.HTTP_200_OK)
     except Exception as e:
-        return JsonResponse({
+        return Response({
             'status': 'error',
             'error': str(e)
-        }, status=500)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Create your views here.

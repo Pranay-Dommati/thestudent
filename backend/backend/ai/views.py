@@ -1,11 +1,11 @@
 from django.http import JsonResponse
-from rest_framework.decorators import api_view, permission_classes, throttle_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes, throttle_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from .quiz import handle_quiz
 from .summary import handle_summary
 from .reading import handle_reading
@@ -32,6 +32,7 @@ class AIChatThrottle(UserRateThrottle):
 
 
 @api_view(["POST"])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 @throttle_classes([AIChatThrottle])
 def chat(request):
@@ -68,66 +69,63 @@ def chat(request):
     except Exception as e:
         return Response({'error': 'AI service error'}, status=502)
 
-@csrf_exempt
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AIChatThrottle])
 def quiz(request):
     return handle_quiz(request)
 
-@csrf_exempt
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AIChatThrottle])
 def summary(request):
     return handle_summary(request)
 
-@csrf_exempt
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AIChatThrottle])
 def reading(request):
     return handle_reading(request)
 
-@csrf_exempt
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AIChatThrottle])
 def resources(request):
     return handle_resources(request)
 
-@csrf_exempt
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AIChatThrottle])
 def videos(request):
     return handle_videos(request)
 
-@csrf_exempt
-@require_http_methods(["POST"])
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AIChatThrottle])
 def youtube_search(request):
     return handle_youtube_search(request)
 
-@csrf_exempt
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AIChatThrottle])
 def topics(request):
-    return handle_topics(request) 
+    return handle_topics(request)
 
-@csrf_exempt
-@require_http_methods(["GET"])
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
 def get_topic_rate_limit_status(request):
     """Get current rate limiting status for the user"""
     try:
         from .rate_limiter import TopicRateLimiter, get_user_ip
-        from django.contrib.auth import get_user_model
-        
-        # Try to get authenticated user from Authorization header
-        user = None
-        auth_header = request.META.get('HTTP_AUTHORIZATION')
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header[7:]  # Remove 'Bearer ' prefix
-            try:
-                # Try to decode JWT token to get user
-                import jwt
-                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-                user_id = payload.get('user_id')
-                if user_id:
-                    User = get_user_model()
-                    user = User.objects.get(id=user_id)
-                    if not settings.DEBUG:
-                        logger.info(f"Successfully decoded JWT for user: {user_id}")
-            except Exception as token_error:
-                if settings.DEBUG:
-                    logger.debug(f"JWT decode failed: {token_error}")
-                # Fallback to request.user
-                user = getattr(request, 'user', None)
-        else:
-            user = getattr(request, 'user', None)
-        
+        user = request.user if request.user and request.user.is_authenticated else None
         user_ip = get_user_ip(request)
         
         # Debug logging only in development
@@ -152,8 +150,8 @@ def get_topic_rate_limit_status(request):
         logger.error(f"Error getting rate limit status: {e}")
         return JsonResponse({'error': 'Internal server error'}, status=500) 
 
-@csrf_exempt
-@require_http_methods(["GET"])
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def debug_rate_limit_cache(request):
     """DEBUG: Get detailed cache information for rate limiting investigation"""
     if not settings.DEBUG:
@@ -233,8 +231,10 @@ def debug_rate_limit_cache(request):
         logger.error(f"Error in debug endpoint: {e}")
         return JsonResponse({'error': f'Debug error: {str(e)}'}, status=500) 
 
-@csrf_exempt
-@require_http_methods(["POST"])
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AIChatThrottle])
 def classify_topics(request):
     """Classify topics from user query with enhanced security and rate limiting"""
     try:
@@ -480,8 +480,10 @@ def record_topic_creation_with_auth(request, topics_created):
         logger.error(f"Topic creation recording error: {e}")
         return {}
 
-@csrf_exempt 
-@require_http_methods(["POST"])
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AIChatThrottle])
 def create_course_topics(request):
     """Actually create the course topics and apply rate limiting with enhanced security"""
     try:

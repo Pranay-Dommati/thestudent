@@ -1,24 +1,24 @@
-from django.shortcuts import render
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.utils.decorators import method_decorator
-from django.views import View
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.utils import timezone
 from datetime import timedelta
 import json
 from .models import Feedback
 
-@method_decorator(csrf_exempt, name='dispatch')
-class FeedbackAPIView(View):
+class FeedbackAPIView(APIView):
     """
     API View for handling feedback submissions
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]
     
     def post(self, request):
         try:
-            # Parse JSON data from request body
-            data = json.loads(request.body)
+            data = request.data if hasattr(request, 'data') else json.loads(request.body)
             
             # Extract data
             name = data.get('name', '').strip()
@@ -55,7 +55,7 @@ class FeedbackAPIView(View):
                 message=message
             )
             
-            return JsonResponse({
+            return Response({
                 'success': True,
                 'message': 'Feedback submitted successfully!',
                 'data': {
@@ -66,13 +66,13 @@ class FeedbackAPIView(View):
             }, status=201)
             
         except json.JSONDecodeError:
-            return JsonResponse({
+            return Response({
                 'success': False,
                 'message': 'Invalid JSON data'
             }, status=400)
         
         except Exception as e:
-            return JsonResponse({
+            return Response({
                 'success': False,
                 'message': 'An error occurred while processing your feedback'
             }, status=500)
@@ -81,6 +81,7 @@ class FeedbackAPIView(View):
         """
         Get all feedbacks for admin dashboard
         """
+        self.permission_classes = [IsAdminUser]
         try:
             feedbacks = Feedback.objects.all().order_by('-submitted_at')
             feedback_list = []
@@ -93,19 +94,20 @@ class FeedbackAPIView(View):
                     'submitted_at': feedback.submitted_at.isoformat()
                 })
             
-            return JsonResponse(feedback_list, safe=False)
+            return Response(feedback_list, status=200)
             
         except Exception as e:
-            return JsonResponse({
+            return Response({
                 'error': 'Failed to fetch feedbacks'
             }, status=500)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class FeedbackDetailAPIView(View):
+class FeedbackDetailAPIView(APIView):
     """
     API View for handling individual feedback operations
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdminUser]
     
     def delete(self, request, feedback_id):
         """
@@ -115,53 +117,49 @@ class FeedbackDetailAPIView(View):
             feedback = Feedback.objects.get(id=feedback_id)
             feedback.delete()
             
-            return JsonResponse({
+            return Response({
                 'success': True,
                 'message': 'Feedback deleted successfully'
-            })
+            }, status=200)
             
         except Feedback.DoesNotExist:
-            return JsonResponse({
+            return Response({
                 'error': 'Feedback not found'
             }, status=404)
         except Exception as e:
-            return JsonResponse({
+            return Response({
                 'error': 'Failed to delete feedback'
             }, status=500)
 
 
-# Alternative function-based view (if preferred)
-@csrf_exempt
-@require_http_methods(["POST"])
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([AllowAny])
 def submit_feedback(request):
-    """
-    Function-based view for feedback submission
-    """
+    """Function-based view for feedback submission using DRF."""
     try:
-        data = json.loads(request.body)
-        
+        data = request.data
         name = data.get('name', '').strip()
         message = data.get('message', '').strip()
-        
+
         if not name or not message:
-            return JsonResponse({
+            return Response({
                 'success': False,
                 'message': 'Name and message are required'
             }, status=400)
-        
+
         feedback = Feedback.objects.create(
             name=name,
             message=message
         )
-        
-        return JsonResponse({
+
+        return Response({
             'success': True,
             'message': 'Thank you for your feedback!',
             'id': feedback.id
-        })
-        
-    except Exception as e:
-        return JsonResponse({
+        }, status=201)
+    except Exception:
+        return Response({
             'success': False,
             'message': 'Failed to submit feedback'
         }, status=500)

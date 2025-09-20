@@ -1,23 +1,23 @@
-from django.shortcuts import render
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.utils.decorators import method_decorator
-from django.views import View
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.utils import timezone
 import json
 from .models import Newsletter
 
-@method_decorator(csrf_exempt, name='dispatch')
-class NewsletterAPIView(View):
+class NewsletterAPIView(APIView):
     """
     API View for handling newsletter subscriptions
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]
     
     def post(self, request):
         try:
-            # Parse JSON data from request body
-            data = json.loads(request.body)
+            data = request.data if hasattr(request, 'data') else json.loads(request.body)
             
             # Extract email
             email = data.get('email', '').strip().lower()
@@ -46,7 +46,7 @@ class NewsletterAPIView(View):
             # Create newsletter subscription
             newsletter = Newsletter.objects.create(email=email)
             
-            return JsonResponse({
+            return Response({
                 'success': True,
                 'message': 'Successfully subscribed to newsletter!',
                 'data': {
@@ -57,13 +57,13 @@ class NewsletterAPIView(View):
             }, status=201)
             
         except json.JSONDecodeError:
-            return JsonResponse({
+            return Response({
                 'success': False,
                 'message': 'Invalid JSON data'
             }, status=400)
         
         except Exception as e:
-            return JsonResponse({
+            return Response({
                 'success': False,
                 'message': 'An error occurred while processing your subscription'
             }, status=500)
@@ -72,6 +72,7 @@ class NewsletterAPIView(View):
         """
         Get all newsletter subscriptions for admin dashboard
         """
+        self.permission_classes = [IsAdminUser]
         try:
             newsletters = Newsletter.objects.all().order_by('-subscribed_at')
             newsletter_list = []
@@ -84,19 +85,20 @@ class NewsletterAPIView(View):
                     'is_active': newsletter.is_active
                 })
             
-            return JsonResponse(newsletter_list, safe=False)
+            return Response(newsletter_list, status=200)
             
         except Exception as e:
-            return JsonResponse({
+            return Response({
                 'error': 'Failed to fetch newsletter subscriptions'
             }, status=500)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class NewsletterDetailAPIView(View):
+class NewsletterDetailAPIView(APIView):
     """
     API View for handling individual newsletter operations
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdminUser]
     
     def delete(self, request, newsletter_id):
         """
@@ -106,17 +108,17 @@ class NewsletterDetailAPIView(View):
             newsletter = Newsletter.objects.get(id=newsletter_id)
             newsletter.delete()
             
-            return JsonResponse({
+            return Response({
                 'success': True,
                 'message': 'Newsletter subscription deleted successfully'
-            })
+            }, status=200)
             
         except Newsletter.DoesNotExist:
-            return JsonResponse({
+            return Response({
                 'error': 'Newsletter subscription not found'
             }, status=404)
         except Exception as e:
-            return JsonResponse({
+            return Response({
                 'error': 'Failed to delete newsletter subscription'
             }, status=500)
 
@@ -125,14 +127,14 @@ class NewsletterDetailAPIView(View):
         Update newsletter subscription status (activate/deactivate)
         """
         try:
-            data = json.loads(request.body)
+            data = request.data if hasattr(request, 'data') else json.loads(request.body)
             newsletter = Newsletter.objects.get(id=newsletter_id)
             
             if 'is_active' in data:
                 newsletter.is_active = data['is_active']
                 newsletter.save()
             
-            return JsonResponse({
+            return Response({
                 'success': True,
                 'message': 'Newsletter subscription updated successfully',
                 'data': {
@@ -140,13 +142,13 @@ class NewsletterDetailAPIView(View):
                     'email': newsletter.email,
                     'is_active': newsletter.is_active
                 }
-            })
+            }, status=200)
             
         except Newsletter.DoesNotExist:
-            return JsonResponse({
+            return Response({
                 'error': 'Newsletter subscription not found'
             }, status=404)
         except Exception as e:
-            return JsonResponse({
+            return Response({
                 'error': 'Failed to update newsletter subscription'
             }, status=500)

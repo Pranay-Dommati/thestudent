@@ -1,4 +1,5 @@
 from django.urls import path
+from django.conf import settings
 from .pro_learning_views import (
     ProLearningCourseListCreateView,
     ProLearningCourseDetailView,
@@ -8,20 +9,15 @@ from .pro_learning_views import (
     get_course_progress,
     save_course_from_localStorage
 )
-from .simple_test_view import simple_test_view
-from .simple_django_view import save_course_from_localStorage_simple
-from .working_views import save_pro_learning_course, test_endpoint
+## Dev-only endpoints imported under DEBUG at bottom
 
 app_name = 'pro_learning'
 
 urlpatterns = [
-    # WORKING ENDPOINTS - Place static routes BEFORE dynamic ones
-    path('save-course/', save_pro_learning_course, name='save-course'),
+    # Secure endpoints
+    path('save-course/', save_course_from_localStorage, name='save-course'),
     path('save-from-storage/', save_course_from_localStorage, name='save-from-storage'),
     path('save-from-storage', save_course_from_localStorage, name='save-from-storage-no-slash'),
-    path('save-from-storage-simple/', save_course_from_localStorage_simple, name='save-from-storage-simple'),
-    path('test/', test_endpoint, name='test'),
-    path('test-post/', simple_test_view, name='test-post'),
 
     # Course management
     path('', ProLearningCourseListCreateView.as_view(), name='course-list-create'),
@@ -33,3 +29,15 @@ urlpatterns = [
     path('<str:id>/topics/<int:topic_id>/', ProLearningTopicDetailView.as_view(), name='topic-detail'),
     path('<str:id>/topics/<int:topic_id>/complete/', mark_topic_complete, name='topic-complete'),
 ]
+
+# Dev/test-only endpoints
+if settings.DEBUG:
+    from .simple_test_view import simple_test_view
+    from .simple_django_view import save_course_from_localStorage_simple
+    from .working_views import save_pro_learning_course, test_endpoint
+    urlpatterns += [
+        path('save-course-dev/', save_pro_learning_course, name='save-course-dev'),
+        path('save-from-storage-simple/', save_course_from_localStorage_simple, name='save-from-storage-simple'),
+        path('test/', test_endpoint, name='test'),
+        path('test-post/', simple_test_view, name='test-post'),
+    ]

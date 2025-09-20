@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
 from .models import ProLearningCourse, ProLearningTopic
 from .serializers import (
     ProLearningCourseSerializer,
@@ -26,11 +27,12 @@ class ProLearningCourseListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         try:
             queryset = ProLearningCourse.objects.filter(user=self.request.user).order_by('-created_at')
-            print(f"🔍 Debug - User: {self.request.user}")
-            print(f"🔍 Debug - Queryset count: {queryset.count()}")
-            for course in queryset:
-                print(f"🔍 Debug - Course: {course.course_name}, ID: {course.id}")
-                print(f"🔍 Debug - Topics count: {course.topics.count()}")
+            if settings.DEBUG:
+                print(f"🔍 Debug - User: {self.request.user}")
+                print(f"🔍 Debug - Queryset count: {queryset.count()}")
+                for course in queryset:
+                    print(f"🔍 Debug - Course: {course.course_name}, ID: {course.id}")
+                    print(f"🔍 Debug - Topics count: {course.topics.count()}")
             return queryset
         except Exception as e:
             print(f"❌ Error in get_queryset: {str(e)}")
@@ -48,7 +50,8 @@ class ProLearningCourseListCreateView(generics.ListCreateAPIView):
         try:
             queryset = self.get_queryset()
             serializer = self.get_serializer(queryset, many=True)
-            print(f"🔍 Debug - Serializer data: {serializer.data}")
+            if settings.DEBUG:
+                print(f"🔍 Debug - Serializer data: {serializer.data}")
             return Response(serializer.data)
         except Exception as e:
             print(f"❌ Error in list method: {str(e)}")
@@ -200,7 +203,6 @@ def get_course_progress(request, course_id):
     return Response(progress_data, status=status.HTTP_200_OK)
 
 
-@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def save_course_from_localStorage(request):
