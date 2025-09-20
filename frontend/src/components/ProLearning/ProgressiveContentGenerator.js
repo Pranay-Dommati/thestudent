@@ -9,6 +9,7 @@ import {
   generateResourcesContent
 } from './services/index.js';
 import contentStorageService from '../../services/ContentStorageService.js';
+import logger from '../../utils/logger';
 
 /**
  * Progressive content generator that generates content one tab at a time
@@ -40,7 +41,7 @@ export class ProgressiveContentGenerator {
    */
   async initializeGeneration(courseTitle, topicsList, callbacks = {}, options = {}) {
     if (this.isGenerating) {
-      console.warn('⚠️ Generation already in progress');
+      logger.warn('⚠️ Generation already in progress');
       return { success: false, message: 'Generation already in progress' };
     }
 
@@ -82,12 +83,12 @@ export class ProgressiveContentGenerator {
    */
   async startProgressiveGeneration() {
     if (this.isGenerating) {
-      console.warn('⚠️ Generation already in progress');
+      logger.warn('⚠️ Generation already in progress');
       return;
     }
 
     if (!this.topics || this.topics.length === 0) {
-      console.error('❌ No topics to generate');
+      logger.error('❌ No topics to generate');
       this.callbacks.onError('No topics to generate');
       return;
     }
@@ -102,7 +103,7 @@ export class ProgressiveContentGenerator {
     try {
       await this.generateNextTabContent();
     } catch (error) {
-      console.error('❌ Progressive generation failed:', error);
+      logger.error('❌ Progressive generation failed:', error);
       this.callbacks.onError(error.message);
       this.isGenerating = false;
     }
@@ -115,9 +116,9 @@ export class ProgressiveContentGenerator {
     if (!this.isGenerating || this.currentTopic >= this.topics.length) {
       // All content generated
       this.isGenerating = false;
-      console.log('🔥 PROG GEN DEBUG: Calling onAllComplete callback!');
+      logger.log('🔥 PROG GEN DEBUG: Calling onAllComplete callback!');
       this.callbacks.onAllComplete();
-      console.log('🔥 PROG GEN DEBUG: onAllComplete callback finished');
+      logger.log('🔥 PROG GEN DEBUG: onAllComplete callback finished');
       // All progressive content generation completed!
       return;
     }
@@ -185,7 +186,7 @@ export class ProgressiveContentGenerator {
       }, 1000); // Small delay between generations
 
     } catch (error) {
-      console.error(`❌ Failed to generate ${tab.name} for ${topic.name || topic}:`, error);
+  logger.error(`❌ Failed to generate ${tab.name} for ${topic.name || topic}:`, error);
       
       // Continue with next tab even if current one fails
       this.currentTab++;
@@ -300,8 +301,8 @@ export class ProgressiveContentGenerator {
    * Store content for a specific tab
    */
   async storeTabContent(topic, tabType, content) {
-    const topicName = topic.name || topic;
-    console.log('💾 PROG GEN DEBUG: Storing tab content:', { topicName, tabType, courseId: this.courseId, contentLength: typeof content === 'string' ? content.length : (Array.isArray(content) ? content.length : 'object') });
+  const topicName = topic.name || topic;
+  logger.log('💾 PROG GEN DEBUG: Storing tab content:', { topicName, tabType, courseId: this.courseId, contentLength: typeof content === 'string' ? content.length : (Array.isArray(content) ? content.length : 'object') });
     
     // Get existing content for this topic
     let existingContent = this.getExistingTopicContent(topicName) || {
@@ -336,20 +337,20 @@ export class ProgressiveContentGenerator {
     
     // Approach 3: Only create if absolutely necessary
     if (!topicData) {
-      console.log('⚠️ PROG GEN DEBUG: Topic not found, creating new topic for:', topicName);
+      logger.log('⚠️ PROG GEN DEBUG: Topic not found, creating new topic for:', topicName);
       const topicId = contentStorageService.createTopic(topicName, this.courseId);
       topicData = { id: topicId, name: topicName };
     } else {
-      console.log('✅ PROG GEN DEBUG: Using existing topic:', topicData.id, 'for:', topicName);
+      logger.log('✅ PROG GEN DEBUG: Using existing topic:', topicData.id, 'for:', topicName);
     }
     
-    console.log('💾 PROG GEN DEBUG: Storing content for topic ID:', topicData.id);
+    logger.log('💾 PROG GEN DEBUG: Storing content for topic ID:', topicData.id);
     const contentId = contentStorageService.storeTopicContent(topicData.id, existingContent);
-    console.log('💾 PROG GEN DEBUG: Content stored with ID:', contentId);
+    logger.log('💾 PROG GEN DEBUG: Content stored with ID:', contentId);
 
     // Verify storage worked
-    const verifyContent = contentStorageService.getContentByTopicName(topicName, this.courseId);
-    console.log('✅ PROG GEN DEBUG: Verification - content retrieved:', !!verifyContent, verifyContent ? `has ${tabType}: ${!!(verifyContent[tabType])}` : 'none');
+  const verifyContent = contentStorageService.getContentByTopicName(topicName, this.courseId);
+  logger.log('✅ PROG GEN DEBUG: Verification - content retrieved:', !!verifyContent, verifyContent ? `has ${tabType}: ${!!(verifyContent[tabType])}` : 'none');
 
     return existingContent;
   }
@@ -375,7 +376,7 @@ export class ProgressiveContentGenerator {
     if (course?.id) this.courseId = course.id;
   }
 
-  console.log('🔍 PROG GEN DEBUG: getExistingTopicContent', topicName, 'courseId:', this.courseId);
+  logger.log('🔍 PROG GEN DEBUG: getExistingTopicContent', topicName, 'courseId:', this.courseId);
   return contentStorageService.getContentByTopicName(topicName, this.courseId);
   }
 
@@ -384,7 +385,7 @@ export class ProgressiveContentGenerator {
    */
   stopGeneration() {
     this.isGenerating = false;
-    console.log('🛑 Progressive generation stopped');
+    logger.log('🛑 Progressive generation stopped');
   }
 
   /**

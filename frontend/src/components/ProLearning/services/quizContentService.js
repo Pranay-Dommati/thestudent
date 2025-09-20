@@ -1,6 +1,8 @@
 // Quiz Content Generation Service
 // Handles generating interactive quiz questions for learning assessment
 
+import logger from '../../../utils/logger';
+
 /**
  * Generate quiz content for the given topic
  * @param {function} setContent - React setContent function
@@ -40,7 +42,7 @@ export async function generateQuizContent(setContent, topic = '', readingContent
     // Generated quiz questions
     
   } catch (error) {
-    console.error('🚨 Quiz generation failed:', error);
+    logger.error('🚨 Quiz generation failed:', error);
     
     // Throw error instead of using fallback
     throw new Error('Quiz generation failed');
@@ -61,7 +63,7 @@ async function generateAIQuizQuestions(topic, readingContent) {
       throw new Error('AI quiz generation failed');
     }
   } catch (error) {
-    console.warn('AI quiz generation failed:', error.message);
+    logger.warn('AI quiz generation failed:', error.message);
     throw new Error('AI quiz generation failed');
   }
 }
@@ -141,7 +143,7 @@ function parseQuizQuestions(quizText, topic) {
     });
     return questions.slice(0, 5); // Limit to 5 questions
   } catch (error) {
-    console.warn('Failed to parse quiz questions:', error);
+    logger.warn('Failed to parse quiz questions:', error);
     throw new Error('Failed to parse quiz questions');
   }
 }

@@ -7,17 +7,18 @@ from .pro_learning_views import (
     ProLearningTopicDetailView,
     mark_topic_complete,
     get_course_progress,
-    save_course_from_localStorage
 )
+from .working_views import save_pro_learning_course  # Use robust save handler for production
 ## Dev-only endpoints imported under DEBUG at bottom
 
 app_name = 'pro_learning'
 
 urlpatterns = [
     # Secure endpoints
-    path('save-course/', save_course_from_localStorage, name='save-course'),
-    path('save-from-storage/', save_course_from_localStorage, name='save-from-storage'),
-    path('save-from-storage', save_course_from_localStorage, name='save-from-storage-no-slash'),
+    # Route save endpoints to the working view that matches current models/fields
+    path('save-course/', save_pro_learning_course, name='save-course'),
+    path('save-from-storage/', save_pro_learning_course, name='save-from-storage'),
+    path('save-from-storage', save_pro_learning_course, name='save-from-storage-no-slash'),
 
     # Course management
     path('', ProLearningCourseListCreateView.as_view(), name='course-list-create'),

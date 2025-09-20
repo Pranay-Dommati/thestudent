@@ -1,13 +1,15 @@
 // Videos Content Generation Service
 // Handles finding and curating top educational videos from YouTube
 
+import logger from '../../../utils/logger';
+
 /**
  * Generate top-quality videos content for the given topic using YouTube Data API
  * @param {function} setContent - React setContent function
  * @param {string} topic - The topic to find videos for
  */
 export async function generateVideosContent(setContent, topic = '') {
-  console.log('🎥 Fetching top YouTube educational videos...');
+  logger.log('🎥 Fetching top YouTube educational videos...');
   
   try {
     // Use backend YouTube proxy only (server-side API key, no client key exposure)
@@ -46,10 +48,10 @@ export async function generateVideosContent(setContent, topic = '') {
       }
     });
     
-    console.log(`✅ Found ${normalized.length} top YouTube videos with ${calculateTotalViews(normalized)} total views`);
+  logger.log(`✅ Found ${normalized.length} top YouTube videos with ${calculateTotalViews(normalized)} total views`);
     
   } catch (error) {
-    console.error('🚨 Backend video fetch failed, trying AI recommendations:', error);
+  logger.error('🚨 Backend video fetch failed, trying AI recommendations:', error);
     
     try {
       // Fallback to AI-generated recommendations with YouTube search links (backend)
@@ -79,7 +81,7 @@ async function fetchFromBackendYouTube(topic) {
     const vids = Array.isArray(data?.videos) ? data.videos : [];
     return vids;
   } catch (e) {
-    console.warn('Backend YouTube search error:', e);
+  logger.warn('Backend YouTube search error:', e);
     throw e; // Let caller fallback
   }
 }
@@ -227,7 +229,7 @@ function parseVideoRecommendations(videoText, topic) {
     return videos.slice(0, 8); // Limit to 8 videos
     
   } catch (error) {
-    console.warn('Failed to parse video recommendations:', error);
+    logger.warn('Failed to parse video recommendations:', error);
     throw new Error('Video generation failed');
   }
 }

@@ -1,6 +1,8 @@
 // Reading Content Generation Service
 // Handles AI-powered content generation for educational materials
 
+import logger from '../../../utils/logger';
+
 // Configuration constants for AI model handling
 const AI_CONFIG = {
   MAX_RETRIES: 3,
@@ -21,7 +23,7 @@ function getCachedContent(cacheKey) {
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     // Don't return empty cached content - force regeneration
     if (!cached.content || cached.content.trim() === '') {
-      console.log(`🗑️ Removing empty cached content for: ${cacheKey}`);
+  logger.log(`🗑️ Removing empty cached content for: ${cacheKey}`);
       contentCache.delete(cacheKey);
       return null;
     }
@@ -54,7 +56,7 @@ async function retryWithBackoff(fn, maxRetries = AI_CONFIG.MAX_RETRIES) {
       if (attempt === maxRetries) throw error;
       
       const delay = AI_CONFIG.RETRY_DELAY * Math.pow(2, attempt - 1);
-      console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message);
+  logger.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -157,12 +159,12 @@ async function generateSingleTopicContent(topic) {
       
       // Only log verification failures to reduce noise
       if (foundTechIndicators.length < 2) {
-        console.log(`   ⚠️ VERIFICATION WARNING: Content may NOT be using technical prompt for ${result.topic}`);
+  logger.warn(`   ⚠️ VERIFICATION WARNING: Content may NOT be using technical prompt for ${result.topic}`);
       }
     }
     
     if (!generatedText || generatedText.length === 0) {
-      console.error(`❌ Empty content generated for topic: ${topic}`);
+  logger.error(`❌ Empty content generated for topic: ${topic}`);
       throw new Error(`Empty content generated for topic: ${topic}`);
     }
     
@@ -173,12 +175,12 @@ async function generateSingleTopicContent(topic) {
     
     return generatedText;
   } catch (error) {
-    console.error(`\n❌ FRONTEND ERROR: Content generation failed for "${topic}":`, error);
-    console.log(`🚨 Error Details:`);
-    console.log(`   • Topic: "${topic}"`);
-    console.log(`   • Error Message: ${error.message}`);
-    console.log(`   • Error Type: ${error.name || 'Unknown'}`);
-    console.log(`${'='.repeat(80)}\n`);
+  logger.error(`\n❌ FRONTEND ERROR: Content generation failed for "${topic}":`, error);
+  logger.log(`🚨 Error Details:`);
+  logger.log(`   • Topic: "${topic}"`);
+  logger.log(`   • Error Message: ${error.message}`);
+  logger.log(`   • Error Type: ${error.name || 'Unknown'}`);
+  logger.log(`${'='.repeat(80)}\n`);
     throw new Error(`Reading content generation failed for ${topic}: ${error.message}`);
   }
 }
@@ -232,7 +234,7 @@ export async function generateReadingContent(user_input, setContent, options = {
 
   // Only log for multiple topics to reduce noise
   if (topics.length > 1) {
-    console.log(`🚀 Generating content for ${topics.length} topic(s)`);
+  logger.log(`🚀 Generating content for ${topics.length} topic(s)`);
   }
 
   try {
@@ -295,7 +297,7 @@ export async function generateReadingContent(user_input, setContent, options = {
     }
 
     const finalContent = validResponses.join('\n\n---\n\n');
-    console.log('📋 Final content being set:', {
+  logger.log('📋 Final content being set:', {
       length: finalContent.length,
       preview: finalContent.substring(0, 200) + '...',
       validResponses: validResponses.length
@@ -311,7 +313,7 @@ export async function generateReadingContent(user_input, setContent, options = {
       }
     };
     
-    console.log('🔧 readingContentService: setContent with data:', {
+  logger.log('🔧 readingContentService: setContent with data:', {
       contentKeys: Object.keys(contentToSet),
       readingLength: contentToSet.reading?.length || 0,
       readingPreview: contentToSet.reading ? contentToSet.reading.substring(0, 50) + '...' : 'NO_READING'
@@ -319,9 +321,9 @@ export async function generateReadingContent(user_input, setContent, options = {
     
     setContent(contentToSet);
     setCachedContent(user_input, finalContent);
-    console.log(`✅ Successfully generated content for ${validResponses.length}/${topics.length} topics`);
+  logger.log(`✅ Successfully generated content for ${validResponses.length}/${topics.length} topics`);
   } catch (error) {
-    console.error('🚨 Content generation failed:', error);
+  logger.error('🚨 Content generation failed:', error);
     setContent({
       reading: '',
       metadata: {
@@ -332,14 +334,14 @@ export async function generateReadingContent(user_input, setContent, options = {
         successRate: '0%'
       }
     });
-    console.warn('Content generation failed');
+  logger.warn('Content generation failed');
   }
 }
 
 // Export function to clear cache for debugging
 export function clearReadingContentCache() {
   contentCache.clear();
-  console.log('🗑️ Cleared all reading content cache');
+  logger.log('🗑️ Cleared all reading content cache');
 }
 
 // Export function to check cache status
@@ -351,6 +353,6 @@ export function getReadingContentCacheInfo() {
     isEmpty: !value.content || value.content.trim() === ''
   }));
   
-  console.log('📊 Reading Content Cache Info:', cacheEntries);
+  logger.log('📊 Reading Content Cache Info:', cacheEntries);
   return cacheEntries;
 }

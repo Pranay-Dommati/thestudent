@@ -6,6 +6,7 @@
 const resourcesCache = new Map();
 const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
 import api from '../../../utils/axios';
+import logger from '../../../utils/logger';
 
 /**
  * Generate resources using Google Programmable Search API
@@ -19,22 +20,22 @@ const generateResourcesWithGoogleSearch = async (topic) => {
     const cacheKey = topic.toLowerCase().trim();
     const cached = resourcesCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      console.log('📋 Using cached resources for:', topic);
+      logger.log('📋 Using cached resources for:', topic);
       return cached.resources;
     }
 
     // Call our backend API that uses Google Search via axios client
     const { data } = await api.post('/resources/', { topic, excludeYoutube: true }, { withCredentials: true });
-    console.log('📊 Backend API Response:', data);
+  logger.log('📊 Backend API Response:', data);
     
     if (!data.resources || !Array.isArray(data.resources)) {
-      console.error('❌ Invalid response format:', data);
+      logger.error('❌ Invalid response format:', data);
       throw new Error(`Invalid response format from API: ${JSON.stringify(data)}`);
     }
 
     // If we got results, use them
     if (data.resources.length > 0) {
-      console.log(`✅ Got ${data.resources.length} resources from Google Search API`);
+  logger.log(`✅ Got ${data.resources.length} resources from Google Search API`);
       
       // Enhance resources with additional metadata
       const enhancedResources = data.resources.map((resource, index) => ({
@@ -50,15 +51,15 @@ const generateResourcesWithGoogleSearch = async (topic) => {
         timestamp: Date.now()
       });
 
-      console.log(`✅ Final result: ${enhancedResources.length} high-quality resources for: ${topic}`);
+      logger.log(`✅ Final result: ${enhancedResources.length} high-quality resources for: ${topic}`);
       return enhancedResources;
     } else {
-      console.warn('⚠️ No resources returned from Google Search API, using fallback');
+      logger.warn('⚠️ No resources returned from Google Search API, using fallback');
       throw new Error('No resources found from Google Search');
     }
 
   } catch (error) {
-    console.error('❌ Error generating resources with Google Search:', error);
+    logger.error('❌ Error generating resources with Google Search:', error);
     // Do NOT fallback; return empty to force dynamic-only behavior
     return [];
   }
@@ -69,7 +70,7 @@ const generateResourcesWithGoogleSearch = async (topic) => {
  * Provides basic educational resource recommendations (excluding YouTube)
  */
 const generateFallbackResources = (topic) => {
-  console.log('🔄 Using fallback resources for:', topic);
+  logger.log('🔄 Using fallback resources for:', topic);
   
   const baseResources = [
     {
