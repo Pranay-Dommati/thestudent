@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404
-from django.http import HttpResponse, Http404
+from django.http import HttpResponse, Http404, FileResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, parser_classes, permission_classes, authentication_classes
 from rest_framework.response import Response
@@ -29,6 +29,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
+from django.utils.text import get_valid_filename
+from urllib.parse import quote as urlquote
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
@@ -43,6 +45,13 @@ def create_course(request):
         print("Received data:", data)
     
     try:
+        # Global payload guard (approximate): reject clearly oversized multipart bodies
+        content_length = request.META.get('CONTENT_LENGTH')
+        try:
+            if content_length and int(content_length) > getattr(settings, 'DATA_UPLOAD_MAX_MEMORY_SIZE', 10 * 1024 * 1024) * 3:
+                return Response({'error': 'Payload too large'}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+        except Exception:
+            pass
         # Helper to parse list-like fields coming from JSON or multipart forms
         def _parse_list_field(val, default=None):
             if default is None:
@@ -63,6 +72,29 @@ def create_course(request):
                     return list(default)
             # Fallback
             return list(default)
+        # Helper: validate and attach thumbnail
+        def _attach_thumbnail(files_dict, key='thumbnail'):
+            if key not in files_dict:
+                return None
+            f = files_dict[key]
+            # Enforce max size (5MB default)
+            max_bytes = int(os.environ.get('MAX_THUMBNAIL_SIZE', 5 * 1024 * 1024))
+            if getattr(f, 'size', 0) > max_bytes:
+                raise ValueError('Thumbnail too large')
+            # Validate content type
+            ctype = getattr(f, 'content_type', '')
+            if not ctype or not any(ctype.lower().startswith(p) for p in ['image/jpeg', 'image/png', 'image/jpg']):
+                raise ValueError('Invalid thumbnail type')
+            # Sanitize file name
+            f.name = get_valid_filename(f.name)[:100]
+            return f
+
+        # Reasonable caps to avoid abuse
+        MAX_SECTIONS = int(os.environ.get('MAX_SECTIONS', '50'))
+        MAX_LESSONS_PER_SECTION = int(os.environ.get('MAX_LESSONS_PER_SECTION', '200'))
+        MAX_RESOURCES_PER_LESSON = int(os.environ.get('MAX_RESOURCES_PER_LESSON', '50'))
+        MAX_QUIZ_PER_LESSON = int(os.environ.get('MAX_QUIZ_PER_LESSON', '100'))
+
         # For School courses (10th, 11th, 12th)
         if 'class_level' in data:
             # Extract the form data
@@ -108,7 +140,10 @@ def create_course(request):
                 )
             
             if 'thumbnail' in request.FILES:
-                course_data['thumbnail'] = request.FILES['thumbnail']
+                try:
+                    course_data['thumbnail'] = _attach_thumbnail(request.FILES, 'thumbnail')
+                except ValueError as ve:
+                    return Response({'error': str(ve)}, status=status.HTTP_400_BAD_REQUEST)
             
             # Create the school course
             serializer = CourseWithChaptersSerializer(data=course_data)
@@ -127,6 +162,8 @@ def create_course(request):
                         if file_id in request.FILES:
                             resource_files_info[file_id] = request.FILES[file_id]
                 
+                if len(chapters_data) > MAX_SECTIONS:
+                    return Response({'error': 'Too many chapters'}, status=status.HTTP_400_BAD_REQUEST)
                 for idx, chapter_data in enumerate(chapters_data):
                     if not chapter_data.get('name'):
                         return Response(
@@ -140,7 +177,10 @@ def create_course(request):
                     )
                     
                     # Process lessons for each chapter
-                    for lesson_idx, lesson_data in enumerate(chapter_data.get('lessons', [])):
+                    lessons_list = chapter_data.get('lessons', [])
+                    if len(lessons_list) > MAX_LESSONS_PER_SECTION:
+                        return Response({'error': 'Too many lessons in a chapter'}, status=status.HTTP_400_BAD_REQUEST)
+                    for lesson_idx, lesson_data in enumerate(lessons_list):
                         if not lesson_data.get('title'):
                             return Response(
                                 {'error': f'Lesson title in chapter {idx+1}, lesson {lesson_idx+1} is required'},
@@ -160,7 +200,10 @@ def create_course(request):
                             resources = lesson_data['resources']
                             for res_type in ['downloadable', 'internet']:
                                 if res_type in resources:
-                                    for res_data in resources[res_type]:
+                                    res_list = resources[res_type]
+                                    if len(res_list) > MAX_RESOURCES_PER_LESSON:
+                                        return Response({'error': 'Too many resources in a lesson'}, status=status.HTTP_400_BAD_REQUEST)
+                                    for res_data in res_list:
                                         # Create resource with basic info
                                         resource = lesson.resources.create(
                                             type=res_type,
@@ -178,6 +221,8 @@ def create_course(request):
                                                 resource.save()
                           # Add quiz questions if any
                         if 'quizQuestions' in lesson_data and lesson_data['quizQuestions']:
+                            if len(lesson_data['quizQuestions']) > MAX_QUIZ_PER_LESSON:
+                                return Response({'error': 'Too many quiz questions in a lesson'}, status=status.HTTP_400_BAD_REQUEST)
                             for question_data in lesson_data['quizQuestions']:
                                 correct_answer_index = question_data.get('correctAnswer', 0)
                                 options = question_data.get('options', [])
@@ -224,7 +269,10 @@ def create_course(request):
             }
             
             if 'thumbnail' in request.FILES:
-                course_data['thumbnail'] = request.FILES['thumbnail']
+                try:
+                    course_data['thumbnail'] = _attach_thumbnail(request.FILES, 'thumbnail')
+                except ValueError as ve:
+                    return Response({'error': str(ve)}, status=status.HTTP_400_BAD_REQUEST)
                 
             # Create the engineering course
             serializer = EngineeringCourseWithSectionsSerializer(data=course_data)
@@ -243,6 +291,8 @@ def create_course(request):
                         if file_id in request.FILES:
                             resource_files_info[file_id] = request.FILES[file_id]
                 
+                if len(sections_data) > MAX_SECTIONS:
+                    return Response({'error': 'Too many sections'}, status=status.HTTP_400_BAD_REQUEST)
                 for idx, section_data in enumerate(sections_data):
                     section = course.sections.create(
                         name=section_data.get('name', f'Section {idx+1}'),
@@ -250,7 +300,10 @@ def create_course(request):
                     )
                     
                     # Process lessons for each section
-                    for lesson_idx, lesson_data in enumerate(section_data.get('lessons', [])):
+                    lessons_list = section_data.get('lessons', [])
+                    if len(lessons_list) > MAX_LESSONS_PER_SECTION:
+                        return Response({'error': 'Too many lessons in a section'}, status=status.HTTP_400_BAD_REQUEST)
+                    for lesson_idx, lesson_data in enumerate(lessons_list):
                         lesson = section.lessons.create(
                             title=lesson_data.get('title', ''),
                             type=lesson_data.get('type', 'video'),
@@ -265,7 +318,10 @@ def create_course(request):
                             resources = lesson_data['resources']
                             for res_type in ['downloadable', 'internet']:
                                 if res_type in resources:
-                                    for res_data in resources[res_type]:
+                                    res_list = resources[res_type]
+                                    if len(res_list) > MAX_RESOURCES_PER_LESSON:
+                                        return Response({'error': 'Too many resources in a lesson'}, status=status.HTTP_400_BAD_REQUEST)
+                                    for res_data in res_list:
                                         # Create resource with basic info
                                         resource = lesson.resources.create(
                                             type=res_type,
@@ -283,6 +339,8 @@ def create_course(request):
                                                 resource.save()
                           # Add quiz questions if any
                         if 'quizQuestions' in lesson_data and lesson_data['quizQuestions']:
+                            if len(lesson_data['quizQuestions']) > MAX_QUIZ_PER_LESSON:
+                                return Response({'error': 'Too many quiz questions in a lesson'}, status=status.HTTP_400_BAD_REQUEST)
                             for question_data in lesson_data['quizQuestions']:
                                 correct_answer_index = question_data.get('correctAnswer', 0)
                                 options = question_data.get('options', [])
@@ -1592,50 +1650,76 @@ def get_quality_score(resource):
     return score
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def download_resource(request, resource_id):
     """
-    Download a lesson resource file with proper headers
+    Download a lesson resource file with proper headers and authorization.
+    Access control: user must be enrolled in the corresponding course or be staff.
     """
     try:
         resource = get_object_or_404(LessonResource, id=resource_id)
-        
+
+        # Ensure there's an associated file
         if not resource.file:
-            return Response(
-                {'error': 'No file associated with this resource'}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Get the file path
+            return Response({'error': 'No file associated with this resource'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Authorization: allow staff/superuser, otherwise require enrollment in the course
+        user = request.user
+        if not (getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False)):
+            # Determine course context (school or engineering)
+            lesson = resource.lesson
+            course = None
+            course_type = None
+            if lesson and getattr(lesson, 'section_id', None):
+                course = getattr(lesson.section, 'engineering_course', None)
+                course_type = 'engineering'
+            elif lesson and getattr(lesson, 'chapter_id', None):
+                course = getattr(lesson.chapter, 'school_course', None)
+                course_type = 'school'
+
+            # If course context exists, verify enrollment
+            if course and course_type:
+                is_enrolled = UserStartedPredefinedCourse.objects.filter(
+                    user=user,
+                    course_type=course_type,
+                    engineering_course=course if course_type == 'engineering' else None,
+                    school_course=course if course_type == 'school' else None,
+                ).exists()
+                if not is_enrolled:
+                    return Response({'error': 'Not authorized to download this resource'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Build absolute file path from storage
         file_path = resource.file.path
-        
         if not os.path.exists(file_path):
-            return Response(
-                {'error': 'File not found on server'}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        # Guess the content type
+            return Response({'error': 'File not found on server'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Guess content type
         content_type, _ = mimetypes.guess_type(file_path)
         if content_type is None:
             content_type = 'application/octet-stream'
-        
-        # Read the file
-        with open(file_path, 'rb') as file:
-            response = HttpResponse(file.read(), content_type=content_type)
-            
-        # Set the Content-Disposition header to force download
-        filename = os.path.basename(file_path)
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        response['Content-Length'] = os.path.getsize(file_path)
-        
+
+        # Stream the file to avoid loading into memory
+        file_handle = open(file_path, 'rb')
+        response = FileResponse(file_handle, content_type=content_type)
+
+        # Safe filename handling for Content-Disposition (support utf-8 via filename*)
+        raw_name = os.path.basename(file_path)
+        safe_name = get_valid_filename(raw_name)[:150] or 'download'
+        quoted_name = urlquote(safe_name)
+        response['Content-Disposition'] = f"attachment; filename=\"{safe_name}\"; filename*=UTF-8''{quoted_name}"
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['Cache-Control'] = 'private, max-age=86400'
+
+        # Length header is optional with FileResponse; add if obtainable
+        try:
+            response['Content-Length'] = os.path.getsize(file_path)
+        except OSError:
+            pass
+
         return response
-        
+
     except Exception as e:
-        return Response(
-            {'error': f'Failed to download file: {str(e)}'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({'error': f'Failed to download file: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ==================== COURSE ENROLLMENT ENDPOINTS ====================
