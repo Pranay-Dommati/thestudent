@@ -20,11 +20,58 @@ from django.urls import reverse
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import socket
 
-from .serializers import UserSerializer, RegisterSerializer, LoginSerializer
-from .models import User
+from .serializers import (
+    UserSerializer, RegisterSerializer, LoginSerializer,
+    OTPSignupSerializer, OTPVerifySerializer, OTPResendSerializer,
+)
+from .models import User, EmailOTP
 
 logger = logging.getLogger(__name__)
+
+
+def send_email_via_smtp(to_email: str, subject: str, html_content: str) -> bool:
+    """Send an HTML email using SMTP settings from Django settings.
+    Supports SSL (port 465) or STARTTLS based on settings.
+    Returns True on success, False on failure.
+    """
+    try:
+        smtp_host = getattr(settings, 'SMTP_HOST', '')
+        smtp_port = int(getattr(settings, 'SMTP_PORT', 465))
+        smtp_username = getattr(settings, 'SMTP_USERNAME', '')
+        smtp_password = getattr(settings, 'SMTP_PASSWORD', '')
+        use_ssl = getattr(settings, 'SMTP_USE_SSL', True)
+        use_tls = getattr(settings, 'SMTP_USE_TLS', False)
+
+        if not (smtp_host and smtp_port and smtp_username and smtp_password):
+            if getattr(settings, 'DEBUG', False):
+                logger.error("SMTP settings are not fully configured. Skipping email send.")
+            return False
+
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = smtp_username
+        msg['To'] = to_email
+        msg.attach(MIMEText(html_content, 'html'))
+
+        if use_ssl:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+                server.login(smtp_username, smtp_password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                if use_tls:
+                    server.starttls()
+                server.login(smtp_username, smtp_password)
+                server.send_message(msg)
+        if getattr(settings, 'DEBUG', False):
+            logger.debug(f"Email sent to {to_email} with subject '{subject}'")
+        return True
+    except Exception as e:
+        if getattr(settings, 'DEBUG', False):
+            logger.error(f"Failed to send email to {to_email}: {e}")
+        return False
 
 class RegisterView(generics.CreateAPIView):
     # Public endpoint: no auth required and skip JWT auth entirely
@@ -33,10 +80,11 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     
     def post(self, request, *args, **kwargs):
-        print("Received data:", request.data)  # Debugging: Log the incoming data
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
-            print("Validation errors:", serializer.errors)  # Debugging: Log validation errors
+            # Avoid noisy logs in production
+            if getattr(settings, 'DEBUG', False):
+                logger.debug({"validation_errors": serializer.errors})
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         
@@ -58,11 +106,13 @@ class LoginView(generics.CreateAPIView):
     serializer_class = LoginSerializer
 
     def post(self, request, *args, **kwargs):
-        logger.info(f"Login attempt for email: {request.data.get('email')}")
+        if getattr(settings, 'DEBUG', False):
+            logger.debug("Login attempt received")
         
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
-            logger.error(f"Login validation error: {serializer.errors}")
+            if getattr(settings, 'DEBUG', False):
+                logger.debug(f"Login validation error: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -73,21 +123,24 @@ class LoginView(generics.CreateAPIView):
             )
             
             if not user:
-                logger.error("Invalid credentials")
+                if getattr(settings, 'DEBUG', False):
+                    logger.debug("Invalid credentials")
                 return Response(
                     {"non_field_errors": ["Invalid email or password"]},
                     status=status.HTTP_401_UNAUTHORIZED
                 )
 
             if not user.is_active:
-                logger.error("Inactive user account")
+                if getattr(settings, 'DEBUG', False):
+                    logger.debug("Inactive user account")
                 return Response(
                     {"non_field_errors": ["Account is disabled"]},
                     status=status.HTTP_401_UNAUTHORIZED
                 )
 
             refresh = RefreshToken.for_user(user)
-            logger.info(f"Login successful for user: {user.email}")
+            if getattr(settings, 'DEBUG', False):
+                logger.debug("Login successful")
             
             return Response({
                 'user': UserSerializer(user).data,
@@ -96,11 +149,260 @@ class LoginView(generics.CreateAPIView):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            logger.error(f"Login error: {str(e)}")
+            if getattr(settings, 'DEBUG', False):
+                logger.exception(f"Login error: {str(e)}")
             return Response(
                 {"non_field_errors": ["An error occurred during login"]},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def otp_signup(request):
+    """Start signup: create inactive user, generate OTP, email it."""
+    serializer = OTPSignupSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    full_name = serializer.validated_data['full_name']
+    email = serializer.validated_data['email'].lower()
+    password = serializer.validated_data['password']
+
+    # If user exists but inactive, reuse; else create inactive
+    user, created = User.objects.get_or_create(
+        email=email,
+        defaults={
+            'full_name': full_name,
+            'is_active': False,
+            'agreed_to_terms': serializer.validated_data.get('agreed_to_terms', False),
+            'auth_method': 'email',
+        }
+    )
+    if created:
+        user.set_password(password)
+        user.save()
+    else:
+        # Update name/password if still inactive
+        if not user.is_active:
+            user.full_name = full_name
+            user.set_password(password)
+            user.agreed_to_terms = serializer.validated_data.get('agreed_to_terms', False)
+            user.auth_method = 'email'
+            user.save()
+        else:
+            # Defensive, though validate_email should have caught this
+            return Response({'error': 'User already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Generate 6-digit OTP valid for 10 minutes
+    from random import randint
+    from django.utils import timezone
+    from datetime import timedelta
+
+    # Invalidate older unused OTPs to avoid confusion
+    EmailOTP.objects.filter(user=user, is_used=False).update(is_used=True)
+
+    code = f"{randint(0, 999999):06d}"
+    expires_at = timezone.now() + timedelta(minutes=10)
+    otp = EmailOTP.objects.create(user=user, code=code, expires_at=expires_at)
+
+    # Send email; return error if delivery fails
+    subject = "Your EasyLearnova verification code"
+    html = f"""
+    <html><body>
+      <p>Hi {full_name},</p>
+      <p>Your verification code is:</p>
+      <p style='font-size:24px;letter-spacing:4px'><strong>{code}</strong></p>
+      <p>This code will expire in 10 minutes.</p>
+      <p>If you didn't request this, you can ignore this email.</p>
+      <p>— EasyLearnova</p>
+    </body></html>
+    """
+    sent = send_email_via_smtp(user.email, subject, html)
+    if not sent:
+        # Prevent stale code confusion
+        otp.mark_used()
+        if getattr(settings, 'DEBUG', False):
+            logger.error("OTP email delivery failed during signup")
+        return Response({'error': 'Failed to send verification email. Please try again later.'}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response({'message': 'OTP sent to email.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def otp_verify(request):
+    """Verify OTP; activate user and return JWT tokens."""
+    serializer = OTPVerifySerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    user = serializer.validated_data['user']
+    code = serializer.validated_data['code']
+
+    # Get latest unused, unexpired OTP
+    from django.utils import timezone
+    otp = EmailOTP.objects.filter(user=user, is_used=False, expires_at__gt=timezone.now()).order_by('-created_at').first()
+    if not otp or otp.code != code:
+        return Response({'error': 'Invalid or expired code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Mark used and activate user
+    otp.mark_used()
+    if not user.is_active:
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+
+    # Issue tokens
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        'user': UserSerializer(user).data,
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def otp_resend(request):
+    """Resend OTP with basic rate limiting: max 3 per 30 minutes."""
+    serializer = OTPResendSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    email = serializer.validated_data['email'].lower()
+    user = serializer.context['user']  # set in validate_email
+    if user.is_active:
+        return Response({'error': 'User already verified.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    from django.utils import timezone
+    from datetime import timedelta
+    now = timezone.now()
+
+    # Rate limit: read last OTP
+    last_otp = EmailOTP.objects.filter(user=user).order_by('-created_at').first()
+    if last_otp and last_otp.last_sent_at and last_otp.last_sent_at > now - timedelta(minutes=1):
+        return Response({'error': 'Please wait a minute before requesting another code.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+    # Count resends in rolling 30 min window
+    window_start = now - timedelta(minutes=30)
+    resend_count = EmailOTP.objects.filter(user=user, created_at__gte=window_start).count()
+    if resend_count >= 3:
+        return Response({'error': 'Too many requests. Try again later.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+    # Invalidate older codes
+    EmailOTP.objects.filter(user=user, is_used=False).update(is_used=True)
+
+    # New code
+    from random import randint
+    code = f"{randint(0, 999999):06d}"
+    expires_at = now + timedelta(minutes=10)
+    otp = EmailOTP.objects.create(user=user, code=code, expires_at=expires_at, resend_count=0)
+    # Update last_sent
+    otp.last_sent_at = now
+    otp.save(update_fields=['last_sent_at'])
+
+    # Email
+    subject = "Your EasyLearnova verification code"
+    html = f"""
+    <html><body>
+      <p>Hi {user.full_name},</p>
+      <p>Your new verification code is:</p>
+      <p style='font-size:24px;letter-spacing:4px'><strong>{code}</strong></p>
+      <p>This code will expire in 10 minutes.</p>
+      <p>If you didn't request this, you can ignore this email.</p>
+      <p>— EasyLearnova</p>
+    </body></html>
+    """
+    sent = send_email_via_smtp(user.email, subject, html)
+    if not sent:
+        otp.mark_used()
+        if getattr(settings, 'DEBUG', False):
+            logger.error("OTP email delivery failed during resend")
+        return Response({'error': 'Unable to resend code right now. Please try again later.'}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response({'message': 'OTP resent to email.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def smtp_test(request):
+    """DEBUG-only: Attempt to send a test email via different SMTP modes and report results.
+    Body: { "to": "you@example.com" }
+    """
+    if not getattr(settings, 'DEBUG', False):
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    to_email = request.data.get('to')
+    if not to_email:
+        return Response({'error': 'Missing `to` in body'}, status=status.HTTP_400_BAD_REQUEST)
+
+    smtp_host = getattr(settings, 'SMTP_HOST', '')
+    smtp_user = getattr(settings, 'SMTP_USERNAME', '')
+    smtp_pass = getattr(settings, 'SMTP_PASSWORD', '')
+    results = []
+
+    def _attempt(mode: str, port: int):
+        try:
+            # quick TCP connectivity probe
+            with socket.create_connection((smtp_host, port), timeout=6):
+                pass
+        except Exception as e:
+            results.append({'mode': mode, 'port': port, 'ok': False, 'stage': 'connect', 'error': str(e)})
+            return False
+
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = f"SMTP test via {mode.upper()}:{port}"
+            msg['From'] = smtp_user
+            msg['To'] = to_email
+            msg.attach(MIMEText('<p>This is a test email from SMTP diagnostics.</p>', 'html'))
+
+            if mode == 'ssl':
+                with smtplib.SMTP_SSL(smtp_host, port, timeout=10) as server:
+                    server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+            elif mode == 'tls':
+                with smtplib.SMTP(smtp_host, port, timeout=10) as server:
+                    server.ehlo()
+                    server.starttls()
+                    server.ehlo()
+                    server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(smtp_host, port, timeout=10) as server:
+                    server.ehlo()
+                    server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+
+            results.append({'mode': mode, 'port': port, 'ok': True})
+            return True
+        except Exception as e:
+            results.append({'mode': mode, 'port': port, 'ok': False, 'stage': 'send', 'error': str(e)})
+            return False
+
+    sent_mode = None
+    # Try configured path first
+    use_ssl = getattr(settings, 'SMTP_USE_SSL', True)
+    use_tls = getattr(settings, 'SMTP_USE_TLS', False)
+    port_cfg = int(getattr(settings, 'SMTP_PORT', 465))
+
+    if use_ssl and _attempt('ssl', port_cfg):
+        sent_mode = f'ssl:{port_cfg}'
+    elif use_tls and _attempt('tls', port_cfg):
+        sent_mode = f'tls:{port_cfg}'
+    else:
+        # Fallback common ports
+        if not sent_mode and _attempt('tls', 587):
+            sent_mode = 'tls:587'
+        if not sent_mode and _attempt('ssl', 465):
+            sent_mode = 'ssl:465'
+
+    if getattr(settings, 'DEBUG', False):
+        logger.debug(f"SMTP diagnostics results: {results}; sent_mode={sent_mode}")
+    return Response({'results': results, 'sent_mode': sent_mode}, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -131,7 +433,8 @@ def admin_login(request):
             user = authenticate(request=request, username=email, password=password)
         
         if not user:
-            logger.error(f"Admin login failed - invalid credentials for: {email}")
+            if getattr(settings, 'DEBUG', False):
+                logger.error(f"Admin login failed - invalid credentials for: {email}")
             return Response(
                 {"error": "Invalid email or password"},
                 status=status.HTTP_401_UNAUTHORIZED
@@ -139,14 +442,16 @@ def admin_login(request):
         
         # Check if user is a superuser
         if not getattr(user, 'is_superuser', False):
-            logger.error(f"Admin login failed - user {email} is not a superuser")
+            if getattr(settings, 'DEBUG', False):
+                logger.error(f"Admin login failed - user {email} is not a superuser")
             return Response(
                 {"error": "Access denied. Only superusers can access the admin panel."},
                 status=status.HTTP_403_FORBIDDEN
             )
         
         if not user.is_active:
-            logger.error(f"Admin login failed - user {email} is inactive")
+            if getattr(settings, 'DEBUG', False):
+                logger.error(f"Admin login failed - user {email} is inactive")
             return Response(
                 {"error": "Account is disabled"},
                 status=status.HTTP_401_UNAUTHORIZED
@@ -154,7 +459,8 @@ def admin_login(request):
         
         # Generate JWT tokens for the admin user
         refresh = RefreshToken.for_user(user)
-        logger.info(f"Admin login successful for superuser: {user.email or user.username}")
+        if getattr(settings, 'DEBUG', False):
+            logger.debug("Admin login successful for superuser")
         
         return Response({
             'message': 'Admin login successful',
@@ -174,7 +480,8 @@ def admin_login(request):
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
-        logger.error(f"Admin login error: {str(e)}")
+        if getattr(settings, 'DEBUG', False):
+            logger.exception(f"Admin login error: {str(e)}")
         return Response(
             {"error": "An error occurred during login"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -217,7 +524,8 @@ def verify_admin_token(request):
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
-        logger.error(f"Admin token verification error: {str(e)}")
+        if getattr(settings, 'DEBUG', False):
+            logger.exception(f"Admin token verification error: {str(e)}")
         return Response(
             {"error": "Token verification failed"},
             status=status.HTTP_401_UNAUTHORIZED
@@ -306,7 +614,8 @@ def admin_list_users(request):
 
         return Response(payload, status=status.HTTP_200_OK)
     except Exception as e:
-        logger.error(f"Admin users list error: {str(e)}")
+        if getattr(settings, 'DEBUG', False):
+            logger.exception(f"Admin users list error: {str(e)}")
         return Response({"error": "Failed to fetch users"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -382,7 +691,8 @@ def admin_user_detail(request, user_id: int):
         return Response({"error": "Method not allowed"}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     except Exception as e:
-        logger.error(f"Admin user detail error: {str(e)}")
+        if getattr(settings, 'DEBUG', False):
+            logger.exception(f"Admin user detail error: {str(e)}")
         return Response({"error": "Operation failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
@@ -416,7 +726,8 @@ def admin_set_user_password(request, user_id: int):
         target.save()
         return Response({"success": True}, status=status.HTTP_200_OK)
     except Exception as e:
-        logger.error(f"Admin set password error: {str(e)}")
+        if getattr(settings, 'DEBUG', False):
+            logger.exception(f"Admin set password error: {str(e)}")
         return Response({"error": "Failed to update password"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])

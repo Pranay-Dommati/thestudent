@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
+from django.conf import settings
 
 class UserManager(BaseUserManager):
     """Define a model manager for User model with email as the unique identifier"""
@@ -57,3 +59,36 @@ class User(AbstractUser):
     
     def __str__(self):
         return self.email
+
+
+class EmailOTP(models.Model):
+    """One-time password for email verification during signup.
+    Only the most recent, unused, unexpired code should be accepted.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='email_otps'
+    )
+    code = models.CharField(max_length=6)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_sent_at = models.DateTimeField(auto_now_add=True)
+    resend_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'is_used', 'expires_at'], name='idx_otp_user_state'),
+            models.Index(fields=['created_at'], name='idx_otp_created_at'),
+        ]
+        ordering = ['-created_at']
+
+    @property
+    def is_expired(self) -> bool:
+        return timezone.now() >= self.expires_at
+
+    def mark_used(self):
+        if not self.is_used:
+            self.is_used = True
+            self.save(update_fields=['is_used'])

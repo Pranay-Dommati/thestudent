@@ -4,6 +4,8 @@ import { FaGoogle, FaGraduationCap, FaRegUser, FaRegEnvelope, FaLock } from "rea
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
+import OtpModal from './OtpModal';
+import { otpSignup } from '../../services/otpAuth';
 import AuthNav from './AuthNav';
 import AuthFooter from './AuthFooter';
 
@@ -37,6 +39,7 @@ export default function AuthForm() {
   });
   const [formErrors, setFormErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [otpOpen, setOtpOpen] = useState(false);
 
   const toggleForm = () => {
     const newMode = !isSignUp;
@@ -66,7 +69,7 @@ export default function AuthForm() {
     });
   };
 
-  const { register, login, googleLogin } = useAuth();
+  const { register, login, googleLogin, validateAuth } = useAuth();
   
   // Google Sign-In configuration
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -203,19 +206,15 @@ export default function AuthForm() {
           navigate(returnToPath || '/');
         }
       } else {
-        // Registration logic
-        const registrationData = {
+        // OTP-based signup: do NOT change page UI. Trigger modal on success.
+        const payload = {
           full_name: formData.name,
           email: formData.email,
           password: formData.password,
-          confirm_password: formData.confirmPassword,
           agreed_to_terms: formData.agreedToTerms
         };
-        const success = await register(registrationData);
-        if (success) {
-          // Redirect to the returnTo path if it exists, otherwise to the homepage
-          navigate(returnToPath || '/');
-        }
+        await otpSignup(payload);
+        setOtpOpen(true);
       }
     } catch (error) {
       console.error("Error during login:", error);
@@ -234,6 +233,16 @@ export default function AuthForm() {
   return (
     <>
       <AuthNav />
+      <OtpModal
+        open={otpOpen}
+        email={formData.email}
+        fullName={formData.name}
+        onClose={() => setOtpOpen(false)}
+        onVerified={async () => {
+          await validateAuth();
+          navigate(returnToPath || '/');
+        }}
+      />
       {/* Mobile-first design with full screen layout */}
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 pt-16">
         {/* Background elements - hidden on mobile for cleaner look */}
