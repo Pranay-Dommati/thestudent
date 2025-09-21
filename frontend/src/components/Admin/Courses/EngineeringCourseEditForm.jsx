@@ -44,6 +44,46 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
   const [errors, setErrors] = useState({});
 
+  // Normalize a single quiz question shape
+  const normalizeQuestion = (q, fallbackIndex = 0) => {
+    const rawOptions = q?.options;
+    let options = [];
+    if (Array.isArray(rawOptions)) {
+      options = rawOptions;
+    } else if (typeof rawOptions === 'string') {
+      try {
+        const parsed = JSON.parse(rawOptions);
+        options = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        options = [];
+      }
+    }
+    // Pad or trim to 4 options for UI consistency
+    if (options.length < 4) {
+      options = [...options, ...Array.from({ length: 4 - options.length }, () => '')];
+    } else if (options.length > 4) {
+      options = options.slice(0, 4);
+    }
+
+    // Determine correct answer index
+    let correctIdx = 0;
+    if (Number.isInteger(q?.correctAnswer)) {
+      correctIdx = q.correctAnswer;
+    } else if (typeof q?.correct_answer_index === 'number') {
+      correctIdx = q.correct_answer_index;
+    } else if (typeof q?.correct_answer === 'string') {
+      const idx = options.findIndex(o => o === q.correct_answer);
+      correctIdx = idx >= 0 ? idx : fallbackIndex;
+    }
+
+    return {
+      id: q?.id ?? null,
+      question: q?.question || '',
+      options,
+      correctAnswer: correctIdx,
+    };
+  };
+
   // Helper function to ensure all required arrays exist in formData
   const ensureRequiredArrays = (data) => {
     const result = { ...data };
@@ -173,7 +213,9 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
               downloadable: lesson.resources?.downloadable ?? [],
               internet: lesson.resources?.internet ?? []
             },
-            quizQuestions: lesson.quiz_questions || []
+            quizQuestions: Array.isArray(lesson.quiz_questions)
+              ? lesson.quiz_questions.map((q, qi) => normalizeQuestion(q, 0))
+              : []
           }))
         }));
         setSections(sectionsData);
@@ -597,7 +639,7 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
     ));
   };
 
-  const handleQuizQuestionChange = (sectionIndex, lessonIndex, questionIndex, field, value) => {
+  const handleQuizQuestionChange = (sectionIndex, lessonIndex, questionIndex, field, value, optionIndex) => {
     setSections(prev => prev.map((section, i) => 
       i === sectionIndex 
         ? {
@@ -606,9 +648,23 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
               li === lessonIndex 
                 ? {
                     ...lesson,
-                    quizQuestions: lesson.quizQuestions.map((question, qi) => 
-                      qi === questionIndex ? { ...question, [field]: value } : question
-                    )
+                    quizQuestions: lesson.quizQuestions.map((question, qi) => {
+                      if (qi !== questionIndex) return question;
+                      // Ensure options is an array before mutation
+                      const currentOptions = Array.isArray(question.options) ? question.options.slice() : ['', '', '', ''];
+                      if (field === 'options' && typeof optionIndex === 'number') {
+                        const opts = currentOptions.slice();
+                        // Ensure length at least optionIndex+1
+                        for (let k = opts.length; k <= optionIndex; k++) opts.push('');
+                        opts[optionIndex] = value;
+                        return { ...question, options: opts };
+                      }
+                      if (field === 'correctAnswer') {
+                        const idx = typeof value === 'number' ? value : parseInt(value, 10) || 0;
+                        return { ...question, correctAnswer: idx };
+                      }
+                      return { ...question, [field]: value };
+                    })
                   }
                 : lesson
             )
