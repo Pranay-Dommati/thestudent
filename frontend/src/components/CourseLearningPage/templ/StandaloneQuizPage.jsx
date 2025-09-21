@@ -207,7 +207,7 @@ const StandaloneQuizPage = () => {
         console.log('Submitting school course quiz:', { lessonId });
         
         response = await axiosInstance.post(
-          `/api/quiz/submit-school/${lessonId}/`,
+          `quiz/submit-school/${lessonId}/`,
           { 
             answers: selectedAnswers,
             questions: quizData.questions // Send quiz questions for score calculation
@@ -218,8 +218,12 @@ const StandaloneQuizPage = () => {
         console.log('Submitting regular course quiz');
         
         response = await axiosInstance.post(
-            `/api/quiz/submit/${lessonId}/`,
-            { answers: selectedAnswers }
+            `quiz/submit/${lessonId}/`,
+            { 
+              answers: selectedAnswers,
+              // Send questions as fallback in case backend lacks persisted quiz questions
+              questions: quizData.questions 
+            }
           );
       }
 

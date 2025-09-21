@@ -57,7 +57,6 @@ if not DEBUG:
     CSRF_COOKIE_HTTPONLY = True
     # Additional security headers
     SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
-    SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
 
 # Cookie SameSite settings (use 'None' when serving frontend from a different domain over HTTPS)
 SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
@@ -68,6 +67,16 @@ X_FRAME_OPTIONS = os.environ.get('X_FRAME_OPTIONS', 'SAMEORIGIN')
 SECURE_REFERRER_POLICY = os.environ.get('SECURE_REFERRER_POLICY', 'strict-origin-when-cross-origin')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+# Cross-Origin-Opener-Policy (COOP)
+# - In development, disabling COOP avoids blocking window.postMessage (used by OAuth/HMR, etc.).
+# - In production, use 'same-origin-allow-popups' to preserve popup/OAuth flows while keeping isolation for same-origin.
+# - Allow override via env: SECURE_CROSS_ORIGIN_OPENER_POLICY. Use value 'none' to disable (set to None).
+_COOP_ENV = os.environ.get('SECURE_CROSS_ORIGIN_OPENER_POLICY')
+if _COOP_ENV is not None:
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = (None if _COOP_ENV.strip().lower() == 'none' else _COOP_ENV)
+else:
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = (None if DEBUG else 'same-origin-allow-popups')
 
 # Cache Configuration - Required for Rate Limiting
 CACHES = {
