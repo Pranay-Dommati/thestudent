@@ -1060,56 +1060,89 @@ def submit_quiz(request, lesson_id):
         # Get all quiz questions for this lesson
         quiz_questions = lesson.quiz_questions.all()
         
-        if not quiz_questions.exists():
+        # If no DB-backed questions, allow client-provided questions for grading fallback
+        client_questions = data.get('questions')
+        if not quiz_questions.exists() and client_questions:
+            try:
+                # Normalize client questions into a list of dicts
+                import json
+                if isinstance(client_questions, str):
+                    client_questions = json.loads(client_questions)
+                if not isinstance(client_questions, list):
+                    client_questions = []
+            except Exception:
+                client_questions = []
+        
+        if not quiz_questions.exists() and not client_questions:
             return Response(
                 {"error": "No quiz questions found for this lesson"},
                 status=status.HTTP_404_NOT_FOUND
             )
           # Calculate score
-        total_questions = quiz_questions.count()
-        correct_answers = 0
+    # Support both DB and client-provided question sets
+    total_questions = quiz_questions.count() if quiz_questions.exists() else len(client_questions)
+    correct_answers = 0
         
         # Debug information
         print(f"Processing quiz submission for lesson: {lesson_id}")
         print(f"User answers received: {user_answers}")
         
-        for question in quiz_questions:
-            question_id = str(question.id)
-            user_answer = user_answers.get(question_id)
-            
-            # Parse options if needed
-            options = question.options
-            if isinstance(options, str):
-                try:
-                    import json
-                    options = json.loads(options)
-                except:
-                    options = []
-            
-            if not isinstance(options, list):
-                options = []
+        if quiz_questions.exists():
+            for question in quiz_questions:
+                question_id = str(question.id)
+                user_answer = user_answers.get(question_id)
                 
-            print(f"Question {question_id}: {question.question}")
-            print(f"Options: {options}")
-            print(f"Correct answer: {question.correct_answer}")
-            print(f"User answer index: {user_answer}")
-            
-            if user_answer is not None:
-                try:
-                    user_answer_index = int(user_answer)
-                    # Make sure the answer index is valid
-                    if user_answer_index >= 0 and user_answer_index < len(options):
-                        # Check if the option at this index matches the correct answer
-                        if options[user_answer_index] == question.correct_answer:
-                            correct_answers += 1
-                            print(f"Correct answer for question {question_id}")
+                # Parse options if needed
+                options = question.options
+                if isinstance(options, str):
+                    try:
+                        import json
+                        options = json.loads(options)
+                    except:
+                        options = []
+                
+                if not isinstance(options, list):
+                    options = []
+                    
+                print(f"Question {question_id}: {question.question}")
+                print(f"Options: {options}")
+                print(f"Correct answer: {question.correct_answer}")
+                print(f"User answer index: {user_answer}")
+                
+                if user_answer is not None:
+                    try:
+                        user_answer_index = int(user_answer)
+                        # Make sure the answer index is valid
+                        if user_answer_index >= 0 and user_answer_index < len(options):
+                            # Check if the option at this index matches the correct answer
+                            if options[user_answer_index] == question.correct_answer:
+                                correct_answers += 1
+                                print(f"Correct answer for question {question_id}")
+                            else:
+                                print(f"Wrong answer for question {question_id}")
                         else:
-                            print(f"Wrong answer for question {question_id}")
-                    else:
-                        print(f"Invalid answer index for question {question_id}: {user_answer_index}")
+                            print(f"Invalid answer index for question {question_id}: {user_answer_index}")
+                    except (ValueError, TypeError):
+                        print(f"Invalid answer format for question {question_id}: {user_answer}")
+                        continue
+        else:
+            # Client-provided questions with correctAnswer index
+            for idx, q in enumerate(client_questions or []):
+                qid = str(q.get('id', idx))
+                user_answer = user_answers.get(qid)
+                options = q.get('options') or []
+                try:
+                    user_idx = int(user_answer)
                 except (ValueError, TypeError):
-                    print(f"Invalid answer format for question {question_id}: {user_answer}")
                     continue
+                correct_idx = q.get('correctAnswer')
+                if isinstance(correct_idx, str):
+                    try:
+                        correct_idx = int(correct_idx)
+                    except Exception:
+                        correct_idx = None
+                if isinstance(correct_idx, int) and 0 <= user_idx < len(options) and user_idx == correct_idx:
+                    correct_answers += 1
         
         # Calculate percentage score
         score = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
@@ -1122,7 +1155,8 @@ def submit_quiz(request, lesson_id):
             lesson=lesson,
             answers=user_answers,
             score=score,
-            passed=passed
+            passed=passed,
+            total_questions=total_questions
         )
           # If quiz passed, mark lesson as complete
         if passed:
