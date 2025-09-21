@@ -10,7 +10,8 @@ This project uses a hybrid analytics approach:
 Endpoints (all under `/api/analytics/`):
 - `POST /track-activity/` – single event
 - `POST /track-activity/bulk/` – batch events
-- `GET /recent-events/` – last 200 events for admin UI
+- `GET /recent-events/` – last N events for admin UI (filters: last, feature, success, contains)
+- `GET /recent-sessions/` – aggregated sessions for Replay tab (filters match recent-events)
 
 Model: `tracking.UserActivity`
 
@@ -34,4 +35,4 @@ import tracking from '@/services/trackingService'
 tracking.capture('pro_learning.save_attempted', { course_id: 'abc' }, { feature: 'pro_learning' })
 ```
 
-Admin UI: `/admin-p/analytics` shows recent events and basic metrics.
+Admin UI: `/admin-p/analytics` shows recent events and basic metrics. The Replay tab calls `/api/analytics/recent-sessions/` and provides a quick link to PostHog Recordings; search by the copied session_id (distinct_id).

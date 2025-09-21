@@ -31,16 +31,19 @@ class TrackingService {
   const phHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST || import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com';
 
     if (phKey) {
+      const disableRecording = import.meta.env.VITE_POSTHOG_DISABLE_SESSION_RECORDING === 'true';
       posthog.init(phKey, {
         api_host: phHost,
         autocapture: import.meta.env.VITE_POSTHOG_AUTOCAPTURE !== 'false',
         capture_pageview: true,
         capture_pageleave: true,
-        disable_session_recording: import.meta.env.VITE_POSTHOG_DISABLE_SESSION_RECORDING === 'true',
+        disable_session_recording: disableRecording,
         persistence: import.meta.env.VITE_POSTHOG_PERSISTENCE || 'localStorage',
         // Align with PostHog docs example; can be overridden via env
         defaults: import.meta.env.VITE_PUBLIC_POSTHOG_DEFAULTS || '2025-05-24',
       });
+      // Make sure Session Replay starts when not disabled
+      try { if (!disableRecording && typeof posthog.startSessionRecording === 'function') posthog.startSessionRecording(); } catch {}
       // Use our sessionId as the PostHog distinct_id to correlate replays with our admin analytics
       try {
         posthog.identify(this.sessionId, { session_id: this.sessionId });

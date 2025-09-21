@@ -82,13 +82,10 @@ const AdminAnalytics = ({ isDarkMode }) => {
       if (filters.last) params.set('last', filters.last);
       if (filters.feature) params.set('feature', filters.feature);
       if (filters.success) params.set('success', filters.success);
+      if (filters.contains) params.set('contains', filters.contains);
       params.set('limit', '500');
       const res = await axios.get(`/analytics/recent-events/?${params.toString()}`);
       let evts = res.data.events || [];
-      if (filters.contains) {
-        const q = filters.contains.toLowerCase();
-        evts = evts.filter(e => (e.event_type || '').toLowerCase().includes(q));
-      }
       setEvents(evts);
       eventsRef.current = evts;
     } catch (e) {
@@ -161,35 +158,52 @@ const AdminAnalytics = ({ isDarkMode }) => {
   };
 
   const ReplayPanel = () => {
-    const POSTHOG_APP_URL = import.meta.env.VITE_POSTHOG_APP_URL || 'https://us.posthog.com';
+    const POSTHOG_APP_URL = import.meta.env.VITE_POSTHOG_APP_URL || import.meta.env.VITE_PUBLIC_POSTHOG_APP_URL || 'https://us.posthog.com';
     const [q, setQ] = useState('');
-    const sessions = useMemo(() => {
-      const grouped = new Map();
-      for (const e of events) {
-        const id = e.session_id || 'unknown';
-        if (!grouped.has(id)) grouped.set(id, []);
-        grouped.get(id).push(e);
-      }
-      const list = Array.from(grouped.entries()).map(([id, arr]) => {
-        const times = arr.map(a => new Date(a.created_at).getTime());
-        const first = new Date(Math.min(...times));
-        const last = new Date(Math.max(...times));
-        const success = arr.filter(a => a.success).length;
-        const fail = arr.length - success;
-        return {
-          id,
-          count: arr.length,
-          first, last,
-          durationMin: Math.max(0, Math.round((last - first) / 60000)),
-          success, fail,
-        };
-      }).sort((a, b) => b.last - a.last);
-      return q ? list.filter(s => s.id.toLowerCase().includes(q.toLowerCase())) : list;
-    }, [events, q]);
+    const [sessions, setSessions] = useState([]);
+    const [loadingSessions, setLoadingSessions] = useState(false);
+    const [errSessions, setErrSessions] = useState(null);
 
-    const copy = async (text) => {
-      try { await navigator.clipboard.writeText(text); } catch {}
+    const loadSessions = async () => {
+      setLoadingSessions(true);
+      setErrSessions(null);
+      try {
+        const params = new URLSearchParams();
+        if (filters.last) params.set('last', filters.last);
+        if (filters.feature) params.set('feature', filters.feature);
+        if (filters.success) params.set('success', filters.success);
+        if (filters.contains) params.set('contains', filters.contains);
+        params.set('limit', '1200');
+        const res = await axios.get(`/analytics/recent-sessions/?${params.toString()}`);
+        setSessions(res.data.sessions || []);
+      } catch (e) {
+        setErrSessions(e?.response?.data || e.message);
+      } finally {
+        setLoadingSessions(false);
+      }
     };
+
+    useEffect(() => {
+      loadSessions();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filters.last, filters.feature, filters.success, filters.contains]);
+
+    const filtered = useMemo(() => {
+      const list = sessions.map(s => ({
+        id: s.session_id,
+        count: s.count,
+        success: s.success,
+        fail: s.fail,
+        first: s.first ? new Date(s.first) : null,
+        last: s.last ? new Date(s.last) : null,
+        durationMin: s.duration_min ?? 0,
+      }));
+      const ql = q.toLowerCase();
+      return q ? list.filter(s => s.id?.toLowerCase().includes(ql)) : list;
+    }, [sessions, q]);
+
+    const copy = async (text) => { try { await navigator.clipboard.writeText(text); } catch {} };
+    const recordingUrl = (sid) => `${POSTHOG_APP_URL}/recordings?search=${encodeURIComponent(sid)}`;
 
     return (
       <div className="p-0">
@@ -205,14 +219,21 @@ const AdminAnalytics = ({ isDarkMode }) => {
           >Open PostHog Recordings ↗</a>
         </div>
 
-        <div className="mb-3">
+        <div className="mb-3 flex items-center gap-2">
           <input
             className="w-full md:w-64 border rounded-lg px-3 py-2"
             placeholder="Filter by session id..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
+          <button onClick={loadSessions} className="px-3 py-2 border rounded">Refresh</button>
         </div>
+
+        {errSessions && (
+          <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 mb-3 text-sm">
+            Failed to load sessions: {JSON.stringify(errSessions)}
+          </div>
+        )}
 
         <div className="overflow-auto border rounded-xl">
           <table className="min-w-full divide-y divide-gray-200">
@@ -228,19 +249,21 @@ const AdminAnalytics = ({ isDarkMode }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {sessions.length === 0 ? (
+              {loadingSessions ? (
+                <tr><td className="px-4 py-6" colSpan="7">Loading…</td></tr>
+              ) : filtered.length === 0 ? (
                 <tr><td className="px-4 py-6" colSpan="7">No sessions found</td></tr>
-              ) : sessions.map(s => (
+              ) : filtered.map(s => (
                 <tr key={s.id}>
                   <td className="px-4 py-2 text-xs font-mono">{s.id}</td>
                   <td className="px-4 py-2 text-xs">{s.count}</td>
                   <td className="px-4 py-2 text-xs">{s.success} / {s.fail}</td>
-                  <td className="px-4 py-2 text-xs">{s.first.toLocaleString()}</td>
-                  <td className="px-4 py-2 text-xs">{s.last.toLocaleString()}</td>
+                  <td className="px-4 py-2 text-xs">{s.first ? s.first.toLocaleString() : '—'}</td>
+                  <td className="px-4 py-2 text-xs">{s.last ? s.last.toLocaleString() : '—'}</td>
                   <td className="px-4 py-2 text-xs">{s.durationMin}m</td>
                   <td className="px-4 py-2 text-xs flex gap-2">
                     <button className="px-2 py-1 border rounded" onClick={() => copy(s.id)}>Copy ID</button>
-                    <a className="px-2 py-1 border rounded" href={`${POSTHOG_APP_URL}/recordings`} target="_blank" rel="noreferrer">Open PostHog</a>
+                    <a className="px-2 py-1 border rounded" href={recordingUrl(s.id)} target="_blank" rel="noreferrer">Open PostHog</a>
                   </td>
                 </tr>
               ))}

@@ -114,6 +114,24 @@
 				"cd frontend && npm install --silent"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Run Django checks and quick analytics smoke",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"python -m pip install -r requirements.txt && cd backend && python manage.py makemigrations tracking && python manage.py migrate && python manage.py check && python - << 'PY' \nfrom django.test import Client\nfrom django.conf import settings\nprint('DEBUG:', settings.DEBUG)\nclient = Client()\nprint('GET /api/analytics/recent-events/:', client.get('/api/analytics/recent-events/').status_code)\nprint('GET /api/analytics/recent-sessions/:', client.get('/api/analytics/recent-sessions/').status_code)\nPY"
+			]
+		},
+		{
+			"label": "Smoke check analytics endpoints",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"python -m pip install -r requirements.txt && cd backend && python manage.py makemigrations tracking && python manage.py migrate && python manage.py check && python - << 'PY'\nfrom django.test import Client\nfrom django.conf import settings\nprint('DEBUG:', settings.DEBUG)\nclient = Client()\nprint('GET /api/analytics/recent-events/:', client.get('/api/analytics/recent-events/').status_code)\nprint('GET /api/analytics/recent-sessions/:', client.get('/api/analytics/recent-sessions/').status_code)\nPY"
+			]
 		}
 	]
 }
