@@ -11,6 +11,10 @@ from .views import (
     google_auth_url,
     google_auth_callback,
     google_auth_token,
+    otp_signup,
+    otp_verify,
+    otp_resend,
+    smtp_test,
     forgot_password,
     admin_forgot_password,
     reset_password,
@@ -33,6 +37,12 @@ urlpatterns = [
     path('google/auth-url/', google_auth_url, name='google_auth_url'),
     path('google/callback/', google_auth_callback, name='google_auth_callback'),
     path('google/token/', google_auth_token, name='google_auth_token'),
+
+    # Email OTP signup endpoints
+    path('otp/signup/', otp_signup, name='otp_signup'),
+    path('otp/verify/', otp_verify, name='otp_verify'),
+    path('otp/resend/', otp_resend, name='otp_resend'),
+    path('otp/smtp-test/', smtp_test, name='smtp_test'),
     
     # Password reset endpoints
     path('forgot-password/', forgot_password, name='forgot_password'),

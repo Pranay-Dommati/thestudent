@@ -445,3 +445,21 @@ MAX_TOPICS_PER_REQUEST = int(os.environ.get('MAX_TOPICS_PER_REQUEST', '4'))
 # X-Frame-Options Configuration
 # Allow iframe embedding for certificate PDFs while maintaining security
 X_FRAME_OPTIONS = 'SAMEORIGIN'  # Allow framing from same origin (localhost:8000)
+
+# SMTP/Email settings (for transactional emails like OTP and password reset)
+# Configure via environment. Example for Hostinger:
+# SMTP_HOST=smtp.hostinger.com
+# SMTP_PORT=465
+# SMTP_USERNAME=info@easylearnova.com
+# SMTP_PASSWORD=your_app_password
+# SMTP_USE_SSL=true
+# SMTP_USE_TLS=false
+SMTP_HOST = os.environ.get('SMTP_HOST', '')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '465'))
+SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'true').lower() in ('1', 'true', 'yes')
+SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'false').lower() in ('1', 'true', 'yes')
+
+# Optional: Frontend domain for building links in emails
+FRONTEND_DOMAIN = os.environ.get('FRONTEND_DOMAIN', 'http://localhost:5173')
