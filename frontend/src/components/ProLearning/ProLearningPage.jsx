@@ -65,6 +65,7 @@ import progressiveContentGenerator, {
   getProgressiveTopicContent
 } from './ProgressiveContentGenerator';
 import proContentManager from '../../services/ProContentManager';
+import tracking from '../../services/trackingService';
 import contentStorageService from '../../services/ContentStorageService.js';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 import Navbar from '../Navbar/Navbar';
@@ -195,10 +196,12 @@ const ProLearningPage = () => {
   
   // Activity tracking useEffect - Start tracking when component mounts
   useEffect(() => {
+    try { tracking.capture('pro_learning.page_view', { courseId: courseId || null }, { feature: 'pro_learning' }); } catch {}
     startLearningTracking();
     
     return () => {
       stopLearningTracking();
+      try { tracking.capture('pro_learning.page_leave', { courseId: courseId || null }, { feature: 'pro_learning' }); } catch {}
     };
   }, []); // Empty dependency array - run once on mount/unmount
 
@@ -2331,6 +2334,7 @@ const ProLearningPage = () => {
 
     } catch (error) {
       console.error('❌ AUTO-SAVE: Failed to auto-save course to backend:', error);
+      try { tracking.capture('pro_learning.save_failed', { auto: true, status: error?.response?.status || null }, { feature: 'pro_learning', success: false, error_code: String(error?.response?.status || 'ERR') }); } catch {}
       // Silently fail for auto-save
     }
   };
@@ -2561,13 +2565,15 @@ const ProLearningPage = () => {
         return;
       }
 
-      // Save to SQLite using Django endpoint
+  // Save to SQLite using Django endpoint
+  try { tracking.capture('pro_learning.save_attempted', { course_id: currentCourseId }, { feature: 'pro_learning' }); } catch {}
       const axios = (await import('../../utils/axios')).default;
       const response = await axios.post('/courses/pro-learning/save-course/', courseData);
       const responseData = response.data;
 
       if (response.status >= 200 && response.status < 300) {
-        console.log('✅ Course saved to Learning Hub successfully!', responseData);
+  console.log('✅ Course saved to Learning Hub successfully!', responseData);
+  try { tracking.capture('pro_learning.save_succeeded', { course_id: currentCourseId }, { feature: 'pro_learning' }); } catch {}
         toast.success('✅ Course saved to your Learning Hub successfully!');
         
         // Update course saved status
@@ -2595,7 +2601,8 @@ const ProLearningPage = () => {
         } catch (_) {}
         
       } else {
-        console.error('❌ Failed to save course:', responseData);
+  console.error('❌ Failed to save course:', responseData);
+  try { tracking.capture('pro_learning.save_failed', { course_id: currentCourseId, status: response.status }, { feature: 'pro_learning', success: false, error_code: String(response.status) }); } catch {}
         if (response.status === 401) {
           toast.error('Authentication failed. Please log in again.');
         } else if (response.status === 409) {
@@ -2617,6 +2624,7 @@ const ProLearningPage = () => {
 
     } catch (error) {
       console.error('❌ Failed to save course to Learning Hub:', error);
+      try { tracking.capture('pro_learning.save_failed', { course_id: currentCourseId, message: String(error) }, { feature: 'pro_learning', success: false, error_code: 'NETWORK' }); } catch {}
       toast.error('Network error. Please check your connection and try again.');
     }
   };

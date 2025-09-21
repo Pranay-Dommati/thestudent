@@ -1,6 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import tracking from './services/trackingService.js'
+import posthog from 'posthog-js'
+import { PostHogProvider } from 'posthog-js/react'
 import App from './App.jsx'
 
 // In production, silence console methods for extra safety
@@ -18,9 +21,14 @@ if (import.meta.env.MODE === 'production') {
   console.debug = noop;
 }
 
+// Initialize tracking early so session_id is available globally and PostHog is set up
+try { tracking.init(); } catch {}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <PostHogProvider client={posthog}>
+      <App />
+    </PostHogProvider>
   </StrictMode>,
 )
 

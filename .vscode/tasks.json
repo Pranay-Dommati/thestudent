@@ -61,6 +61,59 @@
 				"-lc",
 				"./dump.sh && ls -lh db_backup.dump | cat"
 			]
+		},
+		{
+			"label": "Make and apply tracking migrations",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd backend && python manage.py makemigrations tracking && python manage.py migrate"
+			],
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Smoke test analytics endpoints",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"python - << 'PY'\\nimport requests, json\\nprint('This is a placeholder; cannot call server without URL. Please open the app and hit /api/analytics/recent-events/.')\\nPY"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Quality checks: Django and Frontend deps",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"python -m pip install -r requirements.txt && cd backend && python manage.py check && cd ../frontend && npm ci --silent"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Install frontend deps (posthog-js)",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd frontend && npm ci --silent"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Install frontend deps with npm install",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd frontend && npm install --silent"
+			],
+			"group": "build"
 		}
 	]
 }

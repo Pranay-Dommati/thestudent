@@ -112,6 +112,7 @@ INSTALLED_APPS = [
     'newsletter',  # Add newsletter app
     'rest_framework',
     'social_django',  # Add social-auth-app-django
+    'tracking',  # Custom analytics/tracking app
 ]
 
 MIDDLEWARE = [

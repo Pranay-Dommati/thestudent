@@ -11,6 +11,7 @@ urlpatterns = [
     path('api/chatbot/', include('chatbotcourse.urls')),
     path('api/feedback/', include('feedback.urls')),  # Add feedback app
     path('api/newsletter/', include('newsletter.urls')),  # Add newsletter app
+    path('api/analytics/', include('tracking.urls')),  # Analytics/tracking endpoints
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 urlpatterns += [
