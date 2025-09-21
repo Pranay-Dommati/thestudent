@@ -27,6 +27,322 @@ MAX_QUERY_LENGTH = 1000
 MAX_TOPICS_PER_REQUEST = 4
 
 
+def derive_personalization(user_query: str) -> str:
+    """Derive a concise, domain-aware personalization from the user query.
+    Keeps it short and instructive, suitable for the confirmation modal.
+    """
+    try:
+        pq = (user_query or '').lower()
+        # Detect level
+        level = None
+        if any(k in pq for k in ['advanced', 'deep dive', 'expert', 'pro level', 'senior']):
+            level = 'advanced'
+        elif any(k in pq for k in ['intermediate', 'medium', 'some experience', 'familiar']):
+            level = 'intermediate'
+        elif any(k in pq for k in ['beginner', 'new to', 'no experience', 'basic', 'basics']):
+            level = 'beginner'
+
+        # Domain categories
+        is_math = any(k in pq for k in [
+            'trigonometry', 'trigonometric', 'trignometric', 'calculus', 'algebra', 'geometry', 'math', 'unit circle', 'sine', 'cosine', 'tangent'
+        ])
+        is_exam = any(k in pq for k in ['jee', 'neet', 'sat', 'gate', 'exam', 'test prep'])
+        # DSA-specific signals
+        is_dsa = any(k in pq for k in [
+            'dsa', 'data structure', 'data structures', 'algorithms', 'leetcode', 'coding interview',
+            'time complexity', 'space complexity', 'big o', 'big-o'
+        ])
+        is_coding = is_dsa or any(k in pq for k in [
+            'python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'golang', 'go', 'rust', 'react', 'node', 'django', 'flask']
+        )
+        is_finance = any(k in pq for k in ['finance', 'economics', 'stock', 'stocks', 'etf', 'invest', 'trading'])
+        is_digital = any(k in pq for k in [
+            'digital logic', 'logic gate', 'logic gates', 'boolean algebra', 'karnaugh', 'k-map', 'k map', 'truth table',
+            'combinational', 'sequential', 'flip-flop', 'flip flops', 'flipflop', 'latch', 'fsm', 'state machine',
+            'multiplexer', 'decoder', 'encoder', 'adder', 'subtractor', 'register', 'counter', 'binary', 'hexadecimal',
+            'octal', 'number system'
+        ])
+        if is_digital:
+            if level == 'advanced' or level == 'intermediate':
+                text = 'Hands-on digital logic with annotated examples: truth tables, Karnaugh maps, minimization, timing diagrams, and FSM design.'
+            elif level == 'beginner':
+                text = 'Beginner-friendly digital logic with visual truth tables, step-by-step K-map simplification, and progressive circuit exercises.'
+            else:
+                text = 'Practical digital logic with truth tables, K-Maps, and progressive circuit design practice.'
+            return text[:300]
+        is_history = any(k in pq for k in [
+            'history', 'ww1', 'ww2', 'wwi', 'wwii', 'world war i', 'world war ii', 'world war 1', 'world war 2',
+            'second world war', 'first world war'
+        ])
+        is_business = any(k in pq for k in ['entrepreneur', 'startup', 'business', 'founder'])
+
+        # Build personalization phrase
+        # DSA personalization (before generic coding)
+        if is_dsa:
+            if level == 'advanced' or level == 'intermediate':
+                text = (
+                    'Intermediate-to-advanced DSA with interview-style problems; annotated code (Python/C++), '
+                    'pattern-based solutions (two pointers, sliding window, recursion/backtracking, DP), '
+                    'Big-O analysis, tests, and edge cases.'
+                )
+            elif level == 'beginner':
+                text = (
+                    'Beginner-friendly DSA with visual intuitions, step-by-step dry runs, annotated Python code, '
+                    'practice problems, and clear Big-O reasoning.'
+                )
+            else:
+                text = (
+                    'Example-driven DSA with code walkthroughs, problem patterns, Big-O analysis, and '
+                    'progressive LeetCode-style practice.'
+                )
+            return text[:300]
+
+        if is_coding:
+            if level == 'advanced' or level == 'intermediate':
+                text = (
+                    'Intermediate-to-advanced, hands-on coding with projects; assumes basics; '
+                    'focus on best practices, performance, and real-world patterns.'
+                )
+            elif level == 'beginner':
+                text = 'Beginner-friendly, practical code walkthroughs with bite-sized projects.'
+            else:
+                text = 'Practical, example-driven coding with step-by-step walkthroughs and projects.'
+            return text[:300]
+
+        if is_math:
+            if level == 'advanced' or level == 'intermediate':
+                text = 'Intermediate-to-advanced, visual intuition with proof sketches and problem-solving drills.'
+            elif level == 'beginner':
+                text = 'Beginner-friendly, visual explanations with scaffolded practice and step-by-step examples.'
+            else:
+                text = 'Visual explanations with step-by-step derivations and graded problem sets.'
+            return text[:300]
+
+        if is_exam:
+            text = 'Exam-focused with timed practice, strategy tips, and targeted error analysis.'
+            return text[:300]
+
+        if is_finance:
+            text = 'Real-world examples, calculators, and decision frameworks with clear risk/return trade-offs.'
+            return text[:300]
+
+        if is_history:
+            text = 'Narrative timelines with maps, primary sources, and geopolitical context; compare causes, strategies, and consequences.'
+            return text[:300]
+
+        if is_business:
+            text = 'Lean, case-driven learning with experiments, metrics, and actionable templates.'
+            return text[:300]
+
+        # Generic fallback by level
+        if level == 'advanced' or level == 'intermediate':
+            return 'Intermediate-to-advanced, example-driven learning with efficient practice and quick feedback.'
+        if level == 'beginner':
+            return 'Beginner-friendly, step-by-step explanations with practical examples.'
+
+        # Default catch-all
+        return 'Accessible, example-driven learning with clear steps and quick feedback.'
+    except Exception:
+        return 'Accessible, example-driven learning with clear steps and quick feedback.'
+
+
+def extract_explicit_topics(user_query: str):
+    """Extract explicitly mentioned topics when the user names them, especially for DSA.
+    Returns a list of topic objects or an empty list when nothing explicit is found.
+    """
+    try:
+        text = (user_query or '').lower()
+
+        # Detect DSA domain suffix
+        dsa_suffix = ''
+        if any(k in text for k in [' dsa', 'data structures', 'algorithms']):
+            dsa_suffix = ' in DSA'
+
+        # Token-to-topic mapping for DSA (structures + techniques)
+        dsa_topic_map = [
+            (['array', 'arrays'], 'Arrays'),
+            (['string', 'strings'], 'Strings'),
+            (['stack', 'stacks'], 'Stacks'),
+            (['queue', 'queues'], 'Queues'),
+            (['linked list', 'linked lists'], 'Linked Lists'),
+            (['hash map', 'hash maps', 'hashmap', 'hash table', 'hash tables'], 'Hash Maps'),
+            (['tree', 'trees', 'bst', 'binary search tree'], 'Trees'),
+            (['graph', 'graphs'], 'Graphs'),
+            (['heap', 'heaps', 'priority queue', 'priority queues'], 'Heaps & Priority Queues'),
+            (['trie', 'tries'], 'Tries'),
+            (['sort', 'sorting'], 'Sorting'),
+            (['search', 'searching', 'binary search'], 'Searching'),
+            (['dp', 'dynamic programming'], 'Dynamic Programming'),
+            (['recursion', 'recursive'], 'Recursion'),
+            (['backtracking', 'back-track'], 'Backtracking'),
+            (['two pointers', 'two-pointers', 'two pointer'], 'Two Pointers'),
+            (['sliding window', 'sliding-window'], 'Sliding Window'),
+            (['greedy'], 'Greedy Algorithms'),
+            (['divide and conquer', 'divide & conquer', 'divide-and-conquer'], 'Divide & Conquer'),
+            (['bfs', 'breadth first search', 'breadth-first search'], 'BFS'),
+            (['dfs', 'depth first search', 'depth-first search'], 'DFS'),
+            (['topological sort', 'topo sort'], 'Topological Sort'),
+            (['prefix sum', 'prefix sums'], 'Prefix Sums'),
+            (['bit manipulation', 'bitmask', 'bitwise'], 'Bit Manipulation'),
+        ]
+
+        # Trigonometry detection (including common misspelling)
+        is_trig = any(k in text for k in [
+            'trigonometry', 'trigonometric', 'trignometric', 'trigonometric ratios', 'trigonometric ratio',
+            'trig ratios', 'sine', 'cosine', 'tangent', 'secant', 'cosecant', 'cotangent', 'unit circle',
+            'radians', 'degrees'
+        ])
+        trig_suffix = ' in Trigonometry'
+        trig_topic_map = []
+        if is_trig:
+            trig_topic_map = [
+                (['trigonometric ratios', 'trigonometric ratio', 'trig ratios'], 'Trigonometric Ratios: sin, cos, tan'),
+                (['sine', 'cosine', 'tangent'], 'Trigonometric Ratios: sin, cos, tan'),
+                (['secant', 'cosecant', 'cotangent'], 'Reciprocal & Co-function Ratios: sec, csc, cot'),
+                (['unit circle', 'special angles'], 'Unit Circle & Special Angles'),
+                (['radians', 'degrees', 'angle measure', 'angle measurement'], 'Angles, Degrees & Radians'),
+                (['identities', 'trigonometric identities', 'trig identities'], 'Trigonometric Identities'),
+                (['inverse trig', 'inverse trigonometric'], 'Inverse Trig Functions'),
+                (['graphs', 'graphing'], 'Trig Graphs & Transformations'),
+                (['law of sines'], 'Law of Sines'),
+                (['law of cosines'], 'Law of Cosines'),
+                (['applications', 'problem solving'], 'Applications & Problem Solving'),
+            ]
+
+        # Digital Logic detection
+        is_digital = any(k in text for k in [
+            'digital logic', 'logic gate', 'logic gates', 'boolean algebra', 'karnaugh', 'k-map', 'k map', 'truth table',
+            'combinational', 'sequential', 'flip-flop', 'flip flops', 'flipflop', 'latch', 'fsm', 'state machine',
+            'multiplexer', 'decoder', 'encoder', 'adder', 'subtractor', 'register', 'counter', 'binary', 'hexadecimal',
+            'octal', 'number system'
+        ])
+        digital_topic_map = []
+        if is_digital:
+            digital_topic_map = [
+                (['number system', 'binary', 'octal', 'hexadecimal'], 'Number Systems & Conversions'),
+                (['boolean algebra', 'truth table'], 'Boolean Algebra & Truth Tables'),
+                (['logic gate', 'logic gates', 'and', 'or', 'not', 'nand', 'nor', 'xor', 'xnor'], 'Logic Gates & Minimization'),
+                (['karnaugh', 'k-map', 'k map'], 'Karnaugh Maps (K-Map) Simplification'),
+                (['combinational', 'adder', 'subtractor', 'multiplexer', 'decoder', 'encoder'], 'Combinational Circuits: Adders, MUX/Decoder'),
+                (['sequential', 'flip-flop', 'flip flops', 'flipflop', 'latch', 'register', 'counter'], 'Sequential Circuits: Flip-Flops, Counters & Registers'),
+                (['fsm', 'state machine'], 'Finite State Machines (FSM) Design'),
+                (['timing', 'waveform'], 'Timing Diagrams & Hazards'),
+            ]
+
+        # Collect matches with their earliest index to preserve input order
+        matches = []  # list of tuples: (index, title)
+        # DSA matches
+        for keys, name in dsa_topic_map:
+            idxs = [text.find(k) for k in keys if k in text]
+            if idxs:
+                title = f"{name}{dsa_suffix}" if dsa_suffix else name
+                matches.append((min(idxs), title))
+        # Trigonometry matches
+        for keys, name in trig_topic_map:
+            idxs = [text.find(k) for k in keys if k in text]
+            if idxs:
+                title = f"{name}{trig_suffix}"
+                matches.append((min(idxs), title))
+        # Digital logic matches
+        for keys, name in digital_topic_map:
+            idxs = [text.find(k) for k in keys if k in text]
+            if idxs:
+                title = name
+                matches.append((min(idxs), title))
+
+        if matches:
+            # Sort by appearance order, then deduplicate while preserving order
+            matches.sort(key=lambda x: x[0])
+            ordered = []
+            seen = set()
+            for _, title in matches:
+                if title not in seen:
+                    seen.add(title)
+                    ordered.append(title)
+
+            topics = [
+                {'id': i + 1, 'name': ordered[i], 'isActive': True}
+                for i in range(min(len(ordered), MAX_TOPICS_PER_REQUEST))
+            ]
+            return topics
+
+        return []
+    except Exception:
+        return []
+
+
+def _merge_with_fallback(user_query: str, explicit_topics: list):
+    """If explicit topics are fewer than MAX_TOPICS_PER_REQUEST, merge with domain fallback.
+    Preserves order: explicit first, then fallback topics excluding duplicates by name (case-insensitive).
+    Returns topics with sequential ids starting at 1.
+    """
+    try:
+        names_ci = set(t.get('name', '').strip().lower() for t in explicit_topics if isinstance(t, dict))
+        fallback = generate_simple_fallback_topics(user_query)
+        merged = []
+        # Start with explicit (keep original order and fields where present)
+        for t in explicit_topics:
+            if isinstance(t, dict) and t.get('name'):
+                merged.append({'id': len(merged) + 1, 'name': t['name'], 'isActive': True, **({k: v for k, v in t.items() if k in ('context',)})})
+        # Add fallback excluding duplicates
+        for t in fallback:
+            name = t.get('name') if isinstance(t, dict) else None
+            if not name:
+                continue
+            if name.strip().lower() in names_ci:
+                continue
+            merged.append({'id': len(merged) + 1, 'name': name, 'isActive': True})
+            names_ci.add(name.strip().lower())
+            if len(merged) >= MAX_TOPICS_PER_REQUEST:
+                break
+        # Cap and reassign ids
+        merged = merged[:MAX_TOPICS_PER_REQUEST]
+        for idx, t in enumerate(merged):
+            t['id'] = idx + 1
+        return merged
+    except Exception:
+        # On error, just fallback
+        return generate_simple_fallback_topics(user_query)
+
+
+def build_topics_prompt(user_query: str, explicit_names: list[str] | None = None) -> str:
+        """Build a robust prompt for Gemini to produce 2–4 topics and a concise personalization.
+        If explicit_names are provided, instruct the model to include them (lightly rephrase allowed)
+        and, if fewer than 4, complete with closely related topics to form a cohesive mini-curriculum.
+        """
+        explicit_clause = ""
+        if explicit_names:
+                # Keep it compact; model can lightly rephrase but preserve intent
+                names_str = ", ".join(explicit_names[:MAX_TOPICS_PER_REQUEST])
+                explicit_clause = f"\nMUST INCLUDE these user-named topics (you may lightly rephrase names but keep intent): [{names_str}]. If fewer than {MAX_TOPICS_PER_REQUEST}, add closely related topics to reach up to {MAX_TOPICS_PER_REQUEST}."
+
+        return f"""You are an expert curriculum designer and learning coach.
+Analyze the user's request and return: (1) 2–4 precise topics and (2) a tailored personalization capturing learner level, intent, tone, pace, prerequisites, and domain context.
+
+Return ONLY a JSON object with this exact shape (no extra text):
+{{
+    "personalization": "Short, informative phrase under 220 characters.",
+    "topics": [
+        {{"id": 1, "name": "Topic Name", "isActive": true, "context": "Optional topic-specific context"}}
+    ]
+}}
+
+Guidelines for personalization:
+- Infer level (beginner/intermediate/advanced) from cues; if uncertain, default to accessible but domain-appropriate.
+- Include 2–3 hints about delivery style (e.g., visual, example-driven, step-by-step, proof-oriented, exam-focused).
+- Include domain framing if signaled (e.g., web dev, DSA/interview, high-school math, electronics).
+
+Guidelines for topics:
+- If the request is BROAD (e.g., "learn java"), BREAK into 2–4 progressive subtopics forming a mini-curriculum.
+- Preserve explicit context like language or domain (e.g., "Arrays & Strings in DSA").
+- Maximum {MAX_TOPICS_PER_REQUEST} topics total.
+- Topic names should be specific and outcomes-oriented when possible.{explicit_clause}
+
+User Query: "{user_query}"
+
+Return only the JSON, no explanations."""
+
+
 class AIChatThrottle(UserRateThrottle):
     # Much higher throttle in development to avoid 429s during iteration
     rate = '3000/min' if settings.DEBUG else '30/min'
@@ -263,84 +579,27 @@ def classify_topics(request):
         parts = user_query.lower().split(" in ")
         learning_context = parts[1].strip() if len(parts) > 1 else None
 
-        prompt = f"""Extract the main learning topics and the user's likely learning context/personalization from this request.
+        # Detect explicitly named topics, but pass them as constraints to the AI
+        try:
+            explicit_topics = extract_explicit_topics(user_query)
+        except Exception:
+            explicit_topics = []
+        explicit_names = [t.get('name') for t in explicit_topics if isinstance(t, dict) and t.get('name')]
 
-User Query: "{user_query}"
-
-Return ONLY a JSON object with this exact shape:
-{{
-    "personalization": "A short phrase capturing audience/level/style, e.g., 'Beginner-friendly, step-by-step explanations with practical examples.'",
-    "topics": [
-        {{"id": 1, "name": "Topic Name", "isActive": true, "context": "Optional topic-specific context like 'for web development' or 'for data science'"}}
-    ]
-}}
-
-IMPORTANT RULES:
-- Understand relationships between topics and technologies
-- If the request is BROAD (e.g., "learn python", "learn dsa", "finance", "entrepreneurship"), BREAK IT INTO 2–4 PROGRESSIVE, BEGINNER-FRIENDLY SUBTOPICS that together form a mini-curriculum.
-- If user specifies "X in Y" (e.g., "DSA in C++"), either combine as a single unit OR break into 2–4 progressive subtopics that keep the language context (e.g., "Arrays & Strings in C++"). Prefer breaking down when the request is broad.
-- Keep the primary learning focus intact and avoid overly generic single-topic outputs.
-- Maximum 4 topics total.
-- Preserve technological context in topic names.
-- Derive "personalization" from the request (audience/level/preferences). If unclear, use this default:
-    "Beginner-friendly, step-by-step explanations with practical examples."
-
-Examples:
-- "i wanna learn python" → {{
-        "personalization": "Beginner-friendly, step-by-step explanations with practical examples.",
-        "topics": [
-            {{"id": 1, "name": "Introduction to Python & Setup", "isActive": true}},
-            {{"id": 2, "name": "Variables, Data Types & Strings", "isActive": true}},
-            {{"id": 3, "name": "Control Flow: Conditionals & Loops", "isActive": true}},
-            {{"id": 4, "name": "Functions & OOP Basics in Python", "isActive": true}}
-        ]
-    }}
-- "i wanna learn dsa" → {{
-        "personalization": "Beginner-friendly, step-by-step explanations with practical examples.",
-        "topics": [
-            {{"id": 1, "name": "Arrays & Strings", "isActive": true}},
-            {{"id": 2, "name": "Stacks & Queues", "isActive": true}},
-            {{"id": 3, "name": "Linked Lists & Hash Maps", "isActive": true}},
-            {{"id": 4, "name": "Sorting & Searching Basics", "isActive": true}}
-        ]
-    }}
-- "give me a course on finance" → {{
-        "personalization": "Beginner-friendly, step-by-step explanations with practical examples.",
-        "topics": [
-            {{"id": 1, "name": "Personal Finance Fundamentals", "isActive": true}},
-            {{"id": 2, "name": "Budgeting & Saving Strategies", "isActive": true}},
-            {{"id": 3, "name": "Investing Basics: Stocks & ETFs", "isActive": true}},
-            {{"id": 4, "name": "Risk Management & Planning", "isActive": true}}
-        ]
-    }}
-- "get started with entrepreneurship" → {{
-        "personalization": "Beginner-friendly, step-by-step explanations with practical examples.",
-        "topics": [
-            {{"id": 1, "name": "Ideation & Problem Validation", "isActive": true}},
-            {{"id": 2, "name": "MVP & Lean Testing", "isActive": true}},
-            {{"id": 3, "name": "Business Model & Go-To-Market", "isActive": true}},
-            {{"id": 4, "name": "Funding Basics & Key Metrics", "isActive": true}}
-        ]
-    }}
-- "learn DSA in C++" → {{
-        "personalization": "Beginner-friendly, step-by-step explanations with practical examples.",
-        "topics": [
-            {{"id": 1, "name": "Arrays & Strings in C++", "isActive": true}},
-            {{"id": 2, "name": "Stacks & Queues in C++", "isActive": true}},
-            {{"id": 3, "name": "Linked Lists & Hash Maps in C++", "isActive": true}},
-            {{"id": 4, "name": "Sorting & Searching in C++", "isActive": true}}
-        ]
-    }}
-
-Return only the JSON, no explanations."""
+        prompt = build_topics_prompt(user_query, explicit_names or None)
         
         try:
-            # Call Gemini 1.5 Pro for topic classification and personalization (more stable for this task)
+            # Prefer Gemini 2.5 Pro; if unusable, retry with 1.5 Pro before heuristic fallback.
             if settings.DEBUG:
-                logger.debug("Attempting Gemini 1.5 Pro API call for topic classification + personalization...")
-            response = call_gemini_api(prompt)
+                logger.debug("Attempting Gemini 2.5 Pro API call for topic classification + personalization...")
+            try:
+                response = call_gemini_2_5_pro_api(prompt)
+                used_model = '2.5-pro'
+            except Exception:
+                response = call_gemini_api(prompt)
+                used_model = '1.5-pro'
             if settings.DEBUG:
-                logger.debug("Got Gemini 1.5 Pro response")
+                logger.debug(f"Got Gemini response from {used_model}")
             
             # Extract text from response (robust to shape differences)
             if 'candidates' in response and len(response['candidates']) > 0:
@@ -367,22 +626,39 @@ Return only the JSON, no explanations."""
                     logger.debug(f"Extracted text length: {len(text) if text else 0}")
 
                 # Guard against empty/None text
-                personalization_default = "Beginner-friendly, step-by-step explanations with practical examples."
+                personalization_default = derive_personalization(user_query)
                 if not isinstance(text, str) or not text.strip():
                     if settings.DEBUG:
-                        logger.debug("Empty or invalid AI text response; returning fallback topics with default personalization")
-                    fallback_topics = generate_simple_fallback_topics(user_query)
-                    return JsonResponse({
-                        'topics': fallback_topics,
-                        'personalization': personalization_default
-                    })
+                        logger.debug("Empty/invalid AI text; retry with Gemini 1.5 Pro before fallback")
+                    # If not already 1.5, retry once with 1.5
+                    if used_model != '1.5-pro':
+                        try:
+                            retry_resp = call_gemini_api(prompt)
+                            # Extract retry text
+                            retry_text = None
+                            if 'candidates' in retry_resp and retry_resp['candidates']:
+                                rparts = retry_resp['candidates'][0].get('content', {}).get('parts', [])
+                                if rparts:
+                                    retry_text = rparts[0].get('text')
+                            if isinstance(retry_text, str) and retry_text.strip():
+                                text = retry_text
+                            else:
+                                raise ValueError('Empty retry text')
+                        except Exception:
+                            text = None
+                    if not text:
+                        fallback_topics = (explicit_topics and _merge_with_fallback(user_query, explicit_topics)) or extract_explicit_topics(user_query) or generate_simple_fallback_topics(user_query)
+                        return JsonResponse({
+                            'topics': fallback_topics,
+                            'personalization': personalization_default
+                        })
                 
                 # Try to parse JSON from response (support object or array for backward compatibility)
                 try:
                     # Prefer object shape first (with personalization)
                     import re
                     json_obj_match = re.search(r'\{[\s\S]*\}', text)
-                    personalization_default = "Beginner-friendly, step-by-step explanations with practical examples."
+                    personalization_default = derive_personalization(user_query)
                     personalization_value = personalization_default
 
                     parsed = None
@@ -437,6 +713,14 @@ Return only the JSON, no explanations."""
                         if settings.DEBUG:
                             logger.debug(f"Returning {len(formatted_topics)} formatted topics for review with personalization")
 
+                        # Heuristic enhancement: if personalization is too generic or empty,
+                        # rebuild it from the query using derive_personalization().
+                        if not personalization_value or personalization_value.strip().lower() in (
+                            'beginner-friendly, step-by-step explanations with practical examples.'.lower(),
+                            'beginner friendly, step by step explanations with practical examples.'.lower()
+                        ):
+                            personalization_value = derive_personalization(user_query)
+
                         return JsonResponse({
                             'topics': formatted_topics,
                             'personalization': personalization_value
@@ -451,10 +735,71 @@ Return only the JSON, no explanations."""
                     
                 except (json.JSONDecodeError, ValueError) as e:
                     if settings.DEBUG:
-                        logger.debug(f"Failed to parse AI response: {e}")
-                    # Return fallback topics for review with default personalization
-                    fallback_topics = generate_simple_fallback_topics(user_query)
-                    personalization_default = "Beginner-friendly, step-by-step explanations with practical examples."
+                        logger.debug(f"Failed to parse AI response: {e}; retry with 1.5 Pro before fallback")
+                    # Retry parse with 1.5 Pro if first was 2.5
+                    parsed_ok = False
+                    if used_model != '1.5-pro':
+                        try:
+                            retry_resp = call_gemini_api(prompt)
+                            rtext = None
+                            if 'candidates' in retry_resp and retry_resp['candidates']:
+                                rparts = retry_resp['candidates'][0].get('content', {}).get('parts', [])
+                                if rparts:
+                                    rtext = rparts[0].get('text')
+                            if isinstance(rtext, str) and rtext.strip():
+                                # try parse again
+                                import re
+                                json_obj_match = re.search(r'\{[\s\S]*\}', rtext)
+                                parsed = None
+                                if json_obj_match:
+                                    try:
+                                        parsed = json.loads(json_obj_match.group())
+                                    except Exception:
+                                        parsed = None
+                                if parsed is None:
+                                    json_arr_match = re.search(r'\[[\s\S]*\]', rtext)
+                                    if json_arr_match:
+                                        parsed = json.loads(json_arr_match.group())
+                                    else:
+                                        parsed = json.loads(rtext)
+                                # Normalize to topics
+                                if isinstance(parsed, dict) and 'topics' in parsed:
+                                    topics_raw = parsed.get('topics', [])
+                                    personalization_value = parsed.get('personalization') or personalization_default
+                                elif isinstance(parsed, list):
+                                    topics_raw = parsed
+                                    personalization_value = personalization_default
+                                else:
+                                    raise ValueError('Unexpected JSON shape after retry')
+
+                                formatted_topics = []
+                                for i, topic in enumerate(topics_raw[:MAX_TOPICS_PER_REQUEST]):
+                                    if isinstance(topic, dict):
+                                        name = str(topic.get('name', 'Unknown')).strip()[:200]
+                                        topic_payload = {
+                                            'id': topic.get('id', i + 1),
+                                            'name': name,
+                                            'isActive': topic.get('isActive', True)
+                                        }
+                                        if 'context' in topic and isinstance(topic['context'], str) and topic['context'].strip():
+                                            topic_payload['context'] = topic['context'].strip()[:200]
+                                        formatted_topics.append(topic_payload)
+                                    elif isinstance(topic, str):
+                                        name = str(topic).strip()[:200]
+                                        formatted_topics.append({'id': i + 1, 'name': name, 'isActive': True})
+
+                                if formatted_topics:
+                                    return JsonResponse({
+                                        'topics': formatted_topics,
+                                        'personalization': (personalization_value or personalization_default)[:300]
+                                    })
+                                parsed_ok = True
+                        except Exception:
+                            parsed_ok = False
+
+                    # Fallback if retry also failed (prefer explicit augmented by domain)
+                    fallback_topics = (explicit_topics and _merge_with_fallback(user_query, explicit_topics)) or extract_explicit_topics(user_query) or generate_simple_fallback_topics(user_query)
+                    personalization_default = derive_personalization(user_query)
                     return JsonResponse({
                         'topics': fallback_topics,
                         'personalization': personalization_default
@@ -462,8 +807,8 @@ Return only the JSON, no explanations."""
             else:
                 if settings.DEBUG:
                     logger.debug("No valid candidates in response")
-                fallback_topics = generate_simple_fallback_topics(user_query)
-                personalization_default = "Beginner-friendly, step-by-step explanations with practical examples."
+                fallback_topics = extract_explicit_topics(user_query) or generate_simple_fallback_topics(user_query)
+                personalization_default = derive_personalization(user_query)
                 return JsonResponse({
                     'topics': fallback_topics,
                     'personalization': personalization_default
@@ -481,9 +826,9 @@ Return only the JSON, no explanations."""
                 
         except Exception as api_error:
             logger.error(f"Gemini API error: {api_error}")
-            # Return fallback topics for review
-            fallback_topics = generate_simple_fallback_topics(user_query)
-            personalization_default = "Beginner-friendly, step-by-step explanations with practical examples."
+            # Return explicit or fallback topics for review
+            fallback_topics = extract_explicit_topics(user_query) or generate_simple_fallback_topics(user_query)
+            personalization_default = derive_personalization(user_query)
             return JsonResponse({
                 'topics': fallback_topics,
                 'personalization': personalization_default
@@ -494,7 +839,7 @@ Return only the JSON, no explanations."""
         # Return minimal fallback
         return JsonResponse({
             'topics': [{'id': 1, 'name': 'General Learning', 'isActive': True}],
-            'personalization': "Beginner-friendly, step-by-step explanations with practical examples."
+            'personalization': derive_personalization("")
         })
 
 def check_topic_rate_limit_with_auth(request, requested_topics):
@@ -699,6 +1044,57 @@ def generate_simple_fallback_topics(user_query):
         ]
 
     # Domain-specific 4-topic mini-curricula
+    # Math domains first to avoid programming defaults
+    if any(k in query for k in ['trigonometry', 'trigonometric', 'trignometric', 'unit circle', 'sine', 'cosine', 'tangent']):
+        return four([
+            'Trigonometric Ratios: sin, cos, tan',
+            'Unit Circle & Special Angles',
+            'Angles, Degrees & Radians',
+            'Trigonometric Identities & Applications',
+        ])
+    if any(k in query for k in ['algebra']):
+        return four([
+            'Algebra Basics & Expressions',
+            'Linear Equations & Inequalities',
+            'Polynomials & Factoring',
+            'Quadratic Equations & Graphs',
+        ])
+    if any(k in query for k in ['calculus', 'derivative', 'integral']):
+        return four([
+            'Limits & Continuity',
+            'Derivatives & Rules',
+            'Applications of Derivatives',
+            'Integrals & Applications',
+        ])
+    if any(k in query for k in ['geometry']):
+        return four([
+            'Lines, Angles & Triangles',
+            'Quadrilaterals & Polygons',
+            'Circles & Properties',
+            'Area, Volume & Similarity',
+        ])
+    if any(k in query for k in ['probability', 'statistics', 'random variable']):
+        return four([
+            'Descriptive Statistics & Visualization',
+            'Probability Fundamentals',
+            'Random Variables & Distributions',
+            'Inference: Confidence & Hypothesis Testing',
+        ])
+
+    # Digital logic / electronics
+    if any(k in query for k in [
+        'digital logic', 'logic gate', 'logic gates', 'boolean algebra', 'karnaugh', 'k-map', 'k map', 'truth table',
+        'combinational', 'sequential', 'flip-flop', 'flip flops', 'flipflop', 'latch', 'fsm', 'state machine',
+        'multiplexer', 'decoder', 'encoder', 'adder', 'subtractor', 'register', 'counter', 'number system', 'binary',
+        'hexadecimal', 'octal'
+    ]):
+        return four([
+            'Number Systems & Conversions',
+            'Boolean Algebra, Logic Gates & Truth Tables',
+            'K-Map Minimization & Combinational Circuits',
+            'Sequential Circuits: Flip-Flops, Counters & FSMs',
+        ])
+
     if 'python' in query:
         return four([
             'Introduction to Python & Setup',
@@ -740,6 +1136,43 @@ def generate_simple_fallback_topics(user_query):
             'State & Props',
             'Hooks: useState & useEffect',
             'Routing & Project Structure',
+        ])
+    # History and world wars
+    if (
+        'history' in query or 'ww1' in query or 'ww2' in query or 'wwi' in query or 'wwii' in query or
+        'world war' in query or 'first world war' in query or 'second world war' in query
+    ):
+        # If both WW1 and WW2 implied, present both; otherwise general modern history scaffold
+        if any(k in query for k in ['ww1', 'wwi', 'world war i', 'world war 1', 'first world war']) and any(
+            k in query for k in ['ww2', 'wwii', 'world war ii', 'world war 2', 'second world war']
+        ):
+            return four([
+                'World War I: Causes & Alliances',
+                'World War I: Major Battles & Turning Points',
+                'World War II: Rise of Fascism & Causes',
+                'World War II: Theaters, Strategies & Aftermath',
+            ])
+        # Single war or generic world war/history
+        if any(k in query for k in ['ww1', 'wwi', 'world war i', 'world war 1', 'first world war']):
+            return four([
+                'WWI: Causes, Alliances & Spark (1914)',
+                'WWI: Trench Warfare & Major Fronts',
+                'WWI: Turning Points & US Entry',
+                'WWI: Armistice, Treaty of Versailles & Consequences',
+            ])
+        if any(k in query for k in ['ww2', 'wwii', 'world war ii', 'world war 2', 'second world war']):
+            return four([
+                'WWII: Interwar Period & Causes',
+                'WWII: European Theater (Blitzkrieg to D-Day)',
+                'WWII: Pacific Theater (Pearl Harbor to Hiroshima)',
+                'WWII: Aftermath, UN, and Geopolitical Shifts',
+            ])
+        # General history default
+        return four([
+            'Modern History: Key Causes & Movements',
+            'Major Conflicts: Alliances & Strategies',
+            'Consequences: Political & Economic Changes',
+            'Primary Sources & Historical Debates',
         ])
     if 'java' in query:
         return four([
