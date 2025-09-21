@@ -143,3 +143,68 @@ def call_gemini_flash_api(prompt, max_retries=3):
             continue
     
     raise Exception("All Gemini Flash API attempts failed") 
+
+def call_gemini_2_5_pro_api(prompt, max_retries=5):
+    """Call Gemini 2.5 Pro API with robust retries for higher-quality reasoning/classification"""
+    GEMINI_2_5_PRO_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent'
+
+    if not settings.GEMINI_API_KEY:
+        raise Exception("Gemini API key not configured")
+
+    for attempt in range(max_retries):
+        try:
+            print(f"🔑 Calling Gemini 2.5 Pro API (attempt {attempt + 1}/{max_retries})")
+
+            headers = {'Content-Type': 'application/json'}
+            data = {
+                'contents': [{
+                    'role': 'user',
+                    'parts': [{'text': prompt}]
+                }],
+                'generationConfig': {
+                    # Use low temperature for deterministic classification
+                    'temperature': 0.2,
+                    'topK': 20,
+                    'topP': 0.8,
+                    # Topic classification needs few tokens; keep small but generous enough
+                    'maxOutputTokens': 256,
+                    'stopSequences': []
+                }
+            }
+
+            response = requests.post(
+                f'{GEMINI_2_5_PRO_API_URL}?key={settings.GEMINI_API_KEY}',
+                headers=headers,
+                data=json.dumps(data),
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                print("✅ Gemini 2.5 Pro API call successful")
+                return response.json()
+            elif response.status_code in [429, 503]:
+                # Exponential backoff with jitter
+                base_delay = 2 ** attempt
+                jitter = random.uniform(0.5, 1.5)
+                delay = min(base_delay * jitter, 60)
+                error_type = "Rate limit" if response.status_code == 429 else "Service overloaded"
+                print(f"⏰ {error_type} ({response.status_code}), retrying in {delay:.1f} seconds... (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    time.sleep(delay)
+                continue
+            else:
+                print(f"❌ Gemini 2.5 Pro API error {response.status_code}: {response.text}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                continue
+
+        except (ConnectionError, Timeout, socket.gaierror) as e:
+            print(f"🌐 Network connection error: {str(e)}")
+            raise NetworkError("Network connection lost. Please check your internet connection and try again.")
+        except Exception as e:
+            print(f"❌ Error with Gemini 2.5 Pro API: {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(2)
+            continue
+
+    raise Exception("All Gemini 2.5 Pro API attempts failed")

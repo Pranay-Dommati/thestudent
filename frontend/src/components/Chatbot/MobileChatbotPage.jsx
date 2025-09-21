@@ -88,6 +88,7 @@ const MobileChatbotPage = () => {
   const [proMode, setProMode] = useState(false);
   const [showTopicConfirmation, setShowTopicConfirmation] = useState(false);
   const [pendingTopics, setPendingTopics] = useState([]);
+  const [personalization, setPersonalization] = useState("");
   const [originalPrompt, setOriginalPrompt] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
   // Generate unique IDs using timestamp and random component
@@ -438,6 +439,11 @@ const MobileChatbotPage = () => {
           console.log('🚀 Mobile pro mode activated, calling classifyTopics with:', messageToSend);
           const result = await classifyTopics(messageToSend);
           console.log('✅ Mobile classifyTopics result:', result);
+          if (result && typeof result.personalization === 'string' && result.personalization.trim()) {
+            setPersonalization(result.personalization.trim());
+          } else {
+            setPersonalization('Beginner-friendly, step-by-step explanations with practical examples.');
+          }
           
           // Update usage stats from the response
           if (result.usage_stats) {
@@ -659,7 +665,7 @@ const MobileChatbotPage = () => {
       });
 
       if (result?.status === 429) {
-        // Rate limit exceeded
+        // Some backends may return 200 with a JSON status field; handle gracefully
         const botResponse = {
           id: generateUniqueId(),
           type: "bot",
@@ -668,14 +674,8 @@ const MobileChatbotPage = () => {
           isRateLimit: true
         };
         setChatHistory(prev => [...prev, botResponse]);
-        setShowTopicConfirmation(false);
-        setPendingTopics([]);
-        setOriginalPrompt("");
-        
-        // Update usage stats if provided
-        if (result.usage_stats) {
-          setUsageStats(result.usage_stats);
-        }
+        if (result.usage_stats) setUsageStats(result.usage_stats);
+        // Keep confirmation open and allow adjustments
         return;
       }
 
@@ -721,6 +721,24 @@ const MobileChatbotPage = () => {
       
     } catch (error) {
       console.error('Error creating course:', error);
+      const status = error?.response?.status;
+      const data = error?.response?.data || {};
+      if (status === 429) {
+        const msg = data?.message || 'You have hit the rate limit. Please try again later or reduce the number of requests.';
+        const botResponse = {
+          id: generateUniqueId(),
+          type: "bot",
+          message: `🚫 ${msg}`,
+          timestamp: new Date().toLocaleTimeString(),
+          isRateLimit: true
+        };
+        setChatHistory(prev => [...prev, botResponse]);
+        if (data?.usage_stats) setUsageStats(data.usage_stats);
+        // Do NOT clear topics; allow user to adjust and retry
+        setShowTopicConfirmation(true);
+        return;
+      }
+
       const errorResponse = {
         id: generateUniqueId(),
         type: "bot",
@@ -728,9 +746,8 @@ const MobileChatbotPage = () => {
         timestamp: new Date().toLocaleTimeString(),
       };
       setChatHistory(prev => [...prev, errorResponse]);
-      setShowTopicConfirmation(false);
-      setPendingTopics([]);
-      setOriginalPrompt("");
+      // Keep topics so user can retry
+      setShowTopicConfirmation(true);
     }
   };
 
@@ -1371,6 +1388,13 @@ const MobileChatbotPage = () => {
                     
                     {/* Topics List */}
                     <div className="space-y-2 mb-4">
+                      {personalization && (
+                        <div className="mb-3">
+                          <span className="inline-block text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
+                            Personalization: {personalization}
+                          </span>
+                        </div>
+                      )}
                       {pendingTopics.map((topic, index) => (
                         <div key={topic.id || index} className="flex items-center bg-gray-50 rounded-xl p-3 border border-gray-100">
                           <span className="text-indigo-600 font-semibold mr-3 text-sm w-6">{index + 1}.</span>

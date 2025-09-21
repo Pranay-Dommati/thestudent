@@ -15,7 +15,7 @@ from .topics import handle_topics
 from .rate_limiter import check_topic_rate_limit, record_topic_creation
 import json
 import logging
-from .ai_service import call_gemini_api, NetworkError
+from .ai_service import call_gemini_api, NetworkError, call_gemini_2_5_pro_api
 import requests
 from .youtube import handle_youtube_search
 
@@ -28,7 +28,8 @@ MAX_TOPICS_PER_REQUEST = 4
 
 
 class AIChatThrottle(UserRateThrottle):
-    rate = '30/min'  # tune per needs
+    # Much higher throttle in development to avoid 429s during iteration
+    rate = '3000/min' if settings.DEBUG else '30/min'
 
 
 @api_view(["POST"])
@@ -236,7 +237,7 @@ def debug_rate_limit_cache(request):
 @permission_classes([IsAuthenticated])
 @throttle_classes([AIChatThrottle])
 def classify_topics(request):
-    """Classify topics from user query with enhanced security and rate limiting"""
+    """Classify topics and derive personalization/context from user query with enhanced security and rate limiting"""
     try:
         # Parse and validate input
         try:
@@ -262,106 +263,210 @@ def classify_topics(request):
         parts = user_query.lower().split(" in ")
         learning_context = parts[1].strip() if len(parts) > 1 else None
 
-        prompt = f"""Extract the main learning topics from this user's request, understanding the context and relationships between topics.
+        prompt = f"""Extract the main learning topics and the user's likely learning context/personalization from this request.
 
 User Query: "{user_query}"
 
-Return ONLY a JSON array with properly contextualized topics:
-[
-  {{"id": 1, "name": "Topic Name", "isActive": true, "context": "Optional Context"}}
-]
+Return ONLY a JSON object with this exact shape:
+{{
+    "personalization": "A short phrase capturing audience/level/style, e.g., 'Beginner-friendly, step-by-step explanations with practical examples.'",
+    "topics": [
+        {{"id": 1, "name": "Topic Name", "isActive": true, "context": "Optional topic-specific context like 'for web development' or 'for data science'"}}
+    ]
+}}
 
 IMPORTANT RULES:
 - Understand relationships between topics and technologies
-- If user specifies "X in Y" (e.g. "DSA in C++"), combine them as one topic
-- Keep the primary learning focus intact
-- Maximum 4 topics total
-- Preserve technological context in topic names
+- If the request is BROAD (e.g., "learn python", "learn dsa", "finance", "entrepreneurship"), BREAK IT INTO 2–4 PROGRESSIVE, BEGINNER-FRIENDLY SUBTOPICS that together form a mini-curriculum.
+- If user specifies "X in Y" (e.g., "DSA in C++"), either combine as a single unit OR break into 2–4 progressive subtopics that keep the language context (e.g., "Arrays & Strings in C++"). Prefer breaking down when the request is broad.
+- Keep the primary learning focus intact and avoid overly generic single-topic outputs.
+- Maximum 4 topics total.
+- Preserve technological context in topic names.
+- Derive "personalization" from the request (audience/level/preferences). If unclear, use this default:
+    "Beginner-friendly, step-by-step explanations with practical examples."
 
 Examples:
-- "learn DSA in C++" → [{{id: 1, name: "Data Structures and Algorithms in C++", isActive: true}}]
-- "create course on arrays and strings in java" → [{{id: 1, name: "Java Arrays", isActive: true}}, {{id: 2, name: "Java Strings", isActive: true}}]
-- "python for web development" → [{{id: 1, name: "Python Web Development", isActive: true}}]
+- "i wanna learn python" → {{
+        "personalization": "Beginner-friendly, step-by-step explanations with practical examples.",
+        "topics": [
+            {{"id": 1, "name": "Introduction to Python & Setup", "isActive": true}},
+            {{"id": 2, "name": "Variables, Data Types & Strings", "isActive": true}},
+            {{"id": 3, "name": "Control Flow: Conditionals & Loops", "isActive": true}},
+            {{"id": 4, "name": "Functions & OOP Basics in Python", "isActive": true}}
+        ]
+    }}
+- "i wanna learn dsa" → {{
+        "personalization": "Beginner-friendly, step-by-step explanations with practical examples.",
+        "topics": [
+            {{"id": 1, "name": "Arrays & Strings", "isActive": true}},
+            {{"id": 2, "name": "Stacks & Queues", "isActive": true}},
+            {{"id": 3, "name": "Linked Lists & Hash Maps", "isActive": true}},
+            {{"id": 4, "name": "Sorting & Searching Basics", "isActive": true}}
+        ]
+    }}
+- "give me a course on finance" → {{
+        "personalization": "Beginner-friendly, step-by-step explanations with practical examples.",
+        "topics": [
+            {{"id": 1, "name": "Personal Finance Fundamentals", "isActive": true}},
+            {{"id": 2, "name": "Budgeting & Saving Strategies", "isActive": true}},
+            {{"id": 3, "name": "Investing Basics: Stocks & ETFs", "isActive": true}},
+            {{"id": 4, "name": "Risk Management & Planning", "isActive": true}}
+        ]
+    }}
+- "get started with entrepreneurship" → {{
+        "personalization": "Beginner-friendly, step-by-step explanations with practical examples.",
+        "topics": [
+            {{"id": 1, "name": "Ideation & Problem Validation", "isActive": true}},
+            {{"id": 2, "name": "MVP & Lean Testing", "isActive": true}},
+            {{"id": 3, "name": "Business Model & Go-To-Market", "isActive": true}},
+            {{"id": 4, "name": "Funding Basics & Key Metrics", "isActive": true}}
+        ]
+    }}
+- "learn DSA in C++" → {{
+        "personalization": "Beginner-friendly, step-by-step explanations with practical examples.",
+        "topics": [
+            {{"id": 1, "name": "Arrays & Strings in C++", "isActive": true}},
+            {{"id": 2, "name": "Stacks & Queues in C++", "isActive": true}},
+            {{"id": 3, "name": "Linked Lists & Hash Maps in C++", "isActive": true}},
+            {{"id": 4, "name": "Sorting & Searching in C++", "isActive": true}}
+        ]
+    }}
 
-Return only the JSON array, no explanations."""
+Return only the JSON, no explanations."""
         
         try:
-            # Call Gemini API
+            # Call Gemini 1.5 Pro for topic classification and personalization (more stable for this task)
             if settings.DEBUG:
-                logger.debug("Attempting Gemini API call...")
+                logger.debug("Attempting Gemini 1.5 Pro API call for topic classification + personalization...")
             response = call_gemini_api(prompt)
             if settings.DEBUG:
-                logger.debug("Got Gemini response")
+                logger.debug("Got Gemini 1.5 Pro response")
             
-            # Extract text from response
+            # Extract text from response (robust to shape differences)
             if 'candidates' in response and len(response['candidates']) > 0:
-                text = response['candidates'][0]['content']['parts'][0]['text']
-                if settings.DEBUG:
-                    logger.debug(f"Extracted text length: {len(text)}")
-                
-                # Try to parse JSON from response
+                text = None
                 try:
-                    # Extract JSON array from response
-                    import re
-                    json_match = re.search(r'\[[\s\S]*\]', text)
-                    if json_match:
-                        topics = json.loads(json_match.group())
+                    parts = response['candidates'][0].get('content', {}).get('parts')
+                    if isinstance(parts, list) and parts:
+                        # Prefer first part.text if present, else join any texts
+                        if isinstance(parts[0], dict) and 'text' in parts[0]:
+                            text = parts[0]['text']
+                        else:
+                            texts = [p.get('text') for p in parts if isinstance(p, dict) and 'text' in p]
+                            text = '\n'.join([t for t in texts if t]) if texts else None
                     else:
-                        topics = json.loads(text)
-                    
-                    # Validate structure
-                    if not isinstance(topics, list):
-                        raise ValueError("Response is not a list")
-                    
+                        # Some responses might place text differently
+                        candidate = response['candidates'][0]
+                        if isinstance(candidate.get('content'), str):
+                            text = candidate.get('content')
+                        elif 'text' in candidate:
+                            text = candidate.get('text')
+                except Exception:
+                    text = None
+                if settings.DEBUG:
+                    logger.debug(f"Extracted text length: {len(text) if text else 0}")
+
+                # Guard against empty/None text
+                personalization_default = "Beginner-friendly, step-by-step explanations with practical examples."
+                if not isinstance(text, str) or not text.strip():
+                    if settings.DEBUG:
+                        logger.debug("Empty or invalid AI text response; returning fallback topics with default personalization")
+                    fallback_topics = generate_simple_fallback_topics(user_query)
+                    return JsonResponse({
+                        'topics': fallback_topics,
+                        'personalization': personalization_default
+                    })
+                
+                # Try to parse JSON from response (support object or array for backward compatibility)
+                try:
+                    # Prefer object shape first (with personalization)
+                    import re
+                    json_obj_match = re.search(r'\{[\s\S]*\}', text)
+                    personalization_default = "Beginner-friendly, step-by-step explanations with practical examples."
+                    personalization_value = personalization_default
+
+                    parsed = None
+                    if json_obj_match:
+                        try:
+                            parsed = json.loads(json_obj_match.group())
+                        except Exception:
+                            parsed = None
+
+                    if parsed is None:
+                        # Try array fallback
+                        json_arr_match = re.search(r'\[[\s\S]*\]', text)
+                        if json_arr_match:
+                            parsed = json.loads(json_arr_match.group())
+                        else:
+                            parsed = json.loads(text)
+
+                    # Normalize to topics list and personalization
+                    if isinstance(parsed, dict) and 'topics' in parsed:
+                        topics_raw = parsed.get('topics', [])
+                        if isinstance(parsed.get('personalization'), str) and parsed.get('personalization').strip():
+                            personalization_value = parsed.get('personalization').strip()[:300]
+                    elif isinstance(parsed, list):
+                        topics_raw = parsed
+                    else:
+                        raise ValueError("Unexpected JSON shape for topics response")
+
                     # Ensure proper format and enforce max 4 topics
                     formatted_topics = []
-                    for i, topic in enumerate(topics[:MAX_TOPICS_PER_REQUEST]):
+                    for i, topic in enumerate(topics_raw[:MAX_TOPICS_PER_REQUEST]):
                         if isinstance(topic, dict):
-                            name = str(topic.get('name', 'Unknown')).strip()[:200]  # Limit length
-                            formatted_topics.append({
+                            name = str(topic.get('name', 'Unknown')).strip()[:200]
+                            topic_payload = {
                                 'id': topic.get('id', i + 1),
                                 'name': name,
                                 'isActive': topic.get('isActive', True)
-                            })
+                            }
+                            # Pass through optional topic-specific context if present
+                            if 'context' in topic and isinstance(topic['context'], str) and topic['context'].strip():
+                                topic_payload['context'] = topic['context'].strip()[:200]
+                            formatted_topics.append(topic_payload)
                         elif isinstance(topic, str):
-                            name = str(topic).strip()[:200]  # Limit length
+                            name = str(topic).strip()[:200]
                             formatted_topics.append({
                                 'id': i + 1,
                                 'name': name,
                                 'isActive': True
                             })
-                    
+
                     # Return topics for user to review - DON'T record usage yet
                     if formatted_topics:
                         if settings.DEBUG:
-                            logger.debug(f"Returning {len(formatted_topics)} formatted topics for review")
-                        
+                            logger.debug(f"Returning {len(formatted_topics)} formatted topics for review with personalization")
+
                         return JsonResponse({
-                            'topics': formatted_topics
+                            'topics': formatted_topics,
+                            'personalization': personalization_value
                         })
                     else:
                         # No topics found
                         return JsonResponse({
                             'topics': [],
-                            'message': 'No clear learning topics found in your query. Please be more specific.'
+                            'message': 'No clear learning topics found in your query. Please be more specific.',
+                            'personalization': personalization_default
                         })
                     
                 except (json.JSONDecodeError, ValueError) as e:
                     if settings.DEBUG:
                         logger.debug(f"Failed to parse AI response: {e}")
-                    # Return fallback topics for review
+                    # Return fallback topics for review with default personalization
                     fallback_topics = generate_simple_fallback_topics(user_query)
-                    
+                    personalization_default = "Beginner-friendly, step-by-step explanations with practical examples."
                     return JsonResponse({
-                        'topics': fallback_topics
+                        'topics': fallback_topics,
+                        'personalization': personalization_default
                     })
             else:
                 if settings.DEBUG:
                     logger.debug("No valid candidates in response")
                 fallback_topics = generate_simple_fallback_topics(user_query)
-                
+                personalization_default = "Beginner-friendly, step-by-step explanations with practical examples."
                 return JsonResponse({
-                    'topics': fallback_topics
+                    'topics': fallback_topics,
+                    'personalization': personalization_default
                 })
                 
         except NetworkError as network_error:
@@ -378,16 +483,18 @@ Return only the JSON array, no explanations."""
             logger.error(f"Gemini API error: {api_error}")
             # Return fallback topics for review
             fallback_topics = generate_simple_fallback_topics(user_query)
-            
+            personalization_default = "Beginner-friendly, step-by-step explanations with practical examples."
             return JsonResponse({
-                'topics': fallback_topics
+                'topics': fallback_topics,
+                'personalization': personalization_default
             })
         
     except Exception as e:
         logger.error(f"Error in classify_topics: {e}")
         # Return minimal fallback
         return JsonResponse({
-            'topics': [{'id': 1, 'name': 'General Learning', 'isActive': True}]
+            'topics': [{'id': 1, 'name': 'General Learning', 'isActive': True}],
+            'personalization': "Beginner-friendly, step-by-step explanations with practical examples."
         })
 
 def check_topic_rate_limit_with_auth(request, requested_topics):
@@ -395,6 +502,19 @@ def check_topic_rate_limit_with_auth(request, requested_topics):
     from .rate_limiter import TopicRateLimiter, get_user_ip, validate_topic_input
     from django.contrib.auth import get_user_model
     
+    # Dev bypass to avoid 429s while iterating locally (enabled when DEBUG or explicit flag)
+    if getattr(settings, 'DEBUG', False) or getattr(settings, 'TOPIC_RATE_LIMIT_BYPASS_DEV', False):
+        try:
+            validate_topic_input(requested_topics)
+        except ValueError as e:
+            return False, str(e), {}
+        return True, "", {
+            'daily_used': 0,
+            'daily_limit': getattr(settings, 'MAX_TOPICS_PER_DAY', 1000),
+            'daily_remaining': getattr(settings, 'MAX_TOPICS_PER_DAY', 1000),
+            'per_request_limit': getattr(settings, 'MAX_TOPICS_PER_REQUEST', 4),
+        }
+
     try:
         # Validate input first
         validate_topic_input(requested_topics)
@@ -441,6 +561,19 @@ def record_topic_creation_with_auth(request, topics_created):
     from .rate_limiter import TopicRateLimiter, get_user_ip, validate_topic_input
     from django.contrib.auth import get_user_model
     
+    # Dev bypass to avoid caching usage while iterating locally (enabled when DEBUG or explicit flag)
+    if getattr(settings, 'DEBUG', False) or getattr(settings, 'TOPIC_RATE_LIMIT_BYPASS_DEV', False):
+        try:
+            validate_topic_input(topics_created)
+        except ValueError:
+            return {}
+        return {
+            'daily_used': 0,
+            'daily_limit': getattr(settings, 'MAX_TOPICS_PER_DAY', 1000),
+            'daily_remaining': getattr(settings, 'MAX_TOPICS_PER_DAY', 1000),
+            'per_request_limit': getattr(settings, 'MAX_TOPICS_PER_REQUEST', 4),
+        }
+
     try:
         # Validate input first
         validate_topic_input(topics_created)
@@ -494,17 +627,25 @@ def create_course_topics(request):
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         
         topics = body.get('topics', [])
-        
+
+        # Basic structural validation first
         if not topics:
             return JsonResponse({'error': 'Topics are required'}, status=400)
-        
+
         if not isinstance(topics, list):
             return JsonResponse({'error': 'Topics must be a list'}, status=400)
-        
+
         if len(topics) > MAX_TOPICS_PER_REQUEST:
             return JsonResponse({
                 'error': f'Too many topics: maximum {MAX_TOPICS_PER_REQUEST} allowed per request'
             }, status=400)
+
+        # Validate topic names using rate_limiter validation for clear 400s
+        try:
+            from .rate_limiter import validate_topic_input
+            validate_topic_input(topics)
+        except ValueError as ve:
+            return JsonResponse({'error': str(ve)}, status=400)
         
         if settings.DEBUG:
             logger.debug(f"Creating course with {len(topics)} topics")
@@ -539,39 +680,86 @@ def create_course_topics(request):
         return JsonResponse({'error': 'Internal server error'}, status=500)
 
 def generate_simple_fallback_topics(user_query):
-    """Generate simple fallback topics based on basic keyword matching with security validation"""
+    """Generate structured fallback topics (up to 4) for broad queries with security validation"""
     if not user_query or len(user_query) > MAX_QUERY_LENGTH:
-        return [{'id': 1, 'name': 'General Programming', 'isActive': True}]
-    
+        return [
+            {'id': 1, 'name': 'Introduction to Programming Concepts', 'isActive': True},
+            {'id': 2, 'name': 'Variables, Data Types & Operators', 'isActive': True},
+            {'id': 3, 'name': 'Control Flow: Conditionals & Loops', 'isActive': True},
+            {'id': 4, 'name': 'Functions & Modular Code', 'isActive': True},
+        ]
+
     query = user_query.lower().strip()
-    topics = []
-    
-    # Simple keyword mapping with input sanitization
-    keywords = {
-        'javascript': 'JavaScript',
-        'react': 'React',
-        'python': 'Python',
-        'html': 'HTML',
-        'css': 'CSS',
-        'java': 'Java',
-        'programming': 'Programming',
-        'web': 'Web Development',
-        'mobile': 'Mobile Development',
-        'api': 'API Development'
-    }
-    
-    topic_id = 1
-    for keyword, topic_name in keywords.items():
-        if keyword in query and len(topics) < MAX_TOPICS_PER_REQUEST:
-            topics.append({
-                'id': topic_id,
-                'name': topic_name,
-                'isActive': True
-            })
-            topic_id += 1
-    
-    # If no keywords matched, return general topic
-    if not topics:
-        topics = [{'id': 1, 'name': 'General Programming', 'isActive': True}]
-    
-    return topics[:MAX_TOPICS_PER_REQUEST]  # Ensure max topics limit
+
+    def four(ids_names):
+        # Ensure ids are 1..n and cap at MAX_TOPICS_PER_REQUEST
+        return [
+            {'id': i + 1, 'name': n, 'isActive': True}
+            for i, n in enumerate(ids_names[:MAX_TOPICS_PER_REQUEST])
+        ]
+
+    # Domain-specific 4-topic mini-curricula
+    if 'python' in query:
+        return four([
+            'Introduction to Python & Setup',
+            'Variables, Data Types & Strings',
+            'Control Flow: Conditionals & Loops',
+            'Functions & OOP Basics in Python',
+        ])
+    if 'dsa' in query or 'data structures' in query or 'algorithms' in query:
+        return four([
+            'Arrays & Strings',
+            'Stacks & Queues',
+            'Linked Lists & Hash Maps',
+            'Sorting & Searching Basics',
+        ])
+    if 'finance' in query or 'personal finance' in query:
+        return four([
+            'Personal Finance Fundamentals',
+            'Budgeting & Saving Strategies',
+            'Investing Basics: Stocks & ETFs',
+            'Risk Management & Financial Planning',
+        ])
+    if 'entrepreneur' in query or 'entrepreneurship' in query or 'startup' in query:
+        return four([
+            'Ideation & Problem Validation',
+            'MVP & Lean Testing',
+            'Business Model & Go-To-Market',
+            'Funding Basics & Key Metrics',
+        ])
+    if 'javascript' in query or 'js' in query:
+        return four([
+            'JavaScript Basics & Syntax',
+            'DOM & Events',
+            'Functions, Scope & Closures',
+            'Async JS: Promises & Async/Await',
+        ])
+    if 'react' in query:
+        return four([
+            'React Fundamentals & Components',
+            'State & Props',
+            'Hooks: useState & useEffect',
+            'Routing & Project Structure',
+        ])
+    if 'java' in query:
+        return four([
+            'Java Basics & Setup',
+            'OOP in Java: Classes & Objects',
+            'Collections & Generics',
+            'Exception Handling & File I/O',
+        ])
+    if 'web' in query or 'frontend' in query:
+        return four([
+            'HTML & Semantic Structure',
+            'CSS Fundamentals & Layout',
+            'JavaScript Essentials for the Web',
+            'Building a Simple Web Project',
+        ])
+
+    # General programming default
+    return four([
+        'Introduction to Programming Concepts',
+        'Variables, Data Types & Operators',
+        'Control Flow: Conditionals & Loops',
+        'Functions & Modular Code',
+    ])

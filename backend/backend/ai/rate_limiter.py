@@ -23,7 +23,9 @@ MAX_TOPICS_PER_REQUEST = int(getattr(settings, 'MAX_TOPICS_PER_REQUEST', 4))
 # Security constants
 MAX_CACHE_KEY_LENGTH = 250  # Memcached limit
 MAX_TOPIC_NAME_LENGTH = 200
-ALLOWED_TOPIC_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9\s\-\+\#\.\(\)]+$')
+# Allow common safe punctuation in topic names
+# Added '&' to support names like "Mitosis & Meiosis"
+ALLOWED_TOPIC_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9\s\-\+\#\.\(\)\&]+$')
 
 def validate_topic_input(topics):
     """Validate topic input for security"""

@@ -498,6 +498,7 @@ const ChatbotPage = () => {
   const [coursePlaceholder, setCoursePlaceholder] = useState("Create arrays and strings course...");
   const [showTopicConfirmation, setShowTopicConfirmation] = useState(false);
   const [pendingTopics, setPendingTopics] = useState([]);
+  const [personalization, setPersonalization] = useState("");
   const [originalPrompt, setOriginalPrompt] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showTopicModal, setShowTopicModal] = useState(false);
@@ -825,6 +826,13 @@ const ChatbotPage = () => {
           // This is a course creation request - call the classification API directly
           const result = await classifyTopics(promptToRetry);
           
+          // Capture personalization if provided
+          if (result && typeof result.personalization === 'string' && result.personalization.trim()) {
+            setPersonalization(result.personalization.trim());
+          } else {
+            setPersonalization('Beginner-friendly, step-by-step explanations with practical examples.');
+          }
+
           // Update usage stats from the response
           if (result.usage_stats) {
             setUsageStats(result.usage_stats);
@@ -1096,6 +1104,11 @@ const ChatbotPage = () => {
           console.log('🚀 Pro mode activated, calling classifyTopics with:', messageToSend);
           const result = await classifyTopics(messageToSend);
           console.log('✅ classifyTopics result:', result);
+          if (result && typeof result.personalization === 'string' && result.personalization.trim()) {
+            setPersonalization(result.personalization.trim());
+          } else {
+            setPersonalization('Beginner-friendly, step-by-step explanations with practical examples.');
+          }
           
           // Update usage stats from the response
           if (result.usage_stats) {
@@ -1471,9 +1484,11 @@ const ChatbotPage = () => {
   // Sanitize topic names for backend validation (allow apostrophes visually but strip for backend)
   const sanitizeTopicName = (name) => {
     if (!name) return '';
-    // Remove straight and curly quotes/backticks; normalize spaces
+    // Normalize whitespace and lightly sanitize client-side input.
+    // Keep user-visible symbols but replace & with 'and' to be safe across envs.
     const cleaned = String(name)
-      .replace(/[’'`]/g, '')
+      .replace(/[’'`]/g, '') // strip quotes/backticks
+      .replace(/&/g, ' and ')
       .replace(/\s+/g, ' ')
       .trim();
     return cleaned;
@@ -1514,7 +1529,7 @@ const ChatbotPage = () => {
       });
 
       if (result?.status === 429) {
-        // Rate limit exceeded
+        // Some backends may return 200 with a JSON status field; handle gracefully
         const botResponse = {
           id: generateMessageId(),
           type: "bot",
@@ -1523,14 +1538,8 @@ const ChatbotPage = () => {
           isRateLimit: true
         };
         setChatHistory(prev => [...prev, botResponse]);
-        setShowTopicModal(false);
-        setPendingTopics([]);
-        setOriginalPrompt("");
-        
-        // Update usage stats if provided
-        if (result.usage_stats) {
-          setUsageStats(result.usage_stats);
-        }
+        if (result.usage_stats) setUsageStats(result.usage_stats);
+        // Keep the confirmation dialog open and preserve topics so the user can adjust
         return;
       }
 
@@ -1579,6 +1588,26 @@ const ChatbotPage = () => {
       
     } catch (error) {
       console.error('Error creating course:', error);
+      // Handle HTTP 429 from axios (error.response present)
+      const status = error?.response?.status;
+      const data = error?.response?.data || {};
+      if (status === 429) {
+        const msg = data?.message || 'You have hit the rate limit. Please try again later or reduce the number of requests.';
+        const botResponse = {
+          id: generateMessageId(),
+          type: "bot",
+          content: `🚫 ${msg}`,
+          timestamp: new Date().toLocaleTimeString(),
+          isRateLimit: true
+        };
+        setChatHistory(prev => [...prev, botResponse]);
+        if (data?.usage_stats) setUsageStats(data.usage_stats);
+        // Do NOT clear topics; allow user to adjust and retry
+        // Keep the confirmation dialog open
+        setShowTopicConfirmation(true);
+        return;
+      }
+
       const errorResponse = {
         id: generateMessageId(),
         type: "bot",
@@ -1586,9 +1615,8 @@ const ChatbotPage = () => {
         timestamp: new Date().toLocaleTimeString(),
       };
       setChatHistory(prev => [...prev, errorResponse]);
-      setShowTopicModal(false);
-      setPendingTopics([]);
-      setOriginalPrompt("");
+      // Keep topics so user can retry; close dialog only if needed
+      setShowTopicConfirmation(true);
     }
   };
 
@@ -2221,10 +2249,17 @@ const ChatbotPage = () => {
                           <h3 className="text-lg font-semibold text-gray-800">Confirm Course Topics</h3>
                         </div>
                         
-                        <p className="text-sm text-gray-600 mb-4">
+                        <p className="text-sm text-gray-600 mb-2">
                           I found <strong>{pendingTopics.length}</strong> topic(s) from your query: "<em>{originalPrompt}</em>". 
                           You can edit, delete, or add topics before creating your course. <strong>Maximum 4 topics per course.</strong>
                         </p>
+                        {personalization && (
+                          <div className="mb-4">
+                            <span className="inline-block text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
+                              Personalization: {personalization}
+                            </span>
+                          </div>
+                        )}
                         
                         <div className="space-y-2 mb-4">
                           {pendingTopics.map((topic, index) => (

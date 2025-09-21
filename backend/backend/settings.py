@@ -244,6 +244,19 @@ if os.path.isdir(_backend_static):
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# ProLearning topic rate limits (read by backend.ai.rate_limiter)
+# Use higher defaults in development to avoid frequent 429s during testing
+if DEBUG:
+    MAX_TOPICS_PER_DAY = int(os.environ.get('MAX_TOPICS_PER_DAY', '1000'))
+else:
+    MAX_TOPICS_PER_DAY = int(os.environ.get('MAX_TOPICS_PER_DAY', '16'))
+
+# Per-request limit stays 4 by default; can be overridden via env
+MAX_TOPICS_PER_REQUEST = int(os.environ.get('MAX_TOPICS_PER_REQUEST', '4'))
+
+# Development-only: bypass rate limiting for faster local iteration
+TOPIC_RATE_LIMIT_BYPASS_DEV = DEBUG or os.environ.get('TOPIC_RATE_LIMIT_BYPASS_DEV', 'false').lower() in ('1','true','yes')
+
 # Authentication settings
 AUTHENTICATION_BACKENDS = [
     'social_core.backends.google.GoogleOAuth2',  # Add Google OAuth2 backend
@@ -447,9 +460,8 @@ LOGGING = {
     },
 }
 
-# Rate Limiting Configuration
-MAX_TOPICS_PER_DAY = int(os.environ.get('MAX_TOPICS_PER_DAY', '16'))
-MAX_TOPICS_PER_REQUEST = int(os.environ.get('MAX_TOPICS_PER_REQUEST', '4'))
+# Rate Limiting Configuration is already set above in dev/prod conditional
+# (removed duplicate definition that was overriding the dev-friendly limits)
 
 # X-Frame-Options Configuration
 # Allow iframe embedding for certificate PDFs while maintaining security

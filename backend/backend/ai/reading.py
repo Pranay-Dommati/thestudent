@@ -2,13 +2,12 @@ from django.http import JsonResponse
 from django.conf import settings
 import json
 import re
-from .ai_service import call_gemini_api
-
 from .ai_service import call_gemini_api, call_gemini_flash_api
 
 def classify_topic_with_ai(topic):
     """
-    Use Gemini 1.5 Flash to intelligently classify topic and select best prompt
+    Use Gemini 1.5 Pro to intelligently classify topic and select best prompt.
+    Falls back to keyword classification on any AI/formatting issue.
     """
     print(f"🤖 Analyzing topic with AI: {topic}")
     
@@ -35,15 +34,30 @@ Instructions:
 Respond with ONLY the category name (technical, academic, skills, business_finance, creative, entrepreneurship, or general). No explanation needed."""
 
     try:
-        print(f"🎯 Sending topic analysis request to Gemini Flash...")
-        response_data = call_gemini_flash_api(analysis_prompt)
-        
-        # Extract the response text from Gemini's response format
-        if 'candidates' in response_data and len(response_data['candidates']) > 0:
+        print(f"🎯 Sending topic analysis request to Gemini 1.5 Pro...")
+        response_data = call_gemini_api(analysis_prompt)
+
+        # Extract the response text safely
+        if isinstance(response_data, dict) and response_data.get('candidates'):
             candidate = response_data['candidates'][0]
-            if 'content' in candidate and 'parts' in candidate['content']:
-                category = candidate['content']['parts'][0]['text'].strip().lower()
-                
+            parts = (
+                candidate.get('content', {}).get('parts')
+                if isinstance(candidate.get('content'), dict)
+                else None
+            )
+            text = None
+            if isinstance(parts, list) and parts:
+                first = parts[0]
+                if isinstance(first, dict):
+                    text = first.get('text')
+            # Fallbacks
+            if not isinstance(text, str) or not text.strip():
+                # Try other shapes
+                text = candidate.get('text') if isinstance(candidate, dict) else None
+
+            if isinstance(text, str) and text.strip():
+                category = text.strip().lower()
+
                 # Validate the category
                 valid_categories = ['technical', 'academic', 'skills', 'business_finance', 'creative', 'entrepreneurship', 'general']
                 if category in valid_categories:
@@ -51,12 +65,11 @@ Respond with ONLY the category name (technical, academic, skills, business_finan
                     return category
                 else:
                     print(f"⚠️ AI returned invalid category '{category}', falling back to keyword classification")
-                    # Fall back to keyword-based classification if AI returns invalid category
                     return classify_topic(topic)
-        
-        print("❌ Invalid response format from Gemini Flash, falling back to keyword classification")
+
+        print("❌ Invalid or empty response from Gemini 1.5 Pro, falling back to keyword classification")
         return classify_topic(topic)
-        
+
     except Exception as e:
         print(f"❌ AI classification failed: {e}")
         print("🔄 Falling back to keyword-based classification")
