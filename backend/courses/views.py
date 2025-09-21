@@ -1078,10 +1078,10 @@ def submit_quiz(request, lesson_id):
                 {"error": "No quiz questions found for this lesson"},
                 status=status.HTTP_404_NOT_FOUND
             )
-          # Calculate score
-    # Support both DB and client-provided question sets
-    total_questions = quiz_questions.count() if quiz_questions.exists() else len(client_questions)
-    correct_answers = 0
+        # Calculate score
+        # Support both DB and client-provided question sets
+        total_questions = quiz_questions.count() if quiz_questions.exists() else len(client_questions)
+        correct_answers = 0
         
         # Debug information
         print(f"Processing quiz submission for lesson: {lesson_id}")
@@ -1157,8 +1157,8 @@ def submit_quiz(request, lesson_id):
             score=score,
             passed=passed,
             total_questions=total_questions
-        )
-          # If quiz passed, mark lesson as complete
+                )
+                # If quiz passed, mark lesson as complete
         if passed:
             UserLessonProgress.objects.get_or_create(
                 user=user,
