@@ -15,12 +15,13 @@ from .topics import handle_topics
 from .rate_limiter import check_topic_rate_limit, record_topic_creation
 import json
 import logging
-from .ai_service import call_gemini_api, NetworkError, call_gemini_2_5_pro_api
+from .ai_service import call_gemini_api, NetworkError, call_intent_classifier, call_gemini_flash_api
 import requests
 from .youtube import handle_youtube_search
+import re
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Use the 'ai' logger configured in settings (console+file, level INFO by default)
+logger = logging.getLogger('ai')
 
 # Input validation constants
 MAX_QUERY_LENGTH = 1000
@@ -153,6 +154,9 @@ def extract_explicit_topics(user_query: str):
     try:
         text = (user_query or '').lower()
 
+        # Do NOT attempt to append language/framework or domain suffixes here.
+        # Only detect the base topics; context enrichment will be handled by AI in direct mode.
+
         # Detect DSA domain suffix
         dsa_suffix = ''
         if any(k in text for k in [' dsa', 'data structures', 'algorithms']):
@@ -235,18 +239,21 @@ def extract_explicit_topics(user_query: str):
         for keys, name in dsa_topic_map:
             idxs = [text.find(k) for k in keys if k in text]
             if idxs:
-                title = f"{name}{dsa_suffix}" if dsa_suffix else name
+                # Return base name only; no suffixes here
+                title = name
                 matches.append((min(idxs), title))
         # Trigonometry matches
         for keys, name in trig_topic_map:
             idxs = [text.find(k) for k in keys if k in text]
             if idxs:
-                title = f"{name}{trig_suffix}"
+                # Return base name only; no suffixes here
+                title = name
                 matches.append((min(idxs), title))
         # Digital logic matches
         for keys, name in digital_topic_map:
             idxs = [text.find(k) for k in keys if k in text]
             if idxs:
+                # Return base name only; no suffixes here
                 title = name
                 matches.append((min(idxs), title))
 
@@ -341,6 +348,86 @@ Guidelines for topics:
 User Query: "{user_query}"
 
 Return only the JSON, no explanations."""
+
+
+def build_direct_topics_prompt(user_query: str, explicit_names: list[str]) -> str:
+        """Build a prompt for AI to enrich explicit topics with context from the user query.
+        Requirements:
+        - Preserve number and order of topics exactly as provided in explicit_names
+        - Lightly rephrase each name to include relevant context (e.g., language/framework/domain),
+            such as "Recursion in Python" instead of just "Recursion" when the query indicates it.
+        - Output a JSON object with the topics array only (personalization is not required here).
+        """
+        names_str = ", ".join(explicit_names[:MAX_TOPICS_PER_REQUEST])
+        return f"""You are an expert at clarifying topic names with context.
+From the user's query and their explicit topics, rewrite each topic name to include relevant context indicated by the query (e.g., language/framework/domain), but do NOT add or remove topics and preserve the same order.
+
+Return ONLY a JSON object with this exact shape (no extra text):
+{{
+    "topics": [
+        {{"id": 1, "name": "Rephrased Topic", "isActive": true}},
+        {{"id": 2, "name": "Rephrased Topic", "isActive": true}}
+    ]
+}}
+
+Rules:
+- Keep exactly {len(explicit_names[:MAX_TOPICS_PER_REQUEST])} topics, same order as provided.
+- If the query implies a programming language, framework, or domain (e.g., Python, JavaScript, DSA, Trigonometry), reflect it in the topic names: e.g., "{{Original}} in Python".
+- Be concise and clear. Topic names should be <= 60 characters when possible.
+
+User Query: "{user_query}"
+Explicit Topics (in order): [{names_str}]
+
+Return only the JSON, no explanations.
+"""
+
+
+def classify_query_intent(user_query: str) -> str:
+    """Heuristically classify the query as 'direct' or 'broad'.
+    - direct: user named specific topics (e.g., arrays, recursion, AES, bubble sort)
+    - broad: user asked for a general area (e.g., python, trigonometry, digital logic)
+    """
+    try:
+        q = (user_query or '').strip().lower()
+        if not q:
+            return 'broad'
+
+        # Quick signals: lists or conjunctions typically indicate direct items
+        if any(sep in q for sep in [',', ';']) or any(conn in q for conn in [' and ', ' or '] ):
+            return 'direct'
+
+        # Known broad domains
+        broad_terms = {
+            'python','java','javascript','typescript','react','node','django','flask','c++','c#','golang','go','rust',
+            'dsa','data structures','algorithms','math','algebra','trigonometry','calculus','geometry','probability','statistics',
+            'digital logic','history','world history','ww1','ww2','web','frontend','backend'
+        }
+        for t in broad_terms:
+            if t in q:
+                # Some short tokens like 'ww1'/'ww2' we treat as broad historical themes
+                return 'broad'
+
+        # Short single-term queries that are acronyms or specific concepts -> direct
+        toks = q.split()
+        if len(toks) == 1:
+            tok = toks[0]
+            # Common specific concepts
+            specific_set = {'aes','rsa','sha','sha-256','sha256','bubble sort','binary search','recursion','pointers','stack','queue','linked list','mitosis','photosynthesis'}
+            if tok in specific_set:
+                return 'direct'
+            # Acronym-like or library/util single token
+            if tok.isalpha() and 2 <= len(tok) <= 6:
+                return 'direct'
+        # Phrases like 'learn about <x>' where x is a single specific concept
+        if any(p in q for p in ['learn about ', 'study ', 'deep dive into ', 'explain ']):
+            # If extractor finds specific topics, consider direct
+            if extract_explicit_topics(user_query):
+                return 'direct'
+
+        # Default
+        return 'direct' if extract_explicit_topics(user_query) else 'broad'
+    except Exception:
+        return 'broad'
 
 
 class AIChatThrottle(UserRateThrottle):
@@ -572,34 +659,163 @@ def classify_topics(request):
         
         # Sanitize query for logging
         safe_query = user_query[:100] + "..." if len(user_query) > 100 else user_query
-        if settings.DEBUG:
-            logger.debug(f"Classifying topics for: {safe_query}")
+        logger.info(f"Classifying topics for: {safe_query}")
         
         # Extract context and main topic focus
         parts = user_query.lower().split(" in ")
         learning_context = parts[1].strip() if len(parts) > 1 else None
 
-        # Detect explicitly named topics, but pass them as constraints to the AI
+        # Structured debug metadata returned to frontend for transparency
+        debug_meta = {
+            'intent': None,
+            'intent_source': None,           # ai | heuristic-fallback | override
+            'prompt_mode': None,            # direct | broad
+            'explicit_constraints': [],
+            'topic_model_used': None,       # 2.5-pro | 1.5-pro
+            'model_retry_used': False,
+            'fallback_used': False,
+            'fallback_strategy': None,
+        }
+
+        # Classify intent: explicit vs broad (AI-first, fallback to heuristic)
+        intent = None
+        try:
+            ic_resp = call_intent_classifier(user_query)
+            ic_text = None
+            if 'candidates' in ic_resp and ic_resp['candidates']:
+                parts_ic = ic_resp['candidates'][0].get('content', {}).get('parts', [])
+                if parts_ic:
+                    ic_text = parts_ic[0].get('text')
+            if isinstance(ic_text, str) and ic_text.strip():
+                import re
+                m = re.search(r'\{[\s\S]*\}', ic_text)
+                parsed_ic = json.loads(m.group()) if m else json.loads(ic_text)
+                if isinstance(parsed_ic, dict) and parsed_ic.get('intent') in ['broad', 'direct']:
+                    intent = parsed_ic['intent']
+                    logger.info(f"Intent classifier (AI) returned: {intent} for query='{safe_query}'")
+                    debug_meta['intent'] = intent
+                    debug_meta['intent_source'] = 'ai'
+                    # Post-classification guardrail: single short term should be direct
+                    uq = user_query.strip()
+                    if intent == 'broad' and len(uq.split()) == 1 and 2 <= len(uq) <= 15:
+                        intent = 'direct'
+                        logger.info("Intent override applied (single short term → direct)")
+                        debug_meta['intent'] = intent
+                        debug_meta['intent_source'] = 'override'
+        except Exception:
+            intent = None
+        if not intent:
+            logger.info("Intent classifier failed; falling back to heuristic")
+        if not intent:
+            intent = classify_query_intent(user_query)
+            logger.info(f"Heuristic intent decided: {intent}")
+            debug_meta['intent'] = intent
+            debug_meta['intent_source'] = 'heuristic-fallback'
         try:
             explicit_topics = extract_explicit_topics(user_query)
         except Exception:
             explicit_topics = []
         explicit_names = [t.get('name') for t in explicit_topics if isinstance(t, dict) and t.get('name')]
 
-        prompt = build_topics_prompt(user_query, explicit_names or None)
+        # For direct intent: return extracted topic names as-is; for broad: let AI break down freely
+        if intent == 'direct' and explicit_names:
+            # Direct mode: enrich explicit topics with query context using AI (no breakdown, same count/order)
+            debug_meta['prompt_mode'] = 'direct'
+            debug_meta['explicit_constraints'] = explicit_names
+            logger.info(f"Direct mode: enriching {len(explicit_names)} explicit topics with context via AI")
+
+            prompt_direct = build_direct_topics_prompt(user_query, explicit_names[:MAX_TOPICS_PER_REQUEST])
+            used_model = None
+            response = None
+            try:
+                response = call_gemini_api(prompt_direct)
+                used_model = '1.5-pro'
+            except Exception:
+                try:
+                    response = call_gemini_flash_api(prompt_direct)
+                    used_model = '1.5-flash'
+                except Exception as e:
+                    logger.info(f"Direct enrichment failed, using explicit topics as-is. Error: {e}")
+                    # Fall back to explicit topics unchanged
+                    formatted_topics = [
+                        {'id': i + 1, 'name': name, 'isActive': True}
+                        for i, name in enumerate(explicit_names[:MAX_TOPICS_PER_REQUEST])
+                    ]
+                    debug_meta['topic_model_used'] = None
+                    debug_meta['topics_count'] = len(formatted_topics)
+                    debug_meta['fallback_used'] = True
+                    debug_meta['fallback_strategy'] = 'direct_enrichment_failed'
+                    personalization_value = derive_personalization(user_query)
+                    return JsonResponse({
+                        'topics': formatted_topics,
+                        'personalization': personalization_value,
+                        'debug_meta': debug_meta
+                    })
+
+            debug_meta['topic_model_used'] = used_model
+            # Extract and parse topics JSON
+            enriched_topics = None
+            try:
+                text = None
+                if 'candidates' in response and response['candidates']:
+                    parts_resp = response['candidates'][0].get('content', {}).get('parts', [])
+                    if parts_resp:
+                        text = parts_resp[0].get('text')
+                if isinstance(text, str) and text.strip():
+                    import re
+                    m = re.search(r'\{[\s\S]*\}', text)
+                    parsed = json.loads(m.group()) if m else json.loads(text)
+                    if isinstance(parsed, dict) and isinstance(parsed.get('topics'), list):
+                        enriched_topics = parsed['topics']
+            except Exception:
+                enriched_topics = None
+
+            # Validate and normalize enriched topics; fallback to explicit if malformed
+            formatted_topics = []
+            if isinstance(enriched_topics, list) and len(enriched_topics) == len(explicit_names[:MAX_TOPICS_PER_REQUEST]):
+                for i, topic in enumerate(enriched_topics[:MAX_TOPICS_PER_REQUEST]):
+                    if isinstance(topic, dict):
+                        name = str(topic.get('name', explicit_names[i])).strip()[:200]
+                        formatted_topics.append({'id': i + 1, 'name': name, 'isActive': True})
+                    elif isinstance(topic, str):
+                        name = str(topic).strip()[:200]
+                        formatted_topics.append({'id': i + 1, 'name': name, 'isActive': True})
+            else:
+                # Fallback: keep original explicit names
+                formatted_topics = [
+                    {'id': i + 1, 'name': name, 'isActive': True}
+                    for i, name in enumerate(explicit_names[:MAX_TOPICS_PER_REQUEST])
+                ]
+                if used_model:
+                    debug_meta['fallback_used'] = True
+                    debug_meta['fallback_strategy'] = 'direct_enrichment_parse_failed'
+
+            debug_meta['topics_count'] = len(formatted_topics)
+            personalization_value = derive_personalization(user_query)
+            return JsonResponse({
+                'topics': formatted_topics,
+                'personalization': personalization_value,
+                'debug_meta': debug_meta
+            })
+        
+        # Broad mode: use AI to generate curriculum breakdown
+        prompt = build_topics_prompt(user_query, None)  # No constraints for broad mode
+        debug_meta['prompt_mode'] = 'broad'
+        debug_meta['explicit_constraints'] = []
+        logger.info(f"Broad mode: using AI to break down '{safe_query}' into curriculum")
         
         try:
-            # Prefer Gemini 2.5 Pro; if unusable, retry with 1.5 Pro before heuristic fallback.
+            # Use Gemini 1.5 Pro for topic classification + personalization; fallback to 1.5 Flash.
             if settings.DEBUG:
-                logger.debug("Attempting Gemini 2.5 Pro API call for topic classification + personalization...")
+                logger.debug("Attempting Gemini 1.5 Pro API call for topic classification + personalization...")
             try:
-                response = call_gemini_2_5_pro_api(prompt)
-                used_model = '2.5-pro'
-            except Exception:
                 response = call_gemini_api(prompt)
                 used_model = '1.5-pro'
-            if settings.DEBUG:
-                logger.debug(f"Got Gemini response from {used_model}")
+            except Exception:
+                response = call_gemini_flash_api(prompt)
+                used_model = '1.5-flash'
+            logger.info(f"Topic generation model used: {used_model}")
+            debug_meta['topic_model_used'] = used_model
             
             # Extract text from response (robust to shape differences)
             if 'candidates' in response and len(response['candidates']) > 0:
@@ -628,10 +844,9 @@ def classify_topics(request):
                 # Guard against empty/None text
                 personalization_default = derive_personalization(user_query)
                 if not isinstance(text, str) or not text.strip():
-                    if settings.DEBUG:
-                        logger.debug("Empty/invalid AI text; retry with Gemini 1.5 Pro before fallback")
-                    # If not already 1.5, retry once with 1.5
-                    if used_model != '1.5-pro':
+                    logger.info("Empty/invalid AI text; retry with Gemini 1.5 Pro before fallback")
+                    # If initial was 1.5 Flash, retry once with 1.5 Pro; if initial was 1.5 Pro, no retry
+                    if used_model == '1.5-flash':
                         try:
                             retry_resp = call_gemini_api(prompt)
                             # Extract retry text
@@ -642,15 +857,33 @@ def classify_topics(request):
                                     retry_text = rparts[0].get('text')
                             if isinstance(retry_text, str) and retry_text.strip():
                                 text = retry_text
+                                debug_meta['model_retry_used'] = True
+                                debug_meta['topic_model_used'] = '1.5-pro'
                             else:
                                 raise ValueError('Empty retry text')
                         except Exception:
                             text = None
                     if not text:
-                        fallback_topics = (explicit_topics and _merge_with_fallback(user_query, explicit_topics)) or extract_explicit_topics(user_query) or generate_simple_fallback_topics(user_query)
+                        logger.info("Falling back to explicit+merge or domain fallback topics")
+                        # Compute fallback with strategy labeling
+                        fallback_topics = []
+                        if explicit_topics:
+                            fallback_topics = _merge_with_fallback(user_query, explicit_topics)
+                            if fallback_topics:
+                                debug_meta['fallback_strategy'] = 'explicit_merge'
+                        if not fallback_topics:
+                            re_explicit = extract_explicit_topics(user_query)
+                            if re_explicit:
+                                fallback_topics = re_explicit
+                                debug_meta['fallback_strategy'] = 're_extract_explicit'
+                        if not fallback_topics:
+                            fallback_topics = generate_simple_fallback_topics(user_query)
+                            debug_meta['fallback_strategy'] = 'domain_fallback'
+                        debug_meta['fallback_used'] = True
                         return JsonResponse({
                             'topics': fallback_topics,
-                            'personalization': personalization_default
+                            'personalization': personalization_default,
+                            'debug_meta': debug_meta
                         })
                 
                 # Try to parse JSON from response (support object or array for backward compatibility)
@@ -721,26 +954,31 @@ def classify_topics(request):
                         ):
                             personalization_value = derive_personalization(user_query)
 
+                        debug_meta['topics_count'] = len(formatted_topics)
                         return JsonResponse({
                             'topics': formatted_topics,
-                            'personalization': personalization_value
+                            'personalization': personalization_value,
+                            'debug_meta': debug_meta
                         })
                     else:
                         # No topics found
+                        debug_meta['topics_count'] = 0
                         return JsonResponse({
                             'topics': [],
                             'message': 'No clear learning topics found in your query. Please be more specific.',
-                            'personalization': personalization_default
+                            'personalization': personalization_default,
+                            'debug_meta': debug_meta
                         })
                     
                 except (json.JSONDecodeError, ValueError) as e:
                     if settings.DEBUG:
                         logger.debug(f"Failed to parse AI response: {e}; retry with 1.5 Pro before fallback")
                     # Retry parse with 1.5 Pro if first was 2.5
-                    parsed_ok = False
-                    if used_model != '1.5-pro':
+                    if used_model == '1.5-flash':
                         try:
                             retry_resp = call_gemini_api(prompt)
+                            debug_meta['model_retry_used'] = True
+                            debug_meta['topic_model_used'] = '1.5-pro'
                             rtext = None
                             if 'candidates' in retry_resp and retry_resp['candidates']:
                                 rparts = retry_resp['candidates'][0].get('content', {}).get('parts', [])
@@ -789,29 +1027,50 @@ def classify_topics(request):
                                         formatted_topics.append({'id': i + 1, 'name': name, 'isActive': True})
 
                                 if formatted_topics:
+                                    debug_meta['topics_count'] = len(formatted_topics)
                                     return JsonResponse({
                                         'topics': formatted_topics,
-                                        'personalization': (personalization_value or personalization_default)[:300]
+                                        'personalization': personalization_value,
+                                        'debug_meta': debug_meta
                                     })
                                 parsed_ok = True
                         except Exception:
                             parsed_ok = False
 
                     # Fallback if retry also failed (prefer explicit augmented by domain)
-                    fallback_topics = (explicit_topics and _merge_with_fallback(user_query, explicit_topics)) or extract_explicit_topics(user_query) or generate_simple_fallback_topics(user_query)
+                    # Compute fallback with strategy labeling
+                    fallback_topics = []
+                    if explicit_topics:
+                        fallback_topics = _merge_with_fallback(user_query, explicit_topics)
+                        if fallback_topics:
+                            debug_meta['fallback_strategy'] = 'explicit_merge'
+                    if not fallback_topics:
+                        re_explicit = extract_explicit_topics(user_query)
+                        if re_explicit:
+                            fallback_topics = re_explicit
+                            debug_meta['fallback_strategy'] = 're_extract_explicit'
+                    if not fallback_topics:
+                        fallback_topics = generate_simple_fallback_topics(user_query)
+                        debug_meta['fallback_strategy'] = 'domain_fallback'
+                    debug_meta['fallback_used'] = True
                     personalization_default = derive_personalization(user_query)
                     return JsonResponse({
                         'topics': fallback_topics,
-                        'personalization': personalization_default
+                        'personalization': personalization_default,
+                        'debug_meta': debug_meta
                     })
             else:
                 if settings.DEBUG:
                     logger.debug("No valid candidates in response")
+                # Compute fallback with strategy labeling
                 fallback_topics = extract_explicit_topics(user_query) or generate_simple_fallback_topics(user_query)
+                debug_meta['fallback_used'] = True
+                debug_meta['fallback_strategy'] = 're_extract_explicit' if extract_explicit_topics(user_query) else 'domain_fallback'
                 personalization_default = derive_personalization(user_query)
                 return JsonResponse({
                     'topics': fallback_topics,
-                    'personalization': personalization_default
+                    'personalization': personalization_default,
+                    'debug_meta': debug_meta
                 })
                 
         except NetworkError as network_error:
@@ -829,17 +1088,23 @@ def classify_topics(request):
             # Return explicit or fallback topics for review
             fallback_topics = extract_explicit_topics(user_query) or generate_simple_fallback_topics(user_query)
             personalization_default = derive_personalization(user_query)
+            debug_meta['fallback_used'] = True
+            debug_meta['fallback_strategy'] = 'api_error_fallback'
             return JsonResponse({
                 'topics': fallback_topics,
-                'personalization': personalization_default
+                'personalization': personalization_default,
+                'debug_meta': debug_meta
             })
         
     except Exception as e:
         logger.error(f"Error in classify_topics: {e}")
         # Return minimal fallback
+        debug_meta['fallback_used'] = True
+        debug_meta['fallback_strategy'] = 'unhandled_exception'
         return JsonResponse({
             'topics': [{'id': 1, 'name': 'General Learning', 'isActive': True}],
-            'personalization': derive_personalization("")
+            'personalization': derive_personalization(""),
+            'debug_meta': debug_meta
         })
 
 def check_topic_rate_limit_with_auth(request, requested_topics):
