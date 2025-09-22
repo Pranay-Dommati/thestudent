@@ -2442,6 +2442,66 @@ def update_course(request, course_id):
                         lesson_obj.save()
                         kept_lesson_ids.append(lesson_obj.id)
 
+                        # --- Nested: quiz questions update for SchoolCourse lessons ---
+                        has_quiz_key = ('quizQuestions' in les) or ('quiz_questions' in les)
+                        quiz_list = (les.get('quizQuestions') or les.get('quiz_questions') or [])
+                        if isinstance(quiz_list, str):
+                            try:
+                                import json as _json
+                                quiz_list = _json.loads(quiz_list) or []
+                            except Exception:
+                                quiz_list = []
+                        kept_question_ids = []
+                        for q in (quiz_list or []):
+                            q_id = q.get('id')
+                            question_text = (q.get('question') or '').strip()
+                            options = q.get('options') or []
+                            if isinstance(options, str):
+                                try:
+                                    import json as _json
+                                    options = _json.loads(options) or []
+                                except Exception:
+                                    options = []
+                            # Determine correct answer text
+                            ca = q.get('correctAnswer', q.get('correct_answer', ''))
+                            correct_answer_text = ''
+                            # Support index (int or numeric string)
+                            try:
+                                idx = int(ca)
+                                if 0 <= idx < len(options):
+                                    correct_answer_text = options[idx]
+                            except Exception:
+                                pass
+                            if not correct_answer_text and isinstance(ca, str) and ca in options:
+                                correct_answer_text = ca
+                            if not question_text or not options:
+                                # Skip invalid question payloads
+                                continue
+                            if q_id:
+                                qq = lesson_obj.quiz_questions.filter(id=q_id).first()
+                                if qq:
+                                    qq.question = question_text
+                                    qq.options = options
+                                    if correct_answer_text:
+                                        qq.correct_answer = correct_answer_text
+                                    qq.save()
+                                    kept_question_ids.append(qq.id)
+                                    continue
+                            # Create new
+                            qq = lesson_obj.quiz_questions.create(
+                                question=question_text,
+                                options=options,
+                                correct_answer=correct_answer_text or (options[0] if options else '')
+                            )
+                            kept_question_ids.append(qq.id)
+
+                        # Delete removed quiz questions for this lesson
+                        if has_quiz_key:
+                            if kept_question_ids:
+                                lesson_obj.quiz_questions.exclude(id__in=kept_question_ids).delete()
+                            else:
+                                lesson_obj.quiz_questions.all().delete()
+
                     # Delete lessons not in payload for this chapter
                     if kept_lesson_ids:
                         chapter_obj.lessons.exclude(id__in=kept_lesson_ids).delete()
@@ -2582,6 +2642,66 @@ def update_course(request, course_id):
                         lesson_obj.save()
                         kept_lesson_ids.append(lesson_obj.id)
 
+                        # --- Nested: quiz questions update for EngineeringCourse lessons ---
+                        has_quiz_key = ('quizQuestions' in les) or ('quiz_questions' in les)
+                        quiz_list = (les.get('quizQuestions') or les.get('quiz_questions') or [])
+                        if isinstance(quiz_list, str):
+                            try:
+                                import json as _json
+                                quiz_list = _json.loads(quiz_list) or []
+                            except Exception:
+                                quiz_list = []
+                        kept_question_ids = []
+                        for q in (quiz_list or []):
+                            q_id = q.get('id')
+                            question_text = (q.get('question') or '').strip()
+                            options = q.get('options') or []
+                            if isinstance(options, str):
+                                try:
+                                    import json as _json
+                                    options = _json.loads(options) or []
+                                except Exception:
+                                    options = []
+                            # Determine correct answer text
+                            ca = q.get('correctAnswer', q.get('correct_answer', ''))
+                            correct_answer_text = ''
+                            # Support index (int or numeric string)
+                            try:
+                                idx = int(ca)
+                                if 0 <= idx < len(options):
+                                    correct_answer_text = options[idx]
+                            except Exception:
+                                pass
+                            if not correct_answer_text and isinstance(ca, str) and ca in options:
+                                correct_answer_text = ca
+                            if not question_text or not options:
+                                # Skip invalid question payloads
+                                continue
+                            if q_id:
+                                qq = lesson_obj.quiz_questions.filter(id=q_id).first()
+                                if qq:
+                                    qq.question = question_text
+                                    qq.options = options
+                                    if correct_answer_text:
+                                        qq.correct_answer = correct_answer_text
+                                    qq.save()
+                                    kept_question_ids.append(qq.id)
+                                    continue
+                            # Create new
+                            qq = lesson_obj.quiz_questions.create(
+                                question=question_text,
+                                options=options,
+                                correct_answer=correct_answer_text or (options[0] if options else '')
+                            )
+                            kept_question_ids.append(qq.id)
+
+                        # Delete removed quiz questions for this lesson
+                        if has_quiz_key:
+                            if kept_question_ids:
+                                lesson_obj.quiz_questions.exclude(id__in=kept_question_ids).delete()
+                            else:
+                                lesson_obj.quiz_questions.all().delete()
+
                     # Delete lessons not in payload for this section
                     if kept_lesson_ids:
                         section_obj.lessons.exclude(id__in=kept_lesson_ids).delete()
@@ -2716,11 +2836,14 @@ def get_course_by_id(request, course_id):
                         'title': lesson.title,
                         'type': lesson.type,
                         'video_url': lesson.video_url,
+                        'videoUrl': lesson.video_url,
                         'description': lesson.description,
                         'about_lesson': lesson.about_lesson,
+                        'aboutLesson': lesson.about_lesson,
                         'order': lesson.order,
                         'resources': [],
-                        'quiz_questions': []
+                        'quiz_questions': [],
+                        'quizQuestions': []
                     }
                     
                     # Get lesson resources
@@ -2746,6 +2869,17 @@ def get_course_by_id(request, course_id):
                             'correct_answer': question.correct_answer
                         }
                         lesson_data['quiz_questions'].append(question_data)
+                        # Map correct_answer (text) -> index in options if present
+                        try:
+                            ca_idx = question.options.index(question.correct_answer)
+                        except Exception:
+                            ca_idx = 0 if (isinstance(question.options, list) and question.options) else -1
+                        lesson_data['quizQuestions'].append({
+                            'id': question.id,
+                            'question': question.question,
+                            'options': question.options,
+                            'correctAnswer': ca_idx
+                        })
                     
                     chapter_data['lessons'].append(lesson_data)
                 
@@ -2793,11 +2927,14 @@ def get_course_by_id(request, course_id):
                         'title': lesson.title,
                         'type': lesson.type,
                         'video_url': lesson.video_url,
+                        'videoUrl': lesson.video_url,
                         'description': lesson.description,
                         'about_lesson': lesson.about_lesson,
+                        'aboutLesson': lesson.about_lesson,
                         'order': lesson.order,
                         'resources': [],
-                        'quiz_questions': []
+                        'quiz_questions': [],
+                        'quizQuestions': []
                     }
                     
                     # Get lesson resources
@@ -2823,6 +2960,16 @@ def get_course_by_id(request, course_id):
                             'correct_answer': question.correct_answer
                         }
                         lesson_data['quiz_questions'].append(question_data)
+                        try:
+                            ca_idx = question.options.index(question.correct_answer)
+                        except Exception:
+                            ca_idx = 0 if (isinstance(question.options, list) and question.options) else -1
+                        lesson_data['quizQuestions'].append({
+                            'id': question.id,
+                            'question': question.question,
+                            'options': question.options,
+                            'correctAnswer': ca_idx
+                        })
                     
                     section_data['lessons'].append(lesson_data)
                 
