@@ -8,9 +8,6 @@ venv/
 .vscode/
 venv
 # Environment variables
-env/
-env
-.env
 # Python compiled files and cache
 __pycache__/
 *.py[cod]
