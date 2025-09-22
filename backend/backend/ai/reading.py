@@ -168,18 +168,28 @@ def classify_topic(topic):
         print(f"❓ Keyword classification result: '{topic}' → 'general' (no keywords matched)")
         return 'general'
 
-def get_prompt_by_category(topic, category):
+def get_prompt_by_category(topic, category, personalization: str | None = None, topic_context: str | None = None):
     """
     Return the appropriate prompt based on topic category
     """
     print(f"📝 Selecting prompt for category: '{category}' and topic: '{topic}'")
-    
+
+    # Normalize personalization block for prompt injection (topic-specific context intentionally not used)
+    pers_block = (
+        f"\n\n👤 Learner Personalization Cues (apply tone, examples, depth accordingly):\n- {personalization.strip()}\n"
+        if isinstance(personalization, str) and personalization.strip()
+        else "\n"
+    )
+    # Note: topic_context is intentionally ignored as per product requirement
+
     if category == 'technical':
         print(f"🔧 Using TECHNICAL prompt for topic: '{topic}'")
         print(f"🎯 PROMPT IDENTIFIER: TECHNICAL_PROMPT_V2024 - Programming/Development Focus")
         return f"""You are an expert software engineering instructor and technical mentor. Generate comprehensive, professional educational content on **technical topics** including programming concepts, software development practices, frameworks, system design, and computer science fundamentals.
 
 Your task is to create a detailed **Reading Section** using **Markdown syntax** that serves as a complete learning resource for developers, from beginners to intermediate level.
+
+{pers_block}
 
 🎯 **Tone & Style Guidelines**:
 - Professional yet accessible - like a senior developer explaining to a junior colleague
@@ -230,6 +240,8 @@ Return the content **only in Markdown format**, beginning directly with `## Intr
 
 Given a topic by the user, generate a **detailed, easy-to-understand Reading Section** using **Markdown format**. The content should be self-contained and suitable for students and lifelong learners aiming to understand the topic deeply.
 
+{pers_block}
+
 🎯 **Tone & Style Guidelines**:
 - Clear, engaging, and student-friendly.
 - Avoid jargon unless explained.
@@ -269,6 +281,8 @@ Return the content **only in Markdown format**, beginning directly with `## Intr
         return f"""You are a professional coach and educator skilled in teaching **soft skills and personal development topics** like communication, confidence, time management, emotional intelligence, leadership, etc.
 
 Given a topic by the user, generate a clear and structured **Reading Section** in **Markdown format** that helps individuals learn and grow in this area—whether for career, personal life, or relationships.
+
+{pers_block}
 
 🎯 **Tone & Style Guidelines**:
 - Friendly, motivational, and practical.
@@ -311,6 +325,8 @@ Return the content **only in Markdown format**, beginning directly with `## Intr
 
 When a user provides a topic, generate a full *Reading Section* that feels like a high-quality self-paced learning resource for students, early professionals, founders, and finance enthusiasts.
 
+{pers_block}
+
 ✅ Guidelines to follow:
 
 - Explain the **fundamentals**: What it is, why it matters, and its relevance in real-world business or finance contexts.
@@ -342,6 +358,8 @@ Start directly with the markdown content, using a format like:
         return f"""You are a creative mentor AI that helps learners master topics related to **creative arts, writing, storytelling, filmmaking, design, photography, content creation, and media production**.
 
 Your job is to generate a *Reading Section* that feels like a personal guide from a creative industry expert — full of insight, examples, and inspiration.
+
+{pers_block}
 
 ✅ Guidelines to follow:
 
@@ -376,6 +394,8 @@ Start with markdown output like this:
         return f"""You are an expert business mentor and entrepreneurship educator specializing in **startups, business strategy, marketing, venture capital, business models, and entrepreneurship fundamentals**.
 
 Your task is to create a comprehensive **Reading Section** using **Markdown syntax** that serves as a complete learning resource for aspiring entrepreneurs and business professionals.
+
+{pers_block}
 
 🎯 **Tone & Style Guidelines**:
 - Professional yet inspiring - like a successful entrepreneur sharing wisdom
@@ -480,37 +500,48 @@ Generate only the markdown content. Be comprehensive but concise."""
 def handle_reading(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    
+
     try:
         body = json.loads(request.body.decode('utf-8'))
-        topic = body.get('topic', '')
-        
+        topic = body.get('topic', '').strip()
+        # Only personalization is applied; topic-specific context is intentionally ignored
+        personalization = body.get('personalization')
+        topic_context = None
+
         print(f"\n{'='*60}")
-        print(f"🚀 STARTING AI PROMPT SELECTION PROCESS")
+        print("🚀 STARTING AI PROMPT SELECTION PROCESS")
         print(f"{'='*60}")
         print(f"📥 Input Topic: '{topic}'")
-        print(f"🤖 Method: AI-Powered Classification (Primary) + Keyword Fallback (Backup)")
-        
+        print("🤖 Method: AI-Powered Classification (Primary) + Keyword Fallback (Backup)")
+        # Debug: log personalization received (topic_context is intentionally ignored)
+        try:
+            pers_preview = (personalization or "").strip()
+            if len(pers_preview) > 140:
+                pers_preview = pers_preview[:140] + "..."
+            print(f"👤 Personalization received: '{pers_preview if pers_preview else 'None'}'")
+        except Exception:
+            print("👤 Personalization received: <unprintable or None>")
+
         # Classify the topic using AI and get appropriate prompt
         category = classify_topic_with_ai(topic)
-        
+
         print(f"🎯 FINAL CATEGORY SELECTED: '{category.upper()}'")
-        
-        # Get the appropriate prompt
-        prompt = get_prompt_by_category(topic, category)
-        
-        print(f"� ACTUAL PROMPT BEING USED:")
+
+        # Get the appropriate prompt with personalization only
+        prompt = get_prompt_by_category(topic, category, personalization=personalization, topic_context=topic_context)
+
+        print("🧩 ACTUAL PROMPT BEING USED:")
         print(f"{'='*40}")
         print(prompt[:500] + "..." if len(prompt) > 500 else prompt)
         print(f"{'='*40}")
-        
-        print(f"�📤 Sending to Gemini API with {category.upper()} prompt...")
+
+        print(f"📤 Sending to Gemini API with {category.upper()} prompt...")
         print(f"{'='*60}")
-        
+
         result = call_gemini_api(prompt)
-        
-        print(f"✅ Content generated successfully!")
-        
+
+        print("✅ Content generated successfully!")
+
         # Analyze if the response matches the expected prompt format
         if isinstance(result, dict) and 'content' in result:
             content_text = result['content']
@@ -548,8 +579,12 @@ def handle_reading(request):
                 'category': category,
                 'prompt_id': f"{category.upper()}_PROMPT_V2024" if category != 'general' else 'GENERAL_FALLBACK_V2024',
                 'prompt_description': get_prompt_description(category),
-                'expected_content_type': get_expected_content_type(category)
+                'expected_content_type': get_expected_content_type(category),
+                'personalization_applied': bool(personalization),
+                'topic_context_applied': False
             }
+            result['applied_personalization'] = personalization
+            result['applied_topic_context'] = None
             result['backend_analysis'] = {
                 'content_length': len(content_text),
                 'word_count_estimate': len(content_text.split()),
@@ -567,8 +602,12 @@ def handle_reading(request):
                     'category': category,
                     'prompt_id': f"{category.upper()}_PROMPT_V2024" if category != 'general' else 'GENERAL_FALLBACK_V2024',
                     'prompt_description': get_prompt_description(category),
-                    'expected_content_type': get_expected_content_type(category)
+                    'expected_content_type': get_expected_content_type(category),
+                    'personalization_applied': bool(personalization),
+                    'topic_context_applied': False
                 },
+                'applied_personalization': personalization,
+                'applied_topic_context': None,
                 'backend_analysis': {
                     'content_length': len(content_text),
                     'word_count_estimate': len(content_text.split()),

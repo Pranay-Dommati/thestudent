@@ -24,8 +24,8 @@ MAX_TOPICS_PER_REQUEST = int(getattr(settings, 'MAX_TOPICS_PER_REQUEST', 4))
 MAX_CACHE_KEY_LENGTH = 250  # Memcached limit
 MAX_TOPIC_NAME_LENGTH = 200
 # Allow common safe punctuation in topic names
-# Added '&' to support names like "Mitosis & Meiosis"
-ALLOWED_TOPIC_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9\s\-\+\#\.\(\)\&]+$')
+# Added support for characters used frequently in course topics: &, comma, colon, slash, and apostrophes
+ALLOWED_TOPIC_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9\s\-\+\#\.\(\)\&,:\/'’]+$")
 
 def validate_topic_input(topics):
     """Validate topic input for security"""
@@ -217,7 +217,8 @@ class TopicRateLimiter:
             if not name or len(name) > MAX_TOPIC_NAME_LENGTH:
                 name = name[:MAX_TOPIC_NAME_LENGTH] if name else 'Unknown'
             if not ALLOWED_TOPIC_NAME_PATTERN.match(name):
-                name = re.sub(r'[^\w\s\-\+\#\.\(\)]', '', name) or 'Invalid_Name'
+                # Remove disallowed characters but keep common safe punctuation used in topic names
+                name = re.sub(r"[^\w\s\-\+\#\.\(\)\&,:\/'’]", '', name) or 'Invalid_Name'
             sanitized_topics.append(name)
         
         # Record request with precise timestamp

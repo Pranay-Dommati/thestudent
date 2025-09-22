@@ -4,12 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss(),],
-  esbuild: {
-    // Strip console and debugger in both build and preview transforms
-    drop: ['console', 'debugger']
-  },
   build: {
-    // Remove all console.* and debugger statements in production bundles
+    // Only strip console logs in production builds, keep them in development
     terserOptions: {
       compress: {
         drop_console: true,

@@ -145,6 +145,21 @@ export const classifyTopics = async (query, expectedTopics = null) => {
       ...(expectedTopics && { expected_topics: expectedTopics })
     };
     const { data: result } = await aiAxios.post('/classify_topics/', requestData);
+    // Persist latest classification for downstream personalization/context usage
+    try {
+      const payloadToStore = {
+        query: query.trim(),
+        topics: Array.isArray(result?.topics) ? result.topics : [],
+        personalization: typeof result?.personalization === 'string' ? result.personalization : null,
+        timestamp: Date.now(),
+      };
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('proLearning:lastClassification', JSON.stringify(payloadToStore));
+      }
+    } catch (e) {
+      // Non-fatal: storage unavailable or quota exceeded
+      logger.warn('Could not persist latest classification payload:', e?.message || e);
+    }
     return handleClassificationSuccess(result);
     
   } catch (error) {

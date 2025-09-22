@@ -96,12 +96,64 @@ async function enforceRateLimit() {
   lastRequestTime = Date.now();
 }
 
+// Accessor for last classification persisted by topicclassifier
+function getLastClassification() {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem('proLearning:lastClassification');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 // Generate content for a single topic with enhanced error handling
-async function generateSingleTopicContent(topic) {
+async function generateSingleTopicContent(topic, { personalization = null, topicContext = null } = {}) {
   try {
     // Starting AI content generation for topic via secure backend proxy
     const axiosAi = (await import('../../../utils/axiosAi')).default;
-    const { data: result } = await axiosAi.post('/reading/', { topic });
+    // Derive defaults from last classification if not explicitly provided
+    let effectivePersonalization = personalization;
+    let effectiveTopicContext = topicContext;
+    const last = getLastClassification();
+    if (!effectivePersonalization && last && typeof last.personalization === 'string' && last.personalization.trim()) {
+      effectivePersonalization = last.personalization.trim();
+    }
+    if (!effectiveTopicContext) {
+      // If topic passed in is an object with context, use that
+      const topicObj = (typeof topic === 'object' && topic !== null) ? topic : null;
+      if (topicObj && typeof topicObj.context === 'string' && topicObj.context.trim()) {
+        effectiveTopicContext = topicObj.context.trim();
+      } else if (last && Array.isArray(last.topics)) {
+        // Try to match by name and extract context
+        const topicName = topicObj?.name || String(topic);
+        const match = last.topics.find(t => (t?.name || '').toLowerCase() === String(topicName).toLowerCase());
+        if (match && typeof match.context === 'string' && match.context.trim()) {
+          effectiveTopicContext = match.context.trim();
+        }
+      }
+    }
+
+    const payload = {
+      topic: (typeof topic === 'object' && topic?.name) ? topic.name : String(topic),
+      ...(effectivePersonalization ? { personalization: effectivePersonalization } : {}),
+      ...(effectiveTopicContext ? { topic_context: effectiveTopicContext } : {}),
+    };
+
+    // FRONTEND DEBUG: Log what we're sending to the backend
+    try {
+      const preview = {
+        topic: payload.topic,
+        personalization: payload.personalization ? `${String(payload.personalization).slice(0, 120)}${String(payload.personalization).length > 120 ? '...' : ''}` : null,
+        topic_context_included: Boolean(payload.topic_context),
+      };
+      logger.log('🛰️ Posting to /ai/reading/ with payload:', preview);
+    } catch {}
+
+    const { data: result } = await axiosAi.post('/reading/', payload);
     
     // FRONTEND: Received AI response for topic
     // Response Analysis logged
@@ -206,18 +258,23 @@ export async function generateReadingContent(user_input, setContent, options = {
   }
 
   // Sanitize and prepare topics
-  const topics = user_input
+  // Accept either string input (comma-separated) or an array of topic strings/objects
+  const topicsArray = Array.isArray(user_input) ? user_input : user_input
     .split(',')
-    .map(topic => topic.trim())
-    .filter(topic => topic.length > 0)
-    .slice(0, 10); // Limit to prevent abuse
+    .map(t => t.trim())
+    .filter(t => t.length > 0);
+  const topics = topicsArray.slice(0, 10); // Limit to prevent abuse
 
   if (topics.length === 0) {
     throw new Error('No valid topics provided');
   }
 
   // Check cache first
-  const cachedContent = getCachedContent(user_input);
+  // Compose a cache key that factors personalization when provided
+  const personalizationKey = typeof options.personalization === 'string' && options.personalization.trim() ? `|p:${options.personalization.trim().slice(0,50)}` : '';
+  const topicContextKey = typeof options.topicContext === 'string' && options.topicContext.trim() ? `|c:${options.topicContext.trim().slice(0,50)}` : '';
+  const cacheKeyWhole = (Array.isArray(user_input) ? user_input.map(t => (t?.name || t)).join(',') : user_input) + personalizationKey + topicContextKey;
+  const cachedContent = getCachedContent(cacheKeyWhole);
   if (cachedContent) {
     setContent({
       reading: cachedContent,
@@ -251,7 +308,8 @@ export async function generateReadingContent(user_input, setContent, options = {
       
       const batchPromises = batch.map(async (topic, index) => {
         // Check cache first
-        const cacheKey = `${topic}`.toLowerCase().replace(/\s+/g, '-');
+        const topicName = (typeof topic === 'object' && topic?.name) ? topic.name : String(topic);
+        const cacheKey = `${topicName}${personalizationKey}${topicContextKey}`.toLowerCase().replace(/\s+/g, '-');
         const cachedContent = getCachedContent(cacheKey);
         if (cachedContent) {
           return cachedContent;
@@ -263,7 +321,7 @@ export async function generateReadingContent(user_input, setContent, options = {
         return await retryWithBackoff(async () => {
           await enforceRateLimit();
           try {
-            const content = await generateSingleTopicContent(topic);
+            const content = await generateSingleTopicContent(topic, { personalization: options.personalization, topicContext: options.topicContext });
             setCachedContent(cacheKey, content);
             return content;
           } catch (error) {
@@ -320,7 +378,7 @@ export async function generateReadingContent(user_input, setContent, options = {
     });
     
     setContent(contentToSet);
-    setCachedContent(user_input, finalContent);
+  setCachedContent(cacheKeyWhole, finalContent);
   logger.log(`✅ Successfully generated content for ${validResponses.length}/${topics.length} topics`);
   } catch (error) {
   logger.error('🚨 Content generation failed:', error);

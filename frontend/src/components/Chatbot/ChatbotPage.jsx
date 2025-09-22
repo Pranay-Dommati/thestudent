@@ -1104,6 +1104,11 @@ const ChatbotPage = () => {
           console.log('🚀 Pro mode activated, calling classifyTopics with:', messageToSend);
           const result = await classifyTopics(messageToSend);
           console.log('✅ classifyTopics result:', result);
+          
+          // Log debug metadata for transparency
+          if (result?.debug_meta) {
+            console.info('🧭 Classification Debug Info:', result.debug_meta);
+          }
           if (result && typeof result.personalization === 'string' && result.personalization.trim()) {
             setPersonalization(result.personalization.trim());
           } else {
@@ -1481,14 +1486,14 @@ const ChatbotPage = () => {
     setPendingTopics([...pendingTopics, newTopic]);
   };
 
-  // Sanitize topic names for backend validation (allow apostrophes visually but strip for backend)
+  // Sanitize topic names for backend validation and strip any inline per-topic context/newlines
   const sanitizeTopicName = (name) => {
     if (!name) return '';
+    // If AI or UI appended inline context on a new line, keep only the first line as the topic name
+    let base = String(name).split('\n')[0];
     // Normalize whitespace and lightly sanitize client-side input.
-    // Keep user-visible symbols but replace & with 'and' to be safe across envs.
-    const cleaned = String(name)
-      .replace(/[’'`]/g, '') // strip quotes/backticks
-      .replace(/&/g, ' and ')
+    // Keep common punctuation (commas, colons, slashes, apostrophes) now allowed by backend.
+    const cleaned = base
       .replace(/\s+/g, ' ')
       .trim();
     return cleaned;
@@ -1521,7 +1526,9 @@ const ChatbotPage = () => {
       );
       const { data: result } = await aiAxios.post('/create-course-topics/', {
         topics: pendingTopics.map(t => ({
-          ...t,
+          // Only send id/isActive/name; do not send any per-topic context to backend
+          id: t.id,
+          isActive: t.isActive !== false,
           name: sanitizeTopicName(t.name) || String(t.name || '').trim()
         })),
         learningContext,
@@ -2273,13 +2280,7 @@ const ChatbotPage = () => {
                                     onChange={(e) => handleTopicEdit(index, e.target.value)}
                                     className="w-full px-2 py-1 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                                   />
-                                  {topic.context && (
-                                    <div className="mt-1 ml-2">
-                                      <span className="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
-                                        {topic.context}
-                                      </span>
-                                    </div>
-                                  )}
+                                  {/* Per-topic context intentionally not displayed */}
                                 </div>
                                 <button
                                   onClick={() => handleTopicDelete(index)}
