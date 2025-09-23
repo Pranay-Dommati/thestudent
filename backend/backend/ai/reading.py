@@ -58,6 +58,12 @@ Respond with ONLY the category name (technical, academic, skills, business_finan
             if isinstance(text, str) and text.strip():
                 category = text.strip().lower()
 
+                # Math-first override: force academic for clear math topics
+                math_terms = re.compile(r"\b(algebra|calculus|trigonometry|geometry|differential\s+equations?|equations?|derivatives?|integrals?|limits?|matrix|matrices|linear\s+algebra|probability|statistics?)\b", re.IGNORECASE)
+                if math_terms.search(topic) and category != 'academic':
+                    print(f"📚 Overriding AI category '{category}' → 'academic' for math-related topic")
+                    category = 'academic'
+
                 # Validate the category
                 valid_categories = ['technical', 'academic', 'skills', 'business_finance', 'creative', 'entrepreneurship', 'general']
                 if category in valid_categories:
@@ -102,7 +108,11 @@ def classify_topic(topic):
         'economics', 'political science', 'law', 'medicine', 'anatomy', 'physiology',
         'astronomy', 'geology', 'ecology', 'evolution', 'genetics', 'quantum', 'relativity',
         'theory', 'research', 'study', 'academic', 'scholarly', 'scientific method',
-        'hypothesis', 'experiment', 'analysis', 'statistics', 'probability'
+        'hypothesis', 'experiment', 'analysis', 'statistics', 'probability',
+        # Math-heavy topics we always want as academic
+        'algebra', 'calculus', 'trigonometry', 'geometry', 'equation', 'equations',
+        'differential equations', 'derivative', 'derivatives', 'integral', 'integrals',
+        'limit', 'limits', 'matrix', 'matrices', 'linear algebra'
     ]
     
     # Skills & Personal Development Keywords
@@ -235,38 +245,50 @@ Your task is to create a detailed **Reading Section** using **Markdown syntax** 
 Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the specified sections."""
 
     elif category == 'academic':
-        print(f"📚 Using ACADEMIC prompt for topic: '{topic}'")
-        return f"""You are an expert AI tutor trained to explain **academic or general knowledge subjects** such as History, Physics, Economics, Psychology, Biology, etc.
+            print(f"✅ Using UNIVERSAL & COMPATIBLE prompt for topic: '{topic}'")
+            return f"""You are a dynamic AI curriculum designer and expert educator. Your purpose is not to follow a template, but to create the most effective and personalized learning module possible for a user's specific platform.
 
-Given a topic by the user, generate a **detailed, easy-to-understand Reading Section** using **Markdown format**. The content should be self-contained and suitable for students and lifelong learners aiming to understand the topic deeply.
+Your primary, non-negotiable mission is to generate a bespoke learning experience based **entirely** on the user's personalization request below. You must deeply internalize their learning style, level, and goals, and let that dictate the structure, tone, and content of your response.
 
 {pers_block}
 
-🎯 **Tone & Style Guidelines**:
-- Clear, engaging, and student-friendly.
-- Avoid jargon unless explained.
-- Think like a passionate teacher who wants the learner to genuinely understand.
+---
 
-📘 **Content Must Include**:
-- ✅ Explanation of the topic from basics.
-- ✅ Organize content using these Markdown headers:
-  - `## Introduction`
-  - `## Historical/Scientific Background` *(use only if relevant)*
-  - `## Core Concepts`
-  - `## Real-World Relevance`
-  - `## Diagrams or Visual Description` *(describe if real images can't be embedded)*
-  - `## Examples or Case Studies`
-  - `## Interesting Facts` *(optional)*
-- ✅ Use formatting:
-  - `**bold**` for key terms
-  - Bullet points for breakdowns
-  - Numbered steps for logical processes
-  - Backticks (```) only for formatting, not for code
+### Core Directives & Guiding Principles:
+
+**1. Break the Mold (Embrace Adaptability):**
+- **Do NOT use a fixed, static set of Markdown headers.**
+- **Dynamically choose the most effective structure** and section headers based on the subject matter and the user's unique learning needs. A lesson on History will look very different from a lesson on Algebra.
+
+**2. Principles of an Exceptional Lesson (These must be included, but in your own structure):**
+- **A Captivating Hook:** Start by explaining why the topic is fascinating or critically important, tailored to the user's perspective.
+- **Foundational Concepts:** Clearly and simply explain the absolute basics before building on them.
+- **The Core Subject Matter:** This is the heart of the lesson. Explain the key principles, theories, or mechanisms.
+- **Concrete Application:** Show the concepts in action with clear examples or case studies.
+- **An Illuminating Visual or Analogy:** Provide a text-based diagram, a powerful analogy, or a descriptive visual to aid understanding. Use simple Markdown lists or blockquotes for diagrams.
+
+**3. CRITICAL Formatting Rules for Math & Code (Universal Compatibility):**
+- **Do NOT use LaTeX.** Avoid `$ ... $` and `$$ ... $$` syntax completely.
+- **Do NOT use triple backtick code fences (```) in academic content.** These render as large code panels in the UI.
+- **For inline math and variables** (like x, 5, or a specific term), wrap in **single backticks**.
+    - Example: "To find the value of `x`, we need to..."
+- **For multi-line equations**, write each equation on its own line using simple symbols (`*` for multiply, `/` for divide`). Present them as bullet points or blockquotes without code fences.
+    - Example:
+        - `12 * p = 60`
+        - `(12 * p) / 12 = 60 / 12`
+        - `p = 5`
+- For text-based diagrams, prefer blockquotes:
+    > Distance-Time Graph (conceptual):
+    > start → steady speed → stop
+
+**4. General Formatting for Clarity:**
+- Use Markdown effectively: `**bold**` for key terms, bullet points for lists, and descriptive headers that you invent for the specific topic.
+- Keep paragraphs focused and digestible.
 
 🚫 **Do NOT include**:
-- Summary
-- Quiz
-- Links to sources
+- A final "Summary" or "Conclusion" section.
+- A quiz, practice questions, or homework assignments.
+- External links or source citations.
 
 ---
 
@@ -274,8 +296,8 @@ Given a topic by the user, generate a **detailed, easy-to-understand Reading Sec
 {topic}
 
 ## OUTPUT FORMAT:
-Return the content **only in Markdown format**, beginning directly with `## Introduction` and continuing with the sections listed above."""
-
+Return the content **only in Markdown format**. Invent your own logical structure and headers that best serve the topic and the user's personalization request, while strictly following the universal compatibility rules (no code fences; use inline backticks for math).
+"""
     elif category == 'skills':
         print(f"💪 Using SKILLS prompt for topic: '{topic}'")
         return f"""You are a professional coach and educator skilled in teaching **soft skills and personal development topics** like communication, confidence, time management, emotional intelligence, leadership, etc.
@@ -518,7 +540,9 @@ def handle_reading(request):
             pers_preview = (personalization or "").strip()
             if len(pers_preview) > 140:
                 pers_preview = pers_preview[:140] + "..."
+            print("----- PERSONALIZATION DEBUG BEGIN -----")
             print(f"👤 Personalization received: '{pers_preview if pers_preview else 'None'}'")
+            print("----- PERSONALIZATION DEBUG END -----")
         except Exception:
             print("👤 Personalization received: <unprintable or None>")
 
@@ -543,15 +567,219 @@ def handle_reading(request):
         print("✅ Content generated successfully!")
 
         # Analyze if the response matches the expected prompt format
-        if isinstance(result, dict) and 'content' in result:
-            content_text = result['content']
+        if isinstance(result, dict):
+            if 'content' in result and isinstance(result['content'], str):
+                content_text = result['content']
+            elif 'candidates' in result:
+                # Extract first candidate text
+                try:
+                    candidates = result.get('candidates') or []
+                    candidate0 = candidates[0] if candidates else {}
+                    parts = (
+                        candidate0.get('content', {}).get('parts')
+                        if isinstance(candidate0.get('content'), dict)
+                        else None
+                    )
+                    text = None
+                    if isinstance(parts, list) and parts:
+                        first = parts[0]
+                        if isinstance(first, dict):
+                            text = first.get('text')
+                    if not isinstance(text, str) or not text.strip():
+                        text = candidate0.get('text') if isinstance(candidate0, dict) else None
+                    content_text = text if isinstance(text, str) else ""
+                except Exception:
+                    content_text = ""
+                # Normalize result to minimal shape expected by frontend
+                result = {'content': content_text}
+            else:
+                # Unknown dict shape; stringify content for safety and normalize
+                content_text = str(result)
+                result = {'content': content_text}
         elif isinstance(result, str):
             content_text = result
+            result = {'content': content_text}
         else:
             content_text = str(result)
+            result = {'content': content_text}
+
+        # Sanitize any accidental code-fenced blocks that are not real code (applies to all categories)
+        def sanitize_markdown_fences(text: str, category_hint: str):
+            """
+            Convert bare triple-backtick blocks without a language tag (or with non-code tags like 'text', 'math')
+            into inline code, bullets, or blockquotes so they don't render as giant code panels.
+            Preserve fenced blocks that declare a programming language (e.g., ```python) or contain code keywords.
+            Returns (sanitized_text, replacements)
+            """
+            if not isinstance(text, str) or '```' not in text:
+                return text, 0
+
+            # Regex to find fenced blocks: ```[lang?]\n...\n```
+            fence_pattern = re.compile(r"```([a-zA-Z0-9_+\-]*)\n([\s\S]*?)\n```", re.MULTILINE)
+
+            code_keywords = re.compile(r"\b(def |class |function |var |let |const |import |public |private |return |for |while |if\s*\(|else|elif|=>|#include|using namespace|printf\(|System\.out\.println|console\.log)\b", re.IGNORECASE)
+            # Languages considered real code — keep as code blocks
+            real_code_langs = {"python","py","javascript","js","typescript","ts","java","c","cpp","c++","c#","cs","go","rust","rb","ruby","swift","kotlin","php","r","matlab","octave","bash","sh","shell","powershell","ps1","sql","html","xml","json","yaml","yml","toml","css","scss","less"}
+            # Languages that are not really code in this UI — convert
+            non_code_langs = {"", "text", "plain", "plaintext", "markdown", "md", "math", "equation", "equations"}
+
+            replacements = 0
+            def _replace(m):
+                nonlocal replacements
+                lang = (m.group(1) or '').strip()
+                body = m.group(2)
+                # Keep if language specified and is a real programming language
+                if lang and (lang.lower() in real_code_langs):
+                    return m.group(0)
+                # Keep if likely programming code by keywords
+                if code_keywords.search(body):
+                    return m.group(0)
+                # Otherwise transform intelligently
+                replacements += 1
+                lines = [ln.rstrip() for ln in body.splitlines() if ln.strip()]
+                mathish = re.compile(r"^[A-Za-z0-9_().,+\-*/=^% \\]+$")
+                # Case 1: Single short token like "p" or "t" → inline LaTeX math
+                if len(lines) == 1 and len(lines[0]) <= 8 and ' ' not in lines[0] and mathish.match(lines[0]):
+                    return f"${lines[0]}$"
+                # Case 2: Very short math lines (<= 40 chars) → bullet list with inline LaTeX math
+                if lines and all(len(l) <= 40 and mathish.match(l) for l in lines) and not any(c in '\t' for c in body):
+                    bullets = '\n'.join([f"- ${l}$" for l in lines])
+                    return bullets
+                # Fallback: blockquote for larger text blocks
+                quoted = '\n'.join(["> " + line if line.strip() else ">" for line in body.splitlines()])
+                return quoted
+
+            new_text = fence_pattern.sub(_replace, text)
+            return new_text, replacements
+
+        def convert_inline_code_math(text: str):
+            """Replace short inline code `...` that looks like math tokens with LaTeX $...$.
+            Returns (text, replacements)
+            """
+            if not isinstance(text, str) or '`' not in text:
+                return text, 0
+            pattern = re.compile(r"`([^`\n]{1,30})`")
+            codeish = re.compile(r"(def\s|class\s|;|\{|\}|<|>|console\.|System\.|import\s|function\s|return\s)")
+            mathish = re.compile(r"^[A-Za-z0-9_().,+\-*/=^% \\]+$")
+            reps = 0
+            def _repl(m):
+                nonlocal reps
+                s = m.group(1).strip()
+                if len(s) <= 30 and mathish.match(s) and not codeish.search(s):
+                    reps += 1
+                    return f"${s}$"
+                return m.group(0)
+            out = pattern.sub(_repl, text)
+            return out, reps
+
+        def sanitize_indented_code_blocks(text: str):
+            """Detect indented code blocks (4+ spaces or a tab) that contain short math-ish lines
+            and convert them to inline math ($...$) or bullet lists. Returns (text, replacements).
+            """
+            if not isinstance(text, str):
+                return text, 0
+            lines = text.splitlines()
+            out = []
+            i = 0
+            reps = 0
+            mathish = re.compile(r"^[A-Za-z0-9_().,+\-*/=^% \\]+$")
+            while i < len(lines):
+                line = lines[i]
+                # Start of an indented block
+                if (line.startswith('    ') or line.startswith('\t')):
+                    block = []
+                    # Collect consecutive indented lines
+                    while i < len(lines) and (lines[i].startswith('    ') or lines[i].startswith('\t')):
+                        block.append(lines[i].lstrip(' \t'))
+                        i += 1
+                    trimmed = [b for b in block if b.strip()]
+                    if trimmed and all(len(b) <= 40 and mathish.match(b) for b in trimmed):
+                        reps += 1
+                        if len(trimmed) == 1 and ' ' not in trimmed[0] and len(trimmed[0]) <= 12:
+                            out.append(f"${trimmed[0]}$")
+                        else:
+                            out.extend([f"- ${b}$" for b in trimmed])
+                    else:
+                        # Not math-ish, keep as-is (reconstruct with same indentation)
+                        out.extend(['    ' + b for b in block])
+                    continue
+                else:
+                    out.append(line)
+                    i += 1
+            return "\n".join(out), reps
+
+        def ensure_academic_headers(text: str, topic_title: str):
+            """
+            Ensure the academic content has visible Markdown headings:
+            - Prepend a top-level H2 with the topic if no '## ' exists.
+            - Upgrade title-like lines (Capitalized words possibly ending with a colon) to H3.
+            """
+            if not isinstance(text, str) or not text.strip():
+                return text
+            lines = text.splitlines()
+            has_h2 = any(line.strip().startswith("## ") for line in lines)
+            out = []
+            inserted_h2 = False
+            if not has_h2:
+                out.append(f"## {topic_title}: Learning Guide")
+                out.append("")
+                inserted_h2 = True
+            heading_like = re.compile(r"^([A-Z][\w\s,&'-]{3,80}?)(:)?\s*$")
+            for idx, line in enumerate(lines):
+                s = line.rstrip()
+                if s and not s.startswith(("#", "- ", "* ", ">", "`", "1. ", "2. ", "3. ")) and heading_like.match(s) and len(s.split()) <= 10:
+                    out.append("### " + s.lstrip("# "))
+                else:
+                    out.append(line)
+            result_text = "\n".join(out)
+            return result_text
             
         print(f"🔍 RESPONSE ANALYSIS:")
         print(f"   • Content length: {len(content_text)} characters")
+
+        # Universal sanitization pass for non-code fences
+        markdown_replacements = 0
+        sanitized_text, rep = sanitize_markdown_fences(content_text, category)
+        markdown_replacements = rep
+        if rep > 0:
+            print(f"   • Markdown sanitizer converted {rep} non-code fenced block(s)")
+            content_text = sanitized_text
+            if isinstance(result, dict) and 'content' in result:
+                result['content'] = content_text
+            else:
+                result = {'content': content_text}
+
+        # Convert remaining short inline code to LaTeX inline math
+        inline_math_text, inline_rep = convert_inline_code_math(content_text)
+        if inline_rep > 0:
+            print(f"   • Inline code → math converted: {inline_rep} token(s)")
+            content_text = inline_math_text
+            if isinstance(result, dict) and 'content' in result:
+                result['content'] = content_text
+            else:
+                result = {'content': content_text}
+
+        # Convert indented code blocks (4-space/tab) that are math-ish
+        indent_text, indent_rep = sanitize_indented_code_blocks(content_text)
+        if indent_rep > 0:
+            print(f"   • Indented code → math converted: {indent_rep} block(s)")
+            content_text = indent_text
+            if isinstance(result, dict) and 'content' in result:
+                result['content'] = content_text
+            else:
+                result = {'content': content_text}
+
+        # Academic headings normalization
+        academic_sanitized = rep > 0 if category == 'academic' else False
+        academic_replacements = rep if category == 'academic' else 0
+        if category == 'academic':
+            normalized_text = ensure_academic_headers(content_text, topic)
+            if normalized_text != content_text:
+                content_text = normalized_text
+                if isinstance(result, dict) and 'content' in result:
+                    result['content'] = content_text
+                else:
+                    result = {'content': content_text}
         
         # Check for technical prompt indicators
         if category == 'technical':
@@ -589,7 +817,13 @@ def handle_reading(request):
                 'content_length': len(content_text),
                 'word_count_estimate': len(content_text.split()),
                 'technical_indicators_found': len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) if category == 'technical' else None,
-                'verification_status': 'passed' if category != 'technical' or len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) >= 2 else 'warning'
+                'verification_status': 'passed' if category != 'technical' or len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) >= 2 else 'warning',
+                'markdown_sanitized': markdown_replacements > 0,
+                'markdown_replacement_blocks': markdown_replacements,
+                'inline_math_converted_tokens': inline_rep,
+                'indented_math_converted_blocks': indent_rep,
+                'academic_sanitized': academic_sanitized if category == 'academic' else None,
+                'academic_replacement_blocks': academic_replacements if category == 'academic' else None
             }
         else:
             # If result is not a dict, wrap it with metadata
@@ -612,7 +846,13 @@ def handle_reading(request):
                     'content_length': len(content_text),
                     'word_count_estimate': len(content_text.split()),
                     'technical_indicators_found': len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) if category == 'technical' else None,
-                    'verification_status': 'passed' if category != 'technical' or len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) >= 2 else 'warning'
+                    'verification_status': 'passed' if category != 'technical' or len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) >= 2 else 'warning',
+                    'markdown_sanitized': markdown_replacements > 0,
+                    'markdown_replacement_blocks': markdown_replacements,
+                    'inline_math_converted_tokens': inline_rep,
+                    'indented_math_converted_blocks': indent_rep,
+                    'academic_sanitized': academic_sanitized if category == 'academic' else None,
+                    'academic_replacement_blocks': academic_replacements if category == 'academic' else None
                 }
             }
         

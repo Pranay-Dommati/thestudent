@@ -151,9 +151,47 @@ async function generateSingleTopicContent(topic, { personalization = null, topic
         topic_context_included: Boolean(payload.topic_context),
       };
       logger.log('🛰️ Posting to /ai/reading/ with payload:', preview);
+      if (import.meta.env.MODE !== 'production') {
+        console.log('🛰️ Posting to /ai/reading/ with payload:', preview);
+      }
     } catch {}
 
     const { data: result } = await axiosAi.post('/reading/', payload);
+
+    // FRONTEND DEBUG: Log backend confirmation about personalization usage
+    try {
+      const personalizationApplied = Boolean(result?.prompt_info?.personalization_applied);
+      const appliedPreview = typeof result?.applied_personalization === 'string'
+        ? `${result.applied_personalization.slice(0, 140)}${result.applied_personalization.length > 140 ? '...' : ''}`
+        : null;
+      logger.log('🧪 Backend prompt selection flags:', {
+        topic: payload.topic,
+        category: result?.topic_category || 'unknown',
+        personalization_applied: personalizationApplied,
+        applied_personalization_preview: appliedPreview,
+        topic_context_applied: Boolean(result?.prompt_info?.topic_context_applied)
+      });
+      if (import.meta.env.MODE !== 'production') {
+        console.log('🧪 Backend prompt selection flags:', {
+          topic: payload.topic,
+          category: result?.topic_category || 'unknown',
+          personalization_applied: personalizationApplied,
+          applied_personalization_preview: appliedPreview,
+          topic_context_applied: Boolean(result?.prompt_info?.topic_context_applied)
+        });
+      }
+      if (!personalizationApplied) {
+        logger.warn('⚠️ Personalization was NOT applied for topic:', payload.topic);
+        if (import.meta.env.MODE !== 'production') {
+          console.warn('⚠️ Personalization was NOT applied for topic:', payload.topic);
+        }
+      } else {
+        logger.log('✅ Personalization applied for topic:', payload.topic);
+        if (import.meta.env.MODE !== 'production') {
+          console.log('✅ Personalization applied for topic:', payload.topic);
+        }
+      }
+    } catch {}
     
     // FRONTEND: Received AI response for topic
     // Response Analysis logged

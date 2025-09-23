@@ -27,6 +27,10 @@ import {
   MdSchool, MdAutoAwesome, MdTimeline, MdExplore
 } from "react-icons/md";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import rehypeHighlight from "rehype-highlight";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
@@ -182,6 +186,44 @@ const ProLearningPage = () => {
   const [topicsList, setTopicsList] = useState([]);
   const [sectionGenerating, setSectionGenerating] = useState(false);
   const [generatingTopics, setGeneratingTopics] = useState([]);
+
+  // Robust parser for topics passed in the URL query param "topic"
+  // - Keeps phrases like "Components, Props, and State" together
+  // - Limits to 4 topics
+  // - Trims whitespace and filters empties
+  const parseTopicsFromParam = (param) => {
+    if (!param || typeof param !== 'string') return [];
+    const s = param.trim();
+    // Fast path: no commas => single topic
+    if (!s.includes(',')) return [s];
+
+    // Split by comma, then merge known triplet pattern: X, Y, and Z
+    const parts = s.split(',').map(t => t.trim()).filter(Boolean);
+    const merged = [];
+    for (let i = 0; i < parts.length; i++) {
+      const cur = parts[i];
+      const next = parts[i + 1];
+      const next2 = parts[i + 2];
+      // Detect pattern: cur, next, and something => merge three with commas
+      if (
+        typeof next === 'string' && typeof next2 === 'string' &&
+        /^and\s+/i.test(next2)
+      ) {
+        merged.push(`${cur}, ${next}, ${next2}`);
+        i += 2;
+        continue;
+      }
+      merged.push(cur);
+    }
+
+    // Enforce max 4 topics by merging any extras into the last
+    if (merged.length > 4) {
+      const firstThree = merged.slice(0, 3);
+      const rest = merged.slice(3).join(', ');
+      return [...firstThree, rest];
+    }
+    return merged;
+  };
   
   // Function to fetch course data from database (delegates to ProContentManager with deduping)
   const fetchCourseFromDB = async (courseId) => {
@@ -389,8 +431,9 @@ const ProLearningPage = () => {
         let matchingTopicIndex = -1;
         
         if (topicParam) {
-          // Handle case where topicParam might contain multiple topics (comma-separated)
-          const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
+          // Use robust parser; pick the first parsed topic for selection
+          const parsedFromParam = parseTopicsFromParam(topicParam);
+          const actualTopic = parsedFromParam.length > 0 ? parsedFromParam[0] : topicParam;
           
           // Strategy 1: Exact match (case insensitive)
           matchingTopicIndex = topics.findIndex(topic => 
@@ -629,7 +672,7 @@ const ProLearningPage = () => {
       // IMPORTANT: Handle both multiple topics (comma-separated) and single-topic URLs
       if (topicParam && topicParam.includes(',')) {
         try {
-          const topicNames = topicParam.split(',').map(t => t.trim()).filter(Boolean);
+          const topicNames = parseTopicsFromParam(topicParam);
           if (topicNames.length > 1) { // Only if multiple topics in URL
             const derivedTopics = topicNames.map((name, idx) => ({ 
               id: idx + 1, 
@@ -654,7 +697,8 @@ const ProLearningPage = () => {
       // Single-topic URL: still initialize topics list so sidebar shows the current topic
       else if (topicParam) {
         try {
-          const actualTopic = (topicParam.includes(',') ? topicParam.split(',')[0] : topicParam).trim();
+          const parsed = parseTopicsFromParam(topicParam);
+          const actualTopic = (parsed[0] || '').trim();
           if (actualTopic) {
             const derivedTopics = [{ id: 1, name: actualTopic, isActive: false }];
 
@@ -743,6 +787,114 @@ const ProLearningPage = () => {
   
   // Copy code functionality
   const [copySuccessMap, setCopySuccessMap] = useState({});
+
+  // Lightweight client-side pre-sanitizer to avoid initial flash of bad fences/math
+  // Notes:
+  // - Preserves real code blocks (has a language or typical code patterns)
+  // - Converts language-less tiny fenced tokens to inline math ($x$)
+  // - Converts short, non-code fenced blocks to simple bullet lines
+  // - Falls back to blockquotes for other non-code fenced blocks
+  const preSanitizeMarkdown = (md) => {
+    if (!md || typeof md !== 'string') return '';
+    let out = md;
+    try {
+      // Normalize Windows newlines just in case
+      out = out.replace(/\r\n?/g, '\n');
+
+      // Helpers
+      const isLikelyProgramming = (s) => /[{;}]|<\w|<\/|=>|\bdef\b|\bclass\b|\bfunction\b|\bconst\b|\blet\b|\bvar\b|#include|\bimport\b\s|\bfrom\b\s|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bBEGIN\b|\bEND\b|^\s{2,}\S/m.test(s);
+      const isMathLike = (s) => {
+        const t = (s || '').trim();
+        if (!t) return false;
+        // Strong math tokens or LaTeX commands/symbols
+        if (/\\(frac|sum|int|sqrt|alpha|beta|gamma|theta|lambda|pi|mu|sigma|Delta|nabla|partial)\b|[∑∫√∞≤≥≠≈→⇔∂∇]/.test(t)) return true;
+        // Derivatives and powers
+        if (/(d[xyzt]|dx|dy|dt)\s*\/(d[xyzt]|dx|dy|dt)\b/.test(t)) return true; // dy/dx
+        if (/[\^_]/.test(t) && /[=+\-*/]/.test(t) && !isLikelyProgramming(t)) return true; // x^2 + y
+        // Equations comprised of mostly math-friendly chars (avoid braces/semicolons typical of code)
+        if (/=/.test(t) && /^[\sA-Za-z0-9.,:+\-*/^_|=()\\{}\[\]<>%]+$/.test(t) && !/[;]{1}|\bconst\b|\bfunction\b|<\/?\w/.test(t)) return true;
+        // Trig/log common names
+        if (/\b(sin|cos|tan|log|ln)\b/.test(t) && !isLikelyProgramming(t)) return true;
+        return false;
+      };
+
+      // Handle triple-fenced blocks
+      out = out.replace(/```([^\n]*)\n([\s\S]*?)```/g, (m, langRaw, body) => {
+        const lang = (langRaw || '').trim();
+        const content = (body || '').trim();
+        const langLower = lang.toLowerCase();
+        const mathLang = /^(math|latex|tex|katex|equation|formula)$/i.test(langLower);
+        const likelyProg = isLikelyProgramming(content);
+        const likelyMath = mathLang || isMathLike(content) || (!likelyProg && /^(code|text)?$/.test(langLower) && isMathLike(content));
+
+        // Convert math-like fenced content (even if labeled 'code') to KaTeX-friendly math
+        if (likelyMath) {
+          const isMulti = /\n/.test(content) || content.length > 40 || /\\(frac|sum|int|sqrt)/.test(content);
+          return isMulti ? `$$\n${content}\n$$` : `$${content}$`;
+        }
+
+        // Keep real programming code as-is
+        if (likelyProg || lang) return m;
+
+        // Tiny single token -> inline math
+        const tiny = content.replace(/\s+/g, ' ').trim();
+        if (tiny.length > 0 && tiny.length <= 5 && !/\s/.test(tiny) && /^[A-Za-z0-9()+\-/*=^_.,]+$/.test(tiny)) {
+          return `$${tiny}$`;
+        }
+
+        const lines = content.split(/\n+/).map(l => l.trim()).filter(Boolean);
+        // If all lines look mathy, render as display math
+        if (lines.length > 0 && lines.every(isMathLike)) {
+          return `$$\n${lines.join(' \\ \n')}\n$$`;
+        }
+        if (lines.length <= 3 && lines.every(l => l.length <= 80)) {
+          // short non-code block -> bullets
+          return lines.map(l => `- ${l}`).join('\n');
+        }
+        // default non-code block -> blockquote
+        return lines.map(l => `> ${l}`).join('\n');
+      });
+
+      // Convert very short inline backtick tokens to inline math
+      out = out.replace(/`([^`]+)`/g, (m, tok) => {
+        const t = tok.trim();
+        if (isMathLike(t)) {
+          return /\s|\n/.test(t) ? `$$${t}$$` : `$${t}$`;
+        }
+        return m; // keep regular inline code
+      });
+
+      return out;
+    } catch (e) {
+      // On any issue, just return original content to avoid breaking
+      return md;
+    }
+  };
+
+  // State-gated sanitized reading to ensure we never paint raw content
+  const [sanitizedReading, setSanitizedReading] = useState('');
+  const [readingRenderReady, setReadingRenderReady] = useState(false);
+  useEffect(() => {
+    // When reading changes, compute sanitization synchronously and gate rendering
+    const raw = (content && typeof content.reading === 'string') ? content.reading : '';
+    if (raw && raw.trim().length) {
+      setReadingRenderReady(false);
+      const sanitized = preSanitizeMarkdown(String(raw));
+      setSanitizedReading(sanitized);
+      // Gate render until state is committed
+      Promise.resolve().then(() => setReadingRenderReady(true));
+    } else {
+      setSanitizedReading('');
+      setReadingRenderReady(false);
+    }
+  }, [content && content.reading]);
+
+  // Reset client-side readiness when switching topics to avoid flashing prior sanitized content
+  useEffect(() => {
+    if (!selectedTopic?.name) return;
+    setReadingRenderReady(false);
+    setSanitizedReading('');
+  }, [selectedTopic?.name]);
 
   // Derived: does any topic have any generated tab available?
   const hasAnyContent = useMemo(() => {
@@ -2706,8 +2858,9 @@ const ProLearningPage = () => {
   useEffect(() => {
     const loadInitialTopicContent = async () => {
       if (topicParam && !isLoading && !content) {
-        // Handle case where topicParam might contain multiple topics (comma-separated)
-        const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
+        // Use robust parser to get the primary topic
+        const parsed = parseTopicsFromParam(topicParam);
+        const actualTopic = parsed.length > 0 ? parsed[0] : topicParam;
         console.log('🎯 Loading initial content for topic from URL:', actualTopic);
         
         const currentCourseId = getCourseId();
@@ -3688,6 +3841,12 @@ const ProLearningPage = () => {
   const renderTabContent = () => {
     // Derive current topic name robustly (fallback to URL param if selectedTopic not yet set)
     const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null);
+    // Client-side reading readiness (strict): require sanitized content for current topic
+    const readingClientReadyForCurrentTopic = (
+      activeTab === 'reading' &&
+      contentTopicName === currentTopicName &&
+      !!readingRenderReady && typeof sanitizedReading === 'string' && sanitizedReading.trim().length > 0
+    );
     
     // CRITICAL: Check if current topic is blocked (2nd topic onwards until course completion)
     if (currentTopicName && isTopicBlocked(currentTopicName)) {
@@ -3699,7 +3858,8 @@ const ProLearningPage = () => {
     if (useProgressiveGeneration) {
       const readyTabs = (currentTopicName && availableTabsForTopics[currentTopicName]) || [];
       const hasAnyContent = !!content && contentTopicName === currentTopicName && (
-        (content.reading && content.reading.trim()) ||
+        // For reading, treat as content only if client-sanitized is ready
+        (readingClientReadyForCurrentTopic) ||
         (content.summary && content.summary.trim()) ||
         ((content.videos?.length || 0) > 0) ||
         ((Array.isArray(content.quiz) ? content.quiz.length : (content.quiz?.questions?.length || 0)) > 0) ||
@@ -3708,7 +3868,8 @@ const ProLearningPage = () => {
       if (isBatchGenerating) return <LoadingComponent />;
       // Only treat active tab as ready if its content belongs to this topic
       const activeHasContent = (contentTopicName === currentTopicName) && (
-        (activeTab === 'reading' && !!content?.reading) ||
+        // Require sanitized readiness for reading tab
+        (activeTab === 'reading' && readingClientReadyForCurrentTopic) ||
         (activeTab === 'summary' && !!content?.summary) ||
         (activeTab === 'videos' && (content?.videos?.length || 0) > 0) ||
         (activeTab === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
@@ -3716,7 +3877,8 @@ const ProLearningPage = () => {
       );
       // If viewing a non-reading tab for a later topic while generating, require reading readiness
       const topicIndex = topicsList.findIndex(t => (t.name || t) === currentTopicName);
-  const readingReady = readyTabs.includes('reading') || (content && contentTopicName === currentTopicName && !!content.reading);
+      // Enforce reading-first based on client-side sanitized readiness, not raw presence
+      const readingReady = readingClientReadyForCurrentTopic;
       const enforceReadingFirst = (isProgressiveGenerating && topicIndex > 0 && activeTab !== 'reading' && !readingReady);
       if (enforceReadingFirst) {
         return <LoadingComponent />;
@@ -3739,17 +3901,24 @@ const ProLearningPage = () => {
       const readyTabs = (currentTopicName && availableTabsForTopics[currentTopicName]) || [];
       // Consider a tab ready if we already have content for it
       const activeHasContent = (contentTopicName === currentTopicName) && (
-        (activeTab === 'reading' && !!content?.reading) ||
+        (activeTab === 'reading' && readingClientReadyForCurrentTopic) ||
         (activeTab === 'summary' && !!content?.summary) ||
         (activeTab === 'videos' && (content?.videos?.length || 0) > 0) ||
         (activeTab === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
         (activeTab === 'resources' && (content?.resources?.length || 0) > 0)
       );
-      const activeReady = readyTabs.includes(activeTab) || activeHasContent;
+      const activeReady = (activeTab === 'reading')
+        ? (readingClientReadyForCurrentTopic)
+        : (readyTabs.includes(activeTab) || activeHasContent);
 
       if (!activeReady) {
         return <LoadingComponent />;
       }
+    }
+
+    // Global gate for Reading tab: keep loader until sanitization completes for current topic
+    if (activeTab === 'reading' && !readingClientReadyForCurrentTopic) {
+      return <LoadingComponent />;
     }
 
     // If no content and course not generated, show Pro Learning Experience button
@@ -3936,8 +4105,10 @@ const ProLearningPage = () => {
             </div>
             {/* Enhanced Content with better typography, all content together */}
             <div className="prose prose-lg max-w-none">
-              {content && content.reading ? (
+              {readingRenderReady && sanitizedReading ? (
                 <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[rehypeHighlight, rehypeKatex]}
                   components={{
                     h1: ({children}) => (
                       <h1 className="text-3xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -4003,8 +4174,8 @@ const ProLearningPage = () => {
                       const codeString = String(children).replace(/\n$/, "");
                       const blockId = codeString;
                       return (
-                        <div className="relative my-6">
-                          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
+                        <div className="relative my-6 inline-block max-w-full" style={{ width: 'fit-content' }}>
+                          <div className="inline-flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl" style={{ width: '100%' }}>
                             <span className="text-xs text-gray-500 font-mono">{lang || "code"}</span>
                             <button
                               className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-100 bg-white ml-2 flex items-center gap-1 cursor-pointer"
@@ -4079,7 +4250,9 @@ const ProLearningPage = () => {
                               background: "#23272f",
                               border: "1px solid #222c37",
                               color: "#f8f8f2",
-                              lineHeight: "1.4"
+                              lineHeight: "1.4",
+                              display: 'inline-block',
+                              maxWidth: '100%'
                             }}
                             codeTagProps={{
                               style: { 
@@ -4112,12 +4285,14 @@ const ProLearningPage = () => {
                     )
                   }}
                 >
-                  {content.reading}
+                  {sanitizedReading}
                 </ReactMarkdown>
               ) : (
-                // Fallback: render raw content if sections are empty
-                content && content.reading ? (
+                // Fallback: waiting state or missing sanitized content
+                readingRenderReady && sanitizedReading ? (
                   <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeHighlight, rehypeKatex]}
                     components={{
                       h1: ({children}) => (
                         <h1 className="text-3xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -4183,8 +4358,8 @@ const ProLearningPage = () => {
                         const codeString = String(children).replace(/\n$/, "");
                         const blockId = codeString;
                         return (
-                          <div className="relative my-6">
-                            <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
+                          <div className="relative my-6 inline-block max-w-full" style={{ width: 'fit-content' }}>
+                            <div className="inline-flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl" style={{ width: '100%' }}>
                               <span className="text-xs text-gray-500 font-mono">{lang || "code"}</span>
                               <button
                                 className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-100 bg-white ml-2 flex items-center gap-1 cursor-pointer"
@@ -4259,7 +4434,9 @@ const ProLearningPage = () => {
                                 background: "#23272f",
                                 border: "1px solid #222c37",
                                 color: "#f8f8f2",
-                                lineHeight: "1.4"
+                                lineHeight: "1.4",
+                                display: 'inline-block',
+                                maxWidth: '100%'
                               }}
                               codeTagProps={{
                                 style: { 
@@ -4292,9 +4469,9 @@ const ProLearningPage = () => {
                       )
                     }}
                   >
-                    {content.reading}
+                    {sanitizedReading}
                   </ReactMarkdown>
-                ) : isLoading ? (
+                  ) : (isLoading || (content && content.reading && !readingRenderReady)) ? (
                   <div className="text-center py-12">
                     <div className="inline-flex items-center px-6 py-3 bg-blue-50 rounded-lg">
                       <BiLoaderAlt className="animate-spin text-blue-600 mr-3" />
@@ -4392,6 +4569,8 @@ const ProLearningPage = () => {
             {/* Enhanced Summary Content */}
             <div className="prose prose-lg max-w-none">
               <ReactMarkdown 
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeHighlight, rehypeKatex]}
                 components={{
                   h1: ({children}) => (
                     <h1 className="text-3xl font-bold mb-6 pb-4 border-b-2 border-purple-200 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">

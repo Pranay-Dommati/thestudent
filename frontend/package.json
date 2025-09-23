@@ -20,6 +20,7 @@
     "date-fns": "^4.1.0",
     "easymde": "^2.20.0",
     "framer-motion": "^12.23.16",
+    "katex": "^0.16.22",
     "lucide-react": "^0.483.0",
     "openai": "^4.89.0",
     "pdfjs-dist": "^5.4.149",
@@ -37,7 +38,10 @@
     "react-syntax-highlighter": "^15.6.1",
     "react-toastify": "^11.0.5",
     "recharts": "^2.12.7",
+    "rehype-highlight": "^7.0.2",
+    "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "tailwindcss": "^4.0.10",
     "uuid": "^11.1.0"
   },
