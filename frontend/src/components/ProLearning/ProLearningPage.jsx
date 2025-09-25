@@ -135,8 +135,8 @@ const ProLearningPage = () => {
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <div className="flex items-center gap-2">
-                <FaYoutube className="text-red-500" />
-                <h3 className="font-semibold text-gray-900 line-clamp-1">{currentVideo?.title || 'Video'}</h3>
+                <IoPlayCircle className="w-5 h-5" />
+                <span className="font-medium truncate">{currentVideo?.title || 'Playing video'}</span>
               </div>
               <button onClick={closeVideoModal} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="Close video">
                 <IoClose className="w-5 h-5" />
@@ -276,13 +276,13 @@ const ProLearningPage = () => {
           console.log('✅ Reload mode: Found content for topic:', topicName);
           
           // Set content directly
-          setContent({
+          setContentWithSanitization({
             reading: storedContent.reading,
             summary: storedContent.summary || 'Summary not available',
             quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
             videos: storedContent.videos || [],
             resources: storedContent.resources || []
-          });
+          }, 'reload:storedContent');
           setContentTopicName(topicName);
 
           // Set reading sections
@@ -299,13 +299,13 @@ const ProLearningPage = () => {
           setLoadingStep('');
         } else {
           console.warn('⚠️ Reload mode: No content found for topic:', topicName);
-          setContent({
+          setContentWithSanitization({
             reading: 'Content not available. Please regenerate the course.',
             summary: 'Summary not available',
             quiz: { questions: [], currentQuestion: 0 },
             videos: [],
             resources: []
-          });
+          }, 'reload:fallbackNoContent');
           setContentTopicName(topicName);
           
           // Clear loading states for fallback content
@@ -314,13 +314,13 @@ const ProLearningPage = () => {
         }
       } catch (error) {
         console.error('❌ Reload mode: Error loading content for topic:', topicName, error);
-        setContent({
+        setContentWithSanitization({
           reading: 'Error loading content. Please try again.',
           summary: 'Error loading summary',
           quiz: { questions: [], currentQuestion: 0 },
           videos: [],
           resources: []
-        });
+        }, 'reload:error');
         setContentTopicName(topicName);
         
         // Clear loading states for error content
@@ -870,23 +870,127 @@ const ProLearningPage = () => {
     }
   };
 
+  // Identify math-related topics to adjust rendering (no code blocks for math content)
+  const isMathTopicName = (name) => {
+    try {
+      if (!name) return false;
+      const s = String(name).toLowerCase();
+      return [
+        'math','mathematics','algebra','calculus','trigonometry','trigonometric','geometry','statistics','probability',
+        'unit circle','sine','cosine','tangent','derivative','integral','limits','vectors','matrices','matrix','linear algebra'
+      ].some(k => s.includes(k));
+    } catch {
+      return false;
+    }
+  };
+
+  // --- Debug helpers ---
+  const _debugHash = (str) => {
+    try {
+      const s = String(str || '');
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i), h |= 0;
+      return (h >>> 0).toString(16);
+    } catch { return '0'; }
+  };
+  const _short = (s, n = 80) => {
+    try { return String(s || '').replace(/\s+/g, ' ').slice(0, n); } catch { return ''; }
+  };
+
+  // Helper to set content while preserving FIRST reading and controlling sanitization
+  // Behavior:
+  // - First reading wins; later variants are ignored to prevent visual flips
+  // - During progressive generation (or when sourceLabel starts with 'progressive:'),
+  //   we DO NOT sanitize the first reading — we render it raw immediately
+  // - Otherwise, first reading is pre-sanitized to avoid initial formatting flashes
+  const setContentWithSanitization = (incoming, sourceLabel = 'unknown') => {
+    const hasExistingReading = !!(content && typeof content.reading === 'string' && content.reading.trim().length);
+
+    // Normalize incoming object (clone so we can safely adjust fields)
+    const newContent = incoming ? { ...incoming } : incoming;
+
+    if (newContent && typeof newContent.reading === 'string') {
+      // If we already have a reading shown, never overwrite it with a later variant
+      if (hasExistingReading) {
+        const oldHash = _debugHash(content.reading);
+        const newHash = _debugHash(newContent.reading);
+        if (newContent.reading !== content.reading) {
+          console.warn('🔒 [READING-PRESERVE] Incoming reading ignored to preserve first render', {
+            source: sourceLabel,
+            topicParam,
+            contentTopicName,
+            selectedTopic: selectedTopic?.name,
+            oldLen: content.reading?.length || 0,
+            newLen: newContent.reading?.length || 0,
+            oldHash,
+            newHash,
+            newPreview: _short(newContent.reading)
+          });
+          // Preserve existing reading and do NOT re-sanitize
+          newContent.reading = content.reading;
+        } else {
+          console.log('ℹ️ [READING-SAME] Incoming reading equals existing', { source: sourceLabel, hash: oldHash });
+        }
+        // Keep current sanitizedReading and readiness as-is
+      } else if (newContent.reading.trim()) {
+        // Determine if we should bypass any sanitization for progressive generation flows
+        const progressiveSource = typeof sourceLabel === 'string' && sourceLabel.startsWith('progressive:');
+        const bypassSanitize = useProgressiveGeneration && (isProgressiveGenerating || progressiveSource);
+
+        // First time reading is arriving
+        console.log('✨ [READING-FIRST] Accepting first reading from', {
+          source: sourceLabel,
+          topicParam,
+          contentTopicName,
+          selectedTopic: selectedTopic?.name,
+          len: newContent.reading.length,
+          hash: _debugHash(newContent.reading),
+          preview: _short(newContent.reading)
+        });
+        if (bypassSanitize) {
+          // IMPORTANT: During progressive generation, do NOT sanitize or transform reading content
+          setSanitizedReading(String(newContent.reading));
+        } else {
+          const sanitized = preSanitizeMarkdown(newContent.reading);
+          setSanitizedReading(sanitized);
+        }
+        setReadingRenderReady(true);
+      } else {
+        // Empty reading coming in
+        console.log('⚪ [READING-EMPTY] No reading in payload', { source: sourceLabel });
+        setSanitizedReading('');
+        setReadingRenderReady(false);
+      }
+    } else {
+      // No reading field provided
+      if (!hasExistingReading) {
+        console.log('⚪ [READING-NONE] No reading field present and none exists', { source: sourceLabel });
+        setSanitizedReading('');
+        setReadingRenderReady(false);
+      }
+    }
+    // Log non-reading tabs lengths for traceability
+    try {
+      console.log('🧩 [CONTENT-SET]', {
+        source: sourceLabel,
+        topicParam,
+        contentTopicName,
+        selectedTopic: selectedTopic?.name,
+        readingLen: (newContent?.reading || '').length,
+        summaryLen: (newContent?.summary || '').length,
+        quizCount: Array.isArray(newContent?.quiz) ? newContent.quiz.length : (newContent?.quiz?.questions?.length || 0),
+        videosCount: Array.isArray(newContent?.videos) ? newContent.videos.length : 0,
+        resourcesCount: Array.isArray(newContent?.resources) ? newContent.resources.length : 0
+      });
+    } catch {}
+    setContent(newContent);
+  };
+
   // State-gated sanitized reading to ensure we never paint raw content
   const [sanitizedReading, setSanitizedReading] = useState('');
   const [readingRenderReady, setReadingRenderReady] = useState(false);
-  useEffect(() => {
-    // When reading changes, compute sanitization synchronously and gate rendering
-    const raw = (content && typeof content.reading === 'string') ? content.reading : '';
-    if (raw && raw.trim().length) {
-      setReadingRenderReady(false);
-      const sanitized = preSanitizeMarkdown(String(raw));
-      setSanitizedReading(sanitized);
-      // Gate render until state is committed
-      Promise.resolve().then(() => setReadingRenderReady(true));
-    } else {
-      setSanitizedReading('');
-      setReadingRenderReady(false);
-    }
-  }, [content && content.reading]);
+  // Note: Sanitization is now handled immediately in setContentWithSanitization helper
+  // No useEffect needed since sanitization happens synchronously when content is set
 
   // Reset client-side readiness when switching topics to avoid flashing prior sanitized content
   useEffect(() => {
@@ -1124,11 +1228,20 @@ const ProLearningPage = () => {
     if (topicsList.length > 0 && courseTitle) {
       const activeTopic = topicsList.find(t => t.isActive);
       if (activeTopic) {
+        // If we already have content in state, avoid hydrating from storage to prevent overwriting
+        // progressive content with a different post-generation copy.
+        if (content && (content.reading || content.summary || content.videos?.length || content.quiz?.length || content.resources?.length)) {
+          console.log('🛡️ Skipping stored content hydration to preserve already displayed content for:', activeTopic.name);
+          setIsLoading(false);
+          setShowSkeletons(false);
+          return;
+        }
+
         // Check if content exists in storage for the active topic
         const storedContent = getStoredTopicContent(activeTopic.name, courseTitle, getCourseId());
         
         if (storedContent) {
-          setContent(storedContent);
+            setContentWithSanitization(storedContent, 'initialActiveTopic:stored');
           
           // Parse reading content into sections if available
           if (storedContent.reading) {
@@ -1149,7 +1262,7 @@ const ProLearningPage = () => {
           const checkContentInterval = setInterval(() => {
             const newStoredContent = getStoredTopicContent(activeTopic.name, courseTitle, getCourseId());
             if (newStoredContent) {
-              setContent(newStoredContent);
+              setContentWithSanitization(newStoredContent, 'initialActiveTopic:storedPolling');
               
               // Parse reading content into sections
               if (newStoredContent.reading) {
@@ -1181,7 +1294,7 @@ const ProLearningPage = () => {
               setSectionGenerating(false);
               setGeneratingTopics(prev => prev.filter(t => t !== activeTopic.name));
               if (result && result.content) {
-                setContent(result.content);
+                setContentWithSanitization(result.content, 'initialActiveTopic:getTopicContent');
                 
                 // Parse reading content into sections
                 if (result.content && result.content.reading) {
@@ -1240,7 +1353,7 @@ const ProLearningPage = () => {
         })
           .then(result => {
             if (result?.content?.reading) {
-              setContent(result.content);
+              setContentWithSanitization(result.content, 'direct:getTopicContentWithReading');
               const sections = parseReadingSections(result.content.reading);
               setReadingSections(sections);
               setReadingSectionIndex(0);
@@ -1312,7 +1425,7 @@ const ProLearningPage = () => {
             });
             
             if (newContent && newContent.reading) {
-              setContent(newContent);
+              setContentWithSanitization(newContent);
               const sections = parseReadingSections(newContent.reading);
               setReadingSections(sections);
               setReadingSectionIndex(0);
@@ -1496,6 +1609,20 @@ const ProLearningPage = () => {
     const currentCourseId = getCourseId();
     if (!currentCourseId) return;
 
+    // During active progressive generation or fresh-batch window, avoid hydrating from storage/DB
+    // to ensure the reading shown is the raw progressive one.
+    try {
+      if (useProgressiveGeneration) {
+        const status = getProgressiveGenerationStatus();
+        const activelyGenerating = !!(status && status.isGenerating);
+        const freshBatch = shouldSkipOldCachedContent();
+        if (activelyGenerating || freshBatch) {
+          await loadProgressiveTopicContent(topicName, { showLoader: true });
+          return;
+        }
+      }
+    } catch {}
+
     // OPTIMIZATION: Check if content is already loaded for this topic and user hasn't switched topics
     if (selectedTopic?.name === topicName && content && content.reading && !isLoading) {
       console.log('🚀 Content already loaded for topic:', topicName, '- updating tabs and skipping reload');
@@ -1576,7 +1703,7 @@ const ProLearningPage = () => {
           resources: storedContent.resources || []
         };
         
-  setContent(transformedContent);
+  setContentWithSanitization(transformedContent, 'reload:transformedContent');
   setContentTopicName(topicName);
         
         // Update available tabs for the topic based on loaded content
@@ -1660,7 +1787,7 @@ const ProLearningPage = () => {
             hasResources: !!result.content.resources?.length
           });
           
-          setContent(result.content);
+          setContentWithSanitization(result.content, 'direct:generateProContent');
           setContentTopicName(topicName);
           
           // Update available tabs for the topic based on generated content
@@ -1701,7 +1828,7 @@ const ProLearningPage = () => {
         videos: [],
         resources: []
       };
-  setContent(errorContent);
+  setContentWithSanitization(errorContent, 'progressive:loadError');
   setContentTopicName(topicName);
       
       // Even for error content, set the reading tab as available
@@ -1778,14 +1905,25 @@ const ProLearningPage = () => {
             resources: progressiveContent.resources || []
           };
 
-          // Set content for this topic only - don't merge with previous topic's content
-          setContent({
-            reading: formattedContent.reading,
-            summary: formattedContent.summary,
-            quiz: formattedContent.quiz,
-            videos: formattedContent.videos,
-            resources: formattedContent.resources
-          });
+          // Set content for this topic only - but preserve any already displayed reading
+          // to avoid changing flow/markup after later tabs finish generating.
+          const hasExistingReading = !!(content && typeof content.reading === 'string' && content.reading.trim().length);
+          const nextContent = hasExistingReading
+            ? {
+                reading: content.reading, // preserve first displayed reading
+                summary: formattedContent.summary || content.summary || '',
+                quiz: (Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) ? formattedContent.quiz : (content.quiz || []),
+                videos: (Array.isArray(formattedContent.videos) && formattedContent.videos.length > 0) ? formattedContent.videos : (content.videos || []),
+                resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0) ? formattedContent.resources : (content.resources || [])
+              }
+            : {
+                reading: formattedContent.reading,
+                summary: formattedContent.summary,
+                quiz: formattedContent.quiz,
+                videos: formattedContent.videos,
+                resources: formattedContent.resources
+              };
+          setContentWithSanitization(nextContent, 'progressive:topicContent');
           setContentTopicName(topicName);
 
           // Immediately mark available tabs based on loaded progressive content
@@ -1802,8 +1940,8 @@ const ProLearningPage = () => {
             }));
           }
           
-          // Parse and set reading sections
-          if (progressiveContent.reading) {
+          // Parse and set reading sections only when we actually set reading freshly
+          if (progressiveContent.reading && !hasExistingReading) {
             const sections = parseReadingSections(progressiveContent.reading);
             setReadingSections(sections);
             setReadingSectionIndex(0);
@@ -1815,39 +1953,39 @@ const ProLearningPage = () => {
         } else {
           // Show empty content and let the generation process fill it
           console.log('🆕 DEBUG: Initializing empty content for fresh generation:', topicName);
-          setContent({
+          setContentWithSanitization({
             reading: '',
             summary: '',
             quiz: [],
             videos: [],
             resources: []
-          });
+          }, 'progressive:initEmpty');
           setContentTopicName(topicName);
         }
         
       } else {
         
         // Show empty content with placeholders for topic that hasn't started generating
-        setContent({
+        setContentWithSanitization({
           reading: '',
           summary: '',
           quiz: [],
           videos: [],
           resources: []
-        });
+        }, 'progressive:noContentYet');
         setContentTopicName(topicName);
   setReadingSections([]);
   setReadingSectionIndex(0);
       }
     } catch (error) {
       console.error('❌ Failed to load progressive content:', error);
-      setContent({
+      setContentWithSanitization({
         reading: 'Failed to load content. Please try again.',
         summary: 'Failed to load summary.',
         quiz: [],
         videos: [],
         resources: []
-      });
+      }, 'progressive:error');
       setContentTopicName(topicName);
     } finally {
       if (showLoader) setIsLoading(false);
@@ -2892,13 +3030,13 @@ const ProLearningPage = () => {
           if (storedContent && isContentFreshlyGenerated(storedContent, true)) { // Enable strict mode
             console.log('✅ DEBUG: Using freshly generated content for topic:', actualTopic);
             // Use the fresh content
-            setContent({
+            setContentWithSanitization({
               reading: storedContent.reading,
               summary: storedContent.summary || 'Summary not available',
               quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
               videos: storedContent.videos || [],
               resources: storedContent.resources || []
-            });
+            }, 'urlLoader:freshOnly');
           } else {
             console.log('❌ DEBUG: No fresh content found - skipping all cached content for:', actualTopic);
             // Don't load any cached content, let the generation process handle it
@@ -2914,13 +3052,13 @@ const ProLearningPage = () => {
             console.log('✅ DEBUG: Loading existing stored content for topic:', actualTopic);
             
             // Set content directly from storage
-            setContent({
+            setContentWithSanitization({
               reading: storedContent.reading,
               summary: storedContent.summary || 'Summary not available',
               quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
               videos: storedContent.videos || [],
               resources: storedContent.resources || []
-            });
+            }, 'urlLoader:storedAny');
             
             // CRITICAL: Also update available tabs for this topic
             const availableTabs = [];
@@ -3039,19 +3177,27 @@ const ProLearningPage = () => {
                 };
 
                 // Merge new tab content into existing state
+                // IMPORTANT: preserve previously displayed reading; don't overwrite with later updates
                 setContent(prev => ({
-                  reading: formattedContent.reading || prev?.reading || '',
+                  reading: (prev?.reading && prev.reading.trim().length > 0)
+                    ? prev.reading
+                    : (formattedContent.reading || ''),
                   summary: formattedContent.summary || prev?.summary || '',
                   quiz: (Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) ? formattedContent.quiz : (prev?.quiz || []),
                   videos: (Array.isArray(formattedContent.videos) && formattedContent.videos.length > 0) ? formattedContent.videos : (prev?.videos || []),
                   resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0) ? formattedContent.resources : (prev?.resources || [])
                 }));
                 
-                // Parse and set reading sections if reading was updated
-                if (tabInfo.tabType === 'reading' && freshContent.reading) {
+                // If this is the first time reading becomes available, initialize sections and sanitized view
+                if (tabInfo.tabType === 'reading' && freshContent.reading && (!content || !content.reading)) {
                   const sections = parseReadingSections(freshContent.reading);
                   setReadingSections(sections);
                   setReadingSectionIndex(0);
+                  // Immediately render raw reading without sanitization during progressive generation
+                  try {
+                    setSanitizedReading(String(freshContent.reading || ''));
+                    setReadingRenderReady(true);
+                  } catch {}
                 }
               }
             } else if (!selectedTopic && topicsList?.length > 0 && (topicsList[0].name === tabInfo.topic || (topicsList[0] === tabInfo.topic))) {
@@ -4178,6 +4324,17 @@ const ProLearningPage = () => {
                         return '';
                       };
                       const codeString = flattenText(children).replace(/\n$/, "");
+                      // If current topic is math-related and this doesn't look like programming, render as plain text block
+                      const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : '');
+                      const isMathTopic = isMathTopicName(currentTopicName);
+                      const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
+                      if (isMathTopic && !looksLikeProgramming) {
+                        return (
+                          <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-base leading-7 whitespace-pre text-gray-800">
+                            {codeString}
+                          </pre>
+                        );
+                      }
                       // Detect ASCII diagram blocks (triangles, boxes, etc.) and render as plain <pre>
                       const looksLikeAsciiDiagram = (s) => {
                         const str = String(s || "");
@@ -4389,6 +4546,17 @@ const ProLearningPage = () => {
                           return '';
                         };
                         const codeString = flattenText(children).replace(/\n$/, "");
+                        // If current topic is math-related and this doesn't look like programming, render as plain text block
+                        const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : '');
+                        const isMathTopic = isMathTopicName(currentTopicName);
+                        const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
+                        if (isMathTopic && !looksLikeProgramming) {
+                          return (
+                            <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-base leading-7 whitespace-pre text-gray-800">
+                              {codeString}
+                            </pre>
+                          );
+                        }
                         // Detect ASCII diagram blocks (triangles, boxes, etc.) and render as plain <pre>
                         const looksLikeAsciiDiagram = (s) => {
                           const str = String(s || "");
@@ -4557,7 +4725,7 @@ const ProLearningPage = () => {
                               setLoadingStep: () => {},
                               setContent: (newContent) => {
                                 if (newContent && newContent.reading) {
-                                  setContent(newContent);
+                                  setContentWithSanitization(newContent);
                                   const sections = parseReadingSections(newContent.reading);
                                   setReadingSections(sections);
                                   setReadingSectionIndex(0);
@@ -4707,6 +4875,17 @@ const ProLearningPage = () => {
                       );
                     }
                     const codeString = String(children).replace(/\n$/, "");
+                    // If current topic is math-related and this doesn't look like programming, render as plain text block
+                    const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : '');
+                    const isMathTopic = isMathTopicName(currentTopicName);
+                    const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
+                    if (isMathTopic && !looksLikeProgramming) {
+                      return (
+                        <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-base leading-7 whitespace-pre text-gray-800">
+                          {codeString}
+                        </pre>
+                      );
+                    }
                     const looksLikeAsciiDiagram = (s) => {
                       const str = String(s || "");
                       const lines = str.split(/\n/);
