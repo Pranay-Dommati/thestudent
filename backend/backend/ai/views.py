@@ -15,7 +15,7 @@ from .topics import handle_topics
 from .rate_limiter import check_topic_rate_limit, record_topic_creation
 import json
 import logging
-from .ai_service import call_gemini_api, NetworkError, call_intent_classifier, call_gemini_flash_api
+from .ai_service import call_gemini_api, NetworkError, call_intent_classifier
 import requests
 from .youtube import handle_youtube_search
 import re
@@ -257,6 +257,39 @@ def extract_explicit_topics(user_query: str):
                 title = name
                 matches.append((min(idxs), title))
 
+        # Cryptography / Security detection (RSA, AES, SHA, ECC, etc.)
+        is_crypto = any(k in text for k in [
+            'rsa','aes','des','3des','triple des','ecc','ecdsa','dsa','diffie-hellman','diffie hellman','dh',
+            'hmac','sha-256','sha256','sha 256','sha-1','sha1','sha 1','sha-3','sha3','sha 3','md5',
+            'digital signature','digital signatures','public key','public-key','asymmetric encryption',
+            'symmetric encryption','pki','public key infrastructure','certificate','certificates','x.509','x509'
+        ])
+        crypto_topic_map = []
+        if is_crypto:
+            crypto_topic_map = [
+                (['rsa','rivest-shamir-adleman'], 'RSA'),
+                (['aes','advanced encryption standard'], 'AES'),
+                (['des','3des','triple des','data encryption standard'], 'DES / 3DES'),
+                (['ecc','elliptic curve cryptography'], 'Elliptic Curve Cryptography (ECC)'),
+                (['ecdsa'], 'ECDSA'),
+                (['dsa'], 'DSA'),
+                (['diffie-hellman','diffie hellman','dh key exchange','dh'], 'Diffie-Hellman Key Exchange'),
+                (['hmac'], 'HMAC'),
+                (['sha-256','sha256','sha 256'], 'SHA-256'),
+                (['sha-1','sha1','sha 1'], 'SHA-1'),
+                (['sha-3','sha3','sha 3'], 'SHA-3'),
+                (['md5'], 'MD5'),
+                (['digital signature','digital signatures'], 'Digital Signatures'),
+                (['public key','public-key','public key cryptography','asymmetric encryption'], 'Public-Key Cryptography'),
+                (['symmetric encryption','secret key encryption'], 'Symmetric Encryption'),
+                (['pki','public key infrastructure','certificate','certificates','x.509','x509'], 'PKI & Certificates'),
+            ]
+        for keys, name in crypto_topic_map:
+            idxs = [text.find(k) for k in keys if k in text]
+            if idxs:
+                title = name
+                matches.append((min(idxs), title))
+
         if matches:
             # Sort by appearance order, then deduplicate while preserving order
             matches.sort(key=lambda x: x[0])
@@ -310,6 +343,34 @@ def _merge_with_fallback(user_query: str, explicit_topics: list):
     except Exception:
         # On error, just fallback
         return generate_simple_fallback_topics(user_query)
+
+
+def _normalize_single_topic_name(user_query: str) -> str:
+    """Normalize a single-token query to a clean topic name.
+    - Uppercase common crypto acronyms (RSA, AES, ECC, HMAC, DSA, ECDSA, MD5, DH)
+    - Normalize SHA variants to SHA-256 / SHA-1 / SHA-3
+    - For other short alphabetic tokens, uppercase if <=6 chars; else title-case
+    """
+    try:
+        s = (user_query or '').strip()
+        if not s:
+            return ''
+        sl = s.lower()
+        replacements = {
+            'sha256': 'SHA-256', 'sha-256': 'SHA-256', 'sha 256': 'SHA-256',
+            'sha1': 'SHA-1', 'sha-1': 'SHA-1', 'sha 1': 'SHA-1',
+            'sha3': 'SHA-3', 'sha-3': 'SHA-3', 'sha 3': 'SHA-3',
+            'aes': 'AES', 'rsa': 'RSA', 'ecc': 'ECC', 'ecdsa': 'ECDSA', 'dsa': 'DSA', 'md5': 'MD5', 'hmac': 'HMAC', 'dh': 'DH',
+        }
+        if sl in replacements:
+            return replacements[sl]
+        # If single token and alphabetic short string, use upper for acronym-like
+        toks = s.split()
+        if len(toks) == 1 and s.isalpha() and 2 <= len(s) <= 6:
+            return s.upper()
+        return s.title()
+    except Exception:
+        return (user_query or '').strip()
 
 
 def build_topics_prompt(user_query: str, explicit_names: list[str] | None = None) -> str:
@@ -380,6 +441,138 @@ Explicit Topics (in order): [{names_str}]
 
 Return only the JSON, no explanations.
 """
+
+
+def build_direct_extraction_prompt(user_query: str) -> str:
+                """Prompt to extract topics directly from a short user query that lists items and possibly a global context.
+                Goals:
+                - Preserve the items/topics the user named; do NOT invent new ones.
+                - Infer any global context (e.g., a programming language or domain) present in the query and apply it to each item.
+                - Keep the original order of items from the query.
+                - If the query is a single specific term (e.g., 'rsa', 'aes'), return exactly one normalized topic.
+                - Output strictly JSON with topics array; 1–4 topics maximum.
+
+STRICT OUTPUT REQUIREMENTS:
+- Respond with RAW JSON only. Start your response with '{' and end with '}'.
+- Do NOT include any prose, explanations, markdown, code fences, backticks, or extra characters before or after the JSON.
+- The JSON must have this exact shape:
+{
+    "topics": [
+        {"id": 1, "name": "Topic Name", "isActive": true}
+    ]
+}
+
+Guidelines:
+- Detect a single shared context if present (like "Python", "JavaScript", "DSA", "Trigonometry") and prepend/append it appropriately. Example: "python arrays strings" -> ["Python Arrays", "Python Strings"].
+- Split multiple items when the query uses connectors such as commas, semicolons, "and", "as well as", plus (+). Do NOT return the entire sentence as one topic when multiple items are present.
+- Correct minor spelling mistakes in item names (e.g., "recurstion" -> "Recursion").
+- Do not expand into subtopics or a curriculum; only reflect exactly the items the user mentioned.
+- Keep each topic name concise (<= 60 chars) and properly cased.
+- Maximum 4 topics.
+
+Examples (follow exactly these output conventions):
+- Input: "i wanna learn python arrays and recursion as well as hash maps" → Topics: ["Python Arrays", "Python Recursion", "Python Hash Maps"]
+- Input: "i want to learn python arrays and recurstion and hash maps" → Topics: ["Python Arrays", "Python Recursion", "Python Hash Maps"]
+- Input: "aes" → Topics: ["AES"]
+
+User Query: """ + user_query + """
+
+Return only the JSON, no explanations.
+"""
+
+
+def build_direct_retry_prompt(user_query: str) -> str:
+                """Ultra-constrained retry prompt for direct extraction when the first attempt returned non-JSON or prose.
+                The model MUST return ONLY a minimal JSON object with an array of 1–4 topic strings.
+                """
+                return (
+                        "You are formatting a machine-only response. DO NOT explain. DO NOT use markdown or backticks.\n"
+                        "Start your answer with '{' and end with '}'.\n"
+                        "Return ONLY a JSON object with this exact shape: {\n"
+                        "  \"topics\": [\"Topic 1\", \"Topic 2\"]\n"
+                        "}.\n"
+                        "Rules:\n"
+                        "- Detect a single global context like 'Python' and apply it to each item if present in the query.\n"
+                        "- Split items on connectors (commas, semicolons, 'and', '+', 'as well as'). Preserve original order.\n"
+                        "- Correct minor spelling mistakes (e.g., 'recurstion' -> 'Recursion').\n"
+                        "- 1 to 4 items maximum. No subtopics or curriculum.\n"
+                        "- No prose, no explanations. JSON only.\n\n"
+                        f"User Query: {user_query}\n\n"
+                        "Respond with exactly one JSON object."
+                )
+
+
+def _infer_global_context(user_query: str) -> str | None:
+    try:
+        q = (user_query or '').lower()
+        context_candidates = [
+            ('python', 'Python'), ('javascript', 'JavaScript'), ('typescript', 'TypeScript'), ('js', 'JavaScript'),
+            ('java', 'Java'), ('c++', 'C++'), ('c#', 'C#'), ('golang', 'Go'), ('go', 'Go'), ('rust', 'Rust'),
+            ('react', 'React'), ('django', 'Django'), ('flask', 'Flask'),
+            ('dsa', 'DSA'), ('data structures', 'DSA'), ('algorithms', 'DSA'),
+            ('trigonometry', 'Trigonometry'), ('digital logic', 'Digital Logic'),
+            ('algebra', 'Algebra'), ('calculus', 'Calculus'), ('geometry', 'Geometry'), ('finance', 'Finance')
+        ]
+        for key, label in context_candidates:
+            if key in q:
+                return label
+        return None
+    except Exception:
+        return None
+
+
+def _token_title(token: str) -> str:
+    t = (token or '').strip()
+    if not t:
+        return ''
+    tl = t.lower()
+    special = {
+        'c++': 'C++', 'c#': 'C#', 'js': 'JavaScript', 'ts': 'TypeScript',
+        'rsa': 'RSA', 'aes': 'AES', 'sha256': 'SHA-256', 'sha-256': 'SHA-256', 'sha 256': 'SHA-256',
+        'ecc': 'ECC', 'ecdsa': 'ECDSA', 'dsa': 'DSA', 'md5': 'MD5', 'hmac': 'HMAC'
+    }
+    if tl in special:
+        return special[tl]
+    # title case regular words
+    return t.title()
+
+
+def _fallback_direct_items(user_query: str) -> list[str]:
+    """Non-regex, minimal fallback: split by commas/semicolons/and, or space list with a global context prefix.
+    Returns up to 4 cleaned items in order.
+    """
+    try:
+        q = (user_query or '').strip()
+        if not q:
+            return []
+
+        # Split on common list connectors while preserving order
+        # Connectors: commas, semicolons, pipes, "and", "as well as", "+", "plus"
+        parts = [p.strip() for p in re.split(r"\b(?:,|;|\||and|as well as|\+|plus)\b", q, flags=re.IGNORECASE) if p and p.strip()]
+        if len(parts) > 1:
+            return parts[:MAX_TOPICS_PER_REQUEST]
+
+        # If no connectors, return single trimmed query as one item
+        return [q]
+    except Exception:
+        return []
+
+
+def _dedup_adjacent_words(name: str) -> str:
+    try:
+        if not isinstance(name, str):
+            return name
+        parts = [p for p in name.strip().split() if p]
+        if not parts:
+            return ''
+        out = [parts[0]]
+        for p in parts[1:]:
+            if p.lower() == out[-1].lower():
+                continue
+            out.append(p)
+        return ' '.join(out)
+    except Exception:
+        return str(name)
 
 
 def classify_query_intent(user_query: str) -> str:
@@ -677,7 +870,7 @@ def classify_topics(request):
             'fallback_strategy': None,
         }
 
-        # Classify intent: explicit vs broad (AI-first, fallback to heuristic)
+        # Classify intent strictly via AI (no heuristic fallback)
         intent = None
         try:
             ic_resp = call_intent_classifier(user_query)
@@ -695,66 +888,46 @@ def classify_topics(request):
                     logger.info(f"Intent classifier (AI) returned: {intent} for query='{safe_query}'")
                     debug_meta['intent'] = intent
                     debug_meta['intent_source'] = 'ai'
-                    # Post-classification guardrail: single short term should be direct
-                    uq = user_query.strip()
-                    if intent == 'broad' and len(uq.split()) == 1 and 2 <= len(uq) <= 15:
-                        intent = 'direct'
-                        logger.info("Intent override applied (single short term → direct)")
-                        debug_meta['intent'] = intent
-                        debug_meta['intent_source'] = 'override'
-        except Exception:
+        except Exception as e:
+            logger.error(f"Intent classifier AI error: {e}")
             intent = None
         if not intent:
-            logger.info("Intent classifier failed; falling back to heuristic")
-        if not intent:
-            intent = classify_query_intent(user_query)
-            logger.info(f"Heuristic intent decided: {intent}")
-            debug_meta['intent'] = intent
-            debug_meta['intent_source'] = 'heuristic-fallback'
+            # Strict no-fallback policy: return 422 if AI didn't provide a valid intent
+            debug_meta['intent'] = None
+            debug_meta['intent_source'] = 'ai'
+            return JsonResponse({
+                'error': 'intent_classification_failed',
+                'message': 'AI intent classification did not return a valid intent (direct/broad).',
+                'debug_meta': debug_meta
+            }, status=422)
+        # We no longer use heuristic explicit extraction to generate topics; keep names for potential AI guidance only
         try:
             explicit_topics = extract_explicit_topics(user_query)
         except Exception:
             explicit_topics = []
         explicit_names = [t.get('name') for t in explicit_topics if isinstance(t, dict) and t.get('name')]
 
-        # For direct intent: return extracted topic names as-is; for broad: let AI break down freely
-        if intent == 'direct' and explicit_names:
-            # Direct mode: enrich explicit topics with query context using AI (no breakdown, same count/order)
+        # Direct intent: AI-only extraction with context; do not use regex/keyword extraction or client-side parsing for multiple items
+        if intent == 'direct':
             debug_meta['prompt_mode'] = 'direct'
-            debug_meta['explicit_constraints'] = explicit_names
-            logger.info(f"Direct mode: enriching {len(explicit_names)} explicit topics with context via AI")
-
-            prompt_direct = build_direct_topics_prompt(user_query, explicit_names[:MAX_TOPICS_PER_REQUEST])
+            prompt_extraction = build_direct_extraction_prompt(user_query)
             used_model = None
             response = None
+            raw_ai_text = None
             try:
-                response = call_gemini_api(prompt_direct)
+                response = call_gemini_api(prompt_extraction)
                 used_model = '1.5-pro'
-            except Exception:
-                try:
-                    response = call_gemini_flash_api(prompt_direct)
-                    used_model = '1.5-flash'
-                except Exception as e:
-                    logger.info(f"Direct enrichment failed, using explicit topics as-is. Error: {e}")
-                    # Fall back to explicit topics unchanged
-                    formatted_topics = [
-                        {'id': i + 1, 'name': name, 'isActive': True}
-                        for i, name in enumerate(explicit_names[:MAX_TOPICS_PER_REQUEST])
-                    ]
-                    debug_meta['topic_model_used'] = None
-                    debug_meta['topics_count'] = len(formatted_topics)
-                    debug_meta['fallback_used'] = True
-                    debug_meta['fallback_strategy'] = 'direct_enrichment_failed'
-                    personalization_value = derive_personalization(user_query)
-                    return JsonResponse({
-                        'topics': formatted_topics,
-                        'personalization': personalization_value,
-                        'debug_meta': debug_meta
-                    })
+            except Exception as e:
+                logger.error(f"Direct extraction AI (1.5-pro) failed: {e}")
+                return JsonResponse({
+                    'error': 'ai_unavailable',
+                    'message': 'Unable to extract topics from AI (direct mode).',
+                    'debug_meta': debug_meta
+                }, status=502)
 
             debug_meta['topic_model_used'] = used_model
-            # Extract and parse topics JSON
-            enriched_topics = None
+            # Parse AI JSON
+            topics_ai = None
             try:
                 text = None
                 if 'candidates' in response and response['candidates']:
@@ -762,62 +935,167 @@ def classify_topics(request):
                     if parts_resp:
                         text = parts_resp[0].get('text')
                 if isinstance(text, str) and text.strip():
+                    raw_ai_text = text.strip()
                     import re
-                    m = re.search(r'\{[\s\S]*\}', text)
-                    parsed = json.loads(m.group()) if m else json.loads(text)
+                    # Strip common Markdown code fences to ease JSON parsing
+                    stripped = raw_ai_text
+                    if stripped.startswith('```'):
+                        # remove first fence line and possible trailing fence
+                        stripped = re.sub(r'^```[a-zA-Z]*\n', '', stripped)
+                        stripped = re.sub(r'\n```\s*$', '', stripped)
+                    # Try object first
+                    m_obj = re.search(r'\{[\s\S]*\}', stripped)
+                    parsed = None
+                    if m_obj:
+                        try:
+                            parsed = json.loads(m_obj.group())
+                        except Exception:
+                            parsed = None
+                    if parsed is None:
+                        # Try array fallback
+                        m_arr = re.search(r'\[[\s\S]*\]', stripped)
+                        if m_arr:
+                            try:
+                                parsed = json.loads(m_arr.group())
+                            except Exception:
+                                parsed = None
+                    if parsed is None:
+                        # Final attempt on the whole string
+                        try:
+                            parsed = json.loads(stripped)
+                        except Exception:
+                            parsed = None
                     if isinstance(parsed, dict) and isinstance(parsed.get('topics'), list):
-                        enriched_topics = parsed['topics']
+                        topics_ai = parsed['topics']
+                    elif isinstance(parsed, list):
+                        topics_ai = parsed
             except Exception:
-                enriched_topics = None
+                topics_ai = None
 
-            # Validate and normalize enriched topics; fallback to explicit if malformed
+            # Normalize to formatted topics strictly; if malformed, return 422 (no fallback)
             formatted_topics = []
-            if isinstance(enriched_topics, list) and len(enriched_topics) == len(explicit_names[:MAX_TOPICS_PER_REQUEST]):
-                for i, topic in enumerate(enriched_topics[:MAX_TOPICS_PER_REQUEST]):
+            if isinstance(topics_ai, list) and 1 <= len(topics_ai) <= MAX_TOPICS_PER_REQUEST:
+                for i, topic in enumerate(topics_ai[:MAX_TOPICS_PER_REQUEST]):
                     if isinstance(topic, dict):
-                        name = str(topic.get('name', explicit_names[i])).strip()[:200]
+                        name = str(topic.get('name', f'Topic {i+1}')).strip()
+                        name = _dedup_adjacent_words(name)[:200]
                         formatted_topics.append({'id': i + 1, 'name': name, 'isActive': True})
                     elif isinstance(topic, str):
-                        name = str(topic).strip()[:200]
-                        formatted_topics.append({'id': i + 1, 'name': name, 'isActive': True})
-            else:
-                # Fallback: keep original explicit names
-                formatted_topics = [
-                    {'id': i + 1, 'name': name, 'isActive': True}
-                    for i, name in enumerate(explicit_names[:MAX_TOPICS_PER_REQUEST])
-                ]
-                if used_model:
-                    debug_meta['fallback_used'] = True
-                    debug_meta['fallback_strategy'] = 'direct_enrichment_parse_failed'
+                        const_name = _dedup_adjacent_words(topic.strip())[:200]
+                        formatted_topics.append({'id': i + 1, 'name': const_name, 'isActive': True})
+            if not formatted_topics:
+                # One strict retry with ultra-constrained prompt (AI-only, no heuristics)
+                if settings.DEBUG:
+                    logger.error("Direct mode parse failed; attempting strict retry with ultra-constrained prompt")
+                try:
+                    retry_prompt = build_direct_retry_prompt(user_query)
+                    # Always use 1.5 Pro for retry
+                    retry_resp = call_gemini_api(retry_prompt)
+                    retry_model = '1.5-pro'
+
+                    debug_meta['model_retry_used'] = True
+                    debug_meta['topic_model_used'] = retry_model
+
+                    # Parse retry json (expecting {"topics": ["..."]})
+                    retry_text = None
+                    if 'candidates' in retry_resp and retry_resp['candidates']:
+                        rparts = retry_resp['candidates'][0].get('content', {}).get('parts', [])
+                        if rparts:
+                            retry_text = rparts[0].get('text')
+                    retry_raw = retry_text.strip() if isinstance(retry_text, str) else None
+
+                    topics_ai = None
+                    if isinstance(retry_raw, str) and retry_raw:
+                        import re
+                        stripped = retry_raw
+                        if stripped.startswith('```'):
+                            stripped = re.sub(r'^```[a-zA-Z]*\n', '', stripped)
+                            stripped = re.sub(r'\n```\s*$', '', stripped)
+                        m_obj = re.search(r'\{[\s\S]*\}', stripped)
+                        parsed = None
+                        if m_obj:
+                            try:
+                                parsed = json.loads(m_obj.group())
+                            except Exception:
+                                parsed = None
+                        if parsed is None:
+                            try:
+                                parsed = json.loads(stripped)
+                            except Exception:
+                                parsed = None
+                        if isinstance(parsed, dict) and isinstance(parsed.get('topics'), list):
+                            topics_ai = parsed['topics']
+
+                    formatted_topics = []
+                    if isinstance(topics_ai, list) and 1 <= len(topics_ai) <= MAX_TOPICS_PER_REQUEST:
+                        for i, topic in enumerate(topics_ai[:MAX_TOPICS_PER_REQUEST]):
+                            if isinstance(topic, dict):
+                                name = str(topic.get('name', f'Topic {i+1}')).strip()
+                                name = _dedup_adjacent_words(name)[:200]
+                                formatted_topics.append({'id': i + 1, 'name': name, 'isActive': True})
+                            elif isinstance(topic, str):
+                                const_name = _dedup_adjacent_words(topic.strip())[:200]
+                                formatted_topics.append({'id': i + 1, 'name': const_name, 'isActive': True})
+
+                    if not formatted_topics:
+                        # Debug logging for troubleshooting
+                        if settings.DEBUG:
+                            logger.error(f"🚨 DIRECT MODE AI_PARSE_ERROR DEBUG:")
+                            logger.error(f"   Query: {safe_query}")
+                            logger.error(f"   Used Model (first): {used_model}")
+                            logger.error(f"   Raw AI Text (first): {raw_ai_text[:1000] if isinstance(raw_ai_text, str) else 'None'}")
+                            logger.error(f"   Retry Model: {retry_model}")
+                            logger.error(f"   Raw AI Text (retry): {retry_raw[:1000] if isinstance(retry_raw, str) else 'None'}")
+                            logger.error(f"   Formatted Topics (after retry): {formatted_topics}")
+                        error_payload = {
+                            'error': 'ai_parse_error',
+                            'message': 'AI did not return a valid topics JSON for direct mode.',
+                            'debug_meta': debug_meta
+                        }
+                        if settings.DEBUG:
+                            error_payload['raw_ai_text'] = (raw_ai_text[:2000] if isinstance(raw_ai_text, str) else None)
+                            error_payload['used_model'] = used_model
+                        return JsonResponse(error_payload, status=422)
+
+                except Exception as _retry_err:
+                    if settings.DEBUG:
+                        logger.error(f"Strict retry failed: {_retry_err}")
+                    error_payload = {
+                        'error': 'ai_parse_error',
+                        'message': 'AI did not return a valid topics JSON for direct mode.',
+                        'debug_meta': debug_meta
+                    }
+                    if settings.DEBUG:
+                        error_payload['raw_ai_text'] = (raw_ai_text[:2000] if isinstance(raw_ai_text, str) else None)
+                        error_payload['used_model'] = used_model
+                    return JsonResponse(error_payload, status=422)
 
             debug_meta['topics_count'] = len(formatted_topics)
-            personalization_value = derive_personalization(user_query)
             return JsonResponse({
                 'topics': formatted_topics,
-                'personalization': personalization_value,
+                'personalization': derive_personalization(user_query),
                 'debug_meta': debug_meta
             })
         
-        # Broad mode: use AI to generate curriculum breakdown
+        # If intent was direct but we still couldn't derive a topic, fall back to broad
+        
+    # Broad mode: use AI to generate curriculum breakdown (no heuristic fallback)
         prompt = build_topics_prompt(user_query, None)  # No constraints for broad mode
         debug_meta['prompt_mode'] = 'broad'
         debug_meta['explicit_constraints'] = []
         logger.info(f"Broad mode: using AI to break down '{safe_query}' into curriculum")
         
         try:
-            # Use Gemini 1.5 Pro for topic classification + personalization; fallback to 1.5 Flash.
+            # Use Gemini 1.5 Pro for topic classification + personalization; no Flash fallback.
             if settings.DEBUG:
                 logger.debug("Attempting Gemini 1.5 Pro API call for topic classification + personalization...")
-            try:
-                response = call_gemini_api(prompt)
-                used_model = '1.5-pro'
-            except Exception:
-                response = call_gemini_flash_api(prompt)
-                used_model = '1.5-flash'
+            response = call_gemini_api(prompt)
+            used_model = '1.5-pro'
             logger.info(f"Topic generation model used: {used_model}")
             debug_meta['topic_model_used'] = used_model
             
             # Extract text from response (robust to shape differences)
+            raw_ai_text = None
             if 'candidates' in response and len(response['candidates']) > 0:
                 text = None
                 try:
@@ -838,53 +1116,25 @@ def classify_topics(request):
                             text = candidate.get('text')
                 except Exception:
                     text = None
+                raw_ai_text = text.strip() if isinstance(text, str) else None
                 if settings.DEBUG:
                     logger.debug(f"Extracted text length: {len(text) if text else 0}")
 
                 # Guard against empty/None text
                 personalization_default = derive_personalization(user_query)
                 if not isinstance(text, str) or not text.strip():
-                    logger.info("Empty/invalid AI text; retry with Gemini 1.5 Pro before fallback")
-                    # If initial was 1.5 Flash, retry once with 1.5 Pro; if initial was 1.5 Pro, no retry
-                    if used_model == '1.5-flash':
-                        try:
-                            retry_resp = call_gemini_api(prompt)
-                            # Extract retry text
-                            retry_text = None
-                            if 'candidates' in retry_resp and retry_resp['candidates']:
-                                rparts = retry_resp['candidates'][0].get('content', {}).get('parts', [])
-                                if rparts:
-                                    retry_text = rparts[0].get('text')
-                            if isinstance(retry_text, str) and retry_text.strip():
-                                text = retry_text
-                                debug_meta['model_retry_used'] = True
-                                debug_meta['topic_model_used'] = '1.5-pro'
-                            else:
-                                raise ValueError('Empty retry text')
-                        except Exception:
-                            text = None
+                    logger.info("Empty/invalid AI text from 1.5-pro")
+                    text = None
                     if not text:
-                        logger.info("Falling back to explicit+merge or domain fallback topics")
-                        # Compute fallback with strategy labeling
-                        fallback_topics = []
-                        if explicit_topics:
-                            fallback_topics = _merge_with_fallback(user_query, explicit_topics)
-                            if fallback_topics:
-                                debug_meta['fallback_strategy'] = 'explicit_merge'
-                        if not fallback_topics:
-                            re_explicit = extract_explicit_topics(user_query)
-                            if re_explicit:
-                                fallback_topics = re_explicit
-                                debug_meta['fallback_strategy'] = 're_extract_explicit'
-                        if not fallback_topics:
-                            fallback_topics = generate_simple_fallback_topics(user_query)
-                            debug_meta['fallback_strategy'] = 'domain_fallback'
-                        debug_meta['fallback_used'] = True
-                        return JsonResponse({
-                            'topics': fallback_topics,
-                            'personalization': personalization_default,
+                        error_payload = {
+                            'error': 'ai_empty_response',
+                            'message': 'AI returned no content for broad mode.',
                             'debug_meta': debug_meta
-                        })
+                        }
+                        if settings.DEBUG:
+                            error_payload['raw_ai_text'] = None
+                            error_payload['used_model'] = used_model
+                        return JsonResponse(error_payload, status=502)
                 
                 # Try to parse JSON from response (support object or array for backward compatibility)
                 try:
@@ -961,117 +1211,44 @@ def classify_topics(request):
                             'debug_meta': debug_meta
                         })
                     else:
-                        # No topics found
+                        # No topics found (AI returned empty topics)
                         debug_meta['topics_count'] = 0
-                        return JsonResponse({
-                            'topics': [],
-                            'message': 'No clear learning topics found in your query. Please be more specific.',
-                            'personalization': personalization_default,
+                        error_payload = {
+                            'error': 'ai_empty_topics',
+                            'message': 'AI did not return any topics.',
                             'debug_meta': debug_meta
-                        })
+                        }
+                        if settings.DEBUG:
+                            error_payload['raw_ai_text'] = (raw_ai_text[:2000] if isinstance(raw_ai_text, str) else None)
+                            error_payload['used_model'] = used_model
+                        return JsonResponse(error_payload, status=422)
                     
                 except (json.JSONDecodeError, ValueError) as e:
                     if settings.DEBUG:
                         logger.debug(f"Failed to parse AI response: {e}; retry with 1.5 Pro before fallback")
                     # Retry parse with 1.5 Pro if first was 2.5
-                    if used_model == '1.5-flash':
-                        try:
-                            retry_resp = call_gemini_api(prompt)
-                            debug_meta['model_retry_used'] = True
-                            debug_meta['topic_model_used'] = '1.5-pro'
-                            rtext = None
-                            if 'candidates' in retry_resp and retry_resp['candidates']:
-                                rparts = retry_resp['candidates'][0].get('content', {}).get('parts', [])
-                                if rparts:
-                                    rtext = rparts[0].get('text')
-                            if isinstance(rtext, str) and rtext.strip():
-                                # try parse again
-                                import re
-                                json_obj_match = re.search(r'\{[\s\S]*\}', rtext)
-                                parsed = None
-                                if json_obj_match:
-                                    try:
-                                        parsed = json.loads(json_obj_match.group())
-                                    except Exception:
-                                        parsed = None
-                                if parsed is None:
-                                    json_arr_match = re.search(r'\[[\s\S]*\]', rtext)
-                                    if json_arr_match:
-                                        parsed = json.loads(json_arr_match.group())
-                                    else:
-                                        parsed = json.loads(rtext)
-                                # Normalize to topics
-                                if isinstance(parsed, dict) and 'topics' in parsed:
-                                    topics_raw = parsed.get('topics', [])
-                                    personalization_value = parsed.get('personalization') or personalization_default
-                                elif isinstance(parsed, list):
-                                    topics_raw = parsed
-                                    personalization_value = personalization_default
-                                else:
-                                    raise ValueError('Unexpected JSON shape after retry')
-
-                                formatted_topics = []
-                                for i, topic in enumerate(topics_raw[:MAX_TOPICS_PER_REQUEST]):
-                                    if isinstance(topic, dict):
-                                        name = str(topic.get('name', 'Unknown')).strip()[:200]
-                                        topic_payload = {
-                                            'id': topic.get('id', i + 1),
-                                            'name': name,
-                                            'isActive': topic.get('isActive', True)
-                                        }
-                                        if 'context' in topic and isinstance(topic['context'], str) and topic['context'].strip():
-                                            topic_payload['context'] = topic['context'].strip()[:200]
-                                        formatted_topics.append(topic_payload)
-                                    elif isinstance(topic, str):
-                                        name = str(topic).strip()[:200]
-                                        formatted_topics.append({'id': i + 1, 'name': name, 'isActive': True})
-
-                                if formatted_topics:
-                                    debug_meta['topics_count'] = len(formatted_topics)
-                                    return JsonResponse({
-                                        'topics': formatted_topics,
-                                        'personalization': personalization_value,
-                                        'debug_meta': debug_meta
-                                    })
-                                parsed_ok = True
-                        except Exception:
-                            parsed_ok = False
-
-                    # Fallback if retry also failed (prefer explicit augmented by domain)
-                    # Compute fallback with strategy labeling
-                    fallback_topics = []
-                    if explicit_topics:
-                        fallback_topics = _merge_with_fallback(user_query, explicit_topics)
-                        if fallback_topics:
-                            debug_meta['fallback_strategy'] = 'explicit_merge'
-                    if not fallback_topics:
-                        re_explicit = extract_explicit_topics(user_query)
-                        if re_explicit:
-                            fallback_topics = re_explicit
-                            debug_meta['fallback_strategy'] = 're_extract_explicit'
-                    if not fallback_topics:
-                        fallback_topics = generate_simple_fallback_topics(user_query)
-                        debug_meta['fallback_strategy'] = 'domain_fallback'
-                    debug_meta['fallback_used'] = True
-                    personalization_default = derive_personalization(user_query)
-                    return JsonResponse({
-                        'topics': fallback_topics,
-                        'personalization': personalization_default,
+                    # No Flash retry; return parse error directly
+                    error_payload = {
+                        'error': 'ai_parse_error',
+                        'message': 'AI response could not be parsed into topics.',
                         'debug_meta': debug_meta
-                    })
+                    }
+                    if settings.DEBUG:
+                        error_payload['raw_ai_text'] = (raw_ai_text[:2000] if isinstance(raw_ai_text, str) else None)
+                        error_payload['used_model'] = used_model
+                    return JsonResponse(error_payload, status=422)
             else:
                 if settings.DEBUG:
                     logger.debug("No valid candidates in response")
-                # Compute fallback with strategy labeling
-                fallback_topics = extract_explicit_topics(user_query) or generate_simple_fallback_topics(user_query)
-                debug_meta['fallback_used'] = True
-                debug_meta['fallback_strategy'] = 're_extract_explicit' if extract_explicit_topics(user_query) else 'domain_fallback'
-                personalization_default = derive_personalization(user_query)
-                return JsonResponse({
-                    'topics': fallback_topics,
-                    'personalization': personalization_default,
+                error_payload = {
+                    'error': 'ai_empty_response',
+                    'message': 'AI returned no candidates.',
                     'debug_meta': debug_meta
-                })
+                }
+                if settings.DEBUG:
+                    error_payload['raw_ai_text'] = None
+                    error_payload['used_model'] = used_model
+                return JsonResponse(error_payload, status=502)
                 
         except NetworkError as network_error:
             logger.warning(f"Network connection error: {network_error}")
@@ -1085,27 +1262,19 @@ def classify_topics(request):
                 
         except Exception as api_error:
             logger.error(f"Gemini API error: {api_error}")
-            # Return explicit or fallback topics for review
-            fallback_topics = extract_explicit_topics(user_query) or generate_simple_fallback_topics(user_query)
-            personalization_default = derive_personalization(user_query)
-            debug_meta['fallback_used'] = True
-            debug_meta['fallback_strategy'] = 'api_error_fallback'
             return JsonResponse({
-                'topics': fallback_topics,
-                'personalization': personalization_default,
+                'error': 'ai_service_error',
+                'message': 'AI service error during broad classification.',
                 'debug_meta': debug_meta
-            })
+            }, status=502)
         
     except Exception as e:
         logger.error(f"Error in classify_topics: {e}")
-        # Return minimal fallback
-        debug_meta['fallback_used'] = True
-        debug_meta['fallback_strategy'] = 'unhandled_exception'
         return JsonResponse({
-            'topics': [{'id': 1, 'name': 'General Learning', 'isActive': True}],
-            'personalization': derive_personalization(""),
-            'debug_meta': debug_meta
-        })
+            'error': 'internal_error',
+            'message': 'Unexpected server error in classification.',
+            'debug_meta': debug_meta if 'debug_meta' in locals() else {}
+        }, status=500)
 
 def check_topic_rate_limit_with_auth(request, requested_topics):
     """Enhanced rate limit check with proper authentication and security"""

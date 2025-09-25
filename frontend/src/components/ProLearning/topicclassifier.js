@@ -166,6 +166,16 @@ export const classifyTopics = async (query, expectedTopics = null) => {
     if (error.response) {
       const status = error.response.status;
       const result = error.response.data || {};
+      // In development, surface raw AI text to the console to debug parsing issues
+      if (import.meta && import.meta.env && import.meta.env.DEV) {
+        console.log('🔍 Debug: classify_topics error response (dev mode):', {
+          status,
+          used_model: result.used_model,
+          raw_ai_text_preview: typeof result.raw_ai_text === 'string' ? result.raw_ai_text.slice(0, 1000) : null,
+          error: result.error,
+          full_result: result
+        });
+      }
       if (status === 429) {
         handleRateLimitError(result.error || 'Rate limit exceeded', result.usage_stats);
         throw new Error('Rate limit exceeded');

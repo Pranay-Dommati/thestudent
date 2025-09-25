@@ -30,7 +30,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import rehypeHighlight from "rehype-highlight";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import {
@@ -4108,7 +4107,7 @@ const ProLearningPage = () => {
               {readingRenderReady && sanitizedReading ? (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm, remarkMath]}
-                  rehypePlugins={[rehypeHighlight, rehypeKatex]}
+                  rehypePlugins={[rehypeKatex]}
                   components={{
                     h1: ({children}) => (
                       <h1 className="text-3xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -4170,12 +4169,40 @@ const ProLearningPage = () => {
                           <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border" {...props}>{children}</code>
                         );
                       }
-                      // Use the code string as a unique id for this code block
-                      const codeString = String(children).replace(/\n$/, "");
+                      // Flatten children to a clean text string to avoid [object Object]
+                      const flattenText = (ch) => {
+                        if (Array.isArray(ch)) return ch.map(flattenText).join("");
+                        if (typeof ch === 'string' || typeof ch === 'number') return String(ch);
+                        if (React.isValidElement(ch)) return flattenText(ch.props?.children);
+                        if (ch && typeof ch === 'object' && 'props' in ch) return flattenText(ch.props.children);
+                        return '';
+                      };
+                      const codeString = flattenText(children).replace(/\n$/, "");
+                      // Detect ASCII diagram blocks (triangles, boxes, etc.) and render as plain <pre>
+                      const looksLikeAsciiDiagram = (s) => {
+                        const str = String(s || "");
+                        const lines = str.split(/\n/);
+                        if (lines.length === 0 || lines.length > 30) return false;
+                        // Should contain typical ascii diagram characters
+                        const hasAsciiArtChars = /[\\/|_\-+]/.test(str);
+                        // Avoid typical programming signatures
+                        const looksLikeCode = /[{;}]|<\/?\w|\b(function|class|const|let|var|import|from|#include)\b/.test(str);
+                        // Many lines are short and composed of ascii-art chars and spaces
+                        const asciiLine = /^[\s\\\/\|_\-+.`'()\[\]<>]+$/;
+                        const asciiRatio = lines.reduce((acc, l) => acc + (asciiLine.test(l) ? 1 : 0), 0) / lines.length;
+                        return hasAsciiArtChars && !looksLikeCode && asciiRatio > 0.6;
+                      };
+                      if (looksLikeAsciiDiagram(codeString)) {
+                        return (
+                          <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-sm leading-6 whitespace-pre font-mono text-gray-800">
+                            {codeString}
+                          </pre>
+                        );
+                      }
                       const blockId = codeString;
                       return (
-                        <div className="relative my-6 inline-block max-w-full" style={{ width: 'fit-content' }}>
-                          <div className="inline-flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl" style={{ width: '100%' }}>
+                        <div className="relative my-6 w-full max-w-full">
+                          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl w-full">
                             <span className="text-xs text-gray-500 font-mono">{lang || "code"}</span>
                             <button
                               className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-100 bg-white ml-2 flex items-center gap-1 cursor-pointer"
@@ -4251,8 +4278,8 @@ const ProLearningPage = () => {
                               border: "1px solid #222c37",
                               color: "#f8f8f2",
                               lineHeight: "1.4",
-                              display: 'inline-block',
-                              maxWidth: '100%'
+                              display: 'block',
+                              width: '100%'
                             }}
                             codeTagProps={{
                               style: { 
@@ -4292,7 +4319,7 @@ const ProLearningPage = () => {
                 readingRenderReady && sanitizedReading ? (
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeHighlight, rehypeKatex]}
+                    rehypePlugins={[rehypeKatex]}
                     components={{
                       h1: ({children}) => (
                         <h1 className="text-3xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -4354,12 +4381,36 @@ const ProLearningPage = () => {
                             <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border" {...props}>{children}</code>
                           );
                         }
-                        // Use the code string as a unique id for this code block
-                        const codeString = String(children).replace(/\n$/, "");
+                        const flattenText = (ch) => {
+                          if (Array.isArray(ch)) return ch.map(flattenText).join("");
+                          if (typeof ch === 'string' || typeof ch === 'number') return String(ch);
+                          if (React.isValidElement(ch)) return flattenText(ch.props?.children);
+                          if (ch && typeof ch === 'object' && 'props' in ch) return flattenText(ch.props.children);
+                          return '';
+                        };
+                        const codeString = flattenText(children).replace(/\n$/, "");
+                        // Detect ASCII diagram blocks (triangles, boxes, etc.) and render as plain <pre>
+                        const looksLikeAsciiDiagram = (s) => {
+                          const str = String(s || "");
+                          const lines = str.split(/\n/);
+                          if (lines.length === 0 || lines.length > 30) return false;
+                          const hasAsciiArtChars = /[\\/|_\-+]/.test(str);
+                          const looksLikeCode = /[{;}]|<\/?\w|\b(function|class|const|let|var|import|from|#include)\b/.test(str);
+                          const asciiLine = /^[\s\\\/\|_\-+.`'()\[\]<>]+$/;
+                          const asciiRatio = lines.reduce((acc, l) => acc + (asciiLine.test(l) ? 1 : 0), 0) / lines.length;
+                          return hasAsciiArtChars && !looksLikeCode && asciiRatio > 0.6;
+                        };
+                        if (looksLikeAsciiDiagram(codeString)) {
+                          return (
+                            <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-sm leading-6 whitespace-pre font-mono text-gray-800">
+                              {codeString}
+                            </pre>
+                          );
+                        }
                         const blockId = codeString;
                         return (
-                          <div className="relative my-6 inline-block max-w-full" style={{ width: 'fit-content' }}>
-                            <div className="inline-flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl" style={{ width: '100%' }}>
+                          <div className="relative my-6 w-full max-w-full">
+                            <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl w-full">
                               <span className="text-xs text-gray-500 font-mono">{lang || "code"}</span>
                               <button
                                 className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-100 bg-white ml-2 flex items-center gap-1 cursor-pointer"
@@ -4435,8 +4486,8 @@ const ProLearningPage = () => {
                                 border: "1px solid #222c37",
                                 color: "#f8f8f2",
                                 lineHeight: "1.4",
-                                display: 'inline-block',
-                                maxWidth: '100%'
+                                display: 'block',
+                                width: '100%'
                               }}
                               codeTagProps={{
                                 style: { 
@@ -4570,7 +4621,7 @@ const ProLearningPage = () => {
             <div className="prose prose-lg max-w-none">
               <ReactMarkdown 
                 remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeHighlight, rehypeKatex]}
+                rehypePlugins={[rehypeKatex]}
                 components={{
                   h1: ({children}) => (
                     <h1 className="text-3xl font-bold mb-6 pb-4 border-b-2 border-purple-200 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
@@ -4646,7 +4697,40 @@ const ProLearningPage = () => {
                     <td className="px-4 py-3 text-sm text-gray-600 border-b border-gray-100">
                       {children}
                     </td>
-                  )
+                  ),
+                  code: ({node, inline, className, children, ...props}) => {
+                    const match = /language-(\w+)/.exec(className || "");
+                    const lang = match ? match[1] : "";
+                    if (inline) {
+                      return (
+                        <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border" {...props}>{children}</code>
+                      );
+                    }
+                    const codeString = String(children).replace(/\n$/, "");
+                    const looksLikeAsciiDiagram = (s) => {
+                      const str = String(s || "");
+                      const lines = str.split(/\n/);
+                      if (lines.length === 0 || lines.length > 30) return false;
+                      const hasAsciiArtChars = /[\\/|_\-+]/.test(str);
+                      const looksLikeCode = /[{;}]|<\/?\w|\b(function|class|const|let|var|import|from|#include)\b/.test(str);
+                      const asciiLine = /^[\s\\\/\|_\-+.`'()\[\]<>]+$/;
+                      const asciiRatio = lines.reduce((acc, l) => acc + (asciiLine.test(l) ? 1 : 0), 0) / lines.length;
+                      return hasAsciiArtChars && !looksLikeCode && asciiRatio > 0.6;
+                    };
+                    if (looksLikeAsciiDiagram(codeString)) {
+                      return (
+                        <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-sm leading-6 whitespace-pre font-mono text-gray-800">
+                          {codeString}
+                        </pre>
+                      );
+                    }
+                    // default: keep summary code blocks minimal
+                    return (
+                      <pre className="my-4 p-4 rounded-lg bg-gray-900 text-gray-100 overflow-auto text-sm leading-6 whitespace-pre font-mono">
+                        <code>{codeString}</code>
+                      </pre>
+                    );
+                  }
                 }}
               >
                 {content.summary}
