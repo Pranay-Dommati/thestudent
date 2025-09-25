@@ -246,6 +246,53 @@ const ProLearningPage = () => {
     };
   }, []); // Empty dependency array - run once on mount/unmount
 
+  // Simple content loader for reload mode - no generation, just load from storage
+  const loadContentForReloadMode = async (topicName) => {
+    const currentCourseId = getCourseId();
+    if (!currentCourseId || !topicName) return;
+
+    console.log('⚡ Reload mode: Loading content for topic:', topicName);
+
+    try {
+      const storedContent = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
+      if (storedContent && storedContent.reading) {
+        console.log('✅ Reload mode: Found content for topic:', topicName);
+        // Double-check the topic didn’t change while awaiting
+        if (selectedTopic?.name && selectedTopic.name !== topicName) {
+          return;
+        }
+        setContentWithSanitization({
+          reading: storedContent.reading,
+          summary: storedContent.summary || 'Summary not available',
+          quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
+          videos: storedContent.videos || [],
+          resources: storedContent.resources || []
+        }, 'reload:storedContent');
+        setContentTopicName(topicName);
+
+        if (storedContent.reading) {
+          const sections = parseReadingSections(storedContent.reading);
+          setReadingSections(sections);
+          setReadingSectionIndex(0);
+        }
+
+        setIsLoading(false);
+        setLoadingStep('');
+      } else {
+        console.warn('⚠️ Reload mode: No content found for topic:', topicName);
+        // Avoid injecting fallback reading in reload mode to prevent preservation conflicts.
+        // Just clear loading; UI will indicate missing content without altering reading.
+        setIsLoading(false);
+        setLoadingStep('');
+      }
+    } catch (error) {
+      console.error('❌ Reload mode: Error loading content for topic:', topicName, error);
+      // Avoid injecting error content as reading in reload mode; keep current reading intact.
+      setIsLoading(false);
+      setLoadingStep('');
+    }
+  };
+
   // Check if course is already saved when loading
   useEffect(() => {
     const checkIfCourseSaved = async () => {
@@ -261,73 +308,7 @@ const ProLearningPage = () => {
   // Set default topics and initialize with consistent course ID
   useEffect(() => {
     // Removed IndexedDB waits; Pro Learning no longer relies on IDB
-    
-    // Simple content loader for reload mode - no generation, just load from storage
-    const loadContentForReloadMode = async (topicName) => {
-      const currentCourseId = getCourseId();
-      if (!currentCourseId || !topicName) return;
-
-      console.log('⚡ Reload mode: Loading content for topic:', topicName);
-
-      try {
-        const storedContent = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
-        
-        if (storedContent && storedContent.reading) {
-          console.log('✅ Reload mode: Found content for topic:', topicName);
-          
-          // Set content directly
-          setContentWithSanitization({
-            reading: storedContent.reading,
-            summary: storedContent.summary || 'Summary not available',
-            quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
-            videos: storedContent.videos || [],
-            resources: storedContent.resources || []
-          }, 'reload:storedContent');
-          setContentTopicName(topicName);
-
-          // Set reading sections
-          if (storedContent.reading) {
-            const sections = parseReadingSections(storedContent.reading);
-            setReadingSections(sections);
-            setReadingSectionIndex(0);
-          }
-
-          console.log('✅ Reload mode: Content loaded successfully for:', topicName);
-          
-          // Clear loading states
-          setIsLoading(false);
-          setLoadingStep('');
-        } else {
-          console.warn('⚠️ Reload mode: No content found for topic:', topicName);
-          setContentWithSanitization({
-            reading: 'Content not available. Please regenerate the course.',
-            summary: 'Summary not available',
-            quiz: { questions: [], currentQuestion: 0 },
-            videos: [],
-            resources: []
-          }, 'reload:fallbackNoContent');
-          setContentTopicName(topicName);
-          
-          // Clear loading states for fallback content
-          setIsLoading(false);
-          setLoadingStep('');
-        }
-      } catch (error) {
-        console.error('❌ Reload mode: Error loading content for topic:', topicName, error);
-        setContentWithSanitization({
-          reading: 'Error loading content. Please try again.',
-          summary: 'Error loading summary',
-          quiz: { questions: [], currentQuestion: 0 },
-          videos: [],
-          resources: []
-        }, 'reload:error');
-        setContentTopicName(topicName);
-        
-        // Clear loading states for error content
-        setIsLoading(false);
-        setLoadingStep('');
-      }
-    };
+    // Note: using component-scoped loadContentForReloadMode declared above
     
     // Handle reload scenario - content already exists, load quickly
     const handleReloadScenario = async (courseId, handleTopicSelection) => {
@@ -897,6 +878,16 @@ const ProLearningPage = () => {
     try { return String(s || '').replace(/\s+/g, ' ').slice(0, n); } catch { return ''; }
   };
 
+  // Lightweight debug logger to reduce console noise; enable by setting window.__PRO_LEARNING_DEBUG = true
+  const debugLog = (...args) => {
+    try {
+      if (typeof window !== 'undefined' && window.__PRO_LEARNING_DEBUG) {
+        // eslint-disable-next-line no-console
+        console.log(...args);
+      }
+    } catch {}
+  };
+
   // Helper to set content while preserving FIRST reading and controlling sanitization
   // Behavior:
   // - First reading wins; later variants are ignored to prevent visual flips
@@ -904,7 +895,9 @@ const ProLearningPage = () => {
   //   we DO NOT sanitize the first reading — we render it raw immediately
   // - Otherwise, first reading is pre-sanitized to avoid initial formatting flashes
   const setContentWithSanitization = (incoming, sourceLabel = 'unknown') => {
-    const hasExistingReading = !!(content && typeof content.reading === 'string' && content.reading.trim().length);
+    // Only consider an existing reading if it belongs to the CURRENT selected topic
+    const belongsToCurrentTopic = !!(contentTopicName && selectedTopic?.name && contentTopicName === selectedTopic.name);
+    const hasExistingReading = !!(belongsToCurrentTopic && content && typeof content.reading === 'string' && content.reading.trim().length);
 
     // Normalize incoming object (clone so we can safely adjust fields)
     const newContent = incoming ? { ...incoming } : incoming;
@@ -971,7 +964,7 @@ const ProLearningPage = () => {
     }
     // Log non-reading tabs lengths for traceability
     try {
-      console.log('🧩 [CONTENT-SET]', {
+      debugLog('🧩 [CONTENT-SET]', {
         source: sourceLabel,
         topicParam,
         contentTopicName,
@@ -1221,7 +1214,7 @@ const ProLearningPage = () => {
     const shouldForceGeneration = shouldSkipOld || isProgressiveGeneration;
     
     if (shouldForceGeneration) {
-      console.log('🔄 DEBUG: Fresh course creation detected - skipping cached content loading in initial topic effect');
+  debugLog('🔄 DEBUG: Fresh course creation detected - skipping cached content loading in initial topic effect');
       return;
     }
     
@@ -1459,7 +1452,7 @@ const ProLearningPage = () => {
     const batchMarkerValue = typeof localStorage !== 'undefined' ? localStorage.getItem('proLearning_batchMarker') : null;
     
     if (!batchMarkerValue) {
-      console.log('🔍 DEBUG: No batch marker found - normal content loading');
+  debugLog('🔍 DEBUG: No batch marker found - normal content loading');
       return false;
     }
     
@@ -1473,12 +1466,12 @@ const ProLearningPage = () => {
       
       if (!isRecent) {
         // Batch marker is too old, clear it and don't skip content
-        console.log('🧹 DEBUG: Clearing expired batch marker (older than 5 minutes)');
+  debugLog('🧹 DEBUG: Clearing expired batch marker (older than 5 minutes)');
         localStorage.removeItem('proLearning_batchMarker');
         return false;
       }
       
-      console.log('🔄 DEBUG: Recent batch marker detected - WILL SKIP old cached content');
+  debugLog('🔄 DEBUG: Recent batch marker detected - WILL SKIP old cached content');
       return true;
     } catch (error) {
       // If we can't parse the timestamp, clear the marker
@@ -1491,7 +1484,7 @@ const ProLearningPage = () => {
   // Helper function to check if content is freshly generated (very recent, within current session)
   const isContentFreshlyGenerated = (content, strictMode = false) => {
     if (!content || !content.metadata) {
-      console.log('🔍 DEBUG: No content metadata found - considering as old content');
+  debugLog('🔍 DEBUG: No content metadata found - considering as old content');
       return false;
     }
     
@@ -3187,6 +3180,8 @@ const ProLearningPage = () => {
                   videos: (Array.isArray(formattedContent.videos) && formattedContent.videos.length > 0) ? formattedContent.videos : (prev?.videos || []),
                   resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0) ? formattedContent.resources : (prev?.resources || [])
                 }));
+                    // Set the topic name for which this content is now current so non-reading tabs can render immediately
+                    try { setContentTopicName(tabInfo.topic); } catch {}
                 
                 // If this is the first time reading becomes available, initialize sections and sanitized view
                 if (tabInfo.tabType === 'reading' && freshContent.reading && (!content || !content.reading)) {
@@ -3197,6 +3192,8 @@ const ProLearningPage = () => {
                   try {
                     setSanitizedReading(String(freshContent.reading || ''));
                     setReadingRenderReady(true);
+                    // Ensure content-topic association is set for immediate readiness checks
+                    setContentTopicName(tabInfo.topic);
                   } catch {}
                 }
               }
@@ -4020,14 +4017,8 @@ const ProLearningPage = () => {
         (activeTab === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
         (activeTab === 'resources' && (content?.resources?.length || 0) > 0)
       );
-      // If viewing a non-reading tab for a later topic while generating, require reading readiness
-      const topicIndex = topicsList.findIndex(t => (t.name || t) === currentTopicName);
-      // Enforce reading-first based on client-side sanitized readiness, not raw presence
-      const readingReady = readingClientReadyForCurrentTopic;
-      const enforceReadingFirst = (isProgressiveGenerating && topicIndex > 0 && activeTab !== 'reading' && !readingReady);
-      if (enforceReadingFirst) {
-        return <LoadingComponent />;
-      }
+      // Allow non-reading tabs (e.g., Summary) to render as soon as they are ready,
+      // even if Reading for later topics hasn't finished yet.
 
       if ((isGeneratingCourse || isLoading) && !readyTabs.includes(activeTab) && !activeHasContent) {
         return <LoadingComponent />;
