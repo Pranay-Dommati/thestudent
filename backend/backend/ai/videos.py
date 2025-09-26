@@ -7,7 +7,10 @@ def handle_videos(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     GEMINI_API_KEY = settings.GEMINI_API_KEY
-    GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent'
+    MODEL_URLS = [
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+    ]
     try:
         body = json.loads(request.body.decode('utf-8'))
         topic = body.get('topic', '')
@@ -65,39 +68,39 @@ Generate 6-8 video recommendations following this exact format.
         import time
         import random
         max_retries = 5
-        
-        for attempt in range(max_retries):
-            try:
-                print(f"🔑 Calling Gemini 1.5 Pro Videos API (attempt {attempt + 1}/{max_retries})")
-                response = requests.post(f'{GEMINI_API_URL}?key={GEMINI_API_KEY}', headers=headers, data=json.dumps(data), timeout=30)
-                
-                if response.status_code == 200:
-                    print("✅ Gemini Videos API call successful")
-                    return JsonResponse(response.json(), safe=False)
-                elif response.status_code in [429, 503]:
-                    # Exponential backoff with jitter
-                    base_delay = 2 ** attempt
-                    jitter = random.uniform(0.5, 1.5)
-                    delay = min(base_delay * jitter, 60)
-                    
-                    error_type = "Rate limit" if response.status_code == 429 else "Service overloaded"
-                    print(f"⏰ Videos {error_type} ({response.status_code}), retrying in {delay:.1f} seconds...")
-                    
-                    if attempt < max_retries - 1:
-                        time.sleep(delay)
-                        continue
-                else:
-                    print(f"❌ Videos API error {response.status_code}: {response.text}")
+
+        for model_url in MODEL_URLS:
+            for attempt in range(max_retries):
+                try:
+                    model_name = 'gemini-2.5-flash' if '2.5-flash' in model_url else 'gemini-2.0-flash'
+                    print(f"🔑 Calling {model_name} Videos API (attempt {attempt + 1}/{max_retries})")
+                    response = requests.post(f'{model_url}?key={GEMINI_API_KEY}', headers=headers, data=json.dumps(data), timeout=30)
+
+                    if response.status_code == 200:
+                        print("✅ Gemini Videos API call successful")
+                        return JsonResponse(response.json(), safe=False)
+                    elif response.status_code in [429, 503]:
+                        base_delay = 2 ** attempt
+                        jitter = random.uniform(0.5, 1.5)
+                        delay = min(base_delay * jitter, 30)
+                        error_type = "Rate limit" if response.status_code == 429 else "Service overloaded"
+                        print(f"⏰ Videos {error_type} ({response.status_code}), retrying in {delay:.1f} seconds...")
+                        if attempt < max_retries - 1:
+                            time.sleep(delay)
+                            continue
+                    else:
+                        print(f"❌ Videos API error {response.status_code}: {response.text}")
+                        if attempt < max_retries - 1:
+                            time.sleep(2)
+                            continue
+                except Exception as api_error:
+                    print(f"❌ Videos API exception: {str(api_error)}")
                     if attempt < max_retries - 1:
                         time.sleep(2)
                         continue
-                    
-            except Exception as api_error:
-                print(f"❌ Videos API exception: {str(api_error)}")
-                if attempt < max_retries - 1:
-                    time.sleep(2)
-                    continue
-        
-        return JsonResponse({'error': f'Videos API failed after {max_retries} attempts'}, status=503)
+
+            print("❌ All attempts failed for this model, trying next fallback if available...")
+
+        return JsonResponse({'error': 'Videos API failed for both models (2.5-flash and 2.0-flash)'}, status=503)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500) 

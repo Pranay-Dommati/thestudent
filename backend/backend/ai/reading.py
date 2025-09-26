@@ -6,7 +6,7 @@ from .ai_service import call_gemini_api, call_gemini_flash_api
 
 def classify_topic_with_ai(topic):
     """
-    Use Gemini 1.5 Pro to intelligently classify topic and select best prompt.
+    Use Gemini 2.5 Flash (fallback 2.0 Flash) to intelligently classify topic and select best prompt.
     Falls back to keyword classification on any AI/formatting issue.
     """
     print(f"🤖 Analyzing topic with AI: {topic}")
@@ -34,7 +34,7 @@ Instructions:
 Respond with ONLY the category name (technical, academic, skills, business_finance, creative, entrepreneurship, or general). No explanation needed."""
 
     try:
-        print(f"🎯 Sending topic analysis request to Gemini 1.5 Pro...")
+        print(f"🎯 Sending topic analysis request to Gemini 2.5 Flash (fallback 2.0 Flash)...")
         response_data = call_gemini_api(analysis_prompt)
 
         # Extract the response text safely
@@ -73,7 +73,7 @@ Respond with ONLY the category name (technical, academic, skills, business_finan
                     print(f"⚠️ AI returned invalid category '{category}', falling back to keyword classification")
                     return classify_topic(topic)
 
-        print("❌ Invalid or empty response from Gemini 1.5 Pro, falling back to keyword classification")
+        print("❌ Invalid or empty response from Gemini Flash model, falling back to keyword classification")
         return classify_topic(topic)
 
     except Exception as e:

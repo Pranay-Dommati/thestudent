@@ -577,6 +577,7 @@ def _dedup_adjacent_words(name: str) -> str:
 
 def classify_query_intent(user_query: str) -> str:
     """Heuristically classify the query as 'direct' or 'broad'.
+    Note: Not used for production routing anymore; AI-only intent is authoritative.
     - direct: user named specific topics (e.g., arrays, recursion, AES, bubble sort)
     - broad: user asked for a general area (e.g., python, trigonometry, digital logic)
     """
@@ -864,7 +865,7 @@ def classify_topics(request):
             'intent_source': None,           # ai | heuristic-fallback | override
             'prompt_mode': None,            # direct | broad
             'explicit_constraints': [],
-            'topic_model_used': None,       # 2.5-pro | 1.5-pro
+            'topic_model_used': None,       # 2.5-flash | 2.0-flash
             'model_retry_used': False,
             'fallback_used': False,
             'fallback_strategy': None,
@@ -874,17 +875,63 @@ def classify_topics(request):
         intent = None
         try:
             ic_resp = call_intent_classifier(user_query)
+            print(f"value of ic_resp: {ic_resp}")
+            # DEBUG: Log the full raw response from the intent classifier before any parsing.
+            try:
+                if settings.DEBUG:
+                    logger.debug("Intent classifier full response:\n" + (json.dumps(ic_resp, indent=2)[:8000] if isinstance(ic_resp, (dict, list)) else str(ic_resp)))
+            except Exception:
+                # Avoid crashing on logging issues
+                pass
             ic_text = None
+            # Record candidates count for debugging
+            try:
+                debug_meta['intent_candidates_count'] = len(ic_resp.get('candidates', [])) if isinstance(ic_resp, dict) else None
+            except Exception:
+                debug_meta['intent_candidates_count'] = None
             if 'candidates' in ic_resp and ic_resp['candidates']:
                 parts_ic = ic_resp['candidates'][0].get('content', {}).get('parts', [])
+                try:
+                    debug_meta['intent_candidate0_has_parts'] = bool(parts_ic)
+                except Exception:
+                    pass
                 if parts_ic:
                     ic_text = parts_ic[0].get('text')
+                    try:
+                        debug_meta['intent_candidate0_has_text'] = isinstance(ic_text, str) and bool(ic_text.strip())
+                    except Exception:
+                        pass
+            # Robust parsing: accept raw token, fenced JSON, or plain JSON
             if isinstance(ic_text, str) and ic_text.strip():
-                import re
-                m = re.search(r'\{[\s\S]*\}', ic_text)
-                parsed_ic = json.loads(m.group()) if m else json.loads(ic_text)
-                if isinstance(parsed_ic, dict) and parsed_ic.get('intent') in ['broad', 'direct']:
-                    intent = parsed_ic['intent']
+                raw_ic = ic_text.strip()
+                # Always log a visible snippet of raw model output for diagnostics
+                snippet = raw_ic if len(raw_ic) <= 300 else raw_ic[:300] + '...'
+                logger.info(f"Intent classifier raw text (snippet): {snippet}")
+                # Strip common markdown fences if present
+                stripped = raw_ic
+                if stripped.startswith('```'):
+                    import re as _re
+                    stripped = _re.sub(r'^```[a-zA-Z]*\n', '', stripped)
+                    stripped = _re.sub(r'\n```\s*$', '', stripped)
+                # Try to find a JSON object first
+                try:
+                    import re as _re
+                    m = _re.search(r'\{[\s\S]*\}', stripped)
+                    parsed_ic = json.loads(m.group()) if m else json.loads(stripped)
+                    if isinstance(parsed_ic, dict) and parsed_ic.get('intent') in ['broad', 'direct']:
+                        intent = parsed_ic['intent']
+                        debug_meta['intent_parse_stage'] = 'json_object'
+                except Exception:
+                    intent = None
+                # Fallback: look for a bare token 'direct' or 'broad' in text
+                if not intent:
+                    import re as _re
+                    m2 = _re.search(r'\b(direct|broad)\b', stripped, flags=_re.IGNORECASE)
+                    if m2:
+                        intent = m2.group(1).lower()
+                        debug_meta['intent_parse_stage'] = 'bare_token'
+                debug_meta['intent_raw_text'] = stripped[:300]
+                if intent in ['broad', 'direct']:
                     logger.info(f"Intent classifier (AI) returned: {intent} for query='{safe_query}'")
                     debug_meta['intent'] = intent
                     debug_meta['intent_source'] = 'ai'
@@ -895,6 +942,10 @@ def classify_topics(request):
             # Strict no-fallback policy: return 422 if AI didn't provide a valid intent
             debug_meta['intent'] = None
             debug_meta['intent_source'] = 'ai'
+            try:
+                logger.warning(f"Intent classification failed. debug_meta={debug_meta}")
+            except Exception:
+                pass
             return JsonResponse({
                 'error': 'intent_classification_failed',
                 'message': 'AI intent classification did not return a valid intent (direct/broad).',
@@ -916,9 +967,10 @@ def classify_topics(request):
             raw_ai_text = None
             try:
                 response = call_gemini_api(prompt_extraction)
-                used_model = '1.5-pro'
+                # Primary model is 2.5-flash with 2.0-flash fallback in ai_service
+                used_model = '2.5-flash'
             except Exception as e:
-                logger.error(f"Direct extraction AI (1.5-pro) failed: {e}")
+                logger.error(f"Direct extraction AI (flash) failed: {e}")
                 return JsonResponse({
                     'error': 'ai_unavailable',
                     'message': 'Unable to extract topics from AI (direct mode).',
@@ -989,9 +1041,9 @@ def classify_topics(request):
                     logger.error("Direct mode parse failed; attempting strict retry with ultra-constrained prompt")
                 try:
                     retry_prompt = build_direct_retry_prompt(user_query)
-                    # Always use 1.5 Pro for retry
+                    # Retry uses the same flash-family call (2.5-flash primary, 2.0-flash fallback)
                     retry_resp = call_gemini_api(retry_prompt)
-                    retry_model = '1.5-pro'
+                    retry_model = '2.5-flash'
 
                     debug_meta['model_retry_used'] = True
                     debug_meta['topic_model_used'] = retry_model
@@ -1086,11 +1138,11 @@ def classify_topics(request):
         logger.info(f"Broad mode: using AI to break down '{safe_query}' into curriculum")
         
         try:
-            # Use Gemini 1.5 Pro for topic classification + personalization; no Flash fallback.
+            # Use Gemini 2.5 Flash for topic classification + personalization (fallback to 2.0 Flash)
             if settings.DEBUG:
-                logger.debug("Attempting Gemini 1.5 Pro API call for topic classification + personalization...")
+                logger.debug("Attempting Gemini 2.5 Flash API call for topic classification + personalization...")
             response = call_gemini_api(prompt)
-            used_model = '1.5-pro'
+            used_model = '2.5-flash'
             logger.info(f"Topic generation model used: {used_model}")
             debug_meta['topic_model_used'] = used_model
             
@@ -1123,7 +1175,7 @@ def classify_topics(request):
                 # Guard against empty/None text
                 personalization_default = derive_personalization(user_query)
                 if not isinstance(text, str) or not text.strip():
-                    logger.info("Empty/invalid AI text from 1.5-pro")
+                    logger.info("Empty/invalid AI text from flash model")
                     text = None
                     if not text:
                         error_payload = {
@@ -1225,8 +1277,8 @@ def classify_topics(request):
                     
                 except (json.JSONDecodeError, ValueError) as e:
                     if settings.DEBUG:
-                        logger.debug(f"Failed to parse AI response: {e}; retry with 1.5 Pro before fallback")
-                    # Retry parse with 1.5 Pro if first was 2.5
+                        logger.debug(f"Failed to parse AI response: {e}")
+                    # No secondary retry; return parse error directly
                     # No Flash retry; return parse error directly
                     error_payload = {
                         'error': 'ai_parse_error',

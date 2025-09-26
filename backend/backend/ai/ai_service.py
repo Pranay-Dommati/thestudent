@@ -5,156 +5,177 @@ import random
 from django.conf import settings
 from requests.exceptions import ConnectionError, Timeout, RequestException
 import socket
+import logging
+
+logger = logging.getLogger('ai')
 
 class NetworkError(Exception):
     """Custom exception for network-related errors"""
     pass
 
 def call_gemini_api(prompt, max_retries=5):
-    """Call Gemini API with enhanced retry logic and exponential backoff for Pro model"""
-    GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent'
-    
+    """Call Gemini API using 2.5-flash with fallback to 2.0-flash.
+
+    Notes:
+    - Replaces prior 1.5-pro usage.
+    - Keeps retries with exponential backoff and jitter.
+    """
     if not settings.GEMINI_API_KEY:
         raise Exception("Gemini API key not configured")
-    
-    for attempt in range(max_retries):
+
+    model_urls = [
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+    ]
+
+    # Ensure prompt is a clean string
+    if not isinstance(prompt, str):
         try:
-            print(f"🔑 Calling Gemini 1.5 Pro API (attempt {attempt + 1}/{max_retries})")
-            
-            # Ensure prompt is a clean string
-            if not isinstance(prompt, str):
-                try:
-                    prompt = str(prompt)
-                except Exception:
-                    prompt = ''
-            headers = {'Content-Type': 'application/json; charset=utf-8'}
-            data = {
-                'contents': [{
-                    'parts': [{'text': prompt}]
-                }],
-                'generationConfig': {
-                    'temperature': 0.3,
-                    'topK': 20,
-                    'topP': 0.8,
-                    'maxOutputTokens': 4096,
-                    'stopSequences': []
-                }
-            }
-            
-            response = requests.post(
-                f'{GEMINI_API_URL}?key={settings.GEMINI_API_KEY}',
-                headers=headers,
-                json=data,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                print("✅ Gemini 1.5 Pro API call successful")
-                return response.json()
-            elif response.status_code in [429, 503]:
-                # Calculate exponential backoff with jitter for overload/rate limit
-                base_delay = 2 ** attempt  # 2, 4, 8, 16, 32 seconds
-                jitter = random.uniform(0.5, 1.5)  # Add randomness to avoid thundering herd
-                delay = min(base_delay * jitter, 60)  # Cap at 60 seconds
-                
-                error_type = "Rate limit" if response.status_code == 429 else "Service overloaded"
-                print(f"⏰ {error_type} ({response.status_code}), retrying in {delay:.1f} seconds... (attempt {attempt + 1}/{max_retries})")
-                
-                if attempt < max_retries - 1:  # Don't sleep on the last attempt
-                    time.sleep(delay)
-                continue
-            else:
-                # Helpful debug for 400s
-                snippet = (prompt[:200] + '...') if isinstance(prompt, str) and len(prompt) > 200 else prompt
-                print(f"❌ Gemini API error {response.status_code}: {response.text}\nPayload preview: {snippet}")
+            prompt = str(prompt)
+        except Exception:
+            prompt = ''
+
+    headers = {'Content-Type': 'application/json; charset=utf-8'}
+    data = {
+        'contents': [{
+            'parts': [{'text': prompt}]
+        }],
+        'generationConfig': {
+            'temperature': 0.3,
+            'topK': 20,
+            'topP': 0.8,
+            'maxOutputTokens': 4096,
+            'stopSequences': []
+        }
+    }
+
+    last_error = None
+    for model_url in model_urls:
+        for attempt in range(max_retries):
+            try:
+                model_name = 'gemini-2.5-flash' if '2.5-flash' in model_url else 'gemini-2.0-flash'
+                print(f"🔑 Calling {model_name} (attempt {attempt + 1}/{max_retries})")
+
+                response = requests.post(
+                    f"{model_url}?key={settings.GEMINI_API_KEY}",
+                    headers=headers,
+                    json=data,
+                    timeout=30
+                )
+
+                if response.status_code == 200:
+                    print(f"✅ {model_name} API call successful")
+                    return response.json()
+                elif response.status_code in [429, 503]:
+                    # Exponential backoff with jitter for overload/rate limit
+                    base_delay = 2 ** attempt
+                    jitter = random.uniform(0.5, 1.5)
+                    delay = min(base_delay * jitter, 30)
+                    error_type = "Rate limit" if response.status_code == 429 else "Service overloaded"
+                    print(f"⏰ {error_type} ({response.status_code}), retrying in {delay:.1f} seconds... (attempt {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        time.sleep(delay)
+                    continue
+                else:
+                    snippet = (prompt[:200] + '...') if isinstance(prompt, str) and len(prompt) > 200 else prompt
+                    print(f"❌ {model_name} error {response.status_code}: {response.text}\nPayload preview: {snippet}")
+                    last_error = Exception(f"{model_name} returned {response.status_code}")
+                    if attempt < max_retries - 1:
+                        time.sleep(2)
+                    continue
+            except (ConnectionError, Timeout, socket.gaierror) as e:
+                print(f"🌐 Network connection error: {str(e)}")
+                raise NetworkError("Network connection lost. Please check your internet connection and try again.")
+            except Exception as e:
+                print(f"❌ Error with Gemini API: {str(e)}")
+                last_error = e
                 if attempt < max_retries - 1:
-                    time.sleep(2)  # Short delay for other errors
+                    time.sleep(2)
                 continue
-                
-        except (ConnectionError, Timeout, socket.gaierror) as e:
-            print(f"🌐 Network connection error: {str(e)}")
-            # Don't retry network errors automatically - let frontend handle it
-            raise NetworkError("Network connection lost. Please check your internet connection and try again.")
-        except Exception as e:
-            print(f"❌ Error with Gemini API: {str(e)}")
-            if attempt < max_retries - 1:
-                time.sleep(2)
-            continue
-    
-    raise Exception("All Gemini API attempts failed") 
+
+        # try next model_url on persistent errors
+        print("❌ All attempts failed for this model, trying next fallback if available...")
+
+    # If we get here, both models failed
+    raise last_error or Exception("All Gemini API attempts failed") 
 
 def call_gemini_flash_api(prompt, max_retries=3):
-    """Call Gemini 1.5 Flash API for fast conversations - optimized for chat"""
-    GEMINI_FLASH_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
-    
+    """Call Gemini Flash API using 2.5-flash with fallback to 2.0-flash (optimized for chat)."""
     if not settings.GEMINI_API_KEY:
         raise Exception("Gemini API key not configured")
-    
-    network_error_count = 0
-    
-    for attempt in range(max_retries):
+
+    model_urls = [
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+    ]
+
+    # Ensure prompt is a clean string
+    if not isinstance(prompt, str):
         try:
-            print(f"⚡ Calling Gemini 1.5 Flash API (attempt {attempt + 1}/{max_retries})")
-            
-            if not isinstance(prompt, str):
-                try:
-                    prompt = str(prompt)
-                except Exception:
-                    prompt = ''
-            headers = {'Content-Type': 'application/json; charset=utf-8'}
-            data = {
-                'contents': [{
-                    'parts': [{'text': prompt}]
-                }],
-                'generationConfig': {
-                    'temperature': 0.7,  # Slightly higher for more conversational responses
-                    'topK': 40,
-                    'topP': 0.9,
-                    'maxOutputTokens': 2048,  # Lower for faster responses
-                    'stopSequences': []
-                }
-            }
-            
-            response = requests.post(
-                f'{GEMINI_FLASH_API_URL}?key={settings.GEMINI_API_KEY}',
-                headers=headers,
-                json=data,
-                timeout=15  # Shorter timeout for flash model
-            )
-            
-            if response.status_code == 200:
-                print("✅ Gemini 1.5 Flash API call successful")
-                return response.json()
-            elif response.status_code in [429, 503]:
-                # Shorter backoff for flash model
-                base_delay = 1.5 ** attempt  # 1.5, 2.25, 3.375 seconds
-                jitter = random.uniform(0.8, 1.2)
-                delay = min(base_delay * jitter, 10)  # Cap at 10 seconds
-                
-                error_type = "Rate limit" if response.status_code == 429 else "Service overloaded"
-                print(f"⏰ {error_type} ({response.status_code}), retrying in {delay:.1f} seconds... (attempt {attempt + 1}/{max_retries})")
-                
+            prompt = str(prompt)
+        except Exception:
+            prompt = ''
+
+    headers = {'Content-Type': 'application/json; charset=utf-8'}
+    data = {
+        'contents': [{
+            'parts': [{'text': prompt}]
+        }],
+        'generationConfig': {
+            'temperature': 0.7,
+            'topK': 40,
+            'topP': 0.9,
+            'maxOutputTokens': 2048,
+            'stopSequences': []
+        }
+    }
+
+    last_error = None
+    for model_url in model_urls:
+        for attempt in range(max_retries):
+            try:
+                model_name = 'gemini-2.5-flash' if '2.5-flash' in model_url else 'gemini-2.0-flash'
+                print(f"⚡ Calling {model_name} (attempt {attempt + 1}/{max_retries})")
+
+                response = requests.post(
+                    f"{model_url}?key={settings.GEMINI_API_KEY}",
+                    headers=headers,
+                    json=data,
+                    timeout=15
+                )
+
+                if response.status_code == 200:
+                    print(f"✅ {model_name} API call successful")
+                    return response.json()
+                elif response.status_code in [429, 503]:
+                    base_delay = 1.5 ** attempt
+                    jitter = random.uniform(0.8, 1.2)
+                    delay = min(base_delay * jitter, 10)
+                    error_type = "Rate limit" if response.status_code == 429 else "Service overloaded"
+                    print(f"⏰ {error_type} ({response.status_code}), retrying in {delay:.1f} seconds... (attempt {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        time.sleep(delay)
+                    continue
+                else:
+                    snippet = (prompt[:200] + '...') if isinstance(prompt, str) and len(prompt) > 200 else prompt
+                    print(f"❌ {model_name} error {response.status_code}: {response.text}\nPayload preview: {snippet}")
+                    last_error = Exception(f"{model_name} returned {response.status_code}")
+                    if attempt < max_retries - 1:
+                        time.sleep(1)
+                    continue
+            except (ConnectionError, Timeout, socket.gaierror) as e:
+                print(f"🌐 Network connection error: {str(e)}")
+                raise NetworkError("Network connection lost. Please check your internet connection and try again.")
+            except Exception as e:
+                print(f"❌ Error with Gemini Flash API: {str(e)}")
+                last_error = e
                 if attempt < max_retries - 1:
-                    time.sleep(delay)
+                    time.sleep(1)
                 continue
-            else:
-                snippet = (prompt[:200] + '...') if isinstance(prompt, str) and len(prompt) > 200 else prompt
-                print(f"❌ Gemini Flash API error {response.status_code}: {response.text}\nPayload preview: {snippet}")
-                if attempt < max_retries - 1:
-                    time.sleep(1)  # Shorter delay for flash model
-                continue
-                
-        except (ConnectionError, Timeout, socket.gaierror) as e:
-            print(f"🌐 Network connection error: {str(e)}")
-            # Don't retry network errors automatically - let frontend handle it
-            raise NetworkError("Network connection lost. Please check your internet connection and try again.")
-        except Exception as e:
-            print(f"❌ Error with Gemini Flash API: {str(e)}")
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
-    
-    raise Exception("All Gemini Flash API attempts failed") 
+
+        print("❌ All attempts failed for this model, trying next fallback if available...")
+
+    raise last_error or Exception("All Gemini Flash API attempts failed") 
 
 def call_gemini_2_5_pro_api(prompt, max_retries=3):
     """Call Gemini 2.5 Pro API with robust retries and fallback handling"""
@@ -240,68 +261,40 @@ def call_gemini_2_5_pro_api(prompt, max_retries=3):
                 else:
                     break  # Try next model
 
-    # If all models fail, raise exception to trigger 1.5 Pro fallback
+    # If all models fail, raise exception (no 1.5 Pro fallback; handled by 2.0-flash fallback above)
     raise Exception("All Gemini 2.5 Pro model variants failed")
 
 
 def call_intent_classifier(user_query: str, max_retries: int = 3):
-    """AI-only intent classifier: returns DIRECT or BROAD using Gemini 1.5 Pro.
+    """AI-only intent classifier: returns DIRECT or BROAD using Gemini 2.5 Flash with 2.0 Flash fallback.
     Behavior:
-    - No local heuristics. Always call Gemini 1.5 Pro with a strict, example-driven prompt.
+    - No local heuristics. Always call Gemini with a strict, compact prompt.
     - Returns a Gemini-shaped response JSON (contains 'candidates' with a parts[0].text JSON string).
     Uses GEMINI_CLASSIFIER_API_KEY if set, otherwise GEMINI_API_KEY.
     """
-    api_key = getattr(settings, 'GEMINI_CLASSIFIER_API_KEY', None) or getattr(settings, 'GEMINI_API_KEY', None)
+    # Determine which key is used (log the source, not the value)
+    classifier_key = getattr(settings, 'GEMINI_CLASSIFIER_API_KEY', None)
+    api_key = classifier_key or getattr(settings, 'GEMINI_API_KEY', None)
     if not api_key:
         raise Exception("Gemini classifier API key not configured")
+    key_source = 'GEMINI_CLASSIFIER_API_KEY' if classifier_key else 'GEMINI_API_KEY'
+    try:
+        # Log sanitized query and key source for diagnostics
+        q_snippet = (user_query or '')
+        if len(q_snippet) > 120:
+            q_snippet = q_snippet[:120] + '...'
+        logger.info(f"Intent classifier start: key_source={key_source} query='{q_snippet}'")
+    except Exception:
+        pass
 
-    intent_prompt = f"""
-You are an expert AI curriculum designer. Your primary task is to analyze a user's learning request and classify its scope. This classification determines whether you generate a detailed lesson on specific topics or a high-level syllabus for a broad subject.
-
-Your goal is to classify the user's query as either DIRECT or BROAD.
-
-## Definitions & Core Concepts
-
-- **DIRECT**: The user requests a small, enumerable list of specific, atomic topics. These are "building blocks" of knowledge that could typically be covered in a single lesson or a short series of lessons. The query is focused and narrow.
-    - **Heuristics**: Often contains connectors (commas, "and", "+"), lists, or single, well-defined acronyms/algorithms (e.g., "DFS", "RSA", "Quick Sort").
-
-- **BROAD**: The user names a general field of study, a programming language, a framework, a high-level paradigm, or a subject that requires a full curriculum (a syllabus with multiple modules) to be properly explained. The query is open-ended and high-level.
-    - **Heuristics**: Often a single phrase or noun representing a large domain (e.g., "web development", "calculus", "React").
-
-## The Specificity Test (Critical Thinking Heuristic)
-
-To resolve ambiguity, use this mental model: **"Is this the title of a textbook, or a chapter within it?"**
-- If the query sounds like a **chapter title** (e.g., "For Loops", "CSS Flexbox", "Binary Search"), classify it as **DIRECT**.
-- If the query sounds like the **title of the entire textbook** (e.g., "Python Programming", "Data Structures and Algorithms", "Machine Learning"), classify it as **BROAD**.
-
-## Examples (with Reasoning)
-
-- **Query**: "i want to learn python arrays and recursion and hash maps"
-- **Reasoning**: This is a list of three specific data structures/concepts. Each is a "chapter" in a larger "Data Structures" book.
-- **Classification**: DIRECT
-
-- **Query**: "machine learning"
-- **Reasoning**: This is a vast field of study. It is the "title of a textbook" (or an entire library). It needs to be broken down into a syllabus.
-- **Classification**: BROAD
-
-- **Query**: "rsa"
-- **Reasoning**: This is a specific, well-defined cryptographic algorithm. It's a "chapter" in a cryptography book.
-- **Classification**: DIRECT
-
-- **Query**: "object-oriented programming"
-- **Reasoning**: This is a high-level programming paradigm, not a single algorithm. It consists of multiple core concepts (inheritance, encapsulation, polymorphism) and would be a major section or module in a programming course. It's more than a chapter, closer to a "unit" or the book's main theme. Therefore, it requires a breakdown.
-- **Classification**: BROAD
-
-- **Query**: "React hooks"
-- **Reasoning**: While "React" is BROAD, "React hooks" refers to a specific feature set and API within React (e.g., useState, useEffect). This is a "chapter" in the "React" textbook.
-- **Classification**: DIRECT
-
-## Task
-
-Now, apply this reasoning to the following user query. Return ONLY a single, lowercase JSON object with the key "intent" and the value "direct" or "broad". Do not provide any explanation in your final output.
-
-Query: "{user_query}"
-""".strip()
+    # Keep the instruction ultra-compact to avoid token waste and hidden reasoning.
+    intent_prompt = (
+        "Return ONLY JSON with one field. No prose, no code fences. "
+        "Decide if the user query is 'direct' (specific items like arrays, recursion, AES, DFS, lists with and/commas) "
+        "or 'broad' (general subjects like Python, React, calculus, DSA). "
+        "Answer strictly as: {\"intent\": \"direct\"} or {\"intent\": \"broad\"}.\n\n"
+        f"Query: \"{user_query}\""
+    )
 
     # Helper for posting to a Gemini endpoint with a specific key
     def _post_to_model(url: str, temperature: float, max_tokens: int, timeout: int = 20):
@@ -312,56 +305,83 @@ Query: "{user_query}"
             }],
             'generationConfig': {
                 'temperature': temperature,
-                'topK': 20,
-                'topP': 0.8,
+                'topK': 1,
+                'topP': 0.1,
                 'maxOutputTokens': max_tokens,
-                'stopSequences': []
+                'stopSequences': [],
+                # Hint the model to output raw JSON only
+                'response_mime_type': 'application/json'
             }
         }
         return requests.post(f"{url}?key={api_key}", headers=headers, data=json.dumps(data), timeout=timeout)
 
-    # Use 1.5 Pro only for intent classification
-    url_15_pro = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent'
-    
+    # Use Flash family for intent classification
     models_to_try = [
-        (url_15_pro, "1.5-pro")
+        ('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', "2.5-flash"),
+        ('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', "2.0-flash"),
     ]
 
     for model_url, model_name in models_to_try:
         for attempt in range(max_retries):
             try:
                 print(f"🧭 Calling Intent Classifier ({model_name}) attempt {attempt + 1}/{max_retries}")
+                logger.info(f"Intent classifier request: model={model_name} attempt={attempt + 1}/{max_retries}")
                 
-                # Standard timeout for both models
+                # Standard timeout for flash models
                 timeout = 20
-                
-                r = _post_to_model(model_url, temperature=0.1, max_tokens=64, timeout=timeout)
-                if r.status_code == 200:
+
+                # Keep output tiny to reduce hidden reasoning consumption; JSON-only enforced.
+                r = _post_to_model(model_url, temperature=0.0, max_tokens=2000, timeout=timeout)
+                if r.status_code == 200:    
                     print(f"🧭 Intent classifier success via {model_name}")
-                    return r.json()
+                    try:
+                        data = r.json()
+                        cand_count = len(data.get('candidates', [])) if isinstance(data, dict) else None
+                        # Try to pull a small snippet of first text part for visibility
+                        snippet = None
+                        try:
+                            if isinstance(data, dict) and data.get('candidates'):
+                                parts_ic = data['candidates'][0].get('content', {}).get('parts', [])
+                                if parts_ic:
+                                    text0 = parts_ic[0].get('text')
+                                    if isinstance(text0, str) and text0:
+                                        snippet = text0 if len(text0) <= 200 else text0[:200] + '...'
+                        except Exception:
+                            snippet = None
+                        logger.info(f"Intent classifier response: model={model_name} candidates={cand_count} snippet={repr(snippet) if snippet is not None else None}")
+                    except Exception:
+                        # If JSON parsing here fails, just return original JSON later
+                        data = r.json()
+                    return data
                 elif r.status_code in [429, 503]:
                     # try mild backoff
+                    logger.warning(f"Intent classifier backoff: status={r.status_code} model={model_name} attempt={attempt + 1}")
                     time.sleep(min(1.5 ** attempt, 8))
                     continue
                 elif r.status_code == 404:
                     print(f"❌ Model {model_name} not available, trying next model...")
+                    logger.warning(f"Intent classifier: model not available {model_name}")
                     break  # Try next model
                 else:
                     print(f"❌ Intent classifier error {r.status_code} with {model_name}")
+                    logger.error(f"Intent classifier error: status={r.status_code} model={model_name} body_len={len(r.text) if hasattr(r, 'text') else 'n/a'}")
                     if attempt < max_retries - 1:
                         time.sleep(1)
                     continue
                     
             except (ConnectionError, Timeout, socket.gaierror) as e:
                 print(f"🌐 Network/timeout error with intent classifier ({model_name}): {str(e)}")
+                logger.error(f"Intent classifier network/timeout: model={model_name} err={str(e)}")
                 if attempt < max_retries - 1:
                     time.sleep(1)
                     continue
                 else:
                     print(f"❌ All attempts failed for {model_name}, trying next model...")
+                    logger.error(f"Intent classifier: all attempts failed for model={model_name}")
                     break  # Try next model
             except Exception as e:
                 print(f"❌ Error in intent classifier ({model_name}): {str(e)}")
+                logger.error(f"Intent classifier unexpected error: model={model_name} err={str(e)}")
                 if attempt < max_retries - 1:
                     time.sleep(1)
                     continue
