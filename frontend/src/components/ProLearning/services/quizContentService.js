@@ -44,8 +44,8 @@ export async function generateQuizContent(setContent, topic = '', readingContent
   } catch (error) {
     logger.error('🚨 Quiz generation failed:', error);
     
-    // Throw error instead of using fallback
-    throw new Error('Quiz generation failed');
+    // Re-throw with the detailed error message from generateAIQuizQuestions
+    throw error;
   }
 }
 
@@ -53,18 +53,61 @@ export async function generateQuizContent(setContent, topic = '', readingContent
 async function generateAIQuizQuestions(topic, readingContent) {
   try {
     const axiosAi = (await import('../../../utils/axiosAi')).default;
-    const { data: result } = await axiosAi.post('/quiz/', { topic, reading_content: readingContent });
+    
+    logger.info(`🎯 Generating quiz for topic: ${topic}`);
+    
+    const { data: result } = await axiosAi.post('/quiz/', { 
+      topic, 
+      reading_content: readingContent 
+    });
+    
+    logger.info('✅ Quiz API response received:', result);
+    
+    // Check for error in response
+    if (result.error) {
+      logger.error('❌ Backend returned error:', result);
+      throw new Error(result.error + (result.details ? ` - ${JSON.stringify(result.details)}` : ''));
+    }
+    
     // Parse backend AI response
     const quizText = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    if (!quizText) {
+      logger.error('❌ Empty quiz text from API response:', result);
+      throw new Error('Empty quiz response from API. Response structure: ' + JSON.stringify(result).substring(0, 200));
+    }
+    
     const parsed = parseQuizQuestions(quizText, topic);
+    
     if (parsed && parsed.length > 0) {
+      logger.info(`✅ Successfully parsed ${parsed.length} quiz questions`);
       return parsed;
     } else {
-      throw new Error('AI quiz generation failed');
+      logger.error('❌ Failed to parse quiz questions from text:', quizText.substring(0, 200));
+      throw new Error('Failed to parse quiz questions');
     }
   } catch (error) {
-    logger.warn('AI quiz generation failed:', error.message);
-    throw new Error('AI quiz generation failed');
+    logger.error('❌ AI quiz generation error:', error);
+    
+    // Provide more specific error messages
+    if (error.response) {
+      const status = error.response.status;
+      const message = error.response.data?.error || error.response.statusText;
+      
+      if (status === 401) {
+        throw new Error('Authentication required. Please log in again.');
+      } else if (status === 429) {
+        throw new Error('Rate limit exceeded. Please try again in a few moments.');
+      } else if (status === 503) {
+        throw new Error('AI service temporarily unavailable. Please try again.');
+      } else {
+        throw new Error(`Quiz generation failed: ${message}`);
+      }
+    } else if (error.request) {
+      throw new Error('Network error. Please check your connection and try again.');
+    } else {
+      throw new Error(error.message || 'Quiz generation failed');
+    }
   }
 }
 

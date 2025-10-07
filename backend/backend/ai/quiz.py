@@ -17,88 +17,38 @@ def handle_quiz(request):
         reading_content = body.get('reading_content', '')
         
         if reading_content and len(reading_content) > 200:
-            prompt = f"""
-You are an expert educational assessment creator. Generate high-quality quiz questions based on the provided learning content about "{topic}".
+            # Limit reading content to 2000 chars to save tokens
+            prompt = f"""Generate 8 quiz questions about "{topic}" based on this content:
 
-**Source Content:**
-{reading_content[:3000]}
+{reading_content[:2000]}
 
-**Requirements:**
-Create 8-10 multiple-choice questions that test understanding of the content. Each question should:
-
-**Question Format (use exactly this structure):**
-QUESTION: [Question text here]
-A) [Option A]
-B) [Option B] 
-C) [Option C]
-D) [Option D]
+Format each question exactly as:
+QUESTION: [question text]
+A) [option]
+B) [option]
+C) [option]
+D) [option]
 CORRECT: [A/B/C/D]
-EXPLANATION: [Brief explanation of why this answer is correct]
+EXPLANATION: [why correct]
 DIFFICULTY: [Beginner/Intermediate/Advanced]
-TOPIC: [Specific subtopic this question covers]
-CODE: [If the question references an example, code, or code analysis, include a code block in markdown triple backticks here. Otherwise, omit this line.]
+TOPIC: {topic}
 
-**Guidelines:**
-- Cover different aspects of the content evenly
-- Include 3-4 beginner, 3-4 intermediate, and 2-3 advanced questions
-- Test both conceptual understanding and practical application
-- Avoid trick questions or ambiguous wording
-- Make incorrect options plausible but clearly wrong
-- Include code-related questions if the content covers programming
-- If a question references an example, code, or code analysis, always include the relevant code block in markdown triple backticks in the CODE field above the question text.
-- Ensure questions are directly based on the provided content
-- Keep questions clear and concise
-- Provide helpful explanations that reinforce learning
-
-**Question Types to Include:**
-- Definition/concept questions
-- Application/scenario questions  
-- Best practice questions
-- Code analysis questions (if applicable)
-- Comparison questions
-- Problem-solving questions
-
-Generate exactly 8-10 questions following the format above.
-"""
+Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Test understanding and application. Keep questions clear and concise."""
         else:
-            prompt = f"""
-You are an expert educational assessment creator. Generate comprehensive quiz questions about "{topic}" for learners.
+            prompt = f"""Generate 8 quiz questions about "{topic}".
 
-**Requirements:**
-Create 8-10 multiple-choice questions that test fundamental to advanced knowledge of {topic}.
-
-**Question Format (use exactly this structure):**
-QUESTION: [Question text here]
-A) [Option A]
-B) [Option B]
-C) [Option C] 
-D) [Option D]
+Format each question exactly as:
+QUESTION: [question text]
+A) [option]
+B) [option]
+C) [option]
+D) [option]
 CORRECT: [A/B/C/D]
-EXPLANATION: [Brief explanation of why this answer is correct]
+EXPLANATION: [why correct]
 DIFFICULTY: [Beginner/Intermediate/Advanced]
-TOPIC: [Specific subtopic this question covers]
+TOPIC: {topic}
 
-**Guidelines:**
-- Cover the most important aspects of {topic}
-- Include 3-4 beginner, 3-4 intermediate, and 2-3 advanced questions
-- Test both theoretical knowledge and practical understanding
-- Include real-world application questions
-- Make sure all options are plausible
-- Focus on industry-standard knowledge and best practices
-- Include questions about common use cases and implementations
-
-**Topics to Cover:**
-- Basic concepts and definitions
-- Core principles and fundamentals  
-- Practical applications and use cases
-- Best practices and common patterns
-- Advanced techniques and optimization
-- Real-world scenarios and problem-solving
-- Tools and ecosystem (if applicable)
-- Common mistakes and troubleshooting
-
-Generate exactly 8-10 questions following the format above.
-"""
+Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Cover key concepts, applications, and best practices. Keep clear and concise."""
         
         headers = {'Content-Type': 'application/json'}
         data = {
@@ -110,7 +60,7 @@ Generate exactly 8-10 questions following the format above.
                 'temperature': 0.3,
                 'topK': 20,
                 'topP': 0.8,
-                'maxOutputTokens': 2048,
+                'maxOutputTokens': 4096,  # Increased from 2048 to allow longer quiz content
                 'stopSequences': []
             }
         }
@@ -129,7 +79,71 @@ Generate exactly 8-10 questions following the format above.
 
                     if response.status_code == 200:
                         print("✅ Gemini Quiz API call successful")
-                        return JsonResponse(response.json(), safe=False)
+                        response_data = response.json()
+                        
+                        # Check if the response contains actual content
+                        if not response_data.get('candidates'):
+                            print(f"⚠️ No candidates in response: {response_data}")
+                            if attempt < max_retries - 1:
+                                time.sleep(2)
+                                continue
+                            else:
+                                return JsonResponse({
+                                    'error': 'No quiz content generated',
+                                    'details': response_data
+                                }, status=500)
+                        
+                        # Check if content exists
+                        candidate = response_data['candidates'][0]
+                        finish_reason = candidate.get('finishReason', 'UNKNOWN')
+                        
+                        # Handle MAX_TOKENS - content was cut off
+                        if finish_reason == 'MAX_TOKENS':
+                            print(f"⚠️ MAX_TOKENS reached, response was truncated")
+                            # On first few attempts, retry with shorter prompt
+                            if attempt < max_retries - 2:
+                                print(f"   Retrying with adjusted parameters (attempt {attempt + 1}/{max_retries})...")
+                                time.sleep(2)
+                                continue
+                            # On last attempts, try to use partial content if it exists
+                            if candidate.get('content', {}).get('parts'):
+                                partial_text = candidate['content']['parts'][0].get('text', '')
+                                if len(partial_text) > 200:
+                                    print(f"⚠️ Using partial content: {len(partial_text)} characters")
+                                    return JsonResponse(response_data, safe=False)
+                            # If no usable partial content, return error
+                            return JsonResponse({
+                                'error': 'Quiz generation incomplete - content too long',
+                                'details': 'The AI response was cut off. Try with a shorter topic or less reading content.',
+                                'finishReason': finish_reason
+                            }, status=500)
+                        
+                        if not candidate.get('content') or not candidate['content'].get('parts'):
+                            print(f"⚠️ No content/parts in candidate: {candidate}")
+                            if attempt < max_retries - 1:
+                                time.sleep(2)
+                                continue
+                            else:
+                                return JsonResponse({
+                                    'error': 'Empty quiz content in response',
+                                    'details': response_data
+                                }, status=500)
+                        
+                        quiz_text = candidate['content']['parts'][0].get('text', '')
+                        if not quiz_text or len(quiz_text) < 100:
+                            print(f"⚠️ Quiz text too short ({len(quiz_text)} chars): {quiz_text[:200]}")
+                            if attempt < max_retries - 1:
+                                time.sleep(2)
+                                continue
+                            else:
+                                return JsonResponse({
+                                    'error': 'Generated quiz content is too short',
+                                    'length': len(quiz_text),
+                                    'preview': quiz_text[:200]
+                                }, status=500)
+                        
+                        print(f"✅ Successfully generated quiz: {len(quiz_text)} characters")
+                        return JsonResponse(response_data, safe=False)
                     elif response.status_code in [429, 503]:
                         base_delay = 2 ** attempt
                         jitter = random.uniform(0.5, 1.5)
