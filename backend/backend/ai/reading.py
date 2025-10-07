@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.conf import settings
 import json
 import re
-from .ai_service import call_gemini_api, call_gemini_flash_api
+from .ai_service import call_gemini_api, call_gemini_flash_api, NetworkError
 
 def classify_topic_with_ai(topic):
     """
@@ -857,6 +857,20 @@ def handle_reading(request):
             }
         
         return JsonResponse(result, safe=False)
+    except NetworkError as e:
+        # Handle network/timeout errors specifically
+        print(f"🌐 NETWORK ERROR in handle_reading:")
+        print(f"   • Topic: '{topic if 'topic' in locals() else 'unknown'}'")
+        print(f"   • Category: '{category if 'category' in locals() else 'unknown'}'")
+        print(f"   • Error: {str(e)}")
+        print(f"{'='*60}\n")
+        
+        return JsonResponse({
+            'error': 'Network timeout',
+            'message': str(e),
+            'topic': topic if 'topic' in locals() else 'unknown',
+            'retry_recommended': True
+        }, status=503)  # Service Unavailable - client should retry
     except Exception as e:
         print(f"❌ ERROR in handle_reading:")
         print(f"   • Topic: '{topic if 'topic' in locals() else 'unknown'}'")

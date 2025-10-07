@@ -926,10 +926,6 @@ const ProLearningPage = () => {
         }
         // Keep current sanitizedReading and readiness as-is
       } else if (newContent.reading.trim()) {
-        // Determine if we should bypass any sanitization for progressive generation flows
-        const progressiveSource = typeof sourceLabel === 'string' && sourceLabel.startsWith('progressive:');
-        const bypassSanitize = useProgressiveGeneration && (isProgressiveGenerating || progressiveSource);
-
         // First time reading is arriving
         console.log('✨ [READING-FIRST] Accepting first reading from', {
           source: sourceLabel,
@@ -940,13 +936,19 @@ const ProLearningPage = () => {
           hash: _debugHash(newContent.reading),
           preview: _short(newContent.reading)
         });
-        if (bypassSanitize) {
-          // IMPORTANT: During progressive generation, do NOT sanitize or transform reading content
-          setSanitizedReading(String(newContent.reading));
-        } else {
-          const sanitized = preSanitizeMarkdown(newContent.reading);
-          setSanitizedReading(sanitized);
-        }
+        
+        // ALWAYS sanitize reading content IMMEDIATELY when it arrives (for ALL topics)
+        // This ensures proper markup from first render and prevents broken code blocks
+        // The sanitized version is stored and will never be re-sanitized (first reading wins)
+        const sanitized = preSanitizeMarkdown(newContent.reading);
+        console.log('🧹 [SANITIZE] Pre-sanitized reading content', {
+          source: sourceLabel,
+          originalLen: newContent.reading.length,
+          sanitizedLen: sanitized.length,
+          originalHash: _debugHash(newContent.reading),
+          sanitizedHash: _debugHash(sanitized)
+        });
+        setSanitizedReading(sanitized);
         setReadingRenderReady(true);
       } else {
         // Empty reading coming in
