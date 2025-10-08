@@ -4,6 +4,7 @@ import json
 import re
 from .ai_service import call_gemini_api, call_gemini_flash_api, NetworkError
 from datetime import datetime
+from .sanitization import sanitize_ai_content
 
 def classify_topic_with_ai(topic):
     """
@@ -663,183 +664,53 @@ def handle_reading(request):
             content_text = str(result)
             result = {'content': content_text}
 
-        # Sanitize any accidental code-fenced blocks that are not real code (applies to all categories)
-        def sanitize_markdown_fences(text: str, category_hint: str):
-            """
-            Convert bare triple-backtick blocks without a language tag (or with non-code tags like 'text', 'math')
-            into inline code, bullets, or blockquotes so they don't render as giant code panels.
-            Preserve fenced blocks that declare a programming language (e.g., ```python) or contain code keywords.
-            Returns (sanitized_text, replacements)
-            """
-            if not isinstance(text, str) or '```' not in text:
-                return text, 0
-
-            # Regex to find fenced blocks: ```[lang?]\n...\n```
-            fence_pattern = re.compile(r"```([a-zA-Z0-9_+\-]*)\n([\s\S]*?)\n```", re.MULTILINE)
-
-            code_keywords = re.compile(r"\b(def |class |function |var |let |const |import |public |private |return |for |while |if\s*\(|else|elif|=>|#include|using namespace|printf\(|System\.out\.println|console\.log)\b", re.IGNORECASE)
-            # Languages considered real code — keep as code blocks
-            real_code_langs = {"python","py","javascript","js","typescript","ts","java","c","cpp","c++","c#","cs","go","rust","rb","ruby","swift","kotlin","php","r","matlab","octave","bash","sh","shell","powershell","ps1","sql","html","xml","json","yaml","yml","toml","css","scss","less"}
-            # Languages that are not really code in this UI — convert
-            non_code_langs = {"", "text", "plain", "plaintext", "markdown", "md", "math", "equation", "equations"}
-
-            replacements = 0
-            def _replace(m):
-                nonlocal replacements
-                lang = (m.group(1) or '').strip()
-                body = m.group(2)
-                # Keep if language specified and is a real programming language
-                if lang and (lang.lower() in real_code_langs):
-                    return m.group(0)
-                # Keep if likely programming code by keywords
-                if code_keywords.search(body):
-                    return m.group(0)
-                # Otherwise transform intelligently
-                replacements += 1
-                lines = [ln.rstrip() for ln in body.splitlines() if ln.strip()]
-                mathish = re.compile(r"^[A-Za-z0-9_().,+\-*/=^% \\]+$")
-                # Case 1: Single short token like "p" or "t" → inline LaTeX math
-                if len(lines) == 1 and len(lines[0]) <= 8 and ' ' not in lines[0] and mathish.match(lines[0]):
-                    return f"${lines[0]}$"
-                # Case 2: Very short math lines (<= 40 chars) → bullet list with inline LaTeX math
-                if lines and all(len(l) <= 40 and mathish.match(l) for l in lines) and not any(c in '\t' for c in body):
-                    bullets = '\n'.join([f"- ${l}$" for l in lines])
-                    return bullets
-                # Fallback: blockquote for larger text blocks
-                quoted = '\n'.join(["> " + line if line.strip() else ">" for line in body.splitlines()])
-                return quoted
-
-            new_text = fence_pattern.sub(_replace, text)
-            return new_text, replacements
-
-        def convert_inline_code_math(text: str):
-            """Replace short inline code `...` that looks like math tokens with LaTeX $...$.
-            Returns (text, replacements)
-            """
-            if not isinstance(text, str) or '`' not in text:
-                return text, 0
-            pattern = re.compile(r"`([^`\n]{1,30})`")
-            codeish = re.compile(r"(def\s|class\s|;|\{|\}|<|>|console\.|System\.|import\s|function\s|return\s)")
-            mathish = re.compile(r"^[A-Za-z0-9_().,+\-*/=^% \\]+$")
-            reps = 0
-            def _repl(m):
-                nonlocal reps
-                s = m.group(1).strip()
-                if len(s) <= 30 and mathish.match(s) and not codeish.search(s):
-                    reps += 1
-                    return f"${s}$"
-                return m.group(0)
-            out = pattern.sub(_repl, text)
-            return out, reps
-
-        def sanitize_indented_code_blocks(text: str):
-            """Detect indented code blocks (4+ spaces or a tab) that contain short math-ish lines
-            and convert them to inline math ($...$) or bullet lists. Returns (text, replacements).
-            """
-            if not isinstance(text, str):
-                return text, 0
-            lines = text.splitlines()
-            out = []
-            i = 0
-            reps = 0
-            mathish = re.compile(r"^[A-Za-z0-9_().,+\-*/=^% \\]+$")
-            while i < len(lines):
-                line = lines[i]
-                # Start of an indented block
-                if (line.startswith('    ') or line.startswith('\t')):
-                    block = []
-                    # Collect consecutive indented lines
-                    while i < len(lines) and (lines[i].startswith('    ') or lines[i].startswith('\t')):
-                        block.append(lines[i].lstrip(' \t'))
-                        i += 1
-                    trimmed = [b for b in block if b.strip()]
-                    if trimmed and all(len(b) <= 40 and mathish.match(b) for b in trimmed):
-                        reps += 1
-                        if len(trimmed) == 1 and ' ' not in trimmed[0] and len(trimmed[0]) <= 12:
-                            out.append(f"${trimmed[0]}$")
-                        else:
-                            out.extend([f"- ${b}$" for b in trimmed])
-                    else:
-                        # Not math-ish, keep as-is (reconstruct with same indentation)
-                        out.extend(['    ' + b for b in block])
-                    continue
-                else:
-                    out.append(line)
-                    i += 1
-            return "\n".join(out), reps
-
-        def ensure_academic_headers(text: str, topic_title: str):
-            """
-            Ensure the academic content has visible Markdown headings:
-            - Prepend a top-level H2 with the topic if no '## ' exists.
-            - Upgrade title-like lines (Capitalized words possibly ending with a colon) to H3.
-            """
-            if not isinstance(text, str) or not text.strip():
-                return text
-            lines = text.splitlines()
-            has_h2 = any(line.strip().startswith("## ") for line in lines)
-            out = []
-            inserted_h2 = False
-            if not has_h2:
-                out.append(f"## {topic_title}: Learning Guide")
-                out.append("")
-                inserted_h2 = True
-            heading_like = re.compile(r"^([A-Z][\w\s,&'-]{3,80}?)(:)?\s*$")
-            for idx, line in enumerate(lines):
-                s = line.rstrip()
-                if s and not s.startswith(("#", "- ", "* ", ">", "`", "1. ", "2. ", "3. ")) and heading_like.match(s) and len(s.split()) <= 10:
-                    out.append("### " + s.lstrip("# "))
-                else:
-                    out.append(line)
-            result_text = "\n".join(out)
-            return result_text
-            
+        # ========================================
+        # 🔧 PROFESSIONAL MARKDOWN SANITIZATION ENGINE
+        # ========================================
+        # This system handles ALL markdown/LaTeX issues BEFORE first render
+        # Converts AI output to UI-compatible format using shared sanitization module
+        
         print(f"🔍 RESPONSE ANALYSIS:")
         print(f"   • Content length: {len(content_text)} characters")
+        
+        # Show first 500 chars to see if LaTeX is present
+        preview = content_text[:500]
+        latex_count_before = preview.count('$')
+        backtick_count_before = preview.count('`')
+        print(f"   • LaTeX $ symbols in first 500 chars: {latex_count_before}")
+        print(f"   • Backticks ` in first 500 chars: {backtick_count_before}")
+        if latex_count_before > 0:
+            print(f"   ⚠️ WARNING: LaTeX detected in content - will sanitize")
 
-        # Universal sanitization pass for non-code fences
-        markdown_replacements = 0
-        sanitized_text, rep = sanitize_markdown_fences(content_text, category)
-        markdown_replacements = rep
-        if rep > 0:
-            print(f"   • Markdown sanitizer converted {rep} non-code fenced block(s)")
-            content_text = sanitized_text
-            if isinstance(result, dict) and 'content' in result:
-                result['content'] = content_text
-            else:
-                result = {'content': content_text}
-
-        # Convert remaining short inline code to LaTeX inline math
-        inline_math_text, inline_rep = convert_inline_code_math(content_text)
-        if inline_rep > 0:
-            print(f"   • Inline code → math converted: {inline_rep} token(s)")
-            content_text = inline_math_text
-            if isinstance(result, dict) and 'content' in result:
-                result['content'] = content_text
-            else:
-                result = {'content': content_text}
-
-        # Convert indented code blocks (4-space/tab) that are math-ish
-        indent_text, indent_rep = sanitize_indented_code_blocks(content_text)
-        if indent_rep > 0:
-            print(f"   • Indented code → math converted: {indent_rep} block(s)")
-            content_text = indent_text
-            if isinstance(result, dict) and 'content' in result:
-                result['content'] = content_text
-            else:
-                result = {'content': content_text}
-
-        # Academic headings normalization
-        academic_sanitized = rep > 0 if category == 'academic' else False
-        academic_replacements = rep if category == 'academic' else 0
-        if category == 'academic':
-            normalized_text = ensure_academic_headers(content_text, topic)
-            if normalized_text != content_text:
-                content_text = normalized_text
-                if isinstance(result, dict) and 'content' in result:
-                    result['content'] = content_text
-                else:
-                    result = {'content': content_text}
+        # ========================================
+        # 🚀 APPLY COMPREHENSIVE SANITIZATION PIPELINE
+        # ========================================
+        # Using shared sanitization module for consistent processing
+        
+        print(f"   🧹 Starting comprehensive sanitization...")
+        content_text, changes = sanitize_ai_content(content_text, category)
+        
+        if changes['total'] > 0:
+            print(f"   ✅ Sanitization complete:")
+            print(f"      • LaTeX removed: {changes['latex_removed']}")
+            print(f"      • Excessive inline code cleaned: {changes['inline_code_cleaned']}")
+            print(f"      • Code fences sanitized: {changes['fences_sanitized']}")
+            print(f"      • Indented blocks cleaned: {changes['indents_cleaned']}")
+            print(f"      • Total changes: {changes['total']}")
+            
+            # Verify cleanup
+            latex_count_after = content_text[:500].count('$')
+            backtick_count_after = content_text[:500].count('`')
+            print(f"   • LaTeX $ symbols after cleanup: {latex_count_after}")
+            print(f"   • Backticks ` after cleanup: {backtick_count_after}")
+        else:
+            print(f"   ✅ No sanitization needed - content is clean")
+        
+        # Update result with sanitized content
+        if isinstance(result, dict) and 'content' in result:
+            result['content'] = content_text
+        else:
+            result = {'content': content_text}
         
         # Check for technical prompt indicators
         if category == 'technical':
@@ -878,12 +749,12 @@ def handle_reading(request):
                 'word_count_estimate': len(content_text.split()),
                 'technical_indicators_found': len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) if category == 'technical' else None,
                 'verification_status': 'passed' if category != 'technical' or len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) >= 2 else 'warning',
-                'markdown_sanitized': markdown_replacements > 0,
-                'markdown_replacement_blocks': markdown_replacements,
-                'inline_math_converted_tokens': inline_rep,
-                'indented_math_converted_blocks': indent_rep,
-                'academic_sanitized': academic_sanitized if category == 'academic' else None,
-                'academic_replacement_blocks': academic_replacements if category == 'academic' else None
+                'sanitization_applied': changes['total'] > 0,
+                'sanitization_changes': changes['total'],
+                'latex_removed': changes['latex_removed'],
+                'inline_code_cleaned': changes['inline_code_cleaned'],
+                'fences_sanitized': changes['fences_sanitized'],
+                'indents_cleaned': changes['indents_cleaned']
             }
         else:
             # If result is not a dict, wrap it with metadata
@@ -907,12 +778,12 @@ def handle_reading(request):
                     'word_count_estimate': len(content_text.split()),
                     'technical_indicators_found': len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) if category == 'technical' else None,
                     'verification_status': 'passed' if category != 'technical' or len([indicator for indicator in ['code', 'programming', 'Code Examples', '```', 'algorithm', 'syntax', 'function'] if indicator.lower() in content_text.lower()]) >= 2 else 'warning',
-                    'markdown_sanitized': markdown_replacements > 0,
-                    'markdown_replacement_blocks': markdown_replacements,
-                    'inline_math_converted_tokens': inline_rep,
-                    'indented_math_converted_blocks': indent_rep,
-                    'academic_sanitized': academic_sanitized if category == 'academic' else None,
-                    'academic_replacement_blocks': academic_replacements if category == 'academic' else None
+                    'sanitization_applied': changes['total'] > 0,
+                    'sanitization_changes': changes['total'],
+                    'latex_removed': changes['latex_removed'],
+                    'inline_code_cleaned': changes['inline_code_cleaned'],
+                    'fences_sanitized': changes['fences_sanitized'],
+                    'indents_cleaned': changes['indents_cleaned']
                 }
             }
         

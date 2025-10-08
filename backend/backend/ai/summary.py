@@ -1,6 +1,7 @@
 from django.http import JsonResponse
 from django.conf import settings
 from .ai_service import call_gemini_api
+from .sanitization import sanitize_ai_content
 import json
 
 def handle_summary(request):
@@ -10,6 +11,7 @@ def handle_summary(request):
         body = json.loads(request.body.decode('utf-8'))
         topic = body.get('topic', '')
         reading_content = body.get('reading_content', '')
+        category = body.get('category', 'academic')  # Default to 'academic' for aggressive sanitization
         
         if reading_content and len(reading_content) > 100:
             prompt = f"""
@@ -120,6 +122,46 @@ Generate only the markdown summary content focused on "{topic}". Be comprehensiv
         try:
             # Use ai_service with dual key support
             result = call_gemini_api(prompt)
+            
+            # Apply sanitization to summary content
+            if isinstance(result, dict) and 'content' in result:
+                summary_content = result.get('content', '')
+                
+                # Log before sanitization
+                print(f"📝 SUMMARY SANITIZATION:")
+                print(f"   • Topic: {topic}")
+                print(f"   • Category: {category} (using for aggressive sanitization)")
+                print(f"   • Content length: {len(summary_content)} characters")
+                latex_before = summary_content[:500].count('$')
+                backticks_before = summary_content[:500].count('`')
+                print(f"   • LaTeX $ symbols (first 500 chars): {latex_before}")
+                print(f"   • Backticks ` (first 500 chars): {backticks_before}")
+                
+                # Apply comprehensive sanitization using the same category as reading content
+                # This ensures summaries get the same aggressive treatment for academic/math topics
+                sanitized_content, changes = sanitize_ai_content(summary_content, category)
+                
+                if changes['total'] > 0:
+                    print(f"   ✅ Summary sanitization complete:")
+                    print(f"      • LaTeX removed: {changes['latex_removed']}")
+                    print(f"      • Excessive inline code cleaned: {changes['inline_code_cleaned']}")
+                    print(f"      • Code fences sanitized: {changes['fences_sanitized']}")
+                    print(f"      • Indented blocks cleaned: {changes['indents_cleaned']}")
+                    print(f"      • Total changes: {changes['total']}")
+                    
+                    # Verify cleanup
+                    latex_after = sanitized_content[:500].count('$')
+                    backticks_after = sanitized_content[:500].count('`')
+                    print(f"   • LaTeX $ symbols after: {latex_after}")
+                    print(f"   • Backticks ` after: {backticks_after}")
+                else:
+                    print(f"   ✅ No sanitization needed - summary is clean")
+                
+                # Update result with sanitized content
+                result['content'] = sanitized_content
+                result['sanitization_applied'] = changes['total'] > 0
+                result['sanitization_changes'] = changes
+            
             return JsonResponse(result, safe=False)
         except Exception as api_error:
             return JsonResponse({'error': f'AI service error: {str(api_error)}'}, status=500)
