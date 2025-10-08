@@ -195,6 +195,11 @@ class ContentStorageService {
    */
   storeTopicContent(topicId, contentData) {
   logger.log('💾 STORAGE DEBUG: Storing content for topic ID:', topicId, 'contentData keys:', Object.keys(contentData || {}));
+  logger.log('💾 [STORAGE] Incoming resourcesMetadata:', {
+    hasMetadata: !!contentData?.resourcesMetadata,
+    generatedAt: contentData?.resourcesMetadata?.generatedAt,
+    metadataKeys: contentData?.resourcesMetadata ? Object.keys(contentData.resourcesMetadata) : []
+  });
     const contentId = this.generateId('content');
     const isProgressive = !!(contentData && contentData.metadata);
     const content = {
@@ -208,6 +213,7 @@ class ContentStorageService {
       // Preserve quiz structure (array or object with questions)
       quiz: (Array.isArray(contentData?.quiz) || (contentData?.quiz && typeof contentData.quiz === 'object')) ? contentData.quiz : (contentData?.quiz ?? null),
       resources: Array.isArray(contentData?.resources) ? contentData.resources : (contentData?.resources ? contentData.resources : []),
+      resourcesMetadata: contentData?.resourcesMetadata || null,  // ← PRESERVE RESOURCES METADATA
 
       // Metadata (preserve progressive generation timestamps)
       metadata: contentData?.metadata ? { ...contentData.metadata } : undefined,
@@ -237,6 +243,11 @@ class ContentStorageService {
 
   this.storage.contents.set(contentId, content);
   logger.log('💾 STORAGE DEBUG: Content stored in contents map with ID:', contentId);
+  logger.log('💾 [STORAGE] Stored content with resourcesMetadata:', {
+    hasMetadata: !!content.resourcesMetadata,
+    generatedAt: content.resourcesMetadata?.generatedAt,
+    contentKeys: Object.keys(content)
+  });
 
     // Update topic to reference this content
     const topic = this.storage.topics.get(topicId);
@@ -318,6 +329,17 @@ class ContentStorageService {
     }
 
     const content = this.storage.contents.get(topic.contentId);
+    logger.log('📚 [STORAGE] Retrieved content for topic:', {
+      topicId,
+      hasContent: !!content,
+      hasResourcesMetadata: !!content?.resourcesMetadata,
+      generatedAt: content?.resourcesMetadata?.generatedAt,
+      contentKeys: content ? Object.keys(content) : [],
+      resourcesLength: Array.isArray(content?.resources) ? content.resources.length : 0,
+      sampleResourceTitles: Array.isArray(content?.resources) ? content.resources.slice(0,2).map(r => r.title || r.name || '(no title)') : [],
+      resourcesMetadataKeys: content?.resourcesMetadata ? Object.keys(content.resourcesMetadata) : [],
+      resourcesMetadataRaw: content?.resourcesMetadata || null
+    });
     
     return content ? { ...content } : null;
   }

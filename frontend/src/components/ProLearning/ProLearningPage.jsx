@@ -47,10 +47,10 @@ import {
   formatDuration,
   formatViewCount,
   formatSubscriberCount,
-  getResourceIcon,
-  clearReadingContentCache,
-  getReadingContentCacheInfo
+  getResourceIcon
 } from './services/index.js';
+// Debug cache utilities (exposed to window.debugReadingCache)
+import './services/debugReadingCache';
 import { 
   batchGenerateAllTopics, 
   isTopicContentGenerated,
@@ -1891,14 +1891,30 @@ const ProLearningPage = () => {
         if (shouldUseContent) {
           console.log('📚 DEBUG: Loading progressive content for:', topicName);
           
-          // Transform content to expected format
+          // Debug: Check what's actually in progressiveContent
+          console.log('🔍 [DEBUG] Raw progressiveContent.resourcesMetadata:', progressiveContent.resourcesMetadata);
+          console.log('🔍 [DEBUG] Type of resourcesMetadata:', typeof progressiveContent.resourcesMetadata);
+          console.log('🔍 [DEBUG] progressiveContent.resources length:', progressiveContent.resources?.length || 0);
+          console.log('🔍 [DEBUG] Content was generated at:', progressiveContent.generatedAt);
+          console.log('🔍 [DEBUG] Content generation method:', progressiveContent.generationMethod);
+          console.log('🔍 [DEBUG] Is this OLD content?', progressiveContent.generatedAt ? new Date(progressiveContent.generatedAt).toLocaleString() : 'unknown');
+          
+          // Transform content to expected format, preserving resourcesMetadata
           const formattedContent = {
             reading: progressiveContent.reading || '',
             summary: progressiveContent.summary || '',
             quiz: progressiveContent.quiz || [],
             videos: progressiveContent.videos || [],
-            resources: progressiveContent.resources || []
+            resources: progressiveContent.resources || [],
+            resourcesMetadata: progressiveContent.resourcesMetadata || null  // ← PRESERVE METADATA
           };
+          console.log('📚 [LOAD CONTENT] Formatted progressive content:', {
+            topicName,
+            resourcesCount: formattedContent.resources.length,
+            hasResourcesMetadata: !!formattedContent.resourcesMetadata,
+            generatedAt: formattedContent.resourcesMetadata?.generatedAt,
+            progressiveContentKeys: Object.keys(progressiveContent)
+          });
 
           // Set content for this topic only - but preserve any already displayed reading
           // to avoid changing flow/markup after later tabs finish generating.
@@ -1909,14 +1925,16 @@ const ProLearningPage = () => {
                 summary: formattedContent.summary || content.summary || '',
                 quiz: (Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) ? formattedContent.quiz : (content.quiz || []),
                 videos: (Array.isArray(formattedContent.videos) && formattedContent.videos.length > 0) ? formattedContent.videos : (content.videos || []),
-                resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0) ? formattedContent.resources : (content.resources || [])
+                resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0) ? formattedContent.resources : (content.resources || []),
+                resourcesMetadata: formattedContent.resourcesMetadata || content.resourcesMetadata || null  // ← PRESERVE METADATA
               }
             : {
                 reading: formattedContent.reading,
                 summary: formattedContent.summary,
                 quiz: formattedContent.quiz,
                 videos: formattedContent.videos,
-                resources: formattedContent.resources
+                resources: formattedContent.resources,
+                resourcesMetadata: formattedContent.resourcesMetadata  // ← PRESERVE METADATA
               };
           setContentWithSanitization(nextContent, 'progressive:topicContent');
           setContentTopicName(topicName);
@@ -1927,12 +1945,43 @@ const ProLearningPage = () => {
           if (formattedContent.summary) newReady.push('summary');
           if ((formattedContent.videos?.length || 0) > 0) newReady.push('videos');
           if ((Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) || (formattedContent?.quiz?.questions?.length > 0)) newReady.push('quiz');
-          if ((formattedContent.resources?.length || 0) > 0) newReady.push('resources');
+          // Mark resources as available ONLY if generation completed (with or without results)
+          // Check metadata.generatedAt to ensure generation actually completed
+          console.log('🔓 [TAB AVAILABILITY] Checking resources availability:', {
+            topicName,
+            hasMetadata: !!formattedContent?.resourcesMetadata,
+            generatedAt: formattedContent?.resourcesMetadata?.generatedAt,
+            resourcesCount: formattedContent?.resources?.length || 0,
+            legacyNoMetadata: !formattedContent?.resourcesMetadata && Array.isArray(formattedContent?.resources) && formattedContent.resources.length > 0
+          });
+          if (formattedContent?.resourcesMetadata?.generatedAt) {
+            console.log('✅ [TAB AVAILABILITY] Unlocking resources tab (metadata) for:', topicName);
+            newReady.push('resources');
+          } else if (!formattedContent?.resourcesMetadata && Array.isArray(formattedContent?.resources) && formattedContent.resources.length > 0) {
+            console.log('🕰️ [TAB AVAILABILITY] Unlocking resources tab (legacy array present, no metadata) for:', topicName);
+            newReady.push('resources');
+          } else {
+            console.log('❌ [TAB AVAILABILITY] Resources tab stays LOCKED (no data yet) for:', topicName);
+          }
           if (newReady.length > 0) {
-            setAvailableTabsForTopics(prev => ({
-              ...prev,
-              [topicName]: Array.from(new Set([...(prev[topicName] || []), ...newReady]))
-            }));
+            console.log(`🔓 [LOAD CONTENT] Setting available tabs for ${topicName}:`, {
+              newReady,
+              includesResources: newReady.includes('resources')
+            });
+            setAvailableTabsForTopics(prev => {
+              const updated = {
+                ...prev,
+                [topicName]: Array.from(new Set([...(prev[topicName] || []), ...newReady]))
+              };
+              console.log(`🔓 [LOAD CONTENT] Updated availability:`, {
+                topicName,
+                previousTabs: prev[topicName] || [],
+                newTabs: updated[topicName]
+              });
+              return updated;
+            });
+          } else {
+            console.log(`⚠️ [LOAD CONTENT] No tabs to unlock for ${topicName} (newReady is empty)`);
           }
           
           // Parse and set reading sections only when we actually set reading freshly
@@ -3148,12 +3197,21 @@ const ProLearningPage = () => {
             setCourseGenerationStatus(`Generating ${progress.tabName} for ${progress.topic}...`);
           },
           onTabComplete: (tabInfo) => {
+            console.log(`🎬 [ON TAB COMPLETE] Tab ${tabInfo.tabType} completed for ${tabInfo.topic}`);
             // Make this tab clickable immediately for this topic (for all topics progressively)
             setAvailableTabsForTopics(prev => {
               const topicTabs = prev[tabInfo.topic] || [];
-              return topicTabs.includes(tabInfo.tabType)
+              const alreadyIncluded = topicTabs.includes(tabInfo.tabType);
+              const updated = alreadyIncluded
                 ? prev
                 : { ...prev, [tabInfo.topic]: [...topicTabs, tabInfo.tabType] };
+              console.log(`🔓 [ON TAB COMPLETE] Updating availability for ${tabInfo.topic}:`, {
+                tabType: tabInfo.tabType,
+                alreadyIncluded,
+                previousTabs: topicTabs,
+                newTabs: updated[tabInfo.topic]
+              });
+              return updated;
             });
 
             // Immediately update content if this is the currently selected topic
@@ -3162,15 +3220,26 @@ const ProLearningPage = () => {
               
               // Get the fresh content and update immediately
               const freshContent = getProgressiveTopicContent(tabInfo.topic);
+              console.log(`🔍 [ON TAB COMPLETE] Fresh content for ${tabInfo.topic}:`, {
+                hasResources: Array.isArray(freshContent?.resources),
+                resourcesCount: freshContent?.resources?.length || 0,
+                hasResourcesMetadata: !!freshContent?.resourcesMetadata,
+                generatedAt: freshContent?.resourcesMetadata?.generatedAt
+              });
               if (freshContent) {
-                const formattedContent = {
-                  reading: freshContent.reading || '',
-                  summary: freshContent.summary || '',
-                  quiz: freshContent.quiz || [],
-                  videos: freshContent.videos || [],
-                  resources: freshContent.resources || []
-                };
-
+              const formattedContent = {
+                reading: freshContent.reading || '',
+                summary: freshContent.summary || '',
+                quiz: freshContent.quiz || [],
+                videos: freshContent.videos || [],
+                resources: freshContent.resources || [],
+                resourcesMetadata: freshContent.resourcesMetadata || null
+              };
+              console.log(`✨ [ON TAB COMPLETE] Formatted content:`, {
+                hasResourcesMetadata: !!formattedContent.resourcesMetadata,
+                generatedAt: formattedContent.resourcesMetadata?.generatedAt,
+                resourcesCount: formattedContent.resources.length
+              });
                 // Merge new tab content into existing state
                 // IMPORTANT: preserve previously displayed reading; don't overwrite with later updates
                 setContent(prev => ({
@@ -3180,7 +3249,8 @@ const ProLearningPage = () => {
                   summary: formattedContent.summary || prev?.summary || '',
                   quiz: (Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) ? formattedContent.quiz : (prev?.quiz || []),
                   videos: (Array.isArray(formattedContent.videos) && formattedContent.videos.length > 0) ? formattedContent.videos : (prev?.videos || []),
-                  resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0) ? formattedContent.resources : (prev?.resources || [])
+                  resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0) ? formattedContent.resources : (prev?.resources || []),
+                  resourcesMetadata: formattedContent.resourcesMetadata || prev?.resourcesMetadata || null
                 }));
                     // Set the topic name for which this content is now current so non-reading tabs can render immediately
                     try { setContentTopicName(tabInfo.topic); } catch {}
@@ -3689,11 +3759,29 @@ const ProLearningPage = () => {
                     case 'summary': return typeof content === 'string' && content.trim().length > 0;
                     case 'videos': return Array.isArray(content) && content.length > 0;
                     case 'quiz': return Array.isArray(content) && content.length > 0;
-                    case 'resources': return Array.isArray(content) && content.length > 0;
+                    case 'resources': {
+                      // Resources content is {resources: [...], resourcesMetadata: {...}}
+                      if (Array.isArray(content)) {
+                        return content.length > 0; // Legacy format
+                      }
+                      // New format: object with resources array and metadata
+                      return content && typeof content === 'object' && 
+                             ((Array.isArray(content.resources) && content.resources.length > 0) ||
+                              !!content.resourcesMetadata?.generatedAt); // Has resources OR metadata exists (generation completed)
+                    }
                     default: return false;
                   }
                 };
-                if (!topicTabs.includes(tabInfo.tabType) && hasMeaningful(tabInfo.tabType, c)) {
+                const hasContent = hasMeaningful(tabInfo.tabType, c);
+                console.log(`🔍 [ON TAB COMPLETE - INIT] Checking ${tabInfo.tabType}:`, {
+                  topic: tabInfo.topic,
+                  hasContent,
+                  contentType: typeof c,
+                  isArray: Array.isArray(c),
+                  alreadyInList: topicTabs.includes(tabInfo.tabType)
+                });
+                if (!topicTabs.includes(tabInfo.tabType) && hasContent) {
+                  console.log(`✅ [ON TAB COMPLETE - INIT] Adding ${tabInfo.tabType} to available tabs for ${tabInfo.topic}`);
                   return {
                     ...prev,
                     [tabInfo.topic]: [...topicTabs, tabInfo.tabType]
@@ -5407,12 +5495,74 @@ const ProLearningPage = () => {
 
       case 'resources':
         // Resources Renderer: Grid of resource cards with icons and descriptions
-        // If resources are not yet available, keep showing the loader
-        if (!Array.isArray(content?.resources) || content.resources.length === 0) {
+        // Check if resources generation has COMPLETED (metadata.generatedAt exists)
+        let resourcesGenerationCompleted = content?.resourcesMetadata?.generatedAt;
+        // Legacy support: if older stored course has resources array but no metadata at all, treat as completed
+        if (!resourcesGenerationCompleted && Array.isArray(content?.resources) && content.resources.length > 0 && !content?.resourcesMetadata) {
+          console.log('🕰️ [RESOURCES LEGACY] Detected legacy resources without metadata. Treating generation as completed.', {
+            resourcesCount: content.resources.length
+          });
+          resourcesGenerationCompleted = true; // Do not fabricate metadata object; just allow render.
+        }
+        
+        console.log('🎨 [RENDER RESOURCES] Rendering resources tab:', {
+          hasContent: !!content,
+          resourcesCount: content?.resources?.length || 0,
+          hasMetadata: !!content?.resourcesMetadata,
+          generatedAt: content?.resourcesMetadata?.generatedAt,
+          generationCompleted: !!resourcesGenerationCompleted,
+          contentKeys: content ? Object.keys(content) : [],
+          sampleResources: Array.isArray(content?.resources) ? content.resources.slice(0,2).map((r,i) => ({
+            idx: i,
+            title: r.title || r.name || '(no title)',
+            url: r.url || r.link || r.href,
+            hasDescription: !!r.description
+          })) : [],
+          metadataKeys: content?.resourcesMetadata ? Object.keys(content.resourcesMetadata) : [],
+          tabBlocked: currentTopicName ? isTopicBlocked(currentTopicName) : 'n/a'
+        });
+        
+        // If resources generation hasn't completed yet, show loader
+        if (!resourcesGenerationCompleted) {
+          console.log('⏳ [RENDER RESOURCES] Showing loader - generation not completed');
           return <LoadingComponent />;
         }
+        
+        // If topic is still blocked (shouldn't happen if generation completed, but safety check)
         if (currentTopicName && isTopicBlocked(currentTopicName)) {
           return <LoadingComponent />;
+        }
+        
+        // If resources array is empty (generation completed but found no resources)
+        if (!content?.resources || content.resources.length === 0) {
+          return (
+            <div className="flex flex-col items-center justify-center py-16 px-4">
+              <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-sky-100 rounded-full flex items-center justify-center mb-6 shadow-lg">
+                <FaLink className="text-4xl text-blue-500" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-800 mb-3">
+                Oops! No Resources Found
+              </h3>
+              <p className="text-gray-600 text-center max-w-md mb-6">
+                We couldn't find any external learning resources for this topic at the moment. 
+                Don't worry—the reading material, summary, videos, and quiz are still available!
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setActiveTab('reading')}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
+                >
+                  Go to Reading
+                </button>
+                <button
+                  onClick={() => setActiveTab('quiz')}
+                  className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
+                >
+                  Try the Quiz
+                </button>
+              </div>
+            </div>
+          );
         }
         
         return (
@@ -5591,10 +5741,34 @@ const ProLearningPage = () => {
                             isTabAvailable = false;
                           }
                         }
+                        
+                        // Debug logging for resources tab
+                        if (tab.id === 'resources') {
+                          console.log(`🔍 [TAB RENDER] Resources tab availability check:`, {
+                            currentTopicName,
+                            isTabAvailable,
+                            inAvailableList: availableTabsForTopics[currentTopicName]?.includes('resources'),
+                            hasTabContent,
+                            currentTopicBlocked,
+                            readingReady,
+                            isProgressiveGenerating,
+                            fresh,
+                            availableTabsForTopic: availableTabsForTopics[currentTopicName] || []
+                          });
+                        }
                       }
                       
                       // Tab is disabled if topic is blocked OR if progressive tab is not available
                       const isTabDisabled = currentTopicBlocked || (useProgressiveGeneration && !isTabAvailable);
+                      
+                      if (tab.id === 'resources') {
+                        console.log(`🔍 [TAB RENDER] Resources tab disabled state:`, {
+                          isTabDisabled,
+                          currentTopicBlocked,
+                          useProgressiveGeneration,
+                          isTabAvailable
+                        });
+                      }
                       
                       return (
                         <button

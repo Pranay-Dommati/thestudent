@@ -58,7 +58,29 @@ export const batchGenerateAllTopics = async (
     // 3. Check which topics already have content
     const progress = contentStorageService.getCourseProgress(courseId);
 
+    // ========================================
+    // 🚨 CRITICAL DEBUG: STORAGE CHECK
+    // ========================================
+    console.log('\n' + '='.repeat(80));
+    console.log('🚨 CHECKING CONTENTSTORAGE FOR EXISTING CONTENT');
+    console.log('='.repeat(80));
+    console.log('📦 COURSE ID:', courseId);
+    console.log('📦 COURSE TITLE:', courseTitle);
+    console.log('📦 PROGRESS:', progress);
+    console.log('📦 IS COMPLETE:', progress.isComplete);
+    console.log('📦 TOPICS TO CHECK:', topicsList);
+    
+    const storedTopics = contentStorageService.getTopicsForCourse(courseId);
+    console.log('📦 STORED TOPICS:', storedTopics.map(t => ({
+      name: t.name,
+      hasContent: t.contentGenerated,
+      readingPreview: t.content?.reading?.substring(0, 100)
+    })));
+    console.log('='.repeat(80) + '\n');
+
     if (progress.isComplete) {
+      console.log('\n' + '🚨 WARNING: ALL CONTENT ALREADY EXISTS IN STORAGE - NOT GENERATING FRESH!');
+      console.log('🚨 THIS MAY BE WHY YOU SEE OLD/WRONG CONTENT!\n');
       setLoadingStatus('All topics are ready! Content loaded from storage.');
       setGenerationProgress(100);
       setIsGenerating(false);
@@ -70,9 +92,20 @@ export const batchGenerateAllTopics = async (
     const topicsToGenerate = contentStorageService.getTopicsForCourse(courseId)
       .filter(topic => !topic.contentGenerated);
 
+    // ========================================
+    // 🚨 CRITICAL DEBUG: GENERATION PLAN
+    // ========================================
+    console.log('\n' + '='.repeat(80));
+    console.log('🚨 CONTENT GENERATION PLAN');
+    console.log('='.repeat(80));
+    console.log('🔄 TOPICS THAT NEED GENERATION:', topicsToGenerate.map(t => t.name));
+    console.log('✅ ALREADY GENERATED COUNT:', processedCount);
+    console.log('📊 TOTAL TOPICS:', topicsList.length);
+    console.log('='.repeat(80) + '\n');
 
     // Process each topic that needs content generation
     for (const topic of topicsToGenerate) {
+      console.log('\n' + '🎯 GENERATING CONTENT FOR TOPIC: "' + topic.name + '"');
       setLoadingStatus(`Generating content for ${topic.name} (${processedCount + 1}/${topicsList.length})...`);
       
       try {

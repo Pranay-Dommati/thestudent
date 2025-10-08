@@ -115,6 +115,11 @@ async function generateSingleTopicContent(topic, { personalization = null, topic
   try {
     // Starting AI content generation for topic via secure backend proxy
     const axiosAi = (await import('../../../utils/axiosAi')).default;
+    
+    // Log exactly what topic we're generating for
+    const topicName = (typeof topic === 'object' && topic?.name) ? topic.name : String(topic);
+    logger.log(`🎯 generateSingleTopicContent CALLED for topic: "${topicName}"`);
+    
     // Derive defaults from last classification if not explicitly provided
     let effectivePersonalization = personalization;
     let effectiveTopicContext = topicContext;
@@ -141,22 +146,79 @@ async function generateSingleTopicContent(topic, { personalization = null, topic
       topic: (typeof topic === 'object' && topic?.name) ? topic.name : String(topic),
       ...(effectivePersonalization ? { personalization: effectivePersonalization } : {}),
       ...(effectiveTopicContext ? { topic_context: effectiveTopicContext } : {}),
+      // Temporary debug flag to request prompt/response preview from backend
+      debug: true
     };
 
-    // FRONTEND DEBUG: Log what we're sending to the backend
-    try {
-      const preview = {
-        topic: payload.topic,
-        personalization: payload.personalization ? `${String(payload.personalization).slice(0, 120)}${String(payload.personalization).length > 120 ? '...' : ''}` : null,
-        topic_context_included: Boolean(payload.topic_context),
-      };
-      logger.log('🛰️ Posting to /ai/reading/ with payload:', preview);
-      if (import.meta.env.MODE !== 'production') {
-        console.log('🛰️ Posting to /ai/reading/ with payload:', preview);
-      }
-    } catch {}
+    // ========================================
+    // 🚨 CRITICAL DEBUG: READING REQUEST
+    // ========================================
+    console.log('\n' + '='.repeat(80));
+    console.log('🚨 READING CONTENT REQUEST - FULL DETAILS');
+    console.log('='.repeat(80));
+    console.log('📤 TOPIC BEING SENT TO AI:', payload.topic);
+    console.log('📤 PAYLOAD:', JSON.stringify(payload, null, 2));
+    console.log('⏰ REQUEST TIME:', new Date().toISOString());
+    console.log('='.repeat(80) + '\n');
 
     const { data: result } = await axiosAi.post('/reading/', payload);
+
+    // ========================================
+    // 🚨 CRITICAL DEBUG: READING RESPONSE
+    // ========================================
+    console.log('\n' + '='.repeat(80));
+    console.log('🚨 READING CONTENT RESPONSE - FULL DETAILS');
+    console.log('='.repeat(80));
+    console.log('📥 TOPIC REQUESTED:', payload.topic);
+  console.log('📥 RESPONSE KEYS:', Object.keys(result));
+    console.log('📥 CONTENT LENGTH:', result.content?.length || 0);
+  console.log('📥 FIRST 500 CHARS OF RESPONSE:');
+    console.log('-'.repeat(80));
+    console.log(result.content?.substring(0, 500) || 'NO CONTENT');
+    console.log('-'.repeat(80));
+    console.log('📥 CATEGORY:', result.topic_category);
+    console.log('='.repeat(80) + '\n');
+    
+    if (result.__debug) {
+      console.log('\n' + '='.repeat(80));
+      console.log('🛠  BACKEND __debug BLOCK - FULL DETAILS');
+      console.log('='.repeat(80));
+      console.log('📤 PROMPT TOPIC:', result.__debug.prompt_topic);
+      console.log('📤 PROMPT CATEGORY:', result.__debug.prompt_category);
+      console.log('📤 PROMPT LENGTH:', result.__debug.prompt_length, 'characters');
+      console.log('-'.repeat(80));
+      console.log('📤 LAST 200 CHARS OF PROMPT (should show ## INPUT FORMAT + topic):');
+      console.log(result.__debug.prompt_last_200_chars);
+      console.log('-'.repeat(80));
+      console.log('� FULL PROMPT (scroll to see ## INPUT FORMAT at bottom):');
+      console.log(result.__debug.prompt_full);
+      console.log('-'.repeat(80));
+      console.log('📥 RESPONSE PREVIEW (first 2000 chars):');
+      console.log(result.__debug.response_preview);
+      console.log('-'.repeat(80));
+      console.log('🔍 DIAGNOSIS:');
+      // Check if topic appears in the last 200 chars (where INPUT FORMAT should be)
+      const topicInPrompt = result.__debug.prompt_last_200_chars?.includes(result.__debug.prompt_topic);
+      if (topicInPrompt) {
+        console.log('✅ Topic "' + result.__debug.prompt_topic + '" FOUND in prompt end (INPUT FORMAT section)');
+      } else {
+        console.log('❌ WARNING: Topic "' + result.__debug.prompt_topic + '" NOT FOUND in prompt end!');
+        console.log('❌ This means the wrong topic is being sent to Gemini!');
+      }
+      
+      // Check if response matches the requested topic
+      const topicWords = result.__debug.prompt_topic.toLowerCase().split(' ');
+      const responseStart = (result.__debug.response_preview || '').toLowerCase().substring(0, 500);
+      const topicInResponse = topicWords.some(word => word.length > 3 && responseStart.includes(word));
+      if (topicInResponse) {
+        console.log('✅ Response appears to match requested topic');
+      } else {
+        console.log('⚠️  Response might NOT match requested topic - check content carefully');
+      }
+      console.log('='.repeat(80) + '\n');
+    }
+    
+    console.log('='.repeat(80) + '\n');
 
     // FRONTEND DEBUG: Log backend confirmation about personalization usage
     try {
@@ -314,6 +376,8 @@ export async function generateReadingContent(user_input, setContent, options = {
   const cacheKeyWhole = (Array.isArray(user_input) ? user_input.map(t => (t?.name || t)).join(',') : user_input) + personalizationKey + topicContextKey;
   const cachedContent = getCachedContent(cacheKeyWhole);
   if (cachedContent) {
+    logger.warn(`🗄️ CACHE HIT: Returning cached content for key: ${cacheKeyWhole.substring(0, 100)}...`);
+    logger.warn(`🗄️ Cached content preview: ${cachedContent.substring(0, 200)}...`);
     setContent({
       reading: cachedContent,
       metadata: {
@@ -325,6 +389,8 @@ export async function generateReadingContent(user_input, setContent, options = {
     });
     // Reduced logging for cache hits
     return;
+  } else {
+    logger.log(`🔍 CACHE MISS: No cached content found for key: ${cacheKeyWhole.substring(0, 100)}...`);
   }
 
   // Only log for multiple topics to reduce noise
@@ -350,7 +416,11 @@ export async function generateReadingContent(user_input, setContent, options = {
         const cacheKey = `${topicName}${personalizationKey}${topicContextKey}`.toLowerCase().replace(/\s+/g, '-');
         const cachedContent = getCachedContent(cacheKey);
         if (cachedContent) {
+          logger.warn(`🗄️ INDIVIDUAL TOPIC CACHE HIT for topic: "${topicName}" (cache key: ${cacheKey})`);
+          logger.warn(`🗄️ Cached content preview: ${cachedContent.substring(0, 200)}...`);
           return cachedContent;
+        } else {
+          logger.log(`🔍 CACHE MISS for topic: "${topicName}" (cache key: ${cacheKey}) - will generate fresh content`);
         }
         // Stagger requests to prevent rate limiting
         if (index > 0) {
@@ -438,6 +508,8 @@ export async function generateReadingContent(user_input, setContent, options = {
 export function clearReadingContentCache() {
   contentCache.clear();
   logger.log('🗑️ Cleared all reading content cache');
+  console.log('🗑️ Reading content cache cleared - all entries removed');
+  return `Cleared ${contentCache.size} cache entries`;
 }
 
 // Export function to check cache status
@@ -445,10 +517,13 @@ export function getReadingContentCacheInfo() {
   const cacheEntries = Array.from(contentCache.entries()).map(([key, value]) => ({
     key,
     timestamp: value.timestamp,
+    age_minutes: Math.round((Date.now() - value.timestamp) / 60000),
     contentLength: value.content?.length || 0,
+    contentPreview: value.content ? value.content.substring(0, 150) + '...' : '',
     isEmpty: !value.content || value.content.trim() === ''
   }));
   
-  logger.log('📊 Reading Content Cache Info:', cacheEntries);
+  console.table(cacheEntries);
+  logger.log(`📊 Cache contains ${cacheEntries.length} entries:`, cacheEntries);
   return cacheEntries;
 }

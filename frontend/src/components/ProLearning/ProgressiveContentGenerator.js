@@ -250,7 +250,26 @@ export class ProgressiveContentGenerator {
               tabContent = content.quiz || [];
               break;
             case 'resources':
-              tabContent = content.resources || [];
+              // For resources, preserve both the array AND metadata
+              console.log('🔍 [PROG GEN] Raw content passed to extraction:', {
+                hasContent: !!content,
+                contentKeys: content ? Object.keys(content) : [],
+                hasResources: 'resources' in (content || {}),
+                hasResourcesMetadata: 'resourcesMetadata' in (content || {}),
+                resourcesType: typeof content?.resources,
+                resourcesMetadataType: typeof content?.resourcesMetadata,
+                resourcesMetadataValue: content?.resourcesMetadata
+              });
+              tabContent = {
+                resources: content.resources || [],
+                resourcesMetadata: content.resourcesMetadata || null
+              };
+              console.log('🔍 [PROG GEN] Extracted resources content:', {
+                resourcesCount: tabContent.resources?.length || 0,
+                hasMetadata: !!tabContent.resourcesMetadata,
+                metadataKeys: tabContent.resourcesMetadata ? Object.keys(tabContent.resourcesMetadata) : [],
+                generatedAt: tabContent.resourcesMetadata?.generatedAt
+              });
               break;
             default:
               tabContent = content;
@@ -303,6 +322,20 @@ export class ProgressiveContentGenerator {
   async storeTabContent(topic, tabType, content) {
   const topicName = topic.name || topic;
   logger.log('💾 PROG GEN DEBUG: Storing tab content:', { topicName, tabType, courseId: this.courseId, contentLength: typeof content === 'string' ? content.length : (Array.isArray(content) ? content.length : 'object') });
+  
+  // Debug: Log what we received for resources
+  if (tabType === 'resources') {
+    console.log('🔍 [PROG GEN] Received resources content:', {
+      type: typeof content,
+      isArray: Array.isArray(content),
+      isObject: content && typeof content === 'object' && !Array.isArray(content),
+      hasResourcesKey: content && 'resources' in content,
+      hasMetadataKey: content && 'resourcesMetadata' in content,
+      keys: content ? Object.keys(content) : [],
+      resourcesLength: Array.isArray(content) ? content.length : (content?.resources?.length || 0),
+      metadata: content?.resourcesMetadata || 'none'
+    });
+  }
     
     // Get existing content for this topic
     let existingContent = this.getExistingTopicContent(topicName) || {
@@ -314,8 +347,28 @@ export class ProgressiveContentGenerator {
       metadata: {}
     };
 
-    // Update the specific tab content
-    existingContent[tabType] = content;
+    // Handle resources specially to preserve metadata
+    if (tabType === 'resources' && content && typeof content === 'object' && !Array.isArray(content)) {
+      // Content is {resources: [...], resourcesMetadata: {...}}
+      existingContent.resources = content.resources || [];
+      existingContent.resourcesMetadata = content.resourcesMetadata || null;
+      console.log('💾 [PROG GEN] Storing resources with metadata:', {
+        topicName,
+        resourcesCount: existingContent.resources.length,
+        hasMetadata: !!existingContent.resourcesMetadata,
+        generatedAt: existingContent.resourcesMetadata?.generatedAt
+      });
+    } else {
+      // Normal tab content (string or array)
+      existingContent[tabType] = content;
+      console.log('💾 [PROG GEN] Storing normal tab content:', {
+        topicName,
+        tabType,
+        contentType: typeof content,
+        isArray: Array.isArray(content)
+      });
+    }
+    
     existingContent.metadata = {
       ...existingContent.metadata,
       [`${tabType}Generated`]: true,

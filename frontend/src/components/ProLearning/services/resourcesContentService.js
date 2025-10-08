@@ -237,28 +237,52 @@ export async function generateResourcesContent(setContent, topic = '', options =
     });
     
     // Successfully generated Google Search-powered resources
+    console.log('✅ [RESOURCES SERVICE] Generated resources successfully:', {
+      topic,
+      resourcesCount: validatedResources.length,
+      metadata: metadata,
+      hasGeneratedAt: !!metadata.generatedAt,
+      sampleResources: validatedResources.slice(0,3).map(r => ({
+        title: r.title || r.name || '(no title)',
+        url: r.url || r.link || r.href,
+        type: r.type || r.category,
+        provider: r.provider || r.source || undefined
+      }))
+    });
     
     // Set the content
     setContent({
       resources: validatedResources,
       resourcesMetadata: metadata
     });
+    console.log('📤 [RESOURCES SERVICE] Called setContent with:', {
+      resourcesCount: validatedResources.length,
+      metadataKeys: Object.keys(metadata),
+      generatedAt: metadata.generatedAt,
+      firstResource: validatedResources[0] ? {
+        title: validatedResources[0].title || validatedResources[0].name,
+        url: validatedResources[0].url || validatedResources[0].link,
+        hasDescription: !!validatedResources[0].description
+      } : null
+    });
     
   } catch (error) {
-    console.error('❌ Error generating resources:', error);
+    console.error('❌ [RESOURCES SERVICE] Error generating resources:', error);
     // Set empty results with error metadata; no fallback
+    const errorMetadata = {
+      generatedAt: new Date().toISOString(),
+      totalResources: 0,
+      categories: [],
+      types: [],
+      topic: topic,
+      fromCache: false,
+      source: 'error',
+      error: error.message || 'Failed to fetch resources'
+    };
+    console.log('⚠️ [RESOURCES SERVICE] Setting error state with metadata:', errorMetadata);
     setContent({
       resources: [],
-      resourcesMetadata: {
-        generatedAt: new Date().toISOString(),
-        totalResources: 0,
-        categories: [],
-        types: [],
-        topic: topic,
-        fromCache: false,
-        source: 'error',
-        error: error.message || 'Failed to fetch resources'
-      }
+      resourcesMetadata: errorMetadata
     });
   }
 }
