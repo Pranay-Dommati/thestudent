@@ -949,20 +949,21 @@ const ProLearningPage = () => {
           setSanitizedReadingTopicName(currentTopic);
         } catch {}
       } else {
-        // Empty reading coming in
+        // Empty reading coming in: preserve existing sanitized reading if present
         console.log('⚪ [READING-EMPTY] No reading in payload', { source: sourceLabel });
-        setSanitizedReading('');
-        setReadingRenderReady(false);
-        setSanitizedReadingTopicName(null);
+        if (!(sanitizedReading && String(sanitizedReading).trim().length > 0)) {
+          setSanitizedReading('');
+          setReadingRenderReady(false);
+          setSanitizedReadingTopicName(null);
+        } else {
+          // Keep current sanitized reading as-is
+          debugLog('🛡️ [READING-PRESERVE-EMPTY] Keeping existing sanitized reading');
+        }
       }
     } else {
-      // No reading field provided
-      if (!hasExistingReading) {
-        console.log('⚪ [READING-NONE] No reading field present and none exists', { source: sourceLabel });
-        setSanitizedReading('');
-        setReadingRenderReady(false);
-        setSanitizedReadingTopicName(null);
-      }
+      // No reading field provided: do not clear existing sanitized reading
+      // This can happen when other tabs update (videos/resources/quiz). Preserve reading UI.
+      debugLog('🛡️ [READING-PRESERVE-NONE] No reading field provided; preserving existing sanitized state');
     }
     // Log non-reading tabs lengths for traceability
     try {
@@ -4119,11 +4120,16 @@ const ProLearningPage = () => {
   const renderTabContent = () => {
     // Derive current topic name robustly (fallback to URL param if selectedTopic not yet set)
     const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam);
-    // Client-side reading readiness (strict): require sanitized content for current topic
+    // Client-side reading readiness: prefer sanitized content; fallback to raw content presence for current topic
+    const hasRawReadingForCurrent = (
+      contentTopicName === currentTopicName &&
+      typeof content?.reading === 'string' && content.reading.trim().length > 0
+    );
     const readingClientReadyForCurrentTopic = (
-      activeTab === 'reading' &&
-      sanitizedReadingTopicName === currentTopicName &&
-      typeof sanitizedReading === 'string' && sanitizedReading.trim().length > 0
+      activeTab === 'reading' && (
+        (sanitizedReadingTopicName === currentTopicName && typeof sanitizedReading === 'string' && sanitizedReading.trim().length > 0) ||
+        hasRawReadingForCurrent
+      )
     );
     
     // CRITICAL: Check if current topic is blocked (2nd topic onwards until course completion)
@@ -4384,7 +4390,7 @@ const ProLearningPage = () => {
             </div>
             {/* Enhanced Content with better typography, all content together */}
             <div className="prose prose-lg max-w-none">
-              {sanitizedReading && sanitizedReading.trim().length > 0 ? (
+              {(sanitizedReading && sanitizedReading.trim().length > 0) || (contentTopicName === (selectedTopic?.name || getCurrentTopicFromParam(topicParam)) && typeof content?.reading === 'string' && content.reading.trim().length > 0) ? (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm, remarkMath]}
                   rehypePlugins={[rehypeKatex]}
@@ -4610,7 +4616,22 @@ const ProLearningPage = () => {
                     )
                   }}
                 >
-                  {sanitizedReading}
+                  {(() => {
+                    const currentTopic = selectedTopic?.name || getCurrentTopicFromParam(topicParam);
+                    // If sanitized is missing but raw exists for current topic, sanitize on the fly
+                    if (!(sanitizedReading && sanitizedReading.trim().length > 0) && contentTopicName === currentTopic && typeof content?.reading === 'string' && content.reading.trim().length > 0) {
+                      try {
+                        const s = preSanitizeMarkdown(content.reading);
+                        setSanitizedReading(s);
+                        setReadingRenderReady(true);
+                        setSanitizedReadingTopicName(currentTopic);
+                        return s;
+                      } catch {
+                        return content.reading;
+                      }
+                    }
+                    return sanitizedReading;
+                  })()}
                 </ReactMarkdown>
               ) : (
                 // Fallback: waiting state or missing sanitized content

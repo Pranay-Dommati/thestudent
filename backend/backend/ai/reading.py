@@ -205,6 +205,54 @@ def get_prompt_by_category(topic, category, personalization: str | None = None, 
 
 TOPIC YOU MUST WRITE ABOUT: **{topic}**
 
+🔥 **TOPIC INTERPRETATION GUIDE - READ THIS CAREFULLY**:
+
+**CRITICAL**: When you see "JavaScript Basics: Variables, Data Types & Operators":
+- This is ONE SINGLE TOPIC about JavaScript fundamentals
+- "Variables, Data Types & Operators" are the SPECIFIC FEATURES to cover within JavaScript
+- You must write ONE integrated lesson, NOT three separate lessons
+
+**WRONG APPROACH** ❌:
+```
+## Introduction
+(Introduction about Variables)
+## Core Concepts  
+(Core concepts of Variables)
+## Introduction
+(Introduction about Data Types)
+## Core Concepts
+(Core concepts of Data Types)
+## Introduction
+(Introduction about Operators)
+```
+This is FRAGMENTED and WRONG. Never do this.
+
+**CORRECT APPROACH** ✅:
+```
+## Introduction
+JavaScript is a programming language where variables store data, data types categorize values, and operators manipulate them. Together, these fundamentals enable you to write interactive code...
+
+## Core Concepts
+- **Variables**: Use let/const to declare... (brief explanation)
+- **Data Types**: JavaScript has strings, numbers, booleans... (brief explanation)
+- **Operators**: Arithmetic (+,-), comparison (===), logical (&&)... (brief explanation)
+
+## Practical Example
+(ONE code example showing variables, data types, AND operators working together)
+
+## Common Patterns
+(Patterns that use all three concepts together)
+
+## Best Practices
+(Best practices covering all aspects)
+```
+
+**Key Rules**:
+1. Use the structure template (Introduction, Core Concepts, etc.) ONLY ONCE for the entire topic
+2. Within each section, naturally integrate ALL the aspects mentioned in the topic
+3. Show how the aspects work TOGETHER, not as separate entities
+4. ONE introduction, ONE core concepts section, ONE example - all covering multiple aspects
+
 Your task is to create a **concise yet comprehensive** Reading Section about **{topic}** using Markdown syntax.
 
 {pers_block}
@@ -271,6 +319,45 @@ Return **only Markdown content** starting with `## Introduction` about **{topic}
 
 TOPIC YOU MUST WRITE ABOUT: **{topic}**
 
+🔥 **TOPIC INTERPRETATION GUIDE - READ THIS CAREFULLY**:
+
+**CRITICAL**: When you see "Physics: Motion, Forces & Energy":
+- This is ONE SINGLE TOPIC about Physics fundamentals
+- "Motion, Forces & Energy" are the SPECIFIC CONCEPTS to cover within Physics
+- You must write ONE integrated lesson, NOT three separate lessons
+
+**WRONG APPROACH** ❌:
+```
+Introduction about Motion
+Core concepts of Motion
+Introduction about Forces
+Core concepts of Forces
+Introduction about Energy
+Core concepts of Energy
+```
+This is FRAGMENTED and WRONG. Never do this.
+
+**CORRECT APPROACH** ✅:
+```
+## Introduction
+Physics helps us understand how objects move and interact. Motion describes position changes, forces cause those changes, and energy enables the work involved. These concepts are deeply interconnected...
+
+## Core Concepts
+- **Motion**: Position, velocity, acceleration (brief explanation)
+- **Forces**: Push/pull that changes motion, Newton's laws (brief explanation)  
+- **Energy**: Capacity to do work, kinetic and potential forms (brief explanation)
+(Show how they relate to each other)
+
+## Real-World Examples
+(ONE example showing motion, forces, AND energy working together)
+```
+
+**Key Rules**:
+1. Create ONE unified lesson structure for the entire topic
+2. Within each section, naturally integrate ALL concepts mentioned
+3. Show how concepts are INTERCONNECTED, not isolated
+4. Don't repeat your structure for each individual concept
+
 Your task is to create the most effective and personalized learning module about **{topic}** for a user's specific platform.
 
 {pers_block}
@@ -329,6 +416,48 @@ Return the content **only in Markdown format**. Invent your own logical structur
 
 TOPIC YOU MUST WRITE ABOUT: **{topic}**
 
+🔥 **TOPIC INTERPRETATION GUIDE - READ THIS CAREFULLY**:
+
+**CRITICAL**: When you see "Communication Skills: Active Listening & Body Language":
+- This is ONE SINGLE TOPIC about Communication Skills
+- "Active Listening & Body Language" are the SPECIFIC TECHNIQUES to cover within Communication
+- You must write ONE integrated lesson, NOT two separate lessons
+
+**WRONG APPROACH** ❌:
+```
+## Introduction
+(Introduction to Active Listening)
+## Why It Matters
+(Why Active Listening matters)
+## Introduction
+(Introduction to Body Language)
+## Why It Matters
+(Why Body Language matters)
+```
+This is FRAGMENTED and WRONG. Never do this.
+
+**CORRECT APPROACH** ✅:
+```
+## Introduction
+Communication Skills involve conveying and understanding messages effectively. Active listening and body language are two fundamental aspects that work together to enhance communication...
+
+## Why It Matters
+(Explain why communication matters, mentioning both listening and non-verbal cues)
+
+## Core Principles or Techniques
+- **Active Listening**: Give full attention, ask clarifying questions...
+- **Body Language**: Maintain eye contact, open posture...
+(Show how they complement each other)
+
+## Real-Life Applications
+(Examples using BOTH active listening AND body language together)
+```
+
+**Key Rules**:
+1. Use the structure (Introduction, Why It Matters, etc.) ONLY ONCE for the entire topic
+2. Within each section, naturally integrate ALL techniques mentioned
+3. Show how techniques work TOGETHER, not as separate entities
+
 Your task is to generate a clear and structured **Reading Section** in **Markdown format** about **{topic}** that helps individuals learn and grow in this area—whether for career, personal life, or relationships.
 
 {pers_block}
@@ -376,6 +505,51 @@ Return the content **only in Markdown format**, beginning directly with `## Intr
 
 TOPIC YOU MUST WRITE ABOUT: **{topic}**
 
+🔥 **TOPIC INTERPRETATION GUIDE - READ THIS CAREFULLY**:
+
+**CRITICAL**: When you see "Investing: Stocks, Bonds & ETFs":
+- This is ONE SINGLE TOPIC about Investing
+- "Stocks, Bonds & ETFs" are the SPECIFIC INSTRUMENTS to cover within Investing
+- You must write ONE integrated lesson, NOT three separate lessons
+
+**WRONG APPROACH** ❌:
+```
+## Introduction
+(Introduction to Stocks)
+## Core Concepts
+(How stocks work)
+## Introduction
+(Introduction to Bonds)
+## Core Concepts
+(How bonds work)
+## Introduction
+(Introduction to ETFs)
+```
+This is FRAGMENTED and WRONG. Never do this.
+
+**CORRECT APPROACH** ✅:
+```
+## Introduction
+Investing involves allocating money to assets that can grow in value or generate income. Stocks, bonds, and ETFs are three fundamental investment vehicles, each serving different purposes in a portfolio...
+
+## Real-World Importance
+(Explain why investing matters, covering all three instruments)
+
+## How It Works / Core Concepts
+- **Stocks**: Ownership shares in companies, higher risk/reward...
+- **Bonds**: Debt instruments, more stable income...
+- **ETFs**: Baskets of securities, diversification benefits...
+(Show how they complement each other in a portfolio)
+
+## Practical Examples or Case Studies
+(Portfolio example using stocks, bonds, AND ETFs together)
+```
+
+**Key Rules**:
+1. Use your structure ONLY ONCE for the entire topic
+2. Within each section, naturally integrate ALL instruments/concepts mentioned
+3. Show how they work TOGETHER in an investment strategy
+
 Your task is to generate a full *Reading Section* about **{topic}** that feels like a high-quality self-paced learning resource for students, early professionals, founders, and finance enthusiasts.
 
 {pers_block}
@@ -416,6 +590,48 @@ Start directly with the markdown content about **{topic}**, using a format like:
 🚨 CRITICAL INSTRUCTION: You MUST create educational content ONLY about the specific topic provided below. Do NOT write about any other topic.
 
 TOPIC YOU MUST WRITE ABOUT: **{topic}**
+
+🔥 **TOPIC INTERPRETATION GUIDE - READ THIS CAREFULLY**:
+
+**CRITICAL**: When you see "Writing: Storytelling & Character Development":
+- This is ONE SINGLE TOPIC about Writing
+- "Storytelling & Character Development" are the SPECIFIC TECHNIQUES to cover within Writing
+- You must write ONE integrated lesson, NOT two separate lessons
+
+**WRONG APPROACH** ❌:
+```
+## Introduction
+(Introduction to Storytelling)
+## Core Techniques
+(Storytelling techniques)
+## Introduction
+(Introduction to Character Development)
+## Core Techniques
+(Character development techniques)
+```
+This is FRAGMENTED and WRONG. Never do this.
+
+**CORRECT APPROACH** ✅:
+```
+## Introduction
+Writing compelling narratives requires mastering storytelling structure and character development. These techniques work hand-in-hand to create engaging stories that resonate with readers...
+
+## Why It's Powerful
+(Explain why writing matters, mentioning both storytelling and character development)
+
+## Core Techniques / Creative Principles
+- **Storytelling**: Plot structure, conflict, pacing...
+- **Character Development**: Creating depth, character arcs, motivation...
+(Show how strong characters drive the story forward)
+
+## Real-Life Creative Process Examples
+(ONE example demonstrating both storytelling AND character development together)
+```
+
+**Key Rules**:
+1. Use your structure ONLY ONCE for the entire topic
+2. Within each section, naturally integrate ALL techniques mentioned
+3. Show how techniques work TOGETHER to create art
 
 Your job is to generate a *Reading Section* about **{topic}** that feels like a personal guide from a creative industry expert — full of insight, examples, and inspiration.
 
@@ -459,6 +675,48 @@ Start with markdown output about **{topic}** like this:
 🚨 CRITICAL INSTRUCTION: You MUST create educational content ONLY about the specific topic provided below. Do NOT write about any other topic.
 
 TOPIC YOU MUST WRITE ABOUT: **{topic}**
+
+🔥 **TOPIC INTERPRETATION GUIDE - READ THIS CAREFULLY**:
+
+**CRITICAL**: When you see "Startups: Funding & Growth Strategies":
+- This is ONE SINGLE TOPIC about Startups
+- "Funding & Growth Strategies" are the SPECIFIC STRATEGIES to cover within Startups
+- You must write ONE integrated lesson, NOT two separate lessons
+
+**WRONG APPROACH** ❌:
+```
+## Introduction
+(Introduction to Funding)
+## Core Concepts
+(Funding sources and rounds)
+## Introduction
+(Introduction to Growth Strategies)
+## Core Concepts
+(Growth tactics)
+```
+This is FRAGMENTED and WRONG. Never do this.
+
+**CORRECT APPROACH** ✅:
+```
+## Introduction
+Startups require both adequate funding and smart growth strategies to succeed. Understanding funding options and growth tactics together is crucial for building a sustainable business...
+
+## Real-World Relevance
+(Explain startup importance, covering both funding and growth)
+
+## Core Concepts and Frameworks
+- **Funding**: Bootstrapping, angel investors, VC rounds...
+- **Growth Strategies**: User acquisition, scaling, metrics...
+(Show how funding enables growth and growth attracts funding)
+
+## Case Study or Analogy
+(ONE startup example showing both funding decisions AND growth strategies)
+```
+
+**Key Rules**:
+1. Use your structure ONLY ONCE for the entire topic
+2. Within each section, naturally integrate ALL strategies mentioned
+3. Show how strategies are INTERCONNECTED in the startup journey
 
 Your task is to create a comprehensive **Reading Section** using **Markdown syntax** about **{topic}** that serves as a complete learning resource for aspiring entrepreneurs and business professionals.
 
@@ -512,6 +770,46 @@ Generate comprehensive, professionally-formatted content about **{topic}** that 
 🚨 CRITICAL INSTRUCTION: You MUST create educational content ONLY about the specific topic provided below. Do NOT write about any other topic.
 
 TOPIC YOU MUST WRITE ABOUT: **{topic}**
+
+🔥 **TOPIC INTERPRETATION GUIDE - READ THIS CAREFULLY**:
+
+**CRITICAL**: When you see "Personal Finance: Budgeting & Investing":
+- This is ONE SINGLE TOPIC about Personal Finance
+- "Budgeting & Investing" are the SPECIFIC ASPECTS to cover within Personal Finance
+- You must write ONE integrated lesson, NOT two separate lessons
+
+**WRONG APPROACH** ❌:
+```
+Introduction to Budgeting
+Core concepts of Budgeting
+Best practices for Budgeting
+Introduction to Investing
+Core concepts of Investing
+Best practices for Investing
+```
+This is FRAGMENTED and WRONG. Never do this.
+
+**CORRECT APPROACH** ✅:
+```
+## Introduction
+Personal Finance involves managing money effectively to build wealth and security. Budgeting and investing are two fundamental pillars that work together - budgeting helps you save money, which you then invest to grow wealth...
+
+## Core Concepts
+- **Budgeting**: Track income and expenses, set limits...
+- **Investing**: Put savings to work in assets that grow...
+(Explain how budgeting creates the foundation for investing)
+
+## Practical Examples
+(ONE example showing how someone budgets to free up money for investing)
+
+## Best Practices
+(Tips covering both budgeting AND investing together)
+```
+
+**Key Rules**:
+1. Use your structure ONLY ONCE for the entire topic
+2. Within each section, naturally integrate ALL aspects mentioned
+3. Show how aspects are INTERCONNECTED and build on each other
 
 Your task is to generate a **deep, clear, and adaptive markdown learning guide** EXCLUSIVELY about **{topic}**.
 

@@ -359,10 +359,9 @@ export async function generateReadingContent(user_input, setContent, options = {
 
   // Sanitize and prepare topics
   // Accept either string input (comma-separated) or an array of topic strings/objects
-  const topicsArray = Array.isArray(user_input) ? user_input : user_input
-    .split(',')
-    .map(t => t.trim())
-    .filter(t => t.length > 0);
+  // IMPORTANT: Do NOT split on commas - treat the entire string as a single topic
+  // Topics with commas (e.g., "JavaScript: Variables, Data Types & Operators") should remain intact
+  const topicsArray = Array.isArray(user_input) ? user_input : [user_input.trim()];
   const topics = topicsArray.slice(0, 10); // Limit to prevent abuse
 
   if (topics.length === 0) {
