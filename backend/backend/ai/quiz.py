@@ -30,11 +30,11 @@ B) [option]
 C) [option]
 D) [option]
 CORRECT: [A/B/C/D]
-EXPLANATION: [why correct]
+EXPLANATION: [brief explanation why correct - keep under 50 words]
 DIFFICULTY: [Beginner/Intermediate/Advanced]
 TOPIC: {topic}
 
-Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Test understanding and application. Keep questions clear and concise."""
+Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Test understanding and application. Keep questions clear and concise. Keep explanations brief."""
         else:
             prompt = f"""Generate 8 quiz questions about "{topic}".
 
@@ -45,11 +45,11 @@ B) [option]
 C) [option]
 D) [option]
 CORRECT: [A/B/C/D]
-EXPLANATION: [why correct]
+EXPLANATION: [brief explanation why correct - keep under 50 words]
 DIFFICULTY: [Beginner/Intermediate/Advanced]
 TOPIC: {topic}
 
-Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Cover key concepts, applications, and best practices. Keep clear and concise."""
+Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Cover key concepts, applications, and best practices. Keep questions clear and concise. Keep explanations brief."""
         
         headers = {'Content-Type': 'application/json'}
         data = {
@@ -61,7 +61,7 @@ Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Cover key concepts, appl
                 'temperature': 0.3,
                 'topK': 20,
                 'topP': 0.8,
-                'maxOutputTokens': 4096,  # start high; will reduce on later retries to avoid timeouts
+                'maxOutputTokens': 6144,  # Increased from 4096 to give more room for 8 questions
                 'stopSequences': []
             }
         }
@@ -79,11 +79,11 @@ Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Cover key concepts, appl
                     # On later attempts, progressively reduce output tokens and prompt slice to mitigate timeouts
                     adjusted_data = dict(data)
                     adjusted_config = dict(adjusted_data['generationConfig'])
-                    # Reduce tokens after 2nd attempt
+                    # Reduce tokens after 2nd attempt (but keep higher than before)
                     if attempt >= 2:
-                        adjusted_config['maxOutputTokens'] = 2048
+                        adjusted_config['maxOutputTokens'] = 4096
                     if attempt >= 4:
-                        adjusted_config['maxOutputTokens'] = 1536
+                        adjusted_config['maxOutputTokens'] = 3072
                     adjusted_data['generationConfig'] = adjusted_config
                     # If we have reading_content, shorten the slice on later attempts
                     if 'Generate 8 quiz questions' in prompt and reading_content:
@@ -131,22 +131,29 @@ Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Cover key concepts, appl
                         
                         # Handle MAX_TOKENS - content was cut off
                         if finish_reason == 'MAX_TOKENS':
-                            print(f"⚠️ MAX_TOKENS reached, response was truncated")
-                            # On first few attempts, retry with shorter prompt
-                            if attempt < max_retries - 2:
-                                print(f"   Retrying with adjusted parameters (attempt {attempt + 1}/{max_retries})...")
-                                time.sleep(2)
-                                continue
-                            # On last attempts, try to use partial content if it exists
+                            print(f"⚠️ MAX_TOKENS reached on attempt {attempt + 1}, response was truncated")
+                            # Check if we have usable partial content
                             if candidate.get('content', {}).get('parts'):
                                 partial_text = candidate['content']['parts'][0].get('text', '')
-                                if len(partial_text) > 200:
-                                    print(f"⚠️ Using partial content: {len(partial_text)} characters")
+                                # Count complete questions in partial content
+                                question_count = partial_text.count('QUESTION:')
+                                print(f"   Partial content: {len(partial_text)} chars, {question_count} questions")
+                                
+                                # If we have at least 5 complete questions, use it (even if not all 8)
+                                if question_count >= 5 and len(partial_text) > 500:
+                                    print(f"✅ Using partial content with {question_count} questions (sufficient)")
                                     return JsonResponse(response_data, safe=False)
-                            # If no usable partial content, return error
+                            
+                            # On first few attempts, retry with adjusted parameters
+                            if attempt < max_retries - 2:
+                                print(f"   Retrying with reduced token limit (attempt {attempt + 1}/{max_retries})...")
+                                time.sleep(2)
+                                continue
+                            
+                            # Last resort: return error if content is unusable
                             return JsonResponse({
                                 'error': 'Quiz generation incomplete - content too long',
-                                'details': 'The AI response was cut off. Try with a shorter topic or less reading content.',
+                                'details': 'The AI response was cut off and partial content is insufficient. Try with a shorter topic or less reading content.',
                                 'finishReason': finish_reason
                             }, status=500)
                         
