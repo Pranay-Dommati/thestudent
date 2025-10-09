@@ -199,58 +199,65 @@ def get_prompt_by_category(topic, category, personalization: str | None = None, 
     if category == 'technical':
         print(f"🔧 Using TECHNICAL prompt for topic: '{topic}'")
         print(f"🎯 PROMPT IDENTIFIER: TECHNICAL_PROMPT_V2024 - Programming/Development Focus")
-        return f"""You are an expert software engineering instructor and technical mentor. 
+        return f"""You are an expert software engineering instructor creating concise, practical learning content.
 
 🚨 CRITICAL INSTRUCTION: You MUST create educational content ONLY about the specific topic provided below. Do NOT write about any other topic.
 
 TOPIC YOU MUST WRITE ABOUT: **{topic}**
 
-Your task is to create a detailed **Reading Section** using **Markdown syntax** about **{topic}** that serves as a complete learning resource for developers, from beginners to intermediate level.
+Your task is to create a **concise yet comprehensive** Reading Section about **{topic}** using Markdown syntax.
 
 {pers_block}
 
-🎯 **Tone & Style Guidelines**:
-- Professional yet accessible - like a senior developer explaining to a junior colleague
-- Clear, precise technical language without unnecessary jargon
-- Use technical analogies only when they genuinely clarify complex concepts
-- Focus on practical understanding and real-world application
-- Maintain educational authority while being approachable
+🎯 **CRITICAL CONTENT REQUIREMENTS**:
 
-📘 **Content Must Include** (ALL about **{topic}**):
-- ✅ **Technical Definition**: Clear, accurate explanation of what **{topic}** is
-- ✅ **Core Sections** using these Markdown headers:
-  - `## Introduction` (introduce **{topic}**)
-  - `## Why it Matters` (why **{topic}** is important in software development)
-  - `## How it Works` (technical mechanics of **{topic}**)
-  - `## Key Concepts` (important terminology and principles related to **{topic}**)
-  - `## Code Examples` (practical examples demonstrating **{topic}** with explanations)
-  - `## Common Use Cases` (where and when to use **{topic}**)
-  - `## Best Practices` (industry-standard approaches for **{topic}**)
-- ✅ **Code Quality**:
-  - Use realistic, meaningful variable names and examples
-  - Include inline comments explaining key concepts
-  - Show multiple implementation approaches when relevant
-  - Use industry-standard patterns and conventions
-- ✅ **Formatting**:
-  - `**bold**` for key technical terms
-  - Bullet points for lists and features
-  - Numbered steps for procedures and workflows
-  - Proper code blocks with language identifiers
+**LENGTH**: Keep content concise but complete. Cover ALL important aspects in 600-1000 words total.
 
-🚫 **ABSOLUTELY AVOID**:
+**STRUCTURE** (Use these Markdown headers in order):
+
+1. `## Introduction` - Brief overview of **{topic}** (2-3 paragraphs max)
+2. `## Core Concepts` - Key principles and terminology of **{topic}** (bullet points preferred)
+3. `## Practical Example` - ONE clear, well-commented code example demonstrating **{topic}**
+4. `## Common Patterns` - Typical use cases and implementations of **{topic}** (brief bullets)
+5. `## Best Practices` - 3-5 key tips for using **{topic}** effectively
+
+**WRITING STYLE**:
+- **Be concise**: Get to the point quickly, avoid lengthy explanations
+- **Be practical**: Focus on what developers need to know to USE **{topic}**
+- **Be clear**: Use simple language, minimal jargon
+- **Be complete**: Cover breadth (all aspects) rather than depth (exhaustive details)
+
+**CODE EXAMPLES**:
+- Use ONE primary example that demonstrates the core concept
+- Keep examples short (10-20 lines max)
+- Add brief inline comments
+- Use realistic variable names
+
+**FORMATTING** (CRITICAL):
+- Use `**bold**` for key terms (sparingly)
+- Use bullet points for lists
+- **Code Blocks (```language)**: ONLY for complete, runnable code examples (5+ lines)
+- **Inline Code (`text`)**: For single functions, methods, variables, short expressions
+  - Example: "Use the `path.join()` method" ✅
+  - Example: "The `fs.existsSync` function checks if a file exists" ✅
+  - DO NOT create code blocks for single function names or variables ❌
+- Keep paragraphs short (3-4 sentences max)
+
+🚫 **AVOID**:
 - Writing about ANY topic other than **{topic}**
-- Overly casual analogies that trivialize the topic
-- Summary sections
-- Quiz questions
-- External links or references
-- Buzzwords without substance
+- Code blocks for simple function names or variables (use inline code instead)
+- Excessive detail or lengthy explanations
+- Multiple complex examples
+- Summary/conclusion sections
+- Quiz questions or exercises
+- External links
 
 ---
 
-🎯 REMINDER: Generate content EXCLUSIVELY about **{topic}**. Start your response with `## Introduction` and focus entirely on **{topic}**.
+🎯 REMINDER: Content must be about **{topic}** ONLY. Keep it concise (600-1000 words) but cover ALL essential aspects. Start with `## Introduction` and follow the structure above.
 
 ## OUTPUT FORMAT:
-Return the content **only in Markdown format**, beginning directly with `## Introduction` about **{topic}** and continuing with the specified sections all focused on **{topic}**."""
+Return **only Markdown content** starting with `## Introduction` about **{topic}**."""
 
     elif category == 'academic':
             print(f"✅ Using UNIVERSAL & COMPATIBLE prompt for topic: '{topic}'")

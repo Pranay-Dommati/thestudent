@@ -1847,6 +1847,15 @@ const ProLearningPage = () => {
     try {
       if (showLoader) setIsLoading(true);
       setLoadingStep(`Loading ${topicName} content...`);
+      
+      // CRITICAL FIX: Set progressive generation state immediately when loading topic
+      // This ensures the loading indicator shows on the tab right away
+      setIsProgressiveGenerating(true);
+      setProgressiveGenerationProgress({
+        topic: topicName,
+        tabType: 'reading', // Start with reading tab
+        status: 'loading'
+      });
 
       // Check if we should skip old cached content during fresh course creation
       const shouldSkipOld = shouldSkipOldCachedContent();

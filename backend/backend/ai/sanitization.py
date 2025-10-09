@@ -18,6 +18,7 @@ def sanitize_ai_content(text: str, category: str = 'general'):
         tuple: (sanitized_text, changes_dict)
         where changes_dict contains:
             - latex_removed: number of LaTeX removals
+            - bold_removed: number of excessive bold removals
             - inline_code_cleaned: number of excessive inline code removals
             - fences_sanitized: number of code fence conversions
             - indents_cleaned: number of indented blocks cleaned
@@ -26,6 +27,7 @@ def sanitize_ai_content(text: str, category: str = 'general'):
     if not isinstance(text, str) or not text.strip():
         return text, {
             'latex_removed': 0,
+            'bold_removed': 0,
             'inline_code_cleaned': 0,
             'fences_sanitized': 0,
             'indents_cleaned': 0,
@@ -35,26 +37,30 @@ def sanitize_ai_content(text: str, category: str = 'general'):
     # Step 1: Remove LaTeX syntax
     text, latex_changes = _strip_latex_syntax(text)
     
-    # Step 2: Remove excessive inline code (backticks around simple numbers/words)
+    # Step 2: Remove excessive bold markdown for academic content
+    text, bold_changes = _remove_excessive_bold(text, category)
+    
+    # Step 3: Remove excessive inline code (backticks around simple numbers/words)
     # For academic content, be VERY aggressive - remove almost all backticks
     text, inline_changes = _remove_excessive_inline_code(text, category)
     
-    # Step 3: Sanitize code fences
+    # Step 4: Sanitize code fences
     text, fence_changes = _sanitize_code_fences(text, category)
     
-    # Step 4: Clean indented blocks
+    # Step 5: Clean indented blocks
     text, indent_changes = _clean_indented_blocks(text)
     
-    # Step 5: Final safety - remove any remaining stray dollar signs
+    # Step 6: Final safety - remove any remaining stray dollar signs
     remaining_dollars = text.count('$')
     if remaining_dollars > 0:
         text = text.replace('$', '')
         latex_changes += 1
     
-    total_changes = latex_changes + inline_changes + fence_changes + indent_changes
+    total_changes = latex_changes + bold_changes + inline_changes + fence_changes + indent_changes
     
     changes_dict = {
         'latex_removed': latex_changes,
+        'bold_removed': bold_changes,
         'inline_code_cleaned': inline_changes,
         'fences_sanitized': fence_changes,
         'indents_cleaned': indent_changes,
@@ -119,6 +125,69 @@ def _clean_latex_commands(content: str):
     content = re.sub(r'\^-1', '⁻¹', content)
     content = content.replace('\\', '').replace('{', '').replace('}', '')
     return content
+
+
+def _remove_excessive_bold(text: str, category: str = 'general'):
+    """
+    Remove excessive bold markdown (**text**) for academic content.
+    
+    For ACADEMIC/MATH content: Remove bold from:
+    - Single words/terms (Hypotenuse, Opposite, Adjacent)
+    - Short phrases (SOH CAH TOA, sine, cosine, tangent)
+    - Ratios, formulas, theorem names
+    
+    Keep bold ONLY for:
+    - Important section emphasis (very sparingly)
+    - Critical warnings/notes
+    """
+    if not isinstance(text, str) or '**' not in text:
+        return text, 0
+    
+    replacements = 0
+    
+    # FOR ACADEMIC CONTENT - Remove most bold formatting
+    if category in ['academic', 'skills']:
+        # Pattern to match **text**
+        pattern = re.compile(r'\*\*([^*\n]+?)\*\*')
+        
+        def _should_keep_bold(content: str) -> bool:
+            """Determine if bold should be kept."""
+            content = content.strip()
+            
+            # Keep if empty
+            if not content:
+                return True
+            
+            # Remove bold from:
+            # - Single words (Hypotenuse, sine, cosine, tangent)
+            if len(content.split()) <= 3:
+                return False
+            
+            # - Common terms and ratios
+            math_terms = [
+                'opposite side', 'adjacent side', 'hypotenuse',
+                'sine', 'cosine', 'tangent', 'soh cah toa',
+                'pythagorean theorem', 'trigonometric ratios',
+                'right triangle', 'acute angle'
+            ]
+            if content.lower() in math_terms:
+                return False
+            
+            # Keep for longer important statements only
+            return True
+        
+        def _replace_bold(m):
+            nonlocal replacements
+            content = m.group(1)
+            
+            if not _should_keep_bold(content):
+                replacements += 1
+                return content  # Remove bold, keep text
+            return m.group(0)  # Keep bold
+        
+        text = pattern.sub(_replace_bold, text)
+    
+    return text, replacements
 
 
 def _remove_excessive_inline_code(text: str, category: str = 'general'):
@@ -240,7 +309,10 @@ def _remove_excessive_inline_code(text: str, category: str = 'general'):
 
 
 def _sanitize_code_fences(text: str, category_hint: str):
-    """Convert non-code fenced blocks to appropriate format."""
+    """
+    Convert non-code fenced blocks to appropriate format.
+    For TECHNICAL content: Convert single-word code blocks to inline code.
+    """
     if not isinstance(text, str) or '```' not in text:
         return text, 0
 
@@ -265,23 +337,58 @@ def _sanitize_code_fences(text: str, category_hint: str):
     def _replace(m):
         nonlocal replacements
         lang = (m.group(1) or '').strip().lower()
-        body = m.group(2)
+        body = m.group(2).strip()
         
+        # For TECHNICAL content: Convert single-line/single-word code blocks to inline code
+        if category_hint == 'technical':
+            lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+            
+            # If it's just one line - be VERY aggressive about converting to inline
+            if len(lines) == 1:
+                content = lines[0]
+                
+                # Single operators or short symbols (*, /, +, -, >, <, &&, ||, etc.)
+                if len(content) <= 3 and not code_keywords.search(content):
+                    replacements += 1
+                    return f"`{content}`"
+                
+                # ANY single-line content under 150 chars without programming keywords
+                # This catches: name, path(), urls.py, {% url 'hello' %}, etc.
+                if len(content) < 150:
+                    # If no programming keywords (def, class, function, etc.), convert to inline
+                    if not code_keywords.search(content):
+                        replacements += 1
+                        return f"`{content}`"
+        
+        # Keep if language specified and is a real programming language
         if lang and lang in real_code_langs:
             return m.group(0)
         
+        # Keep if likely programming code by keywords
         if code_keywords.search(body):
             return m.group(0)
         
+        # Otherwise transform to appropriate format
         replacements += 1
         lines = [ln.rstrip() for ln in body.splitlines() if ln.strip()]
         
         if not lines:
             return ""
         
-        math_pattern = re.compile(r'^[A-Za-z0-9_().,+\-*/=<>^%\s\\]+$')
+        # Check if content is mathematical/academic
+        math_pattern = re.compile(r'^[A-Za-z0-9_θπαβγδεζηλμρσωΔΣΩ().,+\-*/=<>^%\s\\≈°≤≥±√∞∫∑∏]+$')
         is_math = all(math_pattern.match(l) for l in lines if l.strip())
         
+        # For ACADEMIC/MATH content: Convert to plain text (no boxes, no backticks)
+        if category_hint in ['academic', 'skills'] and is_math:
+            # Single line: just return as plain text
+            if len(lines) == 1:
+                return f"\n{lines[0]}\n"
+            # Multiple lines: return as plain text lines
+            else:
+                return '\n' + '\n'.join(lines) + '\n'
+        
+        # For other content: use list format if math, blockquotes otherwise
         if is_math and len(lines) <= 5:
             return '\n' + '\n'.join([f"- `{l}`" for l in lines]) + '\n'
         else:
