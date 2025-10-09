@@ -187,12 +187,23 @@ const ProLearningPage = () => {
   const [generatingTopics, setGeneratingTopics] = useState([]);
 
   // Robust parser for topics passed in the URL query param "topic"
-  // - Keeps phrases like "Components, Props, and State" together
+  // - Handles new delimiter (|||) for multiple topics to avoid confusion with commas in topic names
+  // - Falls back to comma splitting for backward compatibility
+  // - Keeps phrases like "Components, Props, and State" together when using comma fallback
   // - Limits to 4 topics
   // - Trims whitespace and filters empties
   const parseTopicsFromParam = (param) => {
     if (!param || typeof param !== 'string') return [];
     const s = param.trim();
+    
+    // Check if using new delimiter (|||) - this is the preferred format
+    if (s.includes('|||')) {
+      const topics = s.split('|||').map(t => t.trim()).filter(Boolean);
+      // Limit to 4 topics
+      return topics.slice(0, 4);
+    }
+    
+    // Legacy format: comma-separated (less reliable for topics containing commas)
     // Fast path: no commas => single topic
     if (!s.includes(',')) return [s];
 
@@ -649,8 +660,8 @@ const ProLearningPage = () => {
       }
       
       // Step 3.5: If no stored/batch/db topics, but URL has topic(s), derive topics from URL
-      // IMPORTANT: Handle both multiple topics (comma-separated) and single-topic URLs
-      if (topicParam && topicParam.includes(',')) {
+      // IMPORTANT: Handle both multiple topics (||| or comma-separated) and single-topic URLs
+      if (topicParam && (topicParam.includes('|||') || topicParam.includes(','))) {
         try {
           const topicNames = parseTopicsFromParam(topicParam);
           if (topicNames.length > 1) { // Only if multiple topics in URL
@@ -1848,14 +1859,9 @@ const ProLearningPage = () => {
       if (showLoader) setIsLoading(true);
       setLoadingStep(`Loading ${topicName} content...`);
       
-      // CRITICAL FIX: Set progressive generation state immediately when loading topic
-      // This ensures the loading indicator shows on the tab right away
-      setIsProgressiveGenerating(true);
-      setProgressiveGenerationProgress({
-        topic: topicName,
-        tabType: 'reading', // Start with reading tab
-        status: 'loading'
-      });
+      // Note: We DON'T manually set progressiveGenerationProgress here because
+      // the actual generator's onProgress callback will set it correctly.
+      // Manually setting it creates a race condition with the generator's updates.
 
       // Check if we should skip old cached content during fresh course creation
       const shouldSkipOld = shouldSkipOldCachedContent();
@@ -3269,14 +3275,38 @@ const ProLearningPage = () => {
                   const sections = parseReadingSections(freshContent.reading);
                   setReadingSections(sections);
                   setReadingSectionIndex(0);
-                  // Immediately render raw reading without sanitization during progressive generation
+                  // Properly sanitize reading content before rendering
                   try {
-                    setSanitizedReading(String(freshContent.reading || ''));
+                    const sanitized = preSanitizeMarkdown(freshContent.reading);
+                    setSanitizedReading(sanitized);
                     setReadingRenderReady(true);
                     // Ensure content-topic association is set for immediate readiness checks
                     setContentTopicName(tabInfo.topic);
-                  } catch {}
+                    console.log('✨ [ON TAB COMPLETE] Reading sanitized and ready for:', tabInfo.topic);
+                  } catch (e) {
+                    console.error('❌ [ON TAB COMPLETE] Failed to sanitize reading:', e);
+                    // Fallback: set raw content
+                    setSanitizedReading(String(freshContent.reading || ''));
+                    setReadingRenderReady(true);
+                    setContentTopicName(tabInfo.topic);
+                  }
                 }
+                
+                // CRITICAL FIX: Clear the loading indicator for the completed tab
+                // Clear progressiveGenerationProgress to remove loading state
+                console.log(`🔓 [ON TAB COMPLETE] Clearing loading state for ${tabInfo.tabType} of ${tabInfo.topic}`);
+                setProgressiveGenerationProgress(prev => {
+                  // If this was the tab being tracked, clear it
+                  if (prev?.topic === tabInfo.topic && prev?.tabType === tabInfo.tabType) {
+                    console.log(`✅ [ON TAB COMPLETE] Cleared progress state for ${tabInfo.tabType}`);
+                    return {};
+                  }
+                  return prev;
+                });
+                
+                // Also clear isLoading state to ensure content can render immediately
+                setIsLoading(false);
+                setLoadingStep('');
               }
             } else if (!selectedTopic && topicsList?.length > 0 && (topicsList[0].name === tabInfo.topic || (topicsList[0] === tabInfo.topic))) {
               // If no selectedTopic yet, set it and hydrate

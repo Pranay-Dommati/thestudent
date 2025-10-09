@@ -1570,8 +1570,9 @@ const ChatbotPage = () => {
       const courseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       // Create the topic string for URL - extract just the names from objects
+      // Use ||| as delimiter to avoid confusion with commas inside topic names
       const topicNames = pendingTopics.map(topic => topic.name);
-      const topicString = topicNames.join(', ');
+      const topicString = topicNames.join('|||');
       // Confirmed topic names: topicNames
       // Generated course ID: courseId
       // Topic string for URL: topicString
