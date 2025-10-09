@@ -966,6 +966,59 @@ const ProLearningPage = () => {
       // This can happen when other tabs update (videos/resources/quiz). Preserve reading UI.
       debugLog('🛡️ [READING-PRESERVE-NONE] No reading field provided; preserving existing sanitized state');
     }
+    // Merge strategy: do NOT wipe existing non-empty tabs when partial updates arrive
+    const prev = content || {};
+    const merged = { ...prev };
+
+    const isNonEmptyString = (s) => typeof s === 'string' && s.trim().length > 0;
+    const isNonEmptyArray = (a) => Array.isArray(a) && a.length > 0;
+    const quizHasItems = (q) => {
+      if (Array.isArray(q)) return q.length > 0;
+      if (q && typeof q === 'object' && Array.isArray(q.questions)) return q.questions.length > 0;
+      return false;
+    };
+
+    // Reading: if provided, keep the adjusted newContent.reading; else preserve previous
+    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'reading')) {
+      merged.reading = newContent.reading;
+    }
+
+    // Summary: only overwrite if new has non-empty; else keep existing if it has content
+    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'summary')) {
+      merged.summary = isNonEmptyString(newContent.summary)
+        ? newContent.summary
+        : (isNonEmptyString(prev.summary) ? prev.summary : (newContent.summary || ''));
+    }
+
+    // Videos: only overwrite if new has items; else keep existing if it has items
+    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'videos')) {
+      merged.videos = isNonEmptyArray(newContent.videos)
+        ? newContent.videos
+        : (isNonEmptyArray(prev.videos) ? prev.videos : (newContent.videos || []));
+    }
+
+    // Quiz: support both array and object-with-questions; avoid wiping non-empty with empty
+    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'quiz')) {
+      merged.quiz = quizHasItems(newContent.quiz)
+        ? newContent.quiz
+        : (quizHasItems(prev.quiz) ? prev.quiz : (newContent.quiz || (prev.quiz || [])));
+    }
+
+    // Resources: reflect current state even if empty (so empty-state can render), and always keep metadata if provided
+    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'resources')) {
+      merged.resources = Array.isArray(newContent.resources) ? newContent.resources : (prev.resources || []);
+    }
+    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'resourcesMetadata')) {
+      merged.resourcesMetadata = newContent.resourcesMetadata || prev.resourcesMetadata || null;
+    }
+
+    // If newContent contains other keys (stats, metadata, etc.), shallow-merge them without clobbering known ones
+    if (newContent) {
+      for (const k of Object.keys(newContent)) {
+        if (!(k in merged)) merged[k] = newContent[k];
+      }
+    }
+
     // Log non-reading tabs lengths for traceability
     try {
       debugLog('🧩 [CONTENT-SET]', {
@@ -973,14 +1026,15 @@ const ProLearningPage = () => {
         topicParam,
         contentTopicName,
         selectedTopic: selectedTopic?.name,
-        readingLen: (newContent?.reading || '').length,
-        summaryLen: (newContent?.summary || '').length,
-        quizCount: Array.isArray(newContent?.quiz) ? newContent.quiz.length : (newContent?.quiz?.questions?.length || 0),
-        videosCount: Array.isArray(newContent?.videos) ? newContent.videos.length : 0,
-        resourcesCount: Array.isArray(newContent?.resources) ? newContent.resources.length : 0
+        readingLen: (merged?.reading || '').length,
+        summaryLen: (merged?.summary || '').length,
+        quizCount: Array.isArray(merged?.quiz) ? merged.quiz.length : (merged?.quiz?.questions?.length || 0),
+        videosCount: Array.isArray(merged?.videos) ? merged.videos.length : 0,
+        resourcesCount: Array.isArray(merged?.resources) ? merged.resources.length : 0
       });
     } catch {}
-    setContent(newContent);
+
+    setContent(merged);
   };
 
   // State-gated sanitized reading to ensure we never paint raw content
@@ -1557,6 +1611,12 @@ const ProLearningPage = () => {
   const isTopicBlocked = (topicName) => {
     // In reload mode (content already saved in DB), never block topics
     if (loadScenario === 'reload') return false;
+    // Also never block if this course was opened via a DB ID (UUID-style) link
+    try {
+      const cid = typeof window !== 'undefined' ? (window.location.pathname.split('/')[2] || '') : '';
+      const isDbCourse = !!cid && !cid.startsWith('course_');
+      if (isDbCourse) return false;
+    } catch {}
 
     if (!topicsList || topicsList.length === 0) return false;
 
@@ -2114,10 +2174,15 @@ const ProLearningPage = () => {
             if ((storedContent.resources?.length > 0) || (storedContent.resourcesMetadata?.generatedAt)) availableTabs.push('resources');
             
             if (availableTabs.length > 0) {
-              setAvailableTabsForTopics(prev => ({
-                ...prev,
-                [topicName]: availableTabs
-              }));
+              setAvailableTabsForTopics(prev => {
+                const prevTabs = prev[topicName] || [];
+                const same = prevTabs.length === availableTabs.length && prevTabs.every((t, i) => t === availableTabs[i]);
+                if (same) return prev;
+                return {
+                  ...prev,
+                  [topicName]: availableTabs
+                };
+              });
               console.log('🎯 Updated tabs for selected topic:', topicName, availableTabs);
             }
           }
@@ -3593,9 +3658,11 @@ const ProLearningPage = () => {
     if (tabUrlSyncPendingRef.current) return; // Skip while a local sync is pending
 
     const requestedTab = searchParams.get('tab') || 'reading';
+    // Detect DB-style course (UUID) where we should not enforce progressive gating
+    const isDbCourse = !!courseId && !String(courseId).startsWith('course_');
 
     // In progressive mode, only allow tabs that are ready for the selected topic
-    if (useProgressiveGeneration) {
+    if (useProgressiveGeneration && !(loadScenario === 'reload' || isDbCourse)) {
       const topicName = selectedTopic.name;
       const ready = [...(availableTabsForTopics[topicName] || [])];
       // Treat already-loaded content as ready ONLY if it belongs to this topic
@@ -3604,7 +3671,17 @@ const ProLearningPage = () => {
         if (content.summary && !ready.includes('summary')) ready.push('summary');
         if ((content.videos?.length || 0) > 0 && !ready.includes('videos')) ready.push('videos');
         if (((Array.isArray(content.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0)) && !ready.includes('quiz')) ready.push('quiz');
-        if ((content.resources?.length || 0) > 0 && !ready.includes('resources')) ready.push('resources');
+        // Consider resources ready if array has items OR metadata indicates generation completion
+        const otherTabsPresent = (
+          (!!content?.reading && String(content.reading).trim().length > 0) ||
+          (!!content?.summary && String(content.summary).trim().length > 0) ||
+          (Array.isArray(content?.videos) && content.videos.length > 0) ||
+          (Array.isArray(content?.quiz) && content.quiz.length > 0) ||
+          (!!content?.quiz?.questions && Array.isArray(content?.quiz?.questions) && content.quiz.questions.length > 0)
+        );
+        const resourcesReady = ((content.resources?.length || 0) > 0) || !!content?.resourcesMetadata?.generatedAt;
+        if (resourcesReady && !ready.includes('resources')) ready.push('resources');
+        // Not adding reload fallback here because this branch is strictly for active progressive gating
       }
 
       // If the requested tab isn't ready (or nothing is ready yet), force a valid fallback
@@ -3635,14 +3712,15 @@ const ProLearningPage = () => {
     const topicName = selectedTopic?.name;
     if (!topicName) return;
 
-    const readyTabs = availableTabsForTopics[topicName] || [];
+    const readyTabs = [...(availableTabsForTopics[topicName] || [])];
     // Consider content already loaded as ready as well
     if (content) {
       if (content.reading && !readyTabs.includes('reading')) readyTabs.push('reading');
       if (content.summary && !readyTabs.includes('summary')) readyTabs.push('summary');
       if ((content.videos?.length || 0) > 0 && !readyTabs.includes('videos')) readyTabs.push('videos');
       if ((content.quiz?.length || 0) > 0 && !readyTabs.includes('quiz')) readyTabs.push('quiz');
-      if ((content.resources?.length || 0) > 0 && !readyTabs.includes('resources')) readyTabs.push('resources');
+      const resourcesReady = ((content.resources?.length || 0) > 0) || !!content?.resourcesMetadata?.generatedAt;
+      if (resourcesReady && !readyTabs.includes('resources')) readyTabs.push('resources');
     }
 
     if (readyTabs.length === 0) return;
@@ -3652,6 +3730,9 @@ const ProLearningPage = () => {
     const firstTopicName = topicsList?.[0]?.name || topicsList?.[0];
     const isFirstTopic = topicName === firstTopicName;
     if (!isFirstTopic && isProgressiveGenerating && !allTopicsGenerated) return;
+    // In reload/DB mode, avoid auto-switching away from a user-selected tab
+    const isDbCourse = !!courseId && !String(courseId).startsWith('course_');
+    if (loadScenario === 'reload' || isDbCourse) return;
 
     // If the current tab isn't ready, switch to the first ready tab
     if (!readyTabs.includes(activeTab)) {
@@ -5620,6 +5701,12 @@ const ProLearningPage = () => {
       case 'resources':
         // Resources Renderer: Grid of resource cards with icons and descriptions
         // Check if resources generation has COMPLETED (metadata.generatedAt exists)
+        // Also detect DB course IDs to allow empty-state rendering on revisits
+        let isDbCourse = false;
+        try {
+          const cid = typeof window !== 'undefined' ? (window.location.pathname.split('/')[2] || '') : '';
+          isDbCourse = !!cid && !cid.startsWith('course_');
+        } catch {}
         let resourcesGenerationCompleted = content?.resourcesMetadata?.generatedAt;
         
         // Legacy support: if older stored course has resources array but no metadata at all, treat as completed
@@ -5629,7 +5716,7 @@ const ProLearningPage = () => {
         
         // Reload mode safety: if we're in reload mode and resourcesMetadata is missing but other tabs exist,
         // assume resources generation previously completed with zero results so we can show the empty state.
-        if (!resourcesGenerationCompleted && loadScenario === 'reload' && !content?.resourcesMetadata) {
+        if (!resourcesGenerationCompleted && (loadScenario === 'reload' || isDbCourse) && !content?.resourcesMetadata) {
           const otherTabsPresent = !!(content?.reading || content?.summary || (Array.isArray(content?.videos) && content.videos.length > 0) || (Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0));
           if (otherTabsPresent) {
             resourcesGenerationCompleted = true;
@@ -5843,7 +5930,18 @@ const ProLearningPage = () => {
                         (tab.id === 'videos' && Array.isArray(content?.videos) && content.videos.length > 0) ||
                         (tab.id === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
                         // Treat resources as ready if array has items OR metadata indicates completion
-                        (tab.id === 'resources' && ((Array.isArray(content?.resources) && content.resources.length > 0) || !!content?.resourcesMetadata?.generatedAt))
+                        (tab.id === 'resources' && (
+                          (Array.isArray(content?.resources) && content.resources.length > 0) ||
+                          !!content?.resourcesMetadata?.generatedAt ||
+                          // Reload/DB mode fallback: if other tabs exist, allow clicking to show empty state
+                          (loadScenario === 'reload' && (
+                            (!!content?.reading && String(content.reading).trim().length > 0) ||
+                            (!!content?.summary && String(content.summary).trim().length > 0) ||
+                            (Array.isArray(content?.videos) && content.videos.length > 0) ||
+                            (Array.isArray(content?.quiz) && content.quiz.length > 0) ||
+                            (!!content?.quiz?.questions && Array.isArray(content?.quiz?.questions) && content.quiz.questions.length > 0)
+                          ))
+                        ))
                       );
 
                       // Check if tab content is available for progressive generation
@@ -5853,11 +5951,23 @@ const ProLearningPage = () => {
                         // Reading-first rule: require reading to be ready before exposing other tabs while generating
                         const readingReady = ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes('reading')) ||
                           (content && contentTopicName === currentTopicName && typeof content.reading === 'string' && content.reading.trim().length > 0));
+                        // In reload/DB mode, if other tabs exist, let users click Resources to see the empty-state UI
+                        const otherTabsPresent = (
+                          (!!content?.reading && String(content.reading).trim().length > 0) ||
+                          (!!content?.summary && String(content.summary).trim().length > 0) ||
+                          (Array.isArray(content?.videos) && content.videos.length > 0) ||
+                          (Array.isArray(content?.quiz) && content.quiz.length > 0) ||
+                          (!!content?.quiz?.questions && Array.isArray(content?.quiz?.questions) && content.quiz.questions.length > 0)
+                        );
 
                         if (currentTopicBlocked) {
                           isTabAvailable = false;
                         } else {
                           isTabAvailable = ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes(tab.id)) || hasTabContent);
+                          // Relax gating for Resources in reload mode so users can see the empty state
+                          if (!isTabAvailable && loadScenario === 'reload' && tab.id === 'resources' && otherTabsPresent) {
+                            isTabAvailable = true;
+                          }
                           if ((isProgressiveGenerating) && tab.id !== 'reading' && !readingReady) {
                             isTabAvailable = false;
                           }
