@@ -761,7 +761,7 @@ const ProLearningPage = () => {
   // Lightweight client-side pre-sanitizer to avoid initial flash of bad fences/math
   // Notes:
   // - Preserves real code blocks (has a language or typical code patterns)
-  // - Converts language-less tiny fenced tokens to inline math ($x$)
+  // - Converts language-less tiny fenced tokens to inline code (`x`) instead of math
   // - Converts short, non-code fenced blocks to simple bullet lines
   // - Falls back to blockquotes for other non-code fenced blocks
   const preSanitizeMarkdown = (md) => {
@@ -773,6 +773,9 @@ const ProLearningPage = () => {
 
       // Helpers
       const isLikelyProgramming = (s) => /[{;}]|<\w|<\/|=>|\bdef\b|\bclass\b|\bfunction\b|\bconst\b|\blet\b|\bvar\b|#include|\bimport\b\s|\bfrom\b\s|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bBEGIN\b|\bEND\b|^\s{2,}\S/m.test(s);
+      const realCodeLangs = new Set([
+        'python','py','javascript','js','typescript','ts','java','c','cpp','c++','c#','cs','csharp','go','rust','rb','ruby','swift','kotlin','php','r','matlab','octave','bash','sh','shell','powershell','ps1','sql','html','xml','json','yaml','yml','toml','css','scss','less','jsx','tsx'
+      ]);
       const isMathLike = (s) => {
         const t = (s || '').trim();
         if (!t) return false;
@@ -795,6 +798,7 @@ const ProLearningPage = () => {
         const langLower = lang.toLowerCase();
         const mathLang = /^(math|latex|tex|katex|equation|formula)$/i.test(langLower);
         const likelyProg = isLikelyProgramming(content);
+        const realLang = realCodeLangs.has(langLower);
         const likelyMath = mathLang || isMathLike(content) || (!likelyProg && /^(code|text)?$/.test(langLower) && isMathLike(content));
 
         // Convert math-like fenced content (even if labeled 'code') to KaTeX-friendly math
@@ -803,29 +807,29 @@ const ProLearningPage = () => {
           return isMulti ? `$$\n${content}\n$$` : `$${content}$`;
         }
 
-        // Keep real programming code as-is
-        if (likelyProg || lang) return m;
+        // Keep real programming code as-is (only for real languages or strong code patterns)
+        if (likelyProg || realLang) return m;
 
-        // Tiny single token -> inline math
-        const tiny = content.replace(/\s+/g, ' ').trim();
-        if (tiny.length > 0 && tiny.length <= 5 && !/\s/.test(tiny) && /^[A-Za-z0-9()+\-/*=^_.,]+$/.test(tiny)) {
-          return `$${tiny}$`;
-        }
-
+        // Otherwise, treat as non-code educational content. Prefer inline code for single-line tokens.
         const lines = content.split(/\n+/).map(l => l.trim()).filter(Boolean);
-        // If all lines look mathy, render as display math
-        if (lines.length > 0 && lines.every(isMathLike)) {
-          return `$$\n${lines.join(' \\ \n')}\n$$`;
+        if (lines.length === 1) {
+          const token = lines[0];
+          // Single short token -> inline code
+          if (token.length <= 80 && !/\n/.test(token)) {
+            return `\`${token}\``;
+          }
+          // Fallback: blockquote single line
+          return `> ${token}`;
         }
+        // 2-3 very short lines -> simple bullet list (use inline code per line when token-like)
         if (lines.length <= 3 && lines.every(l => l.length <= 80)) {
-          // short non-code block -> bullets
-          return lines.map(l => `- ${l}`).join('\n');
+          return lines.map(l => (/^[-A-Za-z0-9_]+$/.test(l) ? `- \`${l}\`` : `- ${l}`)).join('\n');
         }
-        // default non-code block -> blockquote
+        // Default: blockquote
         return lines.map(l => `> ${l}`).join('\n');
       });
 
-      // Convert very short inline backtick tokens to inline math
+      // Do NOT auto-convert inline backticks to math; keep inline code unless it's clearly math
       out = out.replace(/`([^`]+)`/g, (m, tok) => {
         const t = tok.trim();
         if (isMathLike(t)) {
@@ -4423,10 +4427,17 @@ const ProLearningPage = () => {
                         return '';
                       };
                       const codeString = flattenText(children).replace(/\n$/, "");
+                      // If it's a single short token that doesn't look like programming, render as inline code (not a block)
+                      const singleLine = !/\n/.test(codeString);
+                      const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
+                      if (singleLine && codeString.trim().length <= 80 && !looksLikeProgramming && !lang) {
+                        return (
+                          <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border inline-block" {...props}>{codeString}</code>
+                        );
+                      }
                       // If current topic is math-related and this doesn't look like programming, render as plain text block
                       const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
                       const isMathTopic = isMathTopicName(currentTopicName);
-                      const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
                       if (isMathTopic && !looksLikeProgramming) {
                         return (
                           <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-base leading-7 whitespace-pre text-gray-800">
@@ -4645,10 +4656,17 @@ const ProLearningPage = () => {
                           return '';
                         };
                         const codeString = flattenText(children).replace(/\n$/, "");
+                        // If it's a single short token that doesn't look like programming, render as inline code (not a block)
+                        const singleLine = !/\n/.test(codeString);
+                        const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
+                        if (singleLine && codeString.trim().length <= 80 && !looksLikeProgramming && !lang) {
+                          return (
+                            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border inline-block" {...props}>{codeString}</code>
+                          );
+                        }
                         // If current topic is math-related and this doesn't look like programming, render as plain text block
                         const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
                         const isMathTopic = isMathTopicName(currentTopicName);
-                        const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
                         if (isMathTopic && !looksLikeProgramming) {
                           return (
                             <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-base leading-7 whitespace-pre text-gray-800">
