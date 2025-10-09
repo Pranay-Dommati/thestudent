@@ -1,6 +1,7 @@
 from django.http import JsonResponse
 from django.conf import settings
 import requests
+import requests.exceptions as req_exc
 import json
 
 def handle_quiz(request):
@@ -60,7 +61,7 @@ Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Cover key concepts, appl
                 'temperature': 0.3,
                 'topK': 20,
                 'topP': 0.8,
-                'maxOutputTokens': 4096,  # Increased from 2048 to allow longer quiz content
+                'maxOutputTokens': 4096,  # start high; will reduce on later retries to avoid timeouts
                 'stopSequences': []
             }
         }
@@ -75,7 +76,38 @@ Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Cover key concepts, appl
                 try:
                     model_name = 'gemini-2.5-flash' if '2.5-flash' in model_url else 'gemini-2.0-flash'
                     print(f"🔑 Calling {model_name} Quiz API (attempt {attempt + 1}/{max_retries})")
-                    response = requests.post(f'{model_url}?key={GEMINI_API_KEY}', headers=headers, data=json.dumps(data), timeout=30)
+                    # On later attempts, progressively reduce output tokens and prompt slice to mitigate timeouts
+                    adjusted_data = dict(data)
+                    adjusted_config = dict(adjusted_data['generationConfig'])
+                    # Reduce tokens after 2nd attempt
+                    if attempt >= 2:
+                        adjusted_config['maxOutputTokens'] = 2048
+                    if attempt >= 4:
+                        adjusted_config['maxOutputTokens'] = 1536
+                    adjusted_data['generationConfig'] = adjusted_config
+                    # If we have reading_content, shorten the slice on later attempts
+                    if 'Generate 8 quiz questions' in prompt and reading_content:
+                        if attempt >= 2:
+                            short_prompt = prompt.replace(reading_content[:2000], reading_content[:1200])
+                            adjusted_data['contents'] = [{
+                                'role': 'user',
+                                'parts': [{'text': short_prompt}]
+                            }]
+                        if attempt >= 4:
+                            shorter_prompt = prompt.replace(reading_content[:2000], reading_content[:800])
+                            adjusted_data['contents'] = [{
+                                'role': 'user',
+                                'parts': [{'text': shorter_prompt}]
+                            }]
+
+                    # Increase timeout to reduce spurious read timeouts on larger responses
+                    timeout_seconds = 60 if attempt >= 1 else 45
+                    response = requests.post(
+                        f'{model_url}?key={GEMINI_API_KEY}',
+                        headers=headers,
+                        data=json.dumps(adjusted_data),
+                        timeout=timeout_seconds
+                    )
 
                     if response.status_code == 200:
                         print("✅ Gemini Quiz API call successful")
@@ -158,6 +190,15 @@ Mix difficulty: 3 beginner, 3 intermediate, 2 advanced. Cover key concepts, appl
                         if attempt < max_retries - 1:
                             time.sleep(2)
                             continue
+                except req_exc.ReadTimeout as rt_err:
+                    # Specific handling for read timeouts with exponential backoff + jitter
+                    base_delay = 2 ** attempt
+                    jitter = random.uniform(0.5, 1.5)
+                    delay = min(base_delay * jitter, 20)
+                    print(f"⏳ Quiz API ReadTimeout on {model_name} (attempt {attempt + 1}/{max_retries}), retrying in {delay:.1f}s...")
+                    if attempt < max_retries - 1:
+                        time.sleep(delay)
+                        continue
                 except Exception as api_error:
                     print(f"❌ Quiz API exception: {str(api_error)}")
                     if attempt < max_retries - 1:

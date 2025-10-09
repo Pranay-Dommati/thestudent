@@ -944,11 +944,16 @@ const ProLearningPage = () => {
         });
         setSanitizedReading(sanitized);
         setReadingRenderReady(true);
+        try {
+          const currentTopic = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || null;
+          setSanitizedReadingTopicName(currentTopic);
+        } catch {}
       } else {
         // Empty reading coming in
         console.log('⚪ [READING-EMPTY] No reading in payload', { source: sourceLabel });
         setSanitizedReading('');
         setReadingRenderReady(false);
+        setSanitizedReadingTopicName(null);
       }
     } else {
       // No reading field provided
@@ -956,6 +961,7 @@ const ProLearningPage = () => {
         console.log('⚪ [READING-NONE] No reading field present and none exists', { source: sourceLabel });
         setSanitizedReading('');
         setReadingRenderReady(false);
+        setSanitizedReadingTopicName(null);
       }
     }
     // Log non-reading tabs lengths for traceability
@@ -978,6 +984,8 @@ const ProLearningPage = () => {
   // State-gated sanitized reading to ensure we never paint raw content
   const [sanitizedReading, setSanitizedReading] = useState('');
   const [readingRenderReady, setReadingRenderReady] = useState(false);
+  // Track which topic the sanitized reading belongs to, to avoid readiness mismatches
+  const [sanitizedReadingTopicName, setSanitizedReadingTopicName] = useState(null);
   // Note: Sanitization is now handled immediately in setContentWithSanitization helper
   // No useEffect needed since sanitization happens synchronously when content is set
 
@@ -986,6 +994,7 @@ const ProLearningPage = () => {
     if (!selectedTopic?.name) return;
     setReadingRenderReady(false);
     setSanitizedReading('');
+    setSanitizedReadingTopicName(null);
   }, [selectedTopic?.name]);
 
   // Derived: does any topic have any generated tab available?
@@ -1921,7 +1930,11 @@ const ProLearningPage = () => {
             ? {
                 reading: content.reading, // preserve first displayed reading
                 summary: formattedContent.summary || content.summary || '',
-                quiz: (Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) ? formattedContent.quiz : (content.quiz || []),
+                // Quiz can be array or object with questions
+                quiz: (
+                  (Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) ||
+                  (formattedContent?.quiz && Array.isArray(formattedContent.quiz.questions) && formattedContent.quiz.questions.length > 0)
+                ) ? formattedContent.quiz : (content.quiz || []),
                 videos: (Array.isArray(formattedContent.videos) && formattedContent.videos.length > 0) ? formattedContent.videos : (content.videos || []),
                 resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0) ? formattedContent.resources : (content.resources || []),
                 resourcesMetadata: formattedContent.resourcesMetadata || content.resourcesMetadata || null  // ← PRESERVE METADATA
@@ -3263,6 +3276,7 @@ const ProLearningPage = () => {
                     const sanitized = preSanitizeMarkdown(freshContent.reading);
                     setSanitizedReading(sanitized);
                     setReadingRenderReady(true);
+                    setSanitizedReadingTopicName(tabInfo.topic);
                     // Ensure content-topic association is set for immediate readiness checks
                     setContentTopicName(tabInfo.topic);
                     console.log('✨ [ON TAB COMPLETE] Reading sanitized and ready for:', tabInfo.topic);
@@ -3271,6 +3285,7 @@ const ProLearningPage = () => {
                     // Fallback: set raw content
                     setSanitizedReading(String(freshContent.reading || ''));
                     setReadingRenderReady(true);
+                    setSanitizedReadingTopicName(tabInfo.topic);
                     setContentTopicName(tabInfo.topic);
                   }
                 }
@@ -3780,7 +3795,14 @@ const ProLearningPage = () => {
                     case 'reading': return typeof content === 'string' && content.trim().length > 0;
                     case 'summary': return typeof content === 'string' && content.trim().length > 0;
                     case 'videos': return Array.isArray(content) && content.length > 0;
-                    case 'quiz': return Array.isArray(content) && content.length > 0;
+                    case 'quiz': {
+                      // Accept both shapes: array or object with questions array
+                      if (Array.isArray(content)) return content.length > 0;
+                      if (content && typeof content === 'object') {
+                        return Array.isArray(content.questions) && content.questions.length > 0;
+                      }
+                      return false;
+                    }
                     case 'resources': {
                       // Resources content is {resources: [...], resourcesMetadata: {...}}
                       if (Array.isArray(content)) {
@@ -3840,6 +3862,8 @@ const ProLearningPage = () => {
               // All progressive content generation completed!
               setIsProgressiveGenerating(false);
               setAllTopicsGenerated(true);
+              // Clear any 'fresh' batch marker so tabs are not blocked after completion
+              try { if (typeof localStorage !== 'undefined') localStorage.removeItem('proLearning_batchMarker'); } catch {}
               
               // Auto-save for progressive generation completion
               console.log('🚀 Progressive generation completed, triggering auto-save...');
@@ -4098,8 +4122,8 @@ const ProLearningPage = () => {
     // Client-side reading readiness (strict): require sanitized content for current topic
     const readingClientReadyForCurrentTopic = (
       activeTab === 'reading' &&
-      contentTopicName === currentTopicName &&
-      !!readingRenderReady && typeof sanitizedReading === 'string' && sanitizedReading.trim().length > 0
+      sanitizedReadingTopicName === currentTopicName &&
+      typeof sanitizedReading === 'string' && sanitizedReading.trim().length > 0
     );
     
     // CRITICAL: Check if current topic is blocked (2nd topic onwards until course completion)
@@ -4111,23 +4135,30 @@ const ProLearningPage = () => {
     // Show loading thoughtfully: in progressive mode, enforce reading-first for non-first topics
     if (useProgressiveGeneration) {
       const readyTabs = (currentTopicName && availableTabsForTopics[currentTopicName]) || [];
-      const hasAnyContent = !!content && contentTopicName === currentTopicName && (
+      const hasAnyContent = (
+        // Reading content presence should be determined by sanitized association, not contentTopicName
+        readingClientReadyForCurrentTopic ||
+        // Other tabs still require content to belong to this topic
+        (!!content && contentTopicName === currentTopicName && (
         // For reading, treat as content only if client-sanitized is ready
-        (readingClientReadyForCurrentTopic) ||
         (content.summary && content.summary.trim()) ||
         ((content.videos?.length || 0) > 0) ||
         ((Array.isArray(content.quiz) ? content.quiz.length : (content.quiz?.questions?.length || 0)) > 0) ||
         ((content.resources?.length || 0) > 0)
+        ))
       );
       if (isBatchGenerating) return <LoadingComponent />;
       // Only treat active tab as ready if its content belongs to this topic
-      const activeHasContent = (contentTopicName === currentTopicName) && (
-        // Require sanitized readiness for reading tab
+      const activeHasContent = (
+        // Reading tab uses sanitized association, independent of contentTopicName resets
         (activeTab === 'reading' && readingClientReadyForCurrentTopic) ||
-        (activeTab === 'summary' && !!content?.summary) ||
-        (activeTab === 'videos' && (content?.videos?.length || 0) > 0) ||
-        (activeTab === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
-        (activeTab === 'resources' && (content?.resources?.length || 0) > 0)
+        // Other tabs require the content to belong to current topic
+        ((contentTopicName === currentTopicName) && (
+          (activeTab === 'summary' && !!content?.summary) ||
+          (activeTab === 'videos' && (content?.videos?.length || 0) > 0) ||
+          (activeTab === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
+          (activeTab === 'resources' && (content?.resources?.length || 0) > 0)
+        ))
       );
       // Allow non-reading tabs (e.g., Summary) to render as soon as they are ready,
       // even if Reading for later topics hasn't finished yet.
@@ -4353,13 +4384,13 @@ const ProLearningPage = () => {
             </div>
             {/* Enhanced Content with better typography, all content together */}
             <div className="prose prose-lg max-w-none">
-              {readingRenderReady && sanitizedReading ? (
+              {sanitizedReading && sanitizedReading.trim().length > 0 ? (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm, remarkMath]}
                   rehypePlugins={[rehypeKatex]}
                   components={{
                     h1: ({children}) => (
-                      <h1 className="text-3xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      <h1 className="text-3xl font-bold mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                         {children}
                       </h1>
                     ),
@@ -4583,13 +4614,13 @@ const ProLearningPage = () => {
                 </ReactMarkdown>
               ) : (
                 // Fallback: waiting state or missing sanitized content
-                readingRenderReady && sanitizedReading ? (
+                sanitizedReading && sanitizedReading.trim().length > 0 ? (
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
                     rehypePlugins={[rehypeKatex]}
                     components={{
                       h1: ({children}) => (
-                        <h1 className="text-3xl font-bold text-gray-900 mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        <h1 className="text-3xl font-bold mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                           {children}
                         </h1>
                       ),
@@ -4807,7 +4838,7 @@ const ProLearningPage = () => {
                   >
                     {sanitizedReading}
                   </ReactMarkdown>
-                  ) : (isLoading || (content && content.reading && !readingRenderReady)) ? (
+                  ) : (isLoading || (content && content.reading && (!sanitizedReading || !sanitizedReading.trim().length))) ? (
                   <div className="text-center py-12">
                     <div className="inline-flex items-center px-6 py-3 bg-blue-50 rounded-lg">
                       <BiLoaderAlt className="animate-spin text-blue-600 mr-3" />
@@ -4992,10 +5023,17 @@ const ProLearningPage = () => {
                       );
                     }
                     const codeString = String(children).replace(/\n$/, "");
+                    // Convert single short non-programming, language-less blocks to inline code
+                    const singleLine = !/\n/.test(codeString);
+                    const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
+                    if (singleLine && codeString.trim().length <= 80 && !looksLikeProgramming && !lang) {
+                      return (
+                        <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border inline-block" {...props}>{codeString}</code>
+                      );
+                    }
                     // If current topic is math-related and this doesn't look like programming, render as plain text block
                     const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
                     const isMathTopic = isMathTopicName(currentTopicName);
-                    const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
                     if (isMathTopic && !looksLikeProgramming) {
                       return (
                         <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-base leading-7 whitespace-pre text-gray-800">
@@ -5763,8 +5801,6 @@ const ProLearningPage = () => {
                       let isTabAvailable = true;
                       if (useProgressiveGeneration) {
                         // Progressive gating per topic: if the topic is blocked (no tabs ready yet), keep hidden; otherwise allow ready tabs.
-                        let fresh = false;
-                        try { if (typeof localStorage !== 'undefined') fresh = !!localStorage.getItem('proLearning_batchMarker'); } catch {}
                         // Reading-first rule: require reading to be ready before exposing other tabs while generating
                         const readingReady = ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes('reading')) ||
                           (content && contentTopicName === currentTopicName && typeof content.reading === 'string' && content.reading.trim().length > 0));
@@ -5773,7 +5809,7 @@ const ProLearningPage = () => {
                           isTabAvailable = false;
                         } else {
                           isTabAvailable = ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes(tab.id)) || hasTabContent);
-                          if ((isProgressiveGenerating || fresh) && tab.id !== 'reading' && !readingReady) {
+                          if ((isProgressiveGenerating) && tab.id !== 'reading' && !readingReady) {
                             isTabAvailable = false;
                           }
                         }
@@ -5788,7 +5824,6 @@ const ProLearningPage = () => {
                             currentTopicBlocked,
                             readingReady,
                             isProgressiveGenerating,
-                            fresh,
                             availableTabsForTopic: availableTabsForTopics[currentTopicName] || []
                           });
                         }
