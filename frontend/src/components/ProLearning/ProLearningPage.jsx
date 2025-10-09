@@ -450,7 +450,8 @@ const ProLearningPage = () => {
                 if (storedContent.summary) availableTabs.push('summary');
                 if (storedContent.videos?.length > 0) availableTabs.push('videos');
                 if (storedContent.quiz?.length > 0 || (storedContent.quiz?.questions?.length > 0)) availableTabs.push('quiz');
-                if (storedContent.resources?.length > 0) availableTabs.push('resources');
+                // Consider resources generation complete if metadata.generatedAt exists (even with 0 results)
+                if ((storedContent.resources?.length > 0) || (storedContent.resourcesMetadata?.generatedAt)) availableTabs.push('resources');
                 
                 if (availableTabs.length > 0) {
                   tabsMap[topic.name] = availableTabs;
@@ -1591,11 +1592,17 @@ const ProLearningPage = () => {
     try {
       const id = getCourseId();
       const stored = id ? contentStorageService.getContentByTopicName(topicName, id) : null;
+      
+      // Check for resources generation completion (not necessarily having resources)
+      // If metadata.generatedAt exists, resources generation completed (even if 0 results)
+      const resourcesCompleted = stored?.resourcesMetadata?.generatedAt || 
+        (Array.isArray(stored?.resources) && stored.resources.length > 0);
+      
       const hasFull = stored && typeof stored.reading === 'string' && stored.reading.trim() &&
         typeof stored.summary === 'string' && stored.summary.trim() &&
         Array.isArray(stored.videos) && stored.videos.length > 0 &&
         (Array.isArray(stored.quiz) ? stored.quiz.length > 0 : (stored?.quiz?.questions?.length > 0)) &&
-        Array.isArray(stored.resources) && stored.resources.length > 0;
+        resourcesCompleted;  // ← Fixed: Check completion, not content
       if (hasFull) return false;
     } catch {}
 
@@ -1633,12 +1640,18 @@ const ProLearningPage = () => {
       if (content.summary) availableTabs.push('summary');
       if (content.videos?.length > 0) availableTabs.push('videos');
       if (content.quiz?.length > 0 || (content.quiz?.questions?.length > 0)) availableTabs.push('quiz');
-      if (content.resources?.length > 0) availableTabs.push('resources');
+  // Consider resources generation complete if metadata.generatedAt exists (even with 0 results)
+  if ((content.resources?.length > 0) || (content.resourcesMetadata?.generatedAt)) availableTabs.push('resources');
       
-      setAvailableTabsForTopics(prev => ({
-        ...prev,
-        [topicName]: availableTabs
-      }));
+      setAvailableTabsForTopics(prev => {
+        const prevTabs = prev[topicName] || [];
+        const same = prevTabs.length === availableTabs.length && prevTabs.every((t, i) => t === availableTabs[i]);
+        if (same) return prev; // idempotent - avoid unnecessary state update
+        return {
+          ...prev,
+          [topicName]: availableTabs
+        };
+      });
       
       console.log('🎯 Updated available tabs for already loaded topic:', topicName, availableTabs);
       return;
@@ -1713,10 +1726,15 @@ const ProLearningPage = () => {
         if (transformedContent.quiz?.length > 0 || (transformedContent.quiz?.questions?.length > 0)) availableTabs.push('quiz');
         if (transformedContent.resources?.length > 0) availableTabs.push('resources');
         
-        setAvailableTabsForTopics(prev => ({
-          ...prev,
-          [topicName]: availableTabs
-        }));
+        setAvailableTabsForTopics(prev => {
+          const prevTabs = prev[topicName] || [];
+          const same = prevTabs.length === availableTabs.length && prevTabs.every((t, i) => t === availableTabs[i]);
+          if (same) return prev;
+          return {
+            ...prev,
+            [topicName]: availableTabs
+          };
+        });
         
         // Parse and set reading sections
         if (storedContent.reading) {
@@ -1918,7 +1936,7 @@ const ProLearningPage = () => {
           };
           console.log('📚 [LOAD CONTENT] Formatted progressive content:', {
             topicName,
-            resourcesCount: formattedContent.resources.length,
+            resourcesCount: Array.isArray(formattedContent.resources) ? formattedContent.resources.length : 0,
             hasResourcesMetadata: !!formattedContent.resourcesMetadata,
             generatedAt: formattedContent.resourcesMetadata?.generatedAt,
             progressiveContentKeys: Object.keys(progressiveContent)
@@ -1981,13 +1999,17 @@ const ProLearningPage = () => {
               includesResources: newReady.includes('resources')
             });
             setAvailableTabsForTopics(prev => {
+              const combined = Array.from(new Set([...(prev[topicName] || []), ...newReady]));
+              const prevTabs = prev[topicName] || [];
+              const same = prevTabs.length === combined.length && prevTabs.every((t, i) => t === combined[i]);
+              if (same) return prev; // no-op if identical
               const updated = {
                 ...prev,
-                [topicName]: Array.from(new Set([...(prev[topicName] || []), ...newReady]))
+                [topicName]: combined
               };
               console.log(`🔓 [LOAD CONTENT] Updated availability:`, {
                 topicName,
-                previousTabs: prev[topicName] || [],
+                previousTabs: prevTabs,
                 newTabs: updated[topicName]
               });
               return updated;
@@ -2088,7 +2110,8 @@ const ProLearningPage = () => {
             if (storedContent.summary) availableTabs.push('summary');
             if (storedContent.videos?.length > 0) availableTabs.push('videos');
             if (storedContent.quiz?.length > 0 || (storedContent.quiz?.questions?.length > 0)) availableTabs.push('quiz');
-            if (storedContent.resources?.length > 0) availableTabs.push('resources');
+            // Consider resources generation complete if metadata.generatedAt exists (even with 0 results)
+            if ((storedContent.resources?.length > 0) || (storedContent.resourcesMetadata?.generatedAt)) availableTabs.push('resources');
             
             if (availableTabs.length > 0) {
               setAvailableTabsForTopics(prev => ({
@@ -3122,7 +3145,8 @@ const ProLearningPage = () => {
             if (storedContent.summary) availableTabs.push('summary');
             if (storedContent.videos?.length > 0) availableTabs.push('videos');
             if (storedContent.quiz?.length > 0 || (storedContent.quiz?.questions?.length > 0)) availableTabs.push('quiz');
-            if (storedContent.resources?.length > 0) availableTabs.push('resources');
+            // Consider resources generation complete if metadata.generatedAt exists (even with 0 results)
+            if ((storedContent.resources?.length > 0) || (storedContent.resourcesMetadata?.generatedAt)) availableTabs.push('resources');
             
             setAvailableTabsForTopics(prev => ({
               ...prev,
@@ -3250,7 +3274,7 @@ const ProLearningPage = () => {
               console.log(`✨ [ON TAB COMPLETE] Formatted content:`, {
                 hasResourcesMetadata: !!formattedContent.resourcesMetadata,
                 generatedAt: formattedContent.resourcesMetadata?.generatedAt,
-                resourcesCount: formattedContent.resources.length
+                resourcesCount: Array.isArray(formattedContent.resources) ? formattedContent.resources.length : 0
               });
                 // Merge new tab content into existing state
                 // IMPORTANT: preserve previously displayed reading; don't overwrite with later updates
@@ -3827,9 +3851,13 @@ const ProLearningPage = () => {
                 });
                 if (!topicTabs.includes(tabInfo.tabType) && hasContent) {
                   console.log(`✅ [ON TAB COMPLETE - INIT] Adding ${tabInfo.tabType} to available tabs for ${tabInfo.topic}`);
+                  const nextTabs = [...topicTabs, tabInfo.tabType];
+                  // Idempotent check: if equal, return prev
+                  const same = topicTabs.length === nextTabs.length && topicTabs.every((t, i) => t === nextTabs[i]);
+                  if (same) return prev;
                   return {
                     ...prev,
-                    [tabInfo.topic]: [...topicTabs, tabInfo.tabType]
+                    [tabInfo.topic]: nextTabs
                   };
                 }
                 return prev;
@@ -4026,7 +4054,8 @@ const ProLearningPage = () => {
       (activeTab === 'summary' && !!content?.summary) ||
       (activeTab === 'videos' && (content?.videos?.length || 0) > 0) ||
       (activeTab === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
-      (activeTab === 'resources' && (content?.resources?.length || 0) > 0)
+      // Consider Resources "ready" if generation completed (metadata.generatedAt), even with 0 results
+      (activeTab === 'resources' && (((content?.resources?.length || 0) > 0) || !!content?.resourcesMetadata?.generatedAt))
     );
     if (!activeHasContent && readyTabs.length > 0) {
       console.log('🧩 DEBUG: Hydrating content for', topicName, 'tabs ready:', readyTabs);
@@ -5592,44 +5621,34 @@ const ProLearningPage = () => {
         // Resources Renderer: Grid of resource cards with icons and descriptions
         // Check if resources generation has COMPLETED (metadata.generatedAt exists)
         let resourcesGenerationCompleted = content?.resourcesMetadata?.generatedAt;
+        
         // Legacy support: if older stored course has resources array but no metadata at all, treat as completed
         if (!resourcesGenerationCompleted && Array.isArray(content?.resources) && content.resources.length > 0 && !content?.resourcesMetadata) {
-          console.log('🕰️ [RESOURCES LEGACY] Detected legacy resources without metadata. Treating generation as completed.', {
-            resourcesCount: content.resources.length
-          });
           resourcesGenerationCompleted = true; // Do not fabricate metadata object; just allow render.
         }
         
-        console.log('🎨 [RENDER RESOURCES] Rendering resources tab:', {
-          hasContent: !!content,
-          resourcesCount: content?.resources?.length || 0,
-          hasMetadata: !!content?.resourcesMetadata,
-          generatedAt: content?.resourcesMetadata?.generatedAt,
-          generationCompleted: !!resourcesGenerationCompleted,
-          contentKeys: content ? Object.keys(content) : [],
-          sampleResources: Array.isArray(content?.resources) ? content.resources.slice(0,2).map((r,i) => ({
-            idx: i,
-            title: r.title || r.name || '(no title)',
-            url: r.url || r.link || r.href,
-            hasDescription: !!r.description
-          })) : [],
-          metadataKeys: content?.resourcesMetadata ? Object.keys(content.resourcesMetadata) : [],
-          tabBlocked: currentTopicName ? isTopicBlocked(currentTopicName) : 'n/a'
-        });
+        // Reload mode safety: if we're in reload mode and resourcesMetadata is missing but other tabs exist,
+        // assume resources generation previously completed with zero results so we can show the empty state.
+        if (!resourcesGenerationCompleted && loadScenario === 'reload' && !content?.resourcesMetadata) {
+          const otherTabsPresent = !!(content?.reading || content?.summary || (Array.isArray(content?.videos) && content.videos.length > 0) || (Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0));
+          if (otherTabsPresent) {
+            resourcesGenerationCompleted = true;
+          }
+        }
         
         // If resources generation hasn't completed yet, show loader
         if (!resourcesGenerationCompleted) {
-          console.log('⏳ [RENDER RESOURCES] Showing loader - generation not completed');
           return <LoadingComponent />;
         }
         
-        // If topic is still blocked (shouldn't happen if generation completed, but safety check)
-        if (currentTopicName && isTopicBlocked(currentTopicName)) {
-          return <LoadingComponent />;
-        }
+        // CRITICAL: Defensive check for empty or invalid resources
+        // Must check BEFORE any attempt to access .length or .map()
+        const hasValidResources = content?.resources 
+          && Array.isArray(content.resources) 
+          && content.resources.length > 0;
         
-        // If resources array is empty (generation completed but found no resources)
-        if (!content?.resources || content.resources.length === 0) {
+        // If resources array is empty, undefined, or invalid (generation completed but found no resources)
+        if (!hasValidResources) {
           return (
             <div className="flex flex-col items-center justify-center py-16 px-4">
               <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-sky-100 rounded-full flex items-center justify-center mb-6 shadow-lg">
@@ -5660,6 +5679,8 @@ const ProLearningPage = () => {
           );
         }
         
+        console.log('✅ [RESOURCES RENDER] Rendering resources grid with', content.resources.length, 'items');
+        
         return (
           <div className="space-y-6 pt-6">
             {/* Compact Resources Header */}
@@ -5688,12 +5709,18 @@ const ProLearningPage = () => {
             {/* Compact Professional Resources Grid */}
             <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
               {content.resources.map((resource, index) => {
+                // Safety check: skip invalid resources
+                if (!resource || typeof resource !== 'object') {
+                  console.warn('⚠️ [RESOURCES] Skipping invalid resource at index', index);
+                  return null;
+                }
+                
                 const iconName = getResourceIcon(resource.type);
                 const IconComponent = getIconComponent(iconName);
                 
                 return (
                   <div
-                    key={resource.id}
+                    key={resource.id || `resource-${index}`}
                     className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 flex flex-col gap-2 h-full"
                   >
                     <div className="flex items-center gap-3 mb-2">
@@ -5701,11 +5728,11 @@ const ProLearningPage = () => {
                         <IconComponent className="text-xl text-gray-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs text-gray-500 font-medium mb-1">{resource.type}</div>
-                        <div className="text-base font-semibold text-gray-900 line-clamp-2">{resource.title}</div>
+                        <div className="text-xs text-gray-500 font-medium mb-1">{resource.type || 'Resource'}</div>
+                        <div className="text-base font-semibold text-gray-900 line-clamp-2">{resource.title || 'Untitled Resource'}</div>
                       </div>
                     </div>
-                    <div className="text-sm text-gray-600 line-clamp-3 mb-2">{resource.description}</div>
+                    <div className="text-sm text-gray-600 line-clamp-3 mb-2">{resource.description || 'No description available'}</div>
                     <a
                       href={resource.url}
                       target="_blank"
@@ -5815,7 +5842,8 @@ const ProLearningPage = () => {
                         (tab.id === 'summary' && !!content?.summary && String(content.summary).trim().length > 0) ||
                         (tab.id === 'videos' && Array.isArray(content?.videos) && content.videos.length > 0) ||
                         (tab.id === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
-                        (tab.id === 'resources' && Array.isArray(content?.resources) && content.resources.length > 0)
+                        // Treat resources as ready if array has items OR metadata indicates completion
+                        (tab.id === 'resources' && ((Array.isArray(content?.resources) && content.resources.length > 0) || !!content?.resourcesMetadata?.generatedAt))
                       );
 
                       // Check if tab content is available for progressive generation
@@ -5836,47 +5864,66 @@ const ProLearningPage = () => {
                         }
                         
                         // Debug logging for resources tab
-                        if (tab.id === 'resources') {
-                          console.log(`🔍 [TAB RENDER] Resources tab availability check:`, {
-                            currentTopicName,
-                            isTabAvailable,
-                            inAvailableList: availableTabsForTopics[currentTopicName]?.includes('resources'),
-                            hasTabContent,
-                            currentTopicBlocked,
-                            readingReady,
-                            isProgressiveGenerating,
-                            availableTabsForTopic: availableTabsForTopics[currentTopicName] || []
-                          });
-                        }
+                        // Avoid render-time logging to prevent noisy consoles and potential loops
                       }
                       
                       // Tab is disabled if topic is blocked OR if progressive tab is not available
                       const isTabDisabled = currentTopicBlocked || (useProgressiveGeneration && !isTabAvailable);
                       
-                      if (tab.id === 'resources') {
-                        console.log(`🔍 [TAB RENDER] Resources tab disabled state:`, {
-                          isTabDisabled,
-                          currentTopicBlocked,
-                          useProgressiveGeneration,
-                          isTabAvailable
-                        });
-                      }
+                      // Avoid render-time logging to prevent noisy consoles and potential loops
                       
                       return (
                         <button
                           key={tab.id}
                           onClick={() => {
+                            // DIAGNOSTIC LOGGING FOR TAB CLICK
+                            console.log(`🖱️ [TAB CLICK] User clicked ${tab.label} tab`, {
+                              tabId: tab.id,
+                              timestamp: new Date().toISOString(),
+                              currentTopicName,
+                              currentTopicBlocked,
+                              isTabDisabled,
+                              isTabAvailable,
+                              hasTabContent,
+                              willUpdateTab: !currentTopicBlocked && !isTabDisabled
+                            });
+                            
+                            if (tab.id === 'resources') {
+                              console.log(`🖱️ [RESOURCES TAB CLICK] Detailed resources state:`, {
+                                hasContent: !!content,
+                                resourcesInContent: 'resources' in (content || {}),
+                                resourcesType: typeof content?.resources,
+                                resourcesIsArray: Array.isArray(content?.resources),
+                                resourcesCount: content?.resources?.length || 0,
+                                hasResourcesMetadata: !!content?.resourcesMetadata,
+                                generatedAt: content?.resourcesMetadata?.generatedAt || 'MISSING',
+                                availableTabsForCurrentTopic: availableTabsForTopics[currentTopicName] || [],
+                                resourcesIsInAvailableTabs: (availableTabsForTopics[currentTopicName] || []).includes('resources')
+                              });
+                            }
+                            
                             if (!currentTopicBlocked && !isTabDisabled) {
+                              console.log(`✅ [TAB CLICK] Tab ${tab.label} is clickable, updating active tab`);
                               updateActiveTabDesktop(tab.id); // Use debounced version for desktop
                               // Only reload content if progressive generation is enabled AND content is not already available
                               if (useProgressiveGeneration && currentTopicName && isTabAvailable && !content?.[tab.id]) {
+                                console.log(`🔄 [TAB CLICK] Will reload content for ${tab.label}`);
                                 // Only refresh if this specific tab content doesn't exist yet
                                 loadProgressiveTopicContent(currentTopicName, { showLoader: false });
+                              } else {
+                                console.log(`✓ [TAB CLICK] Content already available for ${tab.label}, no reload needed`);
                               }
                             } else if (!currentTopicBlocked && useProgressiveGeneration && !isTabAvailable) {
+                              console.log(`⏳ [TAB CLICK] Tab ${tab.label} not ready yet, showing loading skeleton`);
                               // If disabled due to not ready, show skeletons briefly to convey loading
                               setShowSkeletons(true);
                               setLoadingStep(`Preparing ${tab.label}...`);
+                            } else {
+                              console.log(`🚫 [TAB CLICK] Tab ${tab.label} is blocked or disabled:`, {
+                                currentTopicBlocked,
+                                isTabDisabled,
+                                reason: currentTopicBlocked ? 'Topic is blocked' : 'Tab is disabled'
+                              });
                             }
                           }}
                           disabled={isLoading || isTabDisabled}
