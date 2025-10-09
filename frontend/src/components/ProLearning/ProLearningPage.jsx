@@ -186,53 +186,31 @@ const ProLearningPage = () => {
   const [sectionGenerating, setSectionGenerating] = useState(false);
   const [generatingTopics, setGeneratingTopics] = useState([]);
 
-  // Robust parser for topics passed in the URL query param "topic"
-  // - Handles new delimiter (|||) for multiple topics to avoid confusion with commas in topic names
-  // - Falls back to comma splitting for backward compatibility
-  // - Keeps phrases like "Components, Props, and State" together when using comma fallback
-  // - Limits to 4 topics
-  // - Trims whitespace and filters empties
+  // Parser for topics passed in the URL query param "topic"
+  // Topics are confirmed by AI and user in /chat page, so we trust the format
+  // - Multiple topics use ||| delimiter (no comma splitting needed)
+  // - Single topics are kept intact with any internal commas, colons, etc.
+  // - Limits to 4 topics for consistency
   const parseTopicsFromParam = (param) => {
     if (!param || typeof param !== 'string') return [];
     const s = param.trim();
     
-    // Check if using new delimiter (|||) - this is the preferred format
+    // Check if using delimiter (|||) for multiple topics
     if (s.includes('|||')) {
       const topics = s.split('|||').map(t => t.trim()).filter(Boolean);
-      // Limit to 4 topics
       return topics.slice(0, 4);
     }
     
-    // Legacy format: comma-separated (less reliable for topics containing commas)
-    // Fast path: no commas => single topic
-    if (!s.includes(',')) return [s];
+    // Single topic - keep it intact (don't split by commas)
+    return [s];
+  };
 
-    // Split by comma, then merge known triplet pattern: X, Y, and Z
-    const parts = s.split(',').map(t => t.trim()).filter(Boolean);
-    const merged = [];
-    for (let i = 0; i < parts.length; i++) {
-      const cur = parts[i];
-      const next = parts[i + 1];
-      const next2 = parts[i + 2];
-      // Detect pattern: cur, next, and something => merge three with commas
-      if (
-        typeof next === 'string' && typeof next2 === 'string' &&
-        /^and\s+/i.test(next2)
-      ) {
-        merged.push(`${cur}, ${next}, ${next2}`);
-        i += 2;
-        continue;
-      }
-      merged.push(cur);
-    }
-
-    // Enforce max 4 topics by merging any extras into the last
-    if (merged.length > 4) {
-      const firstThree = merged.slice(0, 3);
-      const rest = merged.slice(3).join(', ');
-      return [...firstThree, rest];
-    }
-    return merged;
+  // Helper to get the first/current topic name from URL param
+  // No comma splitting - topics from /chat are already properly formatted
+  const getCurrentTopicFromParam = (param) => {
+    if (!param || typeof param !== 'string') return null;
+    const topics = parseTopicsFromParam(param);
+    return topics[0] || null;
   };
   
   // Function to fetch course data from database (delegates to ProContentManager with deduping)
@@ -497,7 +475,7 @@ const ProLearningPage = () => {
         
         // Update URL if needed
         const selectedTopicName = selectedTopicObject.name;
-        const currentTopicParam = topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null;
+        const currentTopicParam = getCurrentTopicFromParam(topicParam);
         
         if (selectedTopicName !== currentTopicParam) {
           const newSearchParams = new URLSearchParams(window.location.search);
@@ -660,8 +638,9 @@ const ProLearningPage = () => {
       }
       
       // Step 3.5: If no stored/batch/db topics, but URL has topic(s), derive topics from URL
-      // IMPORTANT: Handle both multiple topics (||| or comma-separated) and single-topic URLs
-      if (topicParam && (topicParam.includes('|||') || topicParam.includes(','))) {
+      // IMPORTANT: Handle both multiple topics (||| delimiter) and single-topic URLs
+      // Only split by comma if ||| delimiter is present, otherwise treat as single topic
+      if (topicParam && topicParam.includes('|||')) {
         try {
           const topicNames = parseTopicsFromParam(topicParam);
           if (topicNames.length > 1) { // Only if multiple topics in URL
@@ -1325,7 +1304,7 @@ const ProLearningPage = () => {
       }
     } else if (topicParam && !topicsList.length) {
       // If no topics list but we have a topic from URL, handle content loading/generation
-      const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
+      const actualTopic = getCurrentTopicFromParam(topicParam);
       const currentCourseId = getCourseId();
       
       if (currentCourseId) {
@@ -1413,7 +1392,7 @@ const ProLearningPage = () => {
         setShowSkeletons(true);
         setLoadingStep(`Generating content for ${topicParam}...`);
 
-        const actualTopic = topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
+        const actualTopic = getCurrentTopicFromParam(topicParam);
         
         // Force regeneration by clearing stored content first
         
@@ -4111,7 +4090,7 @@ const ProLearningPage = () => {
 
   const renderTabContent = () => {
     // Derive current topic name robustly (fallback to URL param if selectedTopic not yet set)
-    const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null);
+    const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam);
     // Client-side reading readiness (strict): require sanitized content for current topic
     const readingClientReadyForCurrentTopic = (
       activeTab === 'reading' &&
@@ -4162,7 +4141,7 @@ const ProLearningPage = () => {
     // Decide whether to show the progressive generation card or the actual content
     // Show the status card only when the active tab is not ready and has no data yet
     if (isProgressiveGenerating) {
-  const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null);
+  const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam);
       const readyTabs = (currentTopicName && availableTabsForTopics[currentTopicName]) || [];
       // Consider a tab ready if we already have content for it
       const activeHasContent = (contentTopicName === currentTopicName) && (
@@ -4445,7 +4424,7 @@ const ProLearningPage = () => {
                       };
                       const codeString = flattenText(children).replace(/\n$/, "");
                       // If current topic is math-related and this doesn't look like programming, render as plain text block
-                      const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : '');
+                      const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
                       const isMathTopic = isMathTopicName(currentTopicName);
                       const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
                       if (isMathTopic && !looksLikeProgramming) {
@@ -4667,7 +4646,7 @@ const ProLearningPage = () => {
                         };
                         const codeString = flattenText(children).replace(/\n$/, "");
                         // If current topic is math-related and this doesn't look like programming, render as plain text block
-                        const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : '');
+                        const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
                         const isMathTopic = isMathTopicName(currentTopicName);
                         const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
                         if (isMathTopic && !looksLikeProgramming) {
@@ -4834,7 +4813,7 @@ const ProLearningPage = () => {
                           setShowSkeletons(true);
                           setLoadingStep('Regenerating content...');
                           
-                          const actualTopic = topicParam?.includes(',') ? topicParam.split(',')[0].trim() : topicParam;
+                          const actualTopic = getCurrentTopicFromParam(topicParam);
                           if (actualTopic) {
                             // Force regeneration by calling generateProContent directly
                             generateProContent({
@@ -4996,7 +4975,7 @@ const ProLearningPage = () => {
                     }
                     const codeString = String(children).replace(/\n$/, "");
                     // If current topic is math-related and this doesn't look like programming, render as plain text block
-                    const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : '');
+                    const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
                     const isMathTopic = isMathTopicName(currentTopicName);
                     const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
                     if (isMathTopic && !looksLikeProgramming) {
@@ -5748,7 +5727,7 @@ const ProLearningPage = () => {
                       const isActive = activeTab === tab.id;
                       
                       // Derive current topic name (fallback to URL param for single-topic flows)
-                      const currentTopicName = selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null);
+                      const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam);
                       
                       // Check if current topic is blocked (2nd topic onwards)
                       const currentTopicBlocked = currentTopicName ? isTopicBlocked(currentTopicName) : false;
@@ -5898,7 +5877,7 @@ const ProLearningPage = () => {
                 selectedTopic={selectedTopic}
                 isProgressiveGenerating={isProgressiveGenerating}
                 progressiveGenerationProgress={progressiveGenerationProgress}
-                currentTopicName={selectedTopic?.name || (topicParam ? (topicParam.includes(',') ? topicParam.split(',')[0].trim() : topicParam) : null)}
+                currentTopicName={selectedTopic?.name || getCurrentTopicFromParam(topicParam)}
                 currentTopicBlocked={selectedTopic?.name ? isTopicBlocked(selectedTopic.name) : false}
               />
 

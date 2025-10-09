@@ -236,11 +236,15 @@ Your task is to create a **concise yet comprehensive** Reading Section about **{
 **FORMATTING** (CRITICAL):
 - Use `**bold**` for key terms (sparingly)
 - Use bullet points for lists
-- **Code Blocks (```language)**: ONLY for complete, runnable code examples (5+ lines)
-- **Inline Code (`text`)**: For single functions, methods, variables, short expressions
-  - Example: "Use the `path.join()` method" ✅
-  - Example: "The `fs.existsSync` function checks if a file exists" ✅
-  - DO NOT create code blocks for single function names or variables ❌
+- **Code Blocks (```language)**: ONLY for complete, multi-line, runnable code examples (5+ lines minimum)
+  - ❌ DO NOT use code blocks for: single words like `Python`, `True`, `False`, data types like `int`, `str`, `bool`
+  - ❌ DO NOT use code blocks for: single function names, single values, single operators
+- **Inline Code (`text`)**: For ALL single keywords, data types, function names, variables, values, expressions
+  - ✅ Example: "The `int` data type stores integers"
+  - ✅ Example: "Use `True` and `False` for boolean values"
+  - ✅ Example: "The `str` type represents strings like `"Hello"`"
+  - ✅ Example: "Call the `print()` function"
+  - ❌ NEVER create a code block for these - ALWAYS use inline code
 - Keep paragraphs short (3-4 sentences max)
 
 🚫 **AVOID**:
@@ -518,8 +522,16 @@ Adapt your style based on **{topic}**:
 - If **{topic}** is **non-technical**, focus on intuitive breakdowns, visuals (via analogy), examples, and real-life connections.
 - Don't force irrelevant sections — adapt naturally to what **{topic}** needs.
 
- **ABSOLUTELY AVOID**:
+**CRITICAL FORMATTING RULES**:
+- **Code Blocks (```language)**: ONLY for complete, multi-line, runnable code (5+ lines minimum)
+  - ❌ NEVER use code blocks for single words, data types, function names, values
+- **Inline Code (`text`)**: For ALL single keywords, data types, functions, variables
+  - ✅ Use: "The `int` type stores whole numbers"
+  - ❌ Never create a code block for single words like `Python`, `True`, `str`
+
+**ABSOLUTELY AVOID**:
 - Writing about ANY topic other than **{topic}**
+- Code blocks for single words or simple values
 - Irrelevant content
 
 ---

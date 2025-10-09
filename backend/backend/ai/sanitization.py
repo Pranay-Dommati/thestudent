@@ -311,7 +311,7 @@ def _remove_excessive_inline_code(text: str, category: str = 'general'):
 def _sanitize_code_fences(text: str, category_hint: str):
     """
     Convert non-code fenced blocks to appropriate format.
-    For TECHNICAL content: Convert single-word code blocks to inline code.
+    AGGRESSIVE: Convert single-line code blocks to inline code for ALL categories.
     """
     if not isinstance(text, str) or '```' not in text:
         return text, 0
@@ -339,26 +339,28 @@ def _sanitize_code_fences(text: str, category_hint: str):
         lang = (m.group(1) or '').strip().lower()
         body = m.group(2).strip()
         
-        # For TECHNICAL content: Convert single-line/single-word code blocks to inline code
-        if category_hint == 'technical':
-            lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+        lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+        
+        # AGGRESSIVE: Convert ALL single-line code blocks to inline code unless they're real code
+        if len(lines) == 1:
+            content = lines[0]
             
-            # If it's just one line - be VERY aggressive about converting to inline
-            if len(lines) == 1:
-                content = lines[0]
-                
-                # Single operators or short symbols (*, /, +, -, >, <, &&, ||, etc.)
-                if len(content) <= 3 and not code_keywords.search(content):
-                    replacements += 1
-                    return f"`{content}`"
-                
-                # ANY single-line content under 150 chars without programming keywords
-                # This catches: name, path(), urls.py, {% url 'hello' %}, etc.
-                if len(content) < 150:
-                    # If no programming keywords (def, class, function, etc.), convert to inline
-                    if not code_keywords.search(content):
-                        replacements += 1
-                        return f"`{content}`"
+            # Keep as code block ONLY if it has real programming keywords
+            has_real_code = code_keywords.search(content) or (lang and lang in real_code_langs and len(content) > 50)
+            
+            if not has_real_code:
+                # Convert to inline code for single words, function names, data types, etc.
+                replacements += 1
+                return f"`{content}`"
+        
+        # For 2-5 line code blocks without keywords, also convert to inline if simple
+        if 2 <= len(lines) <= 5:
+            all_simple = all(len(ln) <= 30 and not code_keywords.search(ln) for ln in lines)
+            if all_simple and not (lang and lang in real_code_langs):
+                # Convert to comma-separated inline code
+                replacements += 1
+                inline_items = ", ".join([f"`{ln}`" for ln in lines])
+                return inline_items
         
         # Keep if language specified and is a real programming language
         if lang and lang in real_code_langs:
