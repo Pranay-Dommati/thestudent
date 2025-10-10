@@ -35,15 +35,19 @@ if command -v docker >/dev/null 2>&1 && docker_cmd ps --format '{{.Names}}' | gr
   echo "[dump] Detected Docker container 'studentshub_mysql'. Dumping inside container..."
   
   # Use mysqldump with --single-transaction for consistent backup without locking tables
+  # --no-tablespaces avoids PROCESS privilege requirement
   # --routines includes stored procedures, --triggers includes triggers
+  # --add-drop-table ensures tables are dropped before recreate
   docker_cmd exec studentshub_mysql \
     mysqldump -u "$DB_USER" -p"$DB_PASSWORD" \
     --single-transaction \
+    --no-tablespaces \
+    --add-drop-table \
     --routines \
     --triggers \
     --events \
     --set-gtid-purged=OFF \
-    "$DB_NAME" > "$OUTPUT_FILE"
+    "$DB_NAME" > "$OUTPUT_FILE" 2>&1 | grep -v "Using a password on the command line" || true
   
   echo "[dump] Dump completed inside container"
 else
@@ -52,11 +56,13 @@ else
   # Local mysqldump
   mysqldump -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" \
     --single-transaction \
+    --no-tablespaces \
+    --add-drop-table \
     --routines \
     --triggers \
     --events \
     --set-gtid-purged=OFF \
-    "$DB_NAME" > "$OUTPUT_FILE"
+    "$DB_NAME" > "$OUTPUT_FILE" 2>&1 | grep -v "Using a password on the command line" || true
 fi
 
 echo "[dump] Wrote $OUTPUT_FILE (commit and push this file)."

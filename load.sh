@@ -65,12 +65,16 @@ if command -v docker >/dev/null 2>&1 && docker_cmd ps --format '{{.Names}}' | gr
 
   # Restore the database
   echo "[load] Restoring database from backup..."
-  docker_cmd exec studentshub_mysql mysql -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < /tmp/db_backup.sql 2>&1 | grep -v "Using a password on the command line" || true
+  docker_cmd exec -i studentshub_mysql mysql -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < db_backup.sql 2>&1 | grep -v "Using a password on the command line" || true
 
   # Cleanup
   docker_cmd exec studentshub_mysql rm -f /tmp/db_backup.sql >/dev/null 2>&1 || true
   
   echo "[load] Restore completed successfully!"
+  echo ""
+  echo "⚠️  IMPORTANT: After loading database, you MUST run migrations to ensure schema is up-to-date:"
+  echo "    cd backend && python manage.py migrate"
+  echo ""
 else
   echo "[load] Using local mysql client (ensure MySQL client tools are installed)..."
   
@@ -93,6 +97,10 @@ else
   mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < db_backup.sql 2>&1 | grep -v "Using a password on the command line" || true
   
   echo "[load] Restore completed successfully!"
+  echo ""
+  echo "⚠️  IMPORTANT: After loading database, you MUST run migrations to ensure schema is up-to-date:"
+  echo "    cd backend && python manage.py migrate"
+  echo ""
 fi
 
 # Post-restore quick verification
