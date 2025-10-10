@@ -65,12 +65,21 @@ if command -v docker >/dev/null 2>&1 && docker_cmd ps --format '{{.Names}}' | gr
 
   # Restore the database
   echo "[load] Restoring database from backup..."
-  docker_cmd exec -i studentshub_mysql bash -c "mysql -u '$DB_USER' -p'$DB_PASSWORD' '$DB_NAME' < /tmp/db_backup.sql" 2>&1 | grep -v "Using a password on the command line" || true
+  
+  # Execute restore inside the container (similar to PostgreSQL's pg_restore approach)
+  docker_cmd exec studentshub_mysql bash -c "mysql -u '$DB_USER' -p'$DB_PASSWORD' '$DB_NAME' < /tmp/db_backup.sql 2>&1" | grep -v "Using a password on the command line" || {
+    RESTORE_EXIT=${PIPESTATUS[0]}
+    if [ $RESTORE_EXIT -ne 0 ]; then
+      echo "[load] ❌ ERROR: Database restore failed with exit code $RESTORE_EXIT"
+      docker_cmd exec studentshub_mysql rm -f /tmp/db_backup.sql >/dev/null 2>&1 || true
+      exit 1
+    fi
+  }
 
   # Cleanup
   docker_cmd exec studentshub_mysql rm -f /tmp/db_backup.sql >/dev/null 2>&1 || true
   
-  echo "[load] Restore completed successfully!"
+  echo "[load] ✅ Restore completed successfully!"
 else
   echo "[load] Using local mysql client (ensure MySQL client tools are installed)..."
   

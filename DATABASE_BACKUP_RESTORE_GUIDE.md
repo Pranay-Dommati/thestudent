@@ -69,21 +69,11 @@ This guide explains how to properly backup and restore your MySQL database acros
 2. Detects if MySQL is running in Docker or locally
 3. **Drops and recreates the database** (⚠️ destroys existing data!)
 4. Restores all tables and data from `db_backup.sql`
-5. Reminds you to run migrations
+5. **No migrations needed** - The dump includes complete schema
 
-### ⚠️ IMPORTANT: Migration Step
+### ⚠️ IMPORTANT: No Migrations Required
 
-**After running `./load.sh`, you MUST run:**
-
-```bash
-cd backend
-python manage.py migrate
-```
-
-**Why?**
-- The SQL dump doesn't know about new migrations in your code
-- Django needs to sync `django_migrations` table with actual applied migrations
-- Without this, Django will think migrations aren't applied and cause errors
+Unlike the previous version of this guide, **you do NOT need to run migrations** after `./load.sh`.
 
 ### Output Example
 
@@ -94,11 +84,14 @@ python manage.py migrate
 [load] Dropping and recreating database...
 [load] Restoring database from backup...
 [load] Restore completed successfully!
-
-⚠️  IMPORTANT: After loading database, you MUST run migrations to ensure schema is up-to-date:
-    cd backend && python manage.py migrate
-
 [load] Verifying presence of key tables and row counts...
++----------------------------+-----------+
+| table_name                 | row_count |
++----------------------------+-----------+
+| courses_engineeringcourse  |         1 |
+| courses_prolearningcourse  |        15 |
+| courses_lesson             |       245 |
++----------------------------+-----------+
 [load] Database verification completed!
 ```
 
@@ -108,13 +101,15 @@ python manage.py migrate
 
 ### Problem: "Table 'X' doesn't exist" after load.sh
 
-**Cause**: You didn't run migrations after restoring
+**Old Cause (FIXED):** The restore command was using wrong file path
 
-**Solution**:
+**New Solution:** Pull the latest fixes:
 ```bash
-cd backend
-python manage.py migrate
+git pull origin pranay-maybe-final
+./load.sh
 ```
+
+The tables will now be created automatically. No migrations needed!
 
 ### Problem: "Access denied; you need PROCESS privilege" during dump.sh
 
@@ -172,14 +167,11 @@ git pull origin pranay-maybe-final
 docker-compose up -d mysql  # if using Docker
 # OR ensure local MySQL service is running
 
-# 3. Restore database
+# 3. Restore database (no migrations needed!)
 ./load.sh
 
-# 4. Run migrations (CRITICAL!)
+# 4. Start server immediately
 cd backend
-python manage.py migrate
-
-# 5. Start server
 python manage.py runserver
 ```
 
@@ -199,9 +191,9 @@ python manage.py runserver
 - ✅ You understand this will **DELETE ALL CURRENT DATA**
 
 ### After Running load.sh
-- ✅ Run `cd backend && python manage.py migrate`
-- ✅ Restart Django server
+- ✅ Start Django server immediately
 - ✅ Test login and basic functionality
+- ✅ Verify courses are visible
 
 ---
 
@@ -283,6 +275,6 @@ python manage.py runserver
 | Script | Purpose | After Running |
 |--------|---------|---------------|
 | `./dump.sh` | Backup current database to `db_backup.sql` | Commit and push the SQL file |
-| `./load.sh` | Restore database from `db_backup.sql` | Run `python manage.py migrate` |
+| `./load.sh` | Restore database from `db_backup.sql` | Start server immediately - no migrations needed! |
 
-**Golden Rule**: `load.sh` → `migrate` → `runserver` ✨
+**Golden Rule**: `load.sh` → `runserver` ✨
