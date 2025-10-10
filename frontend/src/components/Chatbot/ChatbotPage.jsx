@@ -742,6 +742,18 @@ const ChatbotPage = () => {
     }
   }, [proMode, usageStats]);
 
+  // Expose setUsageStats globally for ProLearningPage to refresh after course save
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.chatbotSetUsageStats = setUsageStats;
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete window.chatbotSetUsageStats;
+      }
+    };
+  }, []);
+
   // Do not auto-close/open sidebar on resize; only set default on mount above.
 
   // Cleanup network error timeouts on unmount

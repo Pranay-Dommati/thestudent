@@ -10,6 +10,13 @@ from datetime import datetime, timedelta
 import json
 import re
 import logging
+from django.db.models import Count
+
+try:
+    # Local import to avoid circulars at module import time in migrations
+    from courses.models import ProLearningTopic
+except Exception:
+    ProLearningTopic = None
 
 # Configure logging for rate limiting
 logger = logging.getLogger(__name__)
@@ -19,6 +26,8 @@ User = get_user_model()
 # Rate limiting constants - configurable via environment
 MAX_TOPICS_PER_DAY = int(getattr(settings, 'MAX_TOPICS_PER_DAY', 16))
 MAX_TOPICS_PER_REQUEST = int(getattr(settings, 'MAX_TOPICS_PER_REQUEST', 4))
+MAX_TOPICS_PER_MONTH = int(getattr(settings, 'MAX_TOPICS_PER_MONTH', 15))
+ENFORCE_DAILY_LIMIT = bool(getattr(settings, 'ENFORCE_DAILY_LIMIT', False))
 
 # Security constants
 MAX_CACHE_KEY_LENGTH = 250  # Memcached limit
@@ -97,6 +106,15 @@ class TopicRateLimiter:
     
     def get_daily_usage(self):
         """Get current daily usage for the user/IP with strict time-based validation"""
+        if not ENFORCE_DAILY_LIMIT:
+            # Return a neutral structure when daily limits are disabled
+            now = timezone.now()
+            return {
+                'count': 0,
+                'requests': [],
+                'first_request': now.isoformat(),
+                'last_reset': now.isoformat(),
+            }
         cache_key = self.get_cache_key("_daily")
         now = timezone.now()
         
@@ -156,15 +174,68 @@ class TopicRateLimiter:
     
     def check_daily_limit(self, requested_topics):
         """Check if the request would exceed daily limit"""
+        if not ENFORCE_DAILY_LIMIT:
+            return True, ""
         usage_data = self.get_daily_usage()
-        current_count = max(0, int(usage_data.get('count', 0)))  # Ensure non-negative
+        current_count = max(0, int(usage_data.get('count', 0)))
         new_total = current_count + len(requested_topics)
-        
         if new_total > MAX_TOPICS_PER_DAY:
             remaining = max(0, MAX_TOPICS_PER_DAY - current_count)
-            return False, f"Daily limit exceeded. You have {remaining} topics remaining today. You requested {len(requested_topics)} topics."
-        
+            return False, (
+                f"Daily limit exceeded. You have {remaining} topics remaining today. "
+                f"You requested {len(requested_topics)} topics."
+            )
         return True, ""
+
+    def _get_month_start_end(self, now=None):
+        now = now or timezone.now()
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # To compute month end: advance one month safely
+        if start.month == 12:
+            next_month = start.replace(year=start.year + 1, month=1)
+        else:
+            next_month = start.replace(month=start.month + 1)
+        end = next_month
+        return start, end
+
+    def _get_user_monthly_count(self):
+        """Count topics created for this user in the current month via DB.
+        Fallback to 0 if user or model unavailable.
+        """
+        if not (self.user and getattr(self.user, 'is_authenticated', False)):
+            return 0
+        if ProLearningTopic is None:
+            return 0
+        start, end = self._get_month_start_end()
+        try:
+            return ProLearningTopic.objects.filter(
+                course__user=self.user,
+                created_at__gte=start,
+                created_at__lt=end,
+            ).count()
+        except Exception as e:
+            logger.error(f"Monthly count query failed: {e}")
+            return 0
+
+    def check_monthly_limit(self, requested_topics):
+        """Check if the request would exceed the monthly per-user cap."""
+        # For unauthenticated flows, we don't enforce a monthly user cap
+        if not (self.user and getattr(self.user, 'is_authenticated', False)):
+            return True, ""
+        try:
+            monthly_used = self._get_user_monthly_count()
+            new_total = monthly_used + len(requested_topics)
+            if new_total > MAX_TOPICS_PER_MONTH:
+                remaining = max(0, MAX_TOPICS_PER_MONTH - monthly_used)
+                return False, (
+                    f"Monthly limit exceeded. You have {remaining} topics remaining this month. "
+                    f"You requested {len(requested_topics)} topics."
+                )
+            return True, ""
+        except Exception as e:
+            logger.error(f"Monthly limit check failed: {e}")
+            # Fail closed for safety
+            return False, "Rate limiting error occurred"
     
     def is_request_allowed(self, requested_topics):
         """Check if the request is allowed based on both limits"""
@@ -178,6 +249,12 @@ class TopicRateLimiter:
         allowed, message = self.check_daily_limit(requested_topics)
         if not allowed:
             logger.warning(f"Daily limit exceeded for {self.get_cache_key()}: {message}")
+            return False, message, self.get_daily_usage()
+        
+        # Check monthly limit (per authenticated user)
+        allowed, message = self.check_monthly_limit(requested_topics)
+        if not allowed:
+            logger.warning(f"Monthly limit exceeded for {self.get_cache_key()}: {message}")
             return False, message, self.get_daily_usage()
         
         return True, "", self.get_daily_usage()
@@ -197,13 +274,15 @@ class TopicRateLimiter:
         now = timezone.now()
         topics_count = len(topics_created)
         
-        # Double-check daily limits before recording
-        new_count = max(0, int(usage_data.get('count', 0)) + topics_count)
-        if new_count > MAX_TOPICS_PER_DAY:
-            logger.warning(f"Attempted to exceed daily limit for {cache_key}")
-            raise ValueError(f"Daily limit exceeded. Limit: {MAX_TOPICS_PER_DAY}, Attempted: {new_count}")
-        
-        usage_data['count'] = new_count
+        # Double-check daily limits before recording (only if enforced)
+        if ENFORCE_DAILY_LIMIT:
+            new_count = max(0, int(usage_data.get('count', 0)) + topics_count)
+            if new_count > MAX_TOPICS_PER_DAY:
+                logger.warning(f"Attempted to exceed daily limit for {cache_key}")
+                raise ValueError(
+                    f"Daily limit exceeded. Limit: {MAX_TOPICS_PER_DAY}, Attempted: {new_count}"
+                )
+            usage_data['count'] = new_count
         
         # Sanitize topic names for storage with strict validation
         sanitized_topics = []
@@ -235,16 +314,15 @@ class TopicRateLimiter:
         if not usage_data.get('first_request'):
             usage_data['first_request'] = now.isoformat()
         
-        # Calculate precise cache timeout
-        # Store until next day's midnight plus a small buffer for timezone variations
-        tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=5, second=0, microsecond=0)
-        cache_timeout = int((tomorrow - now).total_seconds())
-        
-        try:
-            cache.set(cache_key, usage_data, timeout=cache_timeout)
-            logger.info(f"Recorded usage for {self.get_cache_key()}: {topics_count} topics")
-        except Exception as e:
-            logger.error(f"Failed to cache usage data: {e}")
+        if ENFORCE_DAILY_LIMIT:
+            # Calculate precise cache timeout until next midnight (+5 minutes)
+            tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=5, second=0, microsecond=0)
+            cache_timeout = int((tomorrow - now).total_seconds())
+            try:
+                cache.set(cache_key, usage_data, timeout=cache_timeout)
+                logger.info(f"Recorded usage for {self.get_cache_key()}: {topics_count} topics")
+            except Exception as e:
+                logger.error(f"Failed to cache usage data: {e}")
         
         return usage_data
     
@@ -271,10 +349,20 @@ class TopicRateLimiter:
             reverse=True
         )
         
+        # Monthly stats (best-effort; unauthenticated => zeros)
+        monthly_used = 0
+        monthly_remaining = MAX_TOPICS_PER_MONTH
+        if self.user and getattr(self.user, 'is_authenticated', False):
+            try:
+                monthly_used = self._get_user_monthly_count()
+                monthly_remaining = max(0, MAX_TOPICS_PER_MONTH - monthly_used)
+            except Exception:
+                pass
+
         return {
-            'daily_used': usage_data['count'],
+            'daily_used': usage_data.get('count', 0),
             'daily_limit': MAX_TOPICS_PER_DAY,
-            'daily_remaining': max(0, MAX_TOPICS_PER_DAY - usage_data['count']),
+            'daily_remaining': max(0, MAX_TOPICS_PER_DAY - usage_data.get('count', 0)),
             'per_request_limit': MAX_TOPICS_PER_REQUEST,
             'request_count_today': len(usage_data.get('requests', [])),
             'first_request_today': first_request_time,
@@ -285,13 +373,20 @@ class TopicRateLimiter:
             'rate_limits': {
                 'daily': {
                     'limit': MAX_TOPICS_PER_DAY,
-                    'remaining': max(0, MAX_TOPICS_PER_DAY - usage_data['count']),
-                    'used': usage_data['count'],
-                    'percent_used': round((usage_data['count'] / MAX_TOPICS_PER_DAY) * 100, 2)
+                    'remaining': max(0, MAX_TOPICS_PER_DAY - usage_data.get('count', 0)),
+                    'used': usage_data.get('count', 0),
+                    'percent_used': round(((usage_data.get('count', 0) or 0) / MAX_TOPICS_PER_DAY) * 100, 2) if ENFORCE_DAILY_LIMIT and MAX_TOPICS_PER_DAY else 0,
+                    'enforced': ENFORCE_DAILY_LIMIT,
                 },
                 'per_request': {
                     'limit': MAX_TOPICS_PER_REQUEST,
                     'remaining': MAX_TOPICS_PER_REQUEST
+                },
+                'monthly': {
+                    'limit': MAX_TOPICS_PER_MONTH,
+                    'remaining': monthly_remaining,
+                    'used': monthly_used,
+                    'percent_used': round((monthly_used / MAX_TOPICS_PER_MONTH) * 100, 2) if MAX_TOPICS_PER_MONTH else 0
                 }
             }
         }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getRateLimitStatus, formatUsageStats, getStatusMessage, MAX_TOPICS_PER_DAY, MAX_TOPICS_PER_REQUEST } from '../ProLearning/topicclassifier';
+import { getRateLimitStatus, formatUsageStats, getStatusMessage, MAX_TOPICS_PER_REQUEST } from '../ProLearning/topicclassifier';
 
 const RateLimitStatus = ({ isProMode, usageStats = null }) => {
   const [rateLimitInfo, setRateLimitInfo] = useState(null);
@@ -46,11 +46,12 @@ const RateLimitStatus = ({ isProMode, usageStats = null }) => {
     return null;
   }
 
-  const dailyInfo = rateLimitInfo.daily;
+  const monthlyInfo = rateLimitInfo.monthly || { used: 0, limit: 15, remaining: 15 };
+  const dailyInfo = rateLimitInfo.daily || { used: 0, limit: 16, remaining: 16, enforced: false };
   const requestInfo = rateLimitInfo.request;
-  const progressPercentage = dailyInfo.percentage || 0;
+  const progressPercentage = (monthlyInfo.percentage || Math.round((monthlyInfo.used / monthlyInfo.limit) * 100)) || 0;
   const isNearLimit = progressPercentage > 80;
-  const isAtLimit = dailyInfo.remaining === 0;
+  const isAtLimit = monthlyInfo.remaining === 0;
 
   // Tooltip content
   const tooltipContent = (
@@ -60,13 +61,13 @@ const RateLimitStatus = ({ isProMode, usageStats = null }) => {
           <h4 className="font-semibold text-yellow-200">Rate Limits</h4>
         </div>
         <div className="flex justify-between">
-          <span>Daily Topics:</span>
-          <span className="font-mono">{dailyInfo.used}/{dailyInfo.limit}</span>
+          <span>Monthly Topics:</span>
+          <span className="font-mono">{monthlyInfo.used}/{monthlyInfo.limit}</span>
         </div>
         <div className="flex justify-between">
-          <span>Topics Remaining:</span>
-          <span className={`font-mono ${dailyInfo.remaining > 3 ? 'text-green-300' : dailyInfo.remaining > 0 ? 'text-yellow-300' : 'text-red-300'}`}>
-            {dailyInfo.remaining}
+          <span>Remaining this month:</span>
+          <span className={`font-mono ${monthlyInfo.remaining > 3 ? 'text-green-300' : monthlyInfo.remaining > 0 ? 'text-yellow-300' : 'text-red-300'}`}>
+            {monthlyInfo.remaining}
           </span>
         </div>
         <div className="flex justify-between">
@@ -76,8 +77,8 @@ const RateLimitStatus = ({ isProMode, usageStats = null }) => {
         <div className="border-t border-gray-700 pt-2">
           <p className="text-gray-300">
             {isAtLimit 
-              ? "Limit reached. Resets at midnight." 
-              : `You can create up to ${Math.min(dailyInfo.remaining, requestInfo.limit)} topics in your next request.`
+              ? "Monthly limit reached. Resets on the 1st." 
+              : `You can create up to ${Math.min(monthlyInfo.remaining, requestInfo.limit)} topics in your next request.`
             }
           </p>
         </div>
@@ -123,11 +124,11 @@ const RateLimitStatus = ({ isProMode, usageStats = null }) => {
               isNearLimit ? 'bg-yellow-100 text-yellow-800' : 
               'bg-blue-100 text-blue-800'
             }`}>
-              {dailyInfo.used}/{dailyInfo.limit}
+              {monthlyInfo.used}/{monthlyInfo.limit}
             </span>
-            {dailyInfo.remaining <= 5 && dailyInfo.remaining > 0 && (
+            {monthlyInfo.remaining <= 5 && monthlyInfo.remaining > 0 && (
               <span className="text-xs px-2 py-1 rounded-full bg-orange-100 text-orange-800 font-medium">
-                {dailyInfo.remaining} left
+                {monthlyInfo.remaining} left
               </span>
             )}
           </div>
@@ -157,7 +158,7 @@ const RateLimitStatus = ({ isProMode, usageStats = null }) => {
             isNearLimit ? 'text-yellow-600' : 
             'text-blue-600'
           }`}>
-            {getStatusMessage({ daily_count: dailyInfo.used, daily_limit: dailyInfo.limit })}
+            {getStatusMessage({ rate_limits: { monthly: monthlyInfo } })}
           </span>
           <span className="text-gray-500 font-mono">
             Max {requestInfo.limit}/request
@@ -169,7 +170,7 @@ const RateLimitStatus = ({ isProMode, usageStats = null }) => {
             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span>Daily limit reached. Resets at midnight. Contact support for higher limits.</span>
+            <span>Monthly limit reached. Resets on the 1st. Contact support for higher limits.</span>
           </div>
         )}
         
@@ -178,7 +179,7 @@ const RateLimitStatus = ({ isProMode, usageStats = null }) => {
             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.866-.833-2.664 0L3.25 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
-            <span>Approaching daily limit. Plan your remaining topics wisely.</span>
+            <span>Approaching monthly limit. Plan your remaining topics wisely.</span>
           </div>
         )}
       </div>

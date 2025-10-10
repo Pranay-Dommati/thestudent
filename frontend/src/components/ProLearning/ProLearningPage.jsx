@@ -3069,6 +3069,17 @@ const ProLearningPage = () => {
   try { tracking.capture('pro_learning.save_succeeded', { course_id: currentCourseId }, { feature: 'pro_learning' }); } catch {}
         toast.success('✅ Course saved to your Learning Hub successfully!');
         
+        // Refresh usage stats after saving (topics were created in DB)
+        try {
+          const { getRateLimitStatus } = await import('../ProLearning/topicclassifier');
+          const freshStats = await getRateLimitStatus();
+          if (freshStats && typeof window !== 'undefined' && window.chatbotSetUsageStats) {
+            window.chatbotSetUsageStats(freshStats);
+          }
+        } catch (statsErr) {
+          console.warn('Could not refresh usage stats after course save:', statsErr);
+        }
+        
         // Update course saved status
         const courseKey = `${currentCourseId}_${smartCourseName}`;
         const savedStatus = localStorage.getItem('coursesSavedToHub');

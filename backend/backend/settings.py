@@ -247,17 +247,29 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # ProLearning topic rate limits (read by backend.ai.rate_limiter)
-# Use higher defaults in development to avoid frequent 429s during testing
+# Daily limits are disabled by default (ENFORCE_DAILY_LIMIT=false).
+# Keep the daily setting for backwards compatibility but it's not enforced.
 if DEBUG:
     MAX_TOPICS_PER_DAY = int(os.environ.get('MAX_TOPICS_PER_DAY', '1000'))
 else:
     MAX_TOPICS_PER_DAY = int(os.environ.get('MAX_TOPICS_PER_DAY', '16'))
 
-# Per-request limit stays 4 by default; can be overridden via env
+# Per-request limit: maximum topics per single request (default 4)
 MAX_TOPICS_PER_REQUEST = int(os.environ.get('MAX_TOPICS_PER_REQUEST', '4'))
 
-# Development-only: bypass rate limiting for faster local iteration
-TOPIC_RATE_LIMIT_BYPASS_DEV = DEBUG or os.environ.get('TOPIC_RATE_LIMIT_BYPASS_DEV', 'false').lower() in ('1','true','yes')
+# Monthly cap: 15 topics per user per calendar month (resets on the 1st)
+# This is the PRIMARY limit enforced in production.
+# Override with MAX_TOPICS_PER_MONTH env var only for testing/dev if needed.
+MAX_TOPICS_PER_MONTH = int(os.environ.get('MAX_TOPICS_PER_MONTH', '15'))
+
+# Control whether to enforce daily limits at all. For production with monthly-only caps,
+# keep this disabled (default false).
+ENFORCE_DAILY_LIMIT = os.environ.get('ENFORCE_DAILY_LIMIT', 'false').lower() in ('1','true','yes')
+
+# Development bypass: Disable rate limiting entirely for faster iteration.
+# Set TOPIC_RATE_LIMIT_BYPASS_DEV=true in your .env ONLY when you need to bypass checks.
+# By default, rate limiting is ACTIVE even in DEBUG to test the 15/month cap properly.
+TOPIC_RATE_LIMIT_BYPASS_DEV = os.environ.get('TOPIC_RATE_LIMIT_BYPASS_DEV', 'false').lower() in ('1','true','yes')
 
 # Authentication settings
 AUTHENTICATION_BACKENDS = [

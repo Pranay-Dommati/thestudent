@@ -14,30 +14,59 @@ class NetworkConnectionError extends Error {
 }
 
 // Rate limiting constants
-export const MAX_TOPICS_PER_DAY = 16;
+export const MAX_TOPICS_PER_DAY = 16; // kept for compatibility when daily is enabled
 export const MAX_TOPICS_PER_REQUEST = 4;
+export const MAX_TOPICS_PER_MONTH = 15;
+
+// Normalize backend usage stats into a common shape
+const normalizeStats = (u) => {
+  if (!u) return null;
+  const rate = u.rate_limits || {};
+  const daily = rate.daily || {};
+  const monthly = rate.monthly || {};
+  return {
+    daily: {
+      used: u.daily_count ?? u.daily_used ?? daily.used ?? 0,
+      limit: u.daily_limit ?? daily.limit ?? MAX_TOPICS_PER_DAY,
+      remaining: (u.daily_limit ?? daily.limit ?? MAX_TOPICS_PER_DAY) - (u.daily_count ?? u.daily_used ?? daily.used ?? 0),
+      enforced: daily.enforced ?? true,
+    },
+    request: {
+      used: u.request_count ?? 0,
+      limit: u.request_limit ?? u.per_request_limit ?? MAX_TOPICS_PER_REQUEST,
+      remaining: (u.request_limit ?? u.per_request_limit ?? MAX_TOPICS_PER_REQUEST) - (u.request_count ?? 0),
+    },
+    monthly: {
+      used: monthly.used ?? 0,
+      limit: monthly.limit ?? MAX_TOPICS_PER_MONTH,
+      remaining: (monthly.limit ?? MAX_TOPICS_PER_MONTH) - (monthly.used ?? 0),
+    }
+  };
+};
 
 // Enhanced error handling for rate limits
 export const handleRateLimitError = (error, usageStats = null) => {
   logger.error('Rate limit error:', error);
   
   if (usageStats) {
-    const remainingDaily = usageStats.daily_limit - usageStats.daily_count;
-    const remainingRequest = usageStats.request_limit - usageStats.request_count;
+    const norm = normalizeStats(usageStats);
+    const remainingDaily = norm.daily.remaining;
+    const remainingRequest = norm.request.remaining;
+    const remainingMonthly = norm.monthly.remaining;
     
-    if (remainingDaily === 0) {
+    if (remainingMonthly === 0) {
       toast.error(
-        `Daily limit reached! You've used all ${usageStats.daily_limit} topics today. Resets at midnight.`,
+        `Monthly limit reached! You've used all ${norm.monthly.limit} topics this month. Resets on the 1st.`,
         { duration: 6000, icon: '🚫' }
       );
     } else if (remainingRequest === 0) {
       toast.error(
-        `Too many topics in this request! Maximum ${usageStats.request_limit} topics per request. You have ${remainingDaily} topics remaining today.`,
+        `Too many topics in this request! Maximum ${norm.request.limit} topics per request. ${remainingMonthly} remaining this month.`,
         { duration: 5000, icon: '⚠️' }
       );
     } else {
       toast.error(
-        `Rate limit exceeded. Daily: ${remainingDaily}/${usageStats.daily_limit}, Request: ${remainingRequest}/${usageStats.request_limit}`,
+        `Rate limit exceeded. Monthly remaining: ${remainingMonthly}/${norm.monthly.limit}`,
         { duration: 4000, icon: '⏱️' }
       );
     }
@@ -61,31 +90,22 @@ export const handleClassificationSuccess = (result) => {
 // Check if user can create more topics
 export const canCreateTopics = (usageStats, requestedCount = 1) => {
   if (!usageStats) return { canCreate: true, reason: null };
-  
-  const remainingDaily = usageStats.daily_limit - usageStats.daily_count;
-  const remainingRequest = usageStats.request_limit - usageStats.request_count;
-  
-  if (remainingDaily === 0) {
-    return { 
-      canCreate: false, 
-      reason: 'daily_limit',
-      message: `Daily limit reached (${usageStats.daily_count}/${usageStats.daily_limit}). Resets at midnight.`
-    };
-  }
+  const norm = normalizeStats(usageStats);
+  const remainingRequest = norm.request.remaining;
+  const remainingMonthly = norm.monthly.remaining;
   
   if (requestedCount > remainingRequest) {
     return { 
       canCreate: false, 
       reason: 'request_limit',
-      message: `Too many topics in this request. Maximum ${usageStats.request_limit} per request.`
+      message: `Too many topics in this request. Maximum ${norm.request.limit} per request.`
     };
   }
-  
-  if (requestedCount > remainingDaily) {
+  if (requestedCount > remainingMonthly) {
     return { 
       canCreate: false, 
-      reason: 'insufficient_daily',
-      message: `Not enough daily topics remaining. You have ${remainingDaily} left today.`
+      reason: 'insufficient_monthly',
+      message: `Not enough monthly topics remaining. You have ${remainingMonthly} left this month.`
     };
   }
   
@@ -96,23 +116,13 @@ export const canCreateTopics = (usageStats, requestedCount = 1) => {
 export const getRemainingLimits = (usageStats) => {
   if (!usageStats) {
     return {
+      monthly: { used: 0, limit: MAX_TOPICS_PER_MONTH, remaining: MAX_TOPICS_PER_MONTH },
       daily: { used: 0, limit: MAX_TOPICS_PER_DAY, remaining: MAX_TOPICS_PER_DAY },
       request: { used: 0, limit: MAX_TOPICS_PER_REQUEST, remaining: MAX_TOPICS_PER_REQUEST }
     };
   }
-  
-  return {
-    daily: {
-      used: usageStats.daily_count || 0,
-      limit: usageStats.daily_limit || MAX_TOPICS_PER_DAY,
-      remaining: (usageStats.daily_limit || MAX_TOPICS_PER_DAY) - (usageStats.daily_count || 0)
-    },
-    request: {
-      used: usageStats.request_count || 0,
-      limit: usageStats.request_limit || MAX_TOPICS_PER_REQUEST,
-      remaining: (usageStats.request_limit || MAX_TOPICS_PER_REQUEST) - (usageStats.request_count || 0)
-    }
-  };
+  const norm = normalizeStats(usageStats);
+  return norm;
 };
 
 // Get rate limit status from API
@@ -121,12 +131,7 @@ export const getRateLimitStatus = async () => {
     const { data: result } = await aiAxios.get('/rate-limit-status/');
     
     if (result.rate_limit_info) {
-      return {
-        daily_count: result.rate_limit_info.daily_used || 0,
-        daily_limit: result.rate_limit_info.daily_limit || 16,
-        request_limit: result.rate_limit_info.per_request_limit || 4,
-        remaining: result.rate_limit_info.daily_remaining || 16
-      };
+      return result.rate_limit_info;
     }
     
     return getRemainingLimits(null);
@@ -205,15 +210,16 @@ export const formatUsageStats = (usageStats) => {
   if (!usageStats) return null;
   
   const limits = getRemainingLimits(usageStats);
-  const dailyPercentage = (limits.daily.used / limits.daily.limit) * 100;
+  const monthlyPercentage = (limits.monthly.used / limits.monthly.limit) * 100;
   
   return {
-    daily: {
-      ...limits.daily,
-      percentage: Math.round(dailyPercentage),
-      status: dailyPercentage >= 100 ? 'exhausted' : dailyPercentage >= 80 ? 'warning' : 'normal'
+    monthly: {
+      ...limits.monthly,
+      percentage: Math.round(monthlyPercentage),
+      status: monthlyPercentage >= 100 ? 'exhausted' : monthlyPercentage >= 80 ? 'warning' : 'normal'
     },
-    request: limits.request
+    request: limits.request,
+    daily: limits.daily,
   };
 };
 
@@ -222,16 +228,10 @@ export const getStatusMessage = (usageStats) => {
   if (!usageStats) return "Ready to create topics";
   
   const limits = getRemainingLimits(usageStats);
-  
-  if (limits.daily.remaining === 0) {
-    return "Daily limit reached - resets at midnight";
-  }
-  
-  if (limits.daily.remaining <= 3) {
-    return `Only ${limits.daily.remaining} topic${limits.daily.remaining !== 1 ? 's' : ''} remaining today`;
-  }
-  
-  return `${limits.daily.remaining} topic${limits.daily.remaining !== 1 ? 's' : ''} remaining today`;
+  const rem = limits.monthly.remaining;
+  if (rem === 0) return "Monthly limit reached - resets on the 1st";
+  if (rem <= 3) return `Only ${rem} topic${rem !== 1 ? 's' : ''} left this month`;
+  return `${rem} topics remaining this month`;
 };
 
 // Legacy compatibility function for ProLearningPage
@@ -267,16 +267,13 @@ export const formatRateLimitMessage = (error) => {
   // If error has usage stats, provide detailed message
   if (error.usage_stats) {
     const limits = getRemainingLimits(error.usage_stats);
-    
-    if (limits.daily.remaining === 0) {
-      return `🚫 Daily limit reached! You've used all ${limits.daily.limit} topics today. Limit resets at midnight.`;
+    if (limits.monthly.remaining === 0) {
+      return `🚫 Monthly limit reached! You've used all ${limits.monthly.limit} topics this month. Resets on the 1st.`;
     }
-    
     if (error.message && error.message.includes('per request')) {
-      return `⚠️ Too many topics in this request! Maximum ${limits.request.limit} topics per request. You have ${limits.daily.remaining} topics remaining today.`;
+      return `⚠️ Too many topics in this request! Maximum ${limits.request.limit} topics per request. ${limits.monthly.remaining} remaining this month.`;
     }
-    
-    return `⏱️ Rate limit exceeded. You have ${limits.daily.remaining} topics remaining today (${limits.daily.used}/${limits.daily.limit} used).`;
+    return `⏱️ Rate limit exceeded. You have ${limits.monthly.remaining} topics remaining this month (${limits.monthly.used}/${limits.monthly.limit} used).`;
   }
   
   // Fallback message

@@ -1344,6 +1344,15 @@ def check_topic_rate_limit_with_auth(request, requested_topics):
             'daily_limit': getattr(settings, 'MAX_TOPICS_PER_DAY', 1000),
             'daily_remaining': getattr(settings, 'MAX_TOPICS_PER_DAY', 1000),
             'per_request_limit': getattr(settings, 'MAX_TOPICS_PER_REQUEST', 4),
+            'rate_limits': {
+                'monthly': {
+                    'limit': getattr(settings, 'MAX_TOPICS_PER_MONTH', 15),
+                    'used': 0,
+                    'remaining': getattr(settings, 'MAX_TOPICS_PER_MONTH', 15),
+                    'percent_used': 0,
+                },
+                'daily': { 'enforced': getattr(settings, 'ENFORCE_DAILY_LIMIT', False) }
+            }
         }
 
     try:
@@ -1403,6 +1412,15 @@ def record_topic_creation_with_auth(request, topics_created):
             'daily_limit': getattr(settings, 'MAX_TOPICS_PER_DAY', 1000),
             'daily_remaining': getattr(settings, 'MAX_TOPICS_PER_DAY', 1000),
             'per_request_limit': getattr(settings, 'MAX_TOPICS_PER_REQUEST', 4),
+            'rate_limits': {
+                'monthly': {
+                    'limit': getattr(settings, 'MAX_TOPICS_PER_MONTH', 15),
+                    'used': 0,
+                    'remaining': getattr(settings, 'MAX_TOPICS_PER_MONTH', 15),
+                    'percent_used': 0,
+                },
+                'daily': { 'enforced': getattr(settings, 'ENFORCE_DAILY_LIMIT', False) }
+            }
         }
 
     try:

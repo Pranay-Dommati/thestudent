@@ -1,5 +1,6 @@
 import baseAxios from 'axios';
 import apiAxios from './axios';
+import storage from './storage';
 
 // Reuse the same interceptors logic by creating a new axios instance
 // with baseURL '/ai' and attaching the same request/response interceptors
@@ -14,10 +15,7 @@ const axiosAi = baseAxios.create({
 // Copy request interceptor: attach Authorization header from localStorage
 axiosAi.interceptors.request.use(
   async (config) => {
-    let token = null;
-    if (typeof localStorage !== 'undefined') {
-      token = localStorage.getItem('accessToken');
-    }
+    const token = storage.getItem('accessToken');
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
@@ -61,7 +59,7 @@ axiosAi.interceptors.response.use(
       }
 
       isRefreshing = true;
-      const refreshToken = typeof localStorage !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+  const refreshToken = storage.getItem('refreshToken');
       if (!refreshToken) {
         isRefreshing = false;
         onRefreshed(null);
@@ -75,18 +73,13 @@ axiosAi.interceptors.response.use(
         });
         const newAccess = data?.access;
         if (!newAccess) throw new Error('No access token in refresh response');
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('accessToken', newAccess);
-        }
+        storage.setItem('accessToken', newAccess);
         onRefreshed(newAccess);
         originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers['Authorization'] = `Bearer ${newAccess}`;
         return axiosAi(originalRequest);
       } catch (refreshErr) {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-        }
+        storage.clearAuthTokens();
         onRefreshed(null);
         return Promise.reject(refreshErr);
       } finally {
