@@ -2,9 +2,7 @@
 set -euo pipefail
 
 # Dump MySQL database into db_backup.sql
-# Supports two modes:
-# 1) Docker container named 'studentshub_mysql'
-# 2) Local mysqldump on host
+# Uses root inside Docker container to include all data
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -17,8 +15,8 @@ if [[ -f ./.env ]]; then
 fi
 
 DB_NAME=${DB_NAME:-studentshub_db}
-DB_USER=${DB_USER:-studentshub_user}
-DB_PASSWORD=${DB_PASSWORD:-}
+DB_USER=${DB_USER:-root}            # Use root to get full dump
+DB_PASSWORD=${DB_PASSWORD:-rootpass123}  # Default root password
 DB_HOST=${DB_HOST:-localhost}
 DB_PORT=${DB_PORT:-3306}
 
@@ -33,11 +31,7 @@ docker_cmd() {
 
 if command -v docker >/dev/null 2>&1 && docker_cmd ps --format '{{.Names}}' | grep -q '^studentshub_mysql$'; then
   echo "[dump] Detected Docker container 'studentshub_mysql'. Dumping inside container..."
-  
-  # Use mysqldump with --single-transaction for consistent backup without locking tables
-  # --no-tablespaces avoids PROCESS privilege requirement
-  # --routines includes stored procedures, --triggers includes triggers
-  # --add-drop-table ensures tables are dropped before recreate
+
   docker_cmd exec studentshub_mysql \
     mysqldump -u "$DB_USER" -p"$DB_PASSWORD" \
     --single-transaction \
@@ -48,12 +42,11 @@ if command -v docker >/dev/null 2>&1 && docker_cmd ps --format '{{.Names}}' | gr
     --events \
     --set-gtid-purged=OFF \
     "$DB_NAME" > "$OUTPUT_FILE" 2>&1 | grep -v "Using a password on the command line" || true
-  
+
   echo "[dump] Dump completed inside container"
 else
   echo "[dump] Using local mysqldump (ensure MySQL client tools are installed)..."
-  
-  # Local mysqldump
+
   mysqldump -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" \
     --single-transaction \
     --no-tablespaces \
