@@ -1,3 +1,4 @@
+mysqldump: [Warning] Using a password on the command line interface can be insecure.
 -- MySQL dump 10.13  Distrib 8.0.43, for Linux (x86_64)
 --
 -- Host: localhost    Database: studentshub_db
@@ -24,7 +25,7 @@ DROP TABLE IF EXISTS `auth_group`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `auth_group` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -76,9 +77,9 @@ DROP TABLE IF EXISTS `auth_permission`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `auth_permission` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `content_type_id` int NOT NULL,
-  `codename` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `codename` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `auth_permission_content_type_id_codename_01ab375a_uniq` (`content_type_id`,`codename`),
   CONSTRAINT `auth_permission_content_type_id_2f476e4b_fk_django_co` FOREIGN KEY (`content_type_id`) REFERENCES `django_content_type` (`id`)
@@ -104,7 +105,7 @@ DROP TABLE IF EXISTS `authentication_emailotp`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `authentication_emailotp` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `code` varchar(6) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code` varchar(6) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `expires_at` datetime(6) NOT NULL,
   `is_used` tinyint(1) NOT NULL,
   `created_at` datetime(6) NOT NULL,
@@ -137,19 +138,19 @@ DROP TABLE IF EXISTS `authentication_user`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `authentication_user` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `password` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `last_login` datetime(6) DEFAULT NULL,
   `is_superuser` tinyint(1) NOT NULL,
-  `first_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `last_name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `first_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_name` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `is_staff` tinyint(1) NOT NULL,
   `is_active` tinyint(1) NOT NULL,
-  `email` varchar(254) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `full_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(254) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `full_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `date_joined` datetime(6) NOT NULL,
   `updated_at` datetime(6) NOT NULL,
   `agreed_to_terms` tinyint(1) NOT NULL,
-  `auth_method` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `auth_method` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -161,7 +162,7 @@ CREATE TABLE `authentication_user` (
 
 LOCK TABLES `authentication_user` WRITE;
 /*!40000 ALTER TABLE `authentication_user` DISABLE KEYS */;
-INSERT INTO `authentication_user` VALUES (1,'pbkdf2_sha256$1000000$ilI6YbDEVhyeYZCxQWBTXM$pYOQ49l9RApzWwEHGM0nNmUOH52EjmIxwts610t9YX4=',NULL,1,'','',1,1,'sai@gmail.com','sai','2025-09-18 06:38:23.197000','2025-09-18 06:38:23.197000',0,'email'),(2,'!RoJeaEe3MBH3s6UxZBoSm6iwa7SH74gBopfD8ZB8',NULL,0,'','',0,1,'balinasaicharan23@gmail.com','sai charan balina','2025-09-18 14:13:32.398000','2025-09-18 14:13:32.398000',1,'google'),(3,'pbkdf2_sha256$1000000$fCfL9sMFGzbJvqci9yIFMK$cnxZMoA/x2287gkYFI+0IXaOCHWWRuJPKMyAz63G1xk=',NULL,1,'','',1,1,'danger@gmail.com','danger','2025-09-18 14:14:33.846000','2025-09-18 14:14:33.846000',0,'email'),(4,'pbkdf2_sha256$1000000$qPze00NuF7zU2Pa0zjuDnX$EtzDwJIz/BWZ5Ic+rXE6H/fS1TvMkK81km3hZS25hFk=',NULL,1,'','',1,1,'akshay@gmail.com','akshay','2025-09-18 14:33:08.873000','2025-09-18 14:33:08.873000',0,'email'),(5,'pbkdf2_sha256$1000000$WgCoc3BPZcRj2WFnQ7vD0c$Xj23IYQ2bVp9ZYBWkUnCxU9V22hhrBSdpYHotbQ/284=',NULL,1,'','',1,1,'example@gmail.com','example','2025-09-19 12:27:53.934000','2025-09-19 12:27:53.934000',0,'email'),(7,'pbkdf2_sha256$1000000$399y96Z8wsLWTBYmWxQjJr$3Y5/CbnUzdrf3YISTGbjXIMZv8hagaBvHiIojjpk1ms=',NULL,1,'','',1,1,'banny@gmail.com','banny','2025-09-19 12:34:13.942000','2025-09-19 12:34:13.942000',0,'email'),(8,'pbkdf2_sha256$1000000$vWmMB6Uq2mL1Cs6zuHi1ld$cUlBFT4XifljfYsi5s8bfSuHMY2irnhHF6KuBJ1ecgQ=',NULL,1,'','',1,1,'bunny@gmail.com','bunny','2025-09-19 12:36:44.890000','2025-09-19 12:36:44.890000',0,'email'),(9,'pbkdf2_sha256$1000000$16QaVAmEsXLkLUwZS4WPX5$qiINPAU8Fcie5Pb2gvK0ZWwHGmev2hnpF9OZUuB2Vvw=',NULL,1,'','',1,1,'br@gmail.com','br','2025-09-20 13:42:34.193000','2025-09-20 13:52:24.233000',0,'email'),(10,'pbkdf2_sha256$1000000$7S6N65kMFbdHtvfQDmJVYg$j35yguQtHOSyF5O0xlXA/5IRNtiF6dQynPQYQKt2rP4=',NULL,1,'','',1,1,'c@gmail.com','c','2025-09-20 14:08:40.311000','2025-09-20 14:08:40.311000',0,'email'),(12,'!E0Cq5DEWsFtXcZdLhkOsCVmTHvHpa1NY2yVI46oy',NULL,0,'','',0,1,'ponnamrishwanth78@gmail.com','ponnam rishwanth','2025-09-20 20:17:39.713000','2025-09-20 20:17:39.713000',1,'google'),(14,'!OuvocwdJikvrlN1fDKu8QcqXpBKhWrHWZrcksX8F',NULL,0,'','',0,1,'easylearnova@gmail.com','EasyLearnova','2025-10-04 10:05:19.897000','2025-10-04 10:05:19.897000',1,'google'),(15,'!YkoLLZ0gRgJTaVmAFyHf8enX2r7IzkFnchnBnb3p',NULL,0,'','',0,1,'bunnydommati77@gmail.com','bunny dommati','2025-10-08 11:44:18.558000','2025-10-08 11:44:18.558000',1,'google'),(16,'!01FegCYCegy8L3OjNp9L4PvkcuVAxVmYvWlai9Xh',NULL,0,'','',0,1,'studentshub72@gmail.com','studentshub','2025-10-10 04:09:10.134000','2025-10-10 04:09:10.134000',1,'google'),(17,'!AKvIHS1L9eKcrBdltvTvecWIzRPTQ7B7DEIdAWmL',NULL,0,'','',0,1,'pranaydommati.ai@gmail.com','Pranay Dommati','2025-10-10 04:16:23.448000','2025-10-10 04:16:23.448000',1,'google'),(18,'!tGobD5GZLvyi6GUTIW7IYqGlXP7lQdzfH4Lm9N30',NULL,0,'','',0,1,'bannydommati@gmail.com','Pranay Dommati','2025-10-10 08:14:07.958263','2025-10-10 08:14:07.958263',1,'google');
+INSERT INTO `authentication_user` VALUES (1,'pbkdf2_sha256$1000000$ilI6YbDEVhyeYZCxQWBTXM$pYOQ49l9RApzWwEHGM0nNmUOH52EjmIxwts610t9YX4=',NULL,1,'','',1,1,'sai@gmail.com','sai','2025-09-18 06:38:23.197000','2025-09-18 06:38:23.197000',0,'email'),(2,'!RoJeaEe3MBH3s6UxZBoSm6iwa7SH74gBopfD8ZB8',NULL,0,'','',0,1,'balinasaicharan23@gmail.com','sai charan balina','2025-09-18 14:13:32.398000','2025-09-18 14:13:32.398000',1,'google'),(3,'pbkdf2_sha256$1000000$fCfL9sMFGzbJvqci9yIFMK$cnxZMoA/x2287gkYFI+0IXaOCHWWRuJPKMyAz63G1xk=',NULL,1,'','',1,1,'danger@gmail.com','danger','2025-09-18 14:14:33.846000','2025-09-18 14:14:33.846000',0,'email'),(4,'pbkdf2_sha256$1000000$qPze00NuF7zU2Pa0zjuDnX$EtzDwJIz/BWZ5Ic+rXE6H/fS1TvMkK81km3hZS25hFk=',NULL,1,'','',1,1,'akshay@gmail.com','akshay','2025-09-18 14:33:08.873000','2025-09-18 14:33:08.873000',0,'email'),(5,'pbkdf2_sha256$1000000$WgCoc3BPZcRj2WFnQ7vD0c$Xj23IYQ2bVp9ZYBWkUnCxU9V22hhrBSdpYHotbQ/284=',NULL,1,'','',1,1,'example@gmail.com','example','2025-09-19 12:27:53.934000','2025-09-19 12:27:53.934000',0,'email'),(7,'pbkdf2_sha256$1000000$399y96Z8wsLWTBYmWxQjJr$3Y5/CbnUzdrf3YISTGbjXIMZv8hagaBvHiIojjpk1ms=',NULL,1,'','',1,1,'banny@gmail.com','banny','2025-09-19 12:34:13.942000','2025-09-19 12:34:13.942000',0,'email'),(8,'pbkdf2_sha256$1000000$vWmMB6Uq2mL1Cs6zuHi1ld$cUlBFT4XifljfYsi5s8bfSuHMY2irnhHF6KuBJ1ecgQ=',NULL,1,'','',1,1,'bunny@gmail.com','bunny','2025-09-19 12:36:44.890000','2025-09-19 12:36:44.890000',0,'email'),(10,'pbkdf2_sha256$1000000$7S6N65kMFbdHtvfQDmJVYg$j35yguQtHOSyF5O0xlXA/5IRNtiF6dQynPQYQKt2rP4=',NULL,1,'','',1,1,'c@gmail.com','c','2025-09-20 14:08:40.311000','2025-09-20 14:08:40.311000',0,'email'),(12,'!E0Cq5DEWsFtXcZdLhkOsCVmTHvHpa1NY2yVI46oy',NULL,0,'','',0,1,'ponnamrishwanth78@gmail.com','ponnam rishwanth','2025-09-20 20:17:39.713000','2025-09-20 20:17:39.713000',1,'google'),(14,'!OuvocwdJikvrlN1fDKu8QcqXpBKhWrHWZrcksX8F',NULL,0,'','',0,1,'easylearnova@gmail.com','EasyLearnova','2025-10-04 10:05:19.897000','2025-10-04 10:05:19.897000',1,'google'),(15,'!YkoLLZ0gRgJTaVmAFyHf8enX2r7IzkFnchnBnb3p',NULL,0,'','',0,1,'bunnydommati77@gmail.com','bunny dommati','2025-10-08 11:44:18.558000','2025-10-08 11:44:18.558000',1,'google'),(16,'!01FegCYCegy8L3OjNp9L4PvkcuVAxVmYvWlai9Xh',NULL,0,'','',0,1,'studentshub72@gmail.com','studentshub','2025-10-10 04:09:10.134000','2025-10-10 04:09:10.134000',1,'google'),(17,'!AKvIHS1L9eKcrBdltvTvecWIzRPTQ7B7DEIdAWmL',NULL,0,'','',0,1,'pranaydommati.ai@gmail.com','Pranay Dommati','2025-10-10 04:16:23.448000','2025-10-10 04:16:23.448000',1,'google'),(18,'!tGobD5GZLvyi6GUTIW7IYqGlXP7lQdzfH4Lm9N30',NULL,0,'','',0,1,'bannydommati@gmail.com','Pranay Dommati','2025-10-10 08:14:07.958263','2025-10-10 08:14:07.958263',1,'google');
 /*!40000 ALTER TABLE `authentication_user` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -230,10 +231,10 @@ DROP TABLE IF EXISTS `courses_certification`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_certification` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `certificate_id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `certificate_id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `issued_at` datetime(6) NOT NULL,
-  `file` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `course_id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `course_id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `user_id` bigint NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `certificate_id` (`certificate_id`),
@@ -262,9 +263,9 @@ DROP TABLE IF EXISTS `courses_coursechapter`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_coursechapter` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `order` int unsigned NOT NULL,
-  `school_course_id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `school_course_id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   KEY `courses_coursechapte_school_course_id_a1fdf00b_fk_courses_s` (`school_course_id`),
   CONSTRAINT `courses_coursechapte_school_course_id_a1fdf00b_fk_courses_s` FOREIGN KEY (`school_course_id`) REFERENCES `courses_schoolcourse` (`id`),
@@ -291,9 +292,9 @@ DROP TABLE IF EXISTS `courses_coursesection`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_coursesection` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `order` int unsigned NOT NULL,
-  `engineering_course_id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `engineering_course_id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   KEY `courses_coursesectio_engineering_course_i_6eb2f22e_fk_courses_e` (`engineering_course_id`),
   CONSTRAINT `courses_coursesectio_engineering_course_i_6eb2f22e_fk_courses_e` FOREIGN KEY (`engineering_course_id`) REFERENCES `courses_engineeringcourse` (`id`),
@@ -319,23 +320,23 @@ DROP TABLE IF EXISTS `courses_engineeringcourse`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_engineeringcourse` (
-  `id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `short_description` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
-  `thumbnail` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `duration` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `short_description` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `thumbnail` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `duration` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `last_updated` date NOT NULL,
   `created_at` datetime(6) NOT NULL,
   `is_published` tinyint(1) NOT NULL,
-  `subject` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `sources` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `proficiency` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `subject` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `sources` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `proficiency` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `certificate_given` tinyint(1) NOT NULL,
   `project_based` tinyint(1) NOT NULL,
   `learning_points` json DEFAULT NULL,
   `requirements` json DEFAULT NULL,
-  `category` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `category` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `user_id` bigint DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `courses_engineeringc_user_id_69106cf0_fk_authentic` (`user_id`),
@@ -394,11 +395,11 @@ DROP TABLE IF EXISTS `courses_lesson`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_lesson` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `video_url` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
-  `about_lesson` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `video_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `about_lesson` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `order` int unsigned NOT NULL,
   `chapter_id` bigint DEFAULT NULL,
   `section_id` bigint DEFAULT NULL,
@@ -430,11 +431,11 @@ DROP TABLE IF EXISTS `courses_lessonresource`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_lessonresource` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
-  `url` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `file` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `lesson_id` bigint NOT NULL,
   PRIMARY KEY (`id`),
   KEY `courses_lessonresource_lesson_id_8c9d4f54_fk_courses_lesson_id` (`lesson_id`),
@@ -459,9 +460,9 @@ DROP TABLE IF EXISTS `courses_prolearningcourse`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_prolearningcourse` (
-  `id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `course_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` longtext COLLATE utf8mb4_unicode_ci,
+  `id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `course_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` datetime(6) NOT NULL,
   `updated_at` datetime(6) NOT NULL,
   `is_completed` tinyint(1) NOT NULL,
@@ -491,16 +492,16 @@ DROP TABLE IF EXISTS `courses_prolearningquizquestion`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_prolearningquizquestion` (
-  `id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `question_text` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
-  `question_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `question_text` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `question_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `options` json NOT NULL,
-  `correct_answer` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `explanation` longtext COLLATE utf8mb4_unicode_ci,
+  `correct_answer` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `explanation` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `points` int unsigned NOT NULL,
   `order` int unsigned NOT NULL,
   `created_at` datetime(6) NOT NULL,
-  `topic_id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `topic_id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   KEY `courses_prolearningq_topic_id_f79b988b_fk_courses_p` (`topic_id`),
   CONSTRAINT `courses_prolearningq_topic_id_f79b988b_fk_courses_p` FOREIGN KEY (`topic_id`) REFERENCES `courses_prolearningtopic` (`id`),
@@ -527,14 +528,14 @@ DROP TABLE IF EXISTS `courses_prolearningresource`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_prolearningresource` (
-  `id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `resource_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `url` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` longtext COLLATE utf8mb4_unicode_ci,
+  `id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `resource_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `order` int unsigned NOT NULL,
   `created_at` datetime(6) NOT NULL,
-  `topic_id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `topic_id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   KEY `courses_prolearningr_topic_id_a70c6add_fk_courses_p` (`topic_id`),
   CONSTRAINT `courses_prolearningr_topic_id_a70c6add_fk_courses_p` FOREIGN KEY (`topic_id`) REFERENCES `courses_prolearningtopic` (`id`),
@@ -560,17 +561,17 @@ DROP TABLE IF EXISTS `courses_prolearningtopic`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_prolearningtopic` (
-  `id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `topic_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `topic_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `order` int unsigned NOT NULL,
-  `reading_material` longtext COLLATE utf8mb4_unicode_ci,
-  `summary` longtext COLLATE utf8mb4_unicode_ci,
+  `reading_material` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `summary` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `is_completed` tinyint(1) NOT NULL,
   `progress_percentage` decimal(5,2) NOT NULL,
   `created_at` datetime(6) NOT NULL,
   `updated_at` datetime(6) NOT NULL,
   `completed_at` datetime(6) DEFAULT NULL,
-  `course_id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `course_id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `courses_prolearningtopic_course_id_order_a2d6c6af_uniq` (`course_id`,`order`),
   CONSTRAINT `courses_prolearningt_course_id_1c76f6c7_fk_courses_p` FOREIGN KEY (`course_id`) REFERENCES `courses_prolearningcourse` (`id`),
@@ -596,15 +597,15 @@ DROP TABLE IF EXISTS `courses_prolearningvideo`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_prolearningvideo` (
-  `id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `video_url` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` longtext COLLATE utf8mb4_unicode_ci,
-  `duration` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `video_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `duration` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `order` int unsigned NOT NULL,
   `is_watched` tinyint(1) NOT NULL,
   `created_at` datetime(6) NOT NULL,
-  `topic_id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `topic_id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   KEY `courses_prolearningv_topic_id_d8e6da15_fk_courses_p` (`topic_id`),
   CONSTRAINT `courses_prolearningv_topic_id_d8e6da15_fk_courses_p` FOREIGN KEY (`topic_id`) REFERENCES `courses_prolearningtopic` (`id`),
@@ -631,9 +632,9 @@ DROP TABLE IF EXISTS `courses_quizquestion`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_quizquestion` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `question` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `question` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `options` json NOT NULL,
-  `correct_answer` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `correct_answer` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `lesson_id` bigint NOT NULL,
   PRIMARY KEY (`id`),
   KEY `courses_quizquestion_lesson_id_892e26cb_fk_courses_lesson_id` (`lesson_id`),
@@ -694,20 +695,20 @@ DROP TABLE IF EXISTS `courses_schoolcourse`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_schoolcourse` (
-  `id` char(32) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `short_description` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
-  `thumbnail` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `duration` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `short_description` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `thumbnail` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `duration` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `last_updated` date NOT NULL,
   `created_at` datetime(6) NOT NULL,
   `is_published` tinyint(1) NOT NULL,
-  `class_level` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `board` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `state` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `subject` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `sources` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `class_level` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `board` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `state` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `subject` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sources` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `key_topics` json NOT NULL,
   `learning_points` json NOT NULL,
   PRIMARY KEY (`id`)
@@ -763,18 +764,18 @@ DROP TABLE IF EXISTS `courses_userstartedpredefinedcourse`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `courses_userstartedpredefinedcourse` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `course_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `class_level` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `board` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `subject` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `course_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `class_level` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `board` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `subject` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `progress_percentage` decimal(5,2) NOT NULL,
   `is_completed` tinyint(1) NOT NULL,
   `started_at` datetime(6) NOT NULL,
   `last_activity` datetime(6) NOT NULL,
   `completed_at` datetime(6) DEFAULT NULL,
-  `engineering_course_id` char(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `engineering_course_id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `last_accessed_lesson_id` bigint DEFAULT NULL,
-  `school_course_id` char(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `school_course_id` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `user_id` bigint NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `courses_userstartedprede_user_id_engineering_cour_d1bc524e_uniq` (`user_id`,`engineering_course_id`),
@@ -798,7 +799,7 @@ CREATE TABLE `courses_userstartedpredefinedcourse` (
 
 LOCK TABLES `courses_userstartedpredefinedcourse` WRITE;
 /*!40000 ALTER TABLE `courses_userstartedpredefinedcourse` DISABLE KEYS */;
-INSERT INTO `courses_userstartedpredefinedcourse` VALUES (2,'school','10th','cbse','mathematics',0.00,0,'2025-09-18 18:46:00.708000','2025-09-18 18:46:00.709000',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',1),(3,'school','10th','cbse','mathematics',0.00,0,'2025-09-19 13:21:44.058000','2025-09-19 13:21:44.058000',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',5),(4,'school','10th','','mathematics',0.00,0,'2025-09-20 13:42:58.705000','2025-09-20 13:42:58.706000',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',9),(5,'school','10th','','mathematics',0.00,0,'2025-09-20 16:31:01.756000','2025-09-20 16:31:01.756000',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',10),(6,'school','10th','','mathematics',0.00,0,'2025-09-20 20:17:46.346000','2025-09-20 20:17:46.346000',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',12),(7,'engineering',NULL,NULL,NULL,0.00,0,'2025-09-21 06:34:51.454000','2025-09-21 06:34:51.454000',NULL,'19a034705c794859836fe62b61c22f17',NULL,NULL,10),(10,'school','10th','','mathematics',0.00,0,'2025-10-10 06:25:43.425865','2025-10-10 06:25:43.426918',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',2),(11,'school','10th','','mathematics',0.00,0,'2025-10-10 09:44:37.298710','2025-10-10 09:44:37.298710',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',18);
+INSERT INTO `courses_userstartedpredefinedcourse` VALUES (2,'school','10th','cbse','mathematics',0.00,0,'2025-09-18 18:46:00.708000','2025-09-18 18:46:00.709000',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',1),(3,'school','10th','cbse','mathematics',0.00,0,'2025-09-19 13:21:44.058000','2025-09-19 13:21:44.058000',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',5),(5,'school','10th','','mathematics',0.00,0,'2025-09-20 16:31:01.756000','2025-09-20 16:31:01.756000',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',10),(6,'school','10th','','mathematics',0.00,0,'2025-09-20 20:17:46.346000','2025-09-20 20:17:46.346000',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',12),(7,'engineering',NULL,NULL,NULL,0.00,0,'2025-09-21 06:34:51.454000','2025-09-21 06:34:51.454000',NULL,'19a034705c794859836fe62b61c22f17',NULL,NULL,10),(10,'school','10th','','mathematics',0.00,0,'2025-10-10 06:25:43.425865','2025-10-10 06:25:43.426918',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',2),(11,'school','10th','','mathematics',0.00,0,'2025-10-10 09:44:37.298710','2025-10-10 09:44:37.298710',NULL,NULL,NULL,'95aff5e789b44aaf8b05eedc816a501b',18);
 /*!40000 ALTER TABLE `courses_userstartedpredefinedcourse` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -812,10 +813,10 @@ DROP TABLE IF EXISTS `django_admin_log`;
 CREATE TABLE `django_admin_log` (
   `id` int NOT NULL AUTO_INCREMENT,
   `action_time` datetime(6) NOT NULL,
-  `object_id` longtext COLLATE utf8mb4_unicode_ci,
-  `object_repr` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `object_id` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `object_repr` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `action_flag` smallint unsigned NOT NULL,
-  `change_message` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `change_message` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `content_type_id` int DEFAULT NULL,
   `user_id` bigint NOT NULL,
   PRIMARY KEY (`id`),
@@ -845,8 +846,8 @@ DROP TABLE IF EXISTS `django_content_type`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `django_content_type` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `app_label` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `model` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `app_label` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `model` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `django_content_type_app_label_model_76bd3d3b_uniq` (`app_label`,`model`)
 ) ENGINE=InnoDB AUTO_INCREMENT=33 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -871,8 +872,8 @@ DROP TABLE IF EXISTS `django_migrations`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `django_migrations` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `app` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `app` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `applied` datetime(6) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=66 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -896,8 +897,8 @@ DROP TABLE IF EXISTS `django_session`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `django_session` (
-  `session_key` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `session_data` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `session_key` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `session_data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `expire_date` datetime(6) NOT NULL,
   PRIMARY KEY (`session_key`),
   KEY `django_session_expire_date_a5c62663` (`expire_date`)
@@ -922,8 +923,8 @@ DROP TABLE IF EXISTS `feedback_feedback`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedback_feedback` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `message` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `message` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `submitted_at` datetime(6) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -948,7 +949,7 @@ DROP TABLE IF EXISTS `newsletter_newsletter`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `newsletter_newsletter` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `email` varchar(254) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(254) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `subscribed_at` datetime(6) NOT NULL,
   `is_active` tinyint(1) NOT NULL,
   PRIMARY KEY (`id`),
@@ -974,12 +975,12 @@ DROP TABLE IF EXISTS `social_auth_association`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `social_auth_association` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `server_url` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `handle` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `secret` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `server_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `handle` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `secret` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `issued` int NOT NULL,
   `lifetime` int NOT NULL,
-  `assoc_type` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `assoc_type` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `social_auth_association_server_url_handle_078befa2_uniq` (`server_url`,`handle`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1003,8 +1004,8 @@ DROP TABLE IF EXISTS `social_auth_code`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `social_auth_code` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `email` varchar(254) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `code` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(254) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `verified` tinyint(1) NOT NULL,
   `timestamp` datetime(6) NOT NULL,
   PRIMARY KEY (`id`),
@@ -1032,9 +1033,9 @@ DROP TABLE IF EXISTS `social_auth_nonce`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `social_auth_nonce` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `server_url` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `server_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `timestamp` int NOT NULL,
-  `salt` varchar(65) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `salt` varchar(65) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `social_auth_nonce_server_url_timestamp_salt_f6284463_uniq` (`server_url`,`timestamp`,`salt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1058,9 +1059,9 @@ DROP TABLE IF EXISTS `social_auth_partial`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `social_auth_partial` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `token` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `token` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `next_step` smallint unsigned NOT NULL,
-  `backend` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `backend` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `timestamp` datetime(6) NOT NULL,
   `data` json NOT NULL DEFAULT (_utf8mb4'{}'),
   PRIMARY KEY (`id`),
@@ -1088,8 +1089,8 @@ DROP TABLE IF EXISTS `social_auth_usersocialauth`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `social_auth_usersocialauth` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `provider` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `uid` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `provider` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `uid` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `user_id` bigint NOT NULL,
   `created` datetime(6) NOT NULL,
   `modified` datetime(6) NOT NULL,
@@ -1121,13 +1122,13 @@ DROP TABLE IF EXISTS `tracking_useractivity`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tracking_useractivity` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `session_id` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `event_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `feature` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `session_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `event_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `feature` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `metadata` json NOT NULL,
   `latency_ms` int DEFAULT NULL,
   `success` tinyint(1) NOT NULL,
-  `error_code` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `error_code` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `client_ts` datetime(6) DEFAULT NULL,
   `created_at` datetime(6) NOT NULL,
   `user_id` bigint DEFAULT NULL,
@@ -1168,4 +1169,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-10-10 12:26:42
+-- Dump completed on 2025-10-10 12:29:37
