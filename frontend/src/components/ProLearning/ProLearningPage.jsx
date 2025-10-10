@@ -620,8 +620,46 @@ const ProLearningPage = () => {
             topics: transformedTopics.map(t => ({ name: t.name, isActive: t.isActive }))
           });
           
-          // Use handleTopicSelection for database topics (but force reload mode logic)
-          setLoadScenario('reload');
+          // CRITICAL FIX: Differentiate between three cases:
+          // 1. Fresh generation: course_TIMESTAMP_ID (e.g., course_1760070219554_jd70zm6tc)
+          // 2. LocalStorage reload: Same course_TIMESTAMP_ID, reload page
+          // 3. Database reload: UUID format (e.g., 7fce76ea-85c4-44c9-bcf9-77197b8d2ad2)
+          
+          // Check if courseId is a UUID (database reload) or timestamp-based (fresh/localStorage)
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentCourseId);
+          const isTimestampBased = currentCourseId.startsWith('course_');
+          
+          console.log('🔍 Course ID analysis:', {
+            courseId: currentCourseId,
+            isUUID,
+            isTimestampBased,
+            hasBatchMarker: !!(typeof localStorage !== 'undefined' && localStorage.getItem('proLearning_batchMarker'))
+          });
+          
+          if (isUUID) {
+            // Case 3: Database reload with UUID - completed course from database
+            console.log('✅ Database reload (UUID) - loading completed course from database');
+            setLoadScenario('reload');
+          } else if (isTimestampBased) {
+            // Case 1 or 2: Fresh generation or localStorage reload with course_TIMESTAMP_ID
+            // Check if there's an active batch marker indicating ongoing generation
+            const hasBatchMarker = typeof localStorage !== 'undefined' ? localStorage.getItem('proLearning_batchMarker') : null;
+            
+            if (hasBatchMarker) {
+              // Case 1: Fresh generation in progress
+              console.log('🆕 Fresh generation (course_TIMESTAMP) - progressive generation mode');
+              setLoadScenario('first-time');
+            } else {
+              // Case 2: LocalStorage reload - page refreshed during or after generation
+              console.log('💾 LocalStorage reload (course_TIMESTAMP) - using cached content');
+              setLoadScenario('reload');
+            }
+          } else {
+            // Fallback: treat as reload
+            console.log('⚠️ Unknown course ID format - defaulting to reload mode');
+            setLoadScenario('reload');
+          }
+          
           handleTopicSelection(transformedTopics);
           // Persist DB topics so they’re available on refresh
           try {
@@ -1209,14 +1247,36 @@ const ProLearningPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseTitle, GEMINI_API_KEY]);
 
-  // Separate useEffect to handle batch generation when topics are available
-  // Skip this entirely when progressive generation is enabled
+  // Separate useEffect to handle batch/progressive generation when topics are available
   useEffect(() => {
+    const currentCourseId = getCourseId();
+    if (topicsList.length === 0 || !currentCourseId) return;
+    
     if (useProgressiveGeneration) {
+      // CRITICAL: Auto-start progressive generation for fresh courses
+      // Check if this is a fresh generation (first-time mode with batch marker)
+      const hasBatchMarker = typeof localStorage !== 'undefined' ? localStorage.getItem('proLearning_batchMarker') : null;
+      const isFirstTime = loadScenario === 'first-time';
+      
+      console.log('🔍 Progressive generation check:', {
+        loadScenario,
+        hasBatchMarker: !!hasBatchMarker,
+        isProgressiveGenerating,
+        topicsCount: topicsList.length
+      });
+      
+      // Auto-start progressive generation if:
+      // 1. We're in first-time mode, OR
+      // 2. We have a batch marker indicating fresh generation
+      if ((isFirstTime || hasBatchMarker) && !isProgressiveGenerating) {
+        console.log('🚀 Auto-starting progressive generation for fresh course');
+        handleProLearningStart();
+      }
       return; // progressive flow manages its own generation lifecycle
     }
-    const currentCourseId = getCourseId();
-    if (topicsList.length > 0 && !isBatchGenerating && currentCourseId) {
+    
+    // Batch generation mode (non-progressive)
+    if (!isBatchGenerating) {
       // Check if we need to start batch generation using new storage system
       const progress = getGenerationProgress(currentCourseId);
       
@@ -1254,7 +1314,7 @@ const ProLearningPage = () => {
         }, 500);
       }
     }
-  }, [topicsList, courseTitle, useProgressiveGeneration]); // Depend on both topicsList and courseTitle
+  }, [topicsList, courseTitle, useProgressiveGeneration, loadScenario, isProgressiveGenerating]); // Depend on loadScenario to detect fresh generation
 
   // Load content for initially active topic using new storage system
   useEffect(() => {
@@ -4969,13 +5029,23 @@ const ProLearningPage = () => {
                   >
                     {sanitizedReading}
                   </ReactMarkdown>
-                  ) : (isLoading || (content && content.reading && (!sanitizedReading || !sanitizedReading.trim().length))) ? (
+                  ) : (isLoading || isProgressiveGenerating || (content && content.reading && (!sanitizedReading || !sanitizedReading.trim().length))) ? (
                   <div className="text-center py-12">
-                    <div className="inline-flex items-center px-6 py-3 bg-blue-50 rounded-lg">
-                      <BiLoaderAlt className="animate-spin text-blue-600 mr-3" />
-                      <span className="text-blue-800 font-medium">
-                        {loadingStep || `Generating content for ${topicParam || 'topic'}...`}
-                      </span>
+                    <div className="inline-flex items-center px-6 py-3 bg-blue-50 rounded-lg shadow-sm">
+                      <BiLoaderAlt className="animate-spin text-blue-600 mr-3 text-2xl" />
+                      <div className="flex flex-col items-start">
+                        <span className="text-blue-800 font-medium">
+                          Loading{' '}
+                          <span className="inline-flex">
+                            <span className="animate-pulse">.</span>
+                            <span className="animate-pulse" style={{ animationDelay: '0.2s' }}>.</span>
+                            <span className="animate-pulse" style={{ animationDelay: '0.4s' }}>.</span>
+                          </span>
+                        </span>
+                        {loadingStep && (
+                          <span className="text-blue-600 text-sm mt-1">{loadingStep}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -6045,7 +6115,7 @@ const ProLearningPage = () => {
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                           } ${(isLoading || isTabDisabled) ? 'opacity-50 cursor-not-allowed' : ''}`}
                           title={
-                            currentTopicBlocked 
+                            currentTopicBlocked && loadScenario !== 'first-time'
                               ? `${tab.label} will be available after course generation completes`
                               : isTabDisabled 
                                 ? `${tab.label} is being generated...` 
