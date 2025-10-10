@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import axiosInstance from '../utils/axios';
+import storage from '../utils/storage';
 
 const AuthContext = createContext(null);
 
@@ -15,7 +16,7 @@ export const AuthProvider = ({ children }) => {
   // Function to refresh the access token
   const refreshAccessToken = async () => {
     try {
-      const refreshToken = localStorage.getItem('refreshToken');
+  const refreshToken = storage.getItem('refreshToken');
       if (!refreshToken) {
         console.error('No refresh token found');
         handleAuthFailure();
@@ -27,9 +28,9 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (response.data.access) {
-        localStorage.setItem('accessToken', response.data.access);
+        storage.setItem('accessToken', response.data.access);
         if (response.data.refresh) {
-          localStorage.setItem('refreshToken', response.data.refresh);
+          storage.setItem('refreshToken', response.data.refresh);
         }
         return true;
       }
@@ -43,8 +44,8 @@ export const AuthProvider = ({ children }) => {
 
   // Function to validate current auth state
   const validateAuth = async () => {
-    const token = localStorage.getItem('accessToken');
-    const refreshToken = localStorage.getItem('refreshToken');
+  const token = storage.getItem('accessToken');
+  const refreshToken = storage.getItem('refreshToken');
     const now = Date.now();
     
     // Only check if we haven't checked in the last minute and we're already logged in
@@ -86,8 +87,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const handleAuthFailure = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+  storage.clearAuthTokens();
   // IndexedDB no longer used
     setUser(null);
     setIsLoggedIn(false);
@@ -129,8 +129,8 @@ export const AuthProvider = ({ children }) => {
       const response = await axiosInstance.post('/auth/register/', registrationData);
       const { user, tokens } = response.data;
 
-  localStorage.setItem('accessToken', tokens.access);
-  localStorage.setItem('refreshToken', tokens.refresh);
+  storage.setItem('accessToken', tokens.access);
+  storage.setItem('refreshToken', tokens.refresh);
 
       setUser(user);
       setIsLoggedIn(true);
@@ -172,8 +172,8 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Invalid response: missing tokens');
       }
       
-      localStorage.setItem('accessToken', access);
-      localStorage.setItem('refreshToken', refresh);
+  storage.setItem('accessToken', access);
+  storage.setItem('refreshToken', refresh);
       
       setUser(user);
       setIsLoggedIn(true);
@@ -220,8 +220,8 @@ export const AuthProvider = ({ children }) => {
       
       const { user, access, refresh } = response.data;
       
-  localStorage.setItem('accessToken', access);
-  localStorage.setItem('refreshToken', refresh);
+  storage.setItem('accessToken', access);
+  storage.setItem('refreshToken', refresh);
       
       setUser(user);
       setIsLoggedIn(true);
@@ -230,7 +230,11 @@ export const AuthProvider = ({ children }) => {
       toast.success('Google login successful!');
       return true;
     } catch (error) {
-      console.error('Google login error:', error.response?.data);
+      // Log richer details to help diagnose undefined cases (e.g., network/CORS)
+      const status = error.response?.status;
+      const data = error.response?.data;
+      const detail = data || error.message || 'Unknown error';
+      console.error('Google login error:', { status, detail });
       
       if (error.response?.status === 400) {
         toast.error('Google authentication failed. Please try again.');
@@ -245,7 +249,7 @@ export const AuthProvider = ({ children }) => {
 
   // Export isAuthenticated as a function to always check current state
   const isAuthenticated = () => {
-    return isLoggedIn && !!localStorage.getItem('accessToken');
+  return isLoggedIn && !!storage.getItem('accessToken');
   };
   return (
     <AuthContext.Provider value={{ 

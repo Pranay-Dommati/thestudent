@@ -1,4 +1,5 @@
 import axios from 'axios';
+import storage from './storage';
 
 const instance = axios.create({
   baseURL: (import.meta.env.VITE_API_BASE_URL || '/api'),
@@ -11,10 +12,7 @@ const instance = axios.create({
 instance.interceptors.request.use(
   async (config) => {
     // Prefer the freshest token from localStorage only.
-    let token = null;
-    if (typeof localStorage !== 'undefined') {
-      token = localStorage.getItem('accessToken');
-    }
+    let token = storage.getItem('accessToken');
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
@@ -72,7 +70,7 @@ instance.interceptors.response.use(
       }
 
       isRefreshing = true;
-      const refreshToken = typeof localStorage !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+  const refreshToken = storage.getItem('refreshToken');
       if (!refreshToken) {
         isRefreshing = false;
         onRefreshed(null);
@@ -90,9 +88,7 @@ instance.interceptors.response.use(
         if (!newAccess) throw new Error('No access token in refresh response');
 
   // Persist new token
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('accessToken', newAccess);
-        }
+        storage.setItem('accessToken', newAccess);
 
         // Notify queued subscribers
         onRefreshed(newAccess);
@@ -103,10 +99,7 @@ instance.interceptors.response.use(
         return instance(originalRequest);
       } catch (refreshErr) {
   // Cleanup tokens on hard failure
-        if (typeof localStorage !== 'undefined') {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-        }
+        storage.clearAuthTokens();
         onRefreshed(null);
         return Promise.reject(refreshErr);
       } finally {

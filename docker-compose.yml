@@ -1,26 +1,28 @@
-# Docker PostgreSQL Setup for Students Hub
+# Docker MySQL Setup for Students Hub
 # Removed obsolete version key and fixed environment variable interpolation
 
 services:
-  postgres:
-    image: postgres:15
-    container_name: studentshub_postgres
+  mysql:
+    image: public.ecr.aws/docker/library/mysql:8.0
+    container_name: studentshub_mysql
     env_file:
       - .env
     environment:
-      POSTGRES_DB: ${DB_NAME}        # taken from .env
-      POSTGRES_USER: ${DB_USER}      # taken from .env
-      POSTGRES_PASSWORD: ${DB_PASSWORD}  # taken from .env
+      MYSQL_DATABASE: ${DB_NAME}        # taken from .env
+      MYSQL_USER: ${DB_USER}            # taken from .env
+      MYSQL_PASSWORD: ${DB_PASSWORD}    # taken from .env
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpass123}  # taken from .env or default
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_USER}", "-p${DB_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
-  postgres_data:
+  mysql_data:

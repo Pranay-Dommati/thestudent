@@ -163,20 +163,20 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 # Environment-driven database configuration.
-# Use PostgreSQL when DB_ENGINE=postgresql (or DB_HOST is defined), otherwise fall back to SQLite.
+# Use MySQL when DB_ENGINE=mysql (or DB_HOST is defined), otherwise fall back to SQLite.
 DB_ENGINE = os.getenv('DB_ENGINE', '').lower()
 DB_HOST = os.getenv('DB_HOST')
-DB_PORT = os.getenv('DB_PORT', '5432')
+DB_PORT = os.getenv('DB_PORT', '3306')
 DB_NAME = os.getenv('DB_NAME', 'studentshub_db')
-DB_USER = os.getenv('DB_USER', 'postgres')
+DB_USER = os.getenv('DB_USER', 'studentshub_user')
 DB_PASSWORD = os.getenv('DB_PASSWORD', '')
 DB_SSL_REQUIRE = os.getenv('DB_SSL_REQUIRE', 'false').lower() in ('1', 'true', 'yes')
 DB_CONN_MAX_AGE = int(os.getenv('DB_CONN_MAX_AGE', '0'))  # seconds; 0 disables persistent connections
 
-if DB_ENGINE in ('postgres', 'postgresql') or DB_HOST:
+if DB_ENGINE in ('mysql', 'mariadb') or DB_HOST:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.postgresql',
+            'ENGINE': 'django.db.backends.mysql',
             'NAME': DB_NAME,
             'USER': DB_USER,
             'PASSWORD': DB_PASSWORD,
@@ -184,7 +184,9 @@ if DB_ENGINE in ('postgres', 'postgresql') or DB_HOST:
             'PORT': DB_PORT,
             'CONN_MAX_AGE': DB_CONN_MAX_AGE,
             'OPTIONS': {
-                **({'sslmode': 'require'} if DB_SSL_REQUIRE else {}),
+                'charset': 'utf8mb4',
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                **({'ssl': {'ssl_mode': 'REQUIRED'}} if DB_SSL_REQUIRE else {}),
             },
         }
     }

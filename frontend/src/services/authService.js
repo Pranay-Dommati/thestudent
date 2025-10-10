@@ -1,5 +1,6 @@
 import logger from '../utils/logger';
 import apiAxios from '../utils/axios';
+import storage from '../utils/storage';
 // Utility for making authenticated API requests with proper token validation
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -12,7 +13,7 @@ class AuthService {
 
   loadAuthData() {
     try {
-      const authData = localStorage.getItem('adminAuth');
+      const authData = storage.getItem('adminAuth');
       this.authData = authData ? JSON.parse(authData) : null;
     } catch (error) {
   logger.error('Error loading auth data:', error);
@@ -22,12 +23,12 @@ class AuthService {
 
   saveAuthData(authData) {
     this.authData = authData;
-    localStorage.setItem('adminAuth', JSON.stringify(authData));
+    storage.setItem('adminAuth', JSON.stringify(authData));
   }
 
   clearAuthData() {
     this.authData = null;
-    localStorage.removeItem('adminAuth');
+    storage.removeItem('adminAuth');
   }
 
   getAccessToken() {
@@ -82,10 +83,8 @@ class AuthService {
       this.saveAuthData(this.authData);
       // Persist common keys used by axios interceptors
       try {
-        if (typeof localStorage !== 'undefined' && data.access) {
-          localStorage.setItem('accessToken', data.access);
-          localStorage.setItem('access_token', data.access);
-        }
+        if (data.access) storage.setItem('accessToken', data.access);
+        if (data.access) storage.setItem('access_token', data.access);
       } catch {}
       
       return data.access;
@@ -146,12 +145,10 @@ class AuthService {
 
       // Also persist tokens to common keys used by axios interceptors and other services
       try {
-        if (typeof localStorage !== 'undefined') {
-          if (data.tokens?.access) localStorage.setItem('accessToken', data.tokens.access);
-          if (data.tokens?.refresh) localStorage.setItem('refreshToken', data.tokens.refresh);
-          // Backwards-compat common keys some code may read
-          if (data.tokens?.access) localStorage.setItem('access_token', data.tokens.access);
-        }
+        if (data.tokens?.access) storage.setItem('accessToken', data.tokens.access);
+        if (data.tokens?.refresh) storage.setItem('refreshToken', data.tokens.refresh);
+        // Backwards-compat common keys some code may read
+        if (data.tokens?.access) storage.setItem('access_token', data.tokens.access);
       } catch {}
       return data;
     } catch (error) {

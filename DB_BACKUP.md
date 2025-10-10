@@ -1,16 +1,17 @@
-PostgreSQL Data Sharing via Git
+DEPRECATED: Old PostgreSQL Backup Flow
 
-- Dump: `./dump.sh` writes `db_backup.dump` (custom format) at repo root. Commit it.
-- Load: `./load.sh` restores from `db_backup.dump` with `--clean --create`.
+This project now uses MySQL 8.0. The previous PostgreSQL dump/load instructions are deprecated and kept for historical reference only.
 
-Notes
-- Reads connection settings from root `.env` (`DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`).
-- Works with Docker container `studentshub_postgres` or local PostgreSQL tools (pg_dump/pg_restore).
-- If using Docker, ensure the container is up: `docker compose up -d postgres`.
+What to use now:
+- To export data: run `./dump.sh` — this writes a MySQL-compatible `db_backup.sql` at the repo root.
+- To import data: run `./load.sh` — this loads `db_backup.sql` into MySQL.
 
-Windows (Git Bash) Note
-- On Windows, Git Bash/MSYS can rewrite POSIX-style paths in Docker args, which can break `docker cp/exec` paths.
-- The scripts now automatically disable this path conversion for Docker commands, so just run them normally:
-	- `./dump.sh` to create `db_backup.dump`
-	- Commit and push the file
-	- `./load.sh` on another machine to restore
+If you still have an old `db_backup.dump` (PostgreSQL custom format):
+- It cannot be imported into MySQL directly.
+- Ask the data owner to regenerate a MySQL dump (`db_backup.sql`) from a MySQL-backed environment, or load Django fixtures in `backend/sqlite_backup/` with:
+  - `(cd backend && python manage.py loaddata sqlite_backup/sqlite_data.json)`
+
+See also:
+- `MYSQL_QUICKSTART.md`
+- `MYSQL_MIGRATION_GUIDE.md`
+- `DATABASE_README.md`

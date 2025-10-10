@@ -1,16 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Restore PostgreSQL database from db_backup.dump in custom format.
+# Restore MySQL database from db_backup.sql
 # Supports:
-# 1) Docker container named 'studentshub_postgres'
-# 2) Local pg_restore on host
+# 1) Docker container named 'studentshub_mysql'
+# 2) Local mysql client on host
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-if [[ ! -f db_backup.dump ]]; then
-  echo "[load] db_backup.dump not found in repo root. Aborting." >&2
+# Require MySQL SQL dump; guide if only Postgres dump is present
+if [[ ! -f db_backup.sql ]]; then
+  if [[ -f db_backup.dump ]]; then
+    echo "[load] Detected db_backup.dump (PostgreSQL custom format) but current database is MySQL." >&2
+    echo "[load] This file cannot be imported into MySQL. Please use a MySQL SQL dump named db_backup.sql." >&2
+    echo "[load] Alternatives:" >&2
+    echo "  - Ask the contributor to run ./dump.sh on a MySQL-backed environment and commit db_backup.sql" >&2
+    echo "  - If you have Django fixtures (e.g., backend/sqlite_backup/*.json), you can load them with:" >&2
+    echo "      (cd backend && python manage.py loaddata sqlite_backup/sqlite_data.json)" >&2
+  else
+    echo "[load] db_backup.sql not found in repo root. Aborting." >&2
+    echo "[load] Tip: Create one with ./dump.sh on a machine that has the data in MySQL." >&2
+  fi
   exit 1
 fi
 
@@ -22,11 +33,11 @@ if [[ -f ./.env ]]; then
 fi
 
 DB_NAME=${DB_NAME:-studentshub_db}
-DB_USER=${DB_USER:-postgres}
+DB_USER=${DB_USER:-studentshub_user}
 DB_PASSWORD=${DB_PASSWORD:-}
+DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootpass123}
 DB_HOST=${DB_HOST:-localhost}
-DB_PORT=${DB_PORT:-5432}
-MAINT_DB=${MAINT_DB:-postgres}
+DB_PORT=${DB_PORT:-3306}
 
 echo "[load] Restoring to DB: $DB_NAME (user=$DB_USER host=$DB_HOST port=$DB_PORT)"
 
@@ -35,48 +46,64 @@ docker_cmd() {
   MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" docker "$@"
 }
 
-if command -v docker >/dev/null 2>&1 && docker_cmd ps --format '{{.Names}}' | grep -q '^studentshub_postgres$'; then
-  echo "[load] Detected Docker container 'studentshub_postgres'. Restoring inside container..."
-  docker_cmd cp db_backup.dump studentshub_postgres:/tmp/db_backup.dump
+if command -v docker >/dev/null 2>&1 && docker_cmd ps --format '{{.Names}}' | grep -q '^studentshub_mysql$'; then
+  echo "[load] Detected Docker container 'studentshub_mysql'. Restoring inside container..."
+  
+  # Copy backup file to container
+  docker_cmd cp db_backup.sql studentshub_mysql:/tmp/db_backup.sql
 
-  # Wait for Postgres readiness inside the container
-  docker_cmd exec studentshub_postgres bash -lc "until pg_isready -U '$DB_USER' -d '$MAINT_DB' -q; do echo '[load] waiting for postgres...'; sleep 1; done"
+  # Wait for MySQL readiness inside the container
+  echo "[load] Waiting for MySQL to be ready..."
+  docker_cmd exec studentshub_mysql bash -c "until mysqladmin ping -h localhost -u '$DB_USER' -p'$DB_PASSWORD' --silent; do echo '[load] waiting for mysql...'; sleep 1; done"
 
-  # Use maintenance DB for --create restores, don't swallow errors
-  # Drop target DB if it exists to avoid duplicate/constraint errors
-  docker_cmd exec -e PGPASSWORD="$DB_PASSWORD" studentshub_postgres \
-    psql -U "$DB_USER" -d "$MAINT_DB" -v ON_ERROR_STOP=1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();" -c "DROP DATABASE IF EXISTS \"$DB_NAME\";"
+  # Drop and recreate database using root user to avoid permission issues
+  echo "[load] Dropping and recreating database..."
+  docker_cmd exec studentshub_mysql mysql -u root -p"$DB_ROOT_PASSWORD" -e "DROP DATABASE IF EXISTS \`$DB_NAME\`; CREATE DATABASE \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+  
+  # Grant privileges to user
+  docker_cmd exec studentshub_mysql mysql -u root -p"$DB_ROOT_PASSWORD" -e "GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'%'; FLUSH PRIVILEGES;"
 
-  docker_cmd exec -e PGPASSWORD="$DB_PASSWORD" studentshub_postgres \
-    pg_restore -U "$DB_USER" -d "$MAINT_DB" --create /tmp/db_backup.dump
+  # Restore the database
+  echo "[load] Restoring database from backup..."
+  docker_cmd exec studentshub_mysql mysql -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < /tmp/db_backup.sql 2>&1 | grep -v "Using a password on the command line" || true
 
-  docker_cmd exec studentshub_postgres rm -f /tmp/db_backup.dump >/dev/null 2>&1 || true
+  # Cleanup
+  docker_cmd exec studentshub_mysql rm -f /tmp/db_backup.sql >/dev/null 2>&1 || true
+  
+  echo "[load] Restore completed successfully!"
 else
-  echo "[load] Using local pg_restore (ensure PostgreSQL client tools are installed)..."
-  # Optionally wait for local Postgres if pg_isready exists
-  if command -v pg_isready >/dev/null 2>&1; then
-    until PGPASSWORD="$DB_PASSWORD" pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$MAINT_DB" -q; do
-      echo "[load] waiting for postgres at $DB_HOST:$DB_PORT..."; sleep 1; done
+  echo "[load] Using local mysql client (ensure MySQL client tools are installed)..."
+  
+  # Wait for MySQL readiness
+  if command -v mysqladmin >/dev/null 2>&1; then
+    until mysqladmin ping -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" --silent 2>/dev/null; do
+      echo "[load] waiting for mysql at $DB_HOST:$DB_PORT..."; sleep 1
+    done
   fi
 
-  # Drop target DB if it exists
-  PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$MAINT_DB" -v ON_ERROR_STOP=1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();" -c "DROP DATABASE IF EXISTS \"$DB_NAME\";"
+  # Drop and recreate database using root
+  echo "[load] Dropping and recreating database..."
+  mysql -h "$DB_HOST" -P "$DB_PORT" -u root -p"$DB_ROOT_PASSWORD" -e "DROP DATABASE IF EXISTS \`$DB_NAME\`; CREATE DATABASE \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>&1 | grep -v "Using a password on the command line" || true
+  
+  # Grant privileges
+  mysql -h "$DB_HOST" -P "$DB_PORT" -u root -p"$DB_ROOT_PASSWORD" -e "GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'%'; FLUSH PRIVILEGES;" 2>&1 | grep -v "Using a password on the command line" || true
 
-  PGPASSWORD="$DB_PASSWORD" pg_restore \
-    -h "$DB_HOST" -p "$DB_PORT" \
-    -U "$DB_USER" -d "$MAINT_DB" --create db_backup.dump
+  # Restore
+  echo "[load] Restoring database from backup..."
+  mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < db_backup.sql 2>&1 | grep -v "Using a password on the command line" || true
+  
+  echo "[load] Restore completed successfully!"
 fi
-
-echo "[load] Restore completed."
 
 # Post-restore quick verification
 echo "[load] Verifying presence of key tables and row counts..."
 
-VERIFY_SQL="SELECT 'courses_engineeringcourse' AS table, COUNT(*) FROM courses_engineeringcourse UNION ALL SELECT 'courses_prolearningcourse', COUNT(*) FROM courses_prolearningcourse UNION ALL SELECT 'courses_lesson', COUNT(*) FROM courses_lesson;"
+VERIFY_SQL="SELECT 'courses_engineeringcourse' AS table_name, COUNT(*) AS row_count FROM courses_engineeringcourse UNION ALL SELECT 'courses_prolearningcourse', COUNT(*) FROM courses_prolearningcourse UNION ALL SELECT 'courses_lesson', COUNT(*) FROM courses_lesson;"
 
-if command -v docker >/dev/null 2>&1 && docker_cmd ps --format '{{.Names}}' | grep -q '^studentshub_postgres$'; then
-  docker_cmd exec -e PGPASSWORD="$DB_PASSWORD" studentshub_postgres \
-    psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "$VERIFY_SQL"
+if command -v docker >/dev/null 2>&1 && docker_cmd ps --format '{{.Names}}' | grep -q '^studentshub_mysql$'; then
+  docker_cmd exec studentshub_mysql mysql -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "$VERIFY_SQL" 2>&1 | grep -v "Using a password on the command line" || true
 else
-  PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "$VERIFY_SQL"
+  mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -e "$VERIFY_SQL" 2>&1 | grep -v "Using a password on the command line" || true
 fi
+
+echo "[load] Database verification completed!"

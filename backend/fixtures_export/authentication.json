@@ -1,0 +1,317 @@
+[
+{
+  "model": "authentication.user",
+  "pk": 1,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$ilI6YbDEVhyeYZCxQWBTXM$pYOQ49l9RApzWwEHGM0nNmUOH52EjmIxwts610t9YX4=",
+    "last_login": null,
+    "is_superuser": true,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": true,
+    "is_active": true,
+    "email": "sai@gmail.com",
+    "full_name": "sai",
+    "auth_method": "email",
+    "agreed_to_terms": false,
+    "date_joined": "2025-09-18T06:38:23.197Z",
+    "updated_at": "2025-09-18T06:38:23.197Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 2,
+  "fields": {
+    "password": "!RoJeaEe3MBH3s6UxZBoSm6iwa7SH74gBopfD8ZB8",
+    "last_login": null,
+    "is_superuser": false,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": false,
+    "is_active": true,
+    "email": "balinasaicharan23@gmail.com",
+    "full_name": "sai charan balina",
+    "auth_method": "google",
+    "agreed_to_terms": true,
+    "date_joined": "2025-09-18T14:13:32.398Z",
+    "updated_at": "2025-09-18T14:13:32.398Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 3,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$fCfL9sMFGzbJvqci9yIFMK$cnxZMoA/x2287gkYFI+0IXaOCHWWRuJPKMyAz63G1xk=",
+    "last_login": null,
+    "is_superuser": true,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": true,
+    "is_active": true,
+    "email": "danger@gmail.com",
+    "full_name": "danger",
+    "auth_method": "email",
+    "agreed_to_terms": false,
+    "date_joined": "2025-09-18T14:14:33.846Z",
+    "updated_at": "2025-09-18T14:14:33.846Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 4,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$qPze00NuF7zU2Pa0zjuDnX$EtzDwJIz/BWZ5Ic+rXE6H/fS1TvMkK81km3hZS25hFk=",
+    "last_login": null,
+    "is_superuser": true,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": true,
+    "is_active": true,
+    "email": "akshay@gmail.com",
+    "full_name": "akshay",
+    "auth_method": "email",
+    "agreed_to_terms": false,
+    "date_joined": "2025-09-18T14:33:08.873Z",
+    "updated_at": "2025-09-18T14:33:08.873Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 5,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$WgCoc3BPZcRj2WFnQ7vD0c$Xj23IYQ2bVp9ZYBWkUnCxU9V22hhrBSdpYHotbQ/284=",
+    "last_login": null,
+    "is_superuser": true,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": true,
+    "is_active": true,
+    "email": "example@gmail.com",
+    "full_name": "example",
+    "auth_method": "email",
+    "agreed_to_terms": false,
+    "date_joined": "2025-09-19T12:27:53.934Z",
+    "updated_at": "2025-09-19T12:27:53.934Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 7,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$399y96Z8wsLWTBYmWxQjJr$3Y5/CbnUzdrf3YISTGbjXIMZv8hagaBvHiIojjpk1ms=",
+    "last_login": null,
+    "is_superuser": true,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": true,
+    "is_active": true,
+    "email": "banny@gmail.com",
+    "full_name": "banny",
+    "auth_method": "email",
+    "agreed_to_terms": false,
+    "date_joined": "2025-09-19T12:34:13.942Z",
+    "updated_at": "2025-09-19T12:34:13.942Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 8,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$vWmMB6Uq2mL1Cs6zuHi1ld$cUlBFT4XifljfYsi5s8bfSuHMY2irnhHF6KuBJ1ecgQ=",
+    "last_login": null,
+    "is_superuser": true,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": true,
+    "is_active": true,
+    "email": "bunny@gmail.com",
+    "full_name": "bunny",
+    "auth_method": "email",
+    "agreed_to_terms": false,
+    "date_joined": "2025-09-19T12:36:44.890Z",
+    "updated_at": "2025-09-19T12:36:44.890Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 9,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$16QaVAmEsXLkLUwZS4WPX5$qiINPAU8Fcie5Pb2gvK0ZWwHGmev2hnpF9OZUuB2Vvw=",
+    "last_login": null,
+    "is_superuser": true,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": true,
+    "is_active": true,
+    "email": "br@gmail.com",
+    "full_name": "br",
+    "auth_method": "email",
+    "agreed_to_terms": false,
+    "date_joined": "2025-09-20T13:42:34.193Z",
+    "updated_at": "2025-09-20T13:52:24.233Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 10,
+  "fields": {
+    "password": "pbkdf2_sha256$870000$HjJ5dodRUme0dJeghQO0Ka$rvQGvNSi3+wWyYJ4tdFTGF1pDrBF9FZmejy9iPWoNQo=",
+    "last_login": null,
+    "is_superuser": true,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": true,
+    "is_active": true,
+    "email": "c@gmail.com",
+    "full_name": "c",
+    "auth_method": "email",
+    "agreed_to_terms": false,
+    "date_joined": "2025-09-20T14:08:40.311Z",
+    "updated_at": "2025-09-20T14:08:40.311Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 12,
+  "fields": {
+    "password": "!E0Cq5DEWsFtXcZdLhkOsCVmTHvHpa1NY2yVI46oy",
+    "last_login": null,
+    "is_superuser": false,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": false,
+    "is_active": true,
+    "email": "ponnamrishwanth78@gmail.com",
+    "full_name": "ponnam rishwanth",
+    "auth_method": "google",
+    "agreed_to_terms": true,
+    "date_joined": "2025-09-20T20:17:39.713Z",
+    "updated_at": "2025-09-20T20:17:39.713Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 13,
+  "fields": {
+    "password": "!PWLu6o3cSYTRExmSbE01ic9eC7hat7xRDapM1lkk",
+    "last_login": null,
+    "is_superuser": false,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": false,
+    "is_active": true,
+    "email": "bannydommati@gmail.com",
+    "full_name": "Pranay Dommati",
+    "auth_method": "google",
+    "agreed_to_terms": true,
+    "date_joined": "2025-09-22T05:39:37.289Z",
+    "updated_at": "2025-09-22T05:39:37.289Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 14,
+  "fields": {
+    "password": "!OuvocwdJikvrlN1fDKu8QcqXpBKhWrHWZrcksX8F",
+    "last_login": null,
+    "is_superuser": false,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": false,
+    "is_active": true,
+    "email": "easylearnova@gmail.com",
+    "full_name": "EasyLearnova",
+    "auth_method": "google",
+    "agreed_to_terms": true,
+    "date_joined": "2025-10-04T10:05:19.897Z",
+    "updated_at": "2025-10-04T10:05:19.897Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 15,
+  "fields": {
+    "password": "!YkoLLZ0gRgJTaVmAFyHf8enX2r7IzkFnchnBnb3p",
+    "last_login": null,
+    "is_superuser": false,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": false,
+    "is_active": true,
+    "email": "bunnydommati77@gmail.com",
+    "full_name": "bunny dommati",
+    "auth_method": "google",
+    "agreed_to_terms": true,
+    "date_joined": "2025-10-08T11:44:18.558Z",
+    "updated_at": "2025-10-08T11:44:18.558Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 16,
+  "fields": {
+    "password": "!01FegCYCegy8L3OjNp9L4PvkcuVAxVmYvWlai9Xh",
+    "last_login": null,
+    "is_superuser": false,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": false,
+    "is_active": true,
+    "email": "studentshub72@gmail.com",
+    "full_name": "studentshub",
+    "auth_method": "google",
+    "agreed_to_terms": true,
+    "date_joined": "2025-10-10T04:09:10.134Z",
+    "updated_at": "2025-10-10T04:09:10.134Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "authentication.user",
+  "pk": 17,
+  "fields": {
+    "password": "!AKvIHS1L9eKcrBdltvTvecWIzRPTQ7B7DEIdAWmL",
+    "last_login": null,
+    "is_superuser": false,
+    "first_name": "",
+    "last_name": "",
+    "is_staff": false,
+    "is_active": true,
+    "email": "pranaydommati.ai@gmail.com",
+    "full_name": "Pranay Dommati",
+    "auth_method": "google",
+    "agreed_to_terms": true,
+    "date_joined": "2025-10-10T04:16:23.448Z",
+    "updated_at": "2025-10-10T04:16:23.448Z",
+    "groups": [],
+    "user_permissions": []
+  }
+}
+]
