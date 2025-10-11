@@ -19,11 +19,33 @@ https://easylearnova.com  →  https://xxx.onrender.com  →  MySQL on Hostinger
 ## 📝 Step 1: Prepare Your Repository
 
 ### 1.1 Verify Files Exist
-Make sure you have these files in your repository root:
-- ✅ `render.yaml` - Render configuration
-- ✅ `build.sh` - Build script
-- ✅ `requirements.txt` - Python dependencies
-- ✅ `backend/manage.py` - Django project
+Make sure you have these files in the correct locations:
+- ✅ `render.yaml` - Render configuration (repository root)
+- ✅ `requirements.txt` - Python dependencies (repository root)
+- ✅ `build.sh` - Build script (repository root)
+- ✅ `backend/manage.py` - Django project (in backend/ folder)
+- ✅ `backend/backend/settings.py` - Django settings
+
+Your project structure:
+```
+thestudent/                 ← Repository root (Render starts here)
+├── render.yaml            ← Render config
+├── requirements.txt       ← Dependencies
+├── build.sh              ← Build script
+├── .env                  ← Environment variables (not committed)
+└── backend/              ← Django project folder
+    ├── manage.py         ← Django management
+    └── backend/          ← Django app folder
+        ├── settings.py
+        ├── wsgi.py
+        └── urls.py
+```
+
+**Why this structure?**
+- `requirements.txt` is in root → Render installs from root
+- `build.sh` is in root → Render runs it from root
+- `build.sh` does `cd backend` → Then runs Django commands
+- Start command does `cd backend && gunicorn` → Runs server from backend/
 
 ### 1.2 Make build.sh Executable (if on Linux/Mac)
 ```bash
@@ -53,10 +75,10 @@ git push origin dep-backend
 - **Name**: `easylearnova-backend` (or your preferred name)
 - **Region**: Choose closest to your users (e.g., Oregon, Frankfurt)
 - **Branch**: `dep-backend`
-- **Root Directory**: Leave empty (repository root)
+- **Root Directory**: Leave empty (Render will use repository root where requirements.txt is)
 - **Runtime**: `Python 3`
 - **Build Command**: `./build.sh`
-- **Start Command**: `gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120`
+- **Start Command**: `cd backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120`
 - **Plan**: `Free` (or `Starter` for production - $7/month, no sleep)
 
 ## 🔐 Step 3: Configure Environment Variables
