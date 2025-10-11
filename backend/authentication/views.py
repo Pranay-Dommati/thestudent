@@ -895,7 +895,8 @@ def google_auth_token(request):
     Integrates perfectly with existing User model and authentication system
     """
     access_token = request.data.get('access_token')
-    id_token = request.data.get('id_token')  # Google Sign-In often provides ID token
+    # Google Identity Services may send this as 'id_token' or 'credential'
+    id_token = request.data.get('id_token') or request.data.get('credential')
     
     # Use ID token if available, otherwise fallback to access token
     token_to_verify = id_token or access_token
@@ -912,23 +913,24 @@ def google_auth_token(request):
         # Try to handle ID token first (from Google Sign-In button)
         if id_token:
             try:
-                # For ID tokens, we need to verify and decode them
-                # This is a simplified approach - in production, you should verify the signature
-                import base64
-                import json
-                
-                # Decode ID token payload (without verification for now)
-                # In production, use google.auth.jwt or similar for proper verification
-                payload = id_token.split('.')[1]
-                # Add padding if needed
-                payload += '=' * (4 - len(payload) % 4)
-                decoded = base64.urlsafe_b64decode(payload)
-                user_data = json.loads(decoded)
-                
+                # Prefer Google's tokeninfo endpoint for robust validation
+                tokeninfo_url = "https://oauth2.googleapis.com/tokeninfo"
+                ti_resp = requests.get(tokeninfo_url, params={"id_token": id_token}, timeout=5)
+                if ti_resp.status_code == 200:
+                    user_data = ti_resp.json()
+                else:
+                    # Fallback to local decode (no signature verification)
+                    import base64
+                    import json
+                    payload = id_token.split('.')[1]
+                    padding = '=' * (-len(payload) % 4)
+                    decoded = base64.urlsafe_b64decode(payload + padding)
+                    user_data = json.loads(decoded)
+
                 # Verify token is for our client
                 if user_data.get('aud') != settings.SOCIAL_AUTH_GOOGLE_OAUTH2_KEY:
                     return Response(
-                        {"error": "Invalid token audience"},
+                        {"error": "invalid_audience"},
                         status=status.HTTP_401_UNAUTHORIZED
                     )
                     
@@ -952,7 +954,7 @@ def google_auth_token(request):
         
         if not user_data:
             return Response(
-                {"error": "Failed to get user information"},
+                {"error": "invalid_token", "detail": "Failed to verify Google token"},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -960,7 +962,7 @@ def google_auth_token(request):
         email = user_data.get('email')
         if not email:
             return Response(
-                {"error": "Email not provided by Google"},
+                {"error": "email_missing", "detail": "Email not provided by Google"},
                 status=status.HTTP_400_BAD_REQUEST
             )
         

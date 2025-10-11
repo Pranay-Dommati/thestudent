@@ -19,17 +19,23 @@ from datetime import timedelta
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env files
-# Priority: root .env (used by docker-compose) first, then backend/.env without overriding
+# Priority: backend/.env takes precedence over root .env for local development
+# This allows developers to override root settings without changing docker-compose values
 try:
     from dotenv import load_dotenv
     root_env = BASE_DIR.parent / '.env'
     backend_env = BASE_DIR / '.env'
     backend_env_local = BASE_DIR / '.env.local'
-    # Load root .env so Django matches docker-compose values
-    load_dotenv(dotenv_path=root_env, override=False)
-    # Load backend/.env but do not override already-set vars
-    load_dotenv(dotenv_path=backend_env, override=False)
-    # Load backend/.env.local last to override for local dev only (not used in production)
+    
+    # Load root .env first without override (docker-compose compatibility)
+    if root_env.exists():
+        load_dotenv(dotenv_path=root_env, override=False)
+    
+    # Load backend/.env with override=True so it takes precedence for local dev
+    if backend_env.exists():
+        load_dotenv(dotenv_path=backend_env, override=True)
+    
+    # Load backend/.env.local last to override everything (local dev only, not in prod)
     if backend_env_local.exists():
         load_dotenv(dotenv_path=backend_env_local, override=True)
 except ImportError:
@@ -73,8 +79,20 @@ CSRF_COOKIE_SAMESITE = os.environ.get('CSRF_COOKIE_SAMESITE', 'Lax')
 X_FRAME_OPTIONS = os.environ.get('X_FRAME_OPTIONS', 'SAMEORIGIN')
 SECURE_REFERRER_POLICY = os.environ.get('SECURE_REFERRER_POLICY', 'strict-origin-when-cross-origin')
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-
+# Robust ALLOWED_HOSTS parsing from environment
+# - Set ALLOWED_HOSTS="*" to allow all (not recommended for production)
+# - Otherwise provide a comma-separated list, e.g. "localhost,127.0.0.1,easylearnova.com,www.easylearnova.com"
+_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
+if DEBUG:
+    print(f"[DEBUG] ALLOWED_HOSTS env value: {repr(_hosts_env)}")
+if _hosts_env.strip() == '*':
+    ALLOWED_HOSTS = ['*']
+else:
+    _hosts_list = [h.strip() for h in _hosts_env.split(',') if h.strip()]
+    # Sensible defaults for development when env not set
+    ALLOWED_HOSTS = _hosts_list or ['localhost', '127.0.0.1', '0.0.0.0']
+if DEBUG:
+    print(f"[DEBUG] Final ALLOWED_HOSTS: {ALLOWED_HOSTS}")
 # Cross-Origin-Opener-Policy (COOP)
 # - In development, disabling COOP avoids blocking window.postMessage (used by OAuth/HMR, etc.).
 # - In production, use 'same-origin-allow-popups' to preserve popup/OAuth flows while keeping isolation for same-origin.
