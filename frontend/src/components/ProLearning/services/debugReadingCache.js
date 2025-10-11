@@ -5,8 +5,8 @@
 
 import { clearReadingContentCache, getReadingContentCacheInfo } from './readingContentService';
 
-// Expose to window for easy console access
-if (typeof window !== 'undefined') {
+// Expose to window for easy console access only in development
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   window.debugReadingCache = {
     clear: () => {
       clearReadingContentCache();

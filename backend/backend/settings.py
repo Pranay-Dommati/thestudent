@@ -127,6 +127,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # Add this at the top
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Efficient static files in production/Hostinger
     'backend.security_middleware.SecurityHeadersMiddleware',  # Custom security headers
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -242,6 +243,19 @@ _backend_static = os.path.join(BASE_DIR, 'static')
 if os.path.isdir(_backend_static):
     STATICFILES_DIRS.append(_backend_static)
 
+# Use WhiteNoise for static files in production (works well on Hostinger Passenger)
+if not DEBUG:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+    # Cache-busting and long max-age are handled by Manifest storage
+    WHITENOISE_MAX_AGE = int(os.environ.get('WHITENOISE_MAX_AGE', 60 * 60 * 24 * 365))
+
 # Media files (uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
@@ -327,17 +341,19 @@ else:
     if not CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGINS == ['']:
         raise ValueError("CORS_ALLOWED_ORIGINS environment variable must be set in production")
 
-# Add this setting if you're using CSRF protection
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-
-# In production, add your actual domain
-if not DEBUG and os.environ.get('CSRF_TRUSTED_ORIGINS'):
-    CSRF_TRUSTED_ORIGINS.extend(os.environ.get('CSRF_TRUSTED_ORIGINS').split(','))
+# CSRF trusted origins
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+else:
+    _csrf_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_env.split(',') if o.strip()]
+    if not CSRF_TRUSTED_ORIGINS:
+        raise ValueError("CSRF_TRUSTED_ORIGINS environment variable must be set in production")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -388,8 +404,16 @@ LOGGING = {
 
 # Social Auth Configuration
 SOCIAL_AUTH_URL_NAMESPACE = 'social'
-SOCIAL_AUTH_LOGIN_REDIRECT_URL = 'http://localhost:5173/'
-SOCIAL_AUTH_LOGIN_URL = '/auth/login/'
+_FRONTEND_DOMAIN = os.environ.get('FRONTEND_DOMAIN', '')
+# Default OAuth redirect:
+# - In dev: http://localhost:5173/
+# - In prod: FRONTEND_DOMAIN if set, else localhost fallback
+SOCIAL_AUTH_LOGIN_REDIRECT_URL = os.environ.get(
+    'SOCIAL_AUTH_LOGIN_REDIRECT_URL',
+    (_FRONTEND_DOMAIN.rstrip('/') + '/') if (not DEBUG and _FRONTEND_DOMAIN) else 'http://localhost:5173/'
+)
+SOCIAL_AUTH_REDIRECT_IS_HTTPS = os.environ.get('SOCIAL_AUTH_REDIRECT_IS_HTTPS', 'true' if not DEBUG else 'false').lower() in ('1','true','yes')
+SOCIAL_AUTH_LOGIN_URL = os.environ.get('SOCIAL_AUTH_LOGIN_URL', '/auth/login/')
 
 # Google OAuth2 specific settings
 SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = [

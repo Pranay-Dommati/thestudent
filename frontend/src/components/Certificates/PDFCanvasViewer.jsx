@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+// Vite resolves the worker as an asset URL; the package provides only .js builds
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
 // Configure worker
 GlobalWorkerOptions.workerSrc = pdfjsWorker;

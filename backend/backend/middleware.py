@@ -2,6 +2,7 @@
 Custom middleware for handling specific security requirements
 """
 from django.utils.deprecation import MiddlewareMixin
+import os
 
 
 class CertificateFrameMiddleware(MiddlewareMixin):
@@ -16,8 +17,15 @@ class CertificateFrameMiddleware(MiddlewareMixin):
             request.path.endswith('.pdf')):
             # Allow iframe embedding for certificate PDFs from same origin and frontend
             response['X-Frame-Options'] = 'SAMEORIGIN'
-            # Add CSP header to allow iframe embedding from frontend
-            response['Content-Security-Policy'] = "frame-ancestors 'self' localhost:5173 127.0.0.1:5173"
+            # Add CSP header to allow iframe embedding from configured frontend origins
+            frontend_origins = os.environ.get('FRONTEND_ORIGINS', '').strip()
+            if frontend_origins:
+                # Expect comma-separated list of origins with scheme
+                origins = ' '.join([o.strip() for o in frontend_origins.split(',') if o.strip()])
+            else:
+                # Dev defaults
+                origins = 'http://localhost:5173 http://127.0.0.1:5173'
+            response['Content-Security-Policy'] = f"frame-ancestors 'self' {origins}"
             # Ensure proper content type for PDFs
             response['Content-Type'] = 'application/pdf'
             # Add cache control for PDFs

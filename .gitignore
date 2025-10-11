@@ -8,6 +8,13 @@ venv/
 .vscode/
 venv
 # Environment variables
+.env
+backend/.env
+*.env
+# Hostinger Passenger logs
+backend/passenger_wsgi_error.log
+# Collected static files
+backend/staticfiles/
 # Python compiled files and cache
 __pycache__/
 *.py[cod]

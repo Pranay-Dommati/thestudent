@@ -1,17 +1,39 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
 
-export default defineConfig({
-  plugins: [react(), tailwindcss(),],
+// Use VITE_BASE_PATH when deploying under a subfolder (e.g., /app/)
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const base = env.VITE_BASE_PATH || '/'
+
+  return {
+  plugins: [react()],
+  base,
   build: {
-    // Only strip console logs in production builds, keep them in development
+    minify: 'terser',
+    // Only strip console logs and debug tools in production builds
     terserOptions: {
       compress: {
         drop_console: true,
-        drop_debugger: true
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn'],
+        global_defs: {
+          DEBUG: false,
+          "process.env.NODE_ENV": JSON.stringify("production")
+        }
       }
-    }
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom', 'react/jsx-runtime'],
+          vendor: ['@heroicons/react', 'framer-motion', 'posthog-js'],
+          katex: ['katex'],
+          pdf: ['pdfjs-dist']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
   },
   server: {
     proxy: {
@@ -32,4 +54,5 @@ export default defineConfig({
       }
     }
   }
+}
 })

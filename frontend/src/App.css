@@ -1,6 +1,4 @@
-@import "tailwindcss";
-
-/* ...existing code... */
+/* App-specific styles (Tailwind is imported in src/index.css) */
 
 /* Custom Scrollbar Styles */
 .custom-scrollbar {
