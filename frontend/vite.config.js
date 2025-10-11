@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
   return {
   plugins: [react()],
   base,
+  cacheDir: 'node_modules/.vite-cache',
   build: {
     minify: 'terser',
     // Only strip console logs and debug tools in production builds
@@ -36,6 +37,7 @@ export default defineConfig(({ mode }) => {
     chunkSizeWarningLimit: 1000
   },
   server: {
+    fs: { strict: false },
     proxy: {
       '/ai': {
         target: 'http://127.0.0.1:8000',

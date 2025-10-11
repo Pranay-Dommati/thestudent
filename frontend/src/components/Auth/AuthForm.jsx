@@ -4,6 +4,7 @@ import { FaGoogle, FaGraduationCap, FaRegUser, FaRegEnvelope, FaLock } from "rea
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
+import { GoogleSignInButton } from '../../hooks/useGoogleAuth.jsx';
 import OtpModal from './OtpModal';
 import { otpSignup } from '../../services/otpAuth';
 import AuthNav from './AuthNav';
@@ -71,81 +72,31 @@ export default function AuthForm() {
 
   const { register, login, googleLogin, validateAuth } = useAuth();
   
-  // Google Sign-In configuration
-  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  
-  // Initialize Google Sign-In
-  useEffect(() => {
-    if (window.google) {
-      try {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleResponse,
-          auto_select: false,
-          cancel_on_tap_outside: true,
-          use_fedcm_for_prompt: false,  // Disable FedCM to avoid domain issues
-          allowed_parent_origin: [window.location.origin],  // Add current origin
-          ux_mode: 'popup',  // Use popup mode to avoid redirect issues
-        });
-      } catch (error) {
-        console.error('Google Sign-In initialization error:', error);
-      }
-    }
-  }, []);
-
-  // Handle Google Sign-In response
-  const handleGoogleResponse = async (response) => {
+  // Enhanced Google Sign-In with proper error handling
+  const handleGoogleSuccess = async (credential) => {
     try {
       setIsLoading(true);
-      const success = await googleLogin(response.credential);
+      console.log('Google credential received, attempting login...');
+      
+      const success = await googleLogin(credential);
       if (success) {
+        toast.success('Successfully signed in with Google!');
         navigate(returnToPath || '/');
+      } else {
+        toast.error('Google sign-in failed. Please try again.');
       }
     } catch (error) {
-      console.error('Google Sign-In error:', error);
-      toast.error('Google Sign-In failed. Please try again.');
+      console.error('Google sign-in error:', error);
+      toast.error('Google sign-in failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle Google Sign-In button click
-  const handleGoogleSignIn = () => {
-    if (window.google) {
-      try {
-        // Try using the newer renderButton method if available
-        if (window.google.accounts.id.renderButton) {
-          const googleButtonContainer = document.createElement('div');
-          googleButtonContainer.style.position = 'absolute';
-          googleButtonContainer.style.top = '-9999px';
-          document.body.appendChild(googleButtonContainer);
-          
-          window.google.accounts.id.renderButton(googleButtonContainer, {
-            theme: 'outline',
-            size: 'medium',
-            type: 'standard',
-            text: 'signin_with'
-          });
-          
-          // Trigger click on the rendered button
-          setTimeout(() => {
-            const googleBtn = googleButtonContainer.querySelector('div[role="button"]');
-            if (googleBtn) {
-              googleBtn.click();
-            }
-            document.body.removeChild(googleButtonContainer);
-          }, 100);
-        } else {
-          // Fallback to prompt
-          window.google.accounts.id.prompt();
-        }
-      } catch (error) {
-        console.error('Google Sign-In error:', error);
-        toast.error('Google Sign-In temporarily unavailable. Please try manual registration.');
-      }
-    } else {
-      toast.error('Google Sign-In not loaded. Please try refreshing the page.');
-    }
+  const handleGoogleError = (error) => {
+    console.error('Google auth error:', error);
+    toast.error(`Google sign-in failed: ${error}`);
+    setIsLoading(false);
   };
   
   const validateForm = () => {
@@ -482,15 +433,11 @@ export default function AuthForm() {
                   </div>
                   
                   <div className="mt-6 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={handleGoogleSignIn}
+                    <GoogleSignInButton
+                      onSuccess={handleGoogleSuccess}
+                      onError={handleGoogleError}
                       disabled={isLoading}
-                      className="w-full max-w-xs flex justify-center items-center py-3 px-4 border-2 border-gray-200 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    >
-                      <FaGoogle className="h-5 w-5 text-red-500 mr-3" />
-                      {isLoading ? 'Signing in...' : 'Google'}
-                    </button>
+                    />
                   </div>
                 </motion.div>
 
@@ -755,15 +702,11 @@ export default function AuthForm() {
                     </div>
                     
                     <div className="mt-6 flex justify-center">
-                      <button
-                        type="button"
-                        onClick={handleGoogleSignIn}
+                      <GoogleSignInButton
+                        onSuccess={handleGoogleSuccess}
+                        onError={handleGoogleError}
                         disabled={isLoading}
-                        className="w-full max-w-xs inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        <FaGoogle className="h-5 w-5 text-red-500" />
-                        <span className="ml-2">{isLoading ? 'Signing in...' : 'Google'}</span>
-                      </button>
+                      />
                     </div>
                   </motion.div>
 

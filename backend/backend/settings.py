@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+import socket
 from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -23,10 +24,14 @@ try:
     from dotenv import load_dotenv
     root_env = BASE_DIR.parent / '.env'
     backend_env = BASE_DIR / '.env'
+    backend_env_local = BASE_DIR / '.env.local'
     # Load root .env so Django matches docker-compose values
     load_dotenv(dotenv_path=root_env, override=False)
     # Load backend/.env but do not override already-set vars
     load_dotenv(dotenv_path=backend_env, override=False)
+    # Load backend/.env.local last to override for local dev only (not used in production)
+    if backend_env_local.exists():
+        load_dotenv(dotenv_path=backend_env_local, override=True)
 except ImportError:
     # python-dotenv not installed, environment variables should be set manually
     pass
@@ -43,14 +48,16 @@ DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
 # Production Security Settings
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    # Allow overriding these via environment to support local HTTP testing while DEBUG=False
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'true').lower() in ('1', 'true', 'yes')
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() in ('1', 'true', 'yes')
+    CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'true').lower() in ('1', 'true', 'yes')
+    # The following headers are generally safe defaults for production
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))  # 1 year by default
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'true').lower() in ('1','true','yes')
+    SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'true').lower() in ('1','true','yes')
     # Respect reverse proxy (e.g., Nginx) X-Forwarded-Proto header
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_HTTPONLY = True
@@ -175,13 +182,25 @@ DB_SSL_REQUIRE = os.getenv('DB_SSL_REQUIRE', 'false').lower() in ('1', 'true', '
 DB_CONN_MAX_AGE = int(os.getenv('DB_CONN_MAX_AGE', '0'))  # seconds; 0 disables persistent connections
 
 if DB_ENGINE in ('mysql', 'mariadb') or DB_HOST:
+    # Optionally force IPv4 for MySQL host to avoid IPv6 access denials on some providers
+    DB_FORCE_IPV4 = os.getenv('DB_FORCE_IPV4', 'false').lower() in ('1','true','yes')
+    _resolved_host = DB_HOST
+    if DB_HOST and DB_FORCE_IPV4:
+        try:
+            # getaddrinfo with AF_INET to pick IPv4 address
+            infos = socket.getaddrinfo(DB_HOST, int(DB_PORT), family=socket.AF_INET, type=socket.SOCK_STREAM)
+            if infos:
+                _resolved_host = infos[0][4][0]
+        except Exception:
+            # Fallback to original host if resolution fails
+            _resolved_host = DB_HOST
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
             'NAME': DB_NAME,
             'USER': DB_USER,
             'PASSWORD': DB_PASSWORD,
-            'HOST': DB_HOST or 'localhost',
+            'HOST': _resolved_host or 'localhost',
             'PORT': DB_PORT,
             'CONN_MAX_AGE': DB_CONN_MAX_AGE,
             'OPTIONS': {

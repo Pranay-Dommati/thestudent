@@ -23,3 +23,7 @@ local_settings.py
 venv/
 .venv/
 env/
+
+# Local environment files (do not commit secrets)
+.env
+.env.local
