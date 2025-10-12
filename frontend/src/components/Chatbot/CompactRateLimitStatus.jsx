@@ -15,36 +15,22 @@ const CompactRateLimitStatus = ({ usageStats, className = "" }) => {
 
   // Monthly (optional) from nested rate_limits.monthly or flat props
   const monthly = usageStats.rate_limits?.monthly;
+  // Default to monthly enforcement unless daily.enforced is explicitly true
   const dailyEnforced = usageStats.rate_limits?.daily?.enforced !== undefined
     ? usageStats.rate_limits.daily.enforced
-    : true;
+    : false;
   const monthlyText = monthly
     ? ` • ${Math.max(0, monthly.limit - (monthly.used || 0))} this month`
     : "";
 
   return (
-    <div className={`inline-flex items-center gap-2 text-sm ${className}`}>
-      <span className="text-indigo-600 font-medium">
+    <div className="text-right">
+      <div className="text-xs font-medium text-gray-600">
         {dailyEnforced
-          ? (
-            <>
-              {remaining} topics remaining today. Up to {requestLimit} per request{monthlyText}.
-            </>
-          )
-          : (
-            <>
-              {monthly ? Math.max(0, monthly.limit - (monthly.used || 0)) : 15} topics remaining this month. Up to {requestLimit} per request.
-            </>
-          )
+          ? `${remaining} topics per day upto ${requestLimit} per request`
+          : `${monthly ? Math.max(0, monthly.limit - (monthly.used || 0)) : 15} topics per month upto ${requestLimit} per request`
         }
-      </span>
-      <button
-        onClick={() => setIsVisible(false)}
-        className="text-indigo-400 hover:text-indigo-600 transition-colors p-0.5 rounded-sm hover:bg-indigo-50"
-        title="Dismiss"
-      >
-        <IoClose size={16} />
-      </button>
+      </div>
     </div>
   );
 };

@@ -253,7 +253,17 @@ const MobileChatbotPage = () => {
     } catch (error) {
       console.error('📊 Error fetching usage stats:', error);
       // Fallback default
-      const fallback = { daily_used: 0, daily_limit: 16, per_request_limit: 4 };
+      const fallback = {
+        rate_limits: {
+          daily: { enforced: false },
+          monthly: { limit: 15, used: 0 },
+        },
+        per_request_limit: 4,
+        request_limit: 4,
+        // Legacy fields for backward-compat (ignored when daily.enforced=false)
+        daily_used: 0,
+        daily_limit: 16,
+      };
       setUsageStats(fallback);
       return fallback;
     }
@@ -389,7 +399,16 @@ const MobileChatbotPage = () => {
       const timeoutId = setTimeout(() => {
         if (!usageStats) {
           console.warn('Mobile stats loading timeout, setting fallback');
-          setUsageStats({ daily_used: 0, daily_limit: 16, per_request_limit: 4 });
+          setUsageStats({
+            rate_limits: {
+              daily: { enforced: false },
+              monthly: { limit: 15, used: 0 },
+            },
+            per_request_limit: 4,
+            request_limit: 4,
+            daily_used: 0,
+            daily_limit: 16,
+          });
         }
       }, 3000); // 3 second timeout
       
@@ -421,14 +440,17 @@ const MobileChatbotPage = () => {
 
     try {
       if (proMode) {
-        // Check daily quota before processing
+        // Check quota before processing (prefer monthly if daily not enforced)
         if (usageStats) {
-          const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
-          if (remainingToday <= 0) {
-            toast.error("🚫 Daily limit reached! You've used all your topic creation quota for today. Please try again tomorrow.", {
-              duration: 5000,
-              position: 'top-center'
-            });
+          const dailyEnforced = usageStats?.rate_limits?.daily?.enforced ?? false;
+          const dailyRemaining = Math.max(0, (usageStats.daily_limit || usageStats.rate_limits?.daily?.limit || 0) - (usageStats.daily_used || usageStats.rate_limits?.daily?.used || 0));
+          const monthlyRemaining = Math.max(0, (usageStats.rate_limits?.monthly?.limit || 15) - (usageStats.rate_limits?.monthly?.used || 0));
+          const remainingAllowance = dailyEnforced ? dailyRemaining : monthlyRemaining;
+          if (remainingAllowance <= 0) {
+            const msg = dailyEnforced
+              ? "🚫 Daily limit reached! You've used all your topic creation quota for today. Please try again tomorrow."
+              : "🚫 Monthly limit reached! You've used all your topic creation quota for this month. Please try again next month.";
+            toast.error(msg, { duration: 5000, position: 'top-center' });
             setIsLoading(false);
             return;
           }
@@ -471,22 +493,28 @@ const MobileChatbotPage = () => {
             let limitMessage = "";
             
             if (usageStats) {
-              const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
+              const dailyEnforced = usageStats?.rate_limits?.daily?.enforced ?? false;
+              const dailyRemaining = Math.max(0, (usageStats.daily_limit || usageStats.rate_limits?.daily?.limit || 0) - (usageStats.daily_used || usageStats.rate_limits?.daily?.used || 0));
+              const monthlyRemaining = Math.max(0, (usageStats.rate_limits?.monthly?.limit || 15) - (usageStats.rate_limits?.monthly?.used || 0));
+              const remainingAllowance = dailyEnforced ? dailyRemaining : monthlyRemaining;
               const maxPerRequestFromStats = usageStats.per_request_limit || 4;
               
-              // Limit topics to the smaller of: remaining daily limit or max per request
-              const maxAllowedTopics = Math.min(remainingToday, maxPerRequestFromStats);
+              // Limit topics to the smaller of: remaining allowance or max per request
+              const maxAllowedTopics = Math.min(remainingAllowance, maxPerRequestFromStats);
               
               if (extractedTopics.length > maxAllowedTopics) {
                 // Limit the topics to what user can actually create
-                availableTopics = extractedTopics.slice(0, maxAllowedTopics);
+                availableTopics = extractedTopics.slice(0, Math.max(0, maxAllowedTopics));
                 
-                if (remainingToday <= 0) {
-                  limitMessage = `⚠️ You've reached your daily limit of ${usageStats.daily_limit || 16} topics. Please try again tomorrow.`;
-                  // Show toast for daily limit reached
-                  toast.error(`🚫 Daily limit reached (${usageStats.daily_used || 0}/${usageStats.daily_limit || 16} used)`, {
-                    duration: 4000
-                  });
+                if (remainingAllowance <= 0) {
+                  if (dailyEnforced) {
+                    limitMessage = `⚠️ You've reached your daily limit of ${usageStats.daily_limit || usageStats.rate_limits?.daily?.limit || 0} topics. Please try again tomorrow.`;
+                    toast.error(`🚫 Daily limit reached (${usageStats.daily_used || usageStats.rate_limits?.daily?.used || 0}/${usageStats.daily_limit || usageStats.rate_limits?.daily?.limit || 0} used)`, { duration: 4000 });
+                  } else {
+                    const m = usageStats.rate_limits?.monthly;
+                    limitMessage = `⚠️ You've reached your monthly limit of ${(m?.limit ?? 15)} topics. Please try again next month.`;
+                    toast.error(`🚫 Monthly limit reached (${m?.used ?? 0}/${m?.limit ?? 15} used)`, { duration: 4000 });
+                  }
                 } 
               }
             } else {
@@ -512,7 +540,7 @@ const MobileChatbotPage = () => {
               const limitResponse = {
                 id: generateUniqueId(),
                 type: "bot",
-                content: limitMessage || "❌ You've reached your daily topic creation limit. Please try again tomorrow.",
+                content: limitMessage || "❌ You've reached your monthly topic creation limit. Please try again next month.",
                 timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
               };
               setChatHistory((prev) => [...prev, limitResponse]);
@@ -525,14 +553,7 @@ const MobileChatbotPage = () => {
             setOriginalPrompt(messageToSend);
             setShowTopicConfirmation(true);
             
-            const confirmationResponse = {
-              id: generateUniqueId(),
-              type: "bot",
-              content: `🤔 I've analyzed your query "${messageToSend}" and extracted ${availableTopics.length} learning topic(s). ${limitMessage} Please review and confirm the topics you'd like to include in your course.`,
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              isTopicConfirmation: true,
-            };
-            setChatHistory((prev) => [...prev, confirmationResponse]);
+            // No need to add a chat message - the dialog is self-explanatory
           } else {
             // No topics extracted - show error
             const errorResponse = {
@@ -558,14 +579,14 @@ const MobileChatbotPage = () => {
             const rateLimitResponse = {
               id: generateUniqueId(),
               type: "bot",
-              content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 16 topics per day\n\nPlease try again later or contact support if you need higher limits.`,
+              content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 15 topics per month\n\nPlease try again next month or contact support if you need higher limits.`,
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
               isRateLimitError: true,
             };
             setChatHistory((prev) => [...prev, rateLimitResponse]);
             
             // Show toast notification
-            toast.error('Daily topic creation limit reached', {
+            toast.error('Monthly topic creation limit reached', {
               duration: 5000,
               position: 'top-center',
             });
@@ -706,7 +727,7 @@ const MobileChatbotPage = () => {
       const proResponse = {
         id: generateUniqueId(),
         type: "bot",
-        content: `🎓 Perfect! I'll create a comprehensive course on: **${topicNames.join(', ')}**. Click the card below to access your customized course materials. Content generation will begin automatically and you'll see a loading screen until all materials are ready.`,
+        content: ``, // Empty content - only show the card
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         isProCard: true,
         topic: topicString,
@@ -958,47 +979,51 @@ const MobileChatbotPage = () => {
               )}
 
               {message.type === "bot" && isProCard && (
-                <div className="w-full">
-                  <div className="bg-gradient-to-br from-purple-50/80 to-blue-50/80 backdrop-blur-sm border border-purple-200/50 rounded-lg p-3 mb-2">
-                    <div className="text-sm text-gray-700 mb-3">{message.content}</div>
-        <Link 
-                      to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
-                      className="block w-full p-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg"
-                      onClick={() => {
-                        // Store the topics and course data for batch generation (same as desktop)
-                        try {
-                          const batchGenerationData = {
-                            courseId: message.courseId,
-                            topics: message.extractedTopics || [],
-                            topicString: message.topic,
-                            triggerBatchGeneration: true,
-                            timestamp: Date.now()
-                          };
-          // Store in localStorage only (no IndexedDB)
-          try { localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData)); } catch {}
-          localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
-                          console.log('🚀 Mobile Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
-                          
-                          // Track in ProLearning history
-                          proLearningHistoryService.trackCourseCreation(message.courseId, message.topic);
-                          
-                          // Refresh history state
-                          setProLearningHistory(proLearningHistoryService.getHistory());
-                          
-                        } catch (error) {
-                          console.error('Failed to store batch generation data:', error);
-                        }
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-base font-bold mb-1">🚀 Pro Learning Experience</h3>
-                          <p className="text-purple-100 text-xs">Complete study materials for: {message.topic}</p>
-                        </div>
-                      </div>
-                    </Link>
+                <Link 
+                  to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
+                  className="inline-flex items-center justify-between w-full px-5 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 group"
+                    onClick={() => {
+                      // Store the topics and course data for batch generation (same as desktop)
+                      try {
+                        const batchGenerationData = {
+                          courseId: message.courseId,
+                          topics: message.extractedTopics || [],
+                          topicString: message.topic,
+                          triggerBatchGeneration: true,
+                          timestamp: Date.now()
+                        };
+        // Store in localStorage only (no IndexedDB)
+        try { localStorage.setItem('proLearning_batchGeneration', JSON.stringify(batchGenerationData)); } catch {}
+        localStorage.setItem('proLearning_batchMarker', String(batchGenerationData.timestamp));
+                        console.log('🚀 Mobile Pro Learning Experience button clicked - batch generation data stored:', batchGenerationData);
+                        
+                        // Track in ProLearning history
+                        proLearningHistoryService.trackCourseCreation(message.courseId, message.topic);
+                        
+                        // Refresh history state
+                        setProLearningHistory(proLearningHistoryService.getHistory());
+                        
+                      } catch (error) {
+                        console.error('Failed to store batch generation data:', error);
+                      }
+                    }}
+                  >
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-white">Start Learning</h3>
+                      <p className="text-sm text-white/80">Professional Course</p>
+                    </div>
                   </div>
-                </div>
+                  
+                  <svg className="w-5 h-5 text-white/90 group-hover:text-white transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
               )}
 
               {message.type === "user" && <div className="text-sm">{message.content}</div>}
@@ -1368,80 +1393,136 @@ const MobileChatbotPage = () => {
             </div>
           )}
 
-          {/* Topic Confirmation Dialog - Improved */}
+          {/* Professional Topic Confirmation Dialog */}
           {showTopicConfirmation && (
             <div className="w-full mb-4">
               <div className="flex justify-start">
-                <div className="max-w-[92%]">
-                  <div className="bg-white border border-blue-200 rounded-2xl rounded-bl-md p-4 shadow-lg">
-                    {/* Header */}
-                    <div className="flex items-center mb-3">
-                      <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mr-3">
-                        <span className="text-white text-sm font-bold">✓</span>
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-800">Confirm Course Topics</h3>
-                        <p className="text-sm text-gray-500">
-                          Found {pendingTopics.length} topic(s) from "<em className="text-gray-700">{originalPrompt}</em>"
-                        </p>
-                      </div>
-                    </div>
+                <div className="w-full max-w-md">
+                  <div className="bg-white border border-indigo-200 rounded-2xl shadow-xl overflow-hidden">
                     
-                    {/* Topics List */}
-                    <div className="space-y-2 mb-4">
+                    {/* Minimal Header Section */}
+                    <div className="bg-gradient-to-r from-indigo-50 to-blue-50 p-4 border-b border-indigo-100">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-lg flex items-center justify-center mr-3">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-base font-bold text-gray-900">Review Topics</h3>
+                          <p className="text-xs text-gray-600 mt-0.5">
+                            {pendingTopics.length} topic{pendingTopics.length !== 1 ? 's' : ''} • Tap to edit
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Personalization Badge */}
                       {personalization && (
-                        <div className="mb-3">
-                          <span className="inline-block text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
-                            Personalization: {personalization}
-                          </span>
+                        <div className="mt-2.5">
+                          <div className="inline-flex items-center px-2.5 py-1 bg-white/70 backdrop-blur border border-indigo-200 rounded-full">
+                            <svg className="w-3 h-3 text-indigo-600 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span className="text-xs font-medium text-indigo-800">
+                              {personalization.length > 35 ? `${personalization.substring(0, 35)}...` : personalization}
+                            </span>
+                          </div>
                         </div>
                       )}
+                    </div>
+                    
+                    {/* Compact Topics List */}
+                    <div className="p-4 space-y-2">
                       {pendingTopics.map((topic, index) => (
-                        <div key={topic.id || index} className="flex items-center bg-gray-50 rounded-xl p-3 border border-gray-100">
-                          <span className="text-indigo-600 font-semibold mr-3 text-sm w-6">{index + 1}.</span>
-                          <input
-                            type="text"
-                            value={topic.name}
-                            onChange={(e) => handleTopicEdit(index, e.target.value)}
-                            className="flex-1 bg-transparent border-none focus:ring-2 focus:ring-indigo-300 rounded-lg px-2 py-1 text-sm"
-                          />
-                          <button
-                            onClick={() => handleTopicDelete(index)}
-                            className="ml-2 text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
+                        <div key={topic.id || index} className="bg-gray-50 border border-gray-200 hover:border-indigo-300 rounded-lg transition-all duration-200">
+                          {/* Single Row: Number + Input + Delete Button */}
+                          <div className="flex items-center gap-2 p-2">
+                            {/* Topic Number */}
+                            <span className="w-6 h-6 bg-indigo-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">
+                              {index + 1}
+                            </span>
+                            
+                            {/* Scrollable Input */}
+                            <div 
+                              className="flex-1 overflow-x-auto overflow-y-hidden"
+                              style={{
+                                scrollbarWidth: 'thin',
+                                scrollbarColor: '#818cf8 #e0e7ff'
+                              }}
+                            >
+                              <input
+                                type="text"
+                                value={topic.name}
+                                onChange={(e) => handleTopicEdit(index, e.target.value)}
+                                className="bg-white border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-md px-2.5 py-1.5 text-sm text-gray-800 placeholder-gray-400 transition-all whitespace-nowrap"
+                                placeholder="Enter topic name..."
+                                style={{ 
+                                  minWidth: '100%',
+                                  width: `${Math.max(topic.name.length * 8, 200)}px`
+                                }}
+                              />
+                            </div>
+                            
+                            {/* Delete Button */}
+                            <button
+                              onClick={() => handleTopicDelete(index)}
+                              className="w-7 h-7 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md flex items-center justify-center transition-colors flex-shrink-0"
+                              title="Remove topic"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
                     
-                    {/* Action Buttons */}
-                    <div className="space-y-3">
-                      <button
-                        onClick={handleTopicConfirm}
-                        className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-sm font-semibold text-sm hover:from-blue-700 hover:to-indigo-700 transition-all"
-                      >
-                        Create Course with {pendingTopics.length} Topic{pendingTopics.length !== 1 ? 's' : ''}
-                      </button>
-                      <div className="flex space-x-3">
+                    {/* Professional Action Buttons */}
+                    <div className="p-4 bg-gray-50 border-t border-gray-100 space-y-3">
+                      {/* Secondary Actions - Add/Cancel at Top */}
+                      <div className="grid grid-cols-2 gap-3">
                         <button
                           onClick={handleTopicAdd}
                           disabled={pendingTopics.length >= 4}
-                          className={`flex-1 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-xl text-sm font-medium transition-all ${
-                            pendingTopics.length >= 4 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-50 hover:border-indigo-300'
+                          className={`py-2.5 px-4 border border-indigo-200 text-indigo-600 rounded-xl text-sm font-medium transition-all duration-200 ${
+                            pendingTopics.length >= 4 
+                              ? 'opacity-50 cursor-not-allowed bg-gray-50' 
+                              : 'bg-white hover:bg-indigo-50 hover:border-indigo-300 hover:shadow-sm active:scale-95'
                           }`}
                         >
-                          + Add Topic
+                          <span className="inline-flex items-center">
+                            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            Add Topic
+                          </span>
                         </button>
                         <button
                           onClick={handleTopicCancel}
-                          className="flex-1 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition-all"
+                          className="py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
                         >
-                          Cancel
+                          <span className="inline-flex items-center">
+                            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Cancel
+                          </span>
                         </button>
                       </div>
+                      
+                      {/* Primary Action - Create Course at Bottom */}
+                      <button
+                        onClick={handleTopicConfirm}
+                        className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl shadow-lg hover:shadow-xl font-semibold text-sm transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        <span className="inline-flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          Create Course ({pendingTopics.length} topic{pendingTopics.length !== 1 ? 's' : ''})
+                        </span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1478,14 +1559,7 @@ const MobileChatbotPage = () => {
                 {/* Minimalistic Usage indicator with dismiss button */}
                 {proMode && usageStats && !usageStatsHidden && (
                   <div className="flex items-center gap-2 flex-1 justify-end">
-                    <div className="text-right">
-                      <div className="text-xs font-medium text-gray-600">
-                        {Math.max(0, (usageStats.daily_limit || 16) - (usageStats.daily_used || 0))} remaining today
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Up to {usageStats.per_request_limit || usageStats.request_limit || 4} per request
-                      </div>
-                    </div>
+                    <CompactRateLimitStatus usageStats={usageStats} className="text-right" />
                     <button
                       onClick={() => setUsageStatsHidden(true)}
                       className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
@@ -1496,10 +1570,16 @@ const MobileChatbotPage = () => {
                 )}
               </div>
               
-              {/* Optional: Rate limit warning only when very low */}
-              {proMode && usageStats && (usageStats.daily_used || 0) >= (usageStats.daily_limit || 16) && (
+              {/* Optional: Rate limit warning when limit reached (daily or monthly) */}
+              {proMode && usageStats && (() => {
+                const dailyEnforced = usageStats?.rate_limits?.daily?.enforced ?? false;
+                const monthly = usageStats?.rate_limits?.monthly;
+                const dailyReached = (usageStats.daily_used || 0) >= (usageStats.daily_limit || 0);
+                const monthlyReached = monthly ? (monthly.used || 0) >= (monthly.limit || 0) : false;
+                return dailyEnforced ? dailyReached : monthlyReached;
+              })() && (
                 <div className="mt-2 text-xs text-orange-600 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-200">
-                  ⚠️ Daily limit reached. Resets tomorrow.
+                  {usageStats?.rate_limits?.daily?.enforced ? '⚠️ Daily limit reached. Resets tomorrow.' : '⚠️ Monthly limit reached. Resets next month.'}
                 </div>
               )}
             </div>
@@ -1523,7 +1603,7 @@ const MobileChatbotPage = () => {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                className="flex-1 py-3 pl-2 pr-12 text-base bg-transparent border-none focus:outline-none focus:ring-0 placeholder-gray-400"
+                className="flex-1 py-3 pl-2 pr-3 text-base bg-transparent border-none focus:outline-none focus:ring-0 placeholder-gray-400"
                 disabled={isLoading}
               />
               
@@ -1531,7 +1611,7 @@ const MobileChatbotPage = () => {
               <button
                 onClick={() => handleSendMessage()}
                 disabled={!message.trim() || isLoading}
-                className={`absolute right-2 p-2.5 rounded-xl transition-all ${
+                className={`ml-2 mr-2 w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
                   message.trim() && !isLoading 
                     ? "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 hover:shadow-md" 
                     : proMode && !isLoading
