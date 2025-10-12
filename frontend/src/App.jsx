@@ -162,12 +162,25 @@ const App = () => {
             style: {
               background: '#363636',
               color: '#fff',
+              padding: '12px 16px',
+              paddingRight: '40px',
+              borderRadius: '10px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              maxWidth: '400px',
             },
             success: {
               duration: 3000,
               style: {
                 background: '#22c55e',
                 color: '#fff',
+                padding: '12px 16px',
+                paddingRight: '40px',
+                borderRadius: '10px',
+                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
+              },
+              iconTheme: {
+                primary: '#fff',
+                secondary: '#22c55e',
               },
             },
             error: {
@@ -175,9 +188,22 @@ const App = () => {
               style: {
                 background: '#ef4444',
                 color: '#fff',
+                padding: '12px 16px',
+                paddingRight: '40px',
+                borderRadius: '10px',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+              },
+              iconTheme: {
+                primary: '#fff',
+                secondary: '#ef4444',
               },
             },
-          }} 
+          }}
+          containerStyle={{
+            top: '20px',
+            right: '20px',
+          }}
+          containerClassName="toast-container"
         />      <BrowserRouter>
         <Layout excludePaths={['/admin-p', '/chat']}>
           <Routes>

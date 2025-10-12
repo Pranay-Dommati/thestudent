@@ -80,7 +80,7 @@ export default function AuthForm() {
       
       const success = await googleLogin(credential);
       if (success) {
-        toast.success('Successfully signed in with Google!');
+        // Toast is already shown in AuthContext, no need for duplicate message
         navigate(returnToPath || '/');
       } else {
         toast.error('Google sign-in failed. Please try again.');

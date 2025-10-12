@@ -169,6 +169,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # Add this at the top
+    'backend.middleware.db_connection.DatabaseConnectionMiddleware',  # Handle MySQL reconnections
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Efficient static files in production/Hostinger
     'backend.security_middleware.SecurityHeadersMiddleware',  # Custom security headers
@@ -179,7 +180,7 @@ MIDDLEWARE = [
     'social_django.middleware.SocialAuthExceptionMiddleware',  # Add social auth middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'backend.middleware.CertificateFrameMiddleware',  # Custom middleware for certificate PDFs
+    'backend.middleware.certificate_frame.CertificateFrameMiddleware',  # Custom middleware for certificate PDFs
 ]
 
 ROOT_URLCONF = 'backend.urls'
@@ -215,7 +216,10 @@ DB_NAME = os.getenv('DB_NAME', 'studentshub_db')
 DB_USER = os.getenv('DB_USER', 'studentshub_user')
 DB_PASSWORD = os.getenv('DB_PASSWORD', '')
 DB_SSL_REQUIRE = os.getenv('DB_SSL_REQUIRE', 'false').lower() in ('1', 'true', 'yes')
-DB_CONN_MAX_AGE = int(os.getenv('DB_CONN_MAX_AGE', '0'))  # seconds; 0 disables persistent connections
+# CRITICAL: For remote MySQL (Hostinger) + Backend (Render) setup
+# Use shorter CONN_MAX_AGE (60s) to avoid stale connections in distributed environment
+# Hostinger MySQL may close idle connections, so we reconnect more frequently
+DB_CONN_MAX_AGE = int(os.getenv('DB_CONN_MAX_AGE', '60'))  # 60 seconds for remote DB (was 300)
 
 if DB_ENGINE in ('mysql', 'mariadb') or DB_HOST:
     # Optionally force IPv4 for MySQL host to avoid IPv6 access denials on some providers
@@ -242,8 +246,16 @@ if DB_ENGINE in ('mysql', 'mariadb') or DB_HOST:
             'OPTIONS': {
                 'charset': 'utf8mb4',
                 'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                # Critical timeouts for remote MySQL (Hostinger) to avoid "Server has gone away"
+                'connect_timeout': 28,   # Increased from 10 to handle network latency
+                'read_timeout': 60,      # Increased from 30 for long queries (AI generation)
+                'write_timeout': 60,     # Increased from 30 for large data writes
+                # Auto-reconnect on connection loss (MySQLdb specific)
+                'autocommit': True,      # Prevent hanging transactions
                 **({'ssl': {'ssl_mode': 'REQUIRED'}} if DB_SSL_REQUIRE else {}),
             },
+            'CONN_HEALTH_CHECKS': True,  # Django 4.1+ - CRITICAL for remote DB
+            'AUTOCOMMIT': True,  # Prevent transaction deadlocks
         }
     }
 else:
@@ -451,14 +463,33 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('FILE_UPLOAD_MAX_MEMORY_SIZE', 
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
         },
     },
     'root': {
         'handlers': ['console'],
         'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO'),
+    },
+    'loggers': {
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'WARNING',  # Set to DEBUG to see all SQL queries
+            'propagate': False,
+        },
+        'backend.middleware.db_connection': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 

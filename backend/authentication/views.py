@@ -28,6 +28,9 @@ from .serializers import (
 )
 from .models import User, EmailOTP
 
+# Import database retry utilities for handling remote MySQL (Hostinger) connection issues
+from backend.db_utils import db_retry_on_connection_error
+
 logger = logging.getLogger(__name__)
 
 
@@ -888,11 +891,14 @@ def google_auth_callback(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])  
 @authentication_classes([])
+@db_retry_on_connection_error(max_retries=3, delay=0.5, backoff=2)  # Auto-retry on connection errors
 def google_auth_token(request):
     """
     Authenticate user directly with Google access token
     Useful for frontend implementations that already have Google tokens
     Integrates perfectly with existing User model and authentication system
+    
+    CRITICAL: Wrapped with @db_retry_on_connection_error for Render + Hostinger MySQL setup
     """
     access_token = request.data.get('access_token')
     # Google Identity Services may send this as 'id_token' or 'credential'
@@ -1311,9 +1317,27 @@ def validate_reset_token(request, uid, token):
                 'valid': False,
                 'error': 'Invalid or expired reset link'
             }, status=status.HTTP_400_BAD_REQUEST)
-            
     except (TypeError, ValueError, OverflowError, User.DoesNotExist):
         return Response({
             'valid': False,
             'error': 'Invalid reset link'
         }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Custom Token Refresh View with database retry logic
+from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshView
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+
+class TokenRefreshViewWithRetry(BaseTokenRefreshView):
+    """
+    Custom Token Refresh View with automatic retry on database connection errors.
+    CRITICAL for Render + Hostinger MySQL setup where connections may drop.
+    """
+    
+    @db_retry_on_connection_error(max_retries=3, delay=0.5, backoff=2)
+    def post(self, request, *args, **kwargs):
+        """
+        Override post method to add database connection retry logic.
+        This ensures token refresh works even if MySQL connection is temporarily lost.
+        """
+        return super().post(request, *args, **kwargs)

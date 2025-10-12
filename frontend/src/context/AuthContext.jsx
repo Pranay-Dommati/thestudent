@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
+import customToast from '../utils/customToast';
 import axiosInstance from '../utils/axios';
 import storage from '../utils/storage';
 
@@ -136,7 +136,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoggedIn(true);
       setLastChecked(Date.now());
 
-      toast.success('Account created successfully!');
+      customToast.success('Account created successfully!');
       return true;
     } catch (error) {
       console.error('Registration error:', error.response?.data);
@@ -144,15 +144,15 @@ export const AuthProvider = ({ children }) => {
       const errorData = error.response?.data;
       if (errorData) {
         if (errorData.password) {
-          toast.error(errorData.password[0]);
+          customToast.error(errorData.password[0]);
         } else if (errorData.email) {
-          toast.error(errorData.email[0]);
+          customToast.error(errorData.email[0]);
         } else if (errorData.full_name) {
-          toast.error(errorData.full_name[0]);
+          customToast.error(errorData.full_name[0]);
         } else if (errorData.non_field_errors) {
-          toast.error(errorData.non_field_errors[0]);
+          customToast.error(errorData.non_field_errors[0]);
         } else {
-          toast.error('Registration failed. Please check your input.');
+          customToast.error('Registration failed. Please check your input.');
         }
       }
       return false;
@@ -179,7 +179,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoggedIn(true);
       setLastChecked(Date.now());
       
-      toast.success('Login successful!');
+      customToast.success('Login successful!');
       return true;
     } catch (error) {
       console.error('Login error:', error.response?.data);
@@ -187,20 +187,20 @@ export const AuthProvider = ({ children }) => {
       if (error.response?.status === 400) {
         const errorData = error.response.data;
         if (errorData.email) {
-          toast.error(errorData.email[0]);
+          customToast.error(errorData.email[0]);
         } else if (errorData.password) {
-          toast.error(errorData.password[0]);
+          customToast.error(errorData.password[0]);
         } else if (errorData.non_field_errors) {
-          toast.error(errorData.non_field_errors[0]);
+          customToast.error(errorData.non_field_errors[0]);
         } else {
-          toast.error('Invalid email or password');
+          customToast.error('Invalid email or password');
         }
       } else if (error.response?.status === 401) {
-        toast.error('Invalid email or password');
+        customToast.error('Invalid email or password');
       } else if (error.response?.status === 500) {
-        toast.error('Server error. Please try again later.');
+        customToast.error('Server error. Please try again later.');
       } else {
-        toast.error('Login failed. Please try again.');
+        customToast.error('Login failed. Please try again.');
       }
       return false;
     }
@@ -208,7 +208,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     handleAuthFailure();
-    toast.success('Logged out successfully');
+    customToast.success('Logged out successfully');
   };
 
   // Google Sign-In function
@@ -227,7 +227,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoggedIn(true);
       setLastChecked(Date.now());
       
-      toast.success('Google login successful!');
+      customToast.success('Login successful!');
       return true;
     } catch (error) {
       // Log richer details to help diagnose undefined cases (e.g., network/CORS)
@@ -237,11 +237,11 @@ export const AuthProvider = ({ children }) => {
       console.error('Google login error:', { status, detail });
       
       if (error.response?.status === 400) {
-        toast.error('Google authentication failed. Please try again.');
+        customToast.error('Google authentication failed. Please try again.');
       } else if (error.response?.status === 500) {
-        toast.error('Server error. Please try again later.');
+        customToast.error('Server error. Please try again later.');
       } else {
-        toast.error('Google login failed. Please try again.');
+        customToast.error('Google login failed. Please try again.');
       }
       return false;
     }

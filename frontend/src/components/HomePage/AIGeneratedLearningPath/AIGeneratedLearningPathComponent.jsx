@@ -88,7 +88,7 @@ const AIGeneratedLearningPath = () => {
   return (
     <section className="relative py-8 sm:py-20 xl:py-24 overflow-visible">
       <div className="block sm:hidden">
-        <div className="container mx-auto max-w-lg px-4 relative z-10">
+        <div className="container mx-auto max-w-lg px-4 relative">
           <div className="text-center mb-6">
             <div className="inline-block mb-2">
               <div className="flex items-center justify-center bg-gradient-to-r from-indigo-100 to-blue-100 rounded-full px-3 py-1 text-indigo-700 font-medium text-xs">
@@ -106,7 +106,7 @@ const AIGeneratedLearningPath = () => {
             </p>
           </div>
 
-          <div className="relative z-[10000]">
+          <div className="relative z-50">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="relative">
                 <input
@@ -123,7 +123,7 @@ const AIGeneratedLearningPath = () => {
                 {showDropdown && (
                   <ul
                     ref={dropdownRef}
-                    className="absolute left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto z-[9999]"
+                    className="absolute left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl mt-1 max-h-48 overflow-y-auto z-50"
                     onMouseDown={(e) => e.preventDefault()}
                   >
                     {predefinedTopics.map((topic, index) => (
@@ -183,7 +183,7 @@ const AIGeneratedLearningPath = () => {
           </svg>
         </div>
         
-        <div className="container mx-auto relative z-10">
+        <div className="container mx-auto relative">
           <div className="text-center mb-16">
             <div className="inline-block mb-6">
               <div className="flex items-center justify-center bg-gradient-to-r from-indigo-100 to-blue-100 rounded-full px-6 py-3 text-indigo-700 font-medium">
@@ -205,7 +205,7 @@ const AIGeneratedLearningPath = () => {
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto relative z-[10000]">
+          <div className="max-w-4xl mx-auto relative z-50">
             <form onSubmit={handleSubmit} className="space-y-8">
               <div className="relative">
                 <div className="relative">
@@ -221,7 +221,7 @@ const AIGeneratedLearningPath = () => {
                   {showDropdown && (
                     <ul
                       ref={dropdownRef}
-                      className="absolute left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-60 overflow-y-auto z-20"
+                      className="absolute left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl mt-1 max-h-60 overflow-y-auto z-50"
                     >
                       {predefinedTopics.map((topic, index) => (
                         <li

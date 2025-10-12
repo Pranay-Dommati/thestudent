@@ -18,12 +18,14 @@ const FeaturedPlaylists = () => {
   const [activeCategory, setActiveCategory] = useState('all');
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const navigate = useNavigate();
 
   // Fetch real courses from database
   useEffect(() => {
     const fetchRealCourses = async () => {
       setLoading(true);
+      setError(false);
       try {
         // Fetch both school courses and engineering courses
         const [schoolCourses, engineeringCourses] = await Promise.all([
@@ -140,21 +142,9 @@ const FeaturedPlaylists = () => {
         
         setCourses(allCourses);
       } catch (error) {
-  // Swallow error in production UI; optionally report to monitoring
-        // Fallback to a few sample courses if API fails
-        setCourses([
-          {
-            id: '1',
-            title: 'Recently Added Mathematics Course',
-            duration: '25 hours',
-            category: 'tenth',
-            author: 'EasyLearnova',
-            board: 'CBSE',
-            subject: 'Mathematics',
-            image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3',
-            courseType: 'school'
-          }
-        ]);
+  // Set error state to show proper error message to users
+        setError(true);
+        setCourses([]);
       } finally {
         setLoading(false);
       }
@@ -368,6 +358,25 @@ const FeaturedPlaylists = () => {
                     </div>
                   </div>
                 ))
+              ) : error ? (
+                <div className="col-span-full text-center py-8 sm:py-12">
+                  <div className="text-red-400 mb-3 sm:mb-4">
+                    <svg className="w-12 h-12 sm:w-16 sm:h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Oops! Something went wrong</h3>
+                  <p className="text-sm sm:text-base text-gray-600 mb-4">We're having trouble loading courses right now.</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh Page
+                  </button>
+                </div>
               ) : (
                 <div className="col-span-full text-center py-8 sm:py-12">
                   <div className="text-gray-400 mb-3 sm:mb-4">

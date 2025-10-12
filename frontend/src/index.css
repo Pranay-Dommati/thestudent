@@ -538,3 +538,8 @@ body {
   margin: 0;
   background-color: #0f172a00; /* transparent, rely on sections */
 }
+
+/* Custom Toast Styles */
+.toast-container {
+  z-index: 9999 !important;
+}

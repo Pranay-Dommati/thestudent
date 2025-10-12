@@ -1,5 +1,4 @@
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     RegisterView, 
     LoginView, 
@@ -19,7 +18,8 @@ from .views import (
     admin_forgot_password,
     reset_password,
     validate_reset_token,
-    admin_set_user_password
+    admin_set_user_password,
+    TokenRefreshViewWithRetry,  # Custom token refresh with retry logic
 )
 
 urlpatterns = [
@@ -30,7 +30,7 @@ urlpatterns = [
     path('users/', admin_list_users, name='admin_list_users'),
     path('users/<int:user_id>/', admin_user_detail, name='admin_user_detail'),
     path('users/<int:user_id>/set-password/', admin_set_user_password, name='admin_set_user_password'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/refresh/', TokenRefreshViewWithRetry.as_view(), name='token_refresh'),  # Use retry-enabled view
     path('profile/', user_profile, name='user_profile'),
     
     # Google OAuth2 endpoints
