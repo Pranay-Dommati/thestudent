@@ -38,34 +38,74 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
       return course.chapters.map(chapter => ({
         id: chapter.id,
         name: chapter.name || '',
-        lessons: chapter.lessons.map(lesson => ({
-          id: lesson.id,
-          title: lesson.title || '',
-          type: lesson.type || 'video',
-          videoUrl: lesson.video_url || '',
-          aboutLesson: lesson.about_lesson || '',
-          hasResources: lesson.resources && lesson.resources.length > 0,
-          resources: {
-            downloadable: lesson.resources.filter(r => r.type === 'downloadable').map(r => ({
-              id: r.id,
-              title: r.title || '',
-              description: r.description || '',
-              file: r.file
-            })),
-            internet: lesson.resources.filter(r => r.type === 'internet').map(r => ({
-              id: r.id,
-              title: r.title || '',
-              description: r.description || '',
-              url: r.url || ''
+        lessons: chapter.lessons.map(lesson => {
+          // Handle both old format (flat array) and new format (grouped object)
+          let downloadableResources = [];
+          let internetResources = [];
+          
+          if (lesson.resources) {
+            if (Array.isArray(lesson.resources)) {
+              // Old format: flat array
+              downloadableResources = lesson.resources
+                .filter(r => r.type === 'downloadable')
+                .map(r => ({
+                  id: r.id,
+                  title: r.title || r.name || '',
+                  name: r.title || r.name || '',
+                  description: r.description || '',
+                  file: r.file
+                }));
+              
+              internetResources = lesson.resources
+                .filter(r => r.type === 'internet')
+                .map(r => ({
+                  id: r.id,
+                  title: r.title || r.name || '',
+                  name: r.title || r.name || '',
+                  description: r.description || '',
+                  url: r.url || r.link || '',
+                  link: r.url || r.link || ''
+                }));
+            } else if (lesson.resources.downloadable || lesson.resources.internet) {
+              // New format: grouped object
+              downloadableResources = (lesson.resources.downloadable || []).map(r => ({
+                id: r.id,
+                title: r.title || r.name || '',
+                name: r.title || r.name || '',
+                description: r.description || '',
+                file: r.file
+              }));
+              
+              internetResources = (lesson.resources.internet || []).map(r => ({
+                id: r.id,
+                title: r.title || r.name || '',
+                name: r.title || r.name || '',
+                description: r.description || '',
+                url: r.url || r.link || '',
+                link: r.url || r.link || ''
+              }));
+            }
+          }
+          
+          return {
+            id: lesson.id,
+            title: lesson.title || '',
+            type: lesson.type || 'video',
+            videoUrl: lesson.video_url || '',
+            aboutLesson: lesson.about_lesson || '',
+            hasResources: downloadableResources.length > 0 || internetResources.length > 0,
+            resources: {
+              downloadable: downloadableResources,
+              internet: internetResources
+            },
+            quizQuestions: (lesson.quiz_questions || []).map(q => ({
+              id: q.id,
+              question: q.question || '',
+              options: q.options || ['', '', '', ''],
+              correctAnswer: q.correct_answer || ''
             }))
-          },
-          quizQuestions: lesson.quiz_questions.map(q => ({
-            id: q.id,
-            question: q.question || '',
-            options: q.options || ['', '', '', ''],
-            correctAnswer: q.correct_answer || ''
-          }))
-        }))
+          };
+        })
       }));
     } else {
       // Default single chapter if none exist

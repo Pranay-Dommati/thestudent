@@ -782,6 +782,7 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
         price: 'price',
         sources: 'sources',
         prerequisites: 'prerequisites',
+        requirements: 'requirements',  // Add this so requirements field is sent
         learning_outcomes: 'learning_outcomes',
         skills_gained: 'skills_gained',
         tags: 'tags',
@@ -811,8 +812,23 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
         const existing = (sections || [])[i];
         const name = (existing?.name || '').trim() || `Section ${i + 1}`;
         const validLessons = (existing?.lessons || []).filter(les => les.title && les.title.trim());
+        
+        // Map lessons and ensure all properties are included (especially resources)
         const lessons = validLessons.length > 0
-          ? validLessons
+          ? validLessons.map(les => ({
+              id: les.id || null,
+              title: les.title,
+              type: les.type || 'video',
+              videoUrl: les.videoUrl || '',
+              description: les.description || '',
+              aboutLesson: les.aboutLesson || '',
+              hasResources: les.hasResources || false,
+              resources: {
+                downloadable: les.resources?.downloadable || [],
+                internet: les.resources?.internet || []
+              },
+              quizQuestions: les.quizQuestions || []
+            }))
           : [
               {
                 id: null,
@@ -820,7 +836,13 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
                 type: 'video',
                 videoUrl: '',
                 description: '',
-                aboutLesson: ''
+                aboutLesson: '',
+                hasResources: false,
+                resources: {
+                  downloadable: [],
+                  internet: []
+                },
+                quizQuestions: []
               }
             ];
         return { id: existing?.id || null, name, lessons };

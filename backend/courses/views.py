@@ -2442,6 +2442,75 @@ def update_course(request, course_id):
                         lesson_obj.save()
                         kept_lesson_ids.append(lesson_obj.id)
 
+                        # --- Handle lesson resources (downloadable and internet) ---
+                        has_resources = les.get('hasResources', False)
+                        resources_data = les.get('resources', {})
+                        
+                        if settings.DEBUG:
+                            print(f"[DEBUG] School Lesson '{lesson_obj.title}' - hasResources: {has_resources}")
+                            print(f"[DEBUG] School Lesson '{lesson_obj.title}' - resources_data: {resources_data}")
+                        
+                        if has_resources and resources_data:
+                            # Clear existing resources for this lesson
+                            lesson_obj.resources.all().delete()
+                            
+                            # Add downloadable resources
+                            downloadable_resources = resources_data.get('downloadable', [])
+                            if isinstance(downloadable_resources, str):
+                                try:
+                                    downloadable_resources = json.loads(downloadable_resources)
+                                except:
+                                    downloadable_resources = []
+                            
+                            if settings.DEBUG:
+                                print(f"[DEBUG] Downloadable resources: {downloadable_resources}")
+                            
+                            for res in downloadable_resources:
+                                if isinstance(res, dict):
+                                    # Handle both 'title'/'url' and 'name'/'link' field names
+                                    resource_title = res.get('title') or res.get('name', '')
+                                    resource_url = res.get('url') or res.get('link', '')
+                                    
+                                    LessonResource.objects.create(
+                                        lesson=lesson_obj,
+                                        type='downloadable',
+                                        title=resource_title,
+                                        description=res.get('description', ''),
+                                        url=resource_url,
+                                    )
+                                    if settings.DEBUG:
+                                        print(f"[DEBUG] Created downloadable resource: {resource_title}")
+                            
+                            # Add internet resources
+                            internet_resources = resources_data.get('internet', [])
+                            if isinstance(internet_resources, str):
+                                try:
+                                    internet_resources = json.loads(internet_resources)
+                                except:
+                                    internet_resources = []
+                            
+                            if settings.DEBUG:
+                                print(f"[DEBUG] Internet resources: {internet_resources}")
+                            
+                            for res in internet_resources:
+                                if isinstance(res, dict):
+                                    # Handle both 'title'/'url' and 'name'/'link' field names
+                                    resource_title = res.get('title') or res.get('name', '')
+                                    resource_url = res.get('url') or res.get('link', '')
+                                    
+                                    LessonResource.objects.create(
+                                        lesson=lesson_obj,
+                                        type='internet',
+                                        title=resource_title,
+                                        description=res.get('description', ''),
+                                        url=resource_url,
+                                    )
+                                    if settings.DEBUG:
+                                        print(f"[DEBUG] Created internet resource: {resource_title}")
+                        elif not has_resources:
+                            # If hasResources is explicitly false, clear all resources
+                            lesson_obj.resources.all().delete()
+
                         # --- Nested: quiz questions update for SchoolCourse lessons ---
                         has_quiz_key = ('quizQuestions' in les) or ('quiz_questions' in les)
                         quiz_list = (les.get('quizQuestions') or les.get('quiz_questions') or [])
@@ -2567,14 +2636,28 @@ def update_course(request, course_id):
                 except (json.JSONDecodeError, AttributeError, TypeError):
                     engineering_course.learning_points = []
             
-            # Handle prerequisites (map to requirements in model)
-            if 'prerequisites' in data:
+            # Handle prerequisites/requirements (map to requirements in model)
+            if 'prerequisites' in data or 'requirements' in data:
                 try:
-                    prereq_data = data.get('prerequisites', '[]')
-                    if not prereq_data.strip():
-                        prereq_data = '[]'
-                    engineering_course.requirements = json.loads(prereq_data)
-                except (json.JSONDecodeError, AttributeError):
+                    # Accept both 'prerequisites' and 'requirements' field names
+                    prereq_data = data.get('requirements') or data.get('prerequisites') or '[]'
+                    if settings.DEBUG:
+                        print(f"[DEBUG] Requirements update - Raw data: {prereq_data}")
+                        print(f"[DEBUG] Requirements update - Type: {type(prereq_data)}")
+                    
+                    if isinstance(prereq_data, str):
+                        if not prereq_data.strip():
+                            prereq_data = '[]'
+                        engineering_course.requirements = json.loads(prereq_data)
+                    else:
+                        # Already a list
+                        engineering_course.requirements = list(prereq_data)
+                    
+                    if settings.DEBUG:
+                        print(f"[DEBUG] Requirements update - Parsed: {engineering_course.requirements}")
+                except (json.JSONDecodeError, AttributeError, TypeError) as e:
+                    if settings.DEBUG:
+                        print(f"[DEBUG] Requirements update - Error: {e}")
                     engineering_course.requirements = []
                     
             # Handle course_content (note: this field may not exist in model, so we'll skip errors)
@@ -2641,6 +2724,75 @@ def update_course(request, course_id):
                         lesson_obj.order = lesson_index
                         lesson_obj.save()
                         kept_lesson_ids.append(lesson_obj.id)
+
+                        # --- Handle lesson resources (downloadable and internet) ---
+                        has_resources = les.get('hasResources', False)
+                        resources_data = les.get('resources', {})
+                        
+                        if settings.DEBUG:
+                            print(f"[DEBUG] Lesson '{lesson_obj.title}' - hasResources: {has_resources}")
+                            print(f"[DEBUG] Lesson '{lesson_obj.title}' - resources_data: {resources_data}")
+                        
+                        if has_resources and resources_data:
+                            # Clear existing resources for this lesson
+                            lesson_obj.resources.all().delete()
+                            
+                            # Add downloadable resources
+                            downloadable_resources = resources_data.get('downloadable', [])
+                            if isinstance(downloadable_resources, str):
+                                try:
+                                    downloadable_resources = json.loads(downloadable_resources)
+                                except:
+                                    downloadable_resources = []
+                            
+                            if settings.DEBUG:
+                                print(f"[DEBUG] Downloadable resources: {downloadable_resources}")
+                            
+                            for res in downloadable_resources:
+                                if isinstance(res, dict):
+                                    # Handle both 'title'/'url' and 'name'/'link' field names
+                                    resource_title = res.get('title') or res.get('name', '')
+                                    resource_url = res.get('url') or res.get('link', '')
+                                    
+                                    LessonResource.objects.create(
+                                        lesson=lesson_obj,
+                                        type='downloadable',
+                                        title=resource_title,
+                                        description=res.get('description', ''),
+                                        url=resource_url,
+                                    )
+                                    if settings.DEBUG:
+                                        print(f"[DEBUG] Created downloadable resource: {resource_title}")
+                            
+                            # Add internet resources
+                            internet_resources = resources_data.get('internet', [])
+                            if isinstance(internet_resources, str):
+                                try:
+                                    internet_resources = json.loads(internet_resources)
+                                except:
+                                    internet_resources = []
+                            
+                            if settings.DEBUG:
+                                print(f"[DEBUG] Internet resources: {internet_resources}")
+                            
+                            for res in internet_resources:
+                                if isinstance(res, dict):
+                                    # Handle both 'title'/'url' and 'name'/'link' field names
+                                    resource_title = res.get('title') or res.get('name', '')
+                                    resource_url = res.get('url') or res.get('link', '')
+                                    
+                                    LessonResource.objects.create(
+                                        lesson=lesson_obj,
+                                        type='internet',
+                                        title=resource_title,
+                                        description=res.get('description', ''),
+                                        url=resource_url,
+                                    )
+                                    if settings.DEBUG:
+                                        print(f"[DEBUG] Created internet resource: {resource_title}")
+                        elif not has_resources:
+                            # If hasResources is explicitly false, clear all resources
+                            lesson_obj.resources.all().delete()
 
                         # --- Nested: quiz questions update for EngineeringCourse lessons ---
                         has_quiz_key = ('quizQuestions' in les) or ('quiz_questions' in les)
@@ -2746,8 +2898,11 @@ def update_course(request, course_id):
             course_data.update({
                 'category': course.category,
                 'proficiency_level': getattr(course, 'proficiency', 'beginner'),
+                # Provide both legacy and new field names for compatibility
                 'learning_objectives': course.learning_points or [],
+                'learning_outcomes': course.learning_points or [],
                 'prerequisites': course.requirements or [],
+                'requirements': course.requirements or [],
                 'sources': course.sources or '',
                 'certificate': 'Certificate of Completion' if getattr(course, 'certificate_given', False) else '',
                 'price': str(getattr(course, 'price', 0)),
@@ -2841,23 +2996,29 @@ def get_course_by_id(request, course_id):
                         'about_lesson': lesson.about_lesson,
                         'aboutLesson': lesson.about_lesson,
                         'order': lesson.order,
-                        'resources': [],
+                        'resources': {'downloadable': [], 'internet': []},  # Changed to grouped structure
                         'quiz_questions': [],
                         'quizQuestions': []
                     }
                     
-                    # Get lesson resources
+                    # Get lesson resources and group by type
                     resources = lesson.resources.all()
                     for resource in resources:
                         resource_data = {
                             'id': resource.id,
                             'type': resource.type,
                             'title': resource.title,
+                            'name': resource.title,  # Also include 'name' for frontend compatibility
                             'description': resource.description,
                             'url': resource.url,
+                            'link': resource.url,  # Also include 'link' for frontend compatibility
                             'file': resource.file.url if resource.file else None
                         }
-                        lesson_data['resources'].append(resource_data)
+                        # Group by type
+                        if resource.type == 'downloadable':
+                            lesson_data['resources']['downloadable'].append(resource_data)
+                        elif resource.type == 'internet':
+                            lesson_data['resources']['internet'].append(resource_data)
                     
                     # Get quiz questions
                     quiz_questions = lesson.quiz_questions.all()
@@ -2900,8 +3061,12 @@ def get_course_by_id(request, course_id):
                 'category': course.category,
                 # Map model fields to expected edit form fields
                 'proficiency_level': getattr(course, 'proficiency', 'beginner'),
+                # Keep legacy keys used by some frontend components
                 'learning_objectives': course.learning_points or [],
                 'prerequisites': course.requirements or [],
+                # Also provide the keys expected by the admin edit form
+                'learning_outcomes': course.learning_points or [],
+                'requirements': course.requirements or [],
                 'course_content': getattr(course, 'course_content', []),
                 'sources': course.sources or '',
                 'certificate': 'Certificate of Completion' if getattr(course, 'certificate_given', False) else '',
@@ -2932,23 +3097,29 @@ def get_course_by_id(request, course_id):
                         'about_lesson': lesson.about_lesson,
                         'aboutLesson': lesson.about_lesson,
                         'order': lesson.order,
-                        'resources': [],
+                        'resources': {'downloadable': [], 'internet': []},  # Changed to grouped structure
                         'quiz_questions': [],
                         'quizQuestions': []
                     }
                     
-                    # Get lesson resources
+                    # Get lesson resources and group by type
                     resources = lesson.resources.all()
                     for resource in resources:
                         resource_data = {
                             'id': resource.id,
                             'type': resource.type,
                             'title': resource.title,
+                            'name': resource.title,  # Also include 'name' for frontend compatibility
                             'description': resource.description,
                             'url': resource.url,
+                            'link': resource.url,  # Also include 'link' for frontend compatibility
                             'file': resource.file.url if resource.file else None
                         }
-                        lesson_data['resources'].append(resource_data)
+                        # Group by type
+                        if resource.type == 'downloadable':
+                            lesson_data['resources']['downloadable'].append(resource_data)
+                        elif resource.type == 'internet':
+                            lesson_data['resources']['internet'].append(resource_data)
                     
                     # Get quiz questions
                     quiz_questions = lesson.quiz_questions.all()
