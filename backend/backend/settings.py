@@ -14,6 +14,11 @@ from pathlib import Path
 import os
 import socket
 from datetime import timedelta
+try:
+    # Ensure we can extend allowed CORS headers with Authorization cleanly
+    from corsheaders.defaults import default_headers as CORS_DEFAULT_HEADERS
+except Exception:
+    CORS_DEFAULT_HEADERS = tuple()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -392,7 +397,12 @@ if DEBUG:
     # Development mode - allow all origins for easy testing
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
-    CORS_ALLOW_HEADERS = ['*']
+    # Explicitly allow Authorization header (wildcard can be unreliable in browsers for preflight)
+    CORS_ALLOW_HEADERS = list(CORS_DEFAULT_HEADERS) + [
+        'authorization',
+        'x-csrftoken',
+        'x-requested-with',
+    ]
     CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
     # Explicitly list localhost origins as well
     CORS_ALLOWED_ORIGINS = [

@@ -680,10 +680,21 @@ const MobileChatbotPage = () => {
     }
 
     try {
+      // Prepare topics data - ensure clean structure with only required fields
+      const topicsData = pendingTopics.map(topic => ({
+        name: topic.name,
+        id: topic.id,
+        isActive: topic.isActive !== undefined ? topic.isActive : true
+      }));
+
+      console.log('📤 Sending topics to backend:', topicsData);
+
       // Call the backend AI endpoint via configured axios client
       const { data: result } = await aiAxios.post('/create-course-topics/', {
-        topics: pendingTopics
+        topics: topicsData
       });
+
+      console.log('📥 Backend response:', result);
 
       if (result?.status === 429) {
         // Some backends may return 200 with a JSON status field; handle gracefully
@@ -742,9 +753,21 @@ const MobileChatbotPage = () => {
       setOriginalPrompt("");
       
     } catch (error) {
-      console.error('Error creating course:', error);
+      console.error('❌ Error creating course:', error);
+      console.error('Error response data:', error?.response?.data);
+      console.error('Error response status:', error?.response?.status);
+      
       const status = error?.response?.status;
       const data = error?.response?.data || {};
+      
+      // Handle 400 Bad Request
+      if (status === 400) {
+        const errorMsg = data?.error || 'Invalid request. Please check your topics.';
+        toast.error(`❌ ${errorMsg}`, { duration: 4000 });
+        console.error('Bad Request Details:', data);
+        return;
+      }
+      
       if (status === 429) {
         const msg = data?.message || 'You have hit the rate limit. Please try again later or reduce the number of requests.';
         const botResponse = {
