@@ -52,9 +52,21 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-8#ohv607$047eflb!2%1f
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-# Production Security Settings
-if not DEBUG:
-    # Allow overriding these via environment to support local HTTP testing while DEBUG=False
+# Security Settings - Auto-configured based on DEBUG mode
+if DEBUG:
+    # Development settings - Allow HTTP connections and less strict security
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_HTTPONLY = False
+    CSRF_COOKIE_HTTPONLY = False
+    # Allow overriding via environment if needed for testing
+    if os.environ.get('SESSION_COOKIE_SECURE'):
+        SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() in ('1', 'true', 'yes')
+    if os.environ.get('CSRF_COOKIE_SECURE'):
+        CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'false').lower() in ('1', 'true', 'yes')
+else:
+    # Production Security Settings - Enforce HTTPS and strict security
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'true').lower() in ('1', 'true', 'yes')
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() in ('1', 'true', 'yes')
     CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'true').lower() in ('1', 'true', 'yes')
@@ -71,9 +83,15 @@ if not DEBUG:
     # Additional security headers
     SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
-# Cookie SameSite settings (use 'None' when serving frontend from a different domain over HTTPS)
-SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
-CSRF_COOKIE_SAMESITE = os.environ.get('CSRF_COOKIE_SAMESITE', 'Lax')
+# Cookie SameSite settings - Auto-configured based on DEBUG mode
+if DEBUG:
+    # Development: Use 'Lax' for easier local testing
+    SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
+    CSRF_COOKIE_SAMESITE = os.environ.get('CSRF_COOKIE_SAMESITE', 'Lax')
+else:
+    # Production: Use 'None' when serving frontend from a different domain over HTTPS
+    SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'None')
+    CSRF_COOKIE_SAMESITE = os.environ.get('CSRF_COOKIE_SAMESITE', 'None')
 
 # Clickjacking and Referrer-Policy
 X_FRAME_OPTIONS = os.environ.get('X_FRAME_OPTIONS', 'SAMEORIGIN')
@@ -359,9 +377,12 @@ else:
 
 # CORS settings
 if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True  # For development only
+    # Development mode - allow all origins for easy testing
+    CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
-    # For development, allow localhost origins
+    CORS_ALLOW_HEADERS = ['*']
+    CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+    # Explicitly list localhost origins as well
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -372,6 +393,8 @@ else:
     # Production CORS settings - MUST be configured properly
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOW_HEADERS = ['content-type', 'authorization', 'x-csrftoken', 'x-requested-with']
+    CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
     CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
     
     # Ensure we have proper origins in production

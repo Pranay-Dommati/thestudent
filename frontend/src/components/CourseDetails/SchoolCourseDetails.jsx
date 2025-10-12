@@ -305,10 +305,7 @@ const SchoolCourseDetails = () => {
 
   logger.log('Enrolling in course with data:', enrollmentData);
 
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.post(`/courses/enroll/`, enrollmentData, {
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const response = await axios.post(`/courses/enroll/`, enrollmentData);
 
       if (response.data.success) {
         if (response.data.created) {
