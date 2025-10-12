@@ -3,8 +3,24 @@ from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve as static_serve
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.cache import never_cache
+
+
+@require_http_methods(["GET", "HEAD"])  # Only allow safe methods
+@never_cache  # Avoid caching to reflect real-time health
+def ping_view(request):
+    """Lightweight health check endpoint.
+
+    Returns a minimal JSON payload without touching the database or printing logs.
+    """
+    return JsonResponse({"status": "ok"})
 
 urlpatterns = [
+    # Health check endpoint
+    path('ping/', ping_view),
+
     path('admin/', admin.site.urls),  # Custom admin path as requested
     # ... other URL patterns
     path('', include('courses.urls')),
