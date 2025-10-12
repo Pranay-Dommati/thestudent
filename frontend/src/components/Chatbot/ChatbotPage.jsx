@@ -876,7 +876,7 @@ const ChatbotPage = () => {
                   msg.id === messageId 
                     ? {
                         ...msg,
-                        content: "❌ You've reached your daily topic creation limit. Please try again tomorrow.",
+                        content: "❌ You've reached your monthly topic creation limit. Please try again next month.",
                         isNetworkError: false,
                         isReconnecting: false,
                         showRetryButton: false
@@ -942,7 +942,7 @@ const ChatbotPage = () => {
               msg.id === messageId && msg.isNetworkError 
                 ? {
                     ...msg,
-                    content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 16 topics per day\n\nPlease try again later or contact support if you need higher limits.`,
+                    content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 15 topics per month\n\nPlease try again next month or contact support if you need higher limits.`,
                     isNetworkError: false,
                     isReconnecting: false,
                     showRetryButton: false,
@@ -1230,7 +1230,7 @@ const ChatbotPage = () => {
               const limitResponse = {
                 id: generateMessageId(),
                 type: "bot",
-                content: limitMessage || "❌ You've reached your daily topic creation limit. Please try again tomorrow.",
+                content: limitMessage || "❌ You've reached your monthly topic creation limit. Please try again next month.",
                 timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
               };
               setChatHistory((prev) => [...prev, limitResponse]);
@@ -1314,14 +1314,14 @@ const ChatbotPage = () => {
             const rateLimitResponse = {
               id: generateMessageId(),
               type: "bot",
-              content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 16 topics per day\n\nPlease try again later or contact support if you need higher limits.`,
+              content: `🚫 **Rate Limit Exceeded**\n\n${rateLimitMessage}\n\n**Current Limits:**\n- Max 4 topics per request\n- Max 15 topics per month\n\nPlease try again next month or contact support if you need higher limits.`,
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
               isRateLimitError: true,
             };
             setChatHistory((prev) => [...prev, rateLimitResponse]);
             
             // Show toast notification
-            toast.error('Daily topic creation limit reached', {
+            toast.error('Monthly topic creation limit reached', {
               duration: 5000,
               position: 'top-center',
             });

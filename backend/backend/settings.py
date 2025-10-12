@@ -242,8 +242,14 @@ if DB_ENGINE in ('mysql', 'mariadb') or DB_HOST:
             'OPTIONS': {
                 'charset': 'utf8mb4',
                 'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                # Connection pool and timeout settings to prevent "Server has gone away"
+                'connect_timeout': 10,  # Connection timeout in seconds
+                'read_timeout': 30,     # Read timeout in seconds
+                'write_timeout': 30,    # Write timeout in seconds
                 **({'ssl': {'ssl_mode': 'REQUIRED'}} if DB_SSL_REQUIRE else {}),
             },
+            # Automatically close stale connections
+            'CONN_HEALTH_CHECKS': True,
         }
     }
 else:
