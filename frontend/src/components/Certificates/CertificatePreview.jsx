@@ -184,6 +184,20 @@ const CertificatePreview = () => {
           const existingCertRes = await axiosInstance.get(`/courses/${courseId}/certificate/`);
           if (existingCertRes.data) {
             setCertificate(existingCertRes.data);
+            // If a certificate record exists but file wasn't generated (no URL), attempt to re-issue
+            if (!existingCertRes.data.download_url) {
+              __debug('Existing certificate has no file; re-issuing');
+              setIssuing(true);
+              try {
+                const reissueRes = await axiosInstance.post(`/courses/${courseId}/certificate/`);
+                if (reissueRes.data) setCertificate(reissueRes.data);
+              } catch (reissueErr) {
+                __debug('Re-issue failed', reissueErr);
+                // Fall through to show generate button in UI
+              } finally {
+                setIssuing(false);
+              }
+            }
             return;
           }
         } catch (certError) {
@@ -609,7 +623,7 @@ const CertificatePreview = () => {
       </div>
 
       {/* Mobile-Optimized Certificate Generation Button for Edge Case */}
-      {!certificate && !loading && progressPct >= 100 && !issuing && location.pathname.includes('/courses/engineering/') && (
+      {!certificate?.download_url && !loading && progressPct >= 100 && !issuing && (
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4">
           <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
             <button

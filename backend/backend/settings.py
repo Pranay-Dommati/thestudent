@@ -329,8 +329,9 @@ if not DEBUG:
     WHITENOISE_MAX_AGE = int(os.environ.get('WHITENOISE_MAX_AGE', 60 * 60 * 24 * 365))
 
 # Media files (uploads)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# Media configuration (overridable via env for production)
+MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
+MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, 'media'))
 
 # ProLearning topic rate limits (read by backend.ai.rate_limiter)
 # Daily limits are disabled by default (ENFORCE_DAILY_LIMIT=false).

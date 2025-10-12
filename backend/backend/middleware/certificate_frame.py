@@ -16,7 +16,12 @@ class CertificateFrameMiddleware(MiddlewareMixin):
         if (request.path.startswith('/media/certificates/') and 
             request.path.endswith('.pdf')):
             # Allow iframe embedding for certificate PDFs from same origin and frontend
-            response['X-Frame-Options'] = 'SAMEORIGIN'
+            # Remove X-Frame-Options to let CSP frame-ancestors dictate embedding policy
+            if 'X-Frame-Options' in response:
+                try:
+                    del response['X-Frame-Options']
+                except Exception:
+                    pass
             # Add CSP header to allow iframe embedding from configured frontend origins
             frontend_origins = os.environ.get('FRONTEND_ORIGINS', '').strip()
             if frontend_origins:
@@ -25,7 +30,9 @@ class CertificateFrameMiddleware(MiddlewareMixin):
             else:
                 # Dev defaults
                 origins = 'http://localhost:5173 http://127.0.0.1:5173'
-            response['Content-Security-Policy'] = f"frame-ancestors 'self' {origins}"
+            # Set or append to CSP to allow framing from frontend origins
+            csp_value = f"frame-ancestors 'self' {origins}"
+            response['Content-Security-Policy'] = csp_value
             # Ensure proper content type for PDFs
             response['Content-Type'] = 'application/pdf'
             # Add cache control for PDFs

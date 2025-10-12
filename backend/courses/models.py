@@ -70,7 +70,11 @@ class EngineeringCourse(BaseCourse):
 class Certification(models.Model):
     """Certificate issued to a user for completing an EngineeringCourse."""
     id = models.BigAutoField(primary_key=True)
-    certificate_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    # Store as hyphenated UUID string to avoid DB length mismatches across engines
+    def generate_uuid_str():
+        return str(uuid.uuid4())
+
+    certificate_id = models.CharField(max_length=36, default=generate_uuid_str, unique=True, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='certificates')
     course = models.ForeignKey('EngineeringCourse', on_delete=models.CASCADE, related_name='certificates')
     issued_at = models.DateTimeField(auto_now_add=True)

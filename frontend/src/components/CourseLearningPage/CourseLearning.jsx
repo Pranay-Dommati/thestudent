@@ -26,6 +26,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [contentType, setContentType] = useState('video'); // 'video', 'resources', 'quiz', 'instructions'
   const [courseProgress, setCourseProgress] = useState(null);
+  // Keep a server-computed snapshot so UI counts match backend/certificate logic
+  const [serverProgress, setServerProgress] = useState(null); // { completed, total, percentage }
   const [savingProgress, setSavingProgress] = useState(false);
   const [internetResourcesOpen, setInternetResourcesOpen] = useState(false);
   const [downloadResourcesOpen, setDownloadResourcesOpen] = useState(false);
@@ -275,6 +277,9 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         const response = await axiosInstance.get(`/courses/progress/${course.id}/`);
         
         setCourseProgress(response.data);
+        if (response?.data?.progress) {
+          setServerProgress(response.data.progress);
+        }
         
         // Update the course lessons with completion status from the API
         const updatedCourse = {...course};
@@ -285,11 +290,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             const chapterIndex = updatedCourse.chapters.findIndex(c => c.title === chapter.name);
             if (chapterIndex !== -1) {
               chapter.lessons.forEach(lessonProgress => {
+                // Prefer matching by stable lesson id to avoid title mismatches
                 const lessonIndex = updatedCourse.chapters[chapterIndex].lessons.findIndex(l => 
-                  l.title === lessonProgress.title
+                  String(l.id) === String(lessonProgress.id)
                 );
                 if (lessonIndex !== -1) {
-                  updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = lessonProgress.completed;
+                  updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = !!lessonProgress.completed;
                 }
               });
             }
@@ -302,10 +308,10 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             if (sectionIndex !== -1) {
               section.lessons.forEach(lessonProgress => {
                 const lessonIndex = updatedCourse.chapters[sectionIndex].lessons.findIndex(l => 
-                  l.title === lessonProgress.title
+                  String(l.id) === String(lessonProgress.id)
                 );
                 if (lessonIndex !== -1) {
-                  updatedCourse.chapters[sectionIndex].lessons[lessonIndex].completed = lessonProgress.completed;
+                  updatedCourse.chapters[sectionIndex].lessons[lessonIndex].completed = !!lessonProgress.completed;
                 }
               });
             }
@@ -320,6 +326,9 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           const pct = summary.data?.progress?.percentage ?? 0;
           setProgressPercent(pct);
           setCertificate(summary.data?.certificate || null);
+          if (summary?.data?.progress) {
+            setServerProgress(summary.data.progress);
+          }
         } catch (e) {
           // ignore if not engineering course or not logged in
         }
@@ -378,22 +387,27 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     
     try {
       const currentLesson = course.chapters[activeChapter].lessons[activeLesson];
-      
-      if (currentLesson.id) {
-        // Handle regular course progress
-        await axiosInstance.post(`/lessons/toggle-completion/${currentLesson.id}/`);
-      }
-      
-      // Update local state
-      const updatedCourse = {...course};
+      // Optimistic UI update for instant tick
+      const updatedCourse = { ...course };
       updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
       setCourse(updatedCourse);
+
+      if (currentLesson.id) {
+        // Fire and then sync progress from server response
+        const response = await axiosInstance.post(`/lessons/toggle-completion/${currentLesson.id}/`);
+        const pct = response?.data?.progress?.percentage;
+        const completed = response?.data?.progress?.completed;
+        const total = response?.data?.progress?.total;
+        if (typeof pct === 'number' && !Number.isNaN(pct)) {
+          setProgressPercent(pct);
+        }
+        if (typeof completed === 'number' && typeof total === 'number') {
+          setServerProgress({ completed, total, percentage: pct });
+        }
+      }
     } catch (error) {
       console.error('Error marking lesson as complete:', error);
-      // Still update local state even if API call fails
-      const updatedCourse = {...course};
-      updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
-      setCourse(updatedCourse);
+      // keep optimistic completion; user can toggle off if needed
     }
   };
 
@@ -408,24 +422,31 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     try {
       const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
       const newCompletionState = !lesson.completed;
-      
-      if (lesson.id) {
-        // Handle regular course progress
-        const response = await axiosInstance.post(`/lessons/toggle-completion/${lesson.id}/`);
-        console.log('Lesson completion toggled:', response.data);
-      }
-      
-      // Update local state
-      const updatedCourse = {...course};
-      updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = newCompletionState;
+
+      // Optimistic UI update for instant feedback
+      const prevCourse = course;
+      const updatedCourse = { ...course };
+      updatedCourse.chapters = course.chapters.map((ch, idx) =>
+        idx !== chapterIndex ? ch : { ...ch, lessons: ch.lessons.map((l, li) => li !== lessonIndex ? l : { ...l, completed: newCompletionState }) }
+      );
       setCourse(updatedCourse);
+
+      if (lesson.id) {
+        const response = await axiosInstance.post(`/lessons/toggle-completion/${lesson.id}/`);
+        // Sync server-computed progress to ensure certificate eligibility reflects correctly
+        const pct = response?.data?.progress?.percentage;
+        const completed = response?.data?.progress?.completed;
+        const total = response?.data?.progress?.total;
+        if (typeof pct === 'number' && !Number.isNaN(pct)) {
+          setProgressPercent(pct);
+        }
+        if (typeof completed === 'number' && typeof total === 'number') {
+          setServerProgress({ completed, total, percentage: pct });
+        }
+      }
     } catch (error) {
       console.error('Error toggling lesson completion:', error);
-      // Still update local state even if API call fails
-      const updatedCourse = {...course};
-      updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = 
-        !updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed;
-      setCourse(updatedCourse);
+      // Note: we leave optimistic state; user can retry or refresh
     }
   };
 
@@ -619,6 +640,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const totalLessons = course.chapters.reduce(
     (acc, chapter) => acc + chapter.lessons.length, 0
   );
+  // Display values: prefer server-computed to match certificate logic
+  const displayCompleted = serverProgress?.completed ?? completedLessons;
+  const displayTotal = serverProgress?.total ?? totalLessons;
+  const displayPercent = typeof serverProgress?.percentage === 'number'
+    ? serverProgress.percentage
+    : (progressPercent || Math.round((displayCompleted / Math.max(1, displayTotal)) * 100));
   
   // Content rendering section in the return statement
   const renderContent = () => {
@@ -926,14 +953,14 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           activeChapter={activeChapter}
           activeLesson={activeLesson}
           handleLessonClick={handleLessonClick}
-          completedLessons={completedLessons}
-          totalLessons={totalLessons}
+          completedLessons={displayCompleted}
+          totalLessons={displayTotal}
           toggleChapter={toggleChapter}
           toggleSidebar={() => setSidebarVisible(!sidebarVisible)}
           toggleLessonCompletion={toggleLessonCompletion}
           navigate={navigate}
           isLoggedIn={isLoggedIn}
-          progressPercent={progressPercent || Math.round((completedLessons / Math.max(1,totalLessons)) * 100)}
+          progressPercent={displayPercent}
           certificate={certificate}
           issuingCert={issuingCert}
           onIssueCertificate={handleIssueCertificate}
