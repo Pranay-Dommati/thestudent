@@ -52,11 +52,27 @@ RewriteRule ^ index.html [L]
 
 If you already have `.htaccess`, merge these rules without duplicating `RewriteEngine On`.
 
+Note:
+- This repository now includes the same `.htaccess` in `frontend/public/.htaccess` so it is automatically copied into `dist/` during `npm run build`. Ensure the final deployed directory (same folder as `index.html`) contains this `.htaccess`.
+- If your app is served under a subpath (e.g., `https://example.com/app/`), set `RewriteBase /app/` and ensure Vite base is aligned (see next section).
+
+## 4.1) Vite base alignment
+
+If the site is deployed at the domain root, no change is needed (`base: '/'`). If hosted in a subfolder (e.g., `/app/`), set `VITE_BASE_PATH=/app/` in your environment so `vite.config.js` emits correct asset URLs.
+
+Example `.env.production`:
+```
+VITE_API_BASE_URL=https://www.easylearnova.com/api
+VITE_BASE_PATH=/
+```
+
 ## 5) Verify
 
 - Go to https://www.easylearnova.com
 - Navigate through app routes (e.g., /courses, /login) directly in the URL bar to confirm SPA fallback works.
 - Open DevTools → Network tab and confirm API requests go to `https://www.easylearnova.com/api/...` and succeed (CORS/CSRF must be set in backend env, which is already covered).
+ - Hard-refresh on a deep route (e.g., `/courses`) and confirm no Hostinger 404 page appears.
+ - Visit a non-existent route (e.g., `/xyz`) and confirm the app's NotFound component renders.
 
 ## 6) Common issues
 

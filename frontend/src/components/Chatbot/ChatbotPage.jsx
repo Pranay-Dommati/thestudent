@@ -498,6 +498,9 @@ const ChatbotPage = () => {
   const [coursePlaceholder, setCoursePlaceholder] = useState("Create arrays and strings course...");
   const [showTopicConfirmation, setShowTopicConfirmation] = useState(false);
   const [pendingTopics, setPendingTopics] = useState([]);
+  // Guard against multiple rapid clicks on "Create Course" in the confirmation dialog
+  const [isCreatingCourse, setIsCreatingCourse] = useState(false);
+  const creatingCourseRef = useRef(false);
   const [personalization, setPersonalization] = useState("");
   const [originalPrompt, setOriginalPrompt] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -693,7 +696,7 @@ const ChatbotPage = () => {
           initialQueryProcessed.current = true; // Set this immediately to prevent duplicate processing
           autoSendProcessed.current = true; // Prevent any duplicate auto-sends
           setTimeout(() => {
-            handleSendMessage(decodedMessage);
+            handleSendMessage(decodedMessage, { forceProMode: true });
           }, 100); // Small delay to ensure state updates
           // Replace URL without parameters for cleaner history
           navigate("/chat", { replace: true });
@@ -711,7 +714,7 @@ const ChatbotPage = () => {
       
       // Auto-send the message when coming from Home page
       setTimeout(() => {
-        handleSendMessage(decodedMessage);
+        handleSendMessage(decodedMessage, { forceProMode: true });
       }, 500); // Slight delay to ensure pro mode is enabled first
       
       // Replace URL without parameters for cleaner history
@@ -1014,7 +1017,9 @@ const ChatbotPage = () => {
     setRetryingMessageId(null);
   };
 
-  const handleSendMessage = async (customMessage = null) => {
+  // Send message; when options.forceProMode is true, treat as course creation regardless of current proMode transient state
+  const handleSendMessage = async (customMessage = null, options = {}) => {
+    const forcePro = options?.forceProMode === true;
     const messageToSend = customMessage || message;
     if (!messageToSend.trim() || isLoading) return;
 
@@ -1097,7 +1102,7 @@ const ChatbotPage = () => {
     setIsLoading(true);
 
     try {
-      if (proMode) {
+      if (forcePro || proMode) {
         // Check daily quota before processing
         if (usageStats) {
           const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
@@ -1512,8 +1517,14 @@ const ChatbotPage = () => {
   };
 
   const handleTopicConfirm = async () => {
+    // Prevent duplicate submissions from double-clicks or spamming the button
+    if (isCreatingCourse || creatingCourseRef.current) return;
+    creatingCourseRef.current = true;
+    setIsCreatingCourse(true);
     if (pendingTopics.length === 0) {
       alert("Please add at least one topic to create a course.");
+      creatingCourseRef.current = false;
+      setIsCreatingCourse(false);
       return;
     }
 
@@ -1637,6 +1648,9 @@ const ChatbotPage = () => {
       setChatHistory(prev => [...prev, errorResponse]);
       // Keep topics so user can retry; close dialog only if needed
       setShowTopicConfirmation(true);
+    } finally {
+      creatingCourseRef.current = false;
+      setIsCreatingCourse(false);
     }
   };
 
@@ -2328,10 +2342,14 @@ const ChatbotPage = () => {
                         <div className="flex gap-2">
                           <button
                             onClick={handleTopicConfirm}
-                            disabled={pendingTopics.length === 0}
-                            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 text-sm font-medium backdrop-blur-sm"
+                            disabled={pendingTopics.length === 0 || isCreatingCourse}
+                            className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 text-sm font-medium backdrop-blur-sm ${
+                              pendingTopics.length === 0 || isCreatingCourse
+                                ? 'bg-gray-400 text-white cursor-not-allowed'
+                                : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700'
+                            }`}
                           >
-                            ✓ Create Course ({pendingTopics.length} topic{pendingTopics.length !== 1 ? 's' : ''})
+                            {isCreatingCourse ? 'Creating...' : `✓ Create Course (${pendingTopics.length} topic${pendingTopics.length !== 1 ? 's' : ''})`}
                           </button>
                           <button
                             onClick={handleTopicCancel}

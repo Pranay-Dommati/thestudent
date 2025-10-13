@@ -88,6 +88,9 @@ const MobileChatbotPage = () => {
   const [proMode, setProMode] = useState(false);
   const [showTopicConfirmation, setShowTopicConfirmation] = useState(false);
   const [pendingTopics, setPendingTopics] = useState([]);
+  // Guard to prevent duplicate course creation on rapid taps
+  const [isCreatingCourse, setIsCreatingCourse] = useState(false);
+  const creatingCourseRef = useRef(false);
   const [personalization, setPersonalization] = useState("");
   const [originalPrompt, setOriginalPrompt] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -358,7 +361,7 @@ const MobileChatbotPage = () => {
           initialQueryProcessed.current = true; // Set this immediately to prevent duplicate processing
           autoSendProcessed.current = true; // Prevent any duplicate auto-sends
           setTimeout(() => {
-            handleSendMessage(decodedMessage);
+            handleSendMessage(decodedMessage, { forceProMode: true });
           }, 100); // Small delay to ensure state updates
           // Replace URL without parameters for cleaner history
           navigate("/chat", { replace: true });
@@ -376,7 +379,7 @@ const MobileChatbotPage = () => {
       
       // Auto-send the message when coming from Home page
       setTimeout(() => {
-        handleSendMessage(decodedMessage);
+        handleSendMessage(decodedMessage, { forceProMode: true });
       }, 500); // Slight delay to ensure pro mode is enabled first
       
       // Replace URL without parameters for cleaner history
@@ -416,7 +419,9 @@ const MobileChatbotPage = () => {
     }
   }, [proMode, usageStats]);
 
-  const handleSendMessage = async (customMessage = null) => {
+  // Send message; when options.forceProMode is true, process as course creation regardless of transient proMode state
+  const handleSendMessage = async (customMessage = null, options = {}) => {
+    const forcePro = options?.forceProMode === true;
     const messageToSend = customMessage || message;
     if (!messageToSend.trim() || isLoading) return;
 
@@ -439,7 +444,7 @@ const MobileChatbotPage = () => {
     setIsLoading(true);
 
     try {
-      if (proMode) {
+      if (forcePro || proMode) {
         // Check quota before processing (prefer monthly if daily not enforced)
         if (usageStats) {
           const dailyEnforced = usageStats?.rate_limits?.daily?.enforced ?? false;
@@ -674,8 +679,13 @@ const MobileChatbotPage = () => {
   };
 
   const handleTopicConfirm = async () => {
+    if (isCreatingCourse || creatingCourseRef.current) return;
+    creatingCourseRef.current = true;
+    setIsCreatingCourse(true);
     if (pendingTopics.length === 0) {
       alert("Please add at least one topic to create a course.");
+      creatingCourseRef.current = false;
+      setIsCreatingCourse(false);
       return;
     }
 
@@ -746,11 +756,11 @@ const MobileChatbotPage = () => {
         courseId: courseId, // Include the generated course ID
       };
       
-      // Update chat history and close confirmation dialog
-      setChatHistory((prev) => [...prev, proResponse]);
-      setShowTopicConfirmation(false);
-      setPendingTopics([]);
-      setOriginalPrompt("");
+  // Update chat history and close confirmation dialog
+  setChatHistory((prev) => [...prev, proResponse]);
+  setShowTopicConfirmation(false);
+  setPendingTopics([]);
+  setOriginalPrompt("");
       
     } catch (error) {
       console.error('❌ Error creating course:', error);
@@ -793,6 +803,9 @@ const MobileChatbotPage = () => {
       setChatHistory(prev => [...prev, errorResponse]);
       // Keep topics so user can retry
       setShowTopicConfirmation(true);
+    } finally {
+      creatingCourseRef.current = false;
+      setIsCreatingCourse(false);
     }
   };
 
@@ -1537,13 +1550,18 @@ const MobileChatbotPage = () => {
                       {/* Primary Action - Create Course at Bottom */}
                       <button
                         onClick={handleTopicConfirm}
-                        className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl shadow-lg hover:shadow-xl font-semibold text-sm transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+                        disabled={isCreatingCourse}
+                        className={`w-full py-3.5 rounded-xl shadow-lg font-semibold text-sm transition-all duration-200 transform ${
+                          isCreatingCourse
+                            ? 'bg-gray-400 text-white cursor-not-allowed'
+                            : 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]'
+                        }`}
                       >
                         <span className="inline-flex items-center">
                           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                           </svg>
-                          Create Course ({pendingTopics.length} topic{pendingTopics.length !== 1 ? 's' : ''})
+                          {isCreatingCourse ? 'Creating...' : `Create Course (${pendingTopics.length} topic${pendingTopics.length !== 1 ? 's' : ''})`}
                         </span>
                       </button>
                     </div>
