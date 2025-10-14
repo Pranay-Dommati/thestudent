@@ -1,3 +1,4 @@
+import universalToast from "../../utils/universalToast";
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoBook, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline, IoChevronForward, IoSearchOutline } from "react-icons/io5";
@@ -348,7 +349,7 @@ const MobileChatbotPage = () => {
           const stats = await fetchUsageStats();
           const remainingToday = stats ? (stats.daily_limit || 16) - (stats.daily_used || 0) : null;
           if (remainingToday !== null && remainingToday <= 0) {
-            toast.error('Sorry, your daily limit is over. Please try again tomorrow.');
+            universalToast.error('Sorry, your daily limit is over. Please try again tomorrow.');
             return;
           }
         }
@@ -455,7 +456,7 @@ const MobileChatbotPage = () => {
             const msg = dailyEnforced
               ? "🚫 Daily limit reached! You've used all your topic creation quota for today. Please try again tomorrow."
               : "🚫 Monthly limit reached! You've used all your topic creation quota for this month. Please try again next month.";
-            toast.error(msg, { duration: 5000, position: 'top-center' });
+            universalToast.error(msg, { duration: 5000 });
             setIsLoading(false);
             return;
           }
@@ -482,12 +483,10 @@ const MobileChatbotPage = () => {
           // Show toast notification IMMEDIATELY if more than 4 topics were extracted
           const maxPerRequest = 4; // Default max per request
           if (extractedTopics.length > maxPerRequest) {
-            toast.info(
+            universalToast.show(
               `📝 Maximum ${maxPerRequest} topics per request. Found ${extractedTopics.length} topics, showing first ${maxPerRequest}.`,
               { 
                 duration: 4000,
-                position: 'top-center',
-                icon: '📝'
               }
             );
           }
@@ -514,11 +513,11 @@ const MobileChatbotPage = () => {
                 if (remainingAllowance <= 0) {
                   if (dailyEnforced) {
                     limitMessage = `⚠️ You've reached your daily limit of ${usageStats.daily_limit || usageStats.rate_limits?.daily?.limit || 0} topics. Please try again tomorrow.`;
-                    toast.error(`🚫 Daily limit reached (${usageStats.daily_used || usageStats.rate_limits?.daily?.used || 0}/${usageStats.daily_limit || usageStats.rate_limits?.daily?.limit || 0} used)`, { duration: 4000 });
+                    universalToast.error(`🚫 Daily limit reached (${usageStats.daily_used || usageStats.rate_limits?.daily?.used || 0}/${usageStats.daily_limit || usageStats.rate_limits?.daily?.limit || 0} used)`, { duration: 4000 });
                   } else {
                     const m = usageStats.rate_limits?.monthly;
                     limitMessage = `⚠️ You've reached your monthly limit of ${(m?.limit ?? 15)} topics. Please try again next month.`;
-                    toast.error(`🚫 Monthly limit reached (${m?.used ?? 0}/${m?.limit ?? 15} used)`, { duration: 4000 });
+                    universalToast.error(`🚫 Monthly limit reached (${m?.used ?? 0}/${m?.limit ?? 15} used)`, { duration: 4000 });
                   }
                 } 
               }
@@ -528,13 +527,7 @@ const MobileChatbotPage = () => {
                 availableTopics = extractedTopics.slice(0, maxPerRequest);
                 limitMessage = `⚠️ Showing first ${maxPerRequest} topics. You can create maximum ${maxPerRequest} topics at a time.`;
                 // Show informational toast for general per-request limiting
-                toast(`🔢 Limited to ${maxPerRequest} topics per request`, {
-                  icon: 'ℹ️',
-                  style: {
-                    background: '#d1ecf1',
-                    color: '#0c5460',
-                    border: '1px solid #bee5eb'
-                  },
+                universalToast.show(`ℹ️ Limited to ${maxPerRequest} topics per request`, {
                   duration: 4000
                 });
               }
@@ -591,9 +584,8 @@ const MobileChatbotPage = () => {
             setChatHistory((prev) => [...prev, rateLimitResponse]);
             
             // Show toast notification
-            toast.error('Monthly topic creation limit reached', {
+            universalToast.error('Monthly topic creation limit reached', {
               duration: 5000,
-              position: 'top-center',
             });
             setIsLoading(false);
             return;
@@ -732,7 +724,7 @@ const MobileChatbotPage = () => {
 
       // Show success toast with just the topic count (no rate limit details)
       const actualTopicCount = pendingTopics.length;
-      toast.success(
+      universalToast.success(
         `✅ ${actualTopicCount} topic${actualTopicCount !== 1 ? 's' : ''} created successfully!`,
         { duration: 3000 }
       );
@@ -773,7 +765,7 @@ const MobileChatbotPage = () => {
       // Handle 400 Bad Request
       if (status === 400) {
         const errorMsg = data?.error || 'Invalid request. Please check your topics.';
-        toast.error(`❌ ${errorMsg}`, { duration: 4000 });
+        universalToast.error(`❌ ${errorMsg}`, { duration: 4000 });
         console.error('Bad Request Details:', data);
         return;
       }
@@ -1097,7 +1089,7 @@ const MobileChatbotPage = () => {
     const stats = await fetchUsageStats();
     const remainingToday = stats ? (stats.daily_limit || 16) - (stats.daily_used || 0) : null;
     if (remainingToday !== null && remainingToday <= 0) {
-      toast.error('Sorry, your daily limit is over. Please try again tomorrow.');
+      universalToast.error('Sorry, your daily limit is over. Please try again tomorrow.');
       return;
     }
 

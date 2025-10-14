@@ -8,7 +8,7 @@ import Footer from '../Footer/Footer';
 import { getEngineeringCourseById } from '../../services/courseApi';
 import { toAbsoluteMedia } from '../../utils/apiOrigin';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import { useAuth } from '../../context/AuthContext';
 
 // Add this helper function at the top of your file
@@ -22,6 +22,7 @@ const CourseDetails = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [openSections, setOpenSections] = useState({});
+  const [isStarting, setIsStarting] = useState(false);
   const { courseId } = useParams();
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth(); // Get authentication state
@@ -96,7 +97,7 @@ const CourseDetails = () => {
         });
       } catch (error) {
         console.error('Error fetching course details:', error);
-        toast.error('Failed to load course details');
+        universalToast.error('Failed to load course details');
       } finally {
         setLoading(false);
       }
@@ -119,13 +120,15 @@ const CourseDetails = () => {
   }, [isLoggedIn]); // Track when user is logged in
 
   const handleStartLearning = async () => {
+    if (isStarting) return; // guard against double-clicks
     if (!isLoggedIn) {
-      toast.error('Please log in to start learning');
+      universalToast.error('Please log in to start learning', { id: 'start-learning' });
       navigate('/auth?mode=login');
       return;
     }
 
     try {
+      setIsStarting(true);
       const enrollmentData = {
         course_type: 'engineering',
         course_id: courseId
@@ -137,9 +140,9 @@ const CourseDetails = () => {
 
       if (response.data.success) {
         if (response.data.created) {
-          toast.success('Successfully enrolled in course!');
+          universalToast.success('Successfully enrolled in course!', { id: 'start-learning' });
         } else {
-          toast.success('Welcome back! Continuing your learning journey.');
+          universalToast.success('Welcome back! Continuing your learning journey.', { id: 'start-learning' });
         }
         
         // Navigate to the learning page
@@ -148,10 +151,12 @@ const CourseDetails = () => {
     } catch (error) {
       console.error('Error enrolling in engineering course:', error);
       if (error.response?.data?.error) {
-        toast.error(error.response.data.error);
+        universalToast.error(error.response.data.error, { id: 'start-learning' });
       } else {
-        toast.error('Failed to start learning. Please try again.');
+        universalToast.error('Failed to start learning. Please try again.', { id: 'start-learning' });
       }
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -331,11 +336,12 @@ const CourseDetails = () => {
                   <div className="space-y-4 sm:space-y-6">
                     <button
                       onClick={handleStartLearning}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-lg font-medium text-sm sm:text-base
-                               transition-colors transform hover:scale-105 flex items-center justify-center space-x-2"
+                      disabled={isStarting}
+                      aria-busy={isStarting}
+                      className={`w-full text-white px-4 sm:px-6 py-3 sm:py-4 rounded-lg font-medium text-sm sm:text-base transition-colors transform flex items-center justify-center space-x-2 ${isStarting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 hover:scale-105'}`}
                     >
                       <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>Start Learning Now</span>
+                      <span>{isStarting ? 'Starting...' : 'Start Learning Now'}</span>
                     </button>
                     <div className="border-t pt-4 sm:pt-6">
                       <h3 className="font-bold text-base sm:text-lg mb-3 sm:mb-4">This course includes:</h3>

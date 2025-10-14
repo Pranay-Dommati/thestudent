@@ -628,10 +628,28 @@ class AIChatThrottle(UserRateThrottle):
     # Much higher throttle in development to avoid 429s during iteration
     rate = '3000/min' if settings.DEBUG else '30/min'
 
+    def get_ident(self, request):
+        """Throttle key: prefer authenticated user id, else fall back to IP.
+        This lets anonymous users be throttled per IP while logged-in users
+        get their own bucket.
+        """
+        try:
+            user = getattr(request, 'user', None)
+            if user and getattr(user, 'is_authenticated', False) and getattr(user, 'id', None):
+                return f"user:{user.id}"
+        except Exception:
+            pass
+        # Fallback to IP
+        try:
+            from .rate_limiter import get_user_ip
+            ip = get_user_ip(request)
+        except Exception:
+            ip = request.META.get('REMOTE_ADDR', 'unknown')
+        return f"ip:{ip}"
+
 
 @api_view(["POST"])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 @throttle_classes([AIChatThrottle])
 def chat(request):
     """Secure chat endpoint that proxies Gemini via server-side key."""

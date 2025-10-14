@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { FaPlay, FaBookReader, FaClock, FaChalkboardTeacher, FaGlobe, FaBook, FaCheck } from 'react-icons/fa';
 import axios from '../../utils/axios';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import LoadingSpinner from './LoadingSpinner';
 import Navbar from '../Navbar/Navbar';
 import Footer from '../Footer/Footer';
@@ -18,6 +18,7 @@ const SchoolCourseDetails = () => {
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [checkingEnrollment, setCheckingEnrollment] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { boardId, stateId, subjectId } = useParams();
@@ -206,7 +207,7 @@ const SchoolCourseDetails = () => {
         }
       } catch (error) {
         logger.error('Error fetching course:', error);
-        toast.error('Failed to load course details');
+        universalToast.error('Failed to load course details');
         
         // Fallback to dummy data in case of error
         const fallbackClassLevel = location.pathname.includes('/6th/') ? '6th' :
@@ -267,17 +268,19 @@ const SchoolCourseDetails = () => {
   }, [isLoggedIn]);
 
   const handleStartLearning = async () => {
+    if (isStarting) return; // guard against rapid clicks
     if (!isLoggedIn) {
-      toast.error('Please log in to start learning');
+      universalToast.error('Please log in to start learning', { id: 'start-learning' });
       navigate('/auth?mode=login');
       return;
     }
 
     try {
+      setIsStarting(true);
       // If user is already enrolled, navigate directly to learning page
       if (isEnrolled) {
         logger.log('User already enrolled, navigating directly to learning page');
-        toast.success('Welcome back! Continuing your learning journey.');
+        universalToast.success('Welcome back! Continuing your learning journey.', { id: 'start-learning' });
         navigate(`${location.pathname}/learning`);
         return;
       }
@@ -309,10 +312,10 @@ const SchoolCourseDetails = () => {
 
       if (response.data.success) {
         if (response.data.created) {
-          toast.success('Successfully enrolled in course!');
+          universalToast.success('Successfully enrolled in course!', { id: 'start-learning' });
           setIsEnrolled(true); // Update enrollment status
         } else {
-          toast.success('Welcome back! Continuing your learning journey.');
+          universalToast.success('Welcome back! Continuing your learning journey.', { id: 'start-learning' });
         }
         
         // Navigate to the learning page
@@ -321,10 +324,12 @@ const SchoolCourseDetails = () => {
     } catch (error) {
       logger.error('Error enrolling in course:', error);
       if (error.response?.data?.error) {
-        toast.error(error.response.data.error);
+        universalToast.error(error.response.data.error, { id: 'start-learning' });
       } else {
-        toast.error('Failed to start learning. Please try again.');
+        universalToast.error('Failed to start learning. Please try again.', { id: 'start-learning' });
       }
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -374,18 +379,21 @@ const SchoolCourseDetails = () => {
 
               <button 
                 onClick={handleStartLearning}
-                disabled={checkingEnrollment}
-                className={`w-full sm:w-auto bg-indigo-500 hover:bg-indigo-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-medium text-sm sm:text-base
-                         flex items-center justify-center sm:justify-start space-x-2 transform transition hover:scale-105
-                         ${checkingEnrollment ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={checkingEnrollment || isStarting}
+                aria-busy={isStarting}
+                className={`w-full sm:w-auto text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-medium text-sm sm:text-base
+                         flex items-center justify-center sm:justify-start space-x-2 transform transition
+                         ${checkingEnrollment || isStarting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600 hover:scale-105'}`}
               >
                 <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span>
-                  {checkingEnrollment 
-                    ? 'Checking...' 
-                    : isEnrolled 
-                      ? 'Continue Learning' 
-                      : 'Start Learning Now'}
+                  {checkingEnrollment
+                    ? 'Checking...'
+                    : isStarting
+                      ? 'Starting...'
+                      : isEnrolled
+                        ? 'Continue Learning'
+                        : 'Start Learning Now'}
                 </span>
               </button>
             </div>

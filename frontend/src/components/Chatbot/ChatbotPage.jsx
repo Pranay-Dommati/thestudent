@@ -1,3 +1,4 @@
+import universalToast from "../../utils/universalToast";
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline, IoBook, IoBookmark, IoInformationCircle, IoChevronForward } from "react-icons/io5";
@@ -683,7 +684,7 @@ const ChatbotPage = () => {
           const stats = await fetchUsageStats();
           const remainingToday = stats ? (stats.daily_limit || 16) - (stats.daily_used || 0) : null;
           if (remainingToday !== null && remainingToday <= 0) {
-            toast.error('Sorry, your daily limit is over. Please try again tomorrow.');
+            universalToast.error('Sorry, your daily limit is over. Please try again tomorrow.');
             return; // don't enable pro mode
           }
         }
@@ -1107,9 +1108,8 @@ const ChatbotPage = () => {
         if (usageStats) {
           const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
           if (remainingToday <= 0) {
-            toast.error("🚫 Daily limit reached! You've used all your topic creation quota for today. Please try again tomorrow.", {
-              duration: 5000,
-              position: 'top-center'
+            universalToast.error("🚫 Daily limit reached! You've used all your topic creation quota for today. Please try again tomorrow.", {
+              duration: 5000
             });
             setIsLoading(false);
             return;
@@ -1142,12 +1142,10 @@ const ChatbotPage = () => {
           // Show toast notification IMMEDIATELY if more than 4 topics were extracted
           const maxPerRequest = 4; // Default max per request
           if (extractedTopics.length > maxPerRequest) {
-            toast.info(
+            universalToast.show(
               `📝 Maximum ${maxPerRequest} topics per request. Found ${extractedTopics.length} topics, showing first ${maxPerRequest}.`,
               { 
-                duration: 4000,
-                position: 'top-center',
-                icon: '📝'
+                duration: 4000
               }
             );
           }
@@ -1171,43 +1169,25 @@ const ChatbotPage = () => {
                 if (remainingToday <= 0) {
                   limitMessage = `⚠️ You've reached your daily limit of ${usageStats.daily_limit || 16} topics. Please try again tomorrow.`;
                   // Show toast for daily limit reached
-                  toast.error(`🚫 Daily limit reached (${usageStats.daily_used || 0}/${usageStats.daily_limit || 16} used)`, {
+                  universalToast.error(`🚫 Daily limit reached (${usageStats.daily_used || 0}/${usageStats.daily_limit || 16} used)`, {
                     duration: 4000
                   });
                 } else if (remainingToday < extractedTopics.length && extractedTopics.length <= maxPerRequestFromStats) {
                   limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you only have ${remainingToday} topic(s) remaining today. Showing first ${availableTopics.length} topic(s).`;
                   // Show informational toast for daily quota limiting
-                  toast(`📊 Limited to ${availableTopics.length} topics due to daily quota`, {
-                    icon: '⚠️',
-                    style: {
-                      background: '#fff3cd',
-                      color: '#856404',
-                      border: '1px solid #ffeaa7'
-                    },
+                  universalToast.show(`⚠️ Limited to ${availableTopics.length} topics due to daily quota`, {
                     duration: 4000
                   });
                 } else if (extractedTopics.length > maxPerRequestFromStats && remainingToday >= maxPerRequestFromStats) {
                   limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you can create maximum ${maxPerRequestFromStats} topics at a time. Showing first ${availableTopics.length} topic(s).`;
                   // Show informational toast for per-request limiting
-                  toast(`🔢 Limited to ${maxPerRequestFromStats} topics per request`, {
-                    icon: 'ℹ️',
-                    style: {
-                      background: '#d1ecf1',
-                      color: '#0c5460',
-                      border: '1px solid #bee5eb'
-                    },
+                  universalToast.show(`ℹ️ Limited to ${maxPerRequestFromStats} topics per request`, {
                     duration: 4000
                   });
                 } else if (extractedTopics.length > maxPerRequestFromStats && remainingToday < maxPerRequestFromStats) {
                   limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you can only create maximum ${maxPerRequestFromStats} topics at a time and have ${remainingToday} topic(s) remaining today. Showing first ${availableTopics.length} topic(s).`;
                   // Show informational toast for combined limiting
-                  toast(`📊 Limited by daily quota (${remainingToday} left) and per-request limit (${maxPerRequestFromStats} max)`, {
-                    icon: '⚠️',
-                    style: {
-                      background: '#fff3cd',
-                      color: '#856404',
-                      border: '1px solid #ffeaa7'
-                    },
+                  universalToast.show(`⚠️ Limited by daily quota (${remainingToday} left) and per-request limit (${maxPerRequestFromStats} max)`, {
                     duration: 5000
                   });
                 }
@@ -1218,13 +1198,7 @@ const ChatbotPage = () => {
                 availableTopics = extractedTopics.slice(0, maxPerRequest);
                 limitMessage = `⚠️ Showing first ${maxPerRequest} topics. You can create maximum ${maxPerRequest} topics at a time.`;
                 // Show informational toast for general per-request limiting
-                toast(`🔢 Limited to ${maxPerRequest} topics per request`, {
-                  icon: 'ℹ️',
-                  style: {
-                    background: '#d1ecf1',
-                    color: '#0c5460',
-                    border: '1px solid #bee5eb'
-                  },
+                universalToast.show(`ℹ️ Limited to ${maxPerRequest} topics per request`, {
                   duration: 4000
                 });
               }
@@ -1326,9 +1300,8 @@ const ChatbotPage = () => {
             setChatHistory((prev) => [...prev, rateLimitResponse]);
             
             // Show toast notification
-            toast.error('Monthly topic creation limit reached', {
+            universalToast.error('Monthly topic creation limit reached', {
               duration: 5000,
-              position: 'top-center',
             });
             setIsLoading(false);
             return;
@@ -1347,19 +1320,7 @@ const ChatbotPage = () => {
         }
       } else {
         // Regular chatbot response using backend AI chat proxy
-
-        if (!isAuthenticated()) {
-          setShowAuthModal(true);
-          const authPrompt = {
-            id: generateMessageId(),
-            type: 'bot',
-            content: 'Please sign in to chat with the AI assistant.',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          };
-          setChatHistory((prev) => [...prev, authPrompt]);
-          setIsLoading(false);
-          return;
-        }
+        // Auth is NOT required for normal chat. Auth modal is only for create-course mode.
 
         // If the device is offline, use the network-lost UX instead of calling the local API
         if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
@@ -1584,7 +1545,7 @@ const ChatbotPage = () => {
 
       // Show success toast with just the topic count (no rate limit details)
       const actualTopicCount = pendingTopics.length;
-      toast.success(
+      universalToast.success(
         `✅ ${actualTopicCount} topic${actualTopicCount !== 1 ? 's' : ''} created successfully!`,
         { duration: 3000 }
       );
@@ -1736,7 +1697,7 @@ const ChatbotPage = () => {
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(codeString);
-                                toast.success('Code copied to clipboard!', { duration: 2000 });
+                                universalToast.success('Code copied to clipboard!', { duration: 2000 });
                               }}
                               className="absolute top-2 right-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-3 py-1.5 rounded-md text-xs font-medium opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1.5"
                             >
@@ -1998,7 +1959,7 @@ const ChatbotPage = () => {
     const stats = await fetchUsageStats();
     const remainingToday = stats ? (stats.daily_limit || 16) - (stats.daily_used || 0) : null;
     if (remainingToday !== null && remainingToday <= 0) {
-      toast.error('Sorry, your daily limit is over. Please try again tomorrow.');
+      universalToast.error('Sorry, your daily limit is over. Please try again tomorrow.');
       return;
     }
 

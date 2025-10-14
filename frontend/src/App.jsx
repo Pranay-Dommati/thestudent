@@ -27,7 +27,7 @@ import SchoolCourseDetails from './components/CourseDetails/SchoolCourseDetails'
 import Navbar from './components/Navbar/Navbar';
 import MobileBottomNavigation from './components/Navigation/MobileBottomNavigation';
 import AdminDashboard from './components/Admin/Dashboard/AdminDashboard';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import HelpCenter from './components/HelpCenter/HelpCenter';
@@ -163,10 +163,9 @@ const App = () => {
               background: '#363636',
               color: '#fff',
               padding: '12px 16px',
-              paddingRight: '40px',
               borderRadius: '10px',
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              maxWidth: '400px',
+              maxWidth: '500px',
             },
             success: {
               duration: 3000,
@@ -174,7 +173,6 @@ const App = () => {
                 background: '#22c55e',
                 color: '#fff',
                 padding: '12px 16px',
-                paddingRight: '40px',
                 borderRadius: '10px',
                 boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
               },
@@ -189,7 +187,6 @@ const App = () => {
                 background: '#ef4444',
                 color: '#fff',
                 padding: '12px 16px',
-                paddingRight: '40px',
                 borderRadius: '10px',
                 boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
               },
@@ -204,7 +201,8 @@ const App = () => {
             right: '20px',
           }}
           containerClassName="toast-container"
-        />      <BrowserRouter>
+        />
+        <BrowserRouter>
         <Layout excludePaths={['/admin-p', '/chat']}>
           <Routes>
             <Route path="/" element={<HomePage />} />

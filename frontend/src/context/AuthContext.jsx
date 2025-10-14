@@ -179,7 +179,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoggedIn(true);
       setLastChecked(Date.now());
       
-      customToast.success('Login successful!');
+      customToast.success('Login successful!', { id: 'auth-login' });
       return true;
     } catch (error) {
       console.error('Login error:', error.response?.data);
@@ -187,20 +187,20 @@ export const AuthProvider = ({ children }) => {
       if (error.response?.status === 400) {
         const errorData = error.response.data;
         if (errorData.email) {
-          customToast.error(errorData.email[0]);
+          customToast.error(errorData.email[0], { id: 'auth-login' });
         } else if (errorData.password) {
-          customToast.error(errorData.password[0]);
+          customToast.error(errorData.password[0], { id: 'auth-login' });
         } else if (errorData.non_field_errors) {
-          customToast.error(errorData.non_field_errors[0]);
+          customToast.error(errorData.non_field_errors[0], { id: 'auth-login' });
         } else {
-          customToast.error('Invalid email or password');
+          customToast.error('Invalid email or password', { id: 'auth-login' });
         }
       } else if (error.response?.status === 401) {
-        customToast.error('Invalid email or password');
+        customToast.error('Invalid email or password', { id: 'auth-login' });
       } else if (error.response?.status === 500) {
-        customToast.error('Server error. Please try again later.');
+        customToast.error('Server error. Please try again later.', { id: 'auth-login' });
       } else {
-        customToast.error('Login failed. Please try again.');
+        customToast.error('Login failed. Please try again.', { id: 'auth-login' });
       }
       return false;
     }
@@ -208,7 +208,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     handleAuthFailure();
-    customToast.success('Logged out successfully');
+    customToast.success('Logged out successfully', { id: 'auth-logout' });
   };
 
   // Google Sign-In function
@@ -227,7 +227,7 @@ export const AuthProvider = ({ children }) => {
       setIsLoggedIn(true);
       setLastChecked(Date.now());
       
-      customToast.success('Login successful!');
+      customToast.success('Login successful!', { id: 'auth-login' });
       return true;
     } catch (error) {
       // Log richer details to help diagnose undefined cases (e.g., network/CORS)
@@ -237,11 +237,11 @@ export const AuthProvider = ({ children }) => {
       console.error('Google login error:', { status, detail });
       
       if (error.response?.status === 400) {
-        customToast.error('Google authentication failed. Please try again.');
+        customToast.error('Google authentication failed. Please try again.', { id: 'auth-login' });
       } else if (error.response?.status === 500) {
-        customToast.error('Server error. Please try again later.');
+        customToast.error('Server error. Please try again later.', { id: 'auth-login' });
       } else {
-        customToast.error('Google login failed. Please try again.');
+        customToast.error('Google login failed. Please try again.', { id: 'auth-login' });
       }
       return false;
     }

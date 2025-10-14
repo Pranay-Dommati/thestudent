@@ -80,14 +80,15 @@ export default function AuthForm() {
       
       const success = await googleLogin(credential);
       if (success) {
-        // Toast is already shown in AuthContext, no need for duplicate message
+        // Toast is already shown in AuthContext with id 'auth-login', no duplicate
         navigate(returnToPath || '/');
       } else {
-        toast.error('Google sign-in failed. Please try again.');
+        // Only show error if googleLogin returns false without throwing
+        toast.error('Google sign-in failed. Please try again.', { id: 'auth-login' });
       }
     } catch (error) {
       console.error('Google sign-in error:', error);
-      toast.error('Google sign-in failed. Please try again.');
+      // AuthContext already shows error toast with id 'auth-login', no duplicate needed
     } finally {
       setIsLoading(false);
     }
@@ -95,7 +96,7 @@ export default function AuthForm() {
 
   const handleGoogleError = (error) => {
     console.error('Google auth error:', error);
-    toast.error(`Google sign-in failed: ${error}`);
+    toast.error(`Google sign-in failed: ${error}`, { id: 'auth-login' });
     setIsLoading(false);
   };
   
@@ -150,7 +151,7 @@ export default function AuthForm() {
 
     try {
       if (!isSignUp) {
-        // Login request
+        // Login request - AuthContext already shows success/error toasts with id 'auth-login'
         const response = await login(formData.email, formData.password);
         if (response) {
           // Redirect to the returnTo path if it exists, otherwise to the homepage
@@ -169,13 +170,11 @@ export default function AuthForm() {
       }
     } catch (error) {
       console.error("Error during login:", error);
-      toast("Invalid email or password", {
-        icon: '❌',
-        style: {
-          backgroundColor: '#EF4444',
-          color: 'white',
-        }
-      });
+      // AuthContext already handles login error toasts with id 'auth-login'
+      // Only show toast for signup errors or other unexpected errors
+      if (isSignUp) {
+        toast.error("Signup failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
