@@ -5,7 +5,7 @@ import HomePage from './components/HomePage/HomePage';
 import Courses from './components/Courses/Courses';
 import CoursesWrapper from './components/Courses/CoursesWrapper';
 import ChatbotWrapper from './components/Chatbot/ChatbotWrapper';
-import ProLearningPage from './components/ProLearning/ProLearningPage';
+import ProLearningPage from './components/ProLearning'; // Updated to use index.js
 import CourseDetailsPage from './components/CourseDetails/CourseDetailsPage/CourseDetailsPage';
 import ResponsiveCourseLearningPage from './components/CourseLearningPage/ResponsiveCourseLearningPage';
 import LearningHubWrapper from './components/LearningHub/LearningHubWrapper';

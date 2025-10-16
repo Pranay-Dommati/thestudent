@@ -25,6 +25,7 @@ from django.contrib.auth import get_user_model
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 import json
+import uuid
 import jwt
 from django.conf import settings
 from builtins import print, len, str, bool, list, Exception, enumerate
@@ -198,15 +199,25 @@ def save_pro_learning_course(request):
                 existing_course.save(update_fields=["description"])
                 course = existing_course
             else:
-                # Create a new course
-                course = ProLearningCourse.objects.create(
-                    course_name=course_name,
-                    description=(
-                        f"AI-generated course covering {len(topics_data)} topics: "
-                        f"{', '.join(list(topics_data.keys())[:3])}{'...' if len(topics_data) > 3 else ''}"
-                    ),
-                    user=user
-                )
+                # Create a new course (defensively trim string lengths to avoid DB errors)
+                safe_course_name = (course_name or '')[:255]
+                safe_description = (
+                    f"AI-generated course covering {len(topics_data)} topics: "
+                    f"{', '.join(list(topics_data.keys())[:3])}{'...' if len(topics_data) > 3 else ''}"
+                )[:1024]
+                print(f"DEBUG: Creating course with course_name(len={len(safe_course_name)}): {safe_course_name[:60]}")
+                try:
+                    new_id = uuid.uuid4().hex  # 32-char to match MySQL CHAR(32)
+                    print(f"DEBUG: Creating ProLearningCourse id={new_id} (len={len(str(new_id))})")
+                    course = ProLearningCourse.objects.create(
+                        id=new_id,
+                        course_name=safe_course_name,
+                        description=safe_description,
+                        user=user
+                    )
+                except Exception as e:
+                    print(f"ERROR: Failed creating ProLearningCourse: {e}")
+                    return JsonResponse({'error': f'Server error: {str(e)}', 'stage': 'create_course'}, status=500)
             
             # Create topics, videos, quizzes, resources, reading material, and summary
             for topic_name, topic_content in topics_data.items():
@@ -236,44 +247,78 @@ def save_pro_learning_course(request):
                 print(f"❓ Quiz questions count: {len(quiz_questions)}")
                 print(f"📎 Resources count: {len(resources)}")
                 
-                topic = ProLearningTopic.objects.create(
-                    course=course,
-                    topic_name=topic_name,  # Use topic_name instead of title
-                    reading_material=reading_material,  # Store reading material
-                    summary=summary,  # Store summary
-                    order=len(course.topics.all()) + 1
-                )
+                # Defensive trimming for topic fields
+                safe_topic_name = (topic_name or '')[:255]
+                safe_reading = (reading_material or '')[:65535]
+                safe_summary = (summary or '')[:65535]
+                try:
+                    topic_uuid = uuid.uuid4().hex  # 32-char
+                    topic = ProLearningTopic.objects.create(
+                        id=topic_uuid,
+                        course=course,
+                        topic_name=safe_topic_name,  # Use topic_name instead of title
+                        reading_material=safe_reading,  # Store reading material
+                        summary=safe_summary,  # Store summary
+                        order=len(course.topics.all()) + 1
+                    )
+                except Exception as e:
+                    print(f"ERROR: Failed creating ProLearningTopic: {e}")
+                    return JsonResponse({'error': f'Server error: {str(e)}', 'stage': 'create_topic'}, status=500)
                 
                 # Create videos
                 for i, video_data in enumerate(videos):
-                    ProLearningVideo.objects.create(
-                        topic=topic,
-                        title=video_data.get('title', f'Video {i+1}'),
-                        video_url=video_data.get('url', ''),  # Use video_url instead of url
-                        order=i + 1
-                    )
+                    v_title = (video_data.get('title', f'Video {i+1}') or '')[:255]
+                    v_url = (video_data.get('url', '') or '')[:500]
+                    try:
+                        ProLearningVideo.objects.create(
+                            id=uuid.uuid4().hex,
+                            topic=topic,
+                            title=v_title,
+                            video_url=v_url,  # Use video_url instead of url
+                            order=i + 1
+                        )
+                    except Exception as e:
+                        print(f"ERROR: Failed creating ProLearningVideo: {e}")
+                        return JsonResponse({'error': f'Server error: {str(e)}', 'stage': 'create_video'}, status=500)
                 
                 # Create quiz questions
                 for i, quiz_data in enumerate(quiz_questions):
-                    ProLearningQuizQuestion.objects.create(
-                        topic=topic,
-                        question_text=quiz_data.get('question', ''),  # Use question_text instead of question
-                        options=quiz_data.get('options', []),
-                        correct_answer=quiz_data.get('correct', 0),
-                        order=i + 1
-                    )
+                    q_text = (quiz_data.get('question', '') or '')[:65535]
+                    q_options = quiz_data.get('options', []) if isinstance(quiz_data.get('options', []), list) else []
+                    q_correct = str(quiz_data.get('correct', ''))[:255]
+                    try:
+                        ProLearningQuizQuestion.objects.create(
+                            id=uuid.uuid4().hex,
+                            topic=topic,
+                            question_text=q_text,  # Use question_text instead of question
+                            options=q_options,
+                            correct_answer=q_correct,
+                            order=i + 1
+                        )
+                    except Exception as e:
+                        print(f"ERROR: Failed creating ProLearningQuizQuestion: {e}")
+                        return JsonResponse({'error': f'Server error: {str(e)}', 'stage': 'create_quiz'}, status=500)
                 
                 # Create resources
                 for i, resource_data in enumerate(resources):
-                    ProLearningResource.objects.create(
-                        topic=topic,
-                        title=resource_data.get('title', f'Resource {i+1}'),
-                        url=resource_data.get('url', ''),
-                        # Persist description and resource type if provided
-                        description=resource_data.get('description', ''),
-                        resource_type=resource_data.get('type', 'link'),
-                        order=i + 1
-                    )
+                    r_title = (resource_data.get('title', f'Resource {i+1}') or '')[:255]
+                    r_url = (resource_data.get('url', '') or '')[:500]
+                    r_desc = (resource_data.get('description', '') or '')[:2000]
+                    r_type = (resource_data.get('type', 'link') or '')[:50]
+                    try:
+                        ProLearningResource.objects.create(
+                            id=uuid.uuid4().hex,
+                            topic=topic,
+                            title=r_title,
+                            url=r_url,
+                            # Persist description and resource type if provided
+                            description=r_desc,
+                            resource_type=r_type,
+                            order=i + 1
+                        )
+                    except Exception as e:
+                        print(f"ERROR: Failed creating ProLearningResource: {e}")
+                        return JsonResponse({'error': f'Server error: {str(e)}', 'stage': 'create_resource'}, status=500)
         
         response_data = {
             'status': 'success',
