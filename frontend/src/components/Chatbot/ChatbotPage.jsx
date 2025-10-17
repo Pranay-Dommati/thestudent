@@ -9,7 +9,6 @@ import remarkGfm from "remark-gfm";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclassifier";
-import AuthModal from '../Common/AuthModal';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
 import proLearningHistoryService from '../../services/ProLearningHistoryService';
@@ -478,7 +477,6 @@ const ChatbotPage = () => {
   const creatingCourseRef = useRef(false);
   const [personalization, setPersonalization] = useState("");
   const [originalPrompt, setOriginalPrompt] = useState("");
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const [showTopicModal, setShowTopicModal] = useState(false);
   const [usageStats, setUsageStats] = useState(null); // Track rate limit usage stats
   const [learningContext, setLearningContext] = useState(""); // Store learning preferences and context
@@ -1091,6 +1089,26 @@ const ChatbotPage = () => {
     setChatHistory((prev) => [...prev, userMessageObj]);
     if (!customMessage) setMessage("");
 
+    // If not authenticated, show a friendly sign-in prompt and stop
+    try {
+      const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isAuthenticated;
+      if (!authed) {
+        const returnTo = window.location.pathname + window.location.search;
+        const signInUrl = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
+        const signUpUrl = `/auth?mode=signup&returnTo=${encodeURIComponent(returnTo)}`;
+        const authPrompt = {
+          id: generateMessageId(),
+          type: "bot",
+          isAuthPrompt: true,
+          signInUrl,
+          signUpUrl,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+        setChatHistory((prev) => [...prev, authPrompt]);
+        return;
+      }
+    } catch (_) {}
+
     // Validate prompt early and provide a helpful message if it looks like nonsense/too short
     const validation = validateCoursePrompt(messageToSend);
     if (!validation.ok) {
@@ -1558,6 +1576,39 @@ const ChatbotPage = () => {
     const sections = isCourseContent ? parseMarkdownResponse(contentText) : [];
     const isLearningPlan = message.isLearningPlan || (contentText.includes("Learning Plan") && contentText.includes("Day "));
     const isProCard = message.isProCard || false;
+
+    // Special inline auth prompt bubble
+    if (message.isAuthPrompt) {
+      return (
+        <div className="w-full max-w-3xl mx-auto px-4 mb-6">
+          <div className="flex justify-start">
+            <div className="max-w-[95%] min-w-0">
+              <div className="rounded-2xl px-5 py-4 bg-gray-50 text-gray-800 border border-gray-200 shadow-sm">
+                <p className="mb-3 text-sm lg:text-base">
+                  <span className="mr-1">🔒</span>
+                  To create personalized learning plans, please sign in.
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link
+                    to={message.signInUrl || '/auth?mode=login'}
+                    className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to={message.signUpUrl || '/auth?mode=signup'}
+                    className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Create Account
+                  </Link>
+                </div>
+                <div className="text-xs mt-2 text-gray-500">{message.timestamp}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="w-full max-w-3xl mx-auto px-4 mb-6">
@@ -2316,14 +2367,7 @@ const ChatbotPage = () => {
 
       </div>
 
-      {/* Authentication Modal */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        title="Course Creation Requires Account"
-        message="Create personalized courses tailored to your learning goals. Save your progress and access advanced features."
-        feature="Create Custom Courses"
-      />
+      {/* Auth modal removed - we now show inline login/signup message within chat */}
     </div>
   );
 };

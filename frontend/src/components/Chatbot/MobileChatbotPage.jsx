@@ -9,7 +9,6 @@ import remarkGfm from "remark-gfm";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclassifier";
-import AuthModal from '../Common/AuthModal';
 import ErrorBoundary from '../Common/ErrorBoundary';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
@@ -77,7 +76,6 @@ const MobileChatbotPage = () => {
   const creatingCourseRef = useRef(false);
   const [personalization, setPersonalization] = useState("");
   const [originalPrompt, setOriginalPrompt] = useState("");
-  const [showAuthModal, setShowAuthModal] = useState(false);
   // Generate unique IDs using timestamp and random component
   const generateUniqueId = () => {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -473,6 +471,27 @@ const MobileChatbotPage = () => {
     setChatHistory((prev) => [...prev, userMessageObj]);
     if (!customMessage) setMessage("");
 
+    // If not authenticated, show a friendly sign-in prompt and stop
+    try {
+      const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isLoggedIn;
+      if (!authed) {
+        const returnTo = window.location.pathname + window.location.search;
+        const signInUrl = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
+        const signUpUrl = `/auth?mode=signup&returnTo=${encodeURIComponent(returnTo)}`;
+        const authPrompt = {
+          id: generateUniqueId(),
+          type: "bot",
+          isAuthPrompt: true,
+          signInUrl,
+          signUpUrl,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+        setChatHistory((prev) => [...prev, authPrompt]);
+        setIsLoading(false);
+        return;
+      }
+    } catch (_) {}
+
     // Validate prompt early and provide a helpful message if it looks like nonsense/too short
     const validation = validateCoursePrompt(messageToSend);
     if (!validation.ok) {
@@ -832,6 +851,38 @@ const MobileChatbotPage = () => {
   };
 
   const MessageBubble = React.memo(({ message }) => {
+    // Inline auth prompt bubble
+    if (message.isAuthPrompt) {
+      return (
+        <div className="w-full mb-4">
+          <div className="flex justify-start">
+            <div className="max-w-[90%] min-w-0">
+              <div className="px-4 py-3 bg-white text-gray-800 border border-gray-200 rounded-2xl rounded-bl-md shadow-sm">
+                <p className="mb-3 text-sm">
+                  <span className="mr-1">🔒</span>
+                  To create personalized learning plans, please sign in.
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link
+                    to={message.signInUrl || '/auth?mode=login'}
+                    className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to={message.signUpUrl || '/auth?mode=signup'}
+                    className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Create Account
+                  </Link>
+                </div>
+                <div className="text-xs mt-2 text-gray-500">{message.timestamp}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
     // More specific detection for course content - look for multiple sections with specific course structure
     const isCourseContent = (
       message.content.includes("# ") && 
@@ -1580,14 +1631,7 @@ const MobileChatbotPage = () => {
         </div>
       </div>
 
-      {/* Authentication Modal */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        title="Course Creation Requires Account"
-        message="Create personalized courses tailored to your learning goals. Save your progress and access advanced features."
-        feature="Create Custom Courses"
-      />
+      {/* Auth modal removed - gating is inline within chat conversation */}
     </div>
   );
 };
