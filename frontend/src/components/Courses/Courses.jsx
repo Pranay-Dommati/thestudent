@@ -164,7 +164,7 @@ const Courses = () => {
     return (
         <>
             <CourseHero />
-            <div className="bg-gray-50 pb-16 pt-7">
+            <div className="bg-gray-50 pt-7">
                 <div className="container mx-auto px-4 py-12">
                     {!selectedLevel ? (
                         <motion.div
@@ -228,8 +228,11 @@ const Courses = () => {
                         <Outlet />
                     )}
                 </div>
+            <div className="hidden md:block">
+                <Footer />
             </div>
-            <Footer />
+            </div>
+            {!selectedLevel && <Footer />}
         </>
     );
 }

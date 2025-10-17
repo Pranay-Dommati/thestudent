@@ -384,7 +384,7 @@ const MobileFirstCourses = () => {
         return (
             <>
                 <Outlet />
-                <Footer />
+                {/* Footer hidden for class subpages on mobile */}
             </>
         );
     }

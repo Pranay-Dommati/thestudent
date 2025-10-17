@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 import os
 import socket
 from datetime import timedelta
@@ -418,7 +419,31 @@ else:
     CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_HEADERS = ['content-type', 'authorization', 'x-csrftoken', 'x-requested-with']
     CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
-    CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
+    # Read allowed origins from env and normalize variants (with/without www)
+    _raw_cors = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw_cors.split(',') if o.strip()]
+    def _expand_www_variants(origins):
+        expanded = set()
+        for origin in origins:
+            try:
+                parsed = urlparse(origin)
+                if not parsed.scheme or not parsed.netloc:
+                    continue
+                host = parsed.netloc
+                # Add original
+                expanded.add(origin)
+                # Add www variant
+                if host.startswith('www.'):
+                    no_www = host[4:]
+                    expanded.add(urlunparse((parsed.scheme, no_www, parsed.path or '', '', '', '')))
+                else:
+                    expanded.add(urlunparse((parsed.scheme, f"www.{host}", parsed.path or '', '', '', '')))
+            except Exception:
+                # If parsing fails, keep the raw string
+                expanded.add(origin)
+        return list(expanded)
+    if CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS = _expand_www_variants(CORS_ALLOWED_ORIGINS)
     
     # Ensure we have proper origins in production
     if not CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGINS == ['']:
@@ -435,6 +460,9 @@ if DEBUG:
 else:
     _csrf_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
     CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_env.split(',') if o.strip()]
+    # Expand CSRF trusted origins with/without www variants to avoid subtle mismatches
+    if CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS = _expand_www_variants(CSRF_TRUSTED_ORIGINS)
     if not CSRF_TRUSTED_ORIGINS:
         raise ValueError("CSRF_TRUSTED_ORIGINS environment variable must be set in production")
 

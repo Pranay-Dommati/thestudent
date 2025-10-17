@@ -165,72 +165,76 @@ class LoginView(generics.CreateAPIView):
 @authentication_classes([])
 def otp_signup(request):
     """Start signup: create inactive user, generate OTP, email it."""
-    serializer = OTPSignupSerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        serializer = OTPSignupSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    full_name = serializer.validated_data['full_name']
-    email = serializer.validated_data['email'].lower()
-    password = serializer.validated_data['password']
+        full_name = serializer.validated_data['full_name']
+        email = serializer.validated_data['email'].lower()
+        password = serializer.validated_data['password']
 
-    # If user exists but inactive, reuse; else create inactive
-    user, created = User.objects.get_or_create(
-        email=email,
-        defaults={
-            'full_name': full_name,
-            'is_active': False,
-            'agreed_to_terms': serializer.validated_data.get('agreed_to_terms', False),
-            'auth_method': 'email',
-        }
-    )
-    if created:
-        user.set_password(password)
-        user.save()
-    else:
-        # Update name/password if still inactive
-        if not user.is_active:
-            user.full_name = full_name
+        # If user exists but inactive, reuse; else create inactive
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                'full_name': full_name,
+                'is_active': False,
+                'agreed_to_terms': serializer.validated_data.get('agreed_to_terms', False),
+                'auth_method': 'email',
+            }
+        )
+        if created:
             user.set_password(password)
-            user.agreed_to_terms = serializer.validated_data.get('agreed_to_terms', False)
-            user.auth_method = 'email'
             user.save()
         else:
-            # Defensive, though validate_email should have caught this
-            return Response({'error': 'User already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+            # Update name/password if still inactive
+            if not user.is_active:
+                user.full_name = full_name
+                user.set_password(password)
+                user.agreed_to_terms = serializer.validated_data.get('agreed_to_terms', False)
+                user.auth_method = 'email'
+                user.save()
+            else:
+                # Defensive, though validate_email should have caught this
+                return Response({'error': 'User already exists.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Generate 6-digit OTP valid for 10 minutes
-    from random import randint
-    from django.utils import timezone
-    from datetime import timedelta
+        # Generate 6-digit OTP valid for 10 minutes
+        from random import randint
+        from django.utils import timezone
+        from datetime import timedelta
 
-    # Invalidate older unused OTPs to avoid confusion
-    EmailOTP.objects.filter(user=user, is_used=False).update(is_used=True)
+        # Invalidate older unused OTPs to avoid confusion
+        EmailOTP.objects.filter(user=user, is_used=False).update(is_used=True)
 
-    code = f"{randint(0, 999999):06d}"
-    expires_at = timezone.now() + timedelta(minutes=10)
-    otp = EmailOTP.objects.create(user=user, code=code, expires_at=expires_at)
+        code = f"{randint(0, 999999):06d}"
+        expires_at = timezone.now() + timedelta(minutes=10)
+        otp = EmailOTP.objects.create(user=user, code=code, expires_at=expires_at)
 
-    # Send email; return error if delivery fails
-    subject = "Your EasyLearnova verification code"
-    html = f"""
-    <html><body>
-      <p>Hi {full_name},</p>
-      <p>Your verification code is:</p>
-      <p style='font-size:24px;letter-spacing:4px'><strong>{code}</strong></p>
-      <p>This code will expire in 10 minutes.</p>
-      <p>If you didn't request this, you can ignore this email.</p>
-      <p>— EasyLearnova</p>
-    </body></html>
-    """
-    sent = send_email_via_smtp(user.email, subject, html)
-    if not sent:
-        # Prevent stale code confusion
-        otp.mark_used()
-        if getattr(settings, 'DEBUG', False):
+        # Send email; return error if delivery fails
+        subject = "Your EasyLearnova verification code"
+        html = f"""
+        <html><body>
+          <p>Hi {full_name},</p>
+          <p>Your verification code is:</p>
+          <p style='font-size:24px;letter-spacing:4px'><strong>{code}</strong></p>
+          <p>This code will expire in 10 minutes.</p>
+          <p>If you didn't request this, you can ignore this email.</p>
+          <p>— EasyLearnova</p>
+        </body></html>
+        """
+        sent = send_email_via_smtp(user.email, subject, html)
+        if not sent:
+            # Prevent stale code confusion
+            otp.mark_used()
             logger.error("OTP email delivery failed during signup")
-        return Response({'error': 'Failed to send verification email. Please try again later.'}, status=status.HTTP_502_BAD_GATEWAY)
+            return Response({'error': 'Failed to send verification email. Please try again later.'}, status=status.HTTP_502_BAD_GATEWAY)
 
-    return Response({'message': 'OTP sent to email.'}, status=status.HTTP_200_OK)
+        return Response({'message': 'OTP sent to email.'}, status=status.HTTP_200_OK)
+    except Exception as e:
+        # Catch-all to prevent 500 without CORS headers
+        logger.exception(f"otp_signup exception: {e}")
+        return Response({'error': 'Signup failed due to server error. Please try again later.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])

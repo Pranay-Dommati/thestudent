@@ -13,15 +13,29 @@ function unwrapError(err) {
 }
 
 export async function otpSignup({ full_name, email, password, agreed_to_terms }) {
+  // Create abort controller for hard timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // Hard 10 second timeout
+  
   try {
     const { data } = await axios.post('/auth/otp/signup/', {
       full_name,
       email,
       password,
       agreed_to_terms,
+    }, {
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     return data; // { message }
   } catch (err) {
+    clearTimeout(timeoutId);
+    // Check if this was an abort/timeout
+    if (err.name === 'AbortError' || err.name === 'CanceledError') {
+      const timeoutError = new Error('Request timed out. The server is taking too long to respond.');
+      timeoutError.code = 'TIMEOUT';
+      throw timeoutError;
+    }
     throw unwrapError(err);
   }
 }

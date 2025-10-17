@@ -3,10 +3,12 @@ import { motion } from 'framer-motion';
 import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
+import MobileBoardSelector from '../../shared/MobileBoardSelector';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
 import logger from '../../../../utils/logger';
 import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
+import Footer from '../../../Footer/Footer';
 
 const SUBJECT_ICONS = {
   'Mathematics': '📐',
@@ -137,6 +139,7 @@ const SeventhStandard = () => {
   const handleStateSelect = (stateId) => {
     navigate(`/courses/7th/state/${stateId}`);
     setShowStateBoards(false);
+    setSelectedBoard(`state-${stateId}`);
   };
 
   const handleBack = () => {
@@ -158,8 +161,21 @@ const SeventhStandard = () => {
     : 'pt-24 pb-24 md:pt-0 md:pb-0'; // subject listing (course cards)
 
   return (
+    <>
     <div className={`container mx-auto px-4 ${containerPadding}`}>
-      {selectedBoard ? (
+      <MobileBoardSelector
+        availableBoards={availableBoards}
+        availableStates={availableStates}
+        checkingAvailability={checkingAvailability}
+        checkingStates={checkingStates}
+        isBoardSelection={!selectedBoard && !showStateBoards}
+        isStateSelection={showStateBoards}
+        onSelectBoard={handleBoardSelect}
+        onSelectState={(state) => handleStateSelect(state)}
+        onBack={handleBack}
+      />
+
+  {selectedBoard ? (
         <>
           <BackButton 
             title={selectedBoard.includes('state') ? 
@@ -216,7 +232,7 @@ const SeventhStandard = () => {
           )}
         </>
       ) : showStateBoards ? (
-        <>
+        <div className="hidden md:block">
           <BackButton 
             title="Select Your State" 
             subtitle="Choose your state board" 
@@ -252,9 +268,9 @@ const SeventhStandard = () => {
               </div>
             </div>
           )}
-        </>
+        </div>
       ) : (
-        <>
+        <div className="hidden md:block">
           <BackButton 
             title="Select Your Board" 
             subtitle="Choose your education board to view relevant courses" 
@@ -295,9 +311,12 @@ const SeventhStandard = () => {
               </div>
             </div>
           )}
-        </>
-      )}
+        </div>
+  )}
     </div>
+      
+
+    </>
   );
 };
 

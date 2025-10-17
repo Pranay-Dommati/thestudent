@@ -169,11 +169,31 @@ export default function AuthForm() {
         setOtpOpen(true);
       }
     } catch (error) {
-      console.error("Error during login:", error);
-      // AuthContext already handles login error toasts with id 'auth-login'
-      // Only show toast for signup errors or other unexpected errors
-      if (isSignUp) {
-        toast.error("Signup failed. Please try again.");
+      console.error("Error during signup/login:", error);
+      
+      // Determine error message based on error type
+      let errorMessage = "An error occurred. Please try again.";
+      
+      // Check for timeout/abort
+      if (error.code === 'TIMEOUT' || error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.name === 'AbortError') {
+        errorMessage = "Request timed out. The server is taking too long to respond. Please try again.";
+      }
+      // Check for network error
+      else if (error.message === 'Network Error' || !error.response) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      }
+      // Check for CORS or backend error
+      else if (error.response?.status === 500) {
+        errorMessage = "Server error. Please try again later or contact support.";
+      }
+      // Use backend error message if available
+      else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
+      // AuthContext handles login errors, only show toast for signup or other errors
+      if (isSignUp || error.response?.status !== 401) {
+        toast.error(errorMessage);
       }
     } finally {
       setIsLoading(false);

@@ -4,8 +4,10 @@ import { motion } from 'framer-motion';
 import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
+import MobileBoardSelector from '../../shared/MobileBoardSelector';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
+import Footer from '../../../Footer/Footer';
 
 const SUBJECT_ICONS = {
   'Mathematics': '📐',
@@ -141,6 +143,7 @@ const EleventhStandard = () => {
   const handleStateSelect = (stateId) => {
     navigate(`/courses/11th/state/${stateId}`);
     setShowStateBoards(false);
+    setSelectedBoard(`state-${stateId}`);
   };
 
   const handleBack = () => {
@@ -162,9 +165,32 @@ const EleventhStandard = () => {
     : 'pt-24 pb-24 md:pt-0 md:pb-0';
 
   return (
+    <>
     <div className={`container mx-auto px-4 ${containerPadding}`}>
+      <MobileBoardSelector
+        availableBoards={[
+          {id: 'cbse', name: 'CBSE', fullName: 'Central Board of Secondary Education', available: true},
+          {id: 'state', name: 'State Board', fullName: 'State Board of Secondary and Higher Secondary Education', available: true}
+        ]}
+        availableStates={[]}
+        checkingAvailability={false}
+        checkingStates={false}
+        isBoardSelection={!selectedBoard && !showStateBoards}
+        isStateSelection={showStateBoards}
+        onSelectBoard={(id) => {
+          if (id === 'state') {
+            setShowStateBoards(true);
+          } else {
+            setSelectedBoard(id);
+            navigate(`/courses/11th/${id}`);
+          }
+        }}
+        onSelectState={() => {}}
+        onBack={handleBack}
+      />
+
       {!selectedBoard && !showStateBoards ? (
-        <>
+        <div className="hidden md:block">
           <BackButton 
             title="Select Your Board" 
             subtitle="Choose your education board to view relevant courses" 
@@ -191,9 +217,9 @@ const EleventhStandard = () => {
               <p className="text-indigo-700">We're working hard to bring you content for ICSE, NIOS, and other boards. Stay tuned for updates!</p>
             </div>
           </div>
-        </>
+        </div>
       ) : showStateBoards ? (
-        <>
+        <div className="hidden md:block">
           <BackButton 
             title="Select Your State" 
             subtitle="Choose your state board" 
@@ -215,7 +241,7 @@ const EleventhStandard = () => {
               ))}
             </div>
           </div>
-        </>
+        </div>
       ) : (
         <>
           <BackButton 
@@ -305,6 +331,9 @@ const EleventhStandard = () => {
         </>
       )}
     </div>
+      
+
+    </>
   );
 };
 
