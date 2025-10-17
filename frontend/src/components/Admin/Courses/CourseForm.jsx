@@ -132,6 +132,15 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
   };
 
   const handleLevelSelect = (level) => {
+    // For School classes, ensure a fresh form by clearing any saved draft
+    try {
+      const schoolLevels = new Set(['6th','7th','8th','9th','10th','11th','12th']);
+      if (schoolLevels.has(level.id)) {
+        const key = `draft_school_course_${level.id}`;
+        localStorage.removeItem(key);
+      }
+    } catch {}
+
     setSelectedLevel(level);
     setShowLevelSelection(false);
   };

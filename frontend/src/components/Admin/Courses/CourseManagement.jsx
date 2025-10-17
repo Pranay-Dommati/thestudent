@@ -13,7 +13,7 @@ const CourseManagement = ({ isDarkMode }) => {
   const navigate = useNavigate();
   
   const handleAddNew = () => {
-    navigate('/admin-p/add-course');
+    navigate('/admin-p/add-course?new=true');
   };
   
   const handleEditCourse = (courseId, courseType) => {

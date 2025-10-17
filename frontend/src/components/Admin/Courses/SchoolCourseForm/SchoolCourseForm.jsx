@@ -52,7 +52,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     }
   ]);
   
-  // Load draft on mount
+  // Load draft on mount (but ensure a 'new' form is empty by allowing caller to clear draft beforehand)
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -63,6 +63,49 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       }
     } catch (_) { /* ignore */ }
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [STORAGE_KEY]);
+
+  // If admin navigates back to "Add Course" for same class, ensure a clean slate when query param new=true
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('new') === 'true') {
+        localStorage.removeItem(STORAGE_KEY);
+        // reset local states
+        setCourseInfo({
+          thumbnail: null,
+          title: '',
+          board: '',
+          state: '',
+          subject: '',
+          sources: '',
+          duration: '',
+          lastUpdated: new Date().toISOString().split('T')[0],
+          keyTopics: [''],
+          learningPoints: ['', ''],
+          chapterCount: 1
+        });
+        setChapters([
+          {
+            name: '',
+            lessons: [
+              {
+                type: 'video',
+                title: '',
+                videoUrl: '',
+                description: '',
+                aboutLesson: '',
+                hasResources: false,
+                resources: { downloadable: [], internet: [] },
+                quizQuestions: []
+              }
+            ]
+          }
+        ]);
+        setThumbnailPreview(null);
+        setActiveStep(1);
+      }
+    } catch {}
   }, [STORAGE_KEY]);
 
   // Debounced autosave

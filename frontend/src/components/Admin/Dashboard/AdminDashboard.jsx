@@ -77,7 +77,7 @@ const AdminDashboard = () => {
       id: 'addCourse',
       label: 'Add Course', 
       icon: FaPlus, 
-      path: '/admin-p/add-course' 
+      path: '/admin-p/add-course?new=true' 
     },
     { 
       id: 'users', 

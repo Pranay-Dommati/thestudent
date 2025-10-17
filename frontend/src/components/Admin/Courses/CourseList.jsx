@@ -70,7 +70,7 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshTrigger }) 
               Manage all your courses from this dashboard
             </p>
           </div>          <button
-            onClick={() => navigate('/admin-p/add-course')}
+            onClick={() => navigate('/admin-p/add-course?new=true')}
             className={`w-full sm:w-auto flex items-center justify-center px-4 py-2.5 rounded-lg ${
               isDarkMode 
                 ? 'bg-blue-600 text-white hover:bg-blue-700' 
