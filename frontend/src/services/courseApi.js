@@ -21,6 +21,9 @@ export const createCourse = async (formData) => {
         'Content-Type': 'multipart/form-data',
       },
       withCredentials: true,
+      timeout: 120000, // allow for cold starts and large uploads
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
     });
     
   logger.log("API response:", response.data);
@@ -128,6 +131,9 @@ export const updateCourse = async (courseId, formData) => {
     const response = await axios.put(`/courses/${courseId}/update/`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       withCredentials: true,
+      timeout: 120000, // allow for cold starts and large payloads
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
     });
     
   logger.log("Update API response:", response.data);

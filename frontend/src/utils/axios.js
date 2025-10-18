@@ -5,7 +5,9 @@ const instance = axios.create({
   baseURL: (import.meta.env.VITE_API_BASE_URL || '/api'),
   headers: {
     'Content-Type': 'application/json',
-  }
+  },
+  // Deployments can be cold or cross-region; give generous default
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT_MS || '60000', 10),
 });
 
 // Request interceptor
