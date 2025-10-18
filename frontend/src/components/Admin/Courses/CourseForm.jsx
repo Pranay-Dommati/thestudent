@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { FaPlus, FaTrash, FaUpload } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
-import toast from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 import BasicInfoTab from './tabs/BasicInfoTab';
 import CourseContentTab from './tabs/CourseContentTab';
 import RequirementsTab from './tabs/RequirementsTab';

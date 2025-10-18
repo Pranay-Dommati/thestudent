@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
-import { toast } from 'react-toastify';
+import universalToast from '../../../utils/universalToast';
 import axiosInstance from '../../../utils/axios';
 import { CheckIcon } from '@heroicons/react/24/solid';
 import BasicInfoStep from './EngineeringCourseForm/BasicInfoStep';
@@ -424,13 +424,13 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
     if (file) {
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('File size should be less than 5MB');
+  universalToast.error('File size should be less than 5MB');
         return;
       }
 
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file');
+  universalToast.error('Please select an image file');
         return;
       }
 
@@ -687,7 +687,7 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
       console.log('Moving to next step');
     } else {
       console.log('Validation failed, staying on current step');
-      toast.error('Please fill in all required fields');
+  universalToast.error('Please fill in all required fields');
     }
   };
 
@@ -880,7 +880,7 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
       console.log('Response received:', response);
 
       if (response.status === 200) {
-        toast.success('Course updated successfully!');
+  universalToast.success('Course updated successfully!');
         if (typeof onSuccess === 'function') {
           onSuccess();
         }
@@ -896,16 +896,16 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
       if (error.response?.status === 400) {
         const validationErrors = error.response.data;
         setErrors(validationErrors);
-        toast.error('Please fix the validation errors');
+  universalToast.error('Please fix the validation errors');
       } else if (error.response) {
         console.error('Server response error:', error.response.data);
-        toast.error(`Failed to update course: ${error.response.data.message || 'Server error'}`);
+  universalToast.error(`Failed to update course: ${error.response.data.message || 'Server error'}`);
       } else if (error.request) {
         console.error('No response received:', error.request);
-        toast.error('No response from server. Please check your connection.');
+  universalToast.error('No response from server. Please check your connection.');
       } else {
         console.error('Error setting up request:', error.message);
-        toast.error(`Error: ${error.message}`);
+  universalToast.error(`Error: ${error.message}`);
       }
     } finally {
       setIsLoading(false);

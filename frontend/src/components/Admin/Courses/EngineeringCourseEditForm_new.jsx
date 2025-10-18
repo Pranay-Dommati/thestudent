@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
-import { toast } from 'react-toastify';
+import universalToast from '../../../utils/universalToast';
 import axios from '../../../utils/axios';
 import { CheckIcon } from '@heroicons/react/24/solid';
 import BasicInfoStep from './EngineeringCourseForm/BasicInfoStep';
@@ -133,13 +133,13 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel, isLoading, set
     if (file) {
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('File size should be less than 5MB');
+  universalToast.error('File size should be less than 5MB');
         return;
       }
 
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file');
+  universalToast.error('Please select an image file');
         return;
       }
 
@@ -470,7 +470,7 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel, isLoading, set
       );
 
       if (response.status === 200) {
-        toast.success('Course updated successfully!');
+  universalToast.success('Course updated successfully!');
         onSuccess();
       }
     } catch (error) {
@@ -478,9 +478,9 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel, isLoading, set
       if (error.response?.status === 400) {
         const validationErrors = error.response.data;
         setErrors(validationErrors);
-        toast.error('Please fix the validation errors');
+  universalToast.error('Please fix the validation errors');
       } else {
-        toast.error('Failed to update course. Please try again.');
+  universalToast.error('Failed to update course. Please try again.');
       }
     } finally {
       setIsLoading(false);

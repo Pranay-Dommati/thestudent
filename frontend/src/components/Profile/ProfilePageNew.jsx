@@ -7,7 +7,7 @@ import {
 } from 'react-icons/fa';
 import { HiBookOpen } from 'react-icons/hi2';
 import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import { useAuth } from '../../context/AuthContext';
 import Footer from '../Footer/Footer';
 import './ProfilePage.css';
@@ -146,9 +146,9 @@ const ProfilePage = () => {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       setIsEditing(false);
-      toast.success('Profile updated successfully!');
+  universalToast.success('Profile updated successfully!');
     } catch (error) {
-      toast.error('Failed to update profile');
+  universalToast.error('Failed to update profile');
     } finally {
       setIsSaving(false);
     }
@@ -173,9 +173,9 @@ const ProfilePage = () => {
         confirmPassword: ''
       });
       setShowPasswordForm(false);
-      toast.success('Password changed successfully!');
+  universalToast.success('Password changed successfully!');
     } catch (error) {
-      toast.error('Failed to change password');
+  universalToast.error('Failed to change password');
     } finally {
       setIsSaving(false);
     }
@@ -183,16 +183,16 @@ const ProfilePage = () => {
 
   const handleForgotPassword = async () => {
     try {
-      toast.loading('Sending password reset email...');
+  universalToast.loading('Sending password reset email...');
       
       // Simulate API call for password reset
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      toast.dismiss();
-      toast.success('Password reset email sent! Check your inbox.');
+  universalToast.dismiss();
+  universalToast.success('Password reset email sent! Check your inbox.');
     } catch (error) {
-      toast.dismiss();
-      toast.error('Failed to send password reset email');
+  universalToast.dismiss();
+  universalToast.error('Failed to send password reset email');
     }
   };
 
@@ -220,7 +220,7 @@ const ProfilePage = () => {
   // Social account handlers
   const handleConnectSocialAccount = async (provider) => {
     try {
-      toast.loading(`Connecting to ${provider}...`);
+  universalToast.loading(`Connecting to ${provider}...`);
       
       // Simulate API call for social authentication
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -235,23 +235,23 @@ const ProfilePage = () => {
         }
       }));
       
-      toast.dismiss();
-      toast.success(`Successfully connected to ${provider.charAt(0).toUpperCase() + provider.slice(1)}!`);
+  universalToast.dismiss();
+  universalToast.success(`Successfully connected to ${provider.charAt(0).toUpperCase() + provider.slice(1)}!`);
     } catch (error) {
-      toast.dismiss();
-      toast.error(`Failed to connect to ${provider}`);
+  universalToast.dismiss();
+  universalToast.error(`Failed to connect to ${provider}`);
     }
   };
 
   const handleDisconnectSocialAccount = async (provider) => {
     try {
-      toast.loading(`Disconnecting from ${provider}...`);
+  universalToast.loading(`Disconnecting from ${provider}...`);
       
       // Check if user authenticated via this provider
       if (user && user.auth_method === provider) {
         // If user authenticated via this social provider, disconnecting means logging out
-        toast.dismiss();
-        toast.success(`Disconnected from ${provider.charAt(0).toUpperCase() + provider.slice(1)}. Logging out...`);
+  universalToast.dismiss();
+  universalToast.success(`Disconnected from ${provider.charAt(0).toUpperCase() + provider.slice(1)}. Logging out...`);
         
         // Add a small delay to show the message before logout
         setTimeout(() => {
@@ -274,11 +274,11 @@ const ProfilePage = () => {
           connectedAt: null
         }
       }));
-        toast.dismiss();
-      toast.success(`Successfully disconnected from ${provider.charAt(0).toUpperCase() + provider.slice(1)}!`);
+  universalToast.dismiss();
+  universalToast.success(`Successfully disconnected from ${provider.charAt(0).toUpperCase() + provider.slice(1)}!`);
     } catch (error) {
-      toast.dismiss();
-      toast.error(`Failed to disconnect from ${provider}`);
+  universalToast.dismiss();
+  universalToast.error(`Failed to disconnect from ${provider}`);
     }
   };
 
@@ -296,20 +296,20 @@ const ProfilePage = () => {
     const file = event.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('Image size should be less than 5MB');
+  universalToast.error('Image size should be less than 5MB');
         return;
       }
 
       const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
       if (!allowedTypes.includes(file.type)) {
-        toast.error('Please upload a JPG, PNG, or GIF file');
+  universalToast.error('Please upload a JPG, PNG, or GIF file');
         return;
       }
 
       setProfileImage(file);
       const imageUrl = URL.createObjectURL(file);
       setProfileImageUrl(imageUrl);
-      toast.success('Profile picture updated!');
+  universalToast.success('Profile picture updated!');
     }
   };
 

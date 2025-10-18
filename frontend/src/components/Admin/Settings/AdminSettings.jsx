@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FaLock, FaTimes, FaUserShield } from 'react-icons/fa';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 import { motion, AnimatePresence } from 'framer-motion';
 import authService from '../../../services/authService';
 
@@ -50,23 +50,23 @@ const AdminSettings = () => {
   const submitPasswordChange = async (e) => {
     e.preventDefault();
     if (!newPassword || newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
+  universalToast.error('Password must be at least 8 characters');
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match');
+  universalToast.error('Passwords do not match');
       return;
     }
     if (!selectedAdmin) {
-      toast.error('No admin selected');
+  universalToast.error('No admin selected');
       return;
     }
     try {
       await authService.adminSetUserPassword(selectedAdmin.id, newPassword);
-      toast.success('Password updated successfully');
+  universalToast.success('Password updated successfully');
       closePasswordModal();
     } catch (err) {
-      toast.error(err.message || 'Failed to update password');
+  universalToast.error(err.message || 'Failed to update password');
     }
   };
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../../utils/universalToast';
 import BasicInfoStep from './BasicInfoStep';
 import CourseStructureStep from './CourseStructureStep';
 import { createCourse } from '../../../../services/courseApi';
@@ -136,7 +136,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     if (!file) return;
     
     if (file.size > 5 * 1024 * 1024) { // 5MB
-      toast('Image size must be less than 5MB', {
+  universalToast.show('Image size must be less than 5MB', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -150,7 +150,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     const sanitizedFile = sanitizeFileName(file, 100);
     
     if (file.name !== sanitizedFile.name) {
-      toast('File name was too long and has been truncated', {
+  universalToast.show('File name was too long and has been truncated', {
         icon: 'ℹ️',
         style: {
           backgroundColor: '#3B82F6',
@@ -195,7 +195,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   // Remove item from array field
   const removeArrayField = (fieldName, index) => {
     if (fieldName === 'learningPoints' && courseInfo.learningPoints.length <= 2) {
-      toast('At least 2 learning points are required', {
+  universalToast.show('At least 2 learning points are required', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -206,7 +206,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     }
     
     if (fieldName === 'keyTopics' && courseInfo.keyTopics.length <= 1) {
-      toast('At least 1 key topic is required', {
+  universalToast.show('At least 1 key topic is required', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -292,7 +292,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   // Remove lesson from chapter
   const removeLesson = (chapterIndex, lessonIndex) => {
     if (chapters[chapterIndex].lessons.length <= 1) {
-      toast('Each chapter must have at least one lesson', {
+  universalToast.show('Each chapter must have at least one lesson', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -443,7 +443,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     
     // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast('File size must be less than 10MB', {
+  universalToast.show('File size must be less than 10MB', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -457,7 +457,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     const sanitizedFile = sanitizeFileName(file, 100);
     
     if (file.name !== sanitizedFile.name) {
-      toast('File name was too long and has been truncated', {
+  universalToast.show('File name was too long and has been truncated', {
         icon: 'ℹ️',
         style: {
           backgroundColor: '#3B82F6',
@@ -579,7 +579,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       window.scrollTo(0, 0);
     } else {
       console.log("Form validation failed", errors);
-      toast("Please fill in all required fields correctly", {
+  universalToast.show("Please fill in all required fields correctly", {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -717,7 +717,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       
       // Submit the form
       await createCourse(formData);
-      toast('Course created successfully', {
+  universalToast.show('Course created successfully', {
         icon: '🎉',
         style: {
           backgroundColor: '#10B981',
@@ -729,7 +729,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       navigate('/admin-p/courses');
     } catch (error) {
       console.error('Error creating course:', error);
-      toast('Failed to create course. Please try again.', {
+  universalToast.show('Failed to create course. Please try again.', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',

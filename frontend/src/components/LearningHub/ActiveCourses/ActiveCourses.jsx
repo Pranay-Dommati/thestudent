@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import axios from '../../../utils/axios';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 import { FaTrash } from 'react-icons/fa';
 import { stateNameToCode } from '../../../utils/stateMapping';
 
@@ -113,7 +113,7 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
       } catch (error) {
   // silently handle in production
         if (error.response?.status !== 401) {
-          toast.error('Failed to load enrolled courses');
+          universalToast.error('Failed to load enrolled courses');
         }
       } finally {
         setLoading(false);
@@ -128,14 +128,14 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
     const newSort = sortBy === 'recent' ? 'alphabetical' : 'recent';
     setSortBy(newSort);
     
-    toast.success(`Sorted by ${newSort === 'recent' ? 'Recent' : 'Alphabetical'}`);
+  universalToast.success(`Sorted by ${newSort === 'recent' ? 'Recent' : 'Alphabetical'}`);
   };
 
   const handleViewAll = () => {
     
     setShowAll(!showAll);
     
-    toast.success(`${showAll ? 'Showing limited courses' : 'Showing all courses'}`);
+  universalToast.success(`${showAll ? 'Showing limited courses' : 'Showing all courses'}`);
   };
 
   const handleRemoveCourse = async (enrollmentId, courseTitle) => {
@@ -149,7 +149,7 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
 
       // Remove the course from the local state
       setEnrolledCourses(prev => prev.filter(course => course.enrollmentId !== enrollmentId));
-      toast.success(`Successfully removed "${courseTitle}" from your courses`);
+  universalToast.success(`Successfully removed "${courseTitle}" from your courses`);
       // Notify parent (prefer exact count) and emit a custom event so other parts can react
       try {
         onEnrollmentChanged && onEnrollmentChanged({ delta: -1, count: nextCount, enrollmentId });
@@ -161,9 +161,9 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
     } catch (error) {
   
       if (error.response?.status === 404) {
-        toast.error('Course enrollment not found');
+  universalToast.error('Course enrollment not found');
       } else {
-        toast.error('Failed to remove course. Please try again.');
+  universalToast.error('Failed to remove course. Please try again.');
       }
     } finally {
       setRemovingCourseId(null);

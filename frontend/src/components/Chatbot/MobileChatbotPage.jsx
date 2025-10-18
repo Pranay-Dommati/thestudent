@@ -6,7 +6,6 @@ import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclassifier";
 import ErrorBoundary from '../Common/ErrorBoundary';

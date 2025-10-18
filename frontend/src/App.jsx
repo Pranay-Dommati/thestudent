@@ -162,7 +162,7 @@ const App = () => {
             style: {
               background: '#363636',
               color: '#fff',
-              padding: '12px 16px',
+              padding: '14px 16px 12px 16px',
               borderRadius: '10px',
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
               maxWidth: '500px',
@@ -172,7 +172,7 @@ const App = () => {
               style: {
                 background: '#22c55e',
                 color: '#fff',
-                padding: '12px 16px',
+                padding: '14px 16px 12px 16px',
                 borderRadius: '10px',
                 boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
               },
@@ -186,7 +186,7 @@ const App = () => {
               style: {
                 background: '#ef4444',
                 color: '#fff',
-                padding: '12px 16px',
+                padding: '14px 16px 12px 16px',
                 borderRadius: '10px',
                 boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
               },

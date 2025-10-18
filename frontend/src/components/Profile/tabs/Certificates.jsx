@@ -4,7 +4,7 @@ import {
   FaCertificate, FaDownload, FaEye, FaCalendarAlt, 
   FaAward, FaTrophy, FaSpinner, FaExternalLinkAlt 
 } from 'react-icons/fa';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../../../utils/axios';
 
@@ -43,12 +43,12 @@ const Certificates = () => {
 
   const handleDownload = async (certificate) => {
     if (!certificate.download_url) {
-      toast.error('Certificate file not available for download');
+  universalToast.error('Certificate file not available for download');
       return;
     }
     
     try {
-      toast.loading('Downloading certificate...');
+  universalToast.loading('Downloading certificate...');
       
       // Create a temporary anchor element to trigger download
       const link = document.createElement('a');
@@ -60,11 +60,11 @@ const Certificates = () => {
       link.click();
       document.body.removeChild(link);
       
-      toast.dismiss();
-      toast.success('Certificate download started!');
+  universalToast.dismiss();
+  universalToast.success('Certificate download started!');
     } catch (error) {
-      toast.dismiss();
-      toast.error('Failed to download certificate');
+  universalToast.dismiss();
+  universalToast.error('Failed to download certificate');
     }
   };
 

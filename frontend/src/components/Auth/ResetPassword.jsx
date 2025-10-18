@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { FaLock, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import AuthNav from './AuthNav';
 import AuthFooter from './AuthFooter';
 import api from '../../utils/axios';
@@ -35,12 +35,12 @@ export default function ResetPassword() {
         setUserEmail(data.email);
       } else {
         setTokenValid(false);
-        toast.error(data?.error || 'Invalid reset link');
+  universalToast.error(data?.error || 'Invalid reset link');
       }
     } catch (error) {
       console.error('Token validation error:', error);
       setTokenValid(false);
-      toast.error('Failed to validate reset link');
+  universalToast.error('Failed to validate reset link');
     } finally {
       setIsValidating(false);
     }
@@ -102,7 +102,7 @@ export default function ResetPassword() {
       });
       if (data) {
         setResetSuccess(true);
-        toast.success('Password reset successfully!');
+  universalToast.success('Password reset successfully!');
       }
     } catch (error) {
       console.error('Reset password error:', error);
@@ -110,7 +110,7 @@ export default function ResetPassword() {
       if (String(msg).includes('Invalid or expired')) {
         setTokenValid(false);
       }
-      toast.error(msg);
+  universalToast.error(msg);
     } finally {
       setIsLoading(false);
     }

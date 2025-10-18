@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaGoogle, FaGraduationCap, FaRegUser, FaRegEnvelope, FaLock } from "react-icons/fa";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import { useAuth } from '../../context/AuthContext';
 import { GoogleSignInButton } from '../../hooks/useGoogleAuth.jsx';
 import OtpModal from './OtpModal';
@@ -84,7 +84,7 @@ export default function AuthForm() {
         navigate(returnToPath || '/');
       } else {
         // Only show error if googleLogin returns false without throwing
-        toast.error('Google sign-in failed. Please try again.', { id: 'auth-login' });
+  universalToast.error('Google sign-in failed. Please try again.', { id: 'auth-login' });
       }
     } catch (error) {
       console.error('Google sign-in error:', error);
@@ -96,7 +96,7 @@ export default function AuthForm() {
 
   const handleGoogleError = (error) => {
     console.error('Google auth error:', error);
-    toast.error(`Google sign-in failed: ${error}`, { id: 'auth-login' });
+  universalToast.error(`Google sign-in failed: ${error}`, { id: 'auth-login' });
     setIsLoading(false);
   };
   
@@ -193,7 +193,7 @@ export default function AuthForm() {
       
       // AuthContext handles login errors, only show toast for signup or other errors
       if (isSignUp || error.response?.status !== 401) {
-        toast.error(errorMessage);
+  universalToast.error(errorMessage);
       }
     } finally {
       setIsLoading(false);

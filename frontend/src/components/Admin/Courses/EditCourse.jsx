@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 import { getCourseById, updateCourse } from '../../../services/courseApi';
 import { FaArrowLeft, FaSpinner } from 'react-icons/fa';
 import SchoolCourseEditForm from './SchoolCourseEditForm';

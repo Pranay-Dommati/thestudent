@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaPlus, FaSearch, FaFilter, FaEdit, FaTrash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { getAllCourses } from '../../../services/courseApi';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 
 // Backend base resolved via proxy or env; prefer relative '/api' in requests
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FaEnvelope, FaLock, FaArrowRight } from 'react-icons/fa';
 import { motion } from 'framer-motion';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import { useNavigate, Link } from 'react-router-dom';
 import authService from '../../services/authService';
 
@@ -25,7 +25,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
     e.preventDefault();
     
     if (!credentials.email || !credentials.password) {
-      toast.error('Please enter both email and password');
+  universalToast.error('Please enter both email and password');
       return;
     }
     
@@ -34,7 +34,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
     try {
       const data = await authService.adminLogin(credentials.email, credentials.password);
       
-      toast.success(`Welcome back, ${data.user.first_name || data.user.username}!`);
+  universalToast.success(`Welcome back, ${data.user.first_name || data.user.username}!`);
       
       if (onLoginSuccess) {
         onLoginSuccess();
@@ -45,11 +45,11 @@ const AdminLogin = ({ onLoginSuccess }) => {
       console.error('Admin login error:', error);
       
       if (error.message.includes('Access denied')) {
-        toast.error('Access denied. Only superusers can access the admin panel.');
+  universalToast.error('Access denied. Only superusers can access the admin panel.');
       } else if (error.message.includes('Invalid email')) {
-        toast.error('Invalid email or password');
+  universalToast.error('Invalid email or password');
       } else {
-        toast.error(error.message || 'Login failed. Please try again.');
+  universalToast.error(error.message || 'Login failed. Please try again.');
       }
     } finally {
       setIsLoading(false);

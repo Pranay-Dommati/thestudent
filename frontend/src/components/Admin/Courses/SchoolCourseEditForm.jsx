@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FaSave, FaTimes, FaSpinner, FaImage, FaPlus, FaTrash, FaUpload, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 import { toAbsoluteMedia } from '../../../utils/apiOrigin';
 
 // Import the step components from creation form

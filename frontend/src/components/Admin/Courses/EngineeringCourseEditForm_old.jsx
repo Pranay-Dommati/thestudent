@@ -1,7 +1,7 @@
 import { toAbsoluteMedia } from '../../../utils/apiOrigin';
 import React, { useState } from 'react';
 import { FaSave, FaTimes, FaSpinner, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 
 // Import the step components from creation form
 import BasicInfoStep from './EngineeringCourseForm/BasicInfoStep';

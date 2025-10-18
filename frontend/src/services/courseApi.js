@@ -1,5 +1,5 @@
 import axios from '../utils/axios';
-import { toast } from 'react-hot-toast';
+import universalToast from '../utils/universalToast';
 import logger from '../utils/logger';
 
 // Base URL comes from axios instance (VITE_API_BASE_URL or default http://127.0.0.1:8000/api)
@@ -32,16 +32,16 @@ export const createCourse = async (formData) => {
   logger.error('Error creating course:', error);
     
     if (error.response?.status === 403) {
-      toast.error('Permission denied. Please check your authentication.');
+  universalToast.error('Permission denied. Please check your authentication.');
     } else if (error.response?.status === 400) {
       const errorMessage = typeof error.response.data === 'object' 
         ? JSON.stringify(error.response.data) 
         : error.response.data;
-      toast.error(`Bad request: ${errorMessage}`);
+  universalToast.error(`Bad request: ${errorMessage}`);
     } else if (error.code === 'ERR_NETWORK') {
-      toast.error('Cannot connect to server. Please make sure the backend is running.');
+  universalToast.error('Cannot connect to server. Please make sure the backend is running.');
     } else {
-      toast.error(error.response?.data?.message || 'Failed to create course');
+  universalToast.error(error.response?.data?.message || 'Failed to create course');
     }
     throw error;
   }
@@ -142,18 +142,18 @@ export const updateCourse = async (courseId, formData) => {
   logger.error('Error updating course:', error);
     
     if (error.response?.status === 403) {
-      toast.error('Permission denied. Please check your authentication.');
+  universalToast.error('Permission denied. Please check your authentication.');
     } else if (error.response?.status === 400) {
       const errorMessage = typeof error.response.data === 'object' 
         ? JSON.stringify(error.response.data) 
         : error.response.data;
-      toast.error(`Bad request: ${errorMessage}`);
+  universalToast.error(`Bad request: ${errorMessage}`);
     } else if (error.response?.status === 404) {
-      toast.error('Course not found.');
+  universalToast.error('Course not found.');
     } else if (error.code === 'ERR_NETWORK') {
-      toast.error('Cannot connect to server. Please make sure the backend is running.');
+  universalToast.error('Cannot connect to server. Please make sure the backend is running.');
     } else {
-      toast.error(error.response?.data?.message || 'Failed to update course');
+  universalToast.error(error.response?.data?.message || 'Failed to update course');
     }
     throw error;
   }
@@ -171,13 +171,13 @@ export const deleteCourse = async (courseId) => {
   logger.error('Error deleting course:', error);
     
     if (error.response?.status === 403) {
-      toast.error('Permission denied. Please check your authentication.');
+  universalToast.error('Permission denied. Please check your authentication.');
     } else if (error.response?.status === 404) {
-      toast.error('Course not found.');
+  universalToast.error('Course not found.');
     } else if (error.code === 'ERR_NETWORK') {
-      toast.error('Cannot connect to server. Please make sure the backend is running.');
+  universalToast.error('Cannot connect to server. Please make sure the backend is running.');
     } else {
-      toast.error(error.response?.data?.message || 'Failed to delete course');
+  universalToast.error(error.response?.data?.message || 'Failed to delete course');
     }
     throw error;
   }

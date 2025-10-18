@@ -10,7 +10,7 @@ import QuizIntro from './templ/QuizIntro';
 import InstructionsPage from './templ/InstructionsPage';
 import Sidebar from './Sidebar';
 import axiosInstance from '../../utils/axios';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import { useAuth } from '../../context/AuthContext';
 
 // Update the function signature to accept the new props
@@ -337,7 +337,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         console.error('Error fetching user progress:', error);
         // Don't show error toast if 401 Unauthorized (user not logged in)
         if (error.response?.status !== 401) {
-          toast.error('Failed to load your course progress');
+          universalToast.error('Failed to load your course progress');
         }
       }
     };
@@ -348,7 +348,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const handleIssueCertificate = async () => {
     if (!course?.id) return;
     if (!isLoggedIn) {
-      toast.error('Please log in to claim your certificate');
+  universalToast.error('Please log in to claim your certificate');
       return;
     }
     // Navigate to the certificate page; it will issue if eligible
@@ -381,7 +381,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const markLessonComplete = async () => {
     if (!course) return;
     if (!isLoggedIn) {
-      toast.error('Please log in to track your progress');
+  universalToast.error('Please log in to track your progress');
       return;
     }
     
@@ -415,7 +415,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const toggleLessonCompletion = async (chapterIndex, lessonIndex) => {
     if (!course) return;
     if (!isLoggedIn) {
-      toast.error('Please log in to track your progress');
+  universalToast.error('Please log in to track your progress');
       return;
     }
     

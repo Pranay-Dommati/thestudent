@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from '../../../utils/axios';
 import { FaBrain, FaPlay, FaCheckCircle, FaClock, FaChartLine, FaTrash, FaEllipsisV, FaSpinner } from 'react-icons/fa';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 
 // Use axios baseURL and dev proxy
 
@@ -85,7 +85,7 @@ const AILearningPlans = () => {
   
     try {
       // Add loading toast
-      toast.loading(`Loading ${courseName}...`, { id: `loading-${courseId}` });
+  universalToast.loading(`Loading ${courseName}...`, { id: `loading-${courseId}` });
       
       // Optional: Check if course is accessible before navigation
       const token = localStorage.getItem('accessToken');
@@ -97,20 +97,20 @@ const AILearningPlans = () => {
       });
 
       if (response.data) {
-        toast.success('Course loaded successfully!', { id: `loading-${courseId}` });
+  universalToast.success('Course loaded successfully!', { id: `loading-${courseId}` });
         // Navigate using React Router for better SPA experience
         navigate(`/pro-learning/${courseId}`);
       }
     } catch (error) {
   
       if (error.response?.status === 404) {
-        toast.error('Course not found. It may have been deleted.', { id: `loading-${courseId}` });
+  universalToast.error('Course not found. It may have been deleted.', { id: `loading-${courseId}` });
         // Refresh the course list
         fetchProCourses();
       } else if (error.response?.status === 401) {
-        toast.error('Please log in to access this course.', { id: `loading-${courseId}` });
+  universalToast.error('Please log in to access this course.', { id: `loading-${courseId}` });
       } else {
-        toast.error('Failed to load course. Please try again.', { id: `loading-${courseId}` });
+  universalToast.error('Failed to load course. Please try again.', { id: `loading-${courseId}` });
       }
     }
   };
@@ -128,14 +128,14 @@ const AILearningPlans = () => {
 
       // Remove the deleted course from state
       setProCourses(prevCourses => prevCourses.filter(course => course.id !== courseId));
-      toast.success(`"${courseName}" has been deleted successfully`);
+  universalToast.success(`"${courseName}" has been deleted successfully`);
       try {
         const ev = new CustomEvent('prolearning:course-deleted', { detail: { id: courseId, name: courseName } });
         window.dispatchEvent(ev);
       } catch {}
     } catch (error) {
   
-      toast.error('Failed to delete course. Please try again.');
+  universalToast.error('Failed to delete course. Please try again.');
     } finally {
       setDeleteLoading(null);
     }

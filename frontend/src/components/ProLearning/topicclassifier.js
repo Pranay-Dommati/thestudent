@@ -1,7 +1,7 @@
 // ProLearning Topic Classification and Rate Limiting
 // Handles topic extraction from user queries with rate limiting support
 
-import toast from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import aiAxios from '../../utils/axiosAi';
 import logger from '../../utils/logger';
 
@@ -55,23 +55,23 @@ export const handleRateLimitError = (error, usageStats = null) => {
     const remainingMonthly = norm.monthly.remaining;
     
     if (remainingMonthly === 0) {
-      toast.error(
+  universalToast.error(
         `Monthly limit reached! You've used all ${norm.monthly.limit} topics this month. Resets on the 1st.`,
         { duration: 6000, icon: '🚫' }
       );
     } else if (remainingRequest === 0) {
-      toast.error(
+  universalToast.error(
         `Too many topics in this request! Maximum ${norm.request.limit} topics per request. ${remainingMonthly} remaining this month.`,
         { duration: 5000, icon: '⚠️' }
       );
     } else {
-      toast.error(
+  universalToast.error(
         `Rate limit exceeded. Monthly remaining: ${remainingMonthly}/${norm.monthly.limit}`,
         { duration: 4000, icon: '⏱️' }
       );
     }
   } else {
-    toast.error('Rate limit exceeded. Please try again later.', { duration: 4000 });
+  universalToast.error('Rate limit exceeded. Please try again later.', { duration: 4000 });
   }
 };
 
@@ -198,7 +198,7 @@ export const classifyTopics = async (query, expectedTopics = null) => {
   logger.error('Topic classification error:', error);
       // Don't show toast for network-related errors to avoid duplicate notifications
       if (!error.message.includes('Network') && !error.message.includes('connection')) {
-        toast.error(`Failed to classify topics: ${error.message}`, { duration: 4000 });
+  universalToast.error(`Failed to classify topics: ${error.message}`, { duration: 4000 });
       }
     }
     throw error;

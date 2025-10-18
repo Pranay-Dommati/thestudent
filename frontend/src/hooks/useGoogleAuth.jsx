@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
+import universalToast from '../utils/universalToast';
 
 // Enhanced Google Sign-In Hook
 export const useGoogleAuth = (onSuccess, onError) => {
@@ -62,7 +62,7 @@ export const useGoogleAuth = (onSuccess, onError) => {
         
         if (!GOOGLE_CLIENT_ID) {
           console.error('VITE_GOOGLE_CLIENT_ID not found in environment variables');
-          toast.error('Google Sign-In not configured');
+          universalToast.error('Google Sign-In not configured');
           return;
         }
 
@@ -79,7 +79,7 @@ export const useGoogleAuth = (onSuccess, onError) => {
         console.log('Google Sign-In initialized successfully');
       } catch (error) {
         console.error('Google Sign-In initialization failed:', error);
-        toast.error('Google Sign-In failed to load');
+  universalToast.error('Google Sign-In failed to load');
       }
     };
 
@@ -89,7 +89,7 @@ export const useGoogleAuth = (onSuccess, onError) => {
   // Trigger Google Sign-In
   const signInWithGoogle = () => {
     if (!isGoogleReady) {
-      toast.error('Google Sign-In not ready. Please refresh the page.');
+  universalToast.error('Google Sign-In not ready. Please refresh the page.');
       return;
     }
 
@@ -102,12 +102,12 @@ export const useGoogleAuth = (onSuccess, onError) => {
           renderGoogleButtonAndClick();
         } else if (notification.isSkippedMoment()) {
           console.log('Google Sign-In prompt skipped');
-          toast.error('Google Sign-In was cancelled');
+          universalToast.error('Google Sign-In was cancelled');
         }
       });
     } catch (error) {
       console.error('Failed to show Google Sign-In:', error);
-      toast.error('Failed to start Google Sign-In');
+  universalToast.error('Failed to start Google Sign-In');
     }
   };
 
@@ -133,14 +133,14 @@ export const useGoogleAuth = (onSuccess, onError) => {
         if (button) {
           button.click();
         } else {
-          toast.error('Google Sign-In button could not be rendered');
+          universalToast.error('Google Sign-In button could not be rendered');
         }
         // Clean up
         document.body.removeChild(tempContainer);
       }, 100);
     } catch (error) {
       console.error('Fallback Google Sign-In failed:', error);
-      toast.error('Google Sign-In is temporarily unavailable');
+  universalToast.error('Google Sign-In is temporarily unavailable');
     }
   };
 

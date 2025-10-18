@@ -9,7 +9,7 @@ import ResourcesPage from './templ/ResourcesPage';
 import QuizIntro from './templ/QuizIntro';
 import InstructionsPage from './templ/InstructionsPage';
 import axiosInstance from '../../utils/axios';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import { useAuth } from '../../context/AuthContext';
 
 const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
@@ -324,7 +324,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
   const toggleLessonCompletion = async (chapterIndex, lessonIndex) => {
     if (!isLoggedIn) {
-      toast.error('Please log in to track your progress');
+  universalToast.error('Please log in to track your progress');
       return;
     }
 
@@ -345,11 +345,11 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = !lesson.completed;
         setCourse(updatedCourse);
         
-        toast.success(lesson.completed ? 'Lesson marked as incomplete' : 'Lesson completed!');
+  universalToast.success(lesson.completed ? 'Lesson marked as incomplete' : 'Lesson completed!');
       }
     } catch (error) {
       logger.error('❌ Error updating lesson completion:', error);
-      toast.error('Failed to update lesson progress');
+  universalToast.error('Failed to update lesson progress');
     } finally {
       setSavingProgress(false);
     }

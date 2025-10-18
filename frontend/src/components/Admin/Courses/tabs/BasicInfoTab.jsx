@@ -1,6 +1,6 @@
 import React from 'react';
 import { FaUpload } from 'react-icons/fa';
-import toast from 'react-hot-toast';
+import universalToast from '../../../../utils/universalToast';
 
 const courseCategories = [
   { level: '10th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },

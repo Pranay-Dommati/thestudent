@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaTrash, FaUpload } from 'react-icons/fa';
-import toast from 'react-hot-toast';
+import universalToast from '../../../../utils/universalToast';
 
 const PROFICIENCY_LEVELS = [
   { id: 'beginner', label: 'Beginner (No prior experience needed)' },

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FaEnvelope, FaArrowLeft, FaCheck } from 'react-icons/fa';
 import { motion } from 'framer-motion';
-import { toast } from 'react-hot-toast';
+import universalToast from "../../utils/universalToast";
 import { Link, useNavigate } from 'react-router-dom';
 import AdminNav from './layout/AdminNav';
 import api from '../../utils/axios';
@@ -16,7 +16,7 @@ const AdminForgotPassword = () => {
     e.preventDefault();
     
     if (!email || !email.includes('@')) {
-      toast.error('Please enter a valid email address');
+  universalToast.error('Please enter a valid email address');
       return;
     }
     
@@ -25,11 +25,11 @@ const AdminForgotPassword = () => {
     try {
       await api.post('/auth/admin-forgot-password/', { email });
       setEmailSent(true);
-      toast.success('Password reset link sent to your email');
+  universalToast.success('Password reset link sent to your email');
     } catch (error) {
       console.error('Admin forgot password error:', error);
       const msg = error?.response?.data?.error || 'Something went wrong. Please try again later.';
-      toast.error(msg);
+  universalToast.error(msg);
     } finally {
       setIsLoading(false);
     }

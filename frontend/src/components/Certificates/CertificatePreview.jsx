@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import axiosInstance from '../../utils/axios';
 import { useAuth } from '../../context/AuthContext';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import PDFCanvasViewer from './PDFCanvasViewer';
 
 // Simple and reliable PDF viewer component

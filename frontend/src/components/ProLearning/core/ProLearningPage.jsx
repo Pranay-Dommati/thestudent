@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useSearchParams, useNavigate, useParams } from "react-router-dom";
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 import { 
   IoHome, IoChevronBack, IoPlayCircle, IoBookmark, IoDownload, 
   IoCheckmarkCircle, IoTime, IoEye, IoStar, IoSparkles, IoRocket, 
@@ -2846,7 +2846,7 @@ const ProLearningPage = () => {
           const notifiedKey = `proLearning_savedNotified_${currentCourseId}`;
           const alreadyNotified = localStorage.getItem(notifiedKey) === 'true';
           if (!alreadyNotified) {
-            toast.success('🎉 Course generation completed and added to your Learning Hub');
+            universalToast.success('🎉 Course generation completed and added to your Learning Hub');
             localStorage.setItem(notifiedKey, 'true');
           }
         } catch (_) {
@@ -3109,7 +3109,7 @@ const ProLearningPage = () => {
       if (response.status >= 200 && response.status < 300) {
   console.log('✅ Course saved to Learning Hub successfully!', responseData);
   try { tracking.capture('pro_learning.save_succeeded', { course_id: currentCourseId }, { feature: 'pro_learning' }); } catch {}
-        toast.success('✅ Course saved to your Learning Hub successfully!');
+  universalToast.success('✅ Course saved to your Learning Hub successfully!');
         
         // Refresh usage stats after saving (topics were created in DB)
         try {
@@ -3150,7 +3150,7 @@ const ProLearningPage = () => {
   console.error('❌ Failed to save course:', responseData);
   try { tracking.capture('pro_learning.save_failed', { course_id: currentCourseId, status: response.status }, { feature: 'pro_learning', success: false, error_code: String(response.status) }); } catch {}
         if (response.status === 401) {
-          toast.error('Authentication failed. Please log in again.');
+          universalToast.error('Authentication failed. Please log in again.');
         } else if (response.status === 409) {
           toast.warning('This course already exists in your Learning Hub.');
           // Mark as saved locally to reflect existing state
@@ -3164,14 +3164,14 @@ const ProLearningPage = () => {
             }
           } catch {}
         } else {
-          toast.error(responseData.error || 'Failed to save course');
+          universalToast.error(responseData.error || 'Failed to save course');
         }
       }
 
     } catch (error) {
       console.error('❌ Failed to save course to Learning Hub:', error);
       try { tracking.capture('pro_learning.save_failed', { course_id: currentCourseId, message: String(error) }, { feature: 'pro_learning', success: false, error_code: 'NETWORK' }); } catch {}
-      toast.error('Network error. Please check your connection and try again.');
+  universalToast.error('Network error. Please check your connection and try again.');
     }
   };
 

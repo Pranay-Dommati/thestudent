@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaRegCircle, FaRegDotCircle, FaExclamationCircle } from 'react-icons/fa';
 import axiosInstance from '../../../utils/axios';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 
 const StandaloneQuizPage = () => {
   const params = useParams();
@@ -231,7 +231,7 @@ const StandaloneQuizPage = () => {
       setQuizResult(result);
       setShowResults(true);
         if (result.passed) {
-        toast(`🎉 Congratulations! You scored ${result.score.toFixed(1)}% and passed the quiz!`, {
+  universalToast.show(`🎉 Congratulations! You scored ${result.score.toFixed(1)}% and passed the quiz!`, {
           style: {
             backgroundColor: '#10B981',
             color: 'white',
@@ -239,7 +239,7 @@ const StandaloneQuizPage = () => {
           duration: 4000
         });
       } else {
-        toast(`You scored ${result.score.toFixed(1)}%. You need 80% to pass. Try again!`, {
+  universalToast.show(`You scored ${result.score.toFixed(1)}%. You need 80% to pass. Try again!`, {
           icon: '📊',
           duration: 4000
         });
@@ -247,7 +247,7 @@ const StandaloneQuizPage = () => {
       
     } catch (error) {
       console.error('Error submitting quiz:', error);
-      toast('Failed to submit quiz. Please try again.', {
+  universalToast.show('Failed to submit quiz. Please try again.', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',

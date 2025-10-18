@@ -3,7 +3,7 @@ import CourseForm from './CourseForm';
 import CourseList from './CourseList';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 import { deleteCourse } from '../../../services/courseApi';
 
 const CourseManagement = ({ isDarkMode }) => {

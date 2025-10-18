@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { FaRegEnvelope, FaArrowLeft, FaCheckCircle } from "react-icons/fa";
 import { Link } from "react-router-dom";
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import AuthNav from './AuthNav';
 import AuthFooter from './AuthFooter';
 import api from '../../utils/axios';
@@ -36,7 +36,7 @@ export default function ForgotPassword() {
     try {
       await api.post('/auth/forgot-password/', { email: email.trim().toLowerCase() });
       setEmailSent(true);
-      toast.success('Instructions sent to your email!');
+  universalToast.success('Instructions sent to your email!');
     } catch (err) {
       console.error('Forgot password error:', err);
       const msg = err?.response?.data?.error || 'An error occurred. Please try again.';

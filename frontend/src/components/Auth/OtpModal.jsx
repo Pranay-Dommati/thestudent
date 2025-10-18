@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { otpVerify, otpResend } from '../../services/otpAuth';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 
 export default function OtpModal({ open, email, fullName, onClose, onVerified }) {
   const [code, setCode] = useState('');
@@ -28,7 +28,7 @@ export default function OtpModal({ open, email, fullName, onClose, onVerified })
   const handleVerify = async (e) => {
     e.preventDefault();
     if (!code || code.trim().length !== 6) {
-      toast.error('Enter the 6-digit code');
+  universalToast.error('Enter the 6-digit code');
       return;
     }
     setIsSubmitting(true);
@@ -39,14 +39,14 @@ export default function OtpModal({ open, email, fullName, onClose, onVerified })
       if (!access || !refresh) throw new Error('Missing tokens');
       localStorage.setItem('accessToken', access);
       localStorage.setItem('refreshToken', refresh);
-      toast.success('Email verified!');
+  universalToast.success('Email verified!');
       onVerified?.(user);
       onClose?.();
     } catch (err) {
       const status = err?.response?.status;
       const serverMsg = err?.response?.data?.error || err?.response?.data?.detail;
       const msg = serverMsg || (status === 400 ? 'Invalid or expired code' : 'Verification failed');
-      toast.error(msg);
+  universalToast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -57,7 +57,7 @@ export default function OtpModal({ open, email, fullName, onClose, onVerified })
     setResending(true);
     try {
       await otpResend({ email });
-      toast.success('Code resent');
+  universalToast.success('Code resent');
       setResendCooldown(60);
     } catch (err) {
       const status = err?.response?.status;
@@ -66,7 +66,7 @@ export default function OtpModal({ open, email, fullName, onClose, onVerified })
         // Server enforces 1/minute and max per window
         msg = err?.response?.data?.error || 'Too many attempts. Please wait a minute.';
       }
-      toast.error(msg);
+  universalToast.error(msg);
     } finally {
       setResending(false);
     }
