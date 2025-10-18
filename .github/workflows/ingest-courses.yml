@@ -1,0 +1,67 @@
+name: Ingest Courses
+
+on:
+  workflow_dispatch:
+    inputs:
+      pipeline:
+        description: "Which pipeline to run"
+        required: true
+        default: engineering
+        type: choice
+        options: [engineering, school]
+      data_path:
+        description: "Path to data file within repo (e.g., data/engineering/sample_engineering_courses.json)"
+        required: true
+        type: string
+      replace:
+        description: "Replace children (sections/chapters and lessons)"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create .env from secrets
+        run: |
+          cat > .env << EOF
+          DB_ENGINE=mysql
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT || '3306' }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_SSL_REQUIRE=${{ secrets.DB_SSL_REQUIRE || 'false' }}
+          DB_CONN_MAX_AGE=60
+          DEBUG=False
+          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY || 'set-in-secrets' }}
+          EOF
+
+      - name: Validate input file exists
+        run: |
+          if [ ! -f "${{ github.event.inputs.data_path }}" ]; then echo "Data file not found"; exit 1; fi
+
+      - name: Ingest Engineering courses
+        if: ${{ github.event.inputs.pipeline == 'engineering' }}
+        run: |
+          python scripts/ingest_engineering_courses.py --file "${{ github.event.inputs.data_path }}" $( [ "${{ github.event.inputs.replace }}" = "true" ] && echo "--replace" ) --verbose
+
+      - name: Ingest School courses
+        if: ${{ github.event.inputs.pipeline == 'school' }}
+        run: |
+          python scripts/ingest_school_courses.py --file "${{ github.event.inputs.data_path }}" $( [ "${{ github.event.inputs.replace }}" = "true" ] && echo "--replace" ) --verbose

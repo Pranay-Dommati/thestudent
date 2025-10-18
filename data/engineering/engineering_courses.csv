@@ -1,0 +1,2 @@
+title,short_description,description,duration,is_published,subject,sources,proficiency,project_based,learning_points,requirements,category
+Data Structures in Python,Learn core data structures,Arrays, stacks, queues, trees and graphs with Python,40,true,Computer Science,"NPTEL; MIT OCW",beginner,true,"Implement arrays; Solve tree problems","Basic Python; Loops and functions",Programming
