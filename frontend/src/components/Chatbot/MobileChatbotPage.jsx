@@ -1,15 +1,14 @@
 import universalToast from "../../utils/universalToast";
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoBook, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline, IoChevronForward, IoSearchOutline } from "react-icons/io5";
-import { FaRobot } from "react-icons/fa";
+import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoBook, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline, IoChevronForward, IoSearchOutline, IoRocket } from "react-icons/io5";
+// Removed FaRobot - using IoSchoolOutline for Pro Learning branding
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclassifier";
-import AuthModal from '../Common/AuthModal';
 import ErrorBoundary from '../Common/ErrorBoundary';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
@@ -18,28 +17,11 @@ import proLearningHistoryService from '../../services/ProLearningHistoryService'
 // Custom CSS - added for DeepSeek-like UI
 import './mobileChatStyles.css';
 
+// Use relative API paths; dev proxy routes to backend
 import apiAxios from '../../utils/axios';
 import aiAxios from '../../utils/axiosAi';
 
-// Secure backend chat proxy (uses JWT)
-const callChatBackend = async (message) => {
-  const { data } = await aiAxios.post('/chat/', { message });
-  return data?.text || 'Sorry, I could not generate a response.';
-};
-
-// Vector bot API call for general educational responses
-const callVectorBotAPI = async (message) => {
-  try {
-    console.log('📤 Sending request to vector bot API:', message);
-    const token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
-  const { data } = await apiAxios.post('/chatbot/chat/general/', { message });
-  return data.response;
-  } catch (error) {
-    console.error('Error calling vector bot API:', error);
-    return 'Sorry, I encountered an error while processing your request. Please try again later.';
-  }
-};
-
+// Helper function to parse markdown response (legacy - may not be used)
 const parseMarkdownResponse = (content) => {
   const sections = [];
   let currentSection = null;
@@ -86,7 +68,7 @@ const MobileChatbotPage = () => {
   const initialQuery = searchParams.get("q");
 
   const [message, setMessage] = useState("");
-  const [proMode, setProMode] = useState(false);
+  const [proMode] = useState(true); // Always in Pro Learning mode
   const [showTopicConfirmation, setShowTopicConfirmation] = useState(false);
   const [pendingTopics, setPendingTopics] = useState([]);
   // Guard to prevent duplicate course creation on rapid taps
@@ -94,7 +76,6 @@ const MobileChatbotPage = () => {
   const creatingCourseRef = useRef(false);
   const [personalization, setPersonalization] = useState("");
   const [originalPrompt, setOriginalPrompt] = useState("");
-  const [showAuthModal, setShowAuthModal] = useState(false);
   // Generate unique IDs using timestamp and random component
   const generateUniqueId = () => {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -102,14 +83,7 @@ const MobileChatbotPage = () => {
 
   const [usageStats, setUsageStats] = useState(null); // Track rate limit usage stats
   const [usageStatsHidden, setUsageStatsHidden] = useState(false); // Track if user dismissed usage stats
-  const [chatHistory, setChatHistory] = useState([
-    {
-      id: generateUniqueId(),
-      type: "bot",
-      content: "Hello! I'm your AI learning assistant. How can I help you today?",
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    },
-  ]);
+  const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const initialQueryProcessed = useRef(false);
@@ -127,6 +101,41 @@ const MobileChatbotPage = () => {
   const [coursesSearch, setCoursesSearch] = useState("");
   // Feature flag: hide ProLearning courses preview in mobile chat by default
   const [showMobileCoursesPreview, setShowMobileCoursesPreview] = useState(false);
+
+  // Rotating suggestions for empty-state heading (same as desktop)
+  const rotatingSuggestions = [
+    "Help me get started with algebra basics",
+    "Explain how the human digestive system works",
+    "Break down Newton's laws of motion for me",
+    "Build a mini course on electricity and magnetism",
+    "Guide me through the fundamentals of programming",
+    "Design a beginner-friendly Python course for me",
+    "Show me how the Internet actually works",
+    "Walk me through circuits and microcontrollers step by step",
+    "Simplify the basics of thermodynamics",
+    "Build me a hands-on course on machine learning",
+    "Teach me everything about the water cycle and environment",
+    "Explain how database management systems function",
+    "Give me a clear introduction to networking and cybersecurity",
+    "Help me understand how chemical reactions happen"
+  ];
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const [suggestionKey, setSuggestionKey] = useState(0); // for animation re-trigger
+  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+
+  // Rotate suggestions every 10 seconds (same as desktop)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsAnimatingOut(true);
+      setTimeout(() => {
+        setSuggestionIndex((prev) => (prev + 1) % rotatingSuggestions.length);
+        setSuggestionKey((prev) => prev + 1);
+        setIsAnimatingOut(false);
+      }, 300); // Wait for animation to complete
+    }, 10000); // Change every 10 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Check if user has visited chat page before
   useEffect(() => {
@@ -247,16 +256,32 @@ const MobileChatbotPage = () => {
     return coursePlaceholders[randomIndex];
   };
 
+  // Basic client-side prompt validation to provide helpful guidance before calling backend
+  const validateCoursePrompt = (text) => {
+    if (!text) return { ok: false, reason: 'empty' };
+    const trimmed = String(text).trim();
+    if (trimmed.length < 5) return { ok: false, reason: 'too_short' };
+    const letters = (trimmed.match(/[a-zA-Z]/g) || []).length;
+    if (letters < 3) return { ok: false, reason: 'low_signal' };
+    return { ok: true };
+  };
+
   // Fetch usage stats when component mounts or when pro mode is enabled (returns stats)
   const fetchUsageStats = async () => {
     try {
       if (!isLoggedIn) return null;
-      const { data } = await apiAxios.get('/chatbot/usage-stats/');
-      setUsageStats(data);
-      return data;
+      const token = (
+        localStorage.getItem('accessToken') ||
+        localStorage.getItem('access_token') ||
+        localStorage.getItem('token')
+      );
+      const { data: result } = await aiAxios.get('/rate-limit-status/');
+      const stats = result?.rate_limit_info || null;
+      if (stats) setUsageStats(stats);
+      return stats;
     } catch (error) {
       console.error('📊 Error fetching usage stats:', error);
-      // Fallback default
+      // Fallback default with monthly fields and fallback flag
       const fallback = {
         rate_limits: {
           daily: { enforced: false },
@@ -264,6 +289,9 @@ const MobileChatbotPage = () => {
         },
         per_request_limit: 4,
         request_limit: 4,
+        monthly_used: 0,
+        monthly_limit: 15,
+        isFallback: true,
         // Legacy fields for backward-compat (ignored when daily.enforced=false)
         daily_used: 0,
         daily_limit: 16,
@@ -442,31 +470,66 @@ const MobileChatbotPage = () => {
 
     setChatHistory((prev) => [...prev, userMessageObj]);
     if (!customMessage) setMessage("");
+
+    // If not authenticated, show a friendly sign-in prompt and stop
+    try {
+      const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isLoggedIn;
+      if (!authed) {
+        const returnTo = window.location.pathname + window.location.search;
+        const signInUrl = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
+        const signUpUrl = `/auth?mode=signup&returnTo=${encodeURIComponent(returnTo)}`;
+        const authPrompt = {
+          id: generateUniqueId(),
+          type: "bot",
+          isAuthPrompt: true,
+          signInUrl,
+          signUpUrl,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+        setChatHistory((prev) => [...prev, authPrompt]);
+        setIsLoading(false);
+        return;
+      }
+    } catch (_) {}
+
+    // Validate prompt early and provide a helpful message if it looks like nonsense/too short
+    const validation = validateCoursePrompt(messageToSend);
+    if (!validation.ok) {
+      const botResponse = {
+        id: generateUniqueId(),
+        type: "bot",
+        content: "🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      setChatHistory((prev) => [...prev, botResponse]);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      if (forcePro || proMode) {
-        // Check quota before processing (prefer monthly if daily not enforced)
-        if (usageStats) {
-          const dailyEnforced = usageStats?.rate_limits?.daily?.enforced ?? false;
-          const dailyRemaining = Math.max(0, (usageStats.daily_limit || usageStats.rate_limits?.daily?.limit || 0) - (usageStats.daily_used || usageStats.rate_limits?.daily?.used || 0));
-          const monthlyRemaining = Math.max(0, (usageStats.rate_limits?.monthly?.limit || 15) - (usageStats.rate_limits?.monthly?.used || 0));
-          const remainingAllowance = dailyEnforced ? dailyRemaining : monthlyRemaining;
-          if (remainingAllowance <= 0) {
-            const msg = dailyEnforced
-              ? "🚫 Daily limit reached! You've used all your topic creation quota for today. Please try again tomorrow."
-              : "🚫 Monthly limit reached! You've used all your topic creation quota for this month. Please try again next month.";
-            universalToast.error(msg, { duration: 5000 });
-            setIsLoading(false);
-            return;
-          }
+      // Pro Learning Mode - Always Active
+      // Check quota before processing (prefer monthly if daily not enforced)
+      if (usageStats) {
+        const dailyEnforced = usageStats?.rate_limits?.daily?.enforced ?? false;
+        const dailyRemaining = Math.max(0, (usageStats.daily_limit || usageStats.rate_limits?.daily?.limit || 0) - (usageStats.daily_used || usageStats.rate_limits?.daily?.used || 0));
+        const monthlyRemaining = Math.max(0, (usageStats.rate_limits?.monthly?.limit || 15) - (usageStats.rate_limits?.monthly?.used || 0));
+        const remainingAllowance = dailyEnforced ? dailyRemaining : monthlyRemaining;
+        if (remainingAllowance <= 0) {
+          const msg = dailyEnforced
+            ? "🚫 Daily limit reached! You've used all your topic creation quota for today. Please try again tomorrow."
+            : "🚫 Monthly limit reached! You've used all your topic creation quota for this month. Please try again next month.";
+          universalToast.error(msg, { duration: 5000 });
+          setIsLoading(false);
+          return;
         }
+      }
 
-        // Pro mode - extract topics using AI first with rate limiting
-        try {
-          console.log('🚀 Mobile pro mode activated, calling classifyTopics with:', messageToSend);
-          const result = await classifyTopics(messageToSend);
-          console.log('✅ Mobile classifyTopics result:', result);
+      // Extract topics using AI with rate limiting
+      try {
+        console.log('🚀 Mobile Pro Learning mode - calling classifyTopics with:', messageToSend);
+        const result = await classifyTopics(messageToSend);
+        console.log('✅ Mobile classifyTopics result:', result);
           if (result && typeof result.personalization === 'string' && result.personalization.trim()) {
             setPersonalization(result.personalization.trim());
           } else {
@@ -602,34 +665,6 @@ const MobileChatbotPage = () => {
             return;
           }
         }
-      } else {
-        // Regular chatbot response using secure backend proxy
-        if (!isAuthenticated) {
-          setShowAuthModal(true);
-          const authPrompt = {
-            id: generateUniqueId(),
-            type: 'bot',
-            content: 'Please sign in to chat with the AI assistant.',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          };
-          setChatHistory((prev) => [...prev, authPrompt]);
-          return;
-        }
-        console.log('🔄 Calling backend AI chat proxy...');
-        const response = await callChatBackend(messageToSend);
-
-        const botResponse = {
-          id: generateUniqueId(),
-          type: "bot",
-          content: typeof response === 'string' ? response : String(response),
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        };
-
-        setChatHistory((prev) => {
-          const newHistory = [...prev, botResponse];
-          return newHistory;
-        });
-      }
     } catch (error) {
       console.error("Error in chat:", error);
       const errorResponse = {
@@ -816,6 +851,38 @@ const MobileChatbotPage = () => {
   };
 
   const MessageBubble = React.memo(({ message }) => {
+    // Inline auth prompt bubble
+    if (message.isAuthPrompt) {
+      return (
+        <div className="w-full mb-4">
+          <div className="flex justify-start">
+            <div className="max-w-[90%] min-w-0">
+              <div className="px-4 py-3 bg-white text-gray-800 border border-gray-200 rounded-2xl rounded-bl-md shadow-sm">
+                <p className="mb-3 text-sm">
+                  <span className="mr-1">🔒</span>
+                  To create personalized learning plans, please sign in.
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link
+                    to={message.signInUrl || '/auth?mode=login'}
+                    className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to={message.signUpUrl || '/auth?mode=signup'}
+                    className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Create Account
+                  </Link>
+                </div>
+                <div className="text-xs mt-2 text-gray-500">{message.timestamp}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
     // More specific detection for course content - look for multiple sections with specific course structure
     const isCourseContent = (
       message.content.includes("# ") && 
@@ -1099,63 +1166,35 @@ const MobileChatbotPage = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Mobile Header with Navigation */}
+      {/* Mobile Header with Navigation - Always visible on mobile and tablet */}
       <div className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between px-3 py-2">
-          {/* Left: Back button */}
+        <div className="flex items-center justify-between px-3 md:px-4 py-2 md:py-3">
+          {/* Left: Menu button */}
+          <button
+            onClick={openCoursesDrawer}
+            className="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+            title="Menu"
+          >
+            <IoMenuOutline size={18} className="text-gray-700" />
+          </button>
+          
+          {/* Center: EasyLearnova branding */}
+          <div className="flex-1 mx-3 md:mx-4 text-center">
+            <h1 className="text-base md:text-lg font-bold text-gray-900">EasyLearnova</h1>
+            <p className="text-xs md:text-sm text-gray-500">Course Creator</p>
+          </div>
+          
+          {/* Right: Back button */}
           <Link 
             to="/"
-            className="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+            className="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
           >
             <IoChevronBack size={18} className="text-gray-700" />
           </Link>
-          
-          {/* Center: Title and subtitle */}
-          <div className="flex-1 mx-3 text-center">
-            <h1 className="text-base font-bold text-gray-900">AI Chat</h1>
-            <p className="text-xs text-gray-500">Learning Assistant</p>
-          </div>
-          
-          {/* Right: Menu Button */}
-          <div className="relative">
-            <button
-              onClick={openCoursesDrawer}
-              className="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-              title="My Courses"
-            >
-              <IoMenuOutline size={18} className="text-gray-700" />
-            </button>
-          </div>
         </div>
-        
-  {/* Quick Action Suggestions - only show when chat is empty */}
-        {!showTopicConfirmation && chatHistory.length === 0 && (
-          <div className="px-3 pb-2 border-t border-gray-100">
-            <div className="flex items-center justify-center space-x-3 py-2">
-              <button
-                onClick={() => setMessage("Explain quantum physics in simple terms")}
-                className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0"
-              >
-                📚 Quick Learn
-              </button>
-              <button
-                onClick={() => setMessage("Create a course about")}
-                className="text-xs text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-colors flex-shrink-0"
-              >
-                🎓 Create Course
-              </button>
-              <button
-                onClick={() => setMessage("Help me with homework")}
-                className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors flex-shrink-0"
-              >
-                ✏️ Help
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Right-side Drawer: ProLearning Courses */}
+  {/* Left-side Drawer: ProLearning Courses */}
       <div className={`fixed inset-0 z-40 ${isCoursesDrawerOpen ? '' : 'pointer-events-none'}`} aria-hidden={!isCoursesDrawerOpen}>
         {/* Overlay */}
         <div
@@ -1164,7 +1203,7 @@ const MobileChatbotPage = () => {
         />
         {/* Drawer */}
         <div
-          className={`absolute right-0 top-0 h-full w-80 max-w-[88%] bg-white shadow-2xl border-l border-gray-200 transform transition-transform duration-300 ${isCoursesDrawerOpen ? 'translate-x-0' : 'translate-x-full'} rounded-l-2xl`}
+          className={`absolute left-0 top-0 h-full w-80 max-w-[88%] bg-white shadow-2xl border-r border-gray-200 transform transition-transform duration-300 ${isCoursesDrawerOpen ? 'translate-x-0' : '-translate-x-full'} rounded-r-2xl`}
           role="dialog"
           aria-label="ProLearning Courses"
         >
@@ -1333,7 +1372,24 @@ const MobileChatbotPage = () => {
       {/* Chat messages container */}
       <div className="flex-1 overflow-y-auto px-4 py-4 pt-20 pb-32 bg-white chat-container">
         <div className="min-h-full">
-          {/* Backend ProLearning courses preview list (hidden by default on mobile chat) */}
+          {/* Centered welcome screen layout when no messages */}
+          {chatHistory.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 min-h-[60vh]">
+              <div className="text-center w-full max-w-sm px-4">
+                <h1
+                  key={suggestionKey}
+                  className={`text-xl sm:text-2xl font-semibold tracking-tight text-gray-900 leading-tight mb-6 ${
+                    isAnimatingOut ? 'animate-slide-up-out' : 'animate-slide-up-in'
+                  }`}
+                >
+                  {rotatingSuggestions[suggestionIndex]}
+                </h1>
+              </div>
+            </div>
+          ) : (
+            /* Regular chat messages layout */
+            <div className="w-full">
+              {/* Backend ProLearning courses preview list (hidden by default on mobile chat) */}
           {showMobileCoursesPreview && proLearningCourses && proLearningCourses.length > 0 && (
             <div className="mb-3">
               <div className="flex items-center mb-2">
@@ -1421,252 +1477,161 @@ const MobileChatbotPage = () => {
             </div>
           )}
 
-          {/* Professional Topic Confirmation Dialog */}
+          {/* Mobile Course Configuration Dialog - Minimal design to match desktop */}
           {showTopicConfirmation && (
-            <div className="w-full mb-4">
-              <div className="flex justify-start">
-                <div className="w-full max-w-md">
-                  <div className="bg-white border border-indigo-200 rounded-2xl shadow-xl overflow-hidden">
-                    
-                    {/* Minimal Header Section */}
-                    <div className="bg-gradient-to-r from-indigo-50 to-blue-50 p-4 border-b border-indigo-100">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-lg flex items-center justify-center mr-3">
-                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-base font-bold text-gray-900">Review Topics</h3>
-                          <p className="text-xs text-gray-600 mt-0.5">
-                            {pendingTopics.length} topic{pendingTopics.length !== 1 ? 's' : ''} • Tap to edit
-                          </p>
-                        </div>
-                      </div>
-                      
-                      {/* Personalization Badge */}
-                      {personalization && (
-                        <div className="mt-2.5">
-                          <div className="inline-flex items-center px-2.5 py-1 bg-white/70 backdrop-blur border border-indigo-200 rounded-full">
-                            <svg className="w-3 h-3 text-indigo-600 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            <span className="text-xs font-medium text-indigo-800">
-                              {personalization.length > 35 ? `${personalization.substring(0, 35)}...` : personalization}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Compact Topics List */}
-                    <div className="p-4 space-y-2">
-                      {pendingTopics.map((topic, index) => (
-                        <div key={topic.id || index} className="bg-gray-50 border border-gray-200 hover:border-indigo-300 rounded-lg transition-all duration-200">
-                          {/* Single Row: Number + Input + Delete Button */}
-                          <div className="flex items-center gap-2 p-2">
-                            {/* Topic Number */}
-                            <span className="w-6 h-6 bg-indigo-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">
-                              {index + 1}
-                            </span>
-                            
-                            {/* Scrollable Input */}
-                            <div 
-                              className="flex-1 overflow-x-auto overflow-y-hidden"
-                              style={{
-                                scrollbarWidth: 'thin',
-                                scrollbarColor: '#818cf8 #e0e7ff'
-                              }}
-                            >
-                              <input
-                                type="text"
-                                value={topic.name}
-                                onChange={(e) => handleTopicEdit(index, e.target.value)}
-                                className="bg-white border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-md px-2.5 py-1.5 text-sm text-gray-800 placeholder-gray-400 transition-all whitespace-nowrap"
-                                placeholder="Enter topic name..."
-                                style={{ 
-                                  minWidth: '100%',
-                                  width: `${Math.max(topic.name.length * 8, 200)}px`
-                                }}
-                              />
-                            </div>
-                            
-                            {/* Delete Button */}
-                            <button
-                              onClick={() => handleTopicDelete(index)}
-                              className="w-7 h-7 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md flex items-center justify-center transition-colors flex-shrink-0"
-                              title="Remove topic"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {/* Professional Action Buttons */}
-                    <div className="p-4 bg-gray-50 border-t border-gray-100 space-y-3">
-                      {/* Secondary Actions - Add/Cancel at Top */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          onClick={handleTopicAdd}
-                          disabled={pendingTopics.length >= 4}
-                          className={`py-2.5 px-4 border border-indigo-200 text-indigo-600 rounded-xl text-sm font-medium transition-all duration-200 ${
-                            pendingTopics.length >= 4 
-                              ? 'opacity-50 cursor-not-allowed bg-gray-50' 
-                              : 'bg-white hover:bg-indigo-50 hover:border-indigo-300 hover:shadow-sm active:scale-95'
-                          }`}
-                        >
-                          <span className="inline-flex items-center">
-                            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                            Add Topic
-                          </span>
-                        </button>
-                        <button
-                          onClick={handleTopicCancel}
-                          className="py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
-                        >
-                          <span className="inline-flex items-center">
-                            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            Cancel
-                          </span>
-                        </button>
-                      </div>
-                      
-                      {/* Primary Action - Create Course at Bottom */}
+            <div className="w-full mb-6 px-3">
+              <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+                  <h2 className="text-base font-medium text-gray-900">Configure Course Topics</h2>
+                  <span className="text-sm text-gray-500">{pendingTopics.length}/4 topics</span>
+                </div>
+
+                {/* Topics List */}
+                <div className="space-y-2 mb-4">
+                  {pendingTopics.map((topic, index) => (
+                    <div key={`pending-topic-${topic.id || `${index}-${topic.name}`}`} className="flex items-center gap-3">
+                      <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
+                        {index + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={topic.name}
+                        onChange={(e) => handleTopicEdit(index, e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        placeholder="Enter topic name..."
+                      />
                       <button
-                        onClick={handleTopicConfirm}
-                        disabled={isCreatingCourse}
-                        className={`w-full py-3.5 rounded-xl shadow-lg font-semibold text-sm transition-all duration-200 transform ${
-                          isCreatingCourse
-                            ? 'bg-gray-400 text-white cursor-not-allowed'
-                            : 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]'
-                        }`}
+                        onClick={() => handleTopicDelete(index)}
+                        className="p-1 text-gray-400 hover:text-red-500 transition-opacity"
+                        title="Remove topic"
                       >
-                        <span className="inline-flex items-center">
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                          {isCreatingCourse ? 'Creating...' : `Create Course (${pendingTopics.length} topic${pendingTopics.length !== 1 ? 's' : ''})`}
-                        </span>
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
                       </button>
                     </div>
-                  </div>
+                  ))}
+
+                  {/* Add Topic Button */}
+                  {pendingTopics.length < 4 && (
+                    <button
+                      onClick={handleTopicAdd}
+                      className="w-full p-2 border border-dashed border-gray-300 text-gray-600 rounded-md hover:border-indigo-400 hover:text-indigo-600 transition-colors text-sm"
+                    >
+                      + Add Topic ({pendingTopics.length}/4)
+                    </button>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={handleTopicCancel}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleTopicConfirm}
+                    disabled={pendingTopics.length === 0 || isCreatingCourse}
+                    className={`px-6 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                      pendingTopics.length === 0 || isCreatingCourse
+                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    }`}
+                  >
+                    {isCreatingCourse ? (
+                      <>
+                        <BiLoaderAlt className="animate-spin" size={16} />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <IoRocket size={18} />
+                        Create Course
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
           )}
           
           <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Message input - Fixed at bottom with no bottom navigation */}
+      {/* Message input - Fixed at bottom - Always visible */}
       <div className="fixed bottom-0 left-0 right-0 z-20">
         <div className="bg-white border-t border-gray-200 shadow-lg">
-          {/* Bottom input area */}
-          <div className="px-4 py-3">
-            {/* Course Mode Section - Compact Horizontal Design */}
-            <div className="mb-3">
-              {/* Course Creator Button and Usage Info in one row */}
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  onClick={handleCreateCourse}
-                  className={`flex items-center px-4 py-2 rounded-xl text-sm transition-all ${
-                    proMode 
-                    ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-sm"
-                    : "bg-gray-100 text-gray-700 hover:bg-indigo-50 hover:text-indigo-700"
-                  }`}
-                >
-                  <IoSchoolOutline size={16} className="mr-2" />
-                  <span className="font-medium">{proMode ? "Course Mode" : "Course Creator"}</span>
-                  {proMode && <IoCheckmarkCircle size={14} className="ml-2" />}
-                </button>
-                
-                {/* Minimalistic Usage indicator with dismiss button */}
-                {proMode && usageStats && !usageStatsHidden && (
-                  <div className="flex items-center gap-2 flex-1 justify-end">
-                    <CompactRateLimitStatus usageStats={usageStats} className="text-right" />
-                    <button
-                      onClick={() => setUsageStatsHidden(true)}
-                      className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
-                    >
-                      <IoClose size={14} className="text-gray-400" />
-                    </button>
-                  </div>
-                )}
-              </div>
-              
-              {/* Optional: Rate limit warning when limit reached (daily or monthly) */}
-              {proMode && usageStats && (() => {
-                const dailyEnforced = usageStats?.rate_limits?.daily?.enforced ?? false;
-                const monthly = usageStats?.rate_limits?.monthly;
-                const dailyReached = (usageStats.daily_used || 0) >= (usageStats.daily_limit || 0);
-                const monthlyReached = monthly ? (monthly.used || 0) >= (monthly.limit || 0) : false;
-                return dailyEnforced ? dailyReached : monthlyReached;
-              })() && (
-                <div className="mt-2 text-xs text-orange-600 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-200">
-                  {usageStats?.rate_limits?.daily?.enforced ? '⚠️ Daily limit reached. Resets tomorrow.' : '⚠️ Monthly limit reached. Resets next month.'}
-                </div>
-              )}
-            </div>
-            
-            {/* Input container - Improved spacing and styling */}
-            <div className="relative flex items-center bg-gray-50 rounded-2xl border border-gray-200 shadow-sm focus-within:border-indigo-300 focus-within:shadow-md transition-all">
-              {/* Left robot button */}
-              <button
-                onClick={() => {}} // Model toggle
-                className="px-3 py-3"
-              >
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 transition-colors">
-                  <FaRobot size={14} />
-                </div>
-              </button>
-              
-              {/* Input field with better styling */}
-              <input
-                type="text"
-                placeholder={proMode ? "Describe your course topic..." : "Ask anything..."}
+          <div className="px-4 sm:px-5 md:px-8 lg:px-12 xl:px-16 py-3">
+            {/* Simple input field with send button */}
+            <div className="relative">
+              <textarea
+                rows={1}
+                placeholder="Ask anything"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                className="flex-1 py-3 pl-2 pr-3 text-base bg-transparent border-none focus:outline-none focus:ring-0 placeholder-gray-400"
+                onInput={(e) => {
+                  try {
+                    const el = e.target;
+                    el.style.height = 'auto';
+                    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+                  } catch (_) {}
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
                 disabled={isLoading}
+                className="w-full px-4 pt-4 pb-5 pr-14 bg-white border-2 border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400/60 focus:border-indigo-400 text-gray-900 placeholder-gray-500 resize-none overflow-hidden text-base transition-all"
+                style={{ minHeight: '54px', maxHeight: '120px' }}
               />
-              
-              {/* Send button - improved styling */}
-              <button
-                onClick={() => handleSendMessage()}
-                disabled={!message.trim() || isLoading}
-                className={`ml-2 mr-2 w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
-                  message.trim() && !isLoading 
-                    ? "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 hover:shadow-md" 
-                    : proMode && !isLoading
-                      ? "bg-indigo-500 text-white/80 cursor-not-allowed opacity-75"
-                      : "bg-gray-300 text-gray-500"
-                }`}
-              >
-                <IoSend size={14} />
-              </button>
+              <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={!message.trim() || isLoading}
+                  aria-label="Send message"
+                  className={`h-10 w-10 flex items-center justify-center rounded-full transition-all ${
+                    message.trim() && !isLoading 
+                      ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md" 
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  {isLoading ? (
+                    <BiLoaderAlt className="animate-spin" size={18} />
+                  ) : (
+                    <IoSend size={18} className="ml-0.5" />
+                  )}
+                </button>
+              </div>
             </div>
+            
+            {/* Usage Stats - Show below input */}
+            {usageStats && (
+              <div className="mt-3 flex justify-center">
+                <div className="text-center">
+                  <div className="[&>div]:text-center">
+                    <CompactRateLimitStatus usageStats={usageStats} className="text-center" />
+                  </div>
+                  {usageStats.isFallback && (
+                    <div className="text-xs text-gray-400 mt-1">Limits unavailable. Showing default.</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Authentication Modal */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        title="Course Creation Requires Account"
-        message="Create personalized courses tailored to your learning goals. Save your progress and access advanced features."
-        feature="Create Custom Courses"
-      />
+      {/* Auth modal removed - gating is inline within chat conversation */}
     </div>
   );
 };

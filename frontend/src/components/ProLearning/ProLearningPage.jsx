@@ -76,6 +76,49 @@ import { classifyTopicsWithGemini } from './topicclassifier';
 // import BatchGenerationStatus from './BatchGenerationStatus'; // REMOVED - eliminated duplicate loading card
 import ProLearningMobile from './ProLearningMobile';
 
+// Helper function to safely set localStorage items with quota handling
+const safeLocalStorageSet = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    if (error.name === 'QuotaExceededError') {
+      console.warn(`⚠️ localStorage quota exceeded for key: ${key}`);
+      // Try to clean up old ProLearning data
+      try {
+        const keysToClean = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const storageKey = localStorage.key(i);
+          if (storageKey && (
+            storageKey.startsWith('proLearning_courseReady_') ||
+            storageKey.startsWith('proLearning_savedNotified_') ||
+            storageKey.startsWith('proLearning_batchMarker')
+          )) {
+            keysToClean.push(storageKey);
+          }
+        }
+        // Remove old flags (keep only recent 10)
+        if (keysToClean.length > 10) {
+          keysToClean.slice(0, -10).forEach(k => {
+            try {
+              localStorage.removeItem(k);
+            } catch (e) {
+              console.error('Failed to remove key:', k, e);
+            }
+          });
+          // Try setting again after cleanup
+          localStorage.setItem(key, value);
+          console.log('✅ Successfully set after cleanup:', key);
+          return true;
+        }
+      } catch (cleanupError) {
+        console.error('Failed to clean up localStorage:', cleanupError);
+      }
+    }
+    return false;
+  }
+};
+
 
 const ProLearningPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1155,7 +1198,7 @@ const ProLearningPage = () => {
         try {
           const courseId = getCourseId();
           const storageKey = courseId ? `proLearning_completedTopics_${courseId}` : 'proLearning_completedTopics';
-          localStorage.setItem(storageKey, JSON.stringify(currentCompleted));
+          safeLocalStorageSet(storageKey, JSON.stringify(currentCompleted));
         } catch (error) {
           console.warn('Failed to save cleaned completion data:', error);
         }
@@ -2307,7 +2350,7 @@ const ProLearningPage = () => {
       try {
         const courseId = getCourseId();
         const storageKey = courseId ? `proLearning_completedTopics_${courseId}` : 'proLearning_completedTopics';
-        localStorage.setItem(storageKey, JSON.stringify(updated));
+        safeLocalStorageSet(storageKey, JSON.stringify(updated));
         
         // Show brief feedback
         console.log(isCurrentlyCompleted ? '✅ Topic marked as incomplete' : '🎉 Topic completed!');
@@ -2387,7 +2430,7 @@ const ProLearningPage = () => {
 
       if (!currentCourseId) {
         currentCourseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem('currentCourseId', currentCourseId);
+        safeLocalStorageSet('currentCourseId', currentCourseId);
         console.log('🤖 AUTO-SAVE: Generated new course ID:', currentCourseId);
       }
 
@@ -2805,8 +2848,8 @@ const ProLearningPage = () => {
       if (response.status >= 200 && response.status < 300) {
         console.log('✅ AUTO-SAVE: Course auto-saved to backend successfully!', responseData);
         
-        // Mark course as ready (but don't force UI updates)
-        localStorage.setItem(`proLearning_courseReady_${currentCourseId}`, 'true');
+        // Mark course as ready (with quota error handling)
+        safeLocalStorageSet(`proLearning_courseReady_${currentCourseId}`, 'true');
 
         // Show a one-time notification that generation completed and was added to Learning Hub
         try {
@@ -2814,7 +2857,7 @@ const ProLearningPage = () => {
           const alreadyNotified = localStorage.getItem(notifiedKey) === 'true';
           if (!alreadyNotified) {
             toast.success('🎉 Course generation completed and added to your Learning Hub');
-            localStorage.setItem(notifiedKey, 'true');
+            safeLocalStorageSet(notifiedKey, 'true');
           }
         } catch (_) {
           // ignore toast/localStorage failures
@@ -2855,7 +2898,7 @@ const ProLearningPage = () => {
       // If still no ID, create a new one
       if (!currentCourseId) {
         currentCourseId = `course_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem('currentCourseId', currentCourseId);
+        safeLocalStorageSet('currentCourseId', currentCourseId);
         console.log('📝 Generated new course ID:', currentCourseId);
       }
 
@@ -3095,14 +3138,12 @@ const ProLearningPage = () => {
         
         if (!savedCourses.includes(courseKey)) {
           savedCourses.push(courseKey);
-          localStorage.setItem('coursesSavedToHub', JSON.stringify(savedCourses));
+          safeLocalStorageSet('coursesSavedToHub', JSON.stringify(savedCourses));
         }
         
         // Mark course as ready and mark notified to avoid duplicate toasts later
-        localStorage.setItem(`proLearning_courseReady_${currentCourseId}`, 'true');
-        try {
-          localStorage.setItem(`proLearning_savedNotified_${currentCourseId}`, 'true');
-        } catch (_) {}
+        safeLocalStorageSet(`proLearning_courseReady_${currentCourseId}`, 'true');
+        safeLocalStorageSet(`proLearning_savedNotified_${currentCourseId}`, 'true');
         
       } else {
   console.error('❌ Failed to save course:', responseData);
@@ -3322,7 +3363,7 @@ const ProLearningPage = () => {
     // Set batch marker to indicate fresh course creation
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('proLearning_batchMarker', String(Date.now()));
+        safeLocalStorageSet('proLearning_batchMarker', String(Date.now()));
         console.log('🔄 DEBUG: Batch marker set for fresh course generation');
         
         // Clear existing content from both storage systems to ensure fresh generation (only once)
@@ -3831,7 +3872,7 @@ const ProLearningPage = () => {
   };
 
   const setAndNavigateToCourseId = async (id) => {
-    try { if (typeof localStorage !== 'undefined') localStorage.setItem('currentCourseId', id); } catch {}
+    try { if (typeof localStorage !== 'undefined') safeLocalStorageSet('currentCourseId', id); } catch {}
     navigate(`/pro-learning/${id}${window.location.search}`, { replace: true });
   };
 
@@ -3934,7 +3975,7 @@ const ProLearningPage = () => {
           // Set batch marker to indicate fresh course creation
           try {
             if (typeof localStorage !== 'undefined') {
-              localStorage.setItem('proLearning_batchMarker', String(Date.now()));
+              safeLocalStorageSet('proLearning_batchMarker', String(Date.now()));
               console.log('🔄 DEBUG: Batch marker set for automatic progressive generation');
 
               // Clear existing content from both storage systems to ensure fresh generation (only once)

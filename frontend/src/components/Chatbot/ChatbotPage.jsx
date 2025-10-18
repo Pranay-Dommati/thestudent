@@ -1,15 +1,14 @@
 import universalToast from "../../utils/universalToast";
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline, IoBook, IoBookmark, IoInformationCircle, IoChevronForward } from "react-icons/io5";
-import { FaRobot, FaGraduationCap, FaBook, FaRegUser } from "react-icons/fa";
+import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline, IoBook, IoBookmark, IoInformationCircle, IoChevronForward, IoRocket } from "react-icons/io5";
+import { FaGraduationCap, FaBook as FaBookAlt, FaRegUser } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclassifier";
-import AuthModal from '../Common/AuthModal';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
 import proLearningHistoryService from '../../services/ProLearningHistoryService';
@@ -19,18 +18,7 @@ import proLearningHistoryService from '../../services/ProLearningHistoryService'
 import apiAxios from '../../utils/axios';
 import aiAxios from '../../utils/axiosAi';
 
-// Secure backend chat proxy (DRF-protected)
-const callChatBackend = async (message) => {
-  const token = (
-    localStorage.getItem('accessToken') ||
-    localStorage.getItem('access_token') ||
-    localStorage.getItem('token')
-  );
-  const { data } = await aiAxios.post('/chat/', { message });
-  return data?.text || 'Sorry, I could not generate a response.';
-};
-
-// Extract learning context from user's prompt
+// Extract learning context from user's prompt - Used for Pro Learning personalization
 const extractLearningContext = (prompt) => {
   if (!prompt) return '';
   
@@ -82,37 +70,6 @@ const extractLearningContext = (prompt) => {
   }
 
   return contexts.join(' • ');
-};
-
-// Removed client-side Gemini usage in favor of backend proxy
-
-// Vector bot API call for general educational responses
-const callVectorBotAPI = async (message) => {
-  try {
-    const token = (
-      localStorage.getItem('accessToken') ||
-      localStorage.getItem('access_token') ||
-      localStorage.getItem('token')
-    );
-  const { data } = await apiAxios.post('/chatbot/chat/general/', { message });
-    
-    return data.response || 'Sorry, I could not generate a response.';
-  } catch (error) {
-    console.error('❌ Vector bot API error:', error);
-    // If it's a network failure (fetch TypeError/Failed to fetch), throw a special error
-    const isNetworkFailure =
-      error?.name === 'TypeError' ||
-      (typeof error?.message === 'string' && /Failed to fetch|NetworkError|Network request failed/i.test(error.message));
-
-    if (isNetworkFailure) {
-      const netErr = new Error('Network connection error');
-      netErr.name = 'NetworkConnectionError';
-      throw netErr;
-    }
-
-    // Otherwise, rethrow to be handled by the caller
-    throw error;
-  }
 };
 
 // Add slide-up animation and glassmorphism styles
@@ -175,6 +132,22 @@ style.textContent = `
   .animate-float-delayed {
     animation: float 6s ease-in-out infinite;
     animation-delay: -2s;
+  }
+  
+  /* Rotating wheel animation for suggestions */
+  @keyframes slide-up-out {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-20px); }
+  }
+  @keyframes slide-up-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-slide-up-out {
+    animation: slide-up-out 300ms ease-in forwards;
+  }
+  .animate-slide-up-in {
+    animation: slide-up-in 300ms ease-out forwards;
   }
   
   /* Ordered list counter styling */
@@ -495,7 +468,7 @@ const ChatbotPage = () => {
   const initialQuery = searchParams.get("q");
 
   const [message, setMessage] = useState("");
-  const [proMode, setProMode] = useState(false);
+  const [proMode] = useState(true); // Always in Pro Learning mode
   const [coursePlaceholder, setCoursePlaceholder] = useState("Create arrays and strings course...");
   const [showTopicConfirmation, setShowTopicConfirmation] = useState(false);
   const [pendingTopics, setPendingTopics] = useState([]);
@@ -504,7 +477,6 @@ const ChatbotPage = () => {
   const creatingCourseRef = useRef(false);
   const [personalization, setPersonalization] = useState("");
   const [originalPrompt, setOriginalPrompt] = useState("");
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const [showTopicModal, setShowTopicModal] = useState(false);
   const [usageStats, setUsageStats] = useState(null); // Track rate limit usage stats
   const [learningContext, setLearningContext] = useState(""); // Store learning preferences and context
@@ -517,16 +489,8 @@ const ChatbotPage = () => {
   const [proLearningCourses, setProLearningCourses] = useState([]); // Backend DB courses
   const [isLoadingCourses, setIsLoadingCourses] = useState(false); // Loading state for sidebar courses
 
-  // Generate unique message ID
   const generateMessageId = () => Date.now() + Math.random();
-  const [chatHistory, setChatHistory] = useState([
-    {
-      id: 1,
-      type: "bot",
-      content: "Hello! I'm your AI learning assistant. How can I help you today?",
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    },
-  ]);
+  const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const initialQueryProcessed = useRef(false);
@@ -551,6 +515,41 @@ const ChatbotPage = () => {
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
+  // Rotating suggestions for empty-state heading
+  const rotatingSuggestions = [
+    "Help me get started with algebra basics",
+    "Explain how the human digestive system works",
+    "Break down Newton’s laws of motion for me",
+    "Build a mini course on electricity and magnetism",
+    "Guide me through the fundamentals of programming",
+    "Design a beginner-friendly Python course for me",
+    "Show me how the Internet actually works",
+    "Walk me through circuits and microcontrollers step by step",
+    "Simplify the basics of thermodynamics",
+    "Build me a hands-on course on machine learning",
+    "Teach me everything about the water cycle and environment",
+    "Explain how database management systems function",
+    "Give me a clear introduction to networking and cybersecurity",
+    "Help me understand how chemical reactions happen"
+  ];
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const [suggestionKey, setSuggestionKey] = useState(0); // for animation re-trigger
+  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Start exit animation
+      setIsAnimatingOut(true);
+      
+      // After exit animation completes, change text and start enter animation
+      setTimeout(() => {
+        setSuggestionIndex((prev) => (prev + 1) % rotatingSuggestions.length);
+        setSuggestionKey((k) => k + 1);
+        setIsAnimatingOut(false);
+      }, 300); // Match the slide-up-out duration
+  }, 10000); // 10 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   // Random course placeholder texts - Topic focused
   const coursePlaceholders = [
@@ -682,7 +681,7 @@ const ChatbotPage = () => {
         setCoursePlaceholder(getRandomPlaceholder());
         if (isAuthenticated && typeof isAuthenticated === 'function' && isAuthenticated()) {
           const stats = await fetchUsageStats();
-          const remainingToday = stats ? (stats.daily_limit || 16) - (stats.daily_used || 0) : null;
+          const remainingToday = stats ? (stats.monthly_limit || 15) - (stats.monthly_used || 0) : null;
           if (remainingToday !== null && remainingToday <= 0) {
             universalToast.error('Sorry, your daily limit is over. Please try again tomorrow.');
             return; // don't enable pro mode
@@ -738,13 +737,24 @@ const ChatbotPage = () => {
       const timeoutId = setTimeout(() => {
         if (!usageStats) {
           console.warn('Stats loading timeout, setting fallback');
-          setUsageStats({ daily_used: 0, daily_limit: 16, per_request_limit: 4 });
+          setUsageStats({ monthly_used: 0, monthly_limit: 15, per_request_limit: 4 });
         }
       }, 3000); // 3 second timeout
       
       return () => clearTimeout(timeoutId);
     }
   }, [proMode, usageStats]);
+
+  // Fetch usage stats on mount so desktop shows correct monthly stats immediately
+  useEffect(() => {
+    (async () => {
+      try {
+        await fetchUsageStats();
+      } catch (e) {
+        // handled inside fetchUsageStats with fallback
+      }
+    })();
+  }, []);
 
   // Expose setUsageStats globally for ProLearningPage to refresh after course save
   useEffect(() => {
@@ -835,12 +845,9 @@ const ChatbotPage = () => {
         // Clear the failed prompt before retry
         setLastFailedPrompt(null);
         
-        // Check if this is a course creation request (pro mode) or regular chat
-        const isProModeRequest = proMode;
-        
-        if (isProModeRequest) {
-          // This is a course creation request - call the classification API directly
-          const result = await classifyTopics(promptToRetry);
+        // Pro Learning Mode - Always retry with course creation
+        // Call the classification API directly
+        const result = await classifyTopics(promptToRetry);
           
           // Capture personalization if provided
           if (result && typeof result.personalization === 'string' && result.personalization.trim()) {
@@ -913,25 +920,6 @@ const ChatbotPage = () => {
               )
             );
           }
-        } else {
-          // This is a regular chat request - call the backend AI chat proxy
-          const response = await callChatBackend(promptToRetry);
-          
-          // Replace the network error message with the bot response
-          setChatHistory((prev) => 
-            prev.map(msg => 
-              msg.id === messageId 
-                ? {
-                    ...msg,
-                    content: response,
-                    isNetworkError: false,
-                    isReconnecting: false,
-                    showRetryButton: false
-                  }
-                : msg
-            )
-          );
-        }
         
         // Clean up retry state after successful request
         
@@ -1100,27 +1088,61 @@ const ChatbotPage = () => {
 
     setChatHistory((prev) => [...prev, userMessageObj]);
     if (!customMessage) setMessage("");
+
+    // If not authenticated, show a friendly sign-in prompt and stop
+    try {
+      const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isAuthenticated;
+      if (!authed) {
+        const returnTo = window.location.pathname + window.location.search;
+        const signInUrl = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
+        const signUpUrl = `/auth?mode=signup&returnTo=${encodeURIComponent(returnTo)}`;
+        const authPrompt = {
+          id: generateMessageId(),
+          type: "bot",
+          isAuthPrompt: true,
+          signInUrl,
+          signUpUrl,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+        setChatHistory((prev) => [...prev, authPrompt]);
+        return;
+      }
+    } catch (_) {}
+
+    // Validate prompt early and provide a helpful message if it looks like nonsense/too short
+    const validation = validateCoursePrompt(messageToSend);
+    if (!validation.ok) {
+      const botResponse = {
+        id: generateMessageId(),
+        type: "bot",
+        content: "🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      setChatHistory((prev) => [...prev, botResponse]);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      if (forcePro || proMode) {
-        // Check daily quota before processing
-        if (usageStats) {
-          const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
-          if (remainingToday <= 0) {
-            universalToast.error("🚫 Daily limit reached! You've used all your topic creation quota for today. Please try again tomorrow.", {
-              duration: 5000
-            });
-            setIsLoading(false);
-            return;
-          }
+      // Pro Learning Mode - Always Active
+      // Check monthly quota before processing
+      if (usageStats) {
+        const remainingToday = (usageStats.monthly_limit || 15) - (usageStats.monthly_used || 0);
+        if (remainingToday <= 0) {
+          universalToast.error("🚫 Monthly limit reached! You've used all your topic creation quota for this month. Please try again next month.", {
+            duration: 5000
+          });
+          setIsLoading(false);
+          return;
         }
+      }
 
-        // Pro mode - extract topics using AI first with rate limiting
-        try {
-          console.log('🚀 Pro mode activated, calling classifyTopics with:', messageToSend);
-          const result = await classifyTopics(messageToSend);
-          console.log('✅ classifyTopics result:', result);
+      // Extract topics using AI with rate limiting
+      try {
+        console.log('🚀 Pro Learning mode - calling classifyTopics with:', messageToSend);
+        const result = await classifyTopics(messageToSend);
+        console.log('✅ classifyTopics result:', result);
           
           // Log debug metadata for transparency
           if (result?.debug_meta) {
@@ -1156,10 +1178,10 @@ const ChatbotPage = () => {
             let limitMessage = "";
             
             if (usageStats) {
-              const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
+              const remainingToday = (usageStats.monthly_limit || 15) - (usageStats.monthly_used || 0);
               const maxPerRequestFromStats = usageStats.per_request_limit || 4;
               
-              // Limit topics to the smaller of: remaining daily limit or max per request
+              // Limit topics to the smaller of: remaining monthly limit or max per request
               const maxAllowedTopics = Math.min(remainingToday, maxPerRequestFromStats);
               
               if (extractedTopics.length > maxAllowedTopics) {
@@ -1318,112 +1340,6 @@ const ChatbotPage = () => {
             return;
           }
         }
-      } else {
-        // Regular chatbot response using backend AI chat proxy
-        // Auth is NOT required for normal chat. Auth modal is only for create-course mode.
-
-        // If the device is offline, use the network-lost UX instead of calling the local API
-        if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
-          setLastFailedPrompt(messageToSend);
-          setNetworkRetryCount(0);
-
-          const networkLoadingResponse = {
-            id: generateMessageId(),
-            type: "bot",
-            content: "🌐 **Network connection lost. Attempting to reconnect...**",
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            isNetworkError: true,
-            isReconnecting: true,
-          };
-          setChatHistory((prev) => [...prev, networkLoadingResponse]);
-
-          const timeoutId = setTimeout(() => {
-            if (cancelledRetriesRef.current.has(networkLoadingResponse.id)) {
-              delete networkErrorTimeouts.current[networkLoadingResponse.id];
-              return;
-            }
-            setChatHistory((prev) => 
-              prev.map(msg => 
-                msg.id === networkLoadingResponse.id 
-                  ? {
-                      ...msg,
-                      content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
-                      isReconnecting: false,
-                      showRetryButton: msg.isRetryDisabled ? false : true
-                    }
-                  : msg
-              )
-            );
-            delete networkErrorTimeouts.current[networkLoadingResponse.id];
-          }, 8000);
-          networkErrorTimeouts.current[networkLoadingResponse.id] = timeoutId;
-          // Avoid global loading spinner during retry UX
-          setIsLoading(false);
-          return;
-        }
-
-        try {
-          const response = await callChatBackend(messageToSend);
-          
-          const botResponse = {
-            id: generateMessageId(),
-            type: "bot",
-            content: typeof response === 'string' ? response : String(response),
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          };
-
-          setChatHistory((prev) => {
-            const newHistory = [...prev, botResponse];
-            return newHistory;
-          });
-        } catch (error) {
-          // Handle network failures with the same UX as course creation mode
-          if (error.name === 'NetworkConnectionError') {
-            setLastFailedPrompt(messageToSend);
-            setNetworkRetryCount(0);
-
-            const networkLoadingResponse = {
-              id: generateMessageId(),
-              type: "bot",
-              content: "🌐 **Network connection lost. Attempting to reconnect...**",
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              isNetworkError: true,
-              isReconnecting: true,
-            };
-            setChatHistory((prev) => [...prev, networkLoadingResponse]);
-
-            const timeoutId = setTimeout(() => {
-              if (cancelledRetriesRef.current.has(networkLoadingResponse.id)) {
-                delete networkErrorTimeouts.current[networkLoadingResponse.id];
-                return;
-              }
-              setChatHistory((prev) => 
-                prev.map(msg => 
-                  msg.id === networkLoadingResponse.id 
-                    ? {
-                        ...msg,
-                        content: "🌐 **Internet connection lost. Please check your internet connection and try again.**",
-                        isReconnecting: false,
-                        showRetryButton: msg.isRetryDisabled ? false : true
-                      }
-                    : msg
-                )
-              );
-              delete networkErrorTimeouts.current[networkLoadingResponse.id];
-            }, 8000);
-            networkErrorTimeouts.current[networkLoadingResponse.id] = timeoutId;
-          } else {
-            // Non-network error: show a generic failure message (let outer finally clear loading)
-            const errorResponse = {
-              id: generateMessageId(),
-              type: "bot",
-              content: `Sorry, I couldn't process your request. ${error.message || ''}`,
-              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            };
-            setChatHistory((prev) => [...prev, errorResponse]);
-          }
-        }
-      }
     } catch (error) {
       console.error("Error in chat:", error);
       const errorResponse = {
@@ -1477,6 +1393,16 @@ const ChatbotPage = () => {
     return cleaned;
   };
 
+  // Basic client-side prompt validation to provide helpful guidance before calling backend
+  const validateCoursePrompt = (text) => {
+    if (!text) return { ok: false, reason: 'empty' };
+    const trimmed = String(text).trim();
+    if (trimmed.length < 5) return { ok: false, reason: 'too_short' };
+    const letters = (trimmed.match(/[a-zA-Z]/g) || []).length;
+    if (letters < 3) return { ok: false, reason: 'low_signal' };
+    return { ok: true };
+  };
+
   const handleTopicConfirm = async () => {
     // Prevent duplicate submissions from double-clicks or spamming the button
     if (isCreatingCourse || creatingCourseRef.current) return;
@@ -1490,15 +1416,6 @@ const ChatbotPage = () => {
     }
 
     try {
-      // First show an AI thinking message
-      const thinkingResponse = {
-        id: generateMessageId(),
-        type: "bot",
-        content: "🤔 Let me analyze your learning context to create a personalized course plan...",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-      setChatHistory(prev => [...prev, thinkingResponse]);
-
       // Extract context from original prompt
       const learningContext = extractLearningContext(originalPrompt);
       
@@ -1564,7 +1481,7 @@ const ChatbotPage = () => {
       const proResponse = {
         id: generateMessageId(),
         type: "bot",
-        content: `🎓 Perfect! I'll create a comprehensive course on: **${topicNames.join(', ')}**. Click the card below to access your customized course materials. Content generation will begin automatically and you'll see a loading screen until all materials are ready.`,
+        content: ``,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         isProCard: true,
         topic: topicString,
@@ -1629,6 +1546,15 @@ const ChatbotPage = () => {
     setOriginalPrompt("");
   };
 
+  // Auto-resize textarea height up to 200px
+  const handleTextareaInput = (e) => {
+    try {
+      const el = e.target;
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+    } catch (_) {}
+  };
+
   const MessageBubble = ({ message, retryLastRequest, setLastFailedPrompt }) => {
     // Use a safe text fallback for legacy messages that may have `message` instead of `content`
     const contentText =
@@ -1651,27 +1577,60 @@ const ChatbotPage = () => {
     const isLearningPlan = message.isLearningPlan || (contentText.includes("Learning Plan") && contentText.includes("Day "));
     const isProCard = message.isProCard || false;
 
+    // Special inline auth prompt bubble
+    if (message.isAuthPrompt) {
+      return (
+        <div className="w-full max-w-3xl mx-auto px-4 mb-6">
+          <div className="flex justify-start">
+            <div className="max-w-[95%] min-w-0">
+              <div className="rounded-2xl px-5 py-4 bg-gray-50 text-gray-800 border border-gray-200 shadow-sm">
+                <p className="mb-3 text-sm lg:text-base">
+                  <span className="mr-1">🔒</span>
+                  To create personalized learning plans, please sign in.
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link
+                    to={message.signInUrl || '/auth?mode=login'}
+                    className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to={message.signUpUrl || '/auth?mode=signup'}
+                    className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Create Account
+                  </Link>
+                </div>
+                <div className="text-xs mt-2 text-gray-500">{message.timestamp}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="w-full max-w-5xl mx-auto px-6 lg:px-8 mb-4 lg:mb-6">
+      <div className="w-full max-w-3xl mx-auto px-4 mb-6">
         <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
           <div className={`${
             message.type === "user" 
-              ? "max-w-[75%] lg:max-w-[65%]" // User messages - more constrained width
+              ? "max-w-[80%]" 
               : isLearningPlan || isProCard 
                 ? "w-full" 
-                : "max-w-[90%] lg:max-w-[85%] min-w-0" // Bot messages - content-dependent width
+                : "max-w-[95%] min-w-0" 
           }`}>
             <div
-              className={`rounded-2xl px-4 py-3 lg:px-5 lg:py-4 w-fit ${
+              className={`rounded-2xl px-5 py-4 ${
                 message.type === "user"
-                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg backdrop-blur-sm rounded-br-md"
+                  ? "bg-indigo-600 text-white shadow-sm ml-auto"
                   : isLearningPlan || isProCard
-                    ? "bg-white/80 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl" 
-                    : "bg-white/70 backdrop-blur-md text-gray-800 border border-white/30 shadow-sm rounded-bl-md hover:bg-white/80 transition-all duration-200"
+                    ? "bg-white border border-gray-200 shadow-sm rounded-2xl" 
+                    : "bg-gray-50 text-gray-800 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200"
               }`}
             >
               {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
-                <div className="prose prose-sm lg:prose max-w-none dark:prose-invert prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-code:bg-gray-100 prose-code:text-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-strong:text-gray-900 prose-headings:text-gray-900">
+                <div className="prose prose-sm lg:prose max-w-none dark:prose-invert prose-pre:bg-gray-700 prose-pre:text-gray-100 prose-code:bg-gray-100 prose-code:text-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-strong:text-gray-900 prose-headings:text-gray-900">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -1819,14 +1778,12 @@ const ChatbotPage = () => {
 
               {message.type === "bot" && isProCard && (
                 <div className="w-full">
-                  <div className="bg-gradient-to-br from-purple-50/80 to-blue-50/80 backdrop-blur-sm border border-purple-200/50 rounded-xl p-4 mb-2">
-                    <div className="text-sm text-gray-700 mb-4">{message.content}</div>
-                    <Link 
-                      to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
-                      className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1 backdrop-blur-sm"
-                      onClick={() => {
-                        // Store the topics and course data for batch generation
-                        try {
+                  <Link 
+                    to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
+                    className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
+                    onClick={() => {
+                      // Store the topics and course data for batch generation
+                      try {
                           const batchGenerationData = {
                             courseId: message.courseId,
                             topics: message.extractedTopics || [],
@@ -1856,24 +1813,21 @@ const ChatbotPage = () => {
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="text-lg font-bold mb-1">🚀 Pro Learning Experience</h3>
-                          <p className="text-purple-100 text-sm">Complete study materials for: {message.topic}</p>
-                          <div className="flex items-center mt-2 text-xs text-purple-200">
-                            <span className="mr-4">📘 Reading</span>
-                            <span className="mr-4">🧠 Summary</span>
-                            <span className="mr-4">🎥 Videos</span>
-                            <span className="mr-4">✅ Quiz</span>
+                          <h3 className="text-base font-medium mb-1">Access Course</h3>
+                          <div className="flex items-center mt-1 text-xs text-purple-200">
+                            <span className="mr-3">📘 Reading</span>
+                            <span className="mr-3">🎥 Videos</span>
+                            <span className="mr-3">✅ Quiz</span>
                             <span>📚 Resources</span>
                           </div>
                         </div>
-                        <div className="bg-white/20 p-3 rounded-full">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="bg-white/20 p-2 rounded-full">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                           </svg>
                         </div>
                       </div>
                     </Link>
-                  </div>
                 </div>
               )}
 
@@ -1905,11 +1859,11 @@ const ChatbotPage = () => {
                 </div>
               )}
 
-              <div className={`text-[10px] lg:text-xs mt-2 ${
+              <div className={`text-xs mt-2 ${
                 message.type === "user" 
-                  ? "text-blue-100/80" 
+                  ? "text-indigo-200" 
                   : isLearningPlan || isProCard
-                    ? "text-gray-400 pl-2" 
+                    ? "text-gray-400" 
                     : "text-gray-500"
               }`}>
                 {message.timestamp}
@@ -1936,126 +1890,77 @@ const ChatbotPage = () => {
     } catch (error) {
       console.error('Failed to fetch usage stats:', error);
       // Set fallback to prevent infinite "Loading stats..."
-      const fallback = { daily_used: 0, daily_limit: 16, per_request_limit: 4 };
+      const fallback = { monthly_used: 0, monthly_limit: 15, per_request_limit: 4, isFallback: true };
       setUsageStats(fallback);
       return fallback;
     }
   };
 
   // Handle Create Course button with authentication check
-  const handleCreateCourse = async () => {
-    // Toggle off if already enabled
-    if (proMode) {
-      setProMode(false);
-      return;
-    }
-
-    if (!isAuthenticated()) {
-      setShowAuthModal(true);
-      return;
-    }
-
-    // Gate enabling by daily limit
-    const stats = await fetchUsageStats();
-    const remainingToday = stats ? (stats.daily_limit || 16) - (stats.daily_used || 0) : null;
-    if (remainingToday !== null && remainingToday <= 0) {
-      universalToast.error('Sorry, your daily limit is over. Please try again tomorrow.');
-      return;
-    }
-
-    setProMode(true);
-    setCoursePlaceholder(getRandomPlaceholder());
-  };
+  // Pro Learning mode is always enabled - no toggle needed
 
   return (
-    <div className="h-screen flex overflow-hidden w-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative">
-      {/* Floating background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-gradient-to-br from-blue-300/20 to-indigo-400/20 rounded-full blur-xl animate-float"></div>
-        <div className="absolute top-1/2 right-1/4 w-48 h-48 bg-gradient-to-br from-purple-300/20 to-pink-400/20 rounded-full blur-xl animate-float-delayed"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-40 h-40 bg-gradient-to-br from-indigo-300/20 to-purple-400/20 rounded-full blur-xl animate-float"></div>
-      </div>
+    <div className="h-screen flex overflow-hidden w-full bg-white relative">
       
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-30 lg:relative lg:flex-shrink-0 ${
-        isSidebarOpen ? "w-full lg:w-80" : "w-0"
-      } transition-all duration-300 bg-white/95 backdrop-blur-md border-r border-gray-200 shadow-lg flex flex-col overflow-hidden`}>
-        {/* Header */}
-        <div className="p-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800 flex items-center">
-            <div className="p-1.5 rounded-lg bg-blue-100 text-blue-600 mr-3">
-              <IoBookmark size={16} />
+      <div className={`fixed inset-y-0 left-0 z-30 transform lg:transform-none lg:relative lg:flex-shrink-0 ${
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+      } w-[88vw] max-w-[360px] sm:max-w-[380px] md:max-w-[420px] lg:w-64 transition-transform duration-300 bg-gray-50 border-r border-gray-200 flex flex-col overflow-hidden`}>
+        {/* Sidebar Header with Logo and New Chat */}
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm">
+                <IoSchoolOutline size={20} className="text-white" />
+              </div>
+              <span className="font-semibold text-gray-900 text-base">Course Creator</span>
             </div>
-            ProLearning History
-          </h2>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700 transition-colors"
+              aria-label="Close sidebar"
+            >
+              <IoChevronBack size={18} />
+            </button>
+          </div>
           <button
-            onClick={() => setIsSidebarOpen(false)}
-            className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700 transition-all duration-200"
-            aria-label="Close sidebar"
+            onClick={() => {
+              setChatHistory([]);
+              setMessage('');
+              setShowTopicConfirmation(false);
+              setPendingTopics([]);
+            }}
+            className="w-full flex items-center gap-2 px-4 py-3 bg-gray-700 text-white rounded-xl text-sm font-medium hover:bg-gray-600 transition-colors shadow-sm"
           >
-            <IoChevronBack size={20} />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Course
           </button>
         </div>
         
-        {/* ProLearning Courses Section (from backend DB) */}
-        <div className="p-4">
-          <div className="bg-blue-50/80 border border-blue-200/50 rounded-xl p-4 mb-4">
-            <div className="flex items-center mb-3">
-              <div className="p-2 rounded-lg bg-blue-100 text-blue-600 mr-3">
-                <IoSchoolOutline size={18} />
-              </div>
-              <h3 className="font-semibold text-gray-800">
-                ProLearning Courses
-              </h3>
-            </div>
-            {isLoadingCourses ? (
-              <div className="space-y-2">
-                {[...Array(3)].map((_, idx) => (
-                  <div key={idx} className="h-4 bg-blue-100/60 rounded w-3/4 animate-pulse"></div>
-                ))}
-              </div>
-            ) : proLearningCourses && proLearningCourses.length > 0 ? (
-              <div className="text-sm text-gray-600 mb-1">
-                <span>Your saved courses from the Learning Hub.</span>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-600 mb-1">
-                <span>No saved courses found. Create and save a course to see it here.</span>
-              </div>
-            )}
-          </div>
+        {/* ProLearning Courses Section */}
+        <div className="px-4 py-3">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Recent Courses
+          </h3>
         </div>
         
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto px-4 pb-4">
+        <div className="flex-1 overflow-y-auto px-3 pb-4">
           {isLoadingCourses ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {[...Array(4)].map((_, idx) => (
-                <div key={idx} className="p-3 rounded-xl bg-white border border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 w-full">
-                      <div className="bg-indigo-50 rounded-lg p-2">
-                        <div className="w-5 h-5 bg-indigo-200 rounded animate-pulse"></div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="h-4 bg-gray-200 rounded w-2/3 mb-2 animate-pulse"></div>
-                        <div className="flex items-center gap-2">
-                          <div className="h-3 bg-gray-100 rounded w-24 animate-pulse"></div>
-                          <span className="mx-1.5 text-gray-300">•</span>
-                          <div className="h-3 bg-gray-100 rounded w-16 animate-pulse"></div>
-                          <div className="h-4 bg-green-100 rounded w-12 ml-2 animate-pulse"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <div key={idx} className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                  <div className="h-4 bg-gray-200 rounded w-2/3 mb-2 animate-pulse"></div>
+                  <div className="h-3 bg-gray-150 rounded w-1/2 animate-pulse"></div>
                 </div>
               ))}
             </div>
           ) : proLearningCourses && proLearningCourses.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {proLearningCourses
-                // sort newest first if created_at exists
-                .slice() // shallow copy before sort
+                .slice()
                 .sort((a, b) => {
                   const da = a.created_at ? new Date(a.created_at).getTime() : 0;
                   const db = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -2092,27 +1997,17 @@ const ChatbotPage = () => {
                   <a
                     key={course.id}
                     href={href}
-                    className="block p-3 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200 group"
+                    className="block p-3 rounded-xl hover:bg-gray-50 transition-all duration-200 group border border-transparent hover:border-gray-200"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-indigo-50 rounded-lg p-2">
-                          <IoBook className="w-5 h-5 text-indigo-600" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0"></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-800 line-clamp-1 group-hover:text-indigo-600 truncate">
+                          {friendlyName}
                         </div>
-                        <div>
-                          <div className="font-medium text-sm text-gray-800 group-hover:text-blue-600">
-                            {friendlyName}
-                          </div>
-                          <div className="text-xs text-gray-500 flex items-center mt-1">
-                            <span>{new Date(course.created_at).toLocaleDateString()}</span>
-                            <span className="mx-1.5">•</span>
-                            <span>{new Date(course.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-600 text-xs rounded-md">Saved</span>
-                          </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {new Date(course.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </div>
-                      </div>
-                      <div className="text-gray-400">
-                        <IoChevronForward size={18} className="group-hover:text-blue-600 transform group-hover:translate-x-1 transition-all" />
                       </div>
                     </div>
                   </a>
@@ -2120,50 +2015,150 @@ const ChatbotPage = () => {
               })}
             </div>
           ) : (
-            <div></div>
+            <div className="px-4 py-6 text-center">
+              <div className="text-gray-400 mb-2">
+                <IoBook size={24} className="mx-auto opacity-50" />
+              </div>
+              <div className="text-sm text-gray-500">No saved courses yet</div>
+              <div className="text-xs text-gray-400 mt-1">Create your first course to get started</div>
+            </div>
           )}
         </div>
+        
+        {/* Sidebar Footer */}
+        <div className="p-4 border-t border-gray-200 space-y-2">
+          <Link
+            to="/learning-hub"
+            className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            <IoRocket size={16} />
+            Learning Hub
+          </Link>
+          <Link
+            to="/"
+            className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            <IoHome size={16} />
+            Home
+          </Link>
+        </div>
       </div>
+      {/* Overlay for small/tablet when sidebar open */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/30 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden
+        />
+      )}
 
       {/* Main chat container */}
-      <div className="flex-1 flex flex-col h-screen w-full relative">
-        {/* Custom Chat Navbar */}
-        <nav className="sticky top-0 z-20 bg-white/80 backdrop-blur-md shadow-sm border-b border-white/20 px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center">
+      <div className="flex-1 flex flex-col h-screen w-full relative overflow-hidden">
+        {/* Desktop/Tablet header with menu, brand and back (md+) */}
+        <div className="hidden md:flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white/95 backdrop-blur-sm sticky top-0 z-10">
+          <div className="flex items-center gap-3">
             {!isSidebarOpen && (
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="mr-3 lg:mr-4 p-2 -ml-2 text-gray-600 hover:text-gray-800 hover:bg-white/50 rounded-lg transition-colors backdrop-blur-sm"
+                className="p-2 hover:bg-gray-100 rounded-lg text-gray-700 hover:text-gray-900 transition-colors"
                 aria-label="Open sidebar"
               >
-                <IoMenu size={22} />
+                <IoMenu size={18} />
               </button>
             )}
-            <div className="flex items-center">
-              <div className="p-2 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white mr-3">
-                <FaRobot className="w-5 h-5" />
+            <div className="text-lg font-semibold text-gray-900">EasyLearnova</div>
+          </div>
+          <Link to="/" className="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+            <IoChevronBack size={18} />
+            <span className="text-sm font-medium">Back</span>
+          </Link>
+        </div>
+        {/* Minimal mobile header (hidden at md+) */}
+        {!isSidebarOpen && (
+          <div className="md:hidden flex items-center justify-between px-4 py-4 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              <IoMenu size={20} />
+            </button>
+            <h1 className="text-base font-semibold text-gray-900">Course Creator</h1>
+            <div className="w-10"></div>
+          </div>
+        )}
+
+        {/* md+ open button is integrated into the header to avoid overlap */}
+
+        {/* Chat messages - centered max-width container */}
+        {chatHistory.length === 0 ? (
+          /* Centered welcome screen layout */
+          <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+            <div className="text-center w-full max-w-[900px] px-4">
+              <h1
+                key={suggestionKey}
+                className={`text-2xl sm:text-3xl md:text-[1.75rem] font-semibold tracking-tight text-gray-900 leading-tight md:leading-snug mb-3 md:mb-4 ${
+                  isAnimatingOut ? 'animate-slide-up-out' : 'animate-slide-up-in'
+                }`}
+              >
+                {rotatingSuggestions[suggestionIndex]}
+              </h1>
+
+              {/* Centered Input Area */}
+              <div className="max-w-[820px] mx-auto px-4 md:px-8 lg:px-12 pt-1 md:pt-2">
+                <div className="relative group overflow-visible">
+                  <textarea
+                    rows={1}
+                    placeholder="Ask anything"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onInput={handleTextareaInput}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    onFocus={() => setIsInputFocused(true)}
+                    onBlur={() => setIsInputFocused(false)}
+                    disabled={isLoading}
+                    className="w-full px-5 py-4 pr-16 bg-white/90 border-2 border-indigo-300 hover:border-indigo-400 rounded-2xl shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400/60 focus:border-indigo-400 text-gray-900 placeholder-gray-500 resize-none overflow-hidden text-base transition-all"
+                    style={{ minHeight: '56px', maxHeight: '200px' }}
+                  />
+                  <div className="absolute right-2 top-3 bottom-4 flex items-center">
+                    <button
+                      onClick={() => handleSendMessage()}
+                      disabled={!message.trim() || isLoading}
+                      aria-label="Send message"
+                      className={`h-9 w-9 flex items-center justify-center rounded-xl transition-all shadow-sm ${
+                        message.trim() && !isLoading 
+                          ? "bg-indigo-600 text-white hover:bg-indigo-700" 
+                          : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      }`}
+                    >
+                      {isLoading ? (
+                        <BiLoaderAlt className="animate-spin" size={18} />
+                      ) : (
+                        <IoSend size={18} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                {usageStats && (
+                  <div className="mt-3">
+                    <CompactRateLimitStatus usageStats={usageStats} className="text-center" />
+                    {usageStats.isFallback && (
+                      <div className="mt-1 text-[11px] text-gray-400 text-center">Limits unavailable right now. Showing defaults. We’ll update when connected.</div>
+                    )}
+                  </div>
+                )}
               </div>
-              <h2 className="text-lg lg:text-xl font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Learning Assistant</h2>
             </div>
           </div>
-          <div className="flex items-center mr-4">
-            <Link
-              to="/"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-indigo-600 hover:bg-white/50 hover:scale-105 transition-all duration-200 backdrop-blur-sm"
-              aria-label="Go to home"
-            >
-              <IoHome size={20} />
-              <span className="font-medium">Home</span>
-            </Link>
-          </div>
-        </nav>
+        ) : (
+          /* Regular chat messages layout */
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-3xl mx-auto w-full px-4 py-6">
 
-        {/* Chat messages */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-          <div className={`flex-1 overflow-y-auto scrollbar-glass ${
-            isMobile && isInputFocused ? 'pb-32' : 'pb-4'
-          }`}>
-            <div className="min-h-full py-4">
               {/* Welcome Message Popup for First-time Users */}
               {showWelcomeMessage && (
                 <>
@@ -2209,21 +2204,16 @@ const ChatbotPage = () => {
               ))}
 
               {isLoading && (
-                <div className="w-full max-w-5xl mx-auto px-6 lg:px-8 mb-4 lg:mb-6">
+                <div className="w-full max-w-3xl mx-auto px-4 mb-6">
                   <div className="flex justify-start">
-                    <div className="max-w-[85%] lg:max-w-[75%]">
-                      <div className="bg-white/90 backdrop-blur-sm text-gray-800 border border-white/30 shadow-lg rounded-2xl rounded-bl-md px-4 py-3 lg:px-5 lg:py-4">
-                        <div className="flex items-center">
-                          <div className="relative mr-3">
-                            <BiLoaderAlt className="animate-spin text-indigo-500 w-5 h-5" />
-                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full blur-sm opacity-30 animate-pulse"></div>
-                          </div>
-                          <span className="text-gray-700">Thinking...</span>
-                          <div className="ml-2 flex space-x-1">
-                            <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
-                            <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                            <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                          </div>
+                    <div className="bg-gray-50 border border-gray-200 shadow-sm rounded-2xl px-5 py-4">
+                      <div className="flex items-center">
+                        <BiLoaderAlt className="animate-spin text-indigo-500 w-4 h-4 mr-3" />
+                        <span className="text-gray-700 text-sm">Creating your course...</span>
+                        <div className="ml-2 flex space-x-1">
+                          <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
+                          <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                          <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                         </div>
                       </div>
                     </div>
@@ -2231,95 +2221,86 @@ const ChatbotPage = () => {
                 </div>
               )}
 
-              {/* Topic Confirmation Dialog */}
+              {/* Course Topics Configuration Dialog */}
               {showTopicConfirmation && (
-                <div className="w-full max-w-5xl mx-auto px-6 lg:px-8 mb-4 lg:mb-6">
-                  <div className="flex justify-start">
-                    <div className="max-w-[90%] lg:max-w-[80%]">
-                      <div className="bg-gradient-to-br from-blue-50/90 to-purple-50/90 backdrop-blur-md border-2 border-blue-200/50 rounded-2xl rounded-bl-md p-4 shadow-xl">
-                        <div className="flex items-center mb-3">
-                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mr-3">
-                            <span className="text-white text-sm font-bold">✓</span>
-                          </div>
-                          <h3 className="text-lg font-semibold text-gray-800">Confirm Course Topics</h3>
+                <div className="w-full max-w-4xl mx-auto px-4 mb-6">
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+                      <h2 className="text-lg font-medium text-gray-900">
+                        Configure Course Topics
+                      </h2>
+                      <span className="text-sm text-gray-500">
+                        {pendingTopics.length}/4 topics
+                      </span>
+                    </div>
+
+                    {/* Topics List */}
+                    <div className="space-y-2 mb-4">
+                      {pendingTopics.map((topic, index) => (
+                        <div key={`pending-topic-${topic.id || `${index}-${topic.name}`}`} className="flex items-center gap-3 group">
+                          <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
+                            {index + 1}
+                          </span>
+                          <input
+                            type="text"
+                            value={topic.name}
+                            onChange={(e) => handleTopicEdit(index, e.target.value)}
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                            placeholder="Enter topic name..."
+                          />
+                          <button
+                            onClick={() => handleTopicDelete(index)}
+                            className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Remove topic"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
                         </div>
-                        
-                        <p className="text-sm text-gray-600 mb-2">
-                          I found <strong>{pendingTopics.length}</strong> topic(s) from your query: "<em>{originalPrompt}</em>". 
-                          You can edit, delete, or add topics before creating your course. <strong>Maximum 4 topics per course.</strong>
-                        </p>
-                        {personalization && (
-                          <div className="mb-4">
-                            <span className="inline-block text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1">
-                              Personalization: {personalization}
-                            </span>
-                          </div>
-                        )}
-                        
-                        <div className="space-y-2 mb-4">
-                          {pendingTopics.map((topic, index) => (
-                            <div key={`pending-topic-${topic.id || `${index}-${topic.name}`}`} className="space-y-1">
-                              <div className="flex items-center bg-white/80 backdrop-blur-sm rounded-lg p-2 border border-white/30">
-                                <span className="text-indigo-500 mr-2 font-bold">{index + 1}.</span>
-                                <div className="flex-1 flex flex-col">
-                                  <input
-                                    type="text"
-                                    value={topic.name}
-                                    onChange={(e) => handleTopicEdit(index, e.target.value)}
-                                    className="w-full px-2 py-1 bg-white/80 backdrop-blur-sm border border-gray-300/50 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                                  />
-                                  {/* Per-topic context intentionally not displayed */}
-                                </div>
-                                <button
-                                  onClick={() => handleTopicDelete(index)}
-                                  className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded transition-colors backdrop-blur-sm"
-                                  title="Delete topic"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        
+                      ))}
+                      
+                      {/* Add Topic Button */}
+                      {pendingTopics.length < 4 && (
                         <button
                           onClick={handleTopicAdd}
-                          disabled={pendingTopics.length >= 4}
-                          className={`w-full mb-4 p-2 border-2 border-dashed rounded-lg transition-colors text-sm ${
-                            pendingTopics.length >= 4 
-                              ? 'border-gray-300/50 text-gray-400 bg-gray-50/50 cursor-not-allowed'
-                              : 'border-indigo-300/50 text-indigo-600 hover:bg-indigo-50/50 backdrop-blur-sm'
-                          }`}
+                          className="w-full p-2 border border-dashed border-gray-300 text-gray-600 rounded-md hover:border-indigo-400 hover:text-indigo-600 transition-colors text-sm"
                         >
-                          {pendingTopics.length >= 4 
-                            ? `Maximum 4 topics reached` 
-                            : `+ Add New Topic (${pendingTopics.length}/4)`
-                          }
+                          + Add Topic ({pendingTopics.length}/4)
                         </button>
+                      )}
+                    </div>
 
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleTopicConfirm}
-                            disabled={pendingTopics.length === 0 || isCreatingCourse}
-                            className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 text-sm font-medium backdrop-blur-sm ${
-                              pendingTopics.length === 0 || isCreatingCourse
-                                ? 'bg-gray-400 text-white cursor-not-allowed'
-                                : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700'
-                            }`}
-                          >
-                            {isCreatingCourse ? 'Creating...' : `✓ Create Course (${pendingTopics.length} topic${pendingTopics.length !== 1 ? 's' : ''})`}
-                          </button>
-                          <button
-                            onClick={handleTopicCancel}
-                            className="flex-1 bg-gray-500/80 backdrop-blur-sm text-white py-2 px-4 rounded-lg hover:bg-gray-600/80 transition-colors text-sm font-medium"
-                          >
-                            ✗ Cancel
-                          </button>
-                        </div>
-                      </div>
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 pt-4 border-t border-gray-200">
+                      <button
+                        onClick={handleTopicCancel}
+                        className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleTopicConfirm}
+                        disabled={pendingTopics.length === 0 || isCreatingCourse}
+                        className={`px-6 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                          pendingTopics.length === 0 || isCreatingCourse
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        }`}
+                      >
+                        {isCreatingCourse ? (
+                          <>
+                            <BiLoaderAlt className="animate-spin" size={16} />
+                            Creating...
+                          </>
+                        ) : (
+                          <>
+                            <IoRocket size={20} />
+                            Create Course
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -2328,98 +2309,65 @@ const ChatbotPage = () => {
               <div ref={messagesEndRef} />
             </div>
           </div>
+        )}
 
-          {/* Input Section */}
-          <div className="p-3 lg:p-6 bg-white/80 backdrop-blur-md border-t border-white/20 shadow-lg">
-            <div className="w-full max-w-5xl mx-auto px-6 lg:px-8">
-              {/* Create Course Button */}
-              <div className="mb-4">
-                <div className="flex items-center gap-4">
-                  {/* Button Section */}
-                  <button 
-                    onClick={handleCreateCourse}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-105 ${
-                      proMode 
-                        ? 'bg-indigo-50/80 text-indigo-600 border-2 border-indigo-300/50' 
-                        : 'bg-white/80 text-gray-700 border-2 border-gray-200/50 hover:bg-gray-50/80 hover:text-gray-800 hover:border-gray-300/50'
-                    }`}
-                  >
-                    {proMode ? (
-                      <>
-                        <IoCheckmarkCircle size={18} />
-                        Course Creation Mode
-                      </>
-                    ) : (
-                      <>
-                        <IoSchoolOutline size={18} />
-                        Create Course
-                      </>
-                    )}
-                  </button>
-                  
-                  {/* Compact Rate Limit Status beside the button */}
-                  {proMode && usageStats && (
-                    <CompactRateLimitStatus 
-                      usageStats={usageStats} 
-                      className="shrink-0"
-                    />
-                  )}
-                  {proMode && !usageStats && (
-                    <div className="text-xs text-gray-500">Loading stats...</div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder={proMode ? coursePlaceholder : "Type your message here..."}
+        {/* Fixed Input at Bottom - Enhanced Design - Only show when there are messages */}
+        {chatHistory.length > 0 && (
+          <div className="border-t border-gray-200 bg-white p-6">
+            <div className="max-w-[820px] mx-auto px-4 md:px-8 lg:px-12">
+              <div className="relative group overflow-visible">
+                <textarea
+                  rows={1}
+                  placeholder="Describe the course you want to create..."
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                  onFocus={() => {
-                    setIsInputFocused(true);
-                    // On mobile, scroll to make room for suggestions
-                    if (isMobile) {
-                      setTimeout(() => {
-                        window.scrollTo({
-                          top: document.body.scrollHeight,
-                          behavior: 'smooth'
-                        });
-                      }, 100);
+                  onInput={handleTextareaInput}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
                     }
                   }}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
                   disabled={isLoading}
-                  className="w-full pl-5 pr-14 py-4 bg-white/80 backdrop-blur-sm border border-white/30 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-gray-800 placeholder-gray-500 shadow-lg transition-all duration-200 hover:shadow-xl"
+                  className="w-full px-5 py-4 pr-16 bg-white border-2 border-indigo-300 hover:border-indigo-400 rounded-2xl focus:outline-none focus:ring-1 focus:ring-indigo-400/60 focus:border-indigo-400 text-gray-900 placeholder-gray-500 resize-none overflow-hidden text-base shadow-sm hover:shadow-md transition-all"
+                  style={{ minHeight: '56px', maxHeight: '200px' }}
                 />
-                <button
-                  onClick={() => handleSendMessage()}
-                  disabled={!message.trim() || isLoading}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg transition-all duration-200 backdrop-blur-sm ${
-                    message.trim() && !isLoading 
-                      ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:scale-105" 
-                      : proMode && !isLoading
-                        ? "bg-gradient-to-r from-indigo-400 to-purple-500 text-white/80 cursor-not-allowed opacity-75"
-                        : "bg-gray-200/50 text-gray-400"
-                  }`}
-                >
-                  <IoSend size={18} />
-                </button>
+                <div className="absolute right-2 top-4 bottom-4 flex items-center">
+                  <button
+                    onClick={() => handleSendMessage()}
+                    disabled={!message.trim() || isLoading}
+                    aria-label="Send message"
+                    className={`h-9 w-9 flex items-center justify-center rounded-xl transition-all shadow-sm ${
+                      message.trim() && !isLoading 
+                        ? "bg-indigo-600 text-white hover:bg-indigo-700" 
+                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    {isLoading ? (
+                      <BiLoaderAlt className="animate-spin" size={18} />
+                    ) : (
+                      <IoSend size={18} />
+                    )}
+                  </button>
+                </div>
               </div>
-              
+              {usageStats && (
+                <div className="mt-3">
+                  <CompactRateLimitStatus usageStats={usageStats} className="text-center" />
+                  {usageStats.isFallback && (
+                    <div className="mt-1 text-[11px] text-gray-400 text-center">Limits unavailable right now. Showing defaults. We’ll update when connected.</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        )}
+
       </div>
 
-      {/* Authentication Modal */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        title="Course Creation Requires Account"
-        message="Create personalized courses tailored to your learning goals. Save your progress and access advanced features."
-        feature="Create Custom Courses"
-      />
+      {/* Auth modal removed - we now show inline login/signup message within chat */}
     </div>
   );
 };

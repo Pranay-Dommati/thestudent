@@ -40,12 +40,7 @@ const LearningHubPage = () => {
   const token = localStorage.getItem('accessToken');
         
         // Fetch enrolled courses count
-        const coursesResponse = await axios.get(`${API_URL}/api/courses/enrolled/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const coursesResponse = await axios.get('/courses/enrolled/');
 
         if (coursesResponse.data.success) {
           setEnrolledCoursesCount(coursesResponse.data.courses.length);

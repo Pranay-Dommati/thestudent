@@ -4,9 +4,11 @@ import { motion } from 'framer-motion';
 import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
+import MobileBoardSelector from '../../shared/MobileBoardSelector';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
 import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
+import Footer from '../../../Footer/Footer';
 
 const SUBJECT_ICONS = {
   'Mathematics': '📐',
@@ -139,6 +141,7 @@ const SixthStandard = () => {
   const handleStateSelect = (stateId) => {
     navigate(`/courses/6th/state/${stateId}`);
     setShowStateBoards(false);
+    setSelectedBoard(`state-${stateId}`);
   };
 
   const handleBack = () => {
@@ -160,8 +163,21 @@ const SixthStandard = () => {
     : 'pt-24 pb-16 md:pt-0 md:pb-0'; // subject listing (course cards)
 
   return (
+    <>
     <div className={`container mx-auto px-4 ${containerPadding}`}>
-      {selectedBoard ? (
+      <MobileBoardSelector
+        availableBoards={availableBoards}
+        availableStates={availableStates}
+        checkingAvailability={checkingAvailability}
+        checkingStates={checkingStates}
+        isBoardSelection={!selectedBoard && !showStateBoards}
+        isStateSelection={showStateBoards}
+        onSelectBoard={handleBoardSelect}
+        onSelectState={(state) => handleStateSelect(state)}
+        onBack={handleBack}
+      />
+
+  {selectedBoard ? (
         <>
           <BackButton 
             title={selectedBoard.includes('state') ? 
@@ -218,7 +234,7 @@ const SixthStandard = () => {
           )}
         </>
       ) : showStateBoards ? (
-        <>
+        <div className="hidden md:block">
           <BackButton 
             title="Select Your State" 
             subtitle="Choose your state board" 
@@ -254,9 +270,9 @@ const SixthStandard = () => {
               </div>
             </div>
           )}
-        </>
+        </div>
       ) : (
-        <>
+        <div className="hidden md:block">
           <BackButton 
             title="Select Your Board" 
             subtitle="Choose your education board to view relevant courses" 
@@ -297,9 +313,12 @@ const SixthStandard = () => {
               </div>
             </div>
           )}
-        </>
-      )}
+        </div>
+  )}
     </div>
+      
+
+    </>
   );
 };
 

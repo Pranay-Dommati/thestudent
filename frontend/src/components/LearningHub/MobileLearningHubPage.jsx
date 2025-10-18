@@ -62,24 +62,14 @@ const MobileLearningHubPage = () => {
         if (!token) return;
 
         // Fetch enrolled courses count
-        const coursesResponse = await axios.get(`${API_URL}/api/courses/enrolled/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const coursesResponse = await axios.get('/courses/enrolled/');
 
         if (coursesResponse.data.success) {
           setEnrolledCoursesCount(coursesResponse.data.courses.length);
         }
 
         // Fetch learning statistics
-        const response = await axios.get(`${API_URL}/api/learning/analytics/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await axios.get('/learning/analytics/');
 
         if (response.data.success) {
           setLearningStats(response.data.analytics);
@@ -123,14 +113,14 @@ const MobileLearningHubPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 pt-0 md:pt-6">
       {/* Modern Hero Section */}
-      <div className="relative overflow-hidden pt-4">
+      <div className="relative overflow-hidden pt-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600">
         {/* Background Pattern */}
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600"></div>
         <div className="absolute inset-0 bg-black/10"></div>
         
-        <div className="relative px-4 py-5">
+        <div className="relative px-4 py-5 pt-[3.75rem]">
           {/* Welcome Section */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -138,7 +128,7 @@ const MobileLearningHubPage = () => {
             className="text-white mb-4"
           >
             <h1 className="text-xl font-bold mb-1">
-              Welcome back, {user?.firstName || 'Student'}! 👋
+              Welcome back, {user?.full_name || user?.first_name || user?.username || 'Student'}! 👋
             </h1>
             <p className="text-blue-100 text-sm">
               Ready to continue your learning journey?

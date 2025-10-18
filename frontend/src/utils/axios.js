@@ -3,6 +3,7 @@ import storage from './storage';
 
 const instance = axios.create({
   baseURL: (import.meta.env.VITE_API_BASE_URL || '/api'),
+  timeout: 15000, // 15 second timeout - fail fast to prevent user frustration
   headers: {
     'Content-Type': 'application/json',
   },

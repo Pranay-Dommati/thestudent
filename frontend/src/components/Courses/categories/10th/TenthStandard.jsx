@@ -7,6 +7,8 @@ import BackButton from '../../components/BackButton';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
 import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
+import MobileBoardSelector from '../../shared/MobileBoardSelector';
+import Footer from '../../../Footer/Footer';
 
 const SUBJECT_ICONS = {
   'Mathematics': '📐',
@@ -135,26 +137,28 @@ const TenthStandard = () => {
 
   const handleBoardSelect = async (boardId) => {
     if (boardId === 'state') {
+      // Show state UI immediately for snappy UX; load availability in background
+      setShowStateBoards(true);
       setCheckingStates(true);
+      setAvailableStates([]);
       try {
-        const availableStates = await checkStateAvailability('10th');
-        setAvailableStates(availableStates);
-        setShowStateBoards(true);
+        const states = await checkStateAvailability('10th');
+        setAvailableStates(states);
       } catch (error) {
         logger.error('Error checking state availability:', error);
         setAvailableStates([]);
-        setShowStateBoards(true);
       } finally {
         setCheckingStates(false);
       }
     } else {
-      setSelectedBoard(boardId);
+      // Navigate first; URL-derived effect will sync selectedBoard
       navigate(`/courses/10th/${boardId}`);
     }
   };
 
   const handleStateSelect = (stateId) => {
     const to = `/courses/10th/state/${stateId}`;
+    // Navigate immediately; URL effect will set selectedBoard
     navigate(to);
     setShowStateBoards(false);
   };
@@ -175,11 +179,26 @@ const TenthStandard = () => {
   const isStateSelection = showStateBoards;
   const containerPadding = (isBoardSelection || isStateSelection)
     ? 'pt-24 pb-16 md:pt-0 md:pb-0' // selection
-    : 'pt-24 pb-24 md:pt-0 md:pb-0'; // subject listing
+    : 'pt-24 pb-16 md:pt-0 md:pb-0'; // subject listing
 
   return (
+    <>
     <div className={`container mx-auto px-4 ${containerPadding}`}>
-  {selectedBoard ? (
+      {/* Mobile-only friendly selector */}
+      <MobileBoardSelector
+        availableBoards={availableBoards}
+        availableStates={availableStates}
+        checkingAvailability={checkingAvailability}
+        checkingStates={checkingStates}
+        isBoardSelection={!selectedBoard && !showStateBoards}
+        isStateSelection={showStateBoards}
+        onSelectBoard={handleBoardSelect}
+        onSelectState={handleStateSelect}
+        onBack={handleBack}
+      />
+
+      {/* Subject listing should render on all sizes when a board/state is selected */}
+      {selectedBoard ? (
         <>
           <BackButton 
             title={selectedBoard.includes('state') ? 
@@ -236,7 +255,7 @@ const TenthStandard = () => {
           )}
         </>
       ) : showStateBoards ? (
-        <>
+        <div className="hidden md:block">
           <BackButton 
             title="Select Your State" 
             subtitle="Choose your state board" 
@@ -272,12 +291,13 @@ const TenthStandard = () => {
               </div>
             </div>
           )}
-        </>
+        </div>
       ) : (
-        <>
+        <div className="hidden md:block">
           <BackButton 
             title="Select Your Board" 
             subtitle="Choose your education board to view relevant courses" 
+            onBack={handleBack}
           />
           {checkingAvailability ? (
             <div className="flex justify-center my-12">
@@ -314,9 +334,12 @@ const TenthStandard = () => {
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
+      
+
+    </>
   );
 };
 
