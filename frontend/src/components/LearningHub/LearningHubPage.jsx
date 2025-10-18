@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from '../Navbar/Navbar';
 import Footer from '../Footer/Footer';
 import HeroSection from './HeroSection/HeroSection';
@@ -27,38 +27,124 @@ const LearningHubPage = () => {
   // Cleaned up development logs
   useEffect(() => {}, [learningStats]);
   
-  useEffect(() => {
-    const fetchData = async () => {
-  
-      
-      if (!isLoggedIn) {
-        return;
+  const refreshHubData = useCallback(async () => {
+    if (!isLoggedIn) return;
+    try {
+      // Fetch enrolled courses count
+      const coursesResponse = await axios.get('/courses/enrolled/');
+      if (coursesResponse.data?.success) {
+        setEnrolledCoursesCount(coursesResponse.data.courses.length);
       }
 
-      try {
-        // Check token availability first
-  const token = localStorage.getItem('accessToken');
-        
-        // Fetch enrolled courses count
-        const coursesResponse = await axios.get('/courses/enrolled/');
+      // Fetch learning statistics
+      const stats = await getLearningStats();
+      if (stats) {
+        setLearningStats(stats);
+      }
+    } catch (_) {
+      // silent in production
+    }
+  }, [isLoggedIn]);
 
-        if (coursesResponse.data.success) {
-          setEnrolledCoursesCount(coursesResponse.data.courses.length);
-        }
+  useEffect(() => {
+    refreshHubData();
+  }, [refreshHubData]);
 
-        // Fetch learning statistics
-        const stats = await getLearningStats();
-        if (stats) {
-          setLearningStats(stats);
-        } else {
+  // Lightweight realtime: listen for activity updates and pro-learning saves
+  useEffect(() => {
+    const onActivity = (e) => {
+      // Optimistically update time-based stats without immediate network call
+      const minutes = e?.detail?.minutes;
+      if (typeof minutes === 'number' && minutes > 0) {
+        let shouldRefreshForStreak = false;
+        setLearningStats((prev) => {
+          const prevWeek = Number(prev?.weekly_hours || 0);
+          const prevTodayHours = Number(prev?.today?.hours || 0);
+          const addHours = minutes / 60;
+
+          // If this is the first activity chunk today, schedule a stats refresh to update streak from backend
+          if (prevTodayHours === 0) {
+            shouldRefreshForStreak = true;
+          }
+
+          // Update weekly breakdown marking today as active (for immediate UI feedback)
+          const wb = Array.isArray(prev?.weekly_breakdown) ? [...prev.weekly_breakdown] : [];
+          try {
+            const todayISO = new Date().toISOString().slice(0, 10);
+            const idx = wb.findIndex((d) => {
+              const dateStr = typeof d?.date === 'string' ? d.date : (d?.date ? new Date(d.date).toISOString().slice(0,10) : null);
+              return dateStr === todayISO;
+            });
+            if (idx >= 0) {
+              const item = wb[idx] || {};
+              const itemHours = Number(item.hours || 0) + addHours;
+              const itemMinutes = Number(item.minutes || 0) + minutes;
+              wb[idx] = { ...item, has_activity: true, hours: itemHours, minutes: itemMinutes };
+            }
+          } catch {}
+
+          return {
+            ...prev,
+            weekly_hours: prevWeek + addHours,
+            today: {
+              ...(prev?.today || {}),
+              hours: prevTodayHours + addHours,
+            },
+            weekly_breakdown: wb,
+          };
+        });
+
+        // Fetch authoritative streak data once when today transitions from 0 -> active
+        if (shouldRefreshForStreak) {
+          refreshHubData();
         }
-      } catch (error) {
-  // swallow logs in production
+      } else {
+        // For events without minutes detail, fallback to a refresh
+        refreshHubData();
       }
     };
+    const onStorage = (e) => {
+      // If proLearning course saved markers changed, refresh enrolled/pro courses indirectly
+      if (e && typeof e.key === 'string' && (e.key.startsWith('proLearning_') || e.key === 'coursesSavedToHub')) {
+        refreshHubData();
+      }
+    };
+    const onEnrollmentChanged = (e) => {
+      // Prefer delta updates to avoid extra network call; fallback to full refresh
+      const detail = e?.detail || {};
+      if (typeof detail.count === 'number') {
+        setEnrolledCoursesCount(Math.max(0, detail.count));
+      } else if (typeof detail.delta === 'number') {
+        setEnrolledCoursesCount((prev) => Math.max(0, prev + detail.delta));
+      } else {
+        refreshHubData();
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshHubData();
+      }
+    };
+    const onFocus = () => {
+      // When tab/window gains focus, refresh once
+      refreshHubData();
+    };
+    window.addEventListener('learning:activity-updated', onActivity);
+    window.addEventListener('prolearning:course-saved', onActivity);
+    window.addEventListener('enrollment-changed', onEnrollmentChanged);
+    window.addEventListener('storage', onStorage);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
 
-    fetchData();
-  }, [isLoggedIn]);
+    return () => {
+      window.removeEventListener('learning:activity-updated', onActivity);
+      window.removeEventListener('prolearning:course-saved', onActivity);
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('enrollment-changed', onEnrollmentChanged);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refreshHubData]);
   
   // Create user object with real learning statistics - ALWAYS use fresh data from API
   const user = {
@@ -117,7 +203,17 @@ const LearningHubPage = () => {
                     Professional
                   </span>
                 </div>
-                <ActiveCourses />
+                <ActiveCourses
+                  onEnrollmentChanged={(change) => {
+                    if (change && typeof change.count === 'number') {
+                      setEnrolledCoursesCount(Math.max(0, change.count));
+                    } else if (change && typeof change.delta === 'number') {
+                      setEnrolledCoursesCount((prev) => Math.max(0, prev + change.delta));
+                    } else {
+                      refreshHubData();
+                    }
+                  }}
+                />
               </section>
               
               {/* AI-Created Courses Section */}

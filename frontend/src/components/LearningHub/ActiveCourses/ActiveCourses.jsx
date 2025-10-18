@@ -4,18 +4,19 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import axios from '../../../utils/axios';
 import { toast } from 'react-hot-toast';
-import { FaTrash, FaTimes } from 'react-icons/fa';
+import { FaTrash } from 'react-icons/fa';
 import { stateNameToCode } from '../../../utils/stateMapping';
 
 // Use shared axios instance with baseURL
 const COURSES_PER_PAGE = 4; // Show 4 courses initially
 
-const ActiveCourses = () => {
+const ActiveCourses = ({ onEnrollmentChanged }) => {
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('recent');
   const [showAll, setShowAll] = useState(false);
   const [removingCourseId, setRemovingCourseId] = useState(null);
+  const [confirmState, setConfirmState] = useState({ visible: false, enrollmentId: null, courseTitle: '' });
   const { isLoggedIn } = useAuth();
 
   useEffect(() => {
@@ -138,18 +139,25 @@ const ActiveCourses = () => {
   };
 
   const handleRemoveCourse = async (enrollmentId, courseTitle) => {
-    if (!window.confirm(`Are you sure you want to remove "${courseTitle}" from your enrolled courses?`)) {
-      return;
-    }
-
     setRemovingCourseId(enrollmentId);
     
     try {
       await axios.delete(`/courses/enrollment/${enrollmentId}/`);
 
+      // Compute new count synchronously from current state
+      const nextCount = Math.max(0, (enrolledCourses?.length || 1) - 1);
+
       // Remove the course from the local state
       setEnrolledCourses(prev => prev.filter(course => course.enrollmentId !== enrollmentId));
       toast.success(`Successfully removed "${courseTitle}" from your courses`);
+      // Notify parent (prefer exact count) and emit a custom event so other parts can react
+      try {
+        onEnrollmentChanged && onEnrollmentChanged({ delta: -1, count: nextCount, enrollmentId });
+      } catch (_) {}
+      try {
+        const evt = new CustomEvent('enrollment-changed', { detail: { delta: -1, count: nextCount, enrollmentId } });
+        window.dispatchEvent(evt);
+      } catch (_) {}
     } catch (error) {
   
       if (error.response?.status === 404) {
@@ -159,8 +167,38 @@ const ActiveCourses = () => {
       }
     } finally {
       setRemovingCourseId(null);
+      setConfirmState({ visible: false, enrollmentId: null, courseTitle: '' });
     }
   };
+
+  const askRemoveCourse = (enrollmentId, courseTitle) => {
+    setConfirmState({ visible: true, enrollmentId, courseTitle });
+  };
+
+  const cancelConfirm = () => setConfirmState({ visible: false, enrollmentId: null, courseTitle: '' });
+
+  // Close confirmation on Escape key for accessibility/UX
+  useEffect(() => {
+    if (!confirmState.visible) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        cancelConfirm();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [confirmState.visible]);
+
+  // Lock background scroll on small devices when modal is open
+  useEffect(() => {
+    if (confirmState.visible) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prev || '';
+      };
+    }
+  }, [confirmState.visible]);
 
   // Apply sorting and filtering
   const processedCourses = React.useMemo(() => {
@@ -184,6 +222,7 @@ const ActiveCourses = () => {
   const activeCourses = coursesToDisplay;
 
   return (
+    <>
     <section className="bg-white rounded-xl shadow-md p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800">My Enrolled Courses</h2>
@@ -315,7 +354,7 @@ const ActiveCourses = () => {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            handleRemoveCourse(course.enrollmentId, course.title);
+                            askRemoveCourse(course.enrollmentId, course.title);
                           }}
                           className="w-7 h-7 bg-gray-100 hover:bg-red-50 border border-gray-200 hover:border-red-200 text-gray-500 hover:text-red-500 rounded-md flex items-center justify-center transition-all duration-200 shadow-sm"
                           title="Remove from enrolled courses"
@@ -403,6 +442,38 @@ const ActiveCourses = () => {
         </div>
       )}
     </section>
+    {confirmState.visible && (
+      <div className="fixed inset-0 z-[1000]" role="dialog" aria-modal="true">
+        <div className="absolute inset-0 bg-black/40" onClick={cancelConfirm} />
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
+            <div className="p-5">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Remove enrolled course?</h3>
+              <p className="text-sm text-gray-600">
+                Are you sure you want to remove 
+                <span className="font-medium text-gray-900"> "{confirmState.courseTitle}"</span> from your enrolled courses?
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-5 py-4 bg-gray-50 border-t border-gray-200">
+              <button
+                onClick={cancelConfirm}
+                className="px-4 py-2 rounded-lg text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRemoveCourse(confirmState.enrollmentId, confirmState.courseTitle)}
+                disabled={removingCourseId === confirmState.enrollmentId}
+                className="px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 transition-colors"
+              >
+                {removingCourseId === confirmState.enrollmentId ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

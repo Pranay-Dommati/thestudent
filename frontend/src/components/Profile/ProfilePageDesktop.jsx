@@ -4,8 +4,9 @@ import {
   FaUser, FaLock, FaRegUser, FaRegEnvelope, FaEye, FaEyeSlash,
   FaEdit, FaCheck, FaTimes, FaSpinner, FaSignOutAlt, FaHome,
   FaGoogle, FaUnlink, FaCamera, FaGraduationCap,
-  FaBookOpen, FaCertificate
+  FaCertificate
 } from 'react-icons/fa';
+import { HiBookOpen } from 'react-icons/hi2';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
@@ -424,8 +425,8 @@ const ProfilePageDesktop = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center space-x-3 group">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl transform transition-all group-hover:scale-105 group-hover:rotate-3">
-                S
+              <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white transform transition-all group-hover:scale-105 group-hover:rotate-3">
+                <HiBookOpen className="w-5 h-5" />
               </div>
               <span className="font-bold text-xl bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 EasyLearnova

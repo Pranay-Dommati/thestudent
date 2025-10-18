@@ -62,7 +62,16 @@ class ActivityTracker {
       });
 
       if (response.data.success) {
-        // tracked
+        // Notify listeners in-app that learning activity has been updated
+        try {
+          const event = new CustomEvent('learning:activity-updated', {
+            detail: {
+              minutes,
+              at: Date.now(),
+            },
+          });
+          window.dispatchEvent(event);
+        } catch {}
       }
     } catch (error) {
       logger.error('❌ Error tracking learning activity:', error);

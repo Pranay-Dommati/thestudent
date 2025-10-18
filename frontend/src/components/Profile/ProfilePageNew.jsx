@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FaUser, FaRegUser, FaRegEnvelope,
   FaEdit, FaCheck, FaTimes, FaSpinner, FaSignOutAlt, FaHome,
-  FaGoogle, FaUnlink, FaCamera, FaGraduationCap,
-  FaBookOpen
+  FaGoogle, FaUnlink, FaCamera, FaGraduationCap
 } from 'react-icons/fa';
+import { HiBookOpen } from 'react-icons/hi2';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
@@ -418,8 +418,8 @@ const ProfilePage = () => {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between h-12 sm:h-16">
             <Link to="/" className="flex items-center space-x-2 sm:space-x-3 group">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl transform transition-all group-hover:scale-105 group-hover:rotate-3">
-                S
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center text-white transform transition-all group-hover:scale-105 group-hover:rotate-3">
+                <HiBookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <span className="font-bold text-lg sm:text-xl bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 EasyLearnova

@@ -128,33 +128,7 @@ const LearningAnalytics = ({ user }) => {
                 </div>
               );
             })
-          ) : (
-            // Fallback to 7-day pattern if no real data available
-            Array(7).fill(0).map((_, i) => {
-              const day = new Date();
-              day.setDate(day.getDate() - 6 + i);
-              const dayName = day.toLocaleDateString('en-US', { weekday: 'short' });
-              // Mock data: active days pattern - you would replace with real data
-              const isActive = i === 0 || i === 2 || i === 3 || i === 4 || i === 6; 
-              
-              return (
-                <div key={i} className="flex flex-col items-center group">
-                  <div 
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 transition-all duration-300 ${
-                      isActive 
-                        ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg scale-110' 
-                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                    }`}
-                  >
-                    <span className="text-xs font-bold">{day.getDate()}</span>
-                  </div>
-                  <span className={`text-xs font-medium ${isActive ? 'text-indigo-600' : 'text-gray-400'}`}>
-                    {dayName.substring(0, 3)}
-                  </span>
-                </div>
-              );
-            })
-          )}
+          ) : null}
         </div>
       </div>
     </section>

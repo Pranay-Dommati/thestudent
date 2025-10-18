@@ -8,9 +8,7 @@ const HeroSection = ({ user }) => {
   
   return (
     <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white pt-16 pb-16 relative overflow-hidden">
-      {/* Decorative elements */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full blur-xl -translate-y-1/2 translate-x-1/4"></div>
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-white opacity-10 rounded-full blur-xl translate-y-1/2 -translate-x-1/4"></div>
+      {/* Decorative elements removed for clean, uniform coloring */}
       
       <div className="container mx-auto px-4 relative z-10">
         <div className="max-w-4xl">

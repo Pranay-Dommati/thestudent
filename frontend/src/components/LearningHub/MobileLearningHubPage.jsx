@@ -16,6 +16,7 @@ import AILearningPlans from './AILearningPlans/AILearningPlans';
 import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
 import Certificates from '../Profile/tabs/Certificates';
 import axios from '../../utils/axios';
+import { getLearningStats as fetchLearningStats } from '../../services/activityTracker';
 // logger removed for production cleanliness
 
 // API base is provided via axios instance or fetch with relative paths
@@ -54,33 +55,122 @@ const MobileLearningHubPage = () => {
   ];
 
   useEffect(() => {
-    const fetchData = async () => {
+    const refresh = async () => {
       if (!isLoggedIn) return;
-      
       try {
         const token = localStorage.getItem('accessToken');
         if (!token) return;
-
-        // Fetch enrolled courses count
-        const coursesResponse = await axios.get('/courses/enrolled/');
-
-        if (coursesResponse.data.success) {
+        const [coursesResponse, stats] = await Promise.all([
+          axios.get('/courses/enrolled/'),
+          fetchLearningStats(),
+        ]);
+        if (coursesResponse.data?.success) {
           setEnrolledCoursesCount(coursesResponse.data.courses.length);
         }
-
-        // Fetch learning statistics
-        const response = await axios.get('/learning/analytics/');
-
-        if (response.data.success) {
-          setLearningStats(response.data.analytics);
+        if (stats) {
+          setLearningStats(stats);
         }
-      } catch (error) {
-        // suppress logs in production
+      } catch (_) {}
+    };
+    refresh();
+  }, [isLoggedIn]);
+
+  // Listen for global enrollment changes and refresh-on-focus for mobile
+  useEffect(() => {
+    const onEnrollmentChanged = (e) => {
+      const detail = e?.detail || {};
+      if (typeof detail.count === 'number') {
+        setEnrolledCoursesCount(Math.max(0, detail.count));
+      } else if (typeof detail.delta === 'number') {
+        setEnrolledCoursesCount((prev) => Math.max(0, prev + detail.delta));
+      } else {
+        // Fallback: refetch count once
+        axios.get('/courses/enrolled/').then((res) => {
+          if (res.data?.success) {
+            setEnrolledCoursesCount(res.data.courses.length);
+          }
+        }).catch(() => {});
       }
     };
-
-    fetchData();
-  }, [isLoggedIn]);
+    const onActivity = (e) => {
+      const minutes = e?.detail?.minutes;
+      if (typeof minutes === 'number' && minutes > 0) {
+        let shouldRefreshForStreak = false;
+        setLearningStats((prev) => {
+          if (!prev) return prev;
+          const prevWeek = Number(prev?.weekly_hours || 0);
+          const prevTodayHours = Number(prev?.today?.hours || 0);
+          const addHours = minutes / 60;
+          if (prevTodayHours === 0) shouldRefreshForStreak = true;
+          const wb = Array.isArray(prev?.weekly_breakdown) ? [...prev.weekly_breakdown] : [];
+          try {
+            const todayISO = new Date().toISOString().slice(0, 10);
+            const idx = wb.findIndex((d) => {
+              const dateStr = typeof d?.date === 'string' ? d.date : (d?.date ? new Date(d.date).toISOString().slice(0,10) : null);
+              return dateStr === todayISO;
+            });
+            if (idx >= 0) {
+              const item = wb[idx] || {};
+              const itemHours = Number(item.hours || 0) + addHours;
+              const itemMinutes = Number(item.minutes || 0) + minutes;
+              wb[idx] = { ...item, has_activity: true, hours: itemHours, minutes: itemMinutes };
+            }
+          } catch {}
+          return {
+            ...prev,
+            weekly_hours: prevWeek + addHours,
+            today: { ...(prev?.today || {}), hours: prevTodayHours + addHours },
+            weekly_breakdown: wb,
+          };
+        });
+        if (shouldRefreshForStreak) {
+          fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
+        }
+      } else {
+        fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
+      }
+    };
+    const onStorage = (e) => {
+      if (e && typeof e.key === 'string' && (e.key.startsWith('proLearning_') || e.key === 'coursesSavedToHub')) {
+        fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
+      }
+    };
+    const onProLearningSaved = () => {
+      fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        axios.get('/courses/enrolled/').then((res) => {
+          if (res.data?.success) {
+            setEnrolledCoursesCount(res.data.courses.length);
+          }
+        }).catch(() => {});
+        fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
+      }
+    };
+    const onFocus = () => {
+      axios.get('/courses/enrolled/').then((res) => {
+        if (res.data?.success) {
+          setEnrolledCoursesCount(res.data.courses.length);
+        }
+      }).catch(() => {});
+      fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
+    };
+    window.addEventListener('enrollment-changed', onEnrollmentChanged);
+    window.addEventListener('learning:activity-updated', onActivity);
+    window.addEventListener('prolearning:course-saved', onProLearningSaved);
+    window.addEventListener('storage', onStorage);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('enrollment-changed', onEnrollmentChanged);
+      window.removeEventListener('learning:activity-updated', onActivity);
+      window.removeEventListener('prolearning:course-saved', onProLearningSaved);
+      window.removeEventListener('storage', onStorage);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
 
   // Create enhanced user object with updated stats
   const user = {
@@ -93,7 +183,23 @@ const MobileLearningHubPage = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'enrolled':
-        return <ActiveCourses />;
+        return (
+          <ActiveCourses
+            onEnrollmentChanged={(change) => {
+              if (change && typeof change.count === 'number') {
+                setEnrolledCoursesCount(Math.max(0, change.count));
+              } else if (change && typeof change.delta === 'number') {
+                setEnrolledCoursesCount((prev) => Math.max(0, prev + change.delta));
+              } else {
+                axios.get('/courses/enrolled/').then((res) => {
+                  if (res.data?.success) {
+                    setEnrolledCoursesCount(res.data.courses.length);
+                  }
+                }).catch(() => {});
+              }
+            }}
+          />
+        );
       case 'certificates':
         return <Certificates />;
       case 'ai':

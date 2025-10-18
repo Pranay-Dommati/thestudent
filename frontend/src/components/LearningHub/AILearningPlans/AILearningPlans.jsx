@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 // logger removed for production cleanliness
 import { Link, useNavigate } from 'react-router-dom';
 import axios from '../../../utils/axios';
@@ -17,9 +17,37 @@ const AILearningPlans = () => {
 
   const COURSES_TO_SHOW = 6;
 
-  useEffect(() => {
+  const refreshCourses = useCallback(() => {
     fetchProCourses();
   }, []);
+
+  useEffect(() => {
+    refreshCourses();
+  }, [refreshCourses]);
+
+  // Lightweight realtime refresh: listen to custom events and storage changes (no polling)
+  useEffect(() => {
+    const onSaved = () => refreshCourses();
+    const onStorage = (e) => {
+      if (e && typeof e.key === 'string' && (e.key.startsWith('proLearning_') || e.key === 'coursesSavedToHub')) {
+        refreshCourses();
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshCourses();
+    };
+    const onFocus = () => refreshCourses();
+    window.addEventListener('prolearning:course-saved', onSaved);
+    window.addEventListener('storage', onStorage);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('prolearning:course-saved', onSaved);
+      window.removeEventListener('storage', onStorage);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refreshCourses]);
 
   const fetchProCourses = async () => {
     try {
@@ -101,6 +129,10 @@ const AILearningPlans = () => {
       // Remove the deleted course from state
       setProCourses(prevCourses => prevCourses.filter(course => course.id !== courseId));
       toast.success(`"${courseName}" has been deleted successfully`);
+      try {
+        const ev = new CustomEvent('prolearning:course-deleted', { detail: { id: courseId, name: courseName } });
+        window.dispatchEvent(ev);
+      } catch {}
     } catch (error) {
   
       toast.error('Failed to delete course. Please try again.');

@@ -2851,6 +2851,14 @@ const ProLearningPage = () => {
         // Mark course as ready (with quota error handling)
         safeLocalStorageSet(`proLearning_courseReady_${currentCourseId}`, 'true');
 
+        // Emit a custom event so Learning Hub lists update in realtime
+        try {
+          const ev = new CustomEvent('prolearning:course-saved', {
+            detail: { id: responseData?.course?.id || currentCourseId, title: responseData?.course?.title || smartCourseName }
+          });
+          window.dispatchEvent(ev);
+        } catch {}
+
         // Show a one-time notification that generation completed and was added to Learning Hub
         try {
           const notifiedKey = `proLearning_savedNotified_${currentCourseId}`;
@@ -3111,6 +3119,12 @@ const ProLearningPage = () => {
   console.log('✅ Course saved to Learning Hub successfully!', responseData);
   try { tracking.capture('pro_learning.save_succeeded', { course_id: currentCourseId }, { feature: 'pro_learning' }); } catch {}
         toast.success('✅ Course saved to your Learning Hub successfully!');
+        try {
+          const ev = new CustomEvent('prolearning:course-saved', {
+            detail: { id: responseData?.course?.id || currentCourseId, title: responseData?.course?.title || smartCourseName }
+          });
+          window.dispatchEvent(ev);
+        } catch {}
         
         // Refresh usage stats after saving (topics were created in DB)
         try {
