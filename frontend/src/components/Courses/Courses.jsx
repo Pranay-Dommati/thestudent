@@ -229,11 +229,10 @@ const Courses = () => {
                         <Outlet />
                     )}
                 </div>
+            </div>
             <div className="hidden md:block">
                 <Footer />
             </div>
-            </div>
-            {!selectedLevel && <Footer />}
         </>
     );
 }

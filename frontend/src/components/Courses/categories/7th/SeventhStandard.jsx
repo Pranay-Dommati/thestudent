@@ -314,7 +314,6 @@ const SeventhStandard = () => {
         </div>
   )}
     </div>
-      
 
     </>
   );

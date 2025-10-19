@@ -274,7 +274,7 @@ const NinthStandard = () => {
   )}
     </div>
       
- 
+
     </>
   );
 };
