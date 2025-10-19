@@ -275,13 +275,13 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
     if (file) {
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('File size should be less than 5MB');
+        universalToast.error('File size should be less than 5MB');
         return;
       }
 
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file');
+        universalToast.error('Please select an image file');
         return;
       }
 

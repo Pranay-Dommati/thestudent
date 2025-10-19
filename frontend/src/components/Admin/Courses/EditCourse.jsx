@@ -27,7 +27,7 @@ const EditCourse = ({ isDarkMode }) => {
     } catch (error) {
       console.error('Error fetching course:', error);
       setError('Failed to load course data');
-      toast.error('Failed to load course data');
+      universalToast.error('Failed to load course data');
     } finally {
       setLoading(false);
     }
@@ -39,14 +39,14 @@ const EditCourse = ({ isDarkMode }) => {
       const response = await updateCourse(courseId, formData);
       
       if (response.success) {
-        toast.success(response.message || 'Course updated successfully!');
+        universalToast.success(response.message || 'Course updated successfully!');
         navigate('/admin-p/courses');
       } else {
         throw new Error(response.error || 'Failed to update course');
       }
     } catch (error) {
       console.error('Error updating course:', error);
-      toast.error(error.message || 'Failed to update course');
+      universalToast.error(error.message || 'Failed to update course');
     } finally {
       setUpdating(false);
     }
