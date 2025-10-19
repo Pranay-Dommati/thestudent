@@ -390,7 +390,8 @@ def list_engineering_courses(request):
         if settings.DEBUG:
             print(f"Requested category: {category}")
         
-        queryset = EngineeringCourse.objects.all()
+        # Public listing should only include published courses
+        queryset = EngineeringCourse.objects.filter(is_published=True)
         if settings.DEBUG:
             print(f"Total courses before filtering: {queryset.count()}")
         
@@ -466,13 +467,13 @@ def list_all_courses(request):
         category = request.query_params.get('category', 'all')
         print(f"Requested category: {category}")
         
-        # Process engineering courses
-        eng_queryset = EngineeringCourse.objects.all()
+        # Process engineering courses (only published for public listing)
+        eng_queryset = EngineeringCourse.objects.filter(is_published=True)
         if category != 'all' and category != '' and category != 'school':
             eng_queryset = eng_queryset.filter(category=category)
         
-        # Process school courses
-        school_queryset = SchoolCourse.objects.all()
+        # Process school courses (only published for public listing)
+        school_queryset = SchoolCourse.objects.filter(is_published=True)
         if category == 'school':
             eng_queryset = EngineeringCourse.objects.none()  # Empty if only school courses requested
         

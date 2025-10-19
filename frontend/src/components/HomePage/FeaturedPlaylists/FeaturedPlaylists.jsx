@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { getSchoolCourses } from '../../../services/courseApi';
+import { getSchoolCourses, getEngineeringCourses } from '../../../services/courseApi';
 import { useNavigate, Link } from 'react-router-dom';
 
 const categories = [
   { id: 'all', name: 'All Courses' },
+  { id: 'engineering', name: 'Engineering' },
   { id: 'sixth', name: 'Class 6' },
   { id: 'seventh', name: 'Class 7' },
   { id: 'eighth', name: 'Class 8' },
@@ -20,14 +21,17 @@ const FeaturedPlaylists = () => {
   const [error, setError] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch real courses from database
+  // Fetch real courses from database (both School and Engineering)
   useEffect(() => {
     const fetchRealCourses = async () => {
       setLoading(true);
       setError(false);
       try {
-        // Fetch only school courses (temporarily hiding engineering courses on home page)
-        const schoolCourses = await getSchoolCourses('', '', '');
+        // Fetch in parallel to reduce load time
+        const [schoolCourses, engineeringCourses] = await Promise.all([
+          getSchoolCourses('', '', ''),
+          getEngineeringCourses('all')
+        ]);
         
   // Removed debug logs for production
         
@@ -108,8 +112,27 @@ const FeaturedPlaylists = () => {
           };
         });
 
-        // Combine courses (engineering hidden => only school courses)
-        const allCourses = [...transformedSchoolCourses];
+        // Transform engineering courses
+        const transformedEngineeringCourses = (engineeringCourses || []).map(course => {
+          return {
+            id: course.id,
+            title: course.title,
+            // Use provided duration or fallback
+            duration: course.duration ? `${course.duration}` : 'Self-paced',
+            category: 'engineering',
+            author: course.subject || 'EasyLearnova',
+            board: 'Engineering',
+            board_raw: 'engineering',
+            state: '',
+            subject: course.category || 'General',
+            class_level: 'engineering',
+            image: course.thumbnail || 'https://images.unsplash.com/photo-1529101091764-c3526daf38fe?ixlib=rb-4.0.3',
+            courseType: 'engineering'
+          };
+        });
+
+        // Combine both types for display
+        const allCourses = [...transformedEngineeringCourses, ...transformedSchoolCourses];
   // Removed debug logs
         
         setCourses(allCourses);

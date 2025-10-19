@@ -1,0 +1,214 @@
+{
+  "courses": [
+    {
+      "id": "gen_ai_road_map_p1",
+      "title": "Phase 1: Introduction to AI & Machine Learning",
+      "short_description": "Foundational concepts of Artificial Intelligence and Machine Learning, covering basic models and essential Python libraries.",
+      "description": "This course covers the essentials of AI and ML, including basic concepts, learning types (Supervised, Unsupervised, Reinforcement), an introduction to Neural Networks, and practical tutorials on key Python libraries like Scikit-Learn and NumPy.",
+      "duration": "40",
+      "is_published": true,
+      "subject": "AI/ML",
+      "sources": "Generative AI Roadmap",
+      "proficiency": "beginner",
+      "project_based": false,
+      "learning_points": [
+        "Understand the fundamentals of AI and Machine Learning [cite: 3]",
+        "Differentiate between Supervised, Unsupervised, and Reinforcement Learning [cite: 7]",
+        "Learn the basics of Neural Networks [cite: 8]",
+        "Gain practical skills with Scikit-Learn and NumPy [cite: 10, 12]"
+      ],
+      "requirements": [
+        "Basic programming knowledge (preferably Python)"
+      ],
+      "category": "Machine Learning Fundamentals",
+      "sections": [
+        {
+          "name": "Introduction and Basics",
+          "order": 1,
+          "lessons": [
+            { "title": "Introduction to AI & Machine Learning [cite: 3]" },
+            { "title": "Basics of Machine Learning [cite: 4]" },
+            { "title": "Learning Types: Supervised, Unsupervised, and Reinforcement Learning [cite: 7]" }
+          ]
+        },
+        {
+          "name": "Initial Modeling and Tools",
+          "order": 2,
+          "lessons": [
+            { "title": "Introduction to Neural Networks [cite: 8]" },
+            { "title": "Scikit-Learn Tutorial [cite: 10]" },
+            { "title": "What is NumPy? [cite: 12]" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gen_ai_road_map_p2",
+      "title": "Phase 2: Deep Learning & Neural Networks",
+      "short_description": "Intermediate study of Deep Learning, covering advanced network architectures and core frameworks like TensorFlow and PyTorch.",
+      "description": "Delve deeper into Deep Learning with coverage of Perceptrons and Activation Functions. Explore specialized network architectures: Convolutional Neural Networks (CNNs) and Recurrent Neural Networks (RNNs). Get started with industry-standard deep learning frameworks: TensorFlow and PyTorch.",
+      "duration": "60",
+      "is_published": true,
+      "subject": "Deep Learning",
+      "sources": "Generative AI Roadmap",
+      "proficiency": "intermediate",
+      "project_based": true,
+      "learning_points": [
+        "Understand the fundamentals of Deep Learning, including Perceptrons and Activation Functions [cite: 18]",
+        "Explore and apply Convolutional Neural Networks (CNNs) [cite: 19]",
+        "Understand the architecture and use of Recurrent Neural Networks (RNNs) [cite: 20]",
+        "Acquire basic proficiency in TensorFlow and PyTorch [cite: 22]"
+      ],
+      "requirements": [
+        "Completion of Phase 1 or equivalent knowledge of Machine Learning basics and Python"
+      ],
+      "category": "Deep Learning Architectures",
+      "sections": [
+        {
+          "name": "Deep Learning Foundations",
+          "order": 1,
+          "lessons": [
+            { "title": "Deep Learning Basics (Perceptrons, Activation Functions) [cite: 18]" }
+          ]
+        },
+        {
+          "name": "Advanced Neural Networks",
+          "order": 2,
+          "lessons": [
+            { "title": "Convolutional Neural Networks (CNNs) [cite: 19]" },
+            { "title": "Recurrent Neural Networks (RNNs) [cite: 20]" }
+          ]
+        },
+        {
+          "name": "Frameworks",
+          "order": 3,
+          "lessons": [
+            { "title": "TensorFlow & PyTorch Basics [cite: 22]" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gen_ai_road_map_p3",
+      "title": "Phase 3: Generative Models",
+      "short_description": "A focused course on the core models of Generative AI: VAEs, GANs, and the foundational Transformers for LLMs.",
+      "description": "This course is the heart of Generative AI, covering Variational Autoencoders (VAEs) and Generative Adversarial Networks (GANs). It introduces the Transformer architecture and the Attention Mechanism, which are crucial for understanding modern Large Language Models (LLMs) like GPT and LLAMA.",
+      "duration": "50",
+      "is_published": true,
+      "subject": "Generative AI",
+      "sources": "Generative AI Roadmap",
+      "proficiency": "intermediate",
+      "project_based": true,
+      "learning_points": [
+        "Master the concept and application of Variational Autoencoders (VAEs) [cite: 28]",
+        "Understand and implement Generative Adversarial Networks (GANs) [cite: 30]",
+        "Learn the mechanics of the Transformer and Attention Mechanism [cite: 31]",
+        "Gain an introduction to Large Language Models (LLMs) such as GPT and LLAMA [cite: 34]"
+      ],
+      "requirements": [
+        "Completion of Phase 2 or solid knowledge of Deep Learning and Neural Networks"
+      ],
+      "category": "Generative Models",
+      "sections": [
+        {
+          "name": "Core Generative Architectures",
+          "order": 1,
+          "lessons": [
+            { "title": "Variational Autoencoders (VAEs) [cite: 28]" },
+            { "title": "Generative Adversarial Networks (GANs) [cite: 30]" }
+          ]
+        },
+        {
+          "name": "Language Model Foundations",
+          "order": 2,
+          "lessons": [
+            { "title": "Transformers & Attention Mechanism [cite: 31, 39]" },
+            { "title": "Large Language Models (LLMs) like GPT, LLAMA [cite: 34]" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gen_ai_road_map_p4",
+      "title": "Phase 4: Fine-tuning & Prompt Engineering",
+      "short_description": "Practical skills in adapting pre-trained models using fine-tuning and mastering effective prompt design.",
+      "description": "Focus on optimizing pre-trained models. This includes techniques for Fine-tuning LLMs (like GPT and BERT) and understanding various Transfer Learning approaches. A key component is learning Effective Prompt Engineering to maximize model performance.",
+      "duration": "30",
+      "is_published": true,
+      "subject": "Model Customization",
+      "sources": "Generative AI Roadmap",
+      "proficiency": "advanced",
+      "project_based": true,
+      "learning_points": [
+        "Develop skills in Fine-tuning LLMs (GPT, BERT) [cite: 41]",
+        "Understand and apply Transfer Learning Techniques [cite: 43]",
+        "Master the principles of Effective Prompt Engineering [cite: 45]"
+      ],
+      "requirements": [
+        "Completion of Phase 3 or strong theoretical understanding of LLMs"
+      ],
+      "category": "LLM Application & Customization",
+      "sections": [
+        {
+          "name": "Model Adaptation",
+          "order": 1,
+          "lessons": [
+            { "title": "Fine-tuning LLMs (GPT, BERT) [cite: 41]" },
+            { "title": "Transfer Learning Techniques [cite: 43]" }
+          ]
+        },
+        {
+          "name": "User Interaction",
+          "order": 2,
+          "lessons": [
+            { "title": "Effective Prompt Engineering [cite: 45]" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gen_ai_road_map_p5",
+      "title": "Phase 5: Full-Scale AI Applications & Deployment",
+      "short_description": "The final stage: deploying, scaling, and managing AI models in real-world, ethical, and secure environments.",
+      "description": "Learn how to take an AI model from development to production. Topics include AI Model Deployment using frameworks like Flask, FastAPI, and Streamlit, scaling with Cloud Platforms (AWS, Azure), and critical considerations for Security and Ethics in AI.",
+      "duration": "40",
+      "is_published": true,
+      "subject": "MLOps/AI Ethics",
+      "sources": "Generative AI Roadmap",
+      "proficiency": "advanced",
+      "project_based": true,
+      "learning_points": [
+        "Learn to deploy AI Models using tools like Flask, FastAPI, Streamlit [cite: 50]",
+        "Understand how to use Scalable Cloud Platforms (AWS, Azure) for AI [cite: 51]",
+        "Grasp the Security & Ethical Considerations in AI [cite: 52]"
+      ],
+      "requirements": [
+        "Proficiency in Python and completion of model development phases"
+      ],
+      "category": "Deployment and MLOps",
+      "sections": [
+        {
+          "name": "Model Deployment",
+          "order": 1,
+          "lessons": [
+            { "title": "AI Model Deployment (Flask, FastAPI, Streamlit) [cite: 50]" }
+          ]
+        },
+        {
+          "name": "Scaling and Operations",
+          "order": 2,
+          "lessons": [
+            { "title": "Scalable Cloud Platforms (AWS, Azure) [cite: 51]" }
+          ]
+        },
+        {
+          "name": "Ethics and Security",
+          "order": 3,
+          "lessons": [
+            { "title": "Security & Ethical Considerations in AI [cite: 52]" }
+          ]
+        }
+      ]
+    }
+  ]
+}
