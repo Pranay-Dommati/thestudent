@@ -188,24 +188,28 @@ const ResourcesPage = ({ lessonResources }) => {
   
   // Display a specific message when no resources are available
   const noResourcesMessage = (
-    <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
-      <p className="text-gray-500">No resources available for this lesson.</p>
+    <div className="text-center p-4 md:p-6 bg-gray-50 rounded-lg border border-gray-200">
+      <div className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-3 bg-white rounded-full flex items-center justify-center shadow-sm">
+        <FaFileAlt className="w-5 h-5 md:w-6 md:h-6 text-gray-400" />
+      </div>
+      <p className="text-gray-600 font-medium text-sm md:text-base mb-1">No Resources Available</p>
+      <p className="text-gray-500 text-xs md:text-sm">Check back later for supplementary materials.</p>
     </div>
   );
 
   // Render a resource item
   const renderResourceItem = (resource) => (
     <div 
-      className="p-4 bg-white hover:bg-gray-50 transition-colors"
+      className="p-3 md:p-4 bg-white hover:bg-gray-50 transition-colors"
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center">
-          <div className="p-2.5 bg-gray-100 rounded-lg mr-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-start sm:items-center flex-1 min-w-0">
+          <div className="p-2 md:p-2.5 bg-gray-100 rounded-lg mr-3 flex-shrink-0">
             {getResourceIcon(resource.type)}
           </div>
-          <div>
-            <h3 className="font-semibold text-gray-800">{resource.title}</h3>
-            <p className="text-gray-600 text-sm">{resource.description}</p>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-800 text-sm md:text-base truncate">{resource.title}</h3>
+            <p className="text-gray-600 text-xs md:text-sm line-clamp-2">{resource.description}</p>
           </div>
         </div>
         {resource.isDownloadable === false || resource.type === 'link' ? (
@@ -213,16 +217,16 @@ const ResourcesPage = ({ lessonResources }) => {
             href={resource.downloadUrl} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="ml-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center whitespace-nowrap"
+            className="w-full sm:w-auto px-3 py-2 md:px-4 bg-indigo-50 text-indigo-600 rounded-lg text-xs md:text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center justify-center whitespace-nowrap"
           >
-            <FaExternalLinkAlt className="mr-2" /> Visit Resource
+            <FaExternalLinkAlt className="mr-2 text-xs md:text-sm" /> Visit Resource
           </a>
         ) : (
           <button 
             onClick={() => handleDownload(resource)}
-            className="ml-4 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center whitespace-nowrap cursor-pointer"
+            className="w-full sm:w-auto px-3 py-2 md:px-4 bg-indigo-50 text-indigo-600 rounded-lg text-xs md:text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center justify-center whitespace-nowrap cursor-pointer"
           >
-            <FaDownload className="mr-2" /> Download
+            <FaDownload className="mr-2 text-xs md:text-sm" /> Download
           </button>
         )}
       </div>
@@ -230,10 +234,10 @@ const ResourcesPage = ({ lessonResources }) => {
   );
   
   return (
-    <div className="p-6">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Resources</h1>
-        <p className="text-gray-600">
+    <div className="p-3 md:p-6">
+      <header className="mb-4 md:mb-8">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-1 md:mb-2">Resources</h1>
+        <p className="text-gray-600 text-sm md:text-base">
           Supplementary materials to enhance your learning experience
         </p>
       </header>
@@ -241,20 +245,23 @@ const ResourcesPage = ({ lessonResources }) => {
       {!hasAnyResources ? (
         noResourcesMessage
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {/* Downloadable Resources Section - only show if lesson has this type */}
           {downloadableResources.length > 0 && (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
               <button 
                 onClick={toggleDownloadable}
-                className="w-full flex items-center justify-between p-4 bg-gray-50 transition-colors hover:bg-gray-100"
+                className="w-full flex items-center justify-between p-3 md:p-4 bg-gradient-to-r from-gray-50 to-gray-100 transition-colors hover:from-gray-100 hover:to-gray-200 active:scale-[0.99]"
               >
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Downloadable Resources
-                </h2>
+                <div className="flex items-center">
+                  <FaDownload className="text-indigo-600 mr-2 md:mr-3 text-sm md:text-base" />
+                  <h2 className="text-base md:text-xl font-semibold text-gray-800">
+                    Downloadable Resources
+                  </h2>
+                </div>
                 {downloadableOpen ? 
-                  <FaChevronUp className="text-gray-600" /> : 
-                  <FaChevronDown className="text-gray-600" />
+                  <FaChevronUp className="text-gray-600 text-sm md:text-base" /> : 
+                  <FaChevronDown className="text-gray-600 text-sm md:text-base" />
                 }
               </button>
               
@@ -270,17 +277,20 @@ const ResourcesPage = ({ lessonResources }) => {
 
           {/* Internet Resources Section - only show if lesson has this type */}
           {internetResources.length > 0 && (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
               <button 
                 onClick={toggleInternet}
-                className="w-full flex items-center justify-between p-4 bg-gray-50 transition-colors hover:bg-gray-100"
+                className="w-full flex items-center justify-between p-3 md:p-4 bg-gradient-to-r from-gray-50 to-gray-100 transition-colors hover:from-gray-100 hover:to-gray-200 active:scale-[0.99]"
               >
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Internet Resources
-                </h2>
+                <div className="flex items-center">
+                  <FaExternalLinkAlt className="text-indigo-600 mr-2 md:mr-3 text-sm md:text-base" />
+                  <h2 className="text-base md:text-xl font-semibold text-gray-800">
+                    Internet Resources
+                  </h2>
+                </div>
                 {internetOpen ? 
-                  <FaChevronUp className="text-gray-600" /> : 
-                  <FaChevronDown className="text-gray-600" />
+                  <FaChevronUp className="text-gray-600 text-sm md:text-base" /> : 
+                  <FaChevronDown className="text-gray-600 text-sm md:text-base" />
                 }
               </button>
               

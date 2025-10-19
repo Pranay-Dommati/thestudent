@@ -96,7 +96,10 @@ export default function AuthForm() {
 
   const handleGoogleError = (error) => {
     console.error('Google auth error:', error);
-  universalToast.error(`Google sign-in failed: ${error}`, { id: 'auth-login' });
+    // Only show error toast for actual errors, not for user dismissals
+    if (error && error !== 'Google Sign-In dismissed' && error !== 'Google Sign-In cancelled') {
+      universalToast.error(`Google sign-in failed: ${error}`, { id: 'auth-login' });
+    }
     setIsLoading(false);
   };
   

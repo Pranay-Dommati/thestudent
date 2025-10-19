@@ -332,24 +332,23 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     if (!lesson) return;
 
     setSavingProgress(true);
-    
-    try {
-      const response = await axiosInstance.post('/courses/mark-lesson-completed/', {
-        course_id: course.id,
-        lesson_id: lesson.id,
-        completed: !lesson.completed
-      });
 
-      if (response.status === 200) {
-        const updatedCourse = { ...course };
-        updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = !lesson.completed;
-        setCourse(updatedCourse);
-        
-  universalToast.success(lesson.completed ? 'Lesson marked as incomplete' : 'Lesson completed!');
+    // Optimistic UI update
+    const updatedCourse = { ...course };
+    updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = !lesson.completed;
+    setCourse(updatedCourse);
+
+    try {
+      if (lesson.id) {
+        await axiosInstance.post(`/lessons/toggle-completion/${lesson.id}/`);
       }
     } catch (error) {
       logger.error('❌ Error updating lesson completion:', error);
-  universalToast.error('Failed to update lesson progress');
+      universalToast.error('Failed to update lesson progress');
+      // Revert optimistic change on failure
+      const revert = { ...updatedCourse };
+      revert.chapters[chapterIndex].lessons[lessonIndex].completed = lesson.completed;
+      setCourse(revert);
     } finally {
       setSavingProgress(false);
     }
@@ -666,42 +665,43 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         {renderContent()}
       </div>
 
-      {/* Mobile Navigation - Fixed Bottom - Compact */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-2 z-30 shadow-lg">
-        <div className="flex items-center justify-between max-w-sm mx-auto">
+      {/* Mobile Navigation - Fixed Bottom - Professional */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30 shadow-2xl backdrop-blur-sm bg-opacity-95">
+        <div className="flex items-center justify-between gap-2 px-3 py-3 max-w-lg mx-auto">
           <button 
             onClick={() => navigateToLesson('prev')}
             disabled={activeChapter === 0 && activeLesson === 0}
-            className={`flex items-center px-3 py-2 rounded-lg font-medium text-sm ${
+            className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm transition-all ${
               activeChapter === 0 && activeLesson === 0 
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            } transition-colors`}
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50' 
+                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 hover:border-gray-400 active:scale-95'
+            }`}
           >
-            <FaChevronLeft className="w-3 h-3 mr-1" />
-            Prev
+            <FaChevronLeft className="w-3.5 h-3.5" />
+            <span>Prev</span>
           </button>
+          
           {/* Center action: open course sidebar (topics) */}
           <button
             onClick={() => setShowMobileMenu(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-r from-indigo-600 to-indigo-700 text-white hover:from-indigo-700 hover:to-indigo-800 shadow-lg hover:shadow-xl transition-all active:scale-95"
             aria-label="Open course topics"
           >
-            <FaList className="w-3 h-3" />
-            Topics
+            <FaList className="w-3.5 h-3.5" />
+            <span>Topics</span>
           </button>
           
           <button 
             onClick={() => navigateToLesson('next')}
             disabled={activeChapter === course?.chapters.length - 1 && activeLesson === course?.chapters[activeChapter]?.lessons.length - 1}
-            className={`flex items-center px-3 py-2 rounded-lg font-medium text-sm ${
+            className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm transition-all ${
               activeChapter === course?.chapters.length - 1 && activeLesson === course?.chapters[activeChapter]?.lessons.length - 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                : 'bg-indigo-600 text-white hover:bg-indigo-700'
-            } transition-colors`}
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50' 
+                : 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white hover:from-indigo-700 hover:to-indigo-800 shadow-md hover:shadow-lg active:scale-95'
+            }`}
           >
-            Next
-            <FaChevronRight className="w-3 h-3 ml-1" />
+            <span>Next</span>
+            <FaChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -749,7 +749,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             </div>
             
             {/* Course chapters list */}
-            <div className="overflow-y-auto h-full pb-20">
+            <div className="overflow-y-auto h-full pb-48">
               {course?.chapters?.length === 0 && (
                 <div className="p-6 text-center">
                   <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
@@ -815,7 +815,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                       {chapter.lessons.map((lesson, lessonIndex) => (
                         <button
                           key={lessonIndex}
-                          className={`w-full p-3 pl-12 flex items-center justify-between hover:bg-gray-100 transition-colors text-left group ${
+                          className={`w-full p-3 pl-4 flex items-center justify-between hover:bg-gray-100 transition-colors text-left group ${
                             activeChapter === chapterIndex && activeLesson === lessonIndex
                               ? 'bg-indigo-50 border-r-4 border-indigo-500'
                               : ''
@@ -823,22 +823,27 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                           onClick={() => handleLessonClick(chapterIndex, lessonIndex)}
                         >
                           <div className="flex items-center flex-1 min-w-0">
-                            <div className={`mr-3 p-1.5 rounded-full ${
-                              lesson.completed 
-                                ? 'bg-green-100' 
-                                : activeChapter === chapterIndex && activeLesson === lessonIndex
-                                ? 'bg-indigo-100'
-                                : 'bg-gray-100'
-                            }`}>
-                              {lesson.completed ? (
-                                <FaCheck className="w-3 h-3 text-green-600" />
-                              ) : lesson.type === 'quiz' ? (
-                                <FaQuestionCircle className="w-3 h-3 text-orange-500" />
-                              ) : lesson.type === 'reading' || lesson.type === 'instructions' ? (
-                                <FaBook className="w-3 h-3 text-blue-500" />
-                              ) : (
-                                <FaPlay className="w-3 h-3 text-indigo-500" />
-                              )}
+                            {/* Completion toggle moved to the left of title */}
+                            <div
+                              className={`mr-3 w-5 h-5 flex items-center justify-center rounded-full border-2 cursor-pointer select-none touch-manipulation active:scale-95 transition-all ${
+                                lesson.completed ? 'bg-green-50 border-green-500' : 'bg-white border-gray-300 hover:border-gray-400'
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleLessonCompletion(chapterIndex, lessonIndex);
+                              }}
+                              role="checkbox"
+                              aria-checked={!!lesson.completed}
+                              aria-label={`Mark \"${lesson.title}\" as ${lesson.completed ? 'incomplete' : 'complete'}`}
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  toggleLessonCompletion(chapterIndex, lessonIndex);
+                                }
+                              }}
+                            >
+                              {lesson.completed && <FaCheck className="w-3 h-3 text-green-600" />}
                             </div>
                             <div className="flex-1 min-w-0">
                               <h4 className={`text-sm font-medium truncate ${

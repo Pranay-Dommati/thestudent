@@ -127,13 +127,18 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
           }
         } catch {}
         if (notification.isNotDisplayed && notification.isNotDisplayed()) {
-          console.log('Google Sign-In prompt not displayed');
+          console.log('Google Sign-In prompt not displayed, trying fallback method');
           // Fallback: try rendering a button and clicking it programmatically
+          // Don't call onError here - let the fallback try first
           renderGoogleButtonAndClick();
         } else if (notification.isSkippedMoment && notification.isSkippedMoment()) {
           console.log('Google Sign-In prompt skipped');
           universalToast.error('Google Sign-In was cancelled');
           try { onError && onError('Google Sign-In cancelled'); } catch {}
+        } else if (notification.isDismissedMoment && notification.isDismissedMoment()) {
+          console.log('Google Sign-In popup dismissed/closed by user');
+          // Reset loading state when user closes the popup
+          try { onError && onError('Google Sign-In dismissed'); } catch {}
         }
       });
     } catch (error) {
@@ -189,11 +194,38 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
 // Usage in AuthForm component:
 export const GoogleSignInButton = ({ onSuccess, onError, onStart, onShown, disabled = false }) => {
   const { isGoogleReady, isLoading, signInWithGoogle } = useGoogleAuth(onSuccess, onError, onShown);
+  const [timeoutId, setTimeoutId] = React.useState(null);
+
+  const handleClick = () => {
+    try {
+      onStart && onStart();
+    } catch {}
+    
+    signInWithGoogle();
+    
+    // Safety timeout: if nothing happens within 30 seconds, reset loading state
+    const id = setTimeout(() => {
+      console.log('Google Sign-In timeout - resetting state');
+      try {
+        onError && onError('Google Sign-In timeout');
+      } catch {}
+    }, 30000);
+    setTimeoutId(id);
+  };
+
+  // Clear timeout when component unmounts or when loading completes
+  React.useEffect(() => {
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [timeoutId]);
 
   return (
     <button
       type="button"
-      onClick={() => { try { onStart && onStart(); } catch {} signInWithGoogle(); }}
+      onClick={handleClick}
       disabled={disabled || !isGoogleReady}
       className="w-full flex justify-center items-center py-4 px-4 border-2 border-gray-200 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-0"
       aria-label="Continue with Google"

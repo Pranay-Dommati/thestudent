@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import Navbar from '../Navbar/Navbar';
 import Footer from '../Footer/Footer';
 import CourseLearning from './CourseLearning';
+import CourseLoadingSkeleton from './CourseLoadingSkeleton';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 import { useAuth } from '../../context/AuthContext';
 
@@ -55,11 +56,13 @@ const CourseLearningPage = () => {
     <>
       <Navbar initialStyle="light" />
       <div className="pt-14 min-h-screen bg-white">
-        <CourseLearning 
-          courseId={determineCourseId()}
-          pathname={location.pathname}
-          onSidebarToggle={handleSidebarToggle}
-        />
+        <Suspense fallback={<CourseLoadingSkeleton />}>
+          <CourseLearning 
+            courseId={determineCourseId()}
+            pathname={location.pathname}
+            onSidebarToggle={handleSidebarToggle}
+          />
+        </Suspense>
       </div>
       {/* Footer now responds to sidebar visibility */}
       <div className={`transition-all duration-300 ${sidebarVisible ? 'mr-[400px]' : ''}`}>

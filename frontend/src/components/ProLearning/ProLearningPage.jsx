@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useSearchParams, useNavigate, useParams } from "react-router-dom";
-import universalToast from '../../utils/universalToast';
+import { toast } from 'react-hot-toast';
 import { 
   IoHome, IoChevronBack, IoPlayCircle, IoBookmark, IoDownload, 
   IoCheckmarkCircle, IoTime, IoEye, IoStar, IoSparkles, IoRocket, 
@@ -2851,20 +2851,12 @@ const ProLearningPage = () => {
         // Mark course as ready (with quota error handling)
         safeLocalStorageSet(`proLearning_courseReady_${currentCourseId}`, 'true');
 
-        // Emit a custom event so Learning Hub lists update in realtime
-        try {
-          const ev = new CustomEvent('prolearning:course-saved', {
-            detail: { id: responseData?.course?.id || currentCourseId, title: responseData?.course?.title || smartCourseName }
-          });
-          window.dispatchEvent(ev);
-        } catch {}
-
         // Show a one-time notification that generation completed and was added to Learning Hub
         try {
           const notifiedKey = `proLearning_savedNotified_${currentCourseId}`;
           const alreadyNotified = localStorage.getItem(notifiedKey) === 'true';
           if (!alreadyNotified) {
-            universalToast.success('🎉 Course generation completed and added to your Learning Hub');
+            toast.success('🎉 Course generation completed and added to your Learning Hub');
             safeLocalStorageSet(notifiedKey, 'true');
           }
         } catch (_) {
@@ -3118,13 +3110,7 @@ const ProLearningPage = () => {
       if (response.status >= 200 && response.status < 300) {
   console.log('✅ Course saved to Learning Hub successfully!', responseData);
   try { tracking.capture('pro_learning.save_succeeded', { course_id: currentCourseId }, { feature: 'pro_learning' }); } catch {}
-  universalToast.success('✅ Course saved to your Learning Hub successfully!');
-        try {
-          const ev = new CustomEvent('prolearning:course-saved', {
-            detail: { id: responseData?.course?.id || currentCourseId, title: responseData?.course?.title || smartCourseName }
-          });
-          window.dispatchEvent(ev);
-        } catch {}
+        toast.success('✅ Course saved to your Learning Hub successfully!');
         
         // Refresh usage stats after saving (topics were created in DB)
         try {
@@ -3163,7 +3149,7 @@ const ProLearningPage = () => {
   console.error('❌ Failed to save course:', responseData);
   try { tracking.capture('pro_learning.save_failed', { course_id: currentCourseId, status: response.status }, { feature: 'pro_learning', success: false, error_code: String(response.status) }); } catch {}
         if (response.status === 401) {
-          universalToast.error('Authentication failed. Please log in again.');
+          toast.error('Authentication failed. Please log in again.');
         } else if (response.status === 409) {
           toast.warning('This course already exists in your Learning Hub.');
           // Mark as saved locally to reflect existing state
@@ -3177,14 +3163,14 @@ const ProLearningPage = () => {
             }
           } catch {}
         } else {
-          universalToast.error(responseData.error || 'Failed to save course');
+          toast.error(responseData.error || 'Failed to save course');
         }
       }
 
     } catch (error) {
       console.error('❌ Failed to save course to Learning Hub:', error);
       try { tracking.capture('pro_learning.save_failed', { course_id: currentCourseId, message: String(error) }, { feature: 'pro_learning', success: false, error_code: 'NETWORK' }); } catch {}
-  universalToast.error('Network error. Please check your connection and try again.');
+      toast.error('Network error. Please check your connection and try again.');
     }
   };
 
@@ -3469,27 +3455,16 @@ const ProLearningPage = () => {
               });
                 // Merge new tab content into existing state
                 // IMPORTANT: preserve previously displayed reading; don't overwrite with later updates
-                const prevContentTopicName = contentTopicName; // capture before we update it below
-                setContent(prev => {
-                  const sameTopic = prevContentTopicName === tabInfo.topic;
-                  return {
-                    reading: (prev?.reading && prev.reading.trim().length > 0)
-                      ? prev.reading
-                      : (formattedContent.reading || ''),
-                    summary: formattedContent.summary || (sameTopic ? (prev?.summary || '') : ''),
-                    quiz: (Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0)
-                      ? formattedContent.quiz
-                      : (sameTopic ? (prev?.quiz || []) : []),
-                    videos: (Array.isArray(formattedContent.videos) && formattedContent.videos.length > 0)
-                      ? formattedContent.videos
-                      : (sameTopic ? (prev?.videos || []) : []),
-                    // Do NOT carry over resources from a previous topic
-                    resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0)
-                      ? formattedContent.resources
-                      : (sameTopic ? (prev?.resources || []) : []),
-                    resourcesMetadata: formattedContent.resourcesMetadata || (sameTopic ? (prev?.resourcesMetadata || null) : null)
-                  };
-                });
+                setContent(prev => ({
+                  reading: (prev?.reading && prev.reading.trim().length > 0)
+                    ? prev.reading
+                    : (formattedContent.reading || ''),
+                  summary: formattedContent.summary || prev?.summary || '',
+                  quiz: (Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) ? formattedContent.quiz : (prev?.quiz || []),
+                  videos: (Array.isArray(formattedContent.videos) && formattedContent.videos.length > 0) ? formattedContent.videos : (prev?.videos || []),
+                  resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0) ? formattedContent.resources : (prev?.resources || []),
+                  resourcesMetadata: formattedContent.resourcesMetadata || prev?.resourcesMetadata || null
+                }));
                     // Set the topic name for which this content is now current so non-reading tabs can render immediately
                     try { setContentTopicName(tabInfo.topic); } catch {}
                 
@@ -6077,7 +6052,7 @@ const ProLearningPage = () => {
                       // Check if current topic is blocked (2nd topic onwards)
                       const currentTopicBlocked = currentTopicName ? isTopicBlocked(currentTopicName) : false;
                       
-                      // Check if tab has content already for this topic (do NOT borrow from previous topic)
+                      // Check if tab has content already (treat as available even if tabs map isn’t filled yet)
                       const hasTabContent = !!content && contentTopicName === currentTopicName && (
                         (tab.id === 'reading' && !!content?.reading && String(content.reading).trim().length > 0) ||
                         (tab.id === 'summary' && !!content?.summary && String(content.summary).trim().length > 0) ||
@@ -6086,7 +6061,15 @@ const ProLearningPage = () => {
                         // Treat resources as ready if array has items OR metadata indicates completion
                         (tab.id === 'resources' && (
                           (Array.isArray(content?.resources) && content.resources.length > 0) ||
-                          !!content?.resourcesMetadata?.generatedAt
+                          !!content?.resourcesMetadata?.generatedAt ||
+                          // Reload/DB mode fallback: if other tabs exist, allow clicking to show empty state
+                          (loadScenario === 'reload' && (
+                            (!!content?.reading && String(content.reading).trim().length > 0) ||
+                            (!!content?.summary && String(content.summary).trim().length > 0) ||
+                            (Array.isArray(content?.videos) && content.videos.length > 0) ||
+                            (Array.isArray(content?.quiz) && content.quiz.length > 0) ||
+                            (!!content?.quiz?.questions && Array.isArray(content?.quiz?.questions) && content.quiz.questions.length > 0)
+                          ))
                         ))
                       );
 
@@ -6110,7 +6093,10 @@ const ProLearningPage = () => {
                           isTabAvailable = false;
                         } else {
                           isTabAvailable = ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes(tab.id)) || hasTabContent);
-                          // Do not relax gating for Resources in reload mode; it should only enable when completed for this topic
+                          // Relax gating for Resources in reload mode so users can see the empty state
+                          if (!isTabAvailable && loadScenario === 'reload' && tab.id === 'resources' && otherTabsPresent) {
+                            isTabAvailable = true;
+                          }
                           if ((isProgressiveGenerating) && tab.id !== 'reading' && !readingReady) {
                             isTabAvailable = false;
                           }

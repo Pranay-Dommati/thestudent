@@ -9,7 +9,9 @@ import ResourcesPage from './templ/ResourcesPage';
 import QuizIntro from './templ/QuizIntro';
 import InstructionsPage from './templ/InstructionsPage';
 import Sidebar from './Sidebar';
+import CourseLoadingSkeleton from './CourseLoadingSkeleton';
 import axiosInstance from '../../utils/axios';
+import courseCache from '../../utils/courseCache';
 import universalToast from '../../utils/universalToast';
 import { useAuth } from '../../context/AuthContext';
 
@@ -39,6 +41,29 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const location = useLocation();
   const { isLoggedIn } = useAuth();
 
+  // **HELPER FUNCTION: Update course with progress data**
+  const updateCourseWithProgress = (courseData, progressData) => {
+    const updatedCourse = { ...courseData };
+    
+    if (progressData.chapters) {
+      progressData.chapters.forEach(chapter => {
+        const chapterIndex = updatedCourse.chapters.findIndex(c => c.title === chapter.name);
+        if (chapterIndex !== -1) {
+          chapter.lessons.forEach(lessonProgress => {
+            const lessonIndex = updatedCourse.chapters[chapterIndex].lessons.findIndex(l => 
+              String(l.id) === String(lessonProgress.id)
+            );
+            if (lessonIndex !== -1) {
+              updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = !!lessonProgress.completed;
+            }
+          });
+        }
+      });
+    }
+    
+    return updatedCourse;
+  };
+
   useEffect(() => {
     // Extract URL path to determine course type and proper API endpoint
     const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
@@ -46,8 +71,27 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Fetch regular course data
+        
+        // **OPTIMIZATION 1: Check cache first**
+        const cacheKey = courseCache.generateKey(pathname);
+        const cachedData = courseCache.get(cacheKey);
+        
+        if (cachedData) {
+          console.log('⚡ Loading course from cache - instant load!');
+          setCourse(cachedData.course);
+          if (cachedData.progress) {
+            setCourseProgress(cachedData.progress);
+            setServerProgress(cachedData.progress.progress);
+          }
+          setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
+          setLoading(false);
+          return;
+        }
+        
+        // **OPTIMIZATION 2: Parallel API requests**
+        // Fetch course and progress data in parallel
         await fetchRegularCourse(pathParts);
+        
       } catch (error) {
         console.error('❌ Error fetching course data:', error);
         setError(error.message || 'Failed to load course data');
@@ -234,6 +278,38 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         // Expand the first chapter by default
         if (transformedCourse.chapters.length > 0) {
           setExpandedChapters({ 0: true });
+        }
+        
+        // **OPTIMIZATION 3: Fetch progress in parallel (if user is logged in)**
+        if (isLoggedIn && transformedCourse.id) {
+          try {
+            const progressResponse = await axiosInstance.get(`/courses/progress/${transformedCourse.id}/`);
+            setCourseProgress(progressResponse.data);
+            if (progressResponse?.data?.progress) {
+              setServerProgress(progressResponse.data.progress);
+            }
+            
+            // Update course with progress and cache
+            const updatedCourse = updateCourseWithProgress(transformedCourse, progressResponse.data);
+            setCourse(updatedCourse);
+            
+            // **OPTIMIZATION 4: Cache the complete data**
+            const cacheKey = courseCache.generateKey(pathname);
+            courseCache.set(cacheKey, {
+              course: updatedCourse,
+              progress: progressResponse.data
+            });
+            console.log('💾 Course data cached for faster future loads');
+          } catch (progressError) {
+            console.error('⚠️ Error fetching progress (non-critical):', progressError);
+            // Still cache course without progress
+            const cacheKey = courseCache.generateKey(pathname);
+            courseCache.set(cacheKey, { course: transformedCourse });
+          }
+        } else {
+          // Cache course without progress for non-logged-in users
+          const cacheKey = courseCache.generateKey(pathname);
+          courseCache.set(cacheKey, { course: transformedCourse });
         }
         
       } catch (error) {
