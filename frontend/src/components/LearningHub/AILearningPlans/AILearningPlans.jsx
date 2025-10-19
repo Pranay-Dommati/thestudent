@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 // logger removed for production cleanliness
 import { Link, useNavigate } from 'react-router-dom';
 import axios from '../../../utils/axios';
@@ -18,8 +18,31 @@ const AILearningPlans = () => {
 
   const COURSES_TO_SHOW = 6;
 
-  const refreshCourses = useCallback(() => {
-    fetchProCourses();
+  // Simple session cache to speed up UI. Stored shape: { ts: number, data: Array }
+  const CACHE_KEY = 'ai_pro_courses_cache_v1';
+  const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+  const isFetchingRef = useRef(null); // holds in-flight promise
+
+  const readCache = () => {
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.ts || !Array.isArray(parsed.data)) return null;
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const writeCache = (data) => {
+    try {
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+    } catch (_) {}
+  };
+
+  const refreshCourses = useCallback((force = false) => {
+    fetchProCourses(force);
   }, []);
 
   useEffect(() => {
@@ -28,16 +51,17 @@ const AILearningPlans = () => {
 
   // Lightweight realtime refresh: listen to custom events and storage changes (no polling)
   useEffect(() => {
-    const onSaved = () => refreshCourses();
+    // Force refresh when these events indicate backend changes or page becomes active
+    const onSaved = () => refreshCourses(true);
     const onStorage = (e) => {
       if (e && typeof e.key === 'string' && (e.key.startsWith('proLearning_') || e.key === 'coursesSavedToHub')) {
-        refreshCourses();
+        refreshCourses(true);
       }
     };
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') refreshCourses();
+      if (document.visibilityState === 'visible') refreshCourses(true);
     };
-    const onFocus = () => refreshCourses();
+    const onFocus = () => refreshCourses(true);
     window.addEventListener('prolearning:course-saved', onSaved);
     window.addEventListener('storage', onStorage);
     document.addEventListener('visibilitychange', onVisibility);
@@ -50,35 +74,68 @@ const AILearningPlans = () => {
     };
   }, [refreshCourses]);
 
-  const fetchProCourses = async () => {
+  const fetchProCourses = async (force = false) => {
+    // If we have a fresh cache and not forcing, use it instantly
     try {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        setError('Authentication required');
+      const cached = readCache();
+      if (!force && cached && (Date.now() - cached.ts) < CACHE_TTL) {
+        setProCourses(cached.data);
         setLoading(false);
-        return;
+        // still consider returning early; avoid network call
+        return cached.data;
       }
+    } catch (_) {}
 
-  
-      const response = await axios.get(`/courses/pro-learning/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-  
-      setProCourses(response.data.results || response.data || []);
-      setError(null);
-    } catch (error) {
-  
-      if (error.response?.status === 401) {
-        setError('Please log in to view your AI-created courses');
-      } else {
-        setError('Failed to load AI-created courses');
+    // Deduplicate in-flight requests
+    if (isFetchingRef.current && !force) {
+      try {
+        const result = await isFetchingRef.current;
+        return result;
+      } catch (e) {
+        // continue to attempt fetch below
       }
-    } finally {
+    }
+
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      setError('Authentication required');
       setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const p = (async () => {
+      try {
+        const response = await axios.get(`/courses/pro-learning/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = response.data.results || response.data || [];
+        setProCourses(data);
+        writeCache(data);
+        setError(null);
+        return data;
+      } catch (error) {
+        if (error.response?.status === 401) {
+          setError('Please log in to view your AI-created courses');
+        } else {
+          setError('Failed to load AI-created courses');
+        }
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    })();
+
+    isFetchingRef.current = p;
+    try {
+      const res = await p;
+      return res;
+    } finally {
+      isFetchingRef.current = null;
     }
   };
 
@@ -135,7 +192,11 @@ const AILearningPlans = () => {
       });
 
       // Remove the deleted course from state
-      setProCourses(prevCourses => prevCourses.filter(c => c.id !== course.id));
+      const updated = proCourses.filter(c => c.id !== course.id);
+      setProCourses(updated);
+      // Update cache so the UI remains consistent if user switches tabs
+      writeCache(updated);
+      
       universalToast.success(`"${formatCourseName(course)}" has been deleted successfully`);
       try {
         const ev = new CustomEvent('prolearning:course-deleted', { detail: { id: course.id, name: formatCourseName(course) } });
