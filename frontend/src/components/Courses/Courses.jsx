@@ -149,16 +149,14 @@ const Courses = () => {
     }, [location.pathname]);
 
     const containerVariants = {
-        hidden: { opacity: 0, y: 20 },
+        hidden: { opacity: 0 },
         visible: {
             opacity: 1,
-            y: 0,
-            transition: { duration: 0.4, ease: "easeOut" }
+            transition: { duration: 0.3 }
         },
         exit: {
             opacity: 0,
-            y: -20,
-            transition: { duration: 0.3 }
+            transition: { duration: 0.2 }
         }
     };
 
@@ -199,24 +197,21 @@ const Courses = () => {
                                         <motion.button
                                             key={level.id}
                                             onClick={() => handleLevelSelect(level.id)}
-                                            className="group relative bg-white rounded-2xl shadow-sm hover:shadow-xl 
-                                                     transition-all duration-300 border border-gray-100 overflow-hidden"
-                                            whileHover={{ y: -5 }}
+                                            className="group relative bg-white rounded-2xl shadow-sm hover:shadow-lg 
+                                                     transition-shadow duration-200 border border-gray-100 overflow-hidden"
                                             whileTap={{ scale: 0.98 }}
                                         >
-                                            <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-50 
-                                                          opacity-0 group-hover:opacity-100 transition-opacity duration-300"/>
                                             <div className="relative p-8 flex flex-col items-center text-center">
                                                 <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center 
                                                               justify-center mb-4 group-hover:bg-indigo-600 
-                                                              transition-colors duration-300">
+                                                              transition-colors duration-200">
                                                     <level.icon className="w-8 h-8 text-indigo-600 
-                                                                         group-hover:text-white transition-colors"/>
+                                                                         group-hover:text-white transition-colors duration-200"/>
                                                 </div>
                                                 <h3 className="text-xl font-bold text-gray-900 mb-2">
                                                     {level.name}
                                                 </h3>
-                                                <p className="text-gray-500 text-sm group-hover:text-gray-600">
+                                                <p className="text-gray-500 text-sm">
                                                     {level.description}
                                                 </p>
                                             </div>

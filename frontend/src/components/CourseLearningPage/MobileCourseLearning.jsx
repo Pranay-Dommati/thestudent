@@ -10,6 +10,7 @@ import QuizIntro from './templ/QuizIntro';
 import InstructionsPage from './templ/InstructionsPage';
 import axiosInstance from '../../utils/axios';
 import universalToast from '../../utils/universalToast';
+import courseCache from '../../utils/courseCache';
 import { useAuth } from '../../context/AuthContext';
 
 const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
@@ -38,6 +39,22 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        
+        // Check cache first for instant load
+        const cacheKey = courseCache.generateKey(pathname);
+        const cachedData = courseCache.get(cacheKey);
+        
+        if (cachedData) {
+          console.log('⚡ Mobile: Loading course from cache - instant load!');
+          setCourse(cachedData.course);
+          if (cachedData.progress) {
+            setCourseProgress(cachedData.progress);
+          }
+          setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
+          setLoading(false);
+          return;
+        }
+        
         await fetchRegularCourse(pathParts);
       } catch (error) {
         logger.error('❌ Error fetching course data:', error);
@@ -200,6 +217,11 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           setActiveChapter(0);
           setActiveLesson(0);
         }
+        
+        // Cache the course data for faster future loads
+        const cacheKey = courseCache.generateKey(pathname);
+        courseCache.set(cacheKey, { course: transformedCourse });
+        console.log('💾 Mobile: Course data cached for faster future loads');
       } catch (error) {
         logger.error('❌ Error fetching course data:', error);
         const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
@@ -255,13 +277,21 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         
         setCourse(updatedCourse);
         
+        // Update cache with progress data
+        const cacheKey = courseCache.generateKey(pathname);
+        courseCache.set(cacheKey, { 
+          course: updatedCourse,
+          progress: response.data 
+        });
+        console.log('💾 Mobile: Updated cache with progress data');
+        
       } catch (error) {
         logger.error('❌ Error fetching user progress:', error);
       }
     };
 
     fetchUserProgress();
-  }, [isLoggedIn, course?.id]);
+  }, [isLoggedIn, course?.id, pathname]);
 
   // Navigation helpers
   const handleLessonClick = (chapterIndex, lessonIndex) => {
@@ -575,31 +605,9 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     }
   };
 
-  // Safer back navigation: go back if we have in-app history, otherwise fall back to a course page or courses list
+  // Simple back navigation: go back to the previous page
   const handleBack = () => {
-    try {
-      const hasHistory = window.history.length > 1;
-      const sameOriginReferrer = document.referrer && (() => {
-        try { return new URL(document.referrer).origin === window.location.origin; } catch { return false; }
-      })();
-
-      if (hasHistory && sameOriginReferrer) {
-        navigate(-1);
-        return;
-      }
-
-      // Build a sensible fallback URL
-      let fallback = '/courses';
-      const parts = (pathname || '').split('/').filter(Boolean);
-      const engIdx = parts.indexOf('engineering');
-      if (engIdx !== -1 && parts[engIdx + 1]) {
-        const id = parts[engIdx + 1] || courseId;
-        fallback = `/courses/engineering/${id}`;
-      }
-      navigate(fallback, { replace: true });
-    } catch {
-      navigate('/courses', { replace: true });
-    }
+    navigate(-1);
   };
 
   if (loading) {

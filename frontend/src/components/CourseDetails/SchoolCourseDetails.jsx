@@ -19,6 +19,7 @@ const SchoolCourseDetails = () => {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [checkingEnrollment, setCheckingEnrollment] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [showAllTopics, setShowAllTopics] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { boardId, stateId, subjectId } = useParams();
@@ -382,9 +383,11 @@ const SchoolCourseDetails = () => {
                 onClick={handleStartLearning}
                 disabled={checkingEnrollment || isStarting}
                 aria-busy={isStarting}
-                className={`w-full sm:w-auto text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-medium text-sm sm:text-base
-                         flex items-center justify-center sm:justify-start space-x-2 transform transition
-                         ${checkingEnrollment || isStarting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600 hover:scale-105'}`}
+                className={`w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-medium text-sm sm:text-base
+                         flex items-center justify-center sm:justify-start space-x-2 transform transition-all duration-200
+                         ${checkingEnrollment || isStarting 
+                           ? 'bg-white/50 text-white/70 cursor-not-allowed' 
+                           : 'bg-white/90 text-indigo-700 hover:bg-white hover:scale-[1.02] shadow-sm hover:shadow-md'}`}
               >
                 <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span>
@@ -428,15 +431,15 @@ const SchoolCourseDetails = () => {
 
   <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-8 md:py-12 pb-16 md:pb-12">
         {/* Course Features */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8 md:mb-12">
+        <div className="space-y-4 sm:space-y-5 md:grid md:grid-cols-3 md:gap-6 md:space-y-0 mb-8 sm:mb-10 md:mb-12">
           {course.features.map((feature, index) => (
-            <div key={index} className="bg-white p-4 sm:p-6 rounded-lg sm:rounded-xl shadow-sm flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left">
-              <div className="bg-indigo-100 p-2 sm:p-3 rounded-lg text-indigo-600 mb-3 sm:mb-0 sm:mr-4">
+            <div key={index} className="flex items-start md:block md:bg-white md:p-6 md:rounded-xl md:shadow-sm md:border md:border-gray-200 md:hover:shadow-md md:transition-shadow">
+              <div className="text-indigo-500 mt-1 flex-shrink-0 text-lg sm:text-xl md:bg-indigo-100 md:p-3 md:rounded-lg md:text-indigo-600 md:mb-4 md:inline-block">
                 {feature.icon}
               </div>
-              <div>
-                <h3 className="font-bold text-base sm:text-lg mb-1 sm:mb-2">{feature.title}</h3>
-                <p className="text-gray-600 text-xs sm:text-sm">{feature.desc}</p>
+              <div className="ml-3 sm:ml-4 md:ml-0">
+                <h3 className="font-semibold text-base sm:text-lg text-gray-900 md:mb-2">{feature.title}</h3>
+                <p className="text-gray-600 text-sm sm:text-base leading-relaxed mt-0.5 md:mt-0">{feature.desc}</p>
               </div>
             </div>
           ))}
@@ -444,26 +447,67 @@ const SchoolCourseDetails = () => {
 
         {/* Key Topics */}
         <div className="mt-6 sm:mt-8 md:mt-12">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-4 sm:mb-6">Key Topics Covered</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {course.keyTopics.map((topic, index) => (
-              <div key={index} className="bg-white p-3 sm:p-4 rounded-lg sm:rounded-xl border border-gray-100">
-                <span className="text-gray-800 text-xs sm:text-sm">{topic}</span>
+          <div className="flex items-center justify-between mb-5 sm:mb-6 md:mb-8">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Key Topics Covered</h2>
+            {course.keyTopics.length > 6 && (
+              <button
+                onClick={() => setShowAllTopics(!showAllTopics)}
+                className="text-indigo-600 hover:text-indigo-700 text-sm sm:text-base font-medium flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+              >
+                {showAllTopics ? 'Show Less' : 'Show All'}
+                <svg 
+                  className={`w-4 h-4 transition-transform ${showAllTopics ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            )}
+          </div>
+          
+          <div className="space-y-3 sm:space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+            {(showAllTopics ? course.keyTopics : course.keyTopics.slice(0, 6)).map((topic, index) => (
+              <div key={index} className="flex items-start md:bg-white md:border md:border-gray-100 md:rounded-lg md:p-4">
+                <FaBook className="text-indigo-500 mt-1 flex-shrink-0 h-3 w-3 sm:h-3.5 sm:w-3.5 md:w-8 md:h-8 md:bg-indigo-50 md:rounded-md md:p-2 md:mt-0" />
+                <div className="ml-3 sm:ml-4">
+                  <h3 className="text-gray-800 text-sm sm:text-base md:text-lg font-medium md:font-semibold">{topic}</h3>
+                  <p className="text-gray-400 text-xs sm:text-sm md:text-base mt-0.5">
+                    Chapter {index + 1} • Essential concept
+                  </p>
+                </div>
               </div>
             ))}
           </div>
+          
+          {course.keyTopics.length > 6 && !showAllTopics && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => setShowAllTopics(true)}
+                className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors"
+              >
+                View {course.keyTopics.length - 6} more topics
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* What You'll Learn */}
-        <div className="mt-6 sm:mt-8 md:mt-12 bg-white rounded-lg sm:rounded-xl p-4 sm:p-6 md:p-8 shadow-sm">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-4 sm:mb-6">What You'll Learn</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {course.whatYouLearn.map((item, index) => (
-              <div key={index} className="flex items-start">
-                <FaCheck className="text-indigo-600 mt-1 flex-shrink-0 h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="ml-3 text-gray-700 text-xs sm:text-sm">{item}</span>
-              </div>
-            ))}
+        <div className="mt-6 sm:mt-8 md:mt-12 bg-white rounded-xl border border-gray-200 shadow-sm">
+          <div className="p-5 sm:p-7 md:p-8">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-5 sm:mb-6 md:mb-7 text-gray-900">What You'll Learn</h2>
+            <div className="space-y-3 sm:space-y-4 md:grid md:grid-cols-2 md:gap-6 md:space-y-0">
+              {course.whatYouLearn.map((item, index) => (
+                <div key={index} className="flex items-start md:p-4 md:bg-white md:border md:border-gray-200 md:rounded-lg">
+                  <FaCheck className="text-green-500 mt-1 flex-shrink-0 h-3 w-3 sm:h-3.5 sm:w-3.5 md:w-5 md:h-5 md:mt-0.5" />
+                  <span className="ml-3 sm:ml-4 text-gray-700 text-sm sm:text-base md:text-lg leading-relaxed md:font-medium">{item}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
