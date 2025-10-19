@@ -14,6 +14,7 @@ const AILearningPlans = () => {
   const [error, setError] = useState(null);
   const [showMore, setShowMore] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, course: null });
 
   const COURSES_TO_SHOW = 6;
 
@@ -115,11 +116,18 @@ const AILearningPlans = () => {
     }
   };
 
-  const deleteCourse = async (courseId, courseName) => {
-    setDeleteLoading(courseId);
+  const handleDeleteClick = (course) => {
+    setDeleteConfirm({ show: true, course });
+  };
+
+  const confirmDelete = async () => {
+    const course = deleteConfirm.course;
+    if (!course) return;
+
+    setDeleteLoading(course.id);
     try {
       const token = localStorage.getItem('accessToken');
-      await axios.delete(`/courses/pro-learning/${courseId}/`, {
+      await axios.delete(`/courses/pro-learning/${course.id}/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -127,23 +135,22 @@ const AILearningPlans = () => {
       });
 
       // Remove the deleted course from state
-      setProCourses(prevCourses => prevCourses.filter(course => course.id !== courseId));
-  universalToast.success(`"${courseName}" has been deleted successfully`);
+      setProCourses(prevCourses => prevCourses.filter(c => c.id !== course.id));
+      universalToast.success(`"${formatCourseName(course)}" has been deleted successfully`);
       try {
-        const ev = new CustomEvent('prolearning:course-deleted', { detail: { id: courseId, name: courseName } });
+        const ev = new CustomEvent('prolearning:course-deleted', { detail: { id: course.id, name: formatCourseName(course) } });
         window.dispatchEvent(ev);
       } catch {}
     } catch (error) {
-  
-  universalToast.error('Failed to delete course. Please try again.');
+      universalToast.error('Failed to delete course. Please try again.');
     } finally {
       setDeleteLoading(null);
+      setDeleteConfirm({ show: false, course: null });
     }
   };
 
-  const handleDeleteClick = (course) => {
-  
-    deleteCourse(course.id, course.course_name);
+  const cancelDelete = () => {
+    setDeleteConfirm({ show: false, course: null });
   };
 
   const getProgressColor = (percentage) => {
@@ -220,15 +227,17 @@ const AILearningPlans = () => {
 
   if (proCourses.length === 0) {
     return (
-      <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-8 text-center">
-        <FaBrain className="mx-auto text-4xl text-purple-600 mb-4" />
-        <h3 className="text-xl font-semibold text-gray-800 mb-2">No AI Courses Yet</h3>
-        <p className="text-gray-600 mb-6">
-          Create your first personalized course using our AI-powered course generator
+      <div className="text-center py-8">
+        <div className="text-gray-400 mb-4">
+          <FaBrain className="text-2xl mx-auto mb-2" />
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No AI Courses</h3>
+        <p className="text-gray-500 text-sm mb-6">
+          Create your first AI-powered course
         </p>
         <Link 
           to="/chat"
-          className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium shadow-sm border border-purple-700"
+          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition-colors"
           style={{ 
             pointerEvents: 'auto',
             cursor: 'pointer',
@@ -236,12 +245,10 @@ const AILearningPlans = () => {
             zIndex: 10
           }}
           onClick={(e) => {
-            // Ensure navigation happens
             e.stopPropagation();
           }}
         >
-          <FaBrain className="mr-2" />
-          Create Your First AI Course
+          Create Course
         </Link>
       </div>
     );
@@ -254,108 +261,122 @@ const AILearningPlans = () => {
 
   return (
     <>
-      {/* Course Grid */}
-      <div className="space-y-3 relative z-10">
+      {/* Course List */}
+      <div className="space-y-2">
         {coursesToDisplay.map((course) => (
-          <div key={course.id} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden hover:shadow-md hover:border-purple-200 transition-all duration-200 group relative z-10">
-            
-            {/* Compact Single Row Layout */}
-            <div className="p-4 relative z-10">
-              <div className="flex items-center justify-between">
-                
-                {/* Left: Course Info */}
-                <div className="flex items-center flex-1 min-w-0">
-                  {/* AI Icon */}
-                  <div className="bg-gradient-to-r from-purple-500 to-indigo-600 p-2 rounded-lg mr-3 flex-shrink-0">
-                    <FaBrain className="text-white text-sm" />
-                  </div>
-                  
-                  {/* Course Details */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-gray-900 truncate mb-1">
-                      {formatCourseName(course)}
-                    </h3>
-                    <div className="flex items-center text-xs text-gray-500 space-x-3">
-                      <span>Created {formatDate(course.created_at)}</span>
-                      <span>•</span>
-                      <span className={`${course.is_completed ? 'text-green-600' : 'text-blue-600'}`}>
-                        {course.is_completed ? 'Completed' : 'In Progress'}
-                      </span>
-                    </div>
-                  </div>
+          <div 
+            key={course.id} 
+            className="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center justify-between">
+              {/* Left: Course Info */}
+              <div className="flex items-center flex-1 min-w-0 mr-4">
+                <div className="bg-blue-100 p-2 rounded-lg mr-3 flex-shrink-0">
+                  <FaBrain className="text-blue-600 text-sm" />
                 </div>
-
-                {/* Center: Progress */}
-                <div className="mx-4 flex-shrink-0">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-16 bg-gray-100 rounded-full h-1.5">
-                      <div 
-                        className={`h-1.5 rounded-full transition-all duration-300 ${getProgressColor(course.completion_percentage || 0)}`}
-                        style={{ width: `${course.completion_percentage || 0}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-xs font-medium text-gray-600 w-8 text-right">
-                      {Math.round(course.completion_percentage || 0)}%
+                
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-gray-900 truncate">
+                    {formatCourseName(course)}
+                  </h3>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    <span className={course.is_completed ? 'text-green-600' : 'text-blue-600'}>
+                      {course.is_completed ? 'Completed' : 'In Progress'}
                     </span>
                   </div>
                 </div>
+              </div>
 
-                {/* Right: Actions */}
-                <div className="flex items-center space-x-2 flex-shrink-0 relative z-5">
-                  {/* Continue/Start Button */}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleStartCourse(course.id, formatCourseName(course));
-                    }}
-                    className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-md text-xs font-medium hover:from-purple-600 hover:to-indigo-700 transition-all duration-200 flex items-center disabled:opacity-50 cursor-pointer relative z-5"
-                    style={{ cursor: 'pointer', pointerEvents: 'auto' }}
-                    type="button"
-                  >
-                    <FaPlay className="mr-1 text-xs" />
-                    {course.completion_percentage > 0 ? 'Continue' : 'Start'}
-                  </button>
-                  
-                  {/* Delete Button */}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDeleteClick(course);
-                    }}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all duration-200 cursor-pointer relative z-5"
-                    title="Delete course"
-                    style={{ cursor: 'pointer', pointerEvents: 'auto' }}
-                    type="button"
-                  >
-                    <FaTrash className="text-xs" />
-                  </button>
+              {/* Right: Progress & Actions */}
+              <div className="flex items-center space-x-4 flex-shrink-0">
+                {/* Progress */}
+                <div className="text-xs text-gray-500 font-medium">
+                  {Math.round(course.completion_percentage || 0)}%
                 </div>
+                
+                {/* Start Button */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleStartCourse(course.id, formatCourseName(course));
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-colors flex items-center"
+                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                  type="button"
+                >
+                  <FaPlay className="mr-1 text-[10px]" />
+                  Start
+                </button>
+                
+                {/* Delete Button */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDeleteClick(course);
+                  }}
+                  disabled={deleteLoading === course.id}
+                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded transition-colors"
+                  title="Delete"
+                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                  type="button"
+                >
+                  {deleteLoading === course.id ? (
+                    <FaSpinner className="text-sm animate-spin" />
+                  ) : (
+                    <FaTrash className="text-sm" />
+                  )}
+                </button>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Load More Button */}
+      {/* Load More */}
       {proCourses.length > COURSES_TO_SHOW && (
-        <div className="text-center mt-6">
+        <div className="mt-4">
           <button
-            onClick={() => {
-              setShowMore(!showMore);
-            }}
-            className="btn-clickable inline-flex items-center justify-center h-11 min-h-[44px] px-5 rounded-full border border-indigo-200 text-indigo-700 bg-white/80 backdrop-blur-sm hover:bg-white 
-                       transition-all duration-200 font-medium text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            style={{ 
-              cursor: 'pointer',
-              pointerEvents: 'auto',
-              zIndex: 10,
-              position: 'relative'
-            }}
+            onClick={() => setShowMore(!showMore)}
+            className="w-full py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
           >
-            {showMore ? 'Show Less' : `Load More (${proCourses.length - COURSES_TO_SHOW} more)`}
+            {showMore ? 'Show Less' : `Show ${proCourses.length - COURSES_TO_SHOW} More`}
           </button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Delete Course</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete "{formatCourseName(deleteConfirm.course)}"? This action cannot be undone.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={cancelDelete}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleteLoading === deleteConfirm.course?.id}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+              >
+                {deleteLoading === deleteConfirm.course?.id ? (
+                  <>
+                    <FaSpinner className="animate-spin mr-1 text-xs" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

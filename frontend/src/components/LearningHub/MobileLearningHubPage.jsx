@@ -34,12 +34,13 @@ const MobileLearningHubPage = () => {
       icon: FaGraduationCap,
       description: 'Continue your learning'
     },
-    { 
-      id: 'certificates', 
-      label: 'Certificates', 
-      icon: FaCertificate,
-      description: 'Your achievements'
-    },
+    // Temporarily hidden - Certificates tab
+    // { 
+    //   id: 'certificates', 
+    //   label: 'Certificates', 
+    //   icon: FaCertificate,
+    //   description: 'Your achievements'
+    // },
     { 
       id: 'ai', 
       label: 'AI Courses', 
@@ -297,7 +298,7 @@ const MobileLearningHubPage = () => {
       {/* Tab Navigation */}
       <div className="px-4 pt-4 pb-2">
         <div className="bg-white rounded-2xl p-1.5 shadow-lg border border-gray-200">
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-3 gap-1">
             {tabs.map((tab, index) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -305,7 +306,7 @@ const MobileLearningHubPage = () => {
                 <motion.button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative py-3 px-2 rounded-xl font-medium transition-all duration-200 ${
+                  className={`relative py-3.5 px-3 rounded-xl font-medium transition-all duration-200 ${
                     isActive
                       ? 'bg-indigo-500 text-white shadow-md'
                       : 'text-gray-600 hover:bg-gray-50 active:scale-95'
@@ -323,7 +324,7 @@ const MobileLearningHubPage = () => {
                     />
                   )}
                   <div className="relative z-10 text-center">
-                    <Icon className={`text-lg mb-1 mx-auto ${isActive ? 'text-white' : 'text-indigo-500'}`} />
+                    <Icon className={`text-xl mb-1.5 mx-auto ${isActive ? 'text-white' : 'text-indigo-500'}`} />
                     <div className={`text-xs font-semibold leading-tight ${isActive ? 'text-white' : 'text-gray-700'}`}>
                       {tab.label}
                     </div>

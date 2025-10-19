@@ -235,8 +235,8 @@ const LearningHubPage = () => {
                 <AILearningPlans />
               </section>
               
-              {/* Certificates Section */}
-              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+              {/* Certificates Section - Temporarily Hidden */}
+              {/* <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center">
                     <div className="bg-gradient-to-r from-yellow-500 to-orange-600 p-3 rounded-xl mr-4 shadow-lg">
@@ -252,7 +252,7 @@ const LearningHubPage = () => {
                   </span>
                 </div>
                 <Certificates />
-              </section>
+              </section> */}
               
               {/* Minimalistic Call-to-Action Buttons Section */}
               <section className="grid grid-cols-1 md:grid-cols-2 gap-4 learning-hub">

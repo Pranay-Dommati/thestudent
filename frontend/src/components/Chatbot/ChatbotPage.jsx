@@ -2157,7 +2157,7 @@ const ChatbotPage = () => {
       )}
 
       {/* Main chat container */}
-      <div className={`flex-1 flex flex-col h-screen w-full relative overflow-hidden transition-all duration-300 ${
+      <div className={`flex-1 flex flex-col h-full w-full relative overflow-hidden transition-all duration-300 ${
         isSidebarOpen ? "lg:ml-64" : "ml-0"
       }`}>
         {/* Desktop/Tablet header with menu, brand and back (md+) */}
@@ -2431,7 +2431,7 @@ const ChatbotPage = () => {
 
         {/* Fixed Input at Bottom - Enhanced Design - Only show when there are messages */}
         {chatHistory.length > 0 && (
-          <div className="border-t border-gray-200 bg-white p-4 min-h-[120px] md:h-32">
+          <div className="border-t border-gray-200 bg-white p-4">
             <div className="max-w-[820px] mx-auto px-4 md:px-8 lg:px-12">
               <div className="relative group overflow-visible">
                 <textarea
