@@ -63,11 +63,7 @@ export const useGoogleAuth = (onSuccess, onError) => {
         
         if (!GOOGLE_CLIENT_ID) {
           console.error('VITE_GOOGLE_CLIENT_ID not found in environment variables');
-<<<<<<< Updated upstream
           universalToast.error('Google Sign-In not configured');
-=======
-          setIsLoading(false);
->>>>>>> Stashed changes
           return;
         }
 
@@ -87,12 +83,7 @@ export const useGoogleAuth = (onSuccess, onError) => {
         console.log('Google Sign-In initialized successfully');
       } catch (error) {
         console.error('Google Sign-In initialization failed:', error);
-<<<<<<< Updated upstream
   universalToast.error('Google Sign-In failed to load');
-=======
-        setIsGoogleReady(false);
-        setIsLoading(false);
->>>>>>> Stashed changes
       }
     };
 
