@@ -150,6 +150,16 @@ export const classifyTopics = async (query, expectedTopics = null) => {
       ...(expectedTopics && { expected_topics: expectedTopics })
     };
     const { data: result } = await aiAxios.post('/classify_topics/', requestData);
+    // If backend indicates this isn't a study query, bubble up the friendly message
+    if (result && result.intent === 'not_study') {
+      return {
+        topics: [],
+        usage_stats: result.usage_stats || null,
+        personalization: null,
+        user_message: typeof result.message === 'string' ? result.message : "🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".",
+        debug_meta: result.debug_meta,
+      };
+    }
     // Persist latest classification for downstream personalization/context usage
     try {
       const payloadToStore = {
@@ -165,7 +175,7 @@ export const classifyTopics = async (query, expectedTopics = null) => {
       // Non-fatal: storage unavailable or quota exceeded
       logger.warn('Could not persist latest classification payload:', e?.message || e);
     }
-    return handleClassificationSuccess(result);
+  return handleClassificationSuccess(result);
     
   } catch (error) {
     if (error.response) {

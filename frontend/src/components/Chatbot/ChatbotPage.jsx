@@ -904,13 +904,15 @@ const ChatbotPage = () => {
               setShowTopicConfirmation(true);
             }
           } else {
-            // No topics extracted - replace with error message
+            // No topics extracted - show model-provided friendly message if available
             setChatHistory((prev) => 
               prev.map(msg => 
                 msg.id === messageId 
                   ? {
                       ...msg,
-                      content: "❌ I couldn't extract any learning topics from your query. Please try to be more specific about what you'd like to learn (e.g., 'JavaScript arrays and functions', 'Python data structures', etc.)",
+                      content: (result && typeof result.user_message === 'string')
+                        ? result.user_message
+                        : "❌ I couldn't extract any learning topics from your query. Please try to be more specific about what you'd like to learn (e.g., 'JavaScript arrays and functions', 'Python data structures', etc.)",
                       isNetworkError: false,
                       isReconnecting: false,
                       showRetryButton: false
@@ -1108,18 +1110,8 @@ const ChatbotPage = () => {
       }
     } catch (_) {}
 
-    // Validate prompt early and provide a helpful message if it looks like nonsense/too short
-    const validation = validateCoursePrompt(messageToSend);
-    if (!validation.ok) {
-      const botResponse = {
-        id: generateMessageId(),
-        type: "bot",
-        content: "🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-      setChatHistory((prev) => [...prev, botResponse]);
-      return;
-    }
+    // Do not block based on local heuristics; let AI validate if this is a study topic.
+    // We'll call the classifier first and only show guidance if AI couldn't extract any topics.
 
     setIsLoading(true);
 
@@ -1140,7 +1132,7 @@ const ChatbotPage = () => {
       // Extract topics using AI with rate limiting
       try {
         console.log('🚀 Pro Learning mode - calling classifyTopics with:', messageToSend);
-        const result = await classifyTopics(messageToSend);
+  const result = await classifyTopics(messageToSend);
         console.log('✅ classifyTopics result:', result);
           
           // Log debug metadata for transparency
@@ -1158,7 +1150,33 @@ const ChatbotPage = () => {
             setUsageStats(result.usage_stats);
           }
           
-          const extractedTopics = result.topics || [];
+          const extractedTopics = Array.isArray(result.topics) ? result.topics : [];
+
+          // If backend explicitly indicates not a study topic, show its friendly message and stop
+          if (result && typeof result.user_message === 'string' && extractedTopics.length === 0) {
+            const msg = {
+              id: generateMessageId(),
+              type: "bot",
+              content: result.user_message,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+            setChatHistory((prev) => [...prev, msg]);
+            setIsLoading(false);
+            return;
+          }
+
+          // If AI couldn't extract topics (or produced only unknowns), guide the user
+          if (isAiFailedTopics(extractedTopics)) {
+            const botResponse = {
+              id: generateMessageId(),
+              type: "bot",
+              content: "🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".",
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+            setChatHistory((prev) => [...prev, botResponse]);
+            setIsLoading(false);
+            return;
+          }
           
           // Show toast notification IMMEDIATELY if more than 4 topics were extracted
           const maxPerRequest = 4; // Default max per request
@@ -1183,9 +1201,9 @@ const ChatbotPage = () => {
               // Limit topics to the smaller of: remaining monthly limit or max per request
               const maxAllowedTopics = Math.min(remainingToday, maxPerRequestFromStats);
               
-              if (extractedTopics.length > maxAllowedTopics) {
+              if (availableTopics.length > maxAllowedTopics) {
                 // Limit the topics to what user can actually create
-                availableTopics = extractedTopics.slice(0, maxAllowedTopics);
+                availableTopics = availableTopics.slice(0, maxAllowedTopics);
                 
                 if (remainingToday <= 0) {
                   limitMessage = `⚠️ You've reached your daily limit of ${usageStats.daily_limit || 16} topics. Please try again tomorrow.`;
@@ -1193,19 +1211,19 @@ const ChatbotPage = () => {
                   universalToast.error(`🚫 Daily limit reached (${usageStats.daily_used || 0}/${usageStats.daily_limit || 16} used)`, {
                     duration: 4000
                   });
-                } else if (remainingToday < extractedTopics.length && extractedTopics.length <= maxPerRequestFromStats) {
+                } else if (remainingToday < availableTopics.length && availableTopics.length <= maxPerRequestFromStats) {
                   limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you only have ${remainingToday} topic(s) remaining today. Showing first ${availableTopics.length} topic(s).`;
                   // Show informational toast for daily quota limiting
                   universalToast.show(`⚠️ Limited to ${availableTopics.length} topics due to daily quota`, {
                     duration: 4000
                   });
-                } else if (extractedTopics.length > maxPerRequestFromStats && remainingToday >= maxPerRequestFromStats) {
+                } else if (availableTopics.length > maxPerRequestFromStats && remainingToday >= maxPerRequestFromStats) {
                   limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you can create maximum ${maxPerRequestFromStats} topics at a time. Showing first ${availableTopics.length} topic(s).`;
                   // Show informational toast for per-request limiting
                   universalToast.show(`ℹ️ Limited to ${maxPerRequestFromStats} topics per request`, {
                     duration: 4000
                   });
-                } else if (extractedTopics.length > maxPerRequestFromStats && remainingToday < maxPerRequestFromStats) {
+                } else if (availableTopics.length > maxPerRequestFromStats && remainingToday < maxPerRequestFromStats) {
                   limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you can only create maximum ${maxPerRequestFromStats} topics at a time and have ${remainingToday} topic(s) remaining today. Showing first ${availableTopics.length} topic(s).`;
                   // Show informational toast for combined limiting
                   universalToast.show(`⚠️ Limited by daily quota (${remainingToday} left) and per-request limit (${maxPerRequestFromStats} max)`, {
@@ -1215,8 +1233,8 @@ const ChatbotPage = () => {
               }
             } else {
               // If no usage stats, just limit to 4 topics max
-              if (extractedTopics.length > maxPerRequest) {
-                availableTopics = extractedTopics.slice(0, maxPerRequest);
+              if (availableTopics.length > maxPerRequest) {
+                availableTopics = availableTopics.slice(0, maxPerRequest);
                 limitMessage = `⚠️ Showing first ${maxPerRequest} topics. You can create maximum ${maxPerRequest} topics at a time.`;
                 // Show informational toast for general per-request limiting
                 universalToast.show(`ℹ️ Limited to ${maxPerRequest} topics per request`, {
@@ -1238,21 +1256,26 @@ const ChatbotPage = () => {
               return;
             }
             
-            // Store limited topics for confirmation and show confirmation dialog
-            setPendingTopics(availableTopics);
+            // Store limited topics for confirmation and show confirmation dialog (normalize to { name })
+            const normalizedTopics = availableTopics.map(t => {
+              if (typeof t === 'string') return { name: t };
+              if (t && typeof t.name === 'string') return { name: t.name };
+              return { name: String(t || '').trim() };
+            });
+            setPendingTopics(normalizedTopics);
             setOriginalPrompt(messageToSend);
             setShowTopicConfirmation(true);
             
             // No need for redundant analysis message - the topic confirmation dialog is self-explanatory
           } else {
-            // No topics extracted - show error
-            const errorResponse = {
+            // No topics extracted - show friendly guidance
+            const guidanceResponse = {
               id: generateMessageId(),
               type: "bot",
-              content: "❌ I couldn't extract any learning topics from your query. Please try to be more specific about what you'd like to learn (e.g., 'JavaScript arrays and functions', 'Python data structures', etc.)",
+              content: "🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".",
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             };
-            setChatHistory((prev) => [...prev, errorResponse]);
+            setChatHistory((prev) => [...prev, guidanceResponse]);
           }
         } catch (error) {
           console.error('❌ Topic extraction failed:', error);
@@ -1327,14 +1350,14 @@ const ChatbotPage = () => {
             setIsLoading(false);
             return;
           } else {
-            // Generic error handling
-            const errorResponse = {
+            // Generic error handling - show friendly guidance to enter a proper study topic
+            const guidanceResponse = {
               id: generateMessageId(),
               type: "bot",
-              content: `❌ Topic extraction failed: ${error.message}. Please try again with a clearer learning query.`,
+              content: "🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".",
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             };
-            setChatHistory((prev) => [...prev, errorResponse]);
+            setChatHistory((prev) => [...prev, guidanceResponse]);
             setIsLoading(false);
             return;
           }
@@ -1396,10 +1419,84 @@ const ChatbotPage = () => {
   const validateCoursePrompt = (text) => {
     if (!text) return { ok: false, reason: 'empty' };
     const trimmed = String(text).trim();
-    if (trimmed.length < 5) return { ok: false, reason: 'too_short' };
-    const letters = (trimmed.match(/[a-zA-Z]/g) || []).length;
-    if (letters < 3) return { ok: false, reason: 'low_signal' };
+    
+    // Allow very short inputs if they contain meaningful alphanumeric content
+    // This handles acronyms like DSA, VLSI, AI, ML, etc.
+    if (trimmed.length < 2) return { ok: false, reason: 'too_short' };
+    
+    // Check for meaningful content (letters or numbers)
+    const meaningfulChars = (trimmed.match(/[a-zA-Z0-9]/g) || []).length;
+    
+    // If it's very short (2-3 chars), require at least 2 alphanumeric characters
+    if (trimmed.length <= 3 && meaningfulChars < 2) {
+      return { ok: false, reason: 'low_signal' };
+    }
+    
+    // For longer inputs, be more lenient - just need some letters/numbers
+    if (trimmed.length > 3 && meaningfulChars < 2) {
+      return { ok: false, reason: 'low_signal' };
+    }
+    
+    // Reject if it's just special characters or whitespace
+    if (meaningfulChars === 0) return { ok: false, reason: 'no_content' };
+    
+    // Detect repeated characters (like "hiiiii", "hellooo", "aaaaa")
+    // Check if more than 60% of the text is the same character repeated
+    const lowerText = trimmed.toLowerCase();
+    const charCounts = {};
+    for (let char of lowerText) {
+      if (/[a-z0-9]/.test(char)) {
+        charCounts[char] = (charCounts[char] || 0) + 1;
+      }
+    }
+    const maxRepeat = Math.max(...Object.values(charCounts), 0);
+    if (maxRepeat > meaningfulChars * 0.6 && meaningfulChars > 3) {
+      return { ok: false, reason: 'repetitive' };
+    }
+    
+    // Detect common non-educational greetings and casual phrases
+    const casualPatterns = [
+      /^(hi+|hey+|hello+|yo+|sup+|hola+|hii+)$/i,
+      /^(ok+|okay+|yes+|no+|nope+|yep+|yeah+|nah+)$/i,
+      /^(thanks+|thank you+|thx+|ty+)$/i,
+      /^(bye+|goodbye+|cya+|see ya+|later+)$/i,
+      /^(lol+|lmao+|haha+|hehe+|lmfao+)$/i,
+      /^(test+|testing+|hello world+)$/i,
+      /^(what+|why+|how+|when+|where+|who+)$/i,
+      /^[?.!,\s]+$/,
+    ];
+    
+    for (let pattern of casualPatterns) {
+      if (pattern.test(trimmed)) {
+        return { ok: false, reason: 'casual_input' };
+      }
+    }
+    
+    // Detect if the input is just random gibberish
+    // Check for lack of common vowels in longer text (except for acronyms)
+    if (trimmed.length > 5) {
+      const vowels = (trimmed.match(/[aeiou]/gi) || []).length;
+      const consonants = (trimmed.match(/[bcdfghjklmnpqrstvwxyz]/gi) || []).length;
+      // If there are consonants but almost no vowels, it might be gibberish
+      if (consonants > 4 && vowels === 0) {
+        return { ok: false, reason: 'no_vowels' };
+      }
+    }
+    
     return { ok: true };
+  };
+
+  // Minimal AI-driven failure check: treat AI as failed if no topics
+  // or if all topics are exactly 'Unknown Topic'/'Unknown'
+  const isAiFailedTopics = (topics) => {
+    if (!Array.isArray(topics) || topics.length === 0) return true;
+    const normalized = topics.map(t => {
+      const name = (typeof t === 'string' ? t : (t && t.name) || '').toString().trim().toLowerCase();
+      return name;
+    }).filter(Boolean);
+    if (normalized.length === 0) return true;
+    if (normalized.every(n => n === 'unknown topic' || n === 'unknown')) return true;
+    return false;
   };
 
   const handleTopicConfirm = async () => {
@@ -1902,9 +1999,9 @@ const ChatbotPage = () => {
     <div className="h-screen flex overflow-hidden w-full bg-white relative">
       
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-30 transform lg:transform-none lg:relative lg:flex-shrink-0 ${
+      <div className={`fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 ${
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-      } w-[88vw] max-w-[360px] sm:max-w-[380px] md:max-w-[420px] lg:w-64 transition-transform duration-300 bg-gray-50 border-r border-gray-200 flex flex-col overflow-hidden`}>
+      } w-[88vw] max-w-[360px] sm:max-w-[380px] md:max-w-[420px] lg:w-64 bg-gray-50 border-r border-gray-200 flex flex-col overflow-hidden`}>
         {/* Sidebar Header with Logo and New Chat */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-4">
@@ -1915,9 +2012,17 @@ const ChatbotPage = () => {
               <span className="font-semibold text-gray-900 text-base">Course Creator</span>
             </div>
             <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700 transition-colors"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Close button clicked, current sidebar state:', isSidebarOpen);
+                setIsSidebarOpen(false);
+                console.log('Sidebar should now be closed');
+              }}
+              className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700 transition-colors cursor-pointer relative z-50"
               aria-label="Close sidebar"
+              type="button"
+              style={{ pointerEvents: 'auto' }}
             >
               <IoChevronBack size={18} />
             </button>
@@ -2025,7 +2130,7 @@ const ChatbotPage = () => {
         </div>
         
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-gray-200 space-y-2">
+  <div className="p-4 border-t border-gray-200 space-y-2 min-h-[120px] md:h-32 flex flex-col justify-center">
           <Link
             to="/learning-hub"
             className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
@@ -2052,7 +2157,9 @@ const ChatbotPage = () => {
       )}
 
       {/* Main chat container */}
-      <div className="flex-1 flex flex-col h-screen w-full relative overflow-hidden">
+      <div className={`flex-1 flex flex-col h-screen w-full relative overflow-hidden transition-all duration-300 ${
+        isSidebarOpen ? "lg:ml-64" : "ml-0"
+      }`}>
         {/* Desktop/Tablet header with menu, brand and back (md+) */}
         <div className="hidden md:flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white/95 backdrop-blur-sm sticky top-0 z-10">
           <div className="flex items-center gap-3">
@@ -2112,14 +2219,14 @@ const ChatbotPage = () => {
                     onChange={(e) => setMessage(e.target.value)}
                     onInput={handleTextareaInput}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
+                      if (e.key === "Enter" && !e.shiftKey && !isLoading) {
                         e.preventDefault();
                         handleSendMessage();
                       }
                     }}
                     onFocus={() => setIsInputFocused(true)}
                     onBlur={() => setIsInputFocused(false)}
-                    disabled={isLoading}
+                    aria-disabled={isLoading}
                     className="w-full px-5 py-4 pr-16 bg-white/90 border-2 border-indigo-300 hover:border-indigo-400 rounded-2xl shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400/60 focus:border-indigo-400 text-gray-900 placeholder-gray-500 resize-none overflow-hidden text-base transition-all"
                     style={{ minHeight: '56px', maxHeight: '200px' }}
                   />
@@ -2142,7 +2249,7 @@ const ChatbotPage = () => {
                     </button>
                   </div>
                 </div>
-                {usageStats && (
+                {usageStats && isLoggedIn && (
                   <div className="mt-3">
                     <CompactRateLimitStatus usageStats={usageStats} className="text-center" />
                     {usageStats.isFallback && (
@@ -2310,9 +2417,21 @@ const ChatbotPage = () => {
           </div>
         )}
 
+        {/* Rate limit status just above composer (keeps composer height constant) */}
+        {chatHistory.length > 0 && usageStats && isLoggedIn && (
+          <div className="bg-transparent pb-2 md:hidden">
+            <div className="max-w-[820px] mx-auto px-4 md:px-8 lg:px-12">
+              <CompactRateLimitStatus usageStats={usageStats} className="text-center" />
+              {usageStats.isFallback && (
+                <div className="mt-1 text-[11px] text-gray-400 text-center">Limits unavailable right now. Showing defaults. We’ll update when connected.</div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Fixed Input at Bottom - Enhanced Design - Only show when there are messages */}
         {chatHistory.length > 0 && (
-          <div className="border-t border-gray-200 bg-white p-6">
+          <div className="border-t border-gray-200 bg-white p-4 min-h-[120px] md:h-32">
             <div className="max-w-[820px] mx-auto px-4 md:px-8 lg:px-12">
               <div className="relative group overflow-visible">
                 <textarea
@@ -2322,14 +2441,14 @@ const ChatbotPage = () => {
                   onChange={(e) => setMessage(e.target.value)}
                   onInput={handleTextareaInput}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
+                    if (e.key === "Enter" && !e.shiftKey && !isLoading) {
                       e.preventDefault();
                       handleSendMessage();
                     }
                   }}
                   onFocus={() => setIsInputFocused(true)}
                   onBlur={() => setIsInputFocused(false)}
-                  disabled={isLoading}
+                  aria-disabled={isLoading}
                   className="w-full px-5 py-4 pr-16 bg-white border-2 border-indigo-300 hover:border-indigo-400 rounded-2xl focus:outline-none focus:ring-1 focus:ring-indigo-400/60 focus:border-indigo-400 text-gray-900 placeholder-gray-500 resize-none overflow-hidden text-base shadow-sm hover:shadow-md transition-all"
                   style={{ minHeight: '56px', maxHeight: '200px' }}
                 />
@@ -2352,8 +2471,8 @@ const ChatbotPage = () => {
                   </button>
                 </div>
               </div>
-              {usageStats && (
-                <div className="mt-3">
+              {usageStats && isLoggedIn && (
+                <div className="mt-2 hidden md:block">
                   <CompactRateLimitStatus usageStats={usageStats} className="text-center" />
                   {usageStats.isFallback && (
                     <div className="mt-1 text-[11px] text-gray-400 text-center">Limits unavailable right now. Showing defaults. We’ll update when connected.</div>

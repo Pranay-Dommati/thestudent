@@ -30,7 +30,6 @@ import AdminDashboard from './components/Admin/Dashboard/AdminDashboard';
 import { Toaster, toast } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
-import HelpCenter from './components/HelpCenter/HelpCenter';
 import StandaloneQuizPage from './components/CourseLearningPage/templ/StandaloneQuizPage';
 import NotFound from './components/NotFound/NotFound';
 import AdminForgotPassword from './components/Admin/AdminForgotPassword';
@@ -79,8 +78,7 @@ const Layout = ({ children, excludePaths = [] }) => {
   // Determine the navbar style based on the current route
   const getNavbarStyle = () => {
     // Light navbar for pages without hero sections or with light backgrounds
-    if (location.pathname.startsWith('/help-center') || 
-        location.pathname.startsWith('/feedback') ||
+    if (location.pathname.startsWith('/feedback') ||
         location.pathname.startsWith('/terms') ||
         location.pathname.startsWith('/privacy') ||
         location.pathname.startsWith('/profile')) {
@@ -242,7 +240,7 @@ const App = () => {
               <ProtectedRoute>
                 <ProfileLayout />
               </ProtectedRoute>
-            } />            <Route path="/help-center" element={<HelpCenter />} />
+            } />
             <Route path="/feedback" element={<FeedbackPage />} />  {/* Add feedback route */}
             <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
             <Route path="/terms" element={<Navigate to="/terms-and-conditions" />} />

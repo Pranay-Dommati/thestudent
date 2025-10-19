@@ -106,6 +106,8 @@ export default function AuthForm() {
     // Validate name (for signup)
     if (isSignUp && !formData.name) {
       errors.name = "Full name is required";
+    } else if (isSignUp && formData.name.length < 2) {
+      errors.name = "Please provide your full name";
     }
 
     // Validate email
@@ -115,11 +117,25 @@ export default function AuthForm() {
       errors.email = "Invalid email format";
     }
 
-    // Validate password
+    // Validate password - Enhanced validation for signup
     if (!formData.password) {
       errors.password = "Password is required";
-    } else if (formData.password.length < 6) {
-      errors.password = "Password must be at least 6 characters";
+    } else if (isSignUp) {
+      // Stricter validation for signup
+      if (formData.password.length < 8) {
+        errors.password = "Password must be at least 8 characters";
+      } else if (!/(?=.*[a-z])/.test(formData.password)) {
+        errors.password = "Password must contain at least one lowercase letter";
+      } else if (!/(?=.*[A-Z])/.test(formData.password)) {
+        errors.password = "Password must contain at least one uppercase letter";
+      } else if (!/(?=.*\d)/.test(formData.password)) {
+        errors.password = "Password must contain at least one number";
+      }
+    } else {
+      // Login only requires minimum length
+      if (formData.password.length < 6) {
+        errors.password = "Password must be at least 6 characters";
+      }
     }
 
     // Validate confirm password (for signup)
@@ -153,9 +169,30 @@ export default function AuthForm() {
       if (!isSignUp) {
         // Login request - AuthContext already shows success/error toasts with id 'auth-login'
         const response = await login(formData.email, formData.password);
-        if (response) {
+        setIsLoading(false); // Stop loading immediately after response
+        
+        if (response?.success) {
           // Redirect to the returnTo path if it exists, otherwise to the homepage
           navigate(returnToPath || '/');
+        } else if (response?.suggestSignup) {
+          // Dismiss the toast before navigating to prevent duplication
+          toast.dismiss('auth-login');
+          
+          // Preserve the returnTo parameter if it exists
+          const returnToParam = returnToPath ? `&returnTo=${encodeURIComponent(returnToPath)}` : '';
+          
+          // Immediately switch to signup without delay - smooth transition
+          setIsSignUp(true);
+          navigate(`/auth?mode=signup${returnToParam}`, { replace: true });
+          
+          // Show toast AFTER navigation completes
+          setTimeout(() => {
+            toast.error('No account found with this email. Please sign up to continue.', {
+              id: 'suggest-signup',
+              duration: 3000,
+              icon: '📝'
+            });
+          }, 100); // Small delay to ensure navigation completes
         }
       } else {
         // OTP-based signup: do NOT change page UI. Trigger modal on success.
@@ -170,6 +207,38 @@ export default function AuthForm() {
       }
     } catch (error) {
       console.error("Error during signup/login:", error);
+      
+      // Handle backend validation errors (400 status with field-specific errors)
+      if (error.response?.status === 400 && error.response?.data) {
+        const backendErrors = error.response.data;
+        const newFormErrors = {};
+        
+        // Check for field-specific validation errors
+        if (backendErrors.password) {
+          // Password validation errors can be an array or string
+          const passwordError = Array.isArray(backendErrors.password) 
+            ? backendErrors.password[0] 
+            : backendErrors.password;
+          newFormErrors.password = passwordError;
+        }
+        if (backendErrors.email) {
+          newFormErrors.email = Array.isArray(backendErrors.email) 
+            ? backendErrors.email[0] 
+            : backendErrors.email;
+        }
+        if (backendErrors.full_name) {
+          newFormErrors.name = Array.isArray(backendErrors.full_name) 
+            ? backendErrors.full_name[0] 
+            : backendErrors.full_name;
+        }
+        
+        // If we have field errors, set them and return
+        if (Object.keys(newFormErrors).length > 0) {
+          setFormErrors(newFormErrors);
+          setIsLoading(false);
+          return;
+        }
+      }
       
       // Determine error message based on error type
       let errorMessage = "An error occurred. Please try again.";
@@ -202,7 +271,112 @@ export default function AuthForm() {
 
   return (
     <>
+      {/* Professional Loading Modal */}
+      <AnimatePresence>
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 relative overflow-hidden"
+            >
+              {/* Subtle background pattern */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 rounded-2xl" />
+              
+              {/* Content */}
+              <div className="relative text-center">
+                {/* Modern spinner with rocket icon */}
+                <div className="relative mb-6">
+                  <motion.div
+                    className="w-20 h-20 mx-auto relative"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", delay: 0.1 }}
+                  >
+                    {/* Outer ring */}
+                    <motion.div
+                      className="absolute inset-0 rounded-full border-4 border-gray-200"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    />
+                    
+                    {/* Animated progress ring */}
+                    <motion.div
+                      className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-500"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                    />
+                    
+                    {/* Center rocket icon */}
+                    <motion.div
+                      className="absolute inset-0 flex items-center justify-center"
+                      animate={{ y: [-2, 2, -2] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                      <svg
+                        className="w-8 h-8 text-blue-500"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2M7 19H17V21H7V19M8.5 19C8.5 20.38 9.62 21.5 11 21.5S13.5 20.38 13.5 19H8.5Z"/>
+                      </svg>
+                    </motion.div>
+                  </motion.div>
+                </div>
+
+                {/* Professional loading text */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="space-y-3"
+                >
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    {isSignUp ? "Creating Your Account" : "Signing You In"}
+                  </h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    {isSignUp 
+                      ? "Setting up your personalized learning experience..." 
+                      : "Verifying your credentials and preparing your dashboard..."
+                    }
+                  </p>
+
+                  {/* Elegant progress dots */}
+                  <div className="flex items-center justify-center gap-2 pt-4">
+                    {[...Array(3)].map((_, i) => (
+                      <motion.div
+                        key={i}
+                        className="w-2 h-2 bg-blue-500 rounded-full"
+                        animate={{
+                          scale: [1, 1.2, 1],
+                          opacity: [0.4, 1, 0.4],
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          delay: i * 0.2,
+                          ease: "easeInOut",
+                        }}
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AuthNav />
+
       <OtpModal
         open={otpOpen}
         email={formData.email}
@@ -240,20 +414,20 @@ export default function AuthForm() {
                 ease: [0.4, 0.0, 0.2, 1]
               }}
             >
-              {/* Hero Section */}
-              <div className={`flex-1 flex flex-col items-center justify-center px-6 py-8 text-white 
+              {/* Hero Section - Better proportions */}
+              <div className={`flex flex-col items-center justify-center px-6 py-8 text-white 
                 bg-gradient-to-br ${isSignUp ? 'from-blue-600 to-indigo-700' : 'from-indigo-600 to-blue-700'}`}>
                 <motion.div 
-                  className="mb-6 p-4 bg-white/20 rounded-full"
+                  className="mb-5 p-4 bg-white/20 rounded-full"
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.1, duration: 0.3 }}
                 >
-                  <FaGraduationCap className="text-5xl" />
+                  <FaGraduationCap className="text-4xl" />
                 </motion.div>
                 
                 <motion.h1 
-                  className="text-3xl font-bold mb-4 text-center"
+                  className="text-2xl font-bold mb-4 text-center"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2, duration: 0.3 }}
@@ -262,34 +436,65 @@ export default function AuthForm() {
                 </motion.h1>
                 
                 <motion.p 
-                  className="text-center text-white/90 mb-8 max-w-sm leading-relaxed"
+                  className="text-center text-white/90 text-sm max-w-sm leading-relaxed"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.3 }}
                 >
                   {isSignUp 
-                    ? 'Create your account to access free courses, learning paths, and educational resources.' 
-                    : 'Sign in to continue your learning journey and access your saved courses.'}
+                    ? 'Create your account to access free courses and learning resources.' 
+                    : 'Sign in to continue your learning journey.'}
                 </motion.p>
               </div>
 
-              {/* Form Section */}
-              <div className="bg-white px-6 py-8 flex-1">
+              {/* Form Section - Takes remaining space */}
+              <div className="bg-white px-6 py-4 flex-1 min-h-0 overflow-y-auto">
                 <motion.h2 
-                  className="text-2xl font-bold mb-6 text-gray-800 text-center"
+                  className="text-xl font-bold mb-4 text-gray-800 text-center"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4, duration: 0.3 }}
                 >
                   {isSignUp ? 'Create Account' : 'Sign In'}
                 </motion.h2>
-                
-                <motion.form 
-                  className="space-y-5 max-w-sm mx-auto" 
-                  onSubmit={handleSubmit}
+
+                {/* Google Sign In Button - Prominent position */}
+                <motion.div
+                  className="mb-4 w-full max-w-sm mx-auto"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5, duration: 0.3 }}
+                >
+                  <GoogleSignInButton
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    disabled={isLoading}
+                  />
+                </motion.div>
+
+                {/* Divider */}
+                <motion.div 
+                  className="mb-4 w-full max-w-sm mx-auto"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6, duration: 0.3 }}
+                >
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-4 bg-white text-gray-500">Or continue with email</span>
+                    </div>
+                  </div>
+                </motion.div>
+                
+                <motion.form 
+                  className="space-y-4 w-full max-w-sm mx-auto" 
+                  onSubmit={handleSubmit}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7, duration: 0.3 }}
                 >
                   {/* Name field for signup */}
                   <AnimatePresence mode="wait">
@@ -339,21 +544,47 @@ export default function AuthForm() {
                   </div>
                   
                   {/* Password Field */}
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
-                      <FaLock />
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
+                        <FaLock />
+                      </div>
+                      <input 
+                        className={`w-full p-4 pl-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
+                          formErrors.password ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
+                        }`} 
+                        type="password" 
+                        name="password"
+                        placeholder="Password" 
+                        value={formData.password}
+                        onChange={handleChange}
+                      />
                     </div>
-                    <input 
-                      className={`w-full p-4 pl-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
-                        formErrors.password ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
-                      }`} 
-                      type="password" 
-                      name="password"
-                      placeholder="Password" 
-                      value={formData.password}
-                      onChange={handleChange}
-                    />
-                    {formErrors.password && <p className="text-red-500 text-sm mt-2">{formErrors.password}</p>}
+                    
+                    {/* Password Requirements Indicator - Only show for signup when user starts typing */}
+                    {isSignUp && formData.password && (
+                      <div className="bg-gray-50 px-4 py-3 rounded-lg text-xs space-y-1.5">
+                        <div className="font-medium text-gray-700 mb-2">Password must contain:</div>
+                        <div className={`flex items-center gap-2 ${formData.password.length >= 8 ? 'text-green-600' : 'text-gray-500'}`}>
+                          <span className="font-bold">{formData.password.length >= 8 ? '✓' : '○'}</span>
+                          <span>At least 8 characters</span>
+                        </div>
+                        <div className={`flex items-center gap-2 ${/[A-Z]/.test(formData.password) ? 'text-green-600' : 'text-gray-500'}`}>
+                          <span className="font-bold">{/[A-Z]/.test(formData.password) ? '✓' : '○'}</span>
+                          <span>One uppercase letter (A-Z)</span>
+                        </div>
+                        <div className={`flex items-center gap-2 ${/[a-z]/.test(formData.password) ? 'text-green-600' : 'text-gray-500'}`}>
+                          <span className="font-bold">{/[a-z]/.test(formData.password) ? '✓' : '○'}</span>
+                          <span>One lowercase letter (a-z)</span>
+                        </div>
+                        <div className={`flex items-center gap-2 ${/\d/.test(formData.password) ? 'text-green-600' : 'text-gray-500'}`}>
+                          <span className="font-bold">{/\d/.test(formData.password) ? '✓' : '○'}</span>
+                          <span>One number (0-9)</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {formErrors.password && <p className="text-red-500 text-sm mt-1">{formErrors.password}</p>}
                   </div>
 
                   {/* Forgot Password - Only for login */}
@@ -427,38 +658,39 @@ export default function AuthForm() {
                   <motion.button 
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-4 rounded-xl font-semibold text-base hover:from-blue-600 hover:to-blue-800 disabled:opacity-50 shadow-lg"
+                    className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-4 rounded-xl font-semibold text-base hover:from-blue-600 hover:to-blue-800 disabled:opacity-50 shadow-lg relative overflow-hidden"
                     whileHover={{ boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" }}
                     whileTap={{ y: 2 }}
                   >
-                    {isLoading ? "Processing..." : (isSignUp ? "Create Account" : "Sign In")}
+                    <AnimatePresence mode="wait">
+                      {isLoading ? (
+                        <motion.div
+                          key="loading"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="flex items-center justify-center gap-2"
+                        >
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                          />
+                          <span>Processing...</span>
+                        </motion.div>
+                      ) : (
+                        <motion.span
+                          key="text"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                        >
+                          {isSignUp ? "Create Account" : "Sign In"}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
                   </motion.button>
                 </motion.form>
-
-                {/* Social Login */}
-                <motion.div 
-                  className="mt-8"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6, duration: 0.3 }}
-                >
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300"></div>
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-4 bg-white text-gray-500">Or continue with</span>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-6 flex justify-center">
-                    <GoogleSignInButton
-                      onSuccess={handleGoogleSuccess}
-                      onError={handleGoogleError}
-                      disabled={isLoading}
-                    />
-                  </div>
-                </motion.div>
 
                 {/* Toggle Form Link */}
                 <motion.div 

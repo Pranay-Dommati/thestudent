@@ -460,6 +460,21 @@ const MobileChatbotPage = () => {
       isLoggedIn
     });
 
+    // If topic confirmation is open and user sends a new message, automatically cancel it (desktop parity)
+    if (showTopicConfirmation && !customMessage) {
+      const cancellationMessage = {
+        id: generateUniqueId(),
+        type: "bot",
+        content: "❌ **Course creation cancelled** - Processing your new request instead.",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        isCancellation: true,
+      };
+      setChatHistory((prev) => [...prev, cancellationMessage]);
+      setShowTopicConfirmation(false);
+      setPendingTopics([]);
+      setOriginalPrompt("");
+    }
+
     const userMessageObj = {
       id: generateUniqueId(),
       type: "user",
@@ -491,18 +506,7 @@ const MobileChatbotPage = () => {
       }
     } catch (_) {}
 
-    // Validate prompt early and provide a helpful message if it looks like nonsense/too short
-    const validation = validateCoursePrompt(messageToSend);
-    if (!validation.ok) {
-      const botResponse = {
-        id: generateUniqueId(),
-        type: "bot",
-        content: "🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-      setChatHistory((prev) => [...prev, botResponse]);
-      return;
-    }
+    // Skip local heuristic validation – rely on AI classification to decide if it's a study topic
 
     setIsLoading(true);
 
@@ -527,7 +531,7 @@ const MobileChatbotPage = () => {
       // Extract topics using AI with rate limiting
       try {
         console.log('🚀 Mobile Pro Learning mode - calling classifyTopics with:', messageToSend);
-        const result = await classifyTopics(messageToSend);
+  const result = await classifyTopics(messageToSend);
         console.log('✅ Mobile classifyTopics result:', result);
           if (result && typeof result.personalization === 'string' && result.personalization.trim()) {
             setPersonalization(result.personalization.trim());
@@ -540,7 +544,20 @@ const MobileChatbotPage = () => {
             setUsageStats(result.usage_stats);
           }
           
-          const extractedTopics = result.topics || [];
+          const extractedTopics = Array.isArray(result.topics) ? result.topics : [];
+
+          // If AI couldn't extract any topics, show guidance and stop
+          if (extractedTopics.length === 0) {
+            const botResponse = {
+              id: generateUniqueId(),
+              type: "bot",
+              content: "🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".",
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+            setChatHistory((prev) => [...prev, botResponse]);
+            setIsLoading(false);
+            return;
+          }
           
           // Show toast notification IMMEDIATELY if more than 4 topics were extracted
           const maxPerRequest = 4; // Default max per request
@@ -652,14 +669,14 @@ const MobileChatbotPage = () => {
             setIsLoading(false);
             return;
           } else {
-            // Generic error handling
-            const errorResponse = {
+            // Generic error handling - show friendly guidance to enter a proper study topic
+            const guidanceResponse = {
               id: generateUniqueId(),
               type: "bot",
-              content: `❌ Topic extraction failed: ${error.message}. Please try again with a clearer learning query.`,
+              content: "🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".",
               timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
             };
-            setChatHistory((prev) => [...prev, errorResponse]);
+            setChatHistory((prev) => [...prev, guidanceResponse]);
             setIsLoading(false);
             return;
           }
@@ -1582,14 +1599,14 @@ const MobileChatbotPage = () => {
                   } catch (_) {}
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey && !isLoading) {
                     e.preventDefault();
                     handleSendMessage();
                   }
                 }}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => setIsInputFocused(false)}
-                disabled={isLoading}
+                aria-disabled={isLoading}
                 className="w-full px-4 pt-4 pb-5 pr-14 bg-white border-2 border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400/60 focus:border-indigo-400 text-gray-900 placeholder-gray-500 resize-none overflow-hidden text-base transition-all"
                 style={{ minHeight: '54px', maxHeight: '120px' }}
               />
@@ -1614,7 +1631,7 @@ const MobileChatbotPage = () => {
             </div>
             
             {/* Usage Stats - Show below input */}
-            {usageStats && (
+            {usageStats && isLoggedIn && (
               <div className="mt-3 flex justify-center">
                 <div className="text-center">
                   <div className="[&>div]:text-center">

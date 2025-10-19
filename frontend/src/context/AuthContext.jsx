@@ -180,11 +180,18 @@ export const AuthProvider = ({ children }) => {
       setLastChecked(Date.now());
       
       customToast.success('Login successful!', { id: 'auth-login' });
-      return true;
+      return { success: true };
     } catch (error) {
       console.error('Login error:', error.response?.data);
       
-      if (error.response?.status === 400) {
+      if (error.response?.status === 404) {
+        // Email doesn't exist - suggest signup
+        const errorData = error.response.data;
+        if (errorData.suggest_signup) {
+          // Don't show toast here - let AuthForm handle it after navigation
+          return { success: false, suggestSignup: true };
+        }
+      } else if (error.response?.status === 400) {
         const errorData = error.response.data;
         if (errorData.email) {
           customToast.error(errorData.email[0], { id: 'auth-login' });
@@ -202,7 +209,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         customToast.error('Login failed. Please try again.', { id: 'auth-login' });
       }
-      return false;
+      return { success: false };
     }
   };
 

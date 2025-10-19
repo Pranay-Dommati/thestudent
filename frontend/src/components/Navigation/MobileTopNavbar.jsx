@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -9,14 +9,36 @@ const MobileTopNavbar = () => {
   const { isLoggedIn, logout, user } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Show confirmation dialog instead of logging out immediately
   const handleLogout = () => {
-    logout();
-    setIsMenuOpen(false);
-    navigate('/');
+    setShowLogoutConfirm(true);
   };
+
+  const confirmLogout = () => {
+    try {
+      logout();
+    } finally {
+      setShowLogoutConfirm(false);
+      setIsMenuOpen(false);
+      navigate('/');
+    }
+  };
+
+  const cancelLogout = () => setShowLogoutConfirm(false);
+
+  // Close with ESC key
+  useEffect(() => {
+    if (!showLogoutConfirm) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') cancelLogout();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showLogoutConfirm]);
 
   const getPageTitle = () => {
     const path = location.pathname;
@@ -298,6 +320,47 @@ const MobileTopNavbar = () => {
                   EasyLearnova v2.0
                   <br />
                   Made with ❤️ for students
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal (mobile) */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[60] md:hidden">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40" onClick={cancelLogout} />
+          {/* Dialog */}
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <div
+              className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-100 animate-in zoom-in-95 fade-in duration-150"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="logout-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-5">
+                <h3 id="logout-title" className="text-base font-semibold text-gray-900 mb-2">
+                  Confirm Sign Out
+                </h3>
+                <p className="text-sm text-gray-600 mb-5">
+                  Are you sure you want to sign out of your account?
+                </p>
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    onClick={cancelLogout}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmLogout}
+                    className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                  >
+                    Sign Out
+                  </button>
                 </div>
               </div>
             </div>

@@ -3,12 +3,10 @@ import storage from './storage';
 
 const instance = axios.create({
   baseURL: (import.meta.env.VITE_API_BASE_URL || '/api'),
-  timeout: 15000, // 15 second timeout - fail fast to prevent user frustration
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT_MS || '30000', 10), // 30 second default timeout
   headers: {
     'Content-Type': 'application/json',
   },
-  // Deployments can be cold or cross-region; give generous default
-  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT_MS || '60000', 10),
 });
 
 // Request interceptor

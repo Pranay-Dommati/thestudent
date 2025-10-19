@@ -90,15 +90,16 @@ const MobileFirstCourses = () => {
             difficulty: 'Advanced',
             apiClass: '12th'
         },
-        { 
-            id: 'engineering', 
-            name: 'Engineering', 
-            icon: FaLaptopCode,
-            description: 'Professional skill development',
-            subjects: ['Programming', 'Web Dev', 'Data Science'],
-            difficulty: 'Expert',
-            apiClass: 'engineering'
-        },
+        // Temporarily disabled engineering card
+        // { 
+        //     id: 'engineering', 
+        //     name: 'Engineering', 
+        //     icon: FaLaptopCode,
+        //     description: 'Professional skill development',
+        //     subjects: ['Programming', 'Web Dev', 'Data Science'],
+        //     difficulty: 'Expert',
+        //     apiClass: 'engineering'
+        // },
     ];
 
     // Function to check if courses exist for a specific class level

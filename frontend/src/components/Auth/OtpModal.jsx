@@ -22,8 +22,25 @@ export default function OtpModal({ open, email, fullName, onClose, onVerified })
       setCode('');
       setIsSubmitting(false);
       setResendCooldown(0);
+    } else {
+      // When modal opens, start cooldown immediately (code was just sent)
+      setResendCooldown(60);
     }
   }, [open]);
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && open) {
+        onClose?.();
+      }
+    };
+
+    if (open) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [open, onClose]);
 
   const handleVerify = async (e) => {
     e.preventDefault();
@@ -57,14 +74,15 @@ export default function OtpModal({ open, email, fullName, onClose, onVerified })
     setResending(true);
     try {
       await otpResend({ email });
-  universalToast.success('Code resent');
+      toast.success('Code resent! Check your email.');
       setResendCooldown(60);
     } catch (err) {
       const status = err?.response?.status;
       let msg = err?.response?.data?.error || 'Unable to resend now';
       if (status === 429) {
-        // Server enforces 1/minute and max per window
-        msg = err?.response?.data?.error || 'Too many attempts. Please wait a minute.';
+        // Server enforces rate limiting - set cooldown even on error
+        msg = err?.response?.data?.error || 'Too many requests. Please wait before trying again.';
+        setResendCooldown(60); // Enforce 60s cooldown on rate limit
       }
   universalToast.error(msg);
     } finally {
@@ -82,12 +100,26 @@ export default function OtpModal({ open, email, fullName, onClose, onVerified })
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="w-full max-w-md rounded-2xl bg-white pt-4 pb-6 px-6 sm:p-8 shadow-xl relative"
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 30, opacity: 0 }}
           >
-            <h3 className="text-xl font-semibold text-gray-800">Verify your email</h3>
+            {/* Content wrapper with proper spacing for close button */}
+            <div className="relative">
+              {/* Close button positioned on the right */}
+              <button
+                onClick={onClose}
+                className="absolute -top-1 right-0 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                aria-label="Close modal"
+              >
+                <svg className="w-5 h-5 text-gray-500 hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <h3 className="text-xl font-semibold text-gray-800 pr-10">Verify your email</h3>
+            </div>
             <p className="mt-1 text-sm text-gray-600">We sent a 6-digit code to <span className="font-medium">{email}</span>.</p>
 
             <form className="mt-4" onSubmit={handleVerify}>
@@ -114,9 +146,13 @@ export default function OtpModal({ open, email, fullName, onClose, onVerified })
               <button
                 onClick={handleResend}
                 disabled={resendCooldown > 0 || resending || isSubmitting}
-                className="text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                className="text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {resending ? 'Sending…' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                {resending 
+                  ? 'Sending…' 
+                  : resendCooldown > 0 
+                    ? `Resend in ${resendCooldown >= 60 ? '1 minute' : `${resendCooldown}s`}` 
+                    : 'Resend code'}
               </button>
               <button onClick={onClose} className="hover:text-gray-800">Change email</button>
             </div>

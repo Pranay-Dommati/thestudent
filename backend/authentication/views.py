@@ -112,6 +112,25 @@ class LoginView(generics.CreateAPIView):
         if getattr(settings, 'DEBUG', False):
             logger.debug("Login attempt received")
         
+        # Check if email exists BEFORE serializer validation
+        email = request.data.get('email', '').lower().strip()
+        if email:
+            try:
+                user_exists = User.objects.filter(email=email).exists()
+                if not user_exists:
+                    if getattr(settings, 'DEBUG', False):
+                        logger.debug(f"User with email {email} does not exist")
+                    return Response(
+                        {
+                            "non_field_errors": ["No account found with this email. Please sign up first."],
+                            "suggest_signup": True
+                        },
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            except Exception as e:
+                if getattr(settings, 'DEBUG', False):
+                    logger.debug(f"Error checking user existence: {str(e)}")
+        
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
             if getattr(settings, 'DEBUG', False):
@@ -119,10 +138,13 @@ class LoginView(generics.CreateAPIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            email = serializer.validated_data['email']
+            password = serializer.validated_data['password']
+            
             user = authenticate(
                 request=request,
-                email=serializer.validated_data['email'],
-                password=serializer.validated_data['password']
+                email=email,
+                password=password
             )
             
             if not user:
@@ -846,6 +868,17 @@ def google_auth_callback(request):
             user = User.objects.get(email=email)
             created = False
             logger.info(f"Google auth: Existing user found - {email}")
+            
+            # CRITICAL FIX: If user exists but is inactive (e.g., from abandoned email signup),
+            # activate them now since Google has verified their email
+            if not user.is_active:
+                user.is_active = True
+                user.auth_method = 'google'  # Update to Google auth since they're using Google now
+                user.full_name = full_name  # Update name from Google
+                user.agreed_to_terms = True  # Google users implicitly agree
+                user.save(update_fields=['is_active', 'auth_method', 'full_name', 'agreed_to_terms'])
+                logger.info(f"Google auth: Activated previously inactive user - {email}")
+                
         except User.DoesNotExist:
             # Create new user using your custom UserManager.create_user method
             try:
@@ -862,13 +895,6 @@ def google_auth_callback(request):
                     {"error": "Failed to create user account"},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
-        
-        # Ensure user is active
-        if not user.is_active:
-            return Response(
-                {"error": "User account is disabled"},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
         
         # Generate JWT tokens using the same method as your regular login
         refresh = RefreshToken.for_user(user)
@@ -993,6 +1019,17 @@ def google_auth_token(request):
             user = User.objects.get(email=email)
             created = False
             logger.info(f"Google token auth: Existing user found - {email}")
+            
+            # CRITICAL FIX: If user exists but is inactive (e.g., from abandoned email signup),
+            # activate them now since Google has verified their email
+            if not user.is_active:
+                user.is_active = True
+                user.auth_method = 'google'  # Update to Google auth since they're using Google now
+                user.full_name = full_name  # Update name from Google
+                user.agreed_to_terms = True  # Google users implicitly agree
+                user.save(update_fields=['is_active', 'auth_method', 'full_name', 'agreed_to_terms'])
+                logger.info(f"Google token auth: Activated previously inactive user - {email}")
+                
         except User.DoesNotExist:
             # Create new user using your custom UserManager.create_user method
             try:
@@ -1010,13 +1047,6 @@ def google_auth_token(request):
                     {"error": "Failed to create user account"},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
-        
-        # Ensure user is active
-        if not user.is_active:
-            return Response(
-                {"error": "User account is disabled"},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
         
         # Generate JWT tokens using the same method as your regular login
         refresh = RefreshToken.for_user(user)

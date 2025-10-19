@@ -3469,16 +3469,27 @@ const ProLearningPage = () => {
               });
                 // Merge new tab content into existing state
                 // IMPORTANT: preserve previously displayed reading; don't overwrite with later updates
-                setContent(prev => ({
-                  reading: (prev?.reading && prev.reading.trim().length > 0)
-                    ? prev.reading
-                    : (formattedContent.reading || ''),
-                  summary: formattedContent.summary || prev?.summary || '',
-                  quiz: (Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) ? formattedContent.quiz : (prev?.quiz || []),
-                  videos: (Array.isArray(formattedContent.videos) && formattedContent.videos.length > 0) ? formattedContent.videos : (prev?.videos || []),
-                  resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0) ? formattedContent.resources : (prev?.resources || []),
-                  resourcesMetadata: formattedContent.resourcesMetadata || prev?.resourcesMetadata || null
-                }));
+                const prevContentTopicName = contentTopicName; // capture before we update it below
+                setContent(prev => {
+                  const sameTopic = prevContentTopicName === tabInfo.topic;
+                  return {
+                    reading: (prev?.reading && prev.reading.trim().length > 0)
+                      ? prev.reading
+                      : (formattedContent.reading || ''),
+                    summary: formattedContent.summary || (sameTopic ? (prev?.summary || '') : ''),
+                    quiz: (Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0)
+                      ? formattedContent.quiz
+                      : (sameTopic ? (prev?.quiz || []) : []),
+                    videos: (Array.isArray(formattedContent.videos) && formattedContent.videos.length > 0)
+                      ? formattedContent.videos
+                      : (sameTopic ? (prev?.videos || []) : []),
+                    // Do NOT carry over resources from a previous topic
+                    resources: (Array.isArray(formattedContent.resources) && formattedContent.resources.length > 0)
+                      ? formattedContent.resources
+                      : (sameTopic ? (prev?.resources || []) : []),
+                    resourcesMetadata: formattedContent.resourcesMetadata || (sameTopic ? (prev?.resourcesMetadata || null) : null)
+                  };
+                });
                     // Set the topic name for which this content is now current so non-reading tabs can render immediately
                     try { setContentTopicName(tabInfo.topic); } catch {}
                 
@@ -3536,6 +3547,8 @@ const ProLearningPage = () => {
             setAllTopicsGenerated(true);
             setIsLoading(false);
             setCourseGenerationStatus('✅ All topics generated successfully!');
+            // Ensure any per-tab progress badges are cleared
+            try { setProgressiveGenerationProgress({}); } catch {}
 
             // Auto-save after full progressive completion
             autoSaveToBackend().catch(error => {
@@ -4100,6 +4113,8 @@ const ProLearningPage = () => {
               setAllTopicsGenerated(true);
               // Clear any 'fresh' batch marker so tabs are not blocked after completion
               try { if (typeof localStorage !== 'undefined') localStorage.removeItem('proLearning_batchMarker'); } catch {}
+              // Also clear any lingering per-tab progress state to remove tiny Loading… badges
+              try { setProgressiveGenerationProgress({}); } catch {}
               
               // Auto-save for progressive generation completion
               console.log('🚀 Progressive generation completed, triggering auto-save...');
@@ -4220,13 +4235,16 @@ const ProLearningPage = () => {
 
   // Safety mechanism: Clear loading states if content exists but loading states are still active
   useEffect(() => {
-    if (content && (isLoading || loadingStep) && !isBatchGenerating) {
+    const topicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam);
+    const readyTabs = (topicName && availableTabsForTopics[topicName]) || [];
+    const activeHasContent = !!(content && ((activeTab === 'reading' && !!content.reading) || (activeTab !== 'reading' && !!content[activeTab])));
+    if ((content || allTopicsGenerated || readyTabs.length > 0 || activeHasContent) && (isLoading || loadingStep) && !isBatchGenerating) {
       console.log('🛠️ Safety mechanism: Clearing stuck loading states');
       console.log('🛠️ Content exists:', !!content, 'isLoading:', isLoading, 'loadingStep:', loadingStep);
       setIsLoading(false);
       setLoadingStep('');
     }
-  }, [content, isLoading, loadingStep, isBatchGenerating]);
+  }, [content, isLoading, loadingStep, isBatchGenerating, allTopicsGenerated, availableTabsForTopics, selectedTopic, activeTab]);
 
   // Debug: Log active tab's content whenever content, selectedTopic, or activeTab changes
   useEffect(() => {
@@ -6059,7 +6077,7 @@ const ProLearningPage = () => {
                       // Check if current topic is blocked (2nd topic onwards)
                       const currentTopicBlocked = currentTopicName ? isTopicBlocked(currentTopicName) : false;
                       
-                      // Check if tab has content already (treat as available even if tabs map isn’t filled yet)
+                      // Check if tab has content already for this topic (do NOT borrow from previous topic)
                       const hasTabContent = !!content && contentTopicName === currentTopicName && (
                         (tab.id === 'reading' && !!content?.reading && String(content.reading).trim().length > 0) ||
                         (tab.id === 'summary' && !!content?.summary && String(content.summary).trim().length > 0) ||
@@ -6068,15 +6086,7 @@ const ProLearningPage = () => {
                         // Treat resources as ready if array has items OR metadata indicates completion
                         (tab.id === 'resources' && (
                           (Array.isArray(content?.resources) && content.resources.length > 0) ||
-                          !!content?.resourcesMetadata?.generatedAt ||
-                          // Reload/DB mode fallback: if other tabs exist, allow clicking to show empty state
-                          (loadScenario === 'reload' && (
-                            (!!content?.reading && String(content.reading).trim().length > 0) ||
-                            (!!content?.summary && String(content.summary).trim().length > 0) ||
-                            (Array.isArray(content?.videos) && content.videos.length > 0) ||
-                            (Array.isArray(content?.quiz) && content.quiz.length > 0) ||
-                            (!!content?.quiz?.questions && Array.isArray(content?.quiz?.questions) && content.quiz.questions.length > 0)
-                          ))
+                          !!content?.resourcesMetadata?.generatedAt
                         ))
                       );
 
@@ -6100,10 +6110,7 @@ const ProLearningPage = () => {
                           isTabAvailable = false;
                         } else {
                           isTabAvailable = ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes(tab.id)) || hasTabContent);
-                          // Relax gating for Resources in reload mode so users can see the empty state
-                          if (!isTabAvailable && loadScenario === 'reload' && tab.id === 'resources' && otherTabsPresent) {
-                            isTabAvailable = true;
-                          }
+                          // Do not relax gating for Resources in reload mode; it should only enable when completed for this topic
                           if ((isProgressiveGenerating) && tab.id !== 'reading' && !readingReady) {
                             isTabAvailable = false;
                           }
@@ -6213,9 +6220,12 @@ const ProLearningPage = () => {
                             </div>
                             <span className="text-sm font-semibold whitespace-nowrap">{tab.label}</span>
                             {/* Tiny status label: show only when generating */}
-                            {useProgressiveGeneration && isProgressiveGenerating &&
-                              progressiveGenerationProgress.topic === selectedTopic?.name &&
-                              progressiveGenerationProgress.tabType === tab.id && (
+                            {useProgressiveGeneration &&
+                              isProgressiveGenerating &&
+                              !!progressiveGenerationProgress?.topic &&
+                              progressiveGenerationProgress.topic === (selectedTopic?.name || getCurrentTopicFromParam(topicParam)) &&
+                              progressiveGenerationProgress.tabType === tab.id &&
+                              !allTopicsGenerated && (
                                 <span className="text-[10px] leading-none text-blue-600" aria-live="polite">Loading…</span>
                             )}
                           </div>

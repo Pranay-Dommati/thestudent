@@ -11,6 +11,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   // Mobile detection
@@ -98,11 +99,24 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const textColor = (isScrolled || initialStyle === 'light' || (isMobile && isCourseSelectionPage)) 
     ? 'text-gray-700 hover:text-blue-600' 
     : 'text-white hover:text-blue-200';
+  // Initiate logout with confirmation on mobile
   const handleLogout = () => {
-    logout();
-    navigate('/');
-    closeAllMenus();
+    // Close the dropdown behind the modal for a cleaner UX
+    setIsMobileMenuOpen(false);
+    setShowLogoutConfirm(true);
   };
+
+  const confirmLogout = () => {
+    try {
+      logout();
+    } finally {
+      setShowLogoutConfirm(false);
+      navigate('/');
+      closeAllMenus();
+    }
+  };
+
+  const cancelLogout = () => setShowLogoutConfirm(false);
   
   const closeAllMenus = () => {
     setIsMobileMenuOpen(false);
@@ -201,14 +215,18 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 </div>
               </button>
             ) : (
-              <button 
-                className="md:hidden ml-4 menu-toggle-button"
-                onClick={() => setIsAuthMenuOpen(!isAuthMenuOpen)}
+              <Link 
+                to="/auth"
+                className="md:hidden ml-4 flex items-center"
               >
-                <div className={`w-8 h-8 rounded-full ${isScrolled || initialStyle === 'light' ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-white/20 backdrop-blur-sm'} flex items-center justify-center`}>
-                  <FaUserCircle className={`w-5 h-5 ${isScrolled || initialStyle === 'light' ? 'text-white' : 'text-white'}`} />
+                <div className={`px-3 py-1.5 rounded-full ${
+                  isScrolled || initialStyle === 'light' 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'bg-white text-blue-600 hover:bg-gray-50'
+                } transition-all duration-300 shadow-sm flex items-center justify-center`}>
+                  <span className="text-sm font-medium">Login</span>
                 </div>
-              </button>
+              </Link>
             )}
           </div>
         </div>
@@ -276,6 +294,46 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           </>
         )}
       </div>
+      {/* Logout Confirmation Modal (mobile) */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[60] md:hidden">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40" onClick={cancelLogout} />
+          {/* Dialog */}
+          <div className="absolute inset-0 flex items-center justify-center p-6">
+            <div
+              className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-100 animate-in zoom-in-95 fade-in duration-150"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="logout-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-5">
+                <h3 id="logout-title" className="text-base font-semibold text-gray-900 mb-2">
+                  Confirm Sign Out
+                </h3>
+                <p className="text-sm text-gray-600 mb-5">
+                  Are you sure you want to sign out of your account?
+                </p>
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    onClick={cancelLogout}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmLogout}
+                    className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

@@ -289,10 +289,12 @@ def call_intent_classifier(user_query: str, max_retries: int = 3):
 
     # Keep the instruction ultra-compact to avoid token waste and hidden reasoning.
     intent_prompt = (
-        "Return ONLY JSON with one field. No prose, no code fences. "
-        "Decide if the user query is 'direct' (specific items like arrays, recursion, AES, DFS, lists with and/commas) "
+        "Return ONLY JSON. No prose, no code fences. "
+        "Decide if the user query is a study/learning topic request. If yes, classify as 'direct' (specific items like arrays, recursion, AES, DFS, lists with and/commas) "
         "or 'broad' (general subjects like Python, React, calculus, DSA). "
-        "Answer strictly as: {\"intent\": \"direct\"} or {\"intent\": \"broad\"}.\n\n"
+        "If the query is NOT related to studying/learning/course creation (e.g., greetings, small talk, random text, unrelated help), respond with: "
+        "{\"intent\": \"not_study\", \"message\": \"🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".\"}. "
+        "Otherwise, answer strictly as: {\"intent\": \"direct\"} or {\"intent\": \"broad\"}.\n\n"
         f"Query: \"{user_query}\""
     )
 

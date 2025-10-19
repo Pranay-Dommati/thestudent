@@ -64,13 +64,14 @@ const Courses = () => {
             description: 'Preparation for higher education',
             apiClass: '12th'
         },
-        { 
-            id: 'engineering', 
-            name: 'Engineering', 
-            icon: FaLaptopCode,
-            description: 'Professional skill development',
-            apiClass: 'engineering'
-        },
+        // Temporarily hidden - Engineering card
+        // { 
+        //     id: 'engineering', 
+        //     name: 'Engineering', 
+        //     icon: FaLaptopCode,
+        //     description: 'Professional skill development',
+        //     apiClass: 'engineering'
+        // },
     ];
 
     // Function to check if courses exist for a specific class level

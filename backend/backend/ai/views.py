@@ -936,20 +936,23 @@ def classify_topics(request):
                     import re as _re
                     m = _re.search(r'\{[\s\S]*\}', stripped)
                     parsed_ic = json.loads(m.group()) if m else json.loads(stripped)
-                    if isinstance(parsed_ic, dict) and parsed_ic.get('intent') in ['broad', 'direct']:
+                    if isinstance(parsed_ic, dict) and parsed_ic.get('intent') in ['broad', 'direct', 'not_study']:
                         intent = parsed_ic['intent']
                         debug_meta['intent_parse_stage'] = 'json_object'
+                        # capture model-provided user-friendly message for non-study
+                        if intent == 'not_study' and isinstance(parsed_ic.get('message'), str):
+                            debug_meta['not_study_message'] = parsed_ic.get('message')
                 except Exception:
                     intent = None
                 # Fallback: look for a bare token 'direct' or 'broad' in text
                 if not intent:
                     import re as _re
-                    m2 = _re.search(r'\b(direct|broad)\b', stripped, flags=_re.IGNORECASE)
+                    m2 = _re.search(r'\b(direct|broad|not_study)\b', stripped, flags=_re.IGNORECASE)
                     if m2:
                         intent = m2.group(1).lower()
                         debug_meta['intent_parse_stage'] = 'bare_token'
                 debug_meta['intent_raw_text'] = stripped[:300]
-                if intent in ['broad', 'direct']:
+                if intent in ['broad', 'direct', 'not_study']:
                     logger.info(f"Intent classifier (AI) returned: {intent} for query='{safe_query}'")
                     debug_meta['intent'] = intent
                     debug_meta['intent_source'] = 'ai'
@@ -969,6 +972,19 @@ def classify_topics(request):
                 'message': 'AI intent classification did not return a valid intent (direct/broad).',
                 'debug_meta': debug_meta
             }, status=422)
+
+        # If the classifier says this is not a study-related query, return early with a friendly message
+        if intent == 'not_study':
+            # Prefer model-provided message; fallback to our standard friendly guidance
+            friendly = debug_meta.get('not_study_message') or "🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\"."
+            return JsonResponse({
+                'success': False,
+                'intent': 'not_study',
+                'message': friendly,
+                'topics': [],
+                'usage_stats': None,
+                'debug_meta': debug_meta,
+            }, status=200)
         # We no longer use heuristic explicit extraction to generate topics; keep names for potential AI guidance only
         try:
             explicit_topics = extract_explicit_topics(user_query)
