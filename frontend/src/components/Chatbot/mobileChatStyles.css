@@ -80,6 +80,34 @@ button {
   animation: slide-down 0.3s ease-out;
 }
 
+/* Fix for welcome card truncation issue */
+.welcome-card {
+  position: absolute !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  max-width: 90vw !important;
+  width: 320px !important;
+  right: auto !important;
+}
+
+/* Welcome card content fixes */
+.welcome-card-content {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.welcome-card ul li {
+  display: flex !important;
+  align-items: flex-start !important;
+}
+
+.welcome-card ul li span:first-child {
+  flex-shrink: 0 !important;
+  margin-top: 0.375rem !important;
+}
+
 /* Enhanced mobile touch targets */
 @media (max-width: 768px) {
   button {

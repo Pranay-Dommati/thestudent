@@ -13,8 +13,10 @@ import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
 import proLearningHistoryService from '../../services/ProLearningHistoryService';
 
-// Custom CSS - added for DeepSeek-like UI
+// Custom CSS - added for DeepSeek-like UI and welcome card fix
 import './mobileChatStyles.css';
+import './welcomeCardFix.css';
+import NewWelcomeCard from './NewWelcomeCard';
 
 // Use relative API paths; dev proxy routes to backend
 import apiAxios from '../../utils/axios';
@@ -429,7 +431,7 @@ const MobileChatbotPage = () => {
     if (proMode && !usageStats) {
       const timeoutId = setTimeout(() => {
         if (!usageStats) {
-          console.warn('Mobile stats loading timeout, setting fallback');
+          // Silently set fallback stats without console warning
           setUsageStats({
             rate_limits: {
               daily: { enforced: false },
@@ -1211,11 +1213,12 @@ const MobileChatbotPage = () => {
       </div>
 
   {/* Left-side Drawer: ProLearning Courses */}
-      <div className={`fixed inset-0 z-40 ${isCoursesDrawerOpen ? '' : 'pointer-events-none'}`} aria-hidden={!isCoursesDrawerOpen}>
+      <div className={`fixed inset-0 z-40 ${isCoursesDrawerOpen ? '' : 'pointer-events-none'}`} aria-hidden={!isCoursesDrawerOpen ? 'true' : undefined}>
         {/* Overlay */}
         <div
           className={`absolute inset-0 bg-black/30 transition-opacity ${isCoursesDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
           onClick={closeCoursesDrawer}
+          aria-hidden="true"
         />
         {/* Drawer */}
         <div
@@ -1351,38 +1354,89 @@ const MobileChatbotPage = () => {
         </div>
       </div>
 
-      {/* Welcome Message Popup for First-time Users */}
-      {showWelcomeMessage && (
-        <>
-          {/* Background Blur Overlay */}
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-md z-40"></div>
-          
-          {/* Top Positioned Welcome Message */}
-          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-sm mx-4">
-            <div className="bg-white/95 backdrop-blur-lg border border-white/30 rounded-xl p-4 shadow-xl animate-slide-down">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mr-2">
-                    <IoSchoolOutline className="w-4 h-4 text-white" />
-                  </div>
-                  <h3 className="text-base font-semibold text-gray-800">Welcome!</h3>
+      {/* Welcome Message Modal for First-time Users - Using New Component */}
+      <NewWelcomeCard 
+        showWelcomeMessage={showWelcomeMessage}
+        setShowWelcomeMessage={setShowWelcomeMessage}
+        setMessage={setMessage}
+        handleSendMessage={handleSendMessage}
+      />
+      {/* Old welcome card code removed and replaced with component above */}
+      {false && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 welcome-message-modal" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+          {/* Overlay (click to close) */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowWelcomeMessage(false)}
+          />
+          {/* Centered Card */}
+          <div className="welcome-card-container">
+            <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden animate-slide-down welcome-card">
+              {/* Header */}
+              {/* Minimal header bar */}
+              <div className="welcome-card-header"></div>
+              
+              <div className="welcome-card-content">
+                <div className="welcome-card-icon">
+                  <IoRocket className="w-6 h-6 text-white" />
                 </div>
+                
+                <h3 id="welcome-title" className="welcome-card-title">Create your dream course in seconds.</h3>
+                <p className="welcome-card-subtitle">No limits. No coding. Just start.</p>
                 <button
                   onClick={() => setShowWelcomeMessage(false)}
-                  className="text-gray-600 hover:text-gray-800 transition-all duration-200 p-1.5 hover:bg-gray-100 rounded-full"
+                  className="absolute right-3 top-3 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition"
+                  aria-label="Close"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <IoClose className="text-white/90" />
                 </button>
               </div>
-              
-              <p className="text-gray-800 text-sm leading-relaxed">
-                Use our powerful tool to seamlessly create customized courses on any topic of your choice — just click the 'Create Course' button to begin.
-              </p>
+
+              {/* Body */}
+              <div className="px-5 py-4 welcome-card-content">
+                <p className="text-sm text-gray-700 leading-relaxed mb-3">
+                  This chat is dedicated to creating courses. Tell us a topic and we’ll extract up to 4 focused topics and generate your course.
+                </p>
+                <ul className="text-sm text-gray-600 space-y-1.5 mb-4">
+                  <li className="welcome-card-list-item"><span className="welcome-card-bullet w-1.5 h-1.5 rounded-full bg-indigo-500"></span> <span>Type a short topic (e.g., "Basics of photosynthesis")</span></li>
+                  <li className="welcome-card-list-item"><span className="welcome-card-bullet w-1.5 h-1.5 rounded-full bg-indigo-500"></span> <span>We create up to 4 topics per request</span></li>
+                  <li className="welcome-card-list-item"><span className="welcome-card-bullet w-1.5 h-1.5 rounded-full bg-indigo-500"></span> <span>Tap any sample below to try</span></li>
+                </ul>
+
+                {/* Sample prompts */}
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    "Create course on basic algebra",
+                    "Create course about photosynthesis",
+                    "Create course on React components",
+                  ].map((sample) => (
+                    <button
+                      key={sample}
+                      onClick={() => {
+                        setShowWelcomeMessage(false);
+                        setMessage(sample);
+                        setTimeout(() => handleSendMessage(sample, { forceProMode: true }), 120);
+                      }}
+                      className="px-3 py-1.5 text-sm rounded-full bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200 transition welcome-card-sample-button"
+                    >
+                      {sample}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 pb-4 pt-1 flex justify-end">
+                <button
+                  onClick={() => setShowWelcomeMessage(false)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700 transition"
+                >
+                  Got it
+                </button>
+              </div>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Chat messages container */}

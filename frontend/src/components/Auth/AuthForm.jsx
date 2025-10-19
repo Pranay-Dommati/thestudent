@@ -468,6 +468,8 @@ export default function AuthForm() {
                   <GoogleSignInButton
                     onSuccess={handleGoogleSuccess}
                     onError={handleGoogleError}
+                    onStart={() => setIsLoading(true)}
+                    onShown={() => setIsLoading(false)}
                     disabled={isLoading}
                   />
                 </motion.div>
@@ -558,6 +560,7 @@ export default function AuthForm() {
                         placeholder="Password" 
                         value={formData.password}
                         onChange={handleChange}
+                        autoComplete={isSignUp ? 'new-password' : 'current-password'}
                       />
                     </div>
                     
@@ -622,6 +625,7 @@ export default function AuthForm() {
                             placeholder="Confirm Password" 
                             value={formData.confirmPassword}
                             onChange={handleChange}
+                            autoComplete={isSignUp ? 'new-password' : 'off'}
                           />
                           {formErrors.confirmPassword && <p className="text-red-500 text-sm mt-2">{formErrors.confirmPassword}</p>}
                         </div>
@@ -857,6 +861,7 @@ export default function AuthForm() {
                         placeholder="Password" 
                         value={formData.password}
                         onChange={handleChange}
+                        autoComplete={isSignUp ? 'new-password' : 'current-password'}
                       />
                       {formErrors.password && <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>}
                     </div>
@@ -894,6 +899,7 @@ export default function AuthForm() {
                               placeholder="Confirm Password" 
                               value={formData.confirmPassword}
                               onChange={handleChange}
+                              autoComplete={isSignUp ? 'new-password' : 'off'}
                             />
                             {formErrors.confirmPassword && <p className="text-red-500 text-xs mt-1">{formErrors.confirmPassword}</p>}
                           </div>
@@ -956,6 +962,8 @@ export default function AuthForm() {
                       <GoogleSignInButton
                         onSuccess={handleGoogleSuccess}
                         onError={handleGoogleError}
+                        onStart={() => setIsLoading(true)}
+                        onShown={() => setIsLoading(false)}
                         disabled={isLoading}
                       />
                     </div>

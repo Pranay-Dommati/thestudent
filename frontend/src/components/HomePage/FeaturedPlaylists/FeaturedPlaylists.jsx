@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSchoolCourses, getAllCourses, getEngineeringCourses } from '../../../services/courseApi';
+import { getSchoolCourses } from '../../../services/courseApi';
 import { useNavigate, Link } from 'react-router-dom';
 
 const categories = [
@@ -10,8 +10,7 @@ const categories = [
   { id: 'ninth', name: 'Class 9' },
   { id: 'tenth', name: 'Class 10' },
   { id: 'eleventh', name: 'Class 11' },
-  { id: 'twelfth', name: 'Class 12' },
-  { id: 'engineering', name: 'Engineering' }
+  { id: 'twelfth', name: 'Class 12' }
 ];
 
 const FeaturedPlaylists = () => {
@@ -27,11 +26,8 @@ const FeaturedPlaylists = () => {
       setLoading(true);
       setError(false);
       try {
-        // Fetch both school courses and engineering courses
-        const [schoolCourses, engineeringCourses] = await Promise.all([
-          getSchoolCourses('', '', ''), // Empty filters to get all school courses
-          getEngineeringCourses('all') // Get all engineering courses
-        ]);
+        // Fetch only school courses (temporarily hiding engineering courses on home page)
+        const schoolCourses = await getSchoolCourses('', '', '');
         
   // Removed debug logs for production
         
@@ -112,32 +108,8 @@ const FeaturedPlaylists = () => {
           };
         });
 
-        // Transform engineering courses to match our display format
-        const transformedEngineeringCourses = Array.isArray(engineeringCourses) ? engineeringCourses.map(course => {
-          // Removed debug log
-          
-          // Handle duration
-          let duration = 'Duration TBA';
-          if (course.duration) {
-            duration = course.duration.includes('hour') ? course.duration : `${course.duration} hours`;
-          }
-
-          return {
-            id: course.id,
-            title: course.title,
-            duration: duration,
-            category: 'engineering', // All engineering courses get 'engineering' category
-            author: course.sources || course.category || 'Engineering', // Use sources or category as author
-            board: 'Engineering',
-            board_raw: 'engineering',
-            subject: course.category || 'Engineering',
-            image: course.thumbnail || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?ixlib=rb-4.0.3',
-            courseType: 'engineering'
-          };
-        }) : [];
-
-        // Combine both types of courses
-        const allCourses = [...transformedSchoolCourses, ...transformedEngineeringCourses];
+        // Combine courses (engineering hidden => only school courses)
+        const allCourses = [...transformedSchoolCourses];
   // Removed debug logs
         
         setCourses(allCourses);
@@ -234,6 +206,19 @@ const FeaturedPlaylists = () => {
   
   const [showAllOnMobile, setShowAllOnMobile] = useState(false);
 
+  // Only show tabs for categories that have courses; always show 'All Courses'
+  const visibleCategories = categories.filter(cat => {
+    if (cat.id === 'all') return true;
+    return courses.some(course => course.category === cat.id);
+  });
+
+  // If current active category has no courses, reset to 'all'
+  useEffect(() => {
+    if (activeCategory !== 'all' && !courses.some(c => c.category === activeCategory)) {
+      setActiveCategory('all');
+    }
+  }, [courses]);
+
   // Filter courses with mobile-specific display logic
   const allFilteredCourses = activeCategory === 'all' 
     ? courses 
@@ -290,7 +275,7 @@ const FeaturedPlaylists = () => {
         {/* Category filters - improved mobile experience */}
         <div className="overflow-x-auto scrollbar-hide -mx-3 px-3 sm:-mx-4 sm:px-4 mb-4 sm:mb-6 lg:mb-8">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-max pb-2">
-            {categories.map(category => (
+            {visibleCategories.map(category => (
               <button
                 key={category.id}
                 onClick={() => setActiveCategory(category.id)}

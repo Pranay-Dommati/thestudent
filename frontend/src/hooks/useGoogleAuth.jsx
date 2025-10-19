@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import universalToast from '../utils/universalToast';
 
 // Enhanced Google Sign-In Hook
-export const useGoogleAuth = (onSuccess, onError) => {
+export const useGoogleAuth = (onSuccess, onError, onShown) => {
   const [isGoogleReady, setIsGoogleReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -69,21 +69,41 @@ export const useGoogleAuth = (onSuccess, onError) => {
 
         await loadGoogleScript();
         
+        // Handle CSP errors gracefully
+        const originalConsoleError = console.error;
+        console.error = (...args) => {
+          // Filter out the specific CSP error for Google framing
+          const message = args.join(' ');
+          if (message.includes("Refused to frame 'https://www.google.com/'") || 
+              message.includes('frame-ancestors') ||
+              message.includes('Content Security Policy directive')) {
+            // This is expected behavior - Google prevents their site from being framed
+            return;
+          }
+          originalConsoleError.apply(console, args);
+        };
+        
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: handleGoogleResponse,
           auto_select: false,
           cancel_on_tap_outside: true,
           use_fedcm_for_prompt: false,
-          ux_mode: 'popup',
+          ux_mode: 'popup', // Use popup mode to avoid iframe issues
+          context: 'signin', // Specify context
         });
+
+        // Restore original console.error after a delay
+        setTimeout(() => {
+          console.error = originalConsoleError;
+        }, 2000);
 
         setIsGoogleReady(true);
         setIsLoading(false);
         console.log('Google Sign-In initialized successfully');
       } catch (error) {
         console.error('Google Sign-In initialization failed:', error);
-  universalToast.error('Google Sign-In failed to load');
+        universalToast.error('Google Sign-In failed to load');
       }
     };
 
@@ -100,18 +120,26 @@ export const useGoogleAuth = (onSuccess, onError) => {
     try {
       // Use prompt method for better compatibility
       window.google.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed()) {
+        try {
+          // If the Google prompt is displayed, inform caller to hide loading
+          if ((notification.isDisplayed && notification.isDisplayed()) || (notification.isDisplayMoment && notification.isDisplayMoment())) {
+            onShown && onShown();
+          }
+        } catch {}
+        if (notification.isNotDisplayed && notification.isNotDisplayed()) {
           console.log('Google Sign-In prompt not displayed');
           // Fallback: try rendering a button and clicking it programmatically
           renderGoogleButtonAndClick();
-        } else if (notification.isSkippedMoment()) {
+        } else if (notification.isSkippedMoment && notification.isSkippedMoment()) {
           console.log('Google Sign-In prompt skipped');
           universalToast.error('Google Sign-In was cancelled');
+          try { onError && onError('Google Sign-In cancelled'); } catch {}
         }
       });
     } catch (error) {
       console.error('Failed to show Google Sign-In:', error);
   universalToast.error('Failed to start Google Sign-In');
+      try { onError && onError(error); } catch {}
     }
   };
 
@@ -135,9 +163,11 @@ export const useGoogleAuth = (onSuccess, onError) => {
       setTimeout(() => {
         const button = tempContainer.querySelector('div[role="button"]');
         if (button) {
+          try { onShown && onShown(); } catch {}
           button.click();
         } else {
           universalToast.error('Google Sign-In button could not be rendered');
+          try { onError && onError('Google Sign-In button could not be rendered'); } catch {}
         }
         // Clean up
         document.body.removeChild(tempContainer);
@@ -145,6 +175,7 @@ export const useGoogleAuth = (onSuccess, onError) => {
     } catch (error) {
       console.error('Fallback Google Sign-In failed:', error);
   universalToast.error('Google Sign-In is temporarily unavailable');
+      try { onError && onError(error); } catch {}
     }
   };
 
@@ -156,13 +187,13 @@ export const useGoogleAuth = (onSuccess, onError) => {
 };
 
 // Usage in AuthForm component:
-export const GoogleSignInButton = ({ onSuccess, onError, disabled = false }) => {
-  const { isGoogleReady, isLoading, signInWithGoogle } = useGoogleAuth(onSuccess, onError);
+export const GoogleSignInButton = ({ onSuccess, onError, onStart, onShown, disabled = false }) => {
+  const { isGoogleReady, isLoading, signInWithGoogle } = useGoogleAuth(onSuccess, onError, onShown);
 
   return (
     <button
       type="button"
-      onClick={signInWithGoogle}
+      onClick={() => { try { onStart && onStart(); } catch {} signInWithGoogle(); }}
       disabled={disabled || !isGoogleReady}
       className="w-full flex justify-center items-center py-4 px-4 border-2 border-gray-200 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-0"
       aria-label="Continue with Google"

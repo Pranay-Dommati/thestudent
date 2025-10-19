@@ -235,6 +235,7 @@ export default function ResetPassword() {
                 placeholder="New Password"
                 value={formData.newPassword}
                 onChange={handleChange}
+                autoComplete="new-password"
                 className={`w-full p-4 pl-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
                   formErrors.newPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
                 }`}
@@ -254,6 +255,7 @@ export default function ResetPassword() {
                 placeholder="Confirm New Password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
+                autoComplete="new-password"
                 className={`w-full p-4 pl-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
                   formErrors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
                 }`}
