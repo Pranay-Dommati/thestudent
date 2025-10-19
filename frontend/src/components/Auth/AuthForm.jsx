@@ -81,7 +81,7 @@ export default function AuthForm() {
       const success = await googleLogin(credential);
       if (success) {
         // Toast is already shown in AuthContext with id 'auth-login', no duplicate
-        navigate(returnToPath || '/');
+        navigate(returnToPath || '/', { replace: true });
       } else {
         // Only show error if googleLogin returns false without throwing
   universalToast.error('Google sign-in failed. Please try again.', { id: 'auth-login' });
@@ -173,7 +173,7 @@ export default function AuthForm() {
         
         if (response?.success) {
           // Redirect to the returnTo path if it exists, otherwise to the homepage
-          navigate(returnToPath || '/');
+          navigate(returnToPath || '/', { replace: true });
         } else if (response?.suggestSignup) {
           // Dismiss the toast before navigating to prevent duplication
           toast.dismiss('auth-login');
@@ -384,7 +384,7 @@ export default function AuthForm() {
         onClose={() => setOtpOpen(false)}
         onVerified={async () => {
           await validateAuth();
-          navigate(returnToPath || '/');
+          navigate(returnToPath || '/', { replace: true });
         }}
       />
       {/* Mobile-first design with full screen layout */}

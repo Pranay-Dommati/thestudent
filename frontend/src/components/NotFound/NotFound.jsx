@@ -56,7 +56,7 @@ const NotFound = () => {
               </div>
             </div>
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <Link to="/auth?mode=login" className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full font-medium transition-all duration-300 text-white border border-white hover:bg-white/20 text-sm sm:text-base">Log In</Link>
+              <Link to={`/auth?mode=login&returnTo=${encodeURIComponent(window.location.pathname + (window.location.search || '') + (window.location.hash || ''))}`} className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full font-medium transition-all duration-300 text-white border border-white hover:bg-white/20 text-sm sm:text-base">Log In</Link>
               <Link to="/auth?mode=signup" className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-shadow text-sm sm:text-base">Sign Up</Link>
             </div>
           </div>

@@ -271,7 +271,8 @@ const SchoolCourseDetails = () => {
     if (isStarting) return; // guard against rapid clicks
     if (!isLoggedIn) {
       universalToast.error('Please log in to start learning', { id: 'start-learning' });
-      navigate('/auth?mode=login');
+      const returnTo = `${window.location.pathname}${window.location.search || ''}${window.location.hash || ''}`;
+      navigate(`/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`);
       return;
     }
 

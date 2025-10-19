@@ -331,13 +331,13 @@ const MobileFirstHomePage = () => {
               </p>
               <div className="space-y-3">
                 <Link 
-                  to="/auth?mode=signup"
+                  to={`/auth?mode=signup&returnTo=${encodeURIComponent(window.location.pathname + (window.location.search || '') + (window.location.hash || ''))}`}
                   className="block w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 rounded-xl hover:shadow-lg transition-shadow"
                 >
                   Sign Up Free
                 </Link>
                 <Link 
-                  to="/auth?mode=login"
+                  to={`/auth?mode=login&returnTo=${encodeURIComponent(window.location.pathname + (window.location.search || '') + (window.location.hash || ''))}`}
                   className="block w-full border border-gray-300 text-gray-700 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors"
                 >
                   Already have an account?

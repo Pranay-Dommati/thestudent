@@ -270,7 +270,7 @@ const MobileTopNavbar = () => {
                 ) : (
                   <>
                     <Link
-                      to="/auth?mode=login"
+                      to={`/auth?mode=login&returnTo=${encodeURIComponent(window.location.pathname + (window.location.search || '') + (window.location.hash || ''))}`}
                       onClick={() => setIsMenuOpen(false)}
                       className="flex items-center space-x-4 p-4 hover:bg-gray-50 rounded-2xl transition-all duration-200 group"
                     >
@@ -283,7 +283,7 @@ const MobileTopNavbar = () => {
                       </div>
                     </Link>
                     <Link
-                      to="/auth?mode=signup"
+                      to={`/auth?mode=signup&returnTo=${encodeURIComponent(window.location.pathname + (window.location.search || '') + (window.location.hash || ''))}`}
                       onClick={() => setIsMenuOpen(false)}
                       className="flex items-center space-x-4 p-4 hover:bg-gray-50 rounded-2xl transition-all duration-200 group"
                     >

@@ -119,6 +119,7 @@ const Layout = ({ children, excludePaths = [] }) => {
 // Add a protected route component
 const ProtectedRoute = ({ children }) => {
   const { isLoggedIn, validateAuth } = useAuth();
+  const location = useLocation();
   const [isValidating, setIsValidating] = useState(true);
   const [isValid, setIsValid] = useState(false);
 
@@ -141,9 +142,9 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!isValid) {
-    // Redirect with return URL
-    const currentPath = window.location.pathname;
-    return <Navigate to={`/auth?mode=login&returnTo=${encodeURIComponent(currentPath)}`} />;
+    // Redirect with return URL (preserve query and hash)
+    const currentPath = `${location.pathname}${location.search || ''}${location.hash || ''}`;
+    return <Navigate to={`/auth?mode=login&returnTo=${encodeURIComponent(currentPath)}`} replace />;
   }
 
   return children;

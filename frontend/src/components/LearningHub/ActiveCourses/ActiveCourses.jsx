@@ -266,7 +266,7 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
             <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">Please Login</h3>
             <p className="text-base text-gray-600 mb-6">Login to see your enrolled courses and continue learning.</p>
             <Link 
-              to="/auth?mode=login" 
+              to={`/auth?mode=login&returnTo=${encodeURIComponent(window.location.pathname + (window.location.search || '') + (window.location.hash || ''))}`} 
               className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 
               transition-all duration-200 hover:shadow-lg active:transform active:scale-95"
             >
