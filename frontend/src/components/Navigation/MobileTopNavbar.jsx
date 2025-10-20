@@ -53,10 +53,11 @@ const MobileTopNavbar = () => {
     if (path.startsWith('/courses/12th')) return '12th Standard';
     if (path.startsWith('/courses/engineering')) return 'Engineering';
     if (path.startsWith('/chat')) return 'AI Assistant';
-    if (path.startsWith('/learning-hub')) return 'Learning Hub';
+  if (path.startsWith('/learning-hub')) return 'Learning Hub';
     if (path.startsWith('/profile')) return 'Profile';
     if (path.startsWith('/auth')) return 'Sign In';
-    if (path.includes('/learning')) return 'Learning';
+    // Only mark as "Learning" for course learning routes, not for "/learning-hub"
+    if (/^\/courses\/.+\/learning(\/|$)/.test(path)) return 'Learning';
     return 'EasyLearnova';
   };
 

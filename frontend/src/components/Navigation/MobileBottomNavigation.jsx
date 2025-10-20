@@ -201,7 +201,9 @@ const MobileBottomNavigation = () => {
     }
 
     // Learning Page (e.g., /courses/6th/cbse/math/learning)
-    if (path.includes('/learning')) {
+    // Use precise match to avoid catching "/learning-hub"
+    const isCourseLearning = /^\/courses\/.+\/learning(\/|$)/.test(path);
+    if (isCourseLearning) {
       return {
         type: 'learning',
         items: [
@@ -226,29 +228,30 @@ const MobileBottomNavigation = () => {
       };
     }
 
-    // Profile Pages
+    // Profile Pages - use same items/order as home page
     if (path.startsWith('/profile')) {
       return {
-        type: 'profile',
-        items: [
-          { path: '/', icon: FaHome, label: 'Home', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-          { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-          { path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-          { path: '/profile', icon: FaUser, label: 'Profile', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
-        ]
-      };
-    }
-
-    // Learning Hub Page
-    if (path === '/learning-hub') {
-      return {
-        type: 'learning-hub',
+        type: 'main',
         items: [
           { path: '/', icon: FaHome, label: 'Home', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/chat', icon: FaBrain, label: 'AI Chat', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-          { path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-          { path: '/profile', icon: FaUser, label: 'Profile', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
+          { path: isLoggedIn ? '/profile' : '/auth?mode=login', icon: FaUser, label: isLoggedIn ? 'Profile' : 'Login', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+        ]
+      };
+    }
+
+    // Learning Hub Page - use same navigation as home page
+    if (path === '/learning-hub') {
+      return {
+        type: 'main',
+        items: [
+          { path: '/', icon: FaHome, label: 'Home', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
+          { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
+          { path: '/chat', icon: FaBrain, label: 'AI Chat', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
+          ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
+          { path: isLoggedIn ? '/profile' : '/auth?mode=login', icon: FaUser, label: isLoggedIn ? 'Profile' : 'Login', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }

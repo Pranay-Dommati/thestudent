@@ -23,37 +23,8 @@ import { getLearningStats as fetchLearningStats } from '../../services/activityT
 
 const MobileLearningHubPage = () => {
   const { user: authUser, isLoggedIn } = useAuth();
-  const [activeTab, setActiveTab] = useState('enrolled');
   const [learningStats, setLearningStats] = useState(null);
   const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(0);
-
-  const tabs = [
-    { 
-      id: 'enrolled', 
-      label: 'My Courses', 
-      icon: FaGraduationCap,
-      description: 'Continue your learning'
-    },
-    // Temporarily hidden - Certificates tab
-    // { 
-    //   id: 'certificates', 
-    //   label: 'Certificates', 
-    //   icon: FaCertificate,
-    //   description: 'Your achievements'
-    // },
-    { 
-      id: 'ai', 
-      label: 'AI Courses', 
-      icon: FaBrain,
-      description: 'AI-powered learning'
-    },
-    { 
-      id: 'analytics', 
-      label: 'Progress', 
-      icon: FaChartLine,
-      description: 'Track your growth'
-    }
-  ];
 
   useEffect(() => {
     const refresh = async () => {
@@ -181,44 +152,6 @@ const MobileLearningHubPage = () => {
     currentStreak: learningStats?.current_streak || 0
   };
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'enrolled':
-        return (
-          <ActiveCourses
-            onEnrollmentChanged={(change) => {
-              if (change && typeof change.count === 'number') {
-                setEnrolledCoursesCount(Math.max(0, change.count));
-              } else if (change && typeof change.delta === 'number') {
-                setEnrolledCoursesCount((prev) => Math.max(0, prev + change.delta));
-              } else {
-                axios.get('/courses/enrolled/').then((res) => {
-                  if (res.data?.success) {
-                    setEnrolledCoursesCount(res.data.courses.length);
-                  }
-                }).catch(() => {});
-              }
-            }}
-          />
-        );
-      case 'certificates':
-        return <Certificates />;
-      case 'ai':
-        return <AILearningPlans />;
-      case 'analytics':
-        return (
-          <LearningAnalytics 
-            user={{
-              ...user,
-              weeklyBreakdown: learningStats?.weekly_breakdown ?? []
-            }} 
-          />
-        );
-      default:
-        return <ActiveCourses />;
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 pt-0 md:pt-6">
       {/* Modern Hero Section */}
@@ -295,60 +228,80 @@ const MobileLearningHubPage = () => {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="px-4 pt-4 pb-2">
-        <div className="bg-white rounded-2xl p-1.5 shadow-lg border border-gray-200">
-          <div className="grid grid-cols-3 gap-1">
-            {tabs.map((tab, index) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <motion.button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`relative py-3.5 px-3 rounded-xl font-medium transition-all duration-200 ${
-                    isActive
-                      ? 'bg-indigo-500 text-white shadow-md'
-                      : 'text-gray-600 hover:bg-gray-50 active:scale-95'
-                  }`}
-                  whileTap={{ scale: 0.95 }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="absolute inset-0 bg-indigo-500 rounded-xl"
-                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                    />
-                  )}
-                  <div className="relative z-10 text-center">
-                    <Icon className={`text-xl mb-1.5 mx-auto ${isActive ? 'text-white' : 'text-indigo-500'}`} />
-                    <div className={`text-xs font-semibold leading-tight ${isActive ? 'text-white' : 'text-gray-700'}`}>
-                      {tab.label}
-                    </div>
-                  </div>
-                </motion.button>
-              );
-            })}
+      {/* Content Area - All sections in scrollable format */}
+      <div className="px-4 pt-6 pb-20 space-y-6">
+        {/* My Enrolled Courses Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="flex items-center mb-3">
+            <div className="bg-indigo-500 p-2 rounded-lg mr-3">
+              <FaGraduationCap className="text-white text-lg" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">My Enrolled Courses</h2>
+              <p className="text-xs text-gray-500">Continue your learning</p>
+            </div>
           </div>
-        </div>
-      </div>
+          <ActiveCourses
+            onEnrollmentChanged={(change) => {
+              if (change && typeof change.count === 'number') {
+                setEnrolledCoursesCount(Math.max(0, change.count));
+              } else if (change && typeof change.delta === 'number') {
+                setEnrolledCoursesCount((prev) => Math.max(0, prev + change.delta));
+              } else {
+                axios.get('/courses/enrolled/').then((res) => {
+                  if (res.data?.success) {
+                    setEnrolledCoursesCount(res.data.courses.length);
+                  }
+                }).catch(() => {});
+              }
+            }}
+          />
+        </motion.div>
 
-      {/* Content Area with Animation */}
-      <div className="px-4 pt-2 pb-20">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-          >
-            {renderTabContent()}
-          </motion.div>
-        </AnimatePresence>
+        {/* AI-Created Courses Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <div className="flex items-center mb-3">
+            <div className="bg-purple-500 p-2 rounded-lg mr-3">
+              <FaBrain className="text-white text-lg" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">My AI-Created Courses</h2>
+              <p className="text-xs text-gray-500">AI-powered learning paths</p>
+            </div>
+          </div>
+          <AILearningPlans />
+        </motion.div>
+
+        {/* Learning Analytics Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <div className="flex items-center mb-3">
+            <div className="bg-blue-500 p-2 rounded-lg mr-3">
+              <FaChartLine className="text-white text-lg" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Learning Progress</h2>
+              <p className="text-xs text-gray-500">Track your growth</p>
+            </div>
+          </div>
+          <LearningAnalytics 
+            user={{
+              ...user,
+              weeklyBreakdown: learningStats?.weekly_breakdown ?? []
+            }} 
+          />
+        </motion.div>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 
 const categories = [
   { id: 'all', name: 'All Courses' },
-  { id: 'engineering', name: 'Engineering' },
+  // Engineering tab removed
   { id: 'sixth', name: 'Class 6' },
   { id: 'seventh', name: 'Class 7' },
   { id: 'eighth', name: 'Class 8' },
@@ -243,9 +243,10 @@ const FeaturedPlaylists = () => {
   }, [courses]);
 
   // Filter courses with mobile-specific display logic
+  // Exclude engineering courses from all displays
   const allFilteredCourses = activeCategory === 'all' 
-    ? courses 
-    : courses.filter(course => course.category === activeCategory);
+    ? courses.filter(course => course.category !== 'engineering')
+    : courses.filter(course => course.category === activeCategory && course.category !== 'engineering');
   
   // For mobile: show 4 initially, then all when "Load More" is clicked
   // For desktop: show normal limits
