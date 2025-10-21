@@ -1,6 +1,6 @@
 import universalToast from "../../utils/universalToast";
 import React, { useState, useEffect, useRef } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoBook, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline, IoChevronForward, IoSearchOutline, IoRocket } from "react-icons/io5";
 // Removed FaRobot - using IoSchoolOutline for Pro Learning branding
 import { BiLoaderAlt } from "react-icons/bi";
@@ -65,6 +65,7 @@ const parseMarkdownResponse = (content) => {
 const MobileChatbotPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAuthenticated, isLoggedIn } = useAuth();
   const initialQuery = searchParams.get("q");
 
@@ -138,14 +139,26 @@ const MobileChatbotPage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Check if user has visited chat page before
+  // Handle initial message from onboarding modal (location state)
   useEffect(() => {
-    const hasVisitedChat = localStorage.getItem('hasVisitedChat');
-    if (!hasVisitedChat) {
-      setShowWelcomeMessage(true);
-      localStorage.setItem('hasVisitedChat', 'true');
+    if (location.state?.initialMessage && !autoSendProcessed.current) {
+      const { initialMessage, forceProMode } = location.state;
+      
+      // Mark as processed immediately to prevent double execution
+      autoSendProcessed.current = true;
+      
+      // Clear the location state to prevent re-triggering
+      navigate(location.pathname, { replace: true, state: {} });
+      
+      // Set the message in the input
+      setMessage(initialMessage);
+      
+      // Small delay to ensure UI is ready, then send
+      setTimeout(() => {
+        handleSendMessage(initialMessage, { forceProMode: forceProMode || true });
+      }, 300);
     }
-  }, []);
+  }, [location.state?.initialMessage]); // Only depend on initialMessage
 
   // Load ProLearning history on component mount and fetch backend courses
   useEffect(() => {

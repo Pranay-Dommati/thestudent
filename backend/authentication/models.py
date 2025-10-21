@@ -49,6 +49,9 @@ class User(AbstractUser):
     # Terms and Conditions
     agreed_to_terms = models.BooleanField(default=False)
     
+    # Onboarding tracking
+    has_seen_onboarding = models.BooleanField(default=False, help_text='Whether user has seen the onboarding modal')
+    
     date_joined = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

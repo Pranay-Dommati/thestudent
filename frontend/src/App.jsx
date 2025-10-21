@@ -39,6 +39,7 @@ import PrivacyPolicy from './components/Legal/PrivacyPolicy';
 import FeedbackPage from './components/Feedback/FeedbackPage';  // Add feedback import
 import './utils/axios';
 import CertificatePreview from './components/Certificates/CertificatePreview';
+import OnboardingModal from './components/Onboarding/OnboardingModal';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -202,6 +203,8 @@ const App = () => {
           containerClassName="toast-container"
         />
         <BrowserRouter>
+          {/* Global Onboarding Modal - shows for new users on first login */}
+          <OnboardingModal />
         <Layout excludePaths={['/admin-p', '/chat']}>
           <Routes>
             <Route path="/" element={<HomePage />} />

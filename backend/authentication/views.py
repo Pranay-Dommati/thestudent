@@ -440,6 +440,27 @@ def user_profile(request):
     return Response(serializer.data)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_onboarding_seen(request):
+    """Mark that user has seen the onboarding modal"""
+    try:
+        user = request.user
+        if not user.has_seen_onboarding:
+            user.has_seen_onboarding = True
+            user.save(update_fields=['has_seen_onboarding'])
+            logger.info(f"User {user.email} marked onboarding as seen")
+        
+        return Response({
+            'success': True,
+            'has_seen_onboarding': True
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Error marking onboarding as seen: {str(e)}")
+        return Response({
+            'error': 'Failed to update onboarding status'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
 @permission_classes([AllowAny])
 @authentication_classes([])
 def admin_login(request):

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FaUser, FaRegUser, FaRegEnvelope,
-  FaEdit, FaCheck, FaTimes, FaSpinner, FaSignOutAlt, FaHome,
+  FaSignOutAlt, FaHome,
   FaGoogle, FaUnlink, FaCamera, FaGraduationCap
 } from 'react-icons/fa';
 import { HiBookOpen } from 'react-icons/hi2';
@@ -15,8 +15,6 @@ import './ProfilePage.css';
 
 const ProfilePage = () => {
   const [activeTab, setActiveTab] = useState('profile');
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
   const [profileImageUrl, setProfileImageUrl] = useState('https://via.placeholder.com/150');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -31,8 +29,6 @@ const ProfilePage = () => {
   });
   // Social accounts state - dynamically set based on user's auth method
   const [socialAccounts, setSocialAccounts] = useState({});
-
-  const [errors, setErrors] = useState({});
 
   // Add stats state
   const [stats] = useState({
@@ -71,152 +67,6 @@ const ProfilePage = () => {
       ...prev,
       [name]: value
     }));
-    // Clear error for this field
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
-
-  const handlePasswordChange = (e) => {
-    const { name, value } = e.target;
-    setPasswordData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    // Clear error for this field
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'Full name is required';
-    }
-    
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Invalid email format';
-    }
-
-    return newErrors;
-  };
-
-  const validatePasswordForm = () => {
-    const newErrors = {};
-    
-    if (activeTab === 'security') {
-      if (!passwordData.currentPassword) {
-        newErrors.currentPassword = 'Current password is required';
-      }
-      
-      if (!passwordData.newPassword) {
-        newErrors.newPassword = 'New password is required';
-      } else if (passwordData.newPassword.length < 8) {
-        newErrors.newPassword = 'Password must be at least 8 characters';
-      }
-      
-      if (passwordData.newPassword !== passwordData.confirmPassword) {
-        newErrors.confirmPassword = 'Passwords do not match';
-      }
-    }
-
-    return newErrors;
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    
-    const formErrors = validateForm();
-    if (Object.keys(formErrors).length > 0) {
-      setErrors(formErrors);
-      setIsSaving(false);
-      return;
-    }
-
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setIsEditing(false);
-  universalToast.success('Profile updated successfully!');
-    } catch (error) {
-  universalToast.error('Failed to update profile');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-  const handlePasswordSave = async () => {
-    setIsSaving(true);
-    
-    const passwordErrors = validatePasswordForm();
-    if (Object.keys(passwordErrors).length > 0) {
-      setErrors(passwordErrors);
-      setIsSaving(false);
-      return;
-    }
-
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-      setShowPasswordForm(false);
-  universalToast.success('Password changed successfully!');
-    } catch (error) {
-  universalToast.error('Failed to change password');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    try {
-  universalToast.loading('Sending password reset email...');
-      
-      // Simulate API call for password reset
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-  universalToast.dismiss();
-  universalToast.success('Password reset email sent! Check your inbox.');
-    } catch (error) {
-  universalToast.dismiss();
-  universalToast.error('Failed to send password reset email');
-    }
-  };
-
-  const handleCancelPasswordChange = () => {
-    setShowPasswordForm(false);
-    setPasswordData({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    });
-    setErrors({});
-  };
-  const handleCancel = () => {
-    if (user) {
-      setFormData({
-        name: user.full_name || '',
-        email: user.email || '',
-        country: user.country || ''
-      });
-    }
-    setIsEditing(false);
-    setErrors({});
   };
 
   // Social account handlers
@@ -343,81 +193,13 @@ const ProfilePage = () => {
 
   const renderFormField = (field) => {
     const value = formData[field.id];
-    const error = errors[field.id];
-
-    if (!isEditing) {
-      return (
-        <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg sm:rounded-xl text-gray-900 text-sm sm:text-base">
-          {field.type === 'select'
-            ? field.options.find(opt => opt.value === value)?.label || 'Not provided'
-            : value || 'Not provided'
-          }
-        </div>
-      );
-    }
-
-    if (field.type === 'select') {
-      return (
-        <div className="relative">
-          <select
-            name={field.id}
-            value={value}
-            onChange={handleInputChange}
-            className={`profile-input ${
-              error
-                ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
-                : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
-            }`}
-          >
-            {field.options.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {error && (
-            <motion.p
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="profile-error"
-            >
-              <FaTimes className="w-3 h-3 sm:w-4 sm:h-4" />
-              {error}
-            </motion.p>
-          )}
-        </div>
-      );
-    }
 
     return (
-      <div className="relative">
-        {field.icon && (
-          <div className="profile-input-icon">
-            <field.icon className="w-4 h-4 sm:w-5 sm:h-5" />
-          </div>
-        )}
-        <input
-          type={field.type}
-          name={field.id}
-          value={value}
-          onChange={handleInputChange}
-          className={`profile-input ${field.icon ? 'profile-input-with-icon' : ''} ${
-            error
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
-              : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
-          }`}
-          placeholder={field.placeholder}
-        />
-        {error && (
-          <motion.p
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="profile-error"
-          >
-            <FaTimes className="w-3 h-3 sm:w-4 sm:h-4" />
-            {error}
-          </motion.p>
-        )}
+      <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg sm:rounded-xl text-gray-900 text-sm sm:text-base">
+        {field.type === 'select'
+          ? field.options.find(opt => opt.value === value)?.label || 'Not provided'
+          : value || 'Not provided'
+        }
       </div>
     );
   };
@@ -501,51 +283,7 @@ const ProfilePage = () => {
               <div className="profile-header">
                 <div className="flex-1">
                   <h2 className="profile-title">Personal Information</h2>
-                  <p className="profile-subtitle">Update your personal details and preferences</p>
-                </div>
-                <div className="profile-actions">
-                  {isEditing ? (
-                    <>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleCancel}
-                        className="profile-button profile-button-secondary touch-button"
-                      >
-                        <FaTimes className="w-4 h-4" />
-                        <span className="hidden sm:inline">Cancel</span>
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="profile-button profile-button-primary touch-button disabled:opacity-70"
-                      >
-                        {isSaving ? (
-                          <>
-                            <FaSpinner className="w-4 h-4 animate-spin" />
-                            <span className="hidden sm:inline">Saving...</span>
-                          </>
-                        ) : (
-                          <>
-                            <FaCheck className="w-4 h-4" />
-                            <span className="hidden sm:inline">Save</span>
-                          </>
-                        )}
-                      </motion.button>
-                    </>
-                  ) : (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setIsEditing(true)}
-                      className="profile-button profile-button-primary touch-button"
-                    >
-                      <FaEdit className="w-4 h-4" />
-                      <span className="hidden sm:inline">Edit Profile</span>
-                    </motion.button>
-                  )}
+                  <p className="profile-subtitle">Your personal details and preferences</p>
                 </div>
               </div>
 

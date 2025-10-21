@@ -1,6 +1,6 @@
 import universalToast from "../../utils/universalToast";
 import React, { useState, useEffect, useRef } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline, IoBook, IoBookmark, IoInformationCircle, IoChevronForward, IoRocket } from "react-icons/io5";
 import { FaGraduationCap, FaBook as FaBookAlt, FaRegUser } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
@@ -463,6 +463,7 @@ const parseMarkdownResponse = (content) => {
 const ChatbotPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAuthenticated, isLoggedIn } = useAuth();
   const initialQuery = searchParams.get("q");
 
@@ -729,6 +730,28 @@ const ChatbotPage = () => {
       navigate("/chat", { replace: true });
     }
   }, [initialQuery, navigate, searchParams]);
+
+  // Handle initial message from onboarding modal (location state)
+  useEffect(() => {
+    if (location.state?.initialMessage && !autoSendProcessed.current) {
+      const { initialMessage, forceProMode } = location.state;
+      
+      // Mark as processed immediately to prevent double execution
+      autoSendProcessed.current = true;
+      initialQueryProcessed.current = true;
+      
+      // Clear the location state to prevent re-triggering
+      navigate(location.pathname, { replace: true, state: {} });
+      
+      // Set the message in the input
+      setMessage(initialMessage);
+      
+      // Small delay to ensure UI is ready, then send
+      setTimeout(() => {
+        handleSendMessage(initialMessage, { forceProMode: forceProMode || true });
+      }, 300);
+    }
+  }, [location.state?.initialMessage]);
 
   // Timeout fallback to prevent infinite "Loading stats..." when pro mode is enabled
   useEffect(() => {

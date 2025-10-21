@@ -2,7 +2,8 @@ from django.urls import path, include
 from .views import (
     RegisterView, 
     LoginView, 
-    user_profile, 
+    user_profile,
+    mark_onboarding_seen,
     admin_login, 
     verify_admin_token,
     admin_list_users,
@@ -32,6 +33,7 @@ urlpatterns = [
     path('users/<int:user_id>/set-password/', admin_set_user_password, name='admin_set_user_password'),
     path('token/refresh/', TokenRefreshViewWithRetry.as_view(), name='token_refresh'),  # Use retry-enabled view
     path('profile/', user_profile, name='user_profile'),
+    path('onboarding/mark-seen/', mark_onboarding_seen, name='mark_onboarding_seen'),
     
     # Google OAuth2 endpoints
     path('google/auth-url/', google_auth_url, name='google_auth_url'),
