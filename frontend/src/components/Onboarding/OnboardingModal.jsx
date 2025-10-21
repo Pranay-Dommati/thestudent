@@ -7,28 +7,33 @@ import '../Chatbot/welcomeCardFix.css';
 
 const OnboardingModal = () => {
   const [showModal, setShowModal] = useState(false);
-  const { user, isLoggedIn } = useAuth();
+  const [hasMarkedSeen, setHasMarkedSeen] = useState(false);
+  const { user, isLoggedIn, validateAuth } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     // Only check when user is logged in
     if (isLoggedIn && user) {
       // Check if user has seen onboarding from the user object
-      if (!user.has_seen_onboarding) {
+      // Also check our local flag to prevent re-showing after marking as seen
+      if (!user.has_seen_onboarding && !hasMarkedSeen) {
         // Small delay to ensure smooth transition after login
         setTimeout(() => {
           setShowModal(true);
         }, 500);
       }
     }
-  }, [isLoggedIn, user]);
+  }, [isLoggedIn, user, hasMarkedSeen]);
 
   const handleClose = async () => {
     setShowModal(false);
+    setHasMarkedSeen(true); // Immediately set local flag
     
     // Mark onboarding as seen via API
     try {
       await apiAxios.post('/auth/onboarding/mark-seen/');
+      // Re-validate auth to update user object with latest data
+      validateAuth();
     } catch (error) {
       console.error('Failed to mark onboarding as seen:', error);
     }

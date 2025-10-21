@@ -514,7 +514,6 @@ const ChatbotPage = () => {
   ]);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
   // Rotating suggestions for empty-state heading
   const rotatingSuggestions = [
     "Help me get started with algebra basics",
@@ -579,15 +578,6 @@ const ChatbotPage = () => {
     return coursePlaceholders[randomIndex];
   };
 
-  // Check if user has visited chat page before
-  useEffect(() => {
-    const hasVisitedChat = localStorage.getItem('hasVisitedChat');
-    if (!hasVisitedChat) {
-      setShowWelcomeMessage(true);
-      localStorage.setItem('hasVisitedChat', 'true');
-    }
-  }, []);
-
   // Helper to get auth token
   const getAuthToken = async () => {
     try {
@@ -644,23 +634,6 @@ const ChatbotPage = () => {
       window.removeEventListener('prolearning-history-updated', handleHistoryUpdate);
     };
   }, []);
-
-  // Handle ESC key to close welcome message
-  useEffect(() => {
-    const handleEscKey = (event) => {
-      if (event.key === 'Escape' && showWelcomeMessage) {
-        setShowWelcomeMessage(false);
-      }
-    };
-
-    if (showWelcomeMessage) {
-      document.addEventListener('keydown', handleEscKey);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscKey);
-    };
-  }, [showWelcomeMessage]);
 
   // Scroll to the bottom of the chat when chat history updates
   useEffect(() => {
@@ -2287,41 +2260,6 @@ const ChatbotPage = () => {
           /* Regular chat messages layout */
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-3xl mx-auto w-full px-4 py-6">
-
-              {/* Welcome Message Popup for First-time Users */}
-              {showWelcomeMessage && (
-                <>
-                  {/* Background Blur Overlay */}
-                  <div className="fixed inset-0 bg-black/30 backdrop-blur-md z-40"></div>
-                  
-                  {/* Top Positioned Welcome Message */}
-                  <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-lg mx-4">
-                    <div className="bg-white/95 backdrop-blur-lg border border-white/30 rounded-2xl p-6 shadow-2xl animate-slide-down">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mr-3">
-                            <IoSchoolOutline className="w-5 h-5 text-white" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-gray-800">Welcome!</h3>
-                        </div>
-                        <button
-                          onClick={() => setShowWelcomeMessage(false)}
-                          className="text-gray-600 hover:text-gray-800 transition-all duration-200 p-2 hover:bg-gray-100 rounded-full hover:scale-110 cursor-pointer"
-                          aria-label="Close welcome message"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                      
-                      <p className="text-gray-800 text-base leading-relaxed font-medium">
-                        Use our powerful tool to seamlessly create customized courses on any topic of your choice — just click the 'Create Course' button to begin.
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
 
               {chatHistory.map((chat) => (
                 <MessageBubble 
