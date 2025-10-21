@@ -75,6 +75,36 @@ import Navbar from '../../Navbar/Navbar';
 import { classifyTopicsWithGemini } from '../topicclassifier';
 // import BatchGenerationStatus from '../BatchGenerationStatus'; // REMOVED - eliminated duplicate loading card
 import ProLearningMobile from '../ProLearningMobile';
+// Reading utilities
+import {
+  preSanitizeMarkdown,
+  parseReadingSections,
+  flattenReactChildren,
+  isMathTopicName,
+  looksLikeAsciiDiagram,
+  isLikelyProgramming,
+  isReadingReadyForTopic,
+  shouldRenderAsInlineCode,
+  shouldRenderAsPlainText,
+  debugHash as _debugHash,
+  shortDebugString as _short
+} from '../utils/ReadingUtils';
+// Summary utilities
+import {
+  getSummaryContent,
+  hasValidSummary,
+  validateSummaryForTab,
+  isSummaryAvailable,
+  getSummaryMetadata,
+  isSummaryReady,
+  estimateSummaryReadingTime,
+  getSummaryWordCount,
+  contentHasSummary,
+  formatSummaryForStorage,
+  mergeSummaryContent,
+  isNotPlaceholder,
+  shouldRegenerateSummary
+} from '../utils/SummaryUtils';
 
 
 const ProLearningPage = () => {
@@ -828,120 +858,6 @@ const ProLearningPage = () => {
   // Copy code functionality
   const [copySuccessMap, setCopySuccessMap] = useState({});
 
-  // Lightweight client-side pre-sanitizer to avoid initial flash of bad fences/math
-  // Notes:
-  // - Preserves real code blocks (has a language or typical code patterns)
-  // - Converts language-less tiny fenced tokens to inline code (`x`) instead of math
-  // - Converts short, non-code fenced blocks to simple bullet lines
-  // - Falls back to blockquotes for other non-code fenced blocks
-  const preSanitizeMarkdown = (md) => {
-    if (!md || typeof md !== 'string') return '';
-    let out = md;
-    try {
-      // Normalize Windows newlines just in case
-      out = out.replace(/\r\n?/g, '\n');
-
-      // Helpers
-      const isLikelyProgramming = (s) => /[{;}]|<\w|<\/|=>|\bdef\b|\bclass\b|\bfunction\b|\bconst\b|\blet\b|\bvar\b|#include|\bimport\b\s|\bfrom\b\s|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bBEGIN\b|\bEND\b|^\s{2,}\S/m.test(s);
-      const realCodeLangs = new Set([
-        'python','py','javascript','js','typescript','ts','java','c','cpp','c++','c#','cs','csharp','go','rust','rb','ruby','swift','kotlin','php','r','matlab','octave','bash','sh','shell','powershell','ps1','sql','html','xml','json','yaml','yml','toml','css','scss','less','jsx','tsx'
-      ]);
-      const isMathLike = (s) => {
-        const t = (s || '').trim();
-        if (!t) return false;
-        // Strong math tokens or LaTeX commands/symbols
-        if (/\\(frac|sum|int|sqrt|alpha|beta|gamma|theta|lambda|pi|mu|sigma|Delta|nabla|partial)\b|[∑∫√∞≤≥≠≈→⇔∂∇]/.test(t)) return true;
-        // Derivatives and powers
-        if (/(d[xyzt]|dx|dy|dt)\s*\/(d[xyzt]|dx|dy|dt)\b/.test(t)) return true; // dy/dx
-        if (/[\^_]/.test(t) && /[=+\-*/]/.test(t) && !isLikelyProgramming(t)) return true; // x^2 + y
-        // Equations comprised of mostly math-friendly chars (avoid braces/semicolons typical of code)
-        if (/=/.test(t) && /^[\sA-Za-z0-9.,:+\-*/^_|=()\\{}\[\]<>%]+$/.test(t) && !/[;]{1}|\bconst\b|\bfunction\b|<\/?\w/.test(t)) return true;
-        // Trig/log common names
-        if (/\b(sin|cos|tan|log|ln)\b/.test(t) && !isLikelyProgramming(t)) return true;
-        return false;
-      };
-
-      // Handle triple-fenced blocks
-      out = out.replace(/```([^\n]*)\n([\s\S]*?)```/g, (m, langRaw, body) => {
-        const lang = (langRaw || '').trim();
-        const content = (body || '').trim();
-        const langLower = lang.toLowerCase();
-        const mathLang = /^(math|latex|tex|katex|equation|formula)$/i.test(langLower);
-        const likelyProg = isLikelyProgramming(content);
-        const realLang = realCodeLangs.has(langLower);
-        const likelyMath = mathLang || isMathLike(content) || (!likelyProg && /^(code|text)?$/.test(langLower) && isMathLike(content));
-
-        // Convert math-like fenced content (even if labeled 'code') to KaTeX-friendly math
-        if (likelyMath) {
-          const isMulti = /\n/.test(content) || content.length > 40 || /\\(frac|sum|int|sqrt)/.test(content);
-          return isMulti ? `$$\n${content}\n$$` : `$${content}$`;
-        }
-
-        // Keep real programming code as-is (only for real languages or strong code patterns)
-        if (likelyProg || realLang) return m;
-
-        // Otherwise, treat as non-code educational content. Prefer inline code for single-line tokens.
-        const lines = content.split(/\n+/).map(l => l.trim()).filter(Boolean);
-        if (lines.length === 1) {
-          const token = lines[0];
-          // Single short token -> inline code
-          if (token.length <= 80 && !/\n/.test(token)) {
-            return `\`${token}\``;
-          }
-          // Fallback: blockquote single line
-          return `> ${token}`;
-        }
-        // 2-3 very short lines -> simple bullet list (use inline code per line when token-like)
-        if (lines.length <= 3 && lines.every(l => l.length <= 80)) {
-          return lines.map(l => (/^[-A-Za-z0-9_]+$/.test(l) ? `- \`${l}\`` : `- ${l}`)).join('\n');
-        }
-        // Default: blockquote
-        return lines.map(l => `> ${l}`).join('\n');
-      });
-
-      // Do NOT auto-convert inline backticks to math; keep inline code unless it's clearly math
-      out = out.replace(/`([^`]+)`/g, (m, tok) => {
-        const t = tok.trim();
-        if (isMathLike(t)) {
-          return /\s|\n/.test(t) ? `$$${t}$$` : `$${t}$`;
-        }
-        return m; // keep regular inline code
-      });
-
-      return out;
-    } catch (e) {
-      // On any issue, just return original content to avoid breaking
-      return md;
-    }
-  };
-
-  // Identify math-related topics to adjust rendering (no code blocks for math content)
-  const isMathTopicName = (name) => {
-    try {
-      if (!name) return false;
-      const s = String(name).toLowerCase();
-      return [
-        'math','mathematics','algebra','calculus','trigonometry','trigonometric','geometry','statistics','probability',
-        'unit circle','sine','cosine','tangent','derivative','integral','limits','vectors','matrices','matrix','linear algebra'
-      ].some(k => s.includes(k));
-    } catch {
-      return false;
-    }
-  };
-
-  // --- Debug helpers ---
-  const _debugHash = (str) => {
-    try {
-      const s = String(str || '');
-      let h = 0;
-      for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i), h |= 0;
-      return (h >>> 0).toString(16);
-    } catch { return '0'; }
-  };
-  const _short = (s, n = 80) => {
-    try { return String(s || '').replace(/\s+/g, ' ').slice(0, n); } catch { return ''; }
-  };
-
   // Lightweight debug logger to reduce console noise; enable by setting window.__PRO_LEARNING_DEBUG = true
   const debugLog = (...args) => {
     try {
@@ -1020,7 +936,13 @@ const ProLearningPage = () => {
         } catch {}
       } else {
         // Empty reading coming in: preserve existing sanitized reading if present
-        console.log('⚪ [READING-EMPTY] No reading in payload', { source: sourceLabel });
+        console.log('⚪ [READING-EMPTY] No reading in payload', { 
+          source: sourceLabel,
+          readingType: typeof newContent.reading,
+          readingLength: newContent.reading?.length || 0,
+          readingTrimLength: newContent.reading?.trim()?.length || 0,
+          readingPreview: newContent.reading ? newContent.reading.substring(0, 100) : 'N/A'
+        });
         if (!(sanitizedReading && String(sanitizedReading).trim().length > 0)) {
           setSanitizedReading('');
           setReadingRenderReady(false);
@@ -1122,6 +1044,32 @@ const ProLearningPage = () => {
     setSanitizedReadingTopicName(null);
   }, [selectedTopic?.name]);
 
+  // Emergency sanitization: if raw content exists but no sanitized version, sanitize it
+  // This should rarely trigger as setContentWithSanitization handles it normally
+  useEffect(() => {
+    const currentTopic = selectedTopic?.name || getCurrentTopicFromParam(topicParam);
+    
+    // Only trigger if we have raw content but no sanitized version for current topic
+    if (!sanitizedReading && 
+        contentTopicName === currentTopic && 
+        content?.reading &&
+        typeof content.reading === 'string' &&
+        content.reading.trim().length > 0) {
+      
+      console.warn('⚠️ Emergency sanitization triggered - raw content detected without sanitized version');
+      
+      try {
+        const sanitized = preSanitizeMarkdown(content.reading);
+        setSanitizedReading(sanitized);
+        setReadingRenderReady(true);
+        setSanitizedReadingTopicName(currentTopic);
+      } catch (error) {
+        console.error('❌ Emergency sanitization failed:', error);
+        // Don't set anything on error to avoid showing broken content
+      }
+    }
+  }, [content?.reading, contentTopicName, sanitizedReading, selectedTopic?.name, topicParam]);
+
   // Derived: does any topic have any generated tab available?
   const hasAnyContent = useMemo(() => {
     // Check tabs availability map first
@@ -1135,7 +1083,7 @@ const ProLearningPage = () => {
     const c = content;
     if (c) {
       if (typeof c.reading === 'string' && c.reading.trim().length > 0) return true;
-      if (typeof c.summary === 'string' && c.summary.trim().length > 0) return true;
+      if (hasValidSummary(c)) return true;
       if (Array.isArray(c.videos) && c.videos.length > 0) return true;
       if (Array.isArray(c.resources) && c.resources.length > 0) return true;
       if (Array.isArray(c.quiz) && c.quiz.length > 0) return true;
@@ -1693,7 +1641,7 @@ const ProLearningPage = () => {
       const id = getCourseId();
       const stored = id ? contentStorageService.getContentByTopicName(firstName, id) : null;
       return !!(stored && typeof stored.reading === 'string' && stored.reading.trim() &&
-        typeof stored.summary === 'string' && stored.summary.trim() &&
+        hasValidSummary(stored) &&
         Array.isArray(stored.videos) && stored.videos.length > 0 &&
         (Array.isArray(stored.quiz) ? stored.quiz.length > 0 : (stored?.quiz?.questions?.length > 0)) &&
         Array.isArray(stored.resources) && stored.resources.length > 0);
@@ -1752,7 +1700,7 @@ const ProLearningPage = () => {
         (Array.isArray(stored?.resources) && stored.resources.length > 0);
       
       const hasFull = stored && typeof stored.reading === 'string' && stored.reading.trim() &&
-        typeof stored.summary === 'string' && stored.summary.trim() &&
+        hasValidSummary(stored) &&
         Array.isArray(stored.videos) && stored.videos.length > 0 &&
         (Array.isArray(stored.quiz) ? stored.quiz.length > 0 : (stored?.quiz?.questions?.length > 0)) &&
         resourcesCompleted;  // ← Fixed: Check completion, not content
@@ -1861,7 +1809,8 @@ const ProLearningPage = () => {
         
         // Transform stored content to the expected format
         const transformedContent = {
-          reading: storedContent.reading || 'Content not available',
+          // Do NOT inject placeholder reading; keep empty string so first real reading can win
+          reading: typeof storedContent.reading === 'string' ? storedContent.reading : '',
           summary: storedContent.summary || 'Summary not available',
           quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
           videos: storedContent.videos || [],
@@ -2087,6 +2036,13 @@ const ProLearningPage = () => {
             resources: progressiveContent.resources || [],
             resourcesMetadata: progressiveContent.resourcesMetadata || null  // ← PRESERVE METADATA
           };
+          console.log('📚 [LOAD CONTENT] Raw progressive content reading:', {
+            hasReading: !!progressiveContent.reading,
+            readingType: typeof progressiveContent.reading,
+            readingLength: progressiveContent.reading?.length || 0,
+            readingTrimLength: progressiveContent.reading?.trim()?.length || 0,
+            readingPreview: progressiveContent.reading ? progressiveContent.reading.substring(0, 150) + '...' : 'N/A'
+          });
           console.log('📚 [LOAD CONTENT] Formatted progressive content:', {
             topicName,
             resourcesCount: Array.isArray(formattedContent.resources) ? formattedContent.resources.length : 0,
@@ -2096,11 +2052,22 @@ const ProLearningPage = () => {
           });
 
           // Set content for this topic only - but preserve any already displayed reading
-          // to avoid changing flow/markup after later tabs finish generating.
+          // ONLY if it belongs to the SAME topic (avoid mixing topics' reading content)
           const hasExistingReading = !!(content && typeof content.reading === 'string' && content.reading.trim().length);
-          const nextContent = hasExistingReading
+          const readingBelongsToCurrentTopic = hasExistingReading && contentTopicName === topicName;
+          
+          console.log('🔍 [TOPIC READING] Reading ownership check:', {
+            topicName,
+            contentTopicName,
+            hasExistingReading,
+            readingBelongsToCurrentTopic,
+            willPreserveReading: readingBelongsToCurrentTopic,
+            newReadingLength: formattedContent.reading?.length || 0
+          });
+          
+          const nextContent = readingBelongsToCurrentTopic
             ? {
-                reading: content.reading, // preserve first displayed reading
+                reading: content.reading, // preserve reading ONLY for same topic
                 summary: formattedContent.summary || content.summary || '',
                 // Quiz can be array or object with questions
                 quiz: (
@@ -2112,7 +2079,7 @@ const ProLearningPage = () => {
                 resourcesMetadata: formattedContent.resourcesMetadata || content.resourcesMetadata || null  // ← PRESERVE METADATA
               }
             : {
-                reading: formattedContent.reading,
+                reading: formattedContent.reading, // use new reading for different topic
                 summary: formattedContent.summary,
                 quiz: formattedContent.quiz,
                 videos: formattedContent.videos,
@@ -2122,10 +2089,25 @@ const ProLearningPage = () => {
           setContentWithSanitization(nextContent, 'progressive:topicContent');
           setContentTopicName(topicName);
 
-          // Immediately mark available tabs based on loaded progressive content
+          // Immediately mark available tabs based on the ACTUAL content being set (nextContent)
           const newReady = [];
-          if (formattedContent.reading) newReady.push('reading');
-          if (formattedContent.summary) newReady.push('summary');
+          // Check what we're actually setting, not just formattedContent
+          const hasValidReading = typeof nextContent.reading === 'string' && nextContent.reading.trim().length > 0;
+          const hasValidSummary = validateSummaryForTab(nextContent);
+          
+          console.log('🔍 [TAB AVAILABILITY] Content validation:', {
+            topicName,
+            hasValidReading,
+            hasValidSummary,
+            readingLength: nextContent.reading?.length || 0,
+            summaryLength: nextContent.summary?.length || 0,
+            formattedReadingLength: formattedContent.reading?.length || 0,
+            wasPreserved: readingBelongsToCurrentTopic,
+            isNewTopicReading: !readingBelongsToCurrentTopic && formattedContent.reading?.length > 0
+          });
+          
+          if (hasValidReading) newReady.push('reading');
+          if (hasValidSummary) newReady.push('summary');
           if ((formattedContent.videos?.length || 0) > 0) newReady.push('videos');
           if ((Array.isArray(formattedContent.quiz) && formattedContent.quiz.length > 0) || (formattedContent?.quiz?.questions?.length > 0)) newReady.push('quiz');
           // Mark resources as available ONLY if generation completed (with or without results)
@@ -2447,14 +2429,14 @@ const ProLearningPage = () => {
           name: selectedTopic || 'Current Topic',
           content: {
             reading: content.reading || content.readingMaterial || '',
-            summary: content.summary || content.topicSummary || '',
+            summary: getSummaryContent(content),
             videos: Array.isArray(content.videos) ? content.videos : [],
             quiz: Array.isArray(content.quiz) ? content.quiz : 
                   Array.isArray(content.quizQuestions) ? content.quizQuestions : [],
             resources: Array.isArray(content.resources) ? content.resources : []
           }
         });
-        console.log(`🤖 AUTO-SAVE: Added current content (reading: ${content.reading?.length || 0} chars, summary: ${content.summary?.length || 0} chars)`);
+        console.log(`🤖 AUTO-SAVE: Added current content (reading: ${content.reading?.length || 0} chars, summary: ${getSummaryContent(content).length} chars)`);
       }
       
       // If no content from current state, try topics list approach
@@ -2478,13 +2460,13 @@ const ProLearningPage = () => {
                 name: topicName,
                 content: {
                   reading: content.reading || content.readingMaterial || '',
-                  summary: content.summary || content.topicSummary || '',
+                  summary: getSummaryContent(content),
                   videos: Array.isArray(content.videos) ? content.videos : [],
                   quiz: Array.isArray(content.quiz) ? content.quiz : (Array.isArray(content.quizQuestions) ? content.quizQuestions : []),
                   resources: Array.isArray(content.resources) ? content.resources : []
                 }
               });
-              console.log(`📝 Added content for topic: ${topicName} (reading: ${content.reading?.length || 0} chars, summary: ${content.summary?.length || 0} chars)`);
+              console.log(`📝 Added content for topic: ${topicName} (reading: ${content.reading?.length || 0} chars, summary: ${getSummaryContent(content).length} chars)`);
             }
           } catch (e) {
             console.warn('Failed to get content for topic:', topic.name, e);
@@ -2508,7 +2490,7 @@ const ProLearningPage = () => {
               const nonEmpty = entries.filter(t => {
                 const c = (t?.content ?? t) || {};
                 const r = c.reading || c.readingMaterial || '';
-                const s = c.summary || c.topicSummary || '';
+                const s = getSummaryContent(c);
                 return (r && String(r).trim().length) || (s && String(s).trim().length);
               }).length;
               return { count: nonEmpty };
@@ -2545,13 +2527,13 @@ const ProLearningPage = () => {
                       name: topicName,
                       content: {
                         reading: topicContent.reading || topicContent.readingMaterial || '',
-                        summary: topicContent.summary || topicContent.topicSummary || '',
+                        summary: getSummaryContent(topicContent),
                         videos: Array.isArray(topicContent.videos) ? topicContent.videos : [],
                         quiz: Array.isArray(topicContent.quiz) ? topicContent.quiz : [],
                         resources: Array.isArray(topicContent.resources) ? topicContent.resources : []
                       }
                     });
-                    console.log(`🤖 AUTO-SAVE: Found content for "${topicName}" (reading: ${topicContent.reading?.length || 0}, summary: ${topicContent.summary?.length || 0})`);
+                    console.log(`🤖 AUTO-SAVE: Found content for "${topicName}" (reading: ${topicContent.reading?.length || 0}, summary: ${getSummaryContent(topicContent).length})`);
                   }
                 } catch (e) {
                   console.warn('Error getting content for topic:', topic.name, e);
@@ -2582,7 +2564,7 @@ const ProLearningPage = () => {
                 name: topicName,
                 content: {
                   reading: content.reading || content.readingMaterial || '',
-                  summary: content.summary || content.topicSummary || '',
+                  summary: getSummaryContent(content),
                   videos: Array.isArray(content.videos) ? content.videos : [],
                   quiz: Array.isArray(content.quiz) ? content.quiz : (Array.isArray(content.quizQuestions) ? content.quizQuestions : []),
                   resources: Array.isArray(content.resources) ? content.resources : []
@@ -2627,7 +2609,7 @@ const ProLearningPage = () => {
                       name: topicName,
                       content: {
                         reading: topicContent.reading || topicContent.readingMaterial || '',
-                        summary: topicContent.summary || topicContent.topicSummary || '',
+                        summary: getSummaryContent(topicContent),
                         videos: Array.isArray(topicContent.videos) ? topicContent.videos : [],
                         quiz: Array.isArray(topicContent.quiz) ? topicContent.quiz : 
                               Array.isArray(topicContent.quizQuestions) ? topicContent.quizQuestions : [],
@@ -2688,7 +2670,7 @@ const ProLearningPage = () => {
           const topicsObj = Object.fromEntries(cc.topics.map((t, idx) => {
             let c = t?.content ?? t ?? {};
             const reading = c.reading || c.readingMaterial || '';
-            const summary = c.summary || c.topicSummary || '';
+            const summary = getSummaryContent(c);
             const videos = Array.isArray(c.videos) ? c.videos : [];
             let quiz = [];
             if (Array.isArray(c.quiz)) quiz = c.quiz;
@@ -2705,7 +2687,7 @@ const ProLearningPage = () => {
         if (!stored) stored = contentStorageService.getContentByTopicName(sanitizeTopicName(t.name));
                 if (stored) {
                   finalReading = stored.reading || finalReading;
-                  finalSummary = stored.summary || finalSummary;
+                  finalSummary = getSummaryContent(stored) || finalSummary;
                 }
               } catch {}
             }
@@ -2736,7 +2718,7 @@ const ProLearningPage = () => {
         const topicsObj = Object.fromEntries(Object.entries(cc.topics).map(([name, t], idx) => {
           let c = t?.content ?? t ?? {};
           let reading = c.reading || c.readingMaterial || '';
-          let summary = c.summary || c.topicSummary || '';
+          let summary = getSummaryContent(c);
           const videos = Array.isArray(c.videos) ? c.videos : [];
           let quiz = [];
           if (Array.isArray(c.quiz)) quiz = c.quiz;
@@ -2750,7 +2732,7 @@ const ProLearningPage = () => {
         if (!stored) stored = contentStorageService.getContentByTopicName(sanitizeTopicName(name));
               if (stored) {
                 reading = stored.reading || reading;
-                summary = stored.summary || summary;
+                summary = getSummaryContent(stored) || summary;
               }
             } catch {}
           }
@@ -2927,7 +2909,7 @@ const ProLearningPage = () => {
                 name: topicName,
                 content: {
                   reading: content.reading || content.readingMaterial || '',
-                  summary: content.summary || content.topicSummary || '',
+                  summary: getSummaryContent(content),
                   videos: Array.isArray(content.videos) ? content.videos : [],
                   quiz: Array.isArray(content.quiz) ? content.quiz : (Array.isArray(content.quizQuestions) ? content.quizQuestions : []),
                   resources: Array.isArray(content.resources) ? content.resources : []
@@ -2954,7 +2936,7 @@ const ProLearningPage = () => {
                 name: topicName,
                 content: {
                   reading: content.reading || content.readingMaterial || '',
-                  summary: content.summary || content.topicSummary || '',
+                  summary: getSummaryContent(content),
                   videos: Array.isArray(content.videos) ? content.videos : [],
                   quiz: Array.isArray(content.quiz) ? content.quiz : (Array.isArray(content.quizQuestions) ? content.quizQuestions : []),
                   resources: Array.isArray(content.resources) ? content.resources : []
@@ -2999,7 +2981,7 @@ const ProLearningPage = () => {
                       name: topicName,
                       content: {
                         reading: topicContent.reading || topicContent.readingMaterial || '',
-                        summary: topicContent.summary || topicContent.topicSummary || '',
+                        summary: getSummaryContent(topicContent),
                         videos: Array.isArray(topicContent.videos) ? topicContent.videos : [],
                         quiz: Array.isArray(topicContent.quiz) ? topicContent.quiz : 
                               Array.isArray(topicContent.quizQuestions) ? topicContent.quizQuestions : [],
@@ -3040,7 +3022,7 @@ const ProLearningPage = () => {
         ? Object.fromEntries(courseContent.topics.map((t, idx) => {
             const c = t?.content ?? t ?? {};
             const reading = c.reading || c.readingMaterial || '';
-            const summary = c.summary || c.topicSummary || '';
+            const summary = getSummaryContent(c);
             const videos = Array.isArray(c.videos) ? c.videos : [];
             let quiz = [];
             if (Array.isArray(c.quiz)) quiz = c.quiz;
@@ -3063,7 +3045,7 @@ const ProLearningPage = () => {
         : Object.fromEntries(Object.entries(courseContent.topics).map(([name, t], idx) => {
             const c = t?.content ?? t ?? {};
             const reading = c.reading || c.readingMaterial || '';
-            const summary = c.summary || c.topicSummary || '';
+            const summary = getSummaryContent(c);
             const videos = Array.isArray(c.videos) ? c.videos : [];
             let quiz = [];
             if (Array.isArray(c.quiz)) quiz = c.quiz;
@@ -3661,32 +3643,6 @@ const ProLearningPage = () => {
     }
   };
 
-  // Parse reading content into sections
-  const parseReadingSections = (readingContent) => {
-    if (!readingContent || typeof readingContent !== 'string') {
-      return [{ header: 'Reading Material', content: readingContent || '' }];
-    }
-
-    // Split by ## headers (markdown H2)
-    const sections = readingContent.split(/^## /m).filter(section => section.trim());
-    
-    if (sections.length <= 1) {
-      // No clear sections, return as single section
-      return [{ header: 'Reading Material', content: readingContent }];
-    }
-
-    return sections.map((section, index) => {
-      const lines = section.trim().split('\n');
-      const header = index === 0 ? 'Introduction' : lines[0].trim();
-      const content = index === 0 ? section : lines.slice(1).join('\n').trim();
-      
-      return {
-        header: header || `Section ${index + 1}`,
-        content: content || ''
-      };
-    });
-  };
-
   // Map icon names to actual React components
   const getIconComponent = (iconName) => {
     const iconMap = {
@@ -3922,7 +3878,7 @@ const ProLearningPage = () => {
         : null);
       if (!c) return false;
       const readingOk = typeof c.reading === 'string' && c.reading.trim().length > 0;
-      const summaryOk = typeof c.summary === 'string' && c.summary.trim().length > 0;
+      const summaryOk = hasValidSummary(c);
       const videosOk = Array.isArray(c.videos) && c.videos.length > 0;
       const quizOk = Array.isArray(c.quiz)
         ? c.quiz.length > 0
@@ -4624,7 +4580,19 @@ const ProLearningPage = () => {
             </div>
             {/* Enhanced Content with better typography, all content together */}
             <div className="prose prose-lg max-w-none">
-              {(sanitizedReading && sanitizedReading.trim().length > 0) || (contentTopicName === (selectedTopic?.name || getCurrentTopicFromParam(topicParam)) && typeof content?.reading === 'string' && content.reading.trim().length > 0) ? (
+              {(() => {
+                const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
+                // Prefer sanitized reading if it belongs to current topic
+                const useSanitized = (sanitizedReadingTopicName === currentTopicName) && (typeof sanitizedReading === 'string') && sanitizedReading.trim().length > 0;
+                // Else fallback to raw content reading if content belongs to current topic
+                const useRaw = (!useSanitized) && (contentTopicName === currentTopicName) && (typeof content?.reading === 'string') && content.reading.trim().length > 0;
+                const displayReading = useSanitized ? sanitizedReading : (useRaw ? content.reading : '');
+                if (!displayReading || displayReading.trim().length === 0) {
+                  return (
+                    <div className="text-gray-500">Content not available</div>
+                  );
+                }
+                return (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm, remarkMath]}
                   rehypePlugins={[rehypeKatex]}
@@ -4690,46 +4658,26 @@ const ProLearningPage = () => {
                         );
                       }
                       // Flatten children to a clean text string to avoid [object Object]
-                      const flattenText = (ch) => {
-                        if (Array.isArray(ch)) return ch.map(flattenText).join("");
-                        if (typeof ch === 'string' || typeof ch === 'number') return String(ch);
-                        if (React.isValidElement(ch)) return flattenText(ch.props?.children);
-                        if (ch && typeof ch === 'object' && 'props' in ch) return flattenText(ch.props.children);
-                        return '';
-                      };
-                      const codeString = flattenText(children).replace(/\n$/, "");
+                      const codeString = flattenReactChildren(children).replace(/\n$/, "");
+                      
                       // If it's a single short token that doesn't look like programming, render as inline code (not a block)
-                      const singleLine = !/\n/.test(codeString);
-                      const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
-                      if (singleLine && codeString.trim().length <= 80 && !looksLikeProgramming && !lang) {
+                      if (shouldRenderAsInlineCode(codeString, lang)) {
                         return (
                           <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border inline-block" {...props}>{codeString}</code>
                         );
                       }
+                      
                       // If current topic is math-related and this doesn't look like programming, render as plain text block
                       const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
-                      const isMathTopic = isMathTopicName(currentTopicName);
-                      if (isMathTopic && !looksLikeProgramming) {
+                      if (shouldRenderAsPlainText(currentTopicName, codeString)) {
                         return (
                           <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-base leading-7 whitespace-pre text-gray-800">
                             {codeString}
                           </pre>
                         );
                       }
+                      
                       // Detect ASCII diagram blocks (triangles, boxes, etc.) and render as plain <pre>
-                      const looksLikeAsciiDiagram = (s) => {
-                        const str = String(s || "");
-                        const lines = str.split(/\n/);
-                        if (lines.length === 0 || lines.length > 30) return false;
-                        // Should contain typical ascii diagram characters
-                        const hasAsciiArtChars = /[\\/|_\-+]/.test(str);
-                        // Avoid typical programming signatures
-                        const looksLikeCode = /[{;}]|<\/?\w|\b(function|class|const|let|var|import|from|#include)\b/.test(str);
-                        // Many lines are short and composed of ascii-art chars and spaces
-                        const asciiLine = /^[\s\\\/\|_\-+.`'()\[\]<>]+$/;
-                        const asciiRatio = lines.reduce((acc, l) => acc + (asciiLine.test(l) ? 1 : 0), 0) / lines.length;
-                        return hasAsciiArtChars && !looksLikeCode && asciiRatio > 0.6;
-                      };
                       if (looksLikeAsciiDiagram(codeString)) {
                         return (
                           <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-sm leading-6 whitespace-pre font-mono text-gray-800">
@@ -4737,6 +4685,7 @@ const ProLearningPage = () => {
                           </pre>
                         );
                       }
+                      
                       const blockId = codeString;
                       return (
                         <div className="relative my-6 w-full max-w-full">
@@ -4850,318 +4799,10 @@ const ProLearningPage = () => {
                     )
                   }}
                 >
-                  {(() => {
-                    const currentTopic = selectedTopic?.name || getCurrentTopicFromParam(topicParam);
-                    // If sanitized is missing but raw exists for current topic, sanitize on the fly
-                    if (!(sanitizedReading && sanitizedReading.trim().length > 0) && contentTopicName === currentTopic && typeof content?.reading === 'string' && content.reading.trim().length > 0) {
-                      try {
-                        const s = preSanitizeMarkdown(content.reading);
-                        setSanitizedReading(s);
-                        setReadingRenderReady(true);
-                        setSanitizedReadingTopicName(currentTopic);
-                        return s;
-                      } catch {
-                        return content.reading;
-                      }
-                    }
-                    return sanitizedReading;
-                  })()}
+                  {displayReading}
                 </ReactMarkdown>
-              ) : (
-                // Fallback: waiting state or missing sanitized content
-                sanitizedReading && sanitizedReading.trim().length > 0 ? (
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeKatex]}
-                    components={{
-                      h1: ({children}) => (
-                        <h1 className="text-3xl font-bold mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                          {children}
-                        </h1>
-                      ),
-                      h2: ({children}) => (
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-4 mt-8 flex items-center">
-                          <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-3"></div>
-                          {children}
-                        </h2>
-                      ),
-                      h3: ({children}) => (
-                        <h3 className="text-xl font-medium text-gray-700 mb-3 mt-6 flex items-center">
-                          <FaLightbulb className="text-yellow-500 mr-2" />
-                          {children}
-                        </h3>
-                      ),
-                      p: ({children}) => {
-                        // Check if children contains code blocks or SyntaxHighlighter components
-                        const hasCodeBlock = React.Children.toArray(children).some(child => {
-                          if (React.isValidElement(child)) {
-                            // Check for pre elements, code elements with language classes, or SyntaxHighlighter
-                            return child.type === 'pre' || 
-                                   (child.props && child.props.className && child.props.className.includes('language-')) ||
-                                   (child.type && child.type.displayName === 'SyntaxHighlighter');
-                          }
-                          return false;
-                        });
-                        
-                        // Use div for paragraphs containing code blocks to avoid nesting issues
-                        if (hasCodeBlock) {
-                          return (
-                            <div className="text-gray-700 leading-relaxed mb-4 text-base">
-                              {children}
-                            </div>
-                          );
-                        }
-                        
-                        return (
-                          <p className="text-gray-700 leading-relaxed mb-4 text-base">
-                            {children}
-                          </p>
-                        );
-                      },
-                      pre: ({children}) => {
-                        // Ensure pre elements are not wrapped in paragraphs
-                        return (
-                          <div className="my-4">
-                            {children}
-                          </div>
-                        );
-                      },
-                      code({node, inline, className, children, ...props}) {
-                        const match = /language-(\w+)/.exec(className || "");
-                        const lang = match ? match[1] : "";
-                        if (inline) {
-                          return (
-                            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border" {...props}>{children}</code>
-                          );
-                        }
-                        const flattenText = (ch) => {
-                          if (Array.isArray(ch)) return ch.map(flattenText).join("");
-                          if (typeof ch === 'string' || typeof ch === 'number') return String(ch);
-                          if (React.isValidElement(ch)) return flattenText(ch.props?.children);
-                          if (ch && typeof ch === 'object' && 'props' in ch) return flattenText(ch.props.children);
-                          return '';
-                        };
-                        const codeString = flattenText(children).replace(/\n$/, "");
-                        // If it's a single short token that doesn't look like programming, render as inline code (not a block)
-                        const singleLine = !/\n/.test(codeString);
-                        const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
-                        if (singleLine && codeString.trim().length <= 80 && !looksLikeProgramming && !lang) {
-                          return (
-                            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border inline-block" {...props}>{codeString}</code>
-                          );
-                        }
-                        // If current topic is math-related and this doesn't look like programming, render as plain text block
-                        const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
-                        const isMathTopic = isMathTopicName(currentTopicName);
-                        if (isMathTopic && !looksLikeProgramming) {
-                          return (
-                            <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-base leading-7 whitespace-pre text-gray-800">
-                              {codeString}
-                            </pre>
-                          );
-                        }
-                        // Detect ASCII diagram blocks (triangles, boxes, etc.) and render as plain <pre>
-                        const looksLikeAsciiDiagram = (s) => {
-                          const str = String(s || "");
-                          const lines = str.split(/\n/);
-                          if (lines.length === 0 || lines.length > 30) return false;
-                          const hasAsciiArtChars = /[\\/|_\-+]/.test(str);
-                          const looksLikeCode = /[{;}]|<\/?\w|\b(function|class|const|let|var|import|from|#include)\b/.test(str);
-                          const asciiLine = /^[\s\\\/\|_\-+.`'()\[\]<>]+$/;
-                          const asciiRatio = lines.reduce((acc, l) => acc + (asciiLine.test(l) ? 1 : 0), 0) / lines.length;
-                          return hasAsciiArtChars && !looksLikeCode && asciiRatio > 0.6;
-                        };
-                        if (looksLikeAsciiDiagram(codeString)) {
-                          return (
-                            <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-sm leading-6 whitespace-pre font-mono text-gray-800">
-                              {codeString}
-                            </pre>
-                          );
-                        }
-                        const blockId = codeString;
-                        return (
-                          <div className="relative my-6 w-full max-w-full">
-                            <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl w-full">
-                              <span className="text-xs text-gray-500 font-mono">{lang || "code"}</span>
-                              <button
-                                className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-100 bg-white ml-2 flex items-center gap-1 cursor-pointer"
-                                onClick={() => handleCopyCode(codeString, blockId)}
-                                type="button"
-                              >
-                                {copySuccessMap[blockId] ? (
-                                  <>
-                                    <FaCheck className="inline-block text-green-600" /> Copied!
-                                  </>
-                                ) : (
-                                  <>Copy</>
-                                )}
-                              </button>
-                            </div>
-                            <SyntaxHighlighter
-                              style={{
-                                'code[class*="language-"]': {
-                                  color: '#f8f8f2',
-                                  background: 'none',
-                                  fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
-                                  fontSize: '1rem',
-                                  lineHeight: '1.5',
-                                  whiteSpace: 'pre',
-                                  wordSpacing: 'normal',
-                                  wordBreak: 'normal',
-                                  wordWrap: 'normal',
-                                  tabSize: 4,
-                                  hyphens: 'none'
-                                },
-                                'pre[class*="language-"]': {
-                                  color: '#f8f8f2',
-                                  background: '#23272f',
-                                  overflow: 'auto'
-                                },
-                                comment: { color: '#6272a4', fontStyle: 'italic' },
-                                prolog: { color: '#6272a4' },
-                                doctype: { color: '#6272a4' },
-                                cdata: { color: '#6272a4' },
-                                punctuation: { color: '#f8f8f2' },
-                                property: { color: '#50fa7b' },
-                                tag: { color: '#ff79c6' },
-                                constant: { color: '#bd93f9' },
-                                symbol: { color: '#bd93f9' },
-                                deleted: { color: '#ff5555' },
-                                boolean: { color: '#bd93f9' },
-                                number: { color: '#bd93f9' },
-                                selector: { color: '#50fa7b' },
-                                'attr-name': { color: '#50fa7b' },
-                                string: { color: '#f1fa8c' },
-                                char: { color: '#f1fa8c' },
-                                builtin: { color: '#8be9fd' },
-                                inserted: { color: '#50fa7b' },
-                                operator: { color: '#ff79c6' },
-                                entity: { color: '#f8f8f2', cursor: 'help' },
-                                url: { color: '#f8f8f2' },
-                                variable: { color: '#f8f8f2' },
-                                atrule: { color: '#8be9fd' },
-                                'attr-value': { color: '#f1fa8c' },
-                                function: { color: '#50fa7b' },
-                                'class-name': { color: '#8be9fd' },
-                                keyword: { color: '#ff79c6' },
-                                regex: { color: '#f1fa8c' },
-                                important: { color: '#ff5555', fontWeight: 'bold' }
-                              }}
-                              language={lang}
-                              customStyle={{
-                                borderRadius: "0 0 0.75rem 0.75rem",
-                                fontSize: "1rem",
-                                margin: 0,
-                                padding: "1rem",
-                                background: "#23272f",
-                                border: "1px solid #222c37",
-                                color: "#f8f8f2",
-                                lineHeight: "1.4",
-                                display: 'block',
-                                width: '100%'
-                              }}
-                              codeTagProps={{
-                                style: { 
-                                  fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
-                                  color: '#f8f8f2'
-                                },
-                                className: 'custom-syntax-highlight'
-                              }}
-                              showLineNumbers={false}
-                            >
-                              {codeString}
-                            </SyntaxHighlighter>
-                          </div>
-                        );
-                      },
-                      ul: ({children}) => <ul className="space-y-2 mb-6 ml-6">{children}</ul>,
-                      li: ({children}) => (
-                        <li className="flex items-start text-gray-700">
-                          <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mt-2.5 mr-3 flex-shrink-0"></div>
-                          <span>{children}</span>
-                        </li>
-                      ),
-                      blockquote: ({children}) => (
-                        <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-6 py-4 my-6 rounded-r-lg">
-                          <div className="flex items-start">
-                            <FaLightbulb className="text-blue-500 mt-1 mr-3 flex-shrink-0" />
-                            <div className="text-blue-800 italic">{children}</div>
-                          </div>
-                        </blockquote>
-                      )
-                    }}
-                  >
-                    {sanitizedReading}
-                  </ReactMarkdown>
-                  ) : (isLoading || isProgressiveGenerating || (content && content.reading && (!sanitizedReading || !sanitizedReading.trim().length))) ? (
-                  <div className="text-center py-12">
-                    <div className="inline-flex items-center px-6 py-3 bg-blue-50 rounded-lg shadow-sm">
-                      <BiLoaderAlt className="animate-spin text-blue-600 mr-3 text-2xl" />
-                      <div className="flex flex-col items-start">
-                        <span className="text-blue-800 font-medium">
-                          Loading{' '}
-                          <span className="inline-flex">
-                            <span className="animate-pulse">.</span>
-                            <span className="animate-pulse" style={{ animationDelay: '0.2s' }}>.</span>
-                            <span className="animate-pulse" style={{ animationDelay: '0.4s' }}>.</span>
-                          </span>
-                        </span>
-                        {loadingStep && (
-                          <span className="text-blue-600 text-sm mt-1">{loadingStep}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-4">
-                      <FaExclamationTriangle className="text-yellow-600 text-2xl mx-auto mb-3" />
-                      <p className="text-yellow-800 font-medium mb-2">No reading content available</p>
-                      <p className="text-yellow-700 text-sm mb-4">
-                        The content may still be generating or there was an issue loading it.
-                      </p>
-                      <button
-                        onClick={() => {
-                          setRegenerationAttempted(false); // Reset flag
-                          setIsLoading(true);
-                          setShowSkeletons(true);
-                          setLoadingStep('Regenerating content...');
-                          
-                          const actualTopic = getCurrentTopicFromParam(topicParam);
-                          if (actualTopic) {
-                            // Force regeneration by calling generateProContent directly
-                            generateProContent({
-                              topic: actualTopic,
-                              setIsLoading: () => {},
-                              setLoadingProgress: () => {},
-                              setShowSkeletons: () => {},
-                              setLoadingStep: () => {},
-                              setContent: (newContent) => {
-                                if (newContent && newContent.reading) {
-                                  setContentWithSanitization(newContent);
-                                  const sections = parseReadingSections(newContent.reading);
-                                  setReadingSections(sections);
-                                  setReadingSectionIndex(0);
-                                }
-                                setIsLoading(false);
-                                setShowSkeletons(false);
-                              },
-                              setStats: () => {},
-                              content: null
-                            }).catch(error => {
-                              setIsLoading(false);
-                              setShowSkeletons(false);
-                            });
-                          }
-                        }}
-                        className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                      >
-                        Refresh Content
-                      </button>
-                    </div>
-                  </div>
-                )
-              )}
+                );
+              })()}
             </div>
           </div>
         );
@@ -5287,35 +4928,25 @@ const ProLearningPage = () => {
                         <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border" {...props}>{children}</code>
                       );
                     }
-                    const codeString = String(children).replace(/\n$/, "");
+                    const codeString = flattenReactChildren(children).replace(/\n$/, "");
+                    
                     // Convert single short non-programming, language-less blocks to inline code
-                    const singleLine = !/\n/.test(codeString);
-                    const looksLikeProgramming = /[{;}]|<\w|<\/|=>|\b(def|class|function|const|let|var|import|from)\b|#include|\bSELECT\b|\bINSERT\b|\bUPDATE\b/.test(codeString);
-                    if (singleLine && codeString.trim().length <= 80 && !looksLikeProgramming && !lang) {
+                    if (shouldRenderAsInlineCode(codeString, lang)) {
                       return (
                         <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border inline-block" {...props}>{codeString}</code>
                       );
                     }
+                    
                     // If current topic is math-related and this doesn't look like programming, render as plain text block
                     const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
-                    const isMathTopic = isMathTopicName(currentTopicName);
-                    if (isMathTopic && !looksLikeProgramming) {
+                    if (shouldRenderAsPlainText(currentTopicName, codeString)) {
                       return (
                         <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-base leading-7 whitespace-pre text-gray-800">
                           {codeString}
                         </pre>
                       );
                     }
-                    const looksLikeAsciiDiagram = (s) => {
-                      const str = String(s || "");
-                      const lines = str.split(/\n/);
-                      if (lines.length === 0 || lines.length > 30) return false;
-                      const hasAsciiArtChars = /[\\/|_\-+]/.test(str);
-                      const looksLikeCode = /[{;}]|<\/?\w|\b(function|class|const|let|var|import|from|#include)\b/.test(str);
-                      const asciiLine = /^[\s\\\/\|_\-+.`'()\[\]<>]+$/;
-                      const asciiRatio = lines.reduce((acc, l) => acc + (asciiLine.test(l) ? 1 : 0), 0) / lines.length;
-                      return hasAsciiArtChars && !looksLikeCode && asciiRatio > 0.6;
-                    };
+                    
                     if (looksLikeAsciiDiagram(codeString)) {
                       return (
                         <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-sm leading-6 whitespace-pre font-mono text-gray-800">
@@ -5323,6 +4954,7 @@ const ProLearningPage = () => {
                         </pre>
                       );
                     }
+                    
                     // default: keep summary code blocks minimal
                     return (
                       <pre className="my-4 p-4 rounded-lg bg-gray-900 text-gray-100 overflow-auto text-sm leading-6 whitespace-pre font-mono">
@@ -5332,7 +4964,7 @@ const ProLearningPage = () => {
                   }
                 }}
               >
-                {content.summary}
+                {preSanitizeMarkdown(content.summary || '')}
               </ReactMarkdown>
             </div>
           </div>
