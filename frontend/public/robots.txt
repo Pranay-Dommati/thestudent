@@ -1,0 +1,16 @@
+# Robots.txt for EasyLearnova
+# https://easylearnova.com/robots.txt
+
+User-agent: *
+Allow: /
+Disallow: /profile
+Disallow: /admin-p
+Disallow: /auth
+Disallow: /login
+Disallow: /signup
+
+# Sitemap location
+Sitemap: https://easylearnova.com/sitemap.xml
+
+# Crawl delay (optional, helps prevent overloading)
+Crawl-delay: 1

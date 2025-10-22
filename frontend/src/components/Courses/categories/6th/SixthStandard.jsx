@@ -9,6 +9,7 @@ import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
 import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
 import Footer from '../../../Footer/Footer';
+import SEO from '../../../SEO/SEO';
 
 const SUBJECT_ICONS = {
   'Mathematics': '📐',
@@ -164,6 +165,12 @@ const SixthStandard = () => {
 
   return (
     <>
+    <SEO
+      title="6th Standard Courses - CBSE & State Board Foundation Learning"
+      description="Explore 6th standard courses: CBSE and state board playlists for Mathematics, Science, English, Social Studies & more. Build strong foundations with free lessons."
+      keywords="6th standard courses, CBSE 6th, state board 6th, 6th class subjects, foundation courses, free 6th grade courses"
+      canonical="https://easylearnova.com/courses/6th"
+    />
     <div className={`container mx-auto px-4 ${containerPadding}`}>
       <MobileBoardSelector
         availableBoards={availableBoards}

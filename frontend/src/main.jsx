@@ -4,6 +4,7 @@ import './index.css'
 import tracking from './services/trackingService.js'
 import posthog from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
+import { HelmetProvider } from 'react-helmet-async'
 import App from './App.jsx'
 
 // Initialize tracking early so session_id is available globally and PostHog is set up
@@ -11,9 +12,11 @@ try { tracking.init(); } catch {}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <PostHogProvider client={posthog}>
-      <App />
-    </PostHogProvider>
+    <HelmetProvider>
+      <PostHogProvider client={posthog}>
+        <App />
+      </PostHogProvider>
+    </HelmetProvider>
   </StrictMode>,
 )
 

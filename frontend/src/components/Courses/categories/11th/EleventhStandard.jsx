@@ -9,6 +9,7 @@ import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
 import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
 import Footer from '../../../Footer/Footer';
+import SEO from '../../../SEO/SEO';
 
 const SUBJECT_ICONS = {
   'Mathematics': '📐',
@@ -203,6 +204,12 @@ const EleventhStandard = () => {
 
   return (
     <>
+    <SEO
+      title="11th Standard Courses - CBSE & State Board JEE/NEET Prep"
+      description="Master 11th standard courses with free CBSE and state board playlists. Excel in Physics, Chemistry, Biology, Math for JEE/NEET preparation."
+      keywords="11th standard courses, CBSE 11th, state board 11th, JEE preparation, NEET preparation, class 11 science"
+      canonical="https://easylearnova.com/courses/11th"
+    />
     <div className={`container mx-auto px-4 ${containerPadding}`}>
       <MobileBoardSelector
         availableBoards={availableBoards}

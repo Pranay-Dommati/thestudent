@@ -9,6 +9,7 @@ import { getSchoolCourses } from '../../../../services/courseApi';
 import logger from '../../../../utils/logger';
 import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
 import Footer from '../../../Footer/Footer';
+import SEO from '../../../SEO/SEO';
 
 const SUBJECT_ICONS = {
   'Mathematics': '📐',
@@ -162,6 +163,12 @@ const SeventhStandard = () => {
 
   return (
     <>
+    <SEO
+      title="7th Standard Courses - CBSE & State Board Progressive Learning"
+      description="Explore 7th standard courses: CBSE and state board playlists for Mathematics, Science, English, Social Studies & more. Progress with structured lessons."
+      keywords="7th standard courses, CBSE 7th, state board 7th, 7th class subjects, middle school courses, free 7th grade courses"
+      canonical="https://easylearnova.com/courses/7th"
+    />
     <div className={`container mx-auto px-4 ${containerPadding}`}>
       <MobileBoardSelector
         availableBoards={availableBoards}

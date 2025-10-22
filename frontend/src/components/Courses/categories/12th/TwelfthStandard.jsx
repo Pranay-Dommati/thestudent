@@ -9,6 +9,7 @@ import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
 import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
 import Footer from '../../../Footer/Footer';
+import SEO from '../../../SEO/SEO';
 
 const SUBJECT_ICONS = {
   'Mathematics': '📐',
@@ -179,6 +180,12 @@ const TwelfthStandard = () => {
 
   return (
     <>
+    <SEO
+      title="12th Standard Courses - CBSE & State Board College Prep"
+      description="Ace board exams with 12th standard courses: free CBSE and state board playlists. Complete your school journey and prepare for college entrance exams."
+      keywords="12th standard courses, CBSE 12th, state board 12th, board exam preparation, college preparation, class 12 science"
+      canonical="https://easylearnova.com/courses/12th"
+    />
     <div className={`container mx-auto px-4 ${containerPadding}`}>
       <MobileBoardSelector
         availableBoards={availableBoards}

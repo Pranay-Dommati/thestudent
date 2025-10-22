@@ -9,6 +9,7 @@ import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
 import { checkBoardAvailability } from '../../../../utils/courseAvailability';
 import Footer from '../../../Footer/Footer';
+import SEO from '../../../SEO/SEO';
 
 const SUBJECT_ICONS = {
   'Mathematics': '📐',
@@ -149,6 +150,12 @@ const NinthStandard = () => {
 
   return (
     <>
+    <SEO
+      title="9th Standard Courses - CBSE & State Board Preparation"
+      description="Explore 9th standard courses with free CBSE and state board playlists. Prepare for high school with structured Science, Math, Social Science lessons."
+      keywords="9th standard courses, CBSE 9th, state board 9th, class 9 free courses, 9th grade playlists"
+      canonical="https://easylearnova.com/courses/9th"
+    />
     <div className={`container mx-auto px-4 ${containerPadding}`}>
       <MobileBoardSelector
         availableBoards={availableBoards}
