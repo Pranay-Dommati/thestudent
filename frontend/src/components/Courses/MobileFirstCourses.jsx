@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
     FaGraduationCap, 
     FaBook, 
@@ -189,35 +188,6 @@ const MobileFirstCourses = () => {
         }
     }, [searchQuery, availableLevels]);
 
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: {
-                staggerChildren: 0.1,
-                delayChildren: 0.2
-            }
-        }
-    };
-
-    const cardVariants = {
-        hidden: { opacity: 0, y: 20 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.5, ease: "easeOut" }
-        }
-    };
-
-    const searchVariants = {
-        hidden: { opacity: 0, height: 0 },
-        visible: { 
-            opacity: 1, 
-            height: "auto",
-            transition: { duration: 0.3 }
-        }
-    };
-
     const MobileHero = () => (
         <section className="bg-gradient-to-br from-indigo-600 via-purple-600 to-purple-700 text-white pt-16 pb-8 relative overflow-hidden">
             {/* Background decorations */}
@@ -228,12 +198,7 @@ const MobileFirstCourses = () => {
             </div>
             
             <div className="container mx-auto px-4 relative z-10">
-                <motion.div 
-                    className="text-center"
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6 }}
-                >
+                <div className="text-center">
                     <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 leading-tight">
                         Find Your Perfect Course
                     </h1>
@@ -268,7 +233,7 @@ const MobileFirstCourses = () => {
                             <div className="text-xs opacity-80">AI-Powered</div>
                         </div>
                     </div>
-                </motion.div>
+                </div>
             </div>
         </section>
     );
@@ -285,15 +250,8 @@ const MobileFirstCourses = () => {
                         <FaSearch className="w-4 h-4 text-gray-600" />
                     </button>
                     
-                    <AnimatePresence>
-                        {showSearch && (
-                            <motion.div
-                                variants={searchVariants}
-                                initial="hidden"
-                                animate="visible"
-                                exit="hidden"
-                                className="flex-1"
-                            >
+                    {showSearch && (
+                            <div className="flex-1">
                                 <input
                                     type="text"
                                     placeholder="Search courses, subjects..."
@@ -303,9 +261,8 @@ const MobileFirstCourses = () => {
                                              focus:outline-none focus:ring-2 focus:ring-indigo-500 
                                              focus:border-transparent text-sm"
                                 />
-                            </motion.div>
+                            </div>
                         )}
-                    </AnimatePresence>
                     
                     <div className="text-sm text-gray-500">
                         {filteredLevels.length} course{filteredLevels.length !== 1 ? 's' : ''}
@@ -316,13 +273,11 @@ const MobileFirstCourses = () => {
     );
 
     const MobileCourseCard = ({ level, index }) => (
-        <motion.button
-            variants={cardVariants}
+        <button
             onClick={() => handleLevelSelect(level.id)}
             className="w-full bg-white rounded-2xl shadow-sm hover:shadow-lg 
-                     transition-all duration-300 border border-gray-100 overflow-hidden
+                     transition-shadow duration-200 border border-gray-100 overflow-hidden
                      active:scale-95 transform"
-            whileTap={{ scale: 0.98 }}
         >
             {/* Clean Card Header */}
             <div className="h-20 bg-gradient-to-r from-gray-50 to-gray-100 relative overflow-hidden border-b border-gray-100">
@@ -378,7 +333,7 @@ const MobileFirstCourses = () => {
                     <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
                 </div>
             </div>
-        </motion.button>
+        </button>
     );
 
     if (selectedLevel) {
@@ -408,12 +363,7 @@ const MobileFirstCourses = () => {
                             <p className="text-gray-500">New courses will appear here as they are added by administrators.</p>
                         </div>
                     ) : (
-                        <motion.div
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="space-y-4"
-                        >
+                        <div className="space-y-4">
                             {/* Course Grid */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {filteredLevels.map((level, index) => (
@@ -427,11 +377,7 @@ const MobileFirstCourses = () => {
 
                             {/* Empty State for Search */}
                             {filteredLevels.length === 0 && searchQuery && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="text-center py-12"
-                                >
+                                <div className="text-center py-12">
                                     <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full 
                                                   flex items-center justify-center">
                                         <FaSearch className="w-6 h-6 text-gray-400" />
@@ -449,9 +395,9 @@ const MobileFirstCourses = () => {
                                     >
                                         Clear Search
                                     </button>
-                                </motion.div>
+                                </div>
                             )}
-                        </motion.div>
+                        </div>
                     )}
                 </div>
             </div>

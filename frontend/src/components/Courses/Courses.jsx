@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { FaGraduationCap, FaBook, FaUniversity, FaLaptopCode } from 'react-icons/fa';
 import Footer from "../Footer/Footer";
 import CourseHero from "./CourseHero/CourseHero";
@@ -148,30 +147,13 @@ const Courses = () => {
         }
     }, [location.pathname]);
 
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { duration: 0.3 }
-        },
-        exit: {
-            opacity: 0,
-            transition: { duration: 0.2 }
-        }
-    };
-
     return (
         <>
             <CourseHero />
             <div className="bg-gray-50 pt-7">
                 <div className="container mx-auto px-4 py-12">
                     {!selectedLevel ? (
-                        <motion.div
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                            exit="exit"
-                            className="max-w-6xl mx-auto"
+                        <div className="max-w-6xl mx-auto"
                         >
                             <div className="text-center mb-12">
                                 <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -194,12 +176,11 @@ const Courses = () => {
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                     {availableLevels.map((level) => (
-                                        <motion.button
+                                        <button
                                             key={level.id}
                                             onClick={() => handleLevelSelect(level.id)}
                                             className="group relative bg-white rounded-2xl shadow-sm hover:shadow-lg 
-                                                     transition-shadow duration-200 border border-gray-100 overflow-hidden"
-                                            whileTap={{ scale: 0.98 }}
+                                                     transition-shadow duration-200 border border-gray-100 overflow-hidden active:scale-[0.98]"
                                         >
                                             <div className="relative p-8 flex flex-col items-center text-center">
                                                 <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center 
@@ -215,11 +196,11 @@ const Courses = () => {
                                                     {level.description}
                                                 </p>
                                             </div>
-                                        </motion.button>
+                                        </button>
                                     ))}
                                 </div>
                             )}
-                        </motion.div>
+                        </div>
                     ) : (
                         <Outlet />
                     )}

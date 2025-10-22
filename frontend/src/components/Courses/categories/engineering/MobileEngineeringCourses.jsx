@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { FaFilter, FaTimes, FaChevronDown, FaArrowLeft } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import CourseListings from './CourseListings/CourseListings';
@@ -70,14 +69,12 @@ const MobileEngineeringCourses = () => {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="px-4 py-3">
           <div className="flex items-center">
-            <motion.button
+            <button
               onClick={() => navigate('/courses')}
-              className="mr-3 p-2 rounded-full text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              className="mr-3 p-2 rounded-full text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-colors duration-200 active:scale-95"
             >
               <FaArrowLeft className="w-4 h-4" />
-            </motion.button>
+            </button>
             <div>
               <h1 className="text-xl font-bold text-gray-900" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
                 {`Engineering Courses`}
@@ -97,38 +94,30 @@ const MobileEngineeringCourses = () => {
           <div className="relative">
             <button
               onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-left text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-between"
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-left text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-between active:bg-gray-100"
             >
               <span>{getSelectedCategoryName()}</span>
-              <FaChevronDown className={`transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+              <FaChevronDown className={`transition-transform duration-200 ${showCategoryDropdown ? 'rotate-180' : ''}`} />
             </button>
 
-            <AnimatePresence>
-              {showCategoryDropdown && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto"
-                >
-                  {allCategories.map(category => (
-                    <button
-                      key={category.id}
-                      onClick={() => handleCategoryChange(category.id)}
-                      className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${
-                        selectedCategory === category.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                      }`}
-                    >
-                      <div className="flex items-center">
-                        {category.icon && <span className="mr-3">{category.icon}</span>}
-                        {category.name}
-                      </div>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {showCategoryDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                {allCategories.map(category => (
+                  <button
+                    key={category.id}
+                    onClick={() => handleCategoryChange(category.id)}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 active:bg-gray-100 transition-colors border-b border-gray-100 last:border-b-0 ${
+                      selectedCategory === category.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      {category.icon && <span className="mr-3">{category.icon}</span>}
+                      {category.name}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -172,7 +161,7 @@ const MobileEngineeringCourses = () => {
                 <button
                   key={level.value}
                   onClick={() => handleFilterChange({ skillLevel: level.value })}
-                  className={`px-2.5 py-1.5 rounded-full text-sm border transition-colors ${
+                  className={`px-2.5 py-1.5 rounded-full text-sm border transition-colors active:scale-95 ${
                     filters.skillLevel === level.value
                       ? 'bg-blue-100 text-blue-700 border-blue-200'
                       : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
@@ -187,14 +176,14 @@ const MobileEngineeringCourses = () => {
             </div>
           </div>
 
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden"
-              >
+          {showFilters && (
+            <div className="transition-all duration-200"
+              style={{
+                maxHeight: showFilters ? '500px' : '0',
+                opacity: showFilters ? 1 : 0,
+                overflow: 'hidden'
+              }}
+            >
                 {/* Duration Filter */}
                 <div className="mt-4">
                   <p className="text-sm font-medium text-gray-600 mb-2">Duration</p>
@@ -238,14 +227,13 @@ const MobileEngineeringCourses = () => {
                 {hasActiveFilters() && (
                   <button
                     onClick={() => setFilters({ skillLevel: 'all', duration: 'all', sortBy: 'popular' })}
-                    className="w-full mt-4 py-2 text-sm text-red-600 hover:text-red-700 font-medium"
+                    className="w-full mt-4 py-2 text-sm text-red-600 hover:text-red-700 font-medium active:text-red-800"
                   >
                     Clear All Filters
                   </button>
                 )}
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
         </div>
       </div>
 
