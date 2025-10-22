@@ -653,12 +653,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
   // Loading and error states
   if (loading) {
-    return (
-      <div className="flex flex-col justify-center items-center h-96 space-y-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-        <p className="text-gray-600">Loading your learning content...</p>
-      </div>
-    );
+    return <CourseLoadingSkeleton />;
   }
 
   if (error) {
@@ -979,9 +974,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         <div className={`transition-all duration-300 ${sidebarVisible ? 'mr-[400px]' : ''}`}>
           <div className="p-6 w-full">
             {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-              </div>
+              <CourseLoadingSkeleton />
             ) : error ? (
               <div className="text-center p-6 bg-red-50 rounded-lg border border-red-200">
                 <p className="text-red-600">{error}</p>

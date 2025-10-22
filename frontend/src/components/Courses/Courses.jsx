@@ -179,12 +179,24 @@ const Courses = () => {
                                 <p className="text-gray-600 text-lg max-w-2xl mx-auto">
                                     Select your education level to discover personalized learning resources
                                 </p>
-                                {loading && (
-                                    <p className="text-blue-600 mt-4">Loading available courses...</p>
-                                )}
                             </div>
                             
-                            {!loading && availableLevels.length === 0 ? (
+                            {loading ? (
+                                <div className="text-center py-12">
+                                    {/* Loading skeleton cards */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-6xl mx-auto">
+                                        {[1, 2, 3, 4].map((i) => (
+                                            <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                                <div className="p-8 flex flex-col items-center text-center">
+                                                    <div className="w-16 h-16 rounded-full bg-gray-200 animate-pulse mb-4"></div>
+                                                    <div className="h-6 bg-gray-200 rounded animate-pulse mb-2 w-3/4"></div>
+                                                    <div className="h-4 bg-gray-200 rounded animate-pulse w-full"></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : availableLevels.length === 0 ? (
                                 <div className="text-center py-12">
                                     <div className="text-gray-400 text-6xl mb-4">📚</div>
                                     <h3 className="text-xl font-semibold text-gray-700 mb-2">No Courses Available Yet</h3>

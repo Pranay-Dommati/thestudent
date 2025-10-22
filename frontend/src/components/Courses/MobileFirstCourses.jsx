@@ -328,7 +328,7 @@ const MobileFirstCourses = () => {
                 
                 {/* Subject Tags */}
                 <div className="flex flex-wrap gap-1 mb-3">
-                    {level.subjects.slice(0, 3).map((subject, idx) => (
+                    {(level.subjects || []).slice(0, 3).map((subject, idx) => (
                         <span
                             key={idx}
                             className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-medium"
@@ -341,7 +341,7 @@ const MobileFirstCourses = () => {
                             + More
                         </span>
                     )}
-                    {level.subjects.length > 3 && (
+                    {(level.subjects && level.subjects.length > 3) && (
                         <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-md text-xs">
                             +{level.subjects.length - 3}
                         </span>

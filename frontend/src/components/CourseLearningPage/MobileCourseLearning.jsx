@@ -12,6 +12,7 @@ import axiosInstance from '../../utils/axios';
 import universalToast from '../../utils/universalToast';
 import courseCache from '../../utils/courseCache';
 import { useAuth } from '../../context/AuthContext';
+import MobileCourseLoadingSkeleton from './MobileCourseLoadingSkeleton';
 
 const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [course, setCourse] = useState(null);
@@ -611,11 +612,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <MobileCourseLoadingSkeleton />;
   }
 
   if (error && !course) {
