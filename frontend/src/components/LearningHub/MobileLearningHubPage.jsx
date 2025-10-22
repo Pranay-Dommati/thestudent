@@ -25,6 +25,7 @@ const MobileLearningHubPage = () => {
   const { user: authUser, isLoggedIn } = useAuth();
   const [learningStats, setLearningStats] = useState(null);
   const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(0);
+  const [activeTab, setActiveTab] = useState('enrolled'); // Tab state
 
   useEffect(() => {
     const refresh = async () => {
@@ -228,80 +229,131 @@ const MobileLearningHubPage = () => {
         </div>
       </div>
 
-      {/* Content Area - All sections in scrollable format */}
-      <div className="px-4 pt-6 pb-20 space-y-6">
-        {/* My Enrolled Courses Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <div className="flex items-center mb-3">
-            <div className="bg-indigo-500 p-2 rounded-lg mr-3">
-              <FaGraduationCap className="text-white text-lg" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-800">My Enrolled Courses</h2>
-              <p className="text-xs text-gray-500">Continue your learning</p>
-            </div>
+      {/* Content Area - Tabbed Interface */}
+      <div className="px-4 pt-6 pb-20">
+        {/* Tab Navigation */}
+        <div className="bg-white rounded-xl shadow-sm mb-4 p-1">
+          <div className="grid grid-cols-3 gap-1">
+            <button
+              onClick={() => setActiveTab('enrolled')}
+              className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'enrolled'
+                  ? 'bg-indigo-500 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+            >
+              <FaGraduationCap className="mx-auto mb-1 text-base" />
+              <div className="text-xs">Enrolled</div>
+            </button>
+            <button
+              onClick={() => setActiveTab('ai')}
+              className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'ai'
+                  ? 'bg-indigo-500 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+            >
+              <FaBrain className="mx-auto mb-1 text-base" />
+              <div className="text-xs">AI Courses</div>
+            </button>
+            <button
+              onClick={() => setActiveTab('stats')}
+              className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'stats'
+                  ? 'bg-indigo-500 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+            >
+              <FaChartLine className="mx-auto mb-1 text-base" />
+              <div className="text-xs">Stats</div>
+            </button>
           </div>
-          <ActiveCourses
-            onEnrollmentChanged={(change) => {
-              if (change && typeof change.count === 'number') {
-                setEnrolledCoursesCount(Math.max(0, change.count));
-              } else if (change && typeof change.delta === 'number') {
-                setEnrolledCoursesCount((prev) => Math.max(0, prev + change.delta));
-              } else {
-                axios.get('/courses/enrolled/').then((res) => {
-                  if (res.data?.success) {
-                    setEnrolledCoursesCount(res.data.courses.length);
+        </div>
+
+        {/* Tab Content */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'enrolled' && (
+            <motion.div
+              key="enrolled"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex items-center mb-4">
+                <div className="bg-indigo-500 p-2 rounded-lg mr-3">
+                  <FaGraduationCap className="text-white text-lg" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800">My Enrolled Courses</h2>
+                  <p className="text-xs text-gray-500">Continue your learning journey</p>
+                </div>
+              </div>
+              <ActiveCourses
+                onEnrollmentChanged={(change) => {
+                  if (change && typeof change.count === 'number') {
+                    setEnrolledCoursesCount(Math.max(0, change.count));
+                  } else if (change && typeof change.delta === 'number') {
+                    setEnrolledCoursesCount((prev) => Math.max(0, prev + change.delta));
+                  } else {
+                    axios.get('/courses/enrolled/').then((res) => {
+                      if (res.data?.success) {
+                        setEnrolledCoursesCount(res.data.courses.length);
+                      }
+                    }).catch(() => {});
                   }
-                }).catch(() => {});
-              }
-            }}
-          />
-        </motion.div>
+                }}
+              />
+            </motion.div>
+          )}
 
-        {/* AI-Created Courses Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <div className="flex items-center mb-3">
-            <div className="bg-purple-500 p-2 rounded-lg mr-3">
-              <FaBrain className="text-white text-lg" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-800">My AI-Created Courses</h2>
-              <p className="text-xs text-gray-500">AI-powered learning paths</p>
-            </div>
-          </div>
-          <AILearningPlans />
-        </motion.div>
+          {activeTab === 'ai' && (
+            <motion.div
+              key="ai"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex items-center mb-4">
+                <div className="bg-purple-500 p-2 rounded-lg mr-3">
+                  <FaBrain className="text-white text-lg" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800">My AI-Created Courses</h2>
+                  <p className="text-xs text-gray-500">AI-powered learning paths</p>
+                </div>
+              </div>
+              <AILearningPlans />
+            </motion.div>
+          )}
 
-        {/* Learning Analytics Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <div className="flex items-center mb-3">
-            <div className="bg-blue-500 p-2 rounded-lg mr-3">
-              <FaChartLine className="text-white text-lg" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-800">Learning Progress</h2>
-              <p className="text-xs text-gray-500">Track your growth</p>
-            </div>
-          </div>
-          <LearningAnalytics 
-            user={{
-              ...user,
-              weeklyBreakdown: learningStats?.weekly_breakdown ?? []
-            }} 
-          />
-        </motion.div>
+          {activeTab === 'stats' && (
+            <motion.div
+              key="stats"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex items-center mb-4">
+                <div className="bg-blue-500 p-2 rounded-lg mr-3">
+                  <FaChartLine className="text-white text-lg" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800">Learning Progress</h2>
+                  <p className="text-xs text-gray-500">Track your growth and achievements</p>
+                </div>
+              </div>
+              <LearningAnalytics 
+                user={{
+                  ...user,
+                  weeklyBreakdown: learningStats?.weekly_breakdown ?? []
+                }} 
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
