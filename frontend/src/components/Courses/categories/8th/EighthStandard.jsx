@@ -177,7 +177,7 @@ const EighthStandard = () => {
               <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
             </div>
           ) : courses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 gap-3 px-4 md:px-0 md:grid-cols-2 lg:grid-cols-3 md:gap-6">
               {courses.map((course) => (
                 <Link 
                   to={selectedBoard.includes('state') 
@@ -187,24 +187,50 @@ const EighthStandard = () => {
                 >
                   <motion.div 
                     whileHover={{ y: -5 }} 
-                    className="bg-white rounded-lg md:rounded-xl shadow-sm md:hover:shadow-lg transition-all duration-300 cursor-pointer h-full border border-gray-100"
+                    whileTap={{ scale: 0.98 }}
+                    className="bg-white rounded-lg md:rounded-xl shadow-sm border border-gray-200/80 hover:border-indigo-300 md:hover:shadow-lg transition-all duration-300 cursor-pointer h-full overflow-hidden"
                   >
-                    <div className="relative p-4 md:p-5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-lg md:rounded-t-xl text-white">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xl md:text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
-                        <FaPlay className="opacity-75 text-sm md:text-base" />
+                    {/* Mobile: Simple header design */}
+                    <div className="md:hidden p-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-lg">{SUBJECT_ICONS[course.subject] || '📚'}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-sm">Tap to choose</span>
                       </div>
-                      <h3 className="text-lg md:text-xl font-bold mt-1 md:mt-2">{course.subject}</h3>
-                      <p className="text-white/80 text-xs md:text-sm mt-1">{course.duration}+ hours of content</p>
+                      <h3 className="text-base font-semibold">{course.subject}</h3>
+                      <p className="text-white/80 text-xs mt-1">{course.duration}+ hours</p>
                     </div>
-                    <div className="p-4 md:p-5">
-                      <p className="text-gray-600 text-sm md:text-base mb-3 md:mb-4">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
+
+                    {/* Desktop: Rich header design */}
+                    <div className="hidden md:block relative p-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                      <div className="flex items-center justify-between">
+                        <span className="text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
+                        <FaPlay className="opacity-75 text-base" />
+                      </div>
+                      <h3 className="text-xl font-bold mt-2">{course.subject}</h3>
+                      <p className="text-white/80 text-sm mt-1">{course.duration}+ hours of content</p>
+                    </div>
+
+                    {/* Mobile: Minimal content */}
+                    <div className="md:hidden p-4">
+                      <p className="text-gray-600 text-xs leading-relaxed mb-2">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-1.5">
+                          <FaBookReader className="text-indigo-500 text-xs" />
+                          <span className="text-xs text-gray-500">Structured</span>
+                        </div>
+                        <span className="text-indigo-600 text-xs font-medium">Preview →</span>
+                      </div>
+                    </div>
+
+                    {/* Desktop: Rich content */}
+                    <div className="hidden md:block p-5">
+                      <p className="text-gray-600 text-base leading-relaxed mb-4">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <FaBookReader className="text-indigo-600" />
                           <span className="text-sm text-gray-600">Structured Learning</span>
                         </div>
-                        <span className="text-indigo-600 text-xs md:text-sm font-medium">Preview Course →</span>
+                        <span className="text-indigo-600 text-sm font-medium">Preview Course →</span>
                       </div>
                     </div>
                   </motion.div>

@@ -14,6 +14,7 @@ import Footer from "../Footer/Footer";
 import '../../styles/mobile-courses.css';
 import logger from '../../utils/logger';
 import api from '../../utils/axios';
+import { courseCache } from '../../utils/courseCache';
 
 const MobileFirstCourses = () => {
     const navigate = useNavigate();
@@ -103,6 +104,16 @@ const MobileFirstCourses = () => {
 
     // Function to check if courses exist for a specific class level
     const checkCoursesAvailability = async () => {
+        // First check if we have cached availability data
+        const cachedAvailability = courseCache.getCourseAvailability();
+        if (cachedAvailability) {
+            console.log('📦 Using cached course availability data (Mobile)');
+            setAvailableLevels(cachedAvailability);
+            setLoading(false);
+            return;
+        }
+
+        console.log('🔄 Fetching fresh course availability data (Mobile)');
         setLoading(true);
         const levelsWithCourses = [];
 
@@ -116,6 +127,8 @@ const MobileFirstCourses = () => {
                     if (data) {
                         if (data && data.length > 0) {
                             levelsWithCourses.push(level);
+                            // Cache individual level data as well
+                            courseCache.setCoursesForLevel(level.apiClass, data);
                         }
                     }
                 } catch (error) {
@@ -131,6 +144,8 @@ const MobileFirstCourses = () => {
                         const engineeringLevel = allEducationLevels.find(level => level.apiClass === 'engineering');
                         if (engineeringLevel) {
                             levelsWithCourses.push(engineeringLevel);
+                            // Cache engineering data
+                            courseCache.setCoursesForLevel('engineering', engineeringData);
                         }
                     }
                 }
@@ -138,6 +153,8 @@ const MobileFirstCourses = () => {
                 logger.error('Error checking engineering courses:', error);
             }
 
+            // Cache the availability results
+            courseCache.setCourseAvailability(levelsWithCourses);
             setAvailableLevels(levelsWithCourses);
         } catch (error) {
             logger.error('Error checking course availability:', error);
@@ -272,20 +289,24 @@ const MobileFirstCourses = () => {
         </div>
     );
 
-    const MobileCourseCard = ({ level, index }) => (
-        <button
-            onClick={() => handleLevelSelect(level.id)}
-            className="w-full bg-white rounded-2xl shadow-sm hover:shadow-lg 
-                     transition-shadow duration-200 border border-gray-100 overflow-hidden
-                     active:scale-95 transform"
-        >
-            {/* Clean Card Header */}
-            <div className="h-20 bg-gradient-to-r from-gray-50 to-gray-100 relative overflow-hidden border-b border-gray-100">
-                <div className="absolute top-3 right-3">
-                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                        <level.icon className="w-5 h-5 text-indigo-600" />
+    const MobileCourseCard = ({ level, index }) => {
+        // Safely get the icon component or use a default
+        const IconComponent = level.icon || FaBook;
+        
+        return (
+            <button
+                onClick={() => handleLevelSelect(level.id)}
+                className="w-full bg-white rounded-2xl shadow-sm hover:shadow-lg 
+                         transition-shadow duration-200 border border-gray-100 overflow-hidden
+                         active:scale-95 transform"
+            >
+                {/* Clean Card Header */}
+                <div className="h-20 bg-gradient-to-r from-gray-50 to-gray-100 relative overflow-hidden border-b border-gray-100">
+                    <div className="absolute top-3 right-3">
+                        <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <IconComponent className="w-5 h-5 text-indigo-600" />
+                        </div>
                     </div>
-                </div>
                 <div className="absolute bottom-3 left-4">
                     <div className="flex items-center space-x-1 text-gray-600">
                         <FaStar className="w-3 h-3" />
@@ -334,7 +355,8 @@ const MobileFirstCourses = () => {
                 </div>
             </div>
         </button>
-    );
+        );
+    };
 
     if (selectedLevel) {
         return (

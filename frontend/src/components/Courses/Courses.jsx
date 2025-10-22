@@ -5,6 +5,7 @@ import Footer from "../Footer/Footer";
 import CourseHero from "./CourseHero/CourseHero";
 import logger from '../../utils/logger';
 import api from '../../utils/axios';
+import { courseCache } from '../../utils/courseCache';
 
 const Courses = () => {
     const navigate = useNavigate();
@@ -75,6 +76,16 @@ const Courses = () => {
 
     // Function to check if courses exist for a specific class level
     const checkCoursesAvailability = async () => {
+        // First check if we have cached availability data
+        const cachedAvailability = courseCache.getCourseAvailability();
+        if (cachedAvailability) {
+            console.log('📦 Using cached course availability data');
+            setAvailableLevels(cachedAvailability);
+            setLoading(false);
+            return;
+        }
+
+        console.log('🔄 Fetching fresh course availability data');
         setLoading(true);
         const levelsWithCourses = [];
 
@@ -88,6 +99,8 @@ const Courses = () => {
                     if (data) {
                         if (data && data.length > 0) {
                             levelsWithCourses.push(level);
+                            // Cache individual level data as well
+                            courseCache.setCoursesForLevel(level.apiClass, data);
                         }
                     }
                 } catch (error) {
@@ -103,6 +116,8 @@ const Courses = () => {
                         const engineeringLevel = allEducationLevels.find(level => level.apiClass === 'engineering');
                         if (engineeringLevel) {
                             levelsWithCourses.push(engineeringLevel);
+                            // Cache engineering data
+                            courseCache.setCoursesForLevel('engineering', engineeringData);
                         }
                     }
                 }
@@ -110,6 +125,8 @@ const Courses = () => {
                 logger.error('Error checking engineering courses:', error);
             }
 
+            // Cache the availability results
+            courseCache.setCourseAvailability(levelsWithCourses);
             setAvailableLevels(levelsWithCourses);
         } catch (error) {
             logger.error('Error checking course availability:', error);
@@ -175,29 +192,32 @@ const Courses = () => {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                    {availableLevels.map((level) => (
-                                        <button
-                                            key={level.id}
-                                            onClick={() => handleLevelSelect(level.id)}
-                                            className="group relative bg-white rounded-2xl shadow-sm hover:shadow-lg 
-                                                     transition-shadow duration-200 border border-gray-100 overflow-hidden active:scale-[0.98]"
-                                        >
-                                            <div className="relative p-8 flex flex-col items-center text-center">
-                                                <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center 
-                                                              justify-center mb-4 group-hover:bg-indigo-600 
-                                                              transition-colors duration-200">
-                                                    <level.icon className="w-8 h-8 text-indigo-600 
-                                                                         group-hover:text-white transition-colors duration-200"/>
+                                    {availableLevels.map((level) => {
+                                        const IconComponent = level.icon || FaBook;
+                                        return (
+                                            <button
+                                                key={level.id}
+                                                onClick={() => handleLevelSelect(level.id)}
+                                                className="group relative bg-white rounded-2xl shadow-sm hover:shadow-lg 
+                                                         transition-shadow duration-200 border border-gray-100 overflow-hidden active:scale-[0.98]"
+                                            >
+                                                <div className="relative p-8 flex flex-col items-center text-center">
+                                                    <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center 
+                                                                  justify-center mb-4 group-hover:bg-indigo-600 
+                                                                  transition-colors duration-200">
+                                                        <IconComponent className="w-8 h-8 text-indigo-600 
+                                                                             group-hover:text-white transition-colors duration-200"/>
+                                                    </div>
+                                                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                                                        {level.name}
+                                                    </h3>
+                                                    <p className="text-gray-500 text-sm">
+                                                        {level.description}
+                                                    </p>
                                                 </div>
-                                                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                                                    {level.name}
-                                                </h3>
-                                                <p className="text-gray-500 text-sm">
-                                                    {level.description}
-                                                </p>
-                                            </div>
-                                        </button>
-                                    ))}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

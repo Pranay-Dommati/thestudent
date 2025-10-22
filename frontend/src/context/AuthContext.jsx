@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import customToast from '../utils/customToast';
 import axiosInstance from '../utils/axios';
 import storage from '../utils/storage';
+import { courseCache } from '../utils/courseCache';
 
 const AuthContext = createContext(null);
 
@@ -215,6 +216,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     handleAuthFailure();
+    // Clear course cache when user logs out
+    courseCache.clearAll();
     customToast.success('Logged out successfully', { id: 'auth-logout' });
   };
 

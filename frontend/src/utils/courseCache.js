@@ -4,7 +4,7 @@
  */
 
 const CACHE_PREFIX = 'course_cache_';
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes in milliseconds
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 export const courseCache = {
   /**
@@ -139,13 +139,47 @@ export const courseCache = {
   },
 
   /**
-   * Generate cache key from URL pathname
-   * @param {string} pathname - URL pathname
+   * Generate cache key from URL pathname or custom key
+   * @param {string} pathname - URL pathname or custom cache key
    * @returns {string} - Cache key
    */
   generateKey(pathname) {
     // Normalize the pathname to create a consistent cache key
     return pathname.replace(/\//g, '_').replace(/^_+|_+$/g, '');
+  },
+
+  /**
+   * Cache course availability data
+   * @param {Array} availableLevels - Array of available course levels
+   */
+  setCourseAvailability(availableLevels) {
+    this.set('course_availability', availableLevels);
+  },
+
+  /**
+   * Get cached course availability data
+   * @returns {Array|null} - Array of available course levels or null if expired/not found
+   */
+  getCourseAvailability() {
+    return this.get('course_availability');
+  },
+
+  /**
+   * Cache individual course level data
+   * @param {string} level - Course level (e.g., '6th', '7th', 'engineering')
+   * @param {Array} courses - Array of courses for that level
+   */
+  setCoursesForLevel(level, courses) {
+    this.set(`courses_${level}`, courses);
+  },
+
+  /**
+   * Get cached courses for a specific level
+   * @param {string} level - Course level (e.g., '6th', '7th', 'engineering')
+   * @returns {Array|null} - Array of courses or null if expired/not found
+   */
+  getCoursesForLevel(level) {
+    return this.get(`courses_${level}`);
   }
 };
 

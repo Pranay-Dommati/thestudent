@@ -7,6 +7,7 @@ import BackButton from '../../components/BackButton';
 import MobileBoardSelector from '../../shared/MobileBoardSelector';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
+import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
 import Footer from '../../../Footer/Footer';
 
 const SUBJECT_ICONS = {
@@ -30,6 +31,28 @@ const TwelfthStandard = () => {
   const [showStateBoards, setShowStateBoards] = useState(false);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [availableBoards, setAvailableBoards] = useState([]);
+  const [checkingAvailability, setCheckingAvailability] = useState(true);
+  const [availableStates, setAvailableStates] = useState([]);
+  const [checkingStates, setCheckingStates] = useState(false);
+
+  // Check course availability for each board
+  useEffect(() => {
+    const checkAvailability = async () => {
+      setCheckingAvailability(true);
+      try {
+        const availableBoards = await checkBoardAvailability('12th');
+        setAvailableBoards(availableBoards);
+      } catch (error) {
+        logger.error('Error checking board availability:', error);
+        setAvailableBoards([]);
+      } finally {
+        setCheckingAvailability(false);
+      }
+    };
+
+    checkAvailability();
+  }, []);
 
   // Sync selected board with URL; also reset on base route
   useEffect(() => {
@@ -61,18 +84,32 @@ const TwelfthStandard = () => {
     }
   ];
 
-  const handleBoardSelect = (board) => {
-    if (board === 'state') {
+  const handleBoardSelect = async (boardId) => {
+    if (boardId === 'state') {
+      // Show state UI immediately for snappy UX; load availability in background
       setShowStateBoards(true);
+      setCheckingStates(true);
+      setAvailableStates([]);
+      try {
+        const states = await checkStateAvailability('12th');
+        setAvailableStates(states);
+      } catch (error) {
+        logger.error('Error checking state availability:', error);
+        setAvailableStates([]);
+      } finally {
+        setCheckingStates(false);
+      }
     } else {
-      navigate(`/courses/12th/${board}`);
+      // Navigate first; URL-derived effect will sync selectedBoard
+      navigate(`/courses/12th/${boardId}`);
     }
   };
 
   const handleStateSelect = (stateId) => {
-    navigate(`/courses/12th/state/${stateId}`);
+    const to = `/courses/12th/state/${stateId}`;
+    // Navigate immediately; URL effect will set selectedBoard
+    navigate(to);
     setShowStateBoards(false);
-    setSelectedBoard(`state-${stateId}`);
   };
 
   const handleBack = () => {
@@ -144,17 +181,14 @@ const TwelfthStandard = () => {
     <>
     <div className={`container mx-auto px-4 ${containerPadding}`}>
       <MobileBoardSelector
-        availableBoards={[
-          {id: 'cbse', name: 'CBSE', fullName: 'Central Board of Secondary Education', available: true},
-          {id: 'state', name: 'State Board', fullName: 'State Board of Secondary and Higher Secondary Education', available: true}
-        ]}
-        availableStates={[]}
-        checkingAvailability={false}
-        checkingStates={false}
+        availableBoards={availableBoards}
+        availableStates={availableStates}
+        checkingAvailability={checkingAvailability}
+        checkingStates={checkingStates}
         isBoardSelection={!selectedBoard && !showStateBoards}
         isStateSelection={showStateBoards}
         onSelectBoard={handleBoardSelect}
-        onSelectState={() => {}}
+        onSelectState={handleStateSelect}
         onBack={handleBack}
       />
 
@@ -164,13 +198,26 @@ const TwelfthStandard = () => {
             title="Select Your Board" 
             subtitle="Choose your education board to view relevant courses" 
           />
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {boards.filter(board => board.available).map((board) => (
-                <motion.button
-                  key={board.id}
-                  onClick={() => handleBoardSelect(board.id)}
-                  className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
+
+          {checkingAvailability ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Checking available boards...</p>
+            </div>
+          ) : availableBoards.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-6xl mb-4">📚</div>
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">No Courses Available Yet</h3>
+              <p className="text-gray-500">Courses for 12th standard are being prepared and will be available soon.</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {availableBoards.map((board) => (
+                  <motion.button
+                    key={board.id}
+                    onClick={() => handleBoardSelect(board.id)}
+                    className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
                   whileHover={{ y: -5 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -180,11 +227,14 @@ const TwelfthStandard = () => {
               ))}
             </div>
 
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
-              <h3 className="text-lg font-semibold text-indigo-900 mb-2">More Boards Coming Soon!</h3>
-              <p className="text-indigo-700">We're working hard to bring you content for ICSE, NIOS, and other boards. Stay tuned for updates!</p>
-            </div>
+            {availableBoards.length < boards.length && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
+                <h3 className="text-lg font-semibold text-indigo-900 mb-2">More Boards Coming Soon!</h3>
+                <p className="text-indigo-700">We're working hard to bring you content for ICSE, NIOS, and other boards. Stay tuned for updates!</p>
+              </div>
+            )}
           </div>
+          )}
         </div>
       ) : showStateBoards ? (
         <div className="hidden md:block">
@@ -192,22 +242,35 @@ const TwelfthStandard = () => {
             title="Select Your State" 
             subtitle="Choose your state board" 
           />
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {stateBoards.map((state) => (
-                <motion.button
-                  key={state.id}
-                  onClick={() => handleStateSelect(state.id)}
-                  className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
-                  whileHover={{ y: -5 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{state.name}</h3>
-                  <p className="text-gray-500 text-sm">{state.fullName}</p>
-                </motion.button>
-              ))}
+          {checkingStates ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Checking available states...</p>
             </div>
-          </div>
+          ) : availableStates.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-6xl mb-4">🗺️</div>
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">No State Boards Available Yet</h3>
+              <p className="text-gray-500">State board courses for 12th standard are being prepared and will be available soon.</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {availableStates.map((state) => (
+                  <motion.button
+                    key={state.id}
+                    onClick={() => handleStateSelect(state.id)}
+                    className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
+                    whileHover={{ y: -5 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">{state.name}</h3>
+                    <p className="text-gray-500 text-sm">{state.fullName}</p>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -224,7 +287,7 @@ const TwelfthStandard = () => {
               <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
             </div>
           ) : courses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 gap-3 px-4 md:px-0 md:grid-cols-2 lg:grid-cols-3 md:gap-6">
               {courses.map((course) => {
                 return (
                   <Link 
@@ -235,24 +298,50 @@ const TwelfthStandard = () => {
                   >
                     <motion.div 
                       whileHover={{ y: -5 }} 
-                      className="bg-white rounded-lg md:rounded-xl shadow-sm md:hover:shadow-lg transition-all duration-300 cursor-pointer h-full border border-gray-100"
+                      whileTap={{ scale: 0.98 }}
+                      className="bg-white rounded-lg md:rounded-xl shadow-sm border border-gray-200/80 hover:border-indigo-300 md:hover:shadow-lg transition-all duration-300 cursor-pointer h-full overflow-hidden"
                     >
-                      <div className="relative p-4 md:p-5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-lg md:rounded-t-xl text-white">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xl md:text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
-                          <FaPlay className="opacity-75 text-sm md:text-base" />
+                      {/* Mobile: Simple header design */}
+                      <div className="md:hidden p-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-lg">{SUBJECT_ICONS[course.subject] || '📚'}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-sm">Tap to choose</span>
                         </div>
-                        <h3 className="text-lg md:text-xl font-bold mt-1 md:mt-2">{course.subject}</h3>
-                        <p className="text-white/80 text-xs md:text-sm mt-1">{course.duration}+ hours of content</p>
+                        <h3 className="text-base font-semibold">{course.subject}</h3>
+                        <p className="text-white/80 text-xs mt-1">{course.duration}+ hours</p>
                       </div>
-                      <div className="p-4 md:p-5">
-                        <p className="text-gray-600 text-sm md:text-base mb-3 md:mb-4">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
+
+                      {/* Desktop: Rich header design */}
+                      <div className="hidden md:block relative p-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
+                          <FaPlay className="opacity-75 text-base" />
+                        </div>
+                        <h3 className="text-xl font-bold mt-2">{course.subject}</h3>
+                        <p className="text-white/80 text-sm mt-1">{course.duration}+ hours of content</p>
+                      </div>
+
+                      {/* Mobile: Minimal content */}
+                      <div className="md:hidden p-4">
+                        <p className="text-gray-600 text-xs leading-relaxed mb-2">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-1.5">
+                            <FaBookReader className="text-indigo-500 text-xs" />
+                            <span className="text-xs text-gray-500">Structured</span>
+                          </div>
+                          <span className="text-indigo-600 text-xs font-medium">Preview →</span>
+                        </div>
+                      </div>
+
+                      {/* Desktop: Rich content */}
+                      <div className="hidden md:block p-5">
+                        <p className="text-gray-600 text-base leading-relaxed mb-4">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             <FaBookReader className="text-indigo-600" />
                             <span className="text-sm text-gray-600">Structured Learning</span>
                           </div>
-                          <span className="text-indigo-600 text-xs md:text-sm font-medium">Preview Course →</span>
+                          <span className="text-indigo-600 text-sm font-medium">Preview Course →</span>
                         </div>
                       </div>
                     </motion.div>
