@@ -1323,6 +1323,13 @@ const ProLearningPage = () => {
     if (topicsList.length > 0 && courseTitle) {
       const activeTopic = topicsList.find(t => t.isActive);
       if (activeTopic) {
+        // CRITICAL: Check if we're already generating content for this topic
+        const generationKey = `${getCourseId()}_${activeTopic.name}`;
+        if (generatingContentRef.current.has(generationKey)) {
+          console.log('🛑 Already generating content for:', activeTopic.name, '- skipping duplicate request');
+          return;
+        }
+        
         // If we already have content in state, avoid hydrating from storage to prevent overwriting
         // progressive content with a different post-generation copy.
         if (content && (content.reading || content.summary || content.videos?.length || content.quiz?.length || content.resources?.length)) {
@@ -1384,8 +1391,18 @@ const ProLearningPage = () => {
           // Pass database topic data if available
           const dbTopic = activeTopic?.dbTopic || null;
           
+          // Mark this topic as being generated
+          const generationKey = `${getCourseId()}_${activeTopic.name}`;
+          generatingContentRef.current.add(generationKey);
+          console.log('🚀 Starting content generation for:', activeTopic.name);
+          
           proContentManager.getTopicContent(activeTopic.name, generateProContent, dbTopic)
             .then(result => {
+              // Remove from generating set when done
+              generatingContentRef.current.delete(generationKey);
+              lastGeneratedTopicRef.current = activeTopic.name;
+              console.log('✅ Completed content generation for:', activeTopic.name);
+              
               setSectionGenerating(false);
               setGeneratingTopics(prev => prev.filter(t => t !== activeTopic.name));
               if (result && result.content) {
@@ -1406,7 +1423,9 @@ const ProLearningPage = () => {
               setShowSkeletons(false);
             })
             .catch(error => {
-              console.error('❌ Failed to load content:', error);
+              // Remove from generating set on error too
+              generatingContentRef.current.delete(generationKey);
+              console.error('❌ Failed to load content for:', activeTopic.name, error);
               setIsLoading(false);
               setShowSkeletons(false);
             });
@@ -1418,9 +1437,20 @@ const ProLearningPage = () => {
       const currentCourseId = getCourseId();
       
       if (currentCourseId) {
+        // CRITICAL: Check if we're already generating content for this topic
+        const generationKey = `${currentCourseId}_${actualTopic}`;
+        if (generatingContentRef.current.has(generationKey)) {
+          console.log('🛑 Already generating content for:', actualTopic, '- skipping duplicate URL request');
+          return;
+        }
+        
         setIsLoading(true);
         setShowSkeletons(true);
         setLoadingStep(`Loading content for ${actualTopic}...`);
+        
+        // Mark this topic as being generated
+        generatingContentRef.current.add(generationKey);
+        console.log('🚀 Starting URL-based content generation for:', actualTopic);
         
         // First try to get database topic data
         const getDatabaseTopicData = async () => {
@@ -1447,6 +1477,11 @@ const ProLearningPage = () => {
           return proContentManager.getTopicContent(actualTopic, generateProContent, dbTopic);
         })
           .then(result => {
+            // Remove from generating set when done
+            generatingContentRef.current.delete(generationKey);
+            lastGeneratedTopicRef.current = actualTopic;
+            console.log('✅ Completed URL-based content generation for:', actualTopic);
+            
             if (result?.content?.reading) {
               setContentWithSanitization(result.content, 'direct:getTopicContentWithReading');
               const sections = parseReadingSections(result.content.reading);
@@ -1458,7 +1493,9 @@ const ProLearningPage = () => {
             }
           })
           .catch(error => {
-            console.error('❌ Failed to load/generate content:', error);
+            // Remove from generating set on error
+            generatingContentRef.current.delete(generationKey);
+            console.error('❌ Failed to load/generate content for:', actualTopic, error);
           })
           .finally(() => {
             setIsLoading(false);
@@ -3680,6 +3717,10 @@ const ProLearningPage = () => {
 
   // Guard to avoid double-switching when URL sync is pending
   const tabUrlSyncPendingRef = useRef(false);
+  
+  // Track content generation to prevent infinite loops
+  const generatingContentRef = useRef(new Set());
+  const lastGeneratedTopicRef = useRef(null);
 
   // Update URL when activeTab changes
   const updateActiveTab = (newTab) => {
