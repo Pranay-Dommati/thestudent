@@ -37,6 +37,7 @@ import AdminResetPassword from './components/Admin/AdminResetPassword';
 import TermsAndConditions from './components/Legal/TermsAndConditions';
 import PrivacyPolicy from './components/Legal/PrivacyPolicy';
 import FeedbackPage from './components/Feedback/FeedbackPage';  // Add feedback import
+import ScrollToTop from './components/ScrollToTop/ScrollToTop'; // Add ScrollToTop import
 import './utils/axios';
 import CertificatePreview from './components/Certificates/CertificatePreview';
 import OnboardingModal from './components/Onboarding/OnboardingModal';
@@ -203,6 +204,8 @@ const App = () => {
           containerClassName="toast-container"
         />
         <BrowserRouter>
+          {/* Auto-scroll to top on route changes - fixes mobile navigation bug */}
+          <ScrollToTop />
           {/* Global Onboarding Modal - shows for new users on first login */}
           <OnboardingModal />
         <Layout excludePaths={['/admin-p', '/chat']}>
