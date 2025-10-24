@@ -1,6 +1,7 @@
 import { getSchoolCourses } from '../services/courseApi';
 import { stateBoards } from '../components/Courses/data/states';
 import logger from './logger';
+import courseCache from './courseCache';
 
 /**
  * Check if courses are available for specific board and class combinations
@@ -8,6 +9,13 @@ import logger from './logger';
  * @returns {Promise<Array>} Array of available boards with availability status
  */
 export const checkBoardAvailability = async (classLevel) => {
+  // Try cache first for quick response
+  const cached = courseCache.getBoardAvailability(classLevel);
+  if (cached && Array.isArray(cached) && cached.length) {
+    logger.log(`Using cached board availability for ${classLevel}`);
+    return cached;
+  }
+
   const boardsToCheck = [
     { 
       id: 'cbse', 
@@ -45,6 +53,11 @@ export const checkBoardAvailability = async (classLevel) => {
     return [];
   }
 
+  // Cache for next time
+  if (availableBoards.length) {
+    courseCache.setBoardAvailability(classLevel, availableBoards);
+  }
+
   return availableBoards;
 };
 
@@ -54,26 +67,38 @@ export const checkBoardAvailability = async (classLevel) => {
  * @returns {Promise<Array>} Array of available states with course availability
  */
 export const checkStateAvailability = async (classLevel) => {
-  const availableStates = [];
-
   try {
-    for (const state of stateBoards) {
-      const stateValue = state.id === 'ts' ? 'Telangana' : 
-                        state.id === 'ap' ? 'Andhra Pradesh' : state.name;
-      
-      const stateData = await getSchoolCourses(classLevel, 'state', stateValue);
-      if (stateData && stateData.length > 0) {
-        availableStates.push({
-          ...state,
-          available: true
-        });
-      }
+    // Fast path: return from cache if present
+    const cached = courseCache.getStateAvailability(classLevel);
+    if (cached && Array.isArray(cached) && cached.length) {
+      logger.log(`Using cached state availability for ${classLevel}`);
+      return cached;
     }
+
+    // Fetch all state-board courses for this class in ONE request
+    const stateCourses = await getSchoolCourses(classLevel, 'state');
+
+    // Build a set of normalized state names present in the data
+    const availableNames = new Set(
+      (stateCourses || [])
+        .map(c => (c.state || '').trim())
+        .filter(Boolean)
+    );
+
+    // Map state names to our stateBoards list
+    const availableStates = stateBoards
+      .filter(sb => availableNames.has(sb.name))
+      .map(sb => ({ ...sb, available: true }));
+
+    // Cache for subsequent navigations
+    if (availableStates.length) {
+      courseCache.setStateAvailability(classLevel, availableStates);
+    }
+
+    return availableStates;
   } catch (error) {
     logger.error('Error checking state availability:', error);
     // Fallback: return all states if API fails
     return stateBoards.map(state => ({ ...state, available: true }));
   }
-
-  return availableStates;
 };

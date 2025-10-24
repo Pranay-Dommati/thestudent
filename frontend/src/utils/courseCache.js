@@ -181,6 +181,40 @@ export const courseCache = {
   getCoursesForLevel(level) {
     return this.get(`courses_${level}`);
   }
+  ,
+
+  /**
+   * Cache available state boards for a given class level
+   * @param {string} classLevel - e.g., '6th', '7th'
+   * @param {Array} states - Array of state objects available for the class
+   */
+  setStateAvailability(classLevel, states) {
+    this.set(`state_availability_${classLevel}`, states);
+  },
+
+  /**
+   * Get cached available state boards for a given class level
+   * @param {string} classLevel - e.g., '6th', '7th'
+   * @returns {Array|null}
+   */
+  getStateAvailability(classLevel) {
+    return this.get(`state_availability_${classLevel}`);
+  }
+  ,
+
+  /**
+   * Cache available boards (cbse/state) for a given class level
+   */
+  setBoardAvailability(classLevel, boards) {
+    this.set(`board_availability_${classLevel}`, boards);
+  },
+
+  /**
+   * Get cached available boards (cbse/state) for a given class level
+   */
+  getBoardAvailability(classLevel) {
+    return this.get(`board_availability_${classLevel}`);
+  }
 };
 
 export default courseCache;
