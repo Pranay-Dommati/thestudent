@@ -38,6 +38,7 @@ import TermsAndConditions from './components/Legal/TermsAndConditions';
 import PrivacyPolicy from './components/Legal/PrivacyPolicy';
 import FeedbackPage from './components/Feedback/FeedbackPage';  // Add feedback import
 import './utils/axios';
+import ScrollManager from './components/Common/ScrollManager.jsx';
 import CertificatePreview from './components/Certificates/CertificatePreview';
 import OnboardingModal from './components/Onboarding/OnboardingModal';
 
@@ -203,6 +204,7 @@ const App = () => {
           containerClassName="toast-container"
         />
         <BrowserRouter>
+          <ScrollManager />
           {/* Global Onboarding Modal - shows for new users on first login */}
           <OnboardingModal />
         <Layout excludePaths={['/admin-p', '/chat']}>
