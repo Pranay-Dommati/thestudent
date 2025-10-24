@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { FaLinkedin } from "react-icons/fa";
+import { FaLinkedin, FaInstagram } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 
 const Footer = () => {
@@ -157,6 +157,16 @@ const Footer = () => {
             aria-label="Visit us on LinkedIn"
           >
             <FaLinkedin />
+          </a>
+          <a
+            href="https://www.instagram.com/easylearnova"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-pink-500 transition-colors"
+            title="Instagram"
+            aria-label="Visit us on Instagram"
+          >
+            <FaInstagram />
           </a>
         </div>
 

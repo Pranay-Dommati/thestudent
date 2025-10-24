@@ -2180,6 +2180,12 @@ def get_learning_stats(request):
     try:
         user = request.user
         
+        # Verify user is authenticated
+        if not user or not user.is_authenticated:
+            return Response({
+                'error': 'User not authenticated'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
         # Get weekly hours
         weekly_hours = LearningActivity.get_weekly_hours(user)
         
@@ -2187,7 +2193,6 @@ def get_learning_stats(request):
         current_streak = LearningActivity.get_current_streak(user)
         
         # Get today's activity
-        from django.utils import timezone
         today = timezone.now().date()
         try:
             today_activity = LearningActivity.objects.get(user=user, date=today)
@@ -2213,7 +2218,7 @@ def get_learning_stats(request):
             check_date = start_of_week + timedelta(days=i)
             day_activity = week_activities.filter(date=check_date).first()
             daily_breakdown.append({
-                'date': check_date,
+                'date': check_date.isoformat(),  # Convert to ISO format for JSON serialization
                 'day_name': check_date.strftime('%A')[:3],  # Mon, Tue, etc.
                 'minutes': day_activity.time_spent_minutes if day_activity else 0,
                 'hours': day_activity.time_spent_hours if day_activity else 0,
@@ -2236,8 +2241,12 @@ def get_learning_stats(request):
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
         print(f"Error in get_learning_stats: {str(e)}")
+        print(f"Traceback: {error_traceback}")
         return Response({
+            'success': False,
             'error': f'Failed to get learning stats: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

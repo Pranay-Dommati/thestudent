@@ -463,6 +463,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     
     try {
       const currentLesson = course.chapters[activeChapter].lessons[activeLesson];
+      
+      // Don't mark if already completed
+      if (currentLesson.completed) {
+        return;
+      }
+      
       // Optimistic UI update for instant tick
       const updatedCourse = { ...course };
       updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
@@ -480,10 +486,32 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         if (typeof completed === 'number' && typeof total === 'number') {
           setServerProgress({ completed, total, percentage: pct });
         }
+        
+        // **FIX: Invalidate and update cache after marking complete**
+        const cacheKey = courseCache.generateKey(pathname);
+        courseCache.invalidate(cacheKey);
+        console.log('🗑️ Cache invalidated after marking lesson complete');
+        
+        // Update cache with new course state
+        courseCache.set(cacheKey, {
+          course: updatedCourse,
+          progress: {
+            progress: { completed, total, percentage: pct },
+            chapters: updatedCourse.chapters.map(ch => ({
+              name: ch.title,
+              lessons: ch.lessons.map(l => ({
+                id: l.id,
+                completed: l.completed
+              }))
+            }))
+          }
+        });
+        console.log('💾 Cache updated with new completion status');
       }
     } catch (error) {
       console.error('Error marking lesson as complete:', error);
       // keep optimistic completion; user can toggle off if needed
+      universalToast.error('Failed to save progress. Please try again.');
     }
   };
 
@@ -495,12 +523,14 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       return;
     }
     
+    // Store the previous state for potential rollback
+    const prevCourse = course;
+    
     try {
       const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
       const newCompletionState = !lesson.completed;
 
       // Optimistic UI update for instant feedback
-      const prevCourse = course;
       const updatedCourse = { ...course };
       updatedCourse.chapters = course.chapters.map((ch, idx) =>
         idx !== chapterIndex ? ch : { ...ch, lessons: ch.lessons.map((l, li) => li !== lessonIndex ? l : { ...l, completed: newCompletionState }) }
@@ -519,10 +549,33 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         if (typeof completed === 'number' && typeof total === 'number') {
           setServerProgress({ completed, total, percentage: pct });
         }
+        
+        // **FIX: Invalidate cache after successful completion toggle**
+        const cacheKey = courseCache.generateKey(pathname);
+        courseCache.invalidate(cacheKey);
+        console.log('🗑️ Cache invalidated after lesson completion toggle');
+        
+        // **FIX: Update cache with new course state**
+        courseCache.set(cacheKey, {
+          course: updatedCourse,
+          progress: {
+            progress: { completed, total, percentage: pct },
+            chapters: updatedCourse.chapters.map(ch => ({
+              name: ch.title,
+              lessons: ch.lessons.map(l => ({
+                id: l.id,
+                completed: l.completed
+              }))
+            }))
+          }
+        });
+        console.log('💾 Cache updated with new completion status');
       }
     } catch (error) {
       console.error('Error toggling lesson completion:', error);
-      // Note: we leave optimistic state; user can retry or refresh
+      // Revert optimistic update on error
+      setCourse(prevCourse);
+      universalToast.error('Failed to update lesson progress. Please try again.');
     }
   };
 

@@ -51,12 +51,12 @@ urlpatterns = [
     path('api/courses/<str:course_id>/certificate/', views.issue_engineering_certificate, name='issue-engineering-certificate'),
     path('api/courses/certificates/', views.get_user_certificates, name='get-user-certificates'),
 
+    # Learning activity tracking endpoints (MUST come before generic <course_id> route)
+    path('api/courses/track-activity/', views.track_learning_activity, name='track-learning-activity'),
+    path('api/courses/learning-stats/', views.get_learning_stats, name='get-learning-stats'),
+
     # Generic course CRUD (placed AFTER specific routes to avoid conflicts)
     path('api/courses/<str:course_id>/', views.get_course_by_id, name='get-course-by-id'),
     path('api/courses/<str:course_id>/update/', views.update_course, name='update-course'),
     path('api/courses/<str:course_id>/delete/', views.delete_course, name='delete-course'),
-
-    # Learning activity tracking endpoints
-    path('api/courses/track-activity/', views.track_learning_activity, name='track-learning-activity'),
-    path('api/courses/learning-stats/', views.get_learning_stats, name='get-learning-stats'),
 ]

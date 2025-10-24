@@ -69,16 +69,27 @@ const Layout = ({ children, excludePaths = [] }) => {
   // Special cases: pages that should not show global navbars
   const isCertificatePage = /^\/courses\/[^/]+\/certificate(\/|$)?/.test(location.pathname);
   const isLearningPage = /^\/courses\/.+\/learning(\/|$)?/.test(location.pathname);
+  
+  // Check if current path exactly matches specific excluded paths
+  const isExactProfilePath = location.pathname === '/profile' || location.pathname.startsWith('/profile/');
+  const isExactChatPath = location.pathname === '/chat';
+  const isExactAuthPath = location.pathname === '/auth' || location.pathname.startsWith('/auth?');
+  const isExactAdminPath = location.pathname.startsWith('/admin-p');
+  const isExactOfflinePath = location.pathname === '/offline';
 
   // Check if the current route is in the excludePaths array or should be excluded
-  const isExcluded = excludePaths.some(path => location.pathname.startsWith(path)) || 
-                     location.pathname.startsWith('/profile') ||
+  const isExcluded = excludePaths.some(path => location.pathname === path || location.pathname.startsWith(path + '/')) || 
+                     isExactProfilePath ||
                      isCertificatePage ||
                      isLearningPage; // Exclude profile, certificate and learning pages for focused layout
 
   // Paths where we don't want mobile navigation (like auth, admin, chat, etc.)
-  const noMobileNavPaths = ['/auth', '/admin-p', '/not-found', '/chat'];
-  const shouldShowMobileNav = !noMobileNavPaths.some(path => location.pathname.startsWith(path)) && !isCertificatePage && !isLearningPage;
+  const shouldShowMobileNav = !isExactAuthPath && 
+                              !isExactAdminPath && 
+                              !isExactChatPath && 
+                              !isExactOfflinePath &&
+                              !isCertificatePage && 
+                              !isLearningPage;
 
   // Determine the navbar style based on the current route
   const getNavbarStyle = () => {

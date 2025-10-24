@@ -24,7 +24,7 @@ const NotFound = () => {
       {/* Global Navbar is used; no custom override here to ensure auth state is accurate */}
 
       {/* Main Content with animation */}
-      <div className="flex-grow flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12 text-center">
+      <div className="flex-grow flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12 pt-24 sm:pt-28 text-center">
         <div className="bg-white shadow-xl rounded-2xl p-6 sm:p-8 md:p-10 max-w-md w-full border border-gray-100 hover:shadow-2xl transition-shadow duration-300">
           <div className="flex flex-col items-center gap-4 sm:gap-6">
             {/* Animated Ghost */}
