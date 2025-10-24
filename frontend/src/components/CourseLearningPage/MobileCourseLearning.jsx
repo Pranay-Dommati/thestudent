@@ -362,6 +362,8 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const lesson = course.chapters[chapterIndex]?.lessons[lessonIndex];
     if (!lesson) return;
 
+    // Store previous state for potential rollback
+    const prevCourse = course;
     setSavingProgress(true);
 
     // Optimistic UI update
@@ -371,15 +373,38 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
     try {
       if (lesson.id) {
-        await axiosInstance.post(`/lessons/toggle-completion/${lesson.id}/`);
+        const response = await axiosInstance.post(`/lessons/toggle-completion/${lesson.id}/`);
+        
+        // **FIX: Invalidate cache after successful completion toggle**
+        const cacheKey = courseCache.generateKey(pathname);
+        courseCache.invalidate(cacheKey);
+        console.log('🗑️ Mobile: Cache invalidated after lesson completion toggle');
+        
+        // **FIX: Update cache with new course state**
+        const pct = response?.data?.progress?.percentage;
+        const completed = response?.data?.progress?.completed;
+        const total = response?.data?.progress?.total;
+        
+        courseCache.set(cacheKey, {
+          course: updatedCourse,
+          progress: {
+            progress: { completed, total, percentage: pct },
+            chapters: updatedCourse.chapters.map(ch => ({
+              name: ch.title,
+              lessons: ch.lessons.map(l => ({
+                id: l.id,
+                completed: l.completed
+              }))
+            }))
+          }
+        });
+        console.log('💾 Mobile: Cache updated with new completion status');
       }
     } catch (error) {
       logger.error('❌ Error updating lesson completion:', error);
       universalToast.error('Failed to update lesson progress');
       // Revert optimistic change on failure
-      const revert = { ...updatedCourse };
-      revert.chapters[chapterIndex].lessons[lessonIndex].completed = lesson.completed;
-      setCourse(revert);
+      setCourse(prevCourse);
     } finally {
       setSavingProgress(false);
     }
