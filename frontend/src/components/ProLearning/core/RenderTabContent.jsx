@@ -27,8 +27,11 @@ export const renderTabContent = (dependencies) => {
     useProgressiveGeneration,
     availableTabsForTopics,
     isBatchGenerating,
+    batchGenerationProgress,
+    batchGenerationStatus,
     isGeneratingCourse,
     isLoading,
+    loadingStep,
     isProgressiveGenerating,
     progressiveGenerationProgress,
     allTopicsGenerated,
@@ -66,7 +69,14 @@ export const renderTabContent = (dependencies) => {
   // CRITICAL: Check if current topic is blocked (2nd topic onwards until course completion)
   if (currentTopicName && isTopicBlocked(currentTopicName)) {
     // For blocked topics, show the existing loading component instead of content
-    return <LoadingComponent />;
+    return (
+      <LoadingComponent 
+        isBatchGenerating={isBatchGenerating}
+        batchGenerationProgress={batchGenerationProgress}
+        batchGenerationStatus={batchGenerationStatus}
+        loadingStep={loadingStep}
+      />
+    );
   }
   
   // Show loading thoughtfully: in progressive mode, enforce reading-first for non-first topics
@@ -84,7 +94,14 @@ export const renderTabContent = (dependencies) => {
       ((content.resources?.length || 0) > 0)
       ))
     );
-    if (isBatchGenerating) return <LoadingComponent />;
+    if (isBatchGenerating) return (
+      <LoadingComponent 
+        isBatchGenerating={isBatchGenerating}
+        batchGenerationProgress={batchGenerationProgress}
+        batchGenerationStatus={batchGenerationStatus}
+        loadingStep={loadingStep}
+      />
+    );
     // Only treat active tab as ready if its content belongs to this topic
     const activeHasContent = (
       // Reading tab uses sanitized association, independent of contentTopicName resets
@@ -101,12 +118,26 @@ export const renderTabContent = (dependencies) => {
     // even if Reading for later topics hasn't finished yet.
 
     if ((isGeneratingCourse || isLoading) && !readyTabs.includes(activeTab) && !activeHasContent) {
-      return <LoadingComponent />;
+      return (
+        <LoadingComponent 
+          isBatchGenerating={isBatchGenerating}
+          batchGenerationProgress={batchGenerationProgress}
+          batchGenerationStatus={batchGenerationStatus}
+          loadingStep={loadingStep}
+        />
+      );
     }
   } else {
     // Legacy/batch mode: keep original blocking loader behavior
     if (isGeneratingCourse || isLoading || isBatchGenerating) {
-      return <LoadingComponent />;
+      return (
+        <LoadingComponent 
+          isBatchGenerating={isBatchGenerating}
+          batchGenerationProgress={batchGenerationProgress}
+          batchGenerationStatus={batchGenerationStatus}
+          loadingStep={loadingStep}
+        />
+      );
     }
   }
   
@@ -128,13 +159,27 @@ export const renderTabContent = (dependencies) => {
       : (readyTabs.includes(activeTab) || activeHasContent);
 
     if (!activeReady) {
-      return <LoadingComponent />;
+      return (
+        <LoadingComponent 
+          isBatchGenerating={isBatchGenerating}
+          batchGenerationProgress={batchGenerationProgress}
+          batchGenerationStatus={batchGenerationStatus}
+          loadingStep={loadingStep}
+        />
+      );
     }
   }
 
   // Global gate for Reading tab: keep loader until sanitization completes for current topic
   if (activeTab === 'reading' && !readingClientReadyForCurrentTopic) {
-    return <LoadingComponent />;
+    return (
+      <LoadingComponent 
+        isBatchGenerating={isBatchGenerating}
+        batchGenerationProgress={batchGenerationProgress}
+        batchGenerationStatus={batchGenerationStatus}
+        loadingStep={loadingStep}
+      />
+    );
   }
 
   // If no content and course not generated, show Pro Learning Experience button

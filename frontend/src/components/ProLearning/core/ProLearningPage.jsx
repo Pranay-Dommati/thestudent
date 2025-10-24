@@ -133,6 +133,15 @@ import * as CourseOrchestration from './CourseOrchestrationHandlers.jsx';
 import * as ProLearningUtils from './ProLearningUtilities.jsx';
 // Render Tab Content
 import { renderTabContent as renderTabContentHandler } from './RenderTabContent.jsx';
+// Content Sanitization
+import { createSetContentWithSanitization } from './ContentSanitization.jsx';
+// Topic Content Loader
+import { createLoadTopicContent } from './TopicContentLoader.jsx';
+import MainContentLayout from './MainContentLayout.jsx';
+// Loading Component
+import LoadingComponent from './LoadingComponent.jsx';
+// Course Initialization
+import { createInitializeCourseData } from './CourseInitialization.jsx';
 
 
 const ProLearningPage = () => {
@@ -167,6 +176,12 @@ const ProLearningPage = () => {
   const [topicsList, setTopicsList] = useState([]);
   const [sectionGenerating, setSectionGenerating] = useState(false);
   const [generatingTopics, setGeneratingTopics] = useState([]);
+
+  // Course ID management handlers - MOVED UP to be available early
+  const { generateCourseId, getCourseId, setAndNavigateToCourseId } = ProLearningUtils.createCourseIdHandlers({
+    courseId,
+    navigate
+  });
 
   // Parser for topics passed in the URL query param "topic"
   // Topics are confirmed by AI and user in /chat page, so we trust the format
@@ -368,361 +383,27 @@ const ProLearningPage = () => {
       }
     };
     
-    const initializeCourseData = async () => {
-      const currentCourseId = getCourseId();
-      
-      if (!currentCourseId) {
-        return;
-      }
-
-      // Helper function to handle URL-based topic selection
-      const handleTopicSelection = (topics) => {
-        if (!topics || topics.length === 0) return;
-        
-        let matchingTopicIndex = -1;
-        
-        if (topicParam) {
-          // Use robust parser; pick the first parsed topic for selection
-          const parsedFromParam = parseTopicsFromParam(topicParam);
-          const actualTopic = parsedFromParam.length > 0 ? parsedFromParam[0] : topicParam;
-          
-          // Strategy 1: Exact match (case insensitive)
-          matchingTopicIndex = topics.findIndex(topic => 
-            topic.name.toLowerCase().trim() === actualTopic.toLowerCase().trim()
-          );
-          
-          // Strategy 2: Partial match
-          if (matchingTopicIndex === -1) {
-            matchingTopicIndex = topics.findIndex(topic => 
-              topic.name.toLowerCase().includes(actualTopic.toLowerCase()) ||
-              actualTopic.toLowerCase().includes(topic.name.toLowerCase())
-            );
-          }
-        }
-        
-        // If no match found or no topicParam, use first topic
-        if (matchingTopicIndex === -1) {
-          matchingTopicIndex = 0;
-        }
-        
-        const selectedTopicObject = topics[matchingTopicIndex];
-        
-        // Update topics with active state
-        const updatedTopics = topics.map((topic, index) => ({
-          ...topic,
-          isActive: index === matchingTopicIndex
-        }));
-        
-        // Update the topics list with active state
-        setTopicsList(updatedTopics);
-        setSelectedTopic(selectedTopicObject);
-        
-        // CRITICAL: Populate available tabs for all topics that have content
-        const populateAvailableTabsForAllTopics = async () => {
-          const currentCourseId = getCourseId();
-          if (!currentCourseId) return;
-          
-          const tabsMap = {};
-          for (const topic of updatedTopics) {
-            try {
-              const storedContent = await proContentManager.getStoredTopicContent(currentCourseId, topic.name);
-              if (storedContent) {
-                const availableTabs = [];
-                if (storedContent.reading) availableTabs.push('reading');
-                if (storedContent.summary) availableTabs.push('summary');
-                if (storedContent.videos?.length > 0) availableTabs.push('videos');
-                if (storedContent.quiz?.length > 0 || (storedContent.quiz?.questions?.length > 0)) availableTabs.push('quiz');
-                // Consider resources generation complete if metadata.generatedAt exists (even with 0 results)
-                if ((storedContent.resources?.length > 0) || (storedContent.resourcesMetadata?.generatedAt)) availableTabs.push('resources');
-                
-                if (availableTabs.length > 0) {
-                  tabsMap[topic.name] = availableTabs;
-                }
-              }
-            } catch (error) {
-              console.warn(`Failed to check content for topic: ${topic.name}`, error);
-            }
-          }
-          
-          if (Object.keys(tabsMap).length > 0) {
-            setAvailableTabsForTopics(prev => ({
-              ...prev,
-              ...tabsMap
-            }));
-            console.log('🎯 Populated available tabs for topics:', Object.keys(tabsMap));
-          }
-        };
-        
-        // Run tab population asynchronously
-        populateAvailableTabsForAllTopics();
-        
-        // Update URL if needed
-        const selectedTopicName = selectedTopicObject.name;
-        const currentTopicParam = getCurrentTopicFromParam(topicParam);
-        
-        if (selectedTopicName !== currentTopicParam) {
-          const newSearchParams = new URLSearchParams(window.location.search);
-          newSearchParams.set("topic", selectedTopicName);
-          navigate(`/pro-learning/${currentCourseId}?${newSearchParams.toString()}`, { replace: true });
-        }
-        
-        // Handle tab parameter from URL
-        const currentTabParam = new URLSearchParams(window.location.search).get("tab");
-        if (currentTabParam) {
-          setActiveTab(currentTabParam);
-        }
-        
-        // Auto-load content for the selected topic
-        setTimeout(() => {
-          if (loadScenario === 'reload') {
-            // RELOAD MODE: Simple content loading without generation
-            loadContentForReloadMode(selectedTopicName);
-          } else {
-            // FIRST-TIME MODE: Full generation logic
-            loadTopicContent(selectedTopicName);
-          }
-        }, 100);
-      };
-
-  // Ensure ProContentManager cache is hydrated from backend/local storage before any synchronous getters
-      try {
-        await proContentManager.initializeCourse(currentCourseId);
-        // Cache initialized; synchronous getters will now return data reliably
-      } catch (e) {
-        // If initialization fails, continue with other fallbacks below
-      }
-
-      // CRITICAL: Detect if this is first-time generation or subsequent reload
-      const detectedScenario = await detectLoadScenario(currentCourseId);
-      setLoadScenario(detectedScenario);
-      console.log('🔍 Load scenario detected:', detectedScenario);
-
-      if (detectedScenario === 'reload') {
-        // RELOAD SCENARIO: Content already exists, load quickly
-        const reloadSuccess = await handleReloadScenario(currentCourseId, handleTopicSelection);
-        if (reloadSuccess) {
-          return; // Successfully handled as reload
-        }
-        // If reload failed, fall through to first-time generation logic
-        console.log('🔄 Reload scenario failed, falling back to generation logic');
-      }
-
-      // FIRST-TIME SCENARIO: Continue with existing generation logic
-      console.log('🚀 First-time generation scenario - proceeding with generation flow');
-
-      // Step 1: Check localStorage for course data
-      const storedTopics = await proContentManager.getStoredTopics(currentCourseId);
-      console.log('🔍 Step 1 - Stored topics check:', {
-        courseId: currentCourseId,
-        topicsFound: storedTopics.length,
-        topics: storedTopics.map(t => t.name)
-      });
-      
-      if (storedTopics.length > 0) {
-        handleTopicSelection(storedTopics);
-        return;
-      }
-      
-      // Step 2: Check batch generation data (localStorage only; legacy payload)
-      let foundFromBatch = false;
-      try {
-        let payload = null;
-        if (typeof localStorage !== 'undefined') {
-          const legacy = localStorage.getItem('proLearning_batchGeneration');
-          if (legacy) {
-            try { payload = JSON.parse(legacy); } catch {}
-          }
-        }
-        if (payload && payload.courseId === currentCourseId && Array.isArray(payload.topics) && payload.topics.length > 0) {
-          console.log('🔍 Step 2 - Batch generation data found (localStorage):', {
-            courseId: currentCourseId,
-            topicsFound: payload.topics.length,
-            topics: payload.topics.map(t => t.name || t)
-          });
-
-          // Use handleTopicSelection for batch topics too
-          handleTopicSelection(payload.topics);
-          // Persist topics immediately so refresh shows them in sidebar
-          try {
-            const normalized = payload.topics.map((t, i) => ({ id: (t.id || i + 1), name: t.name || t }));
-            proContentManager.setCourse(courseTitle || 'Generated Course', currentCourseId);
-            await proContentManager.storeTopics(normalized, currentCourseId);
-            console.log('✅ Batch topics stored successfully');
-          } catch (e) {
-            console.error('❌ Failed to store batch topics:', e);
-          }
-          foundFromBatch = true;
-          return;
-        }
-      } catch (error) {
-        // ignore and continue
-      }
-
-  // Step 3: Try to fetch from database
-      const databaseCourse = await fetchCourseFromDB(currentCourseId);
-      
-      console.log('🗄️ Database course fetch result:', {
-        courseId: currentCourseId,
-        found: !!databaseCourse,
-        topics: databaseCourse?.topics?.length || 0,
-        courseName: databaseCourse?.course_name
-      });
-      
-  if (databaseCourse) {
-        // Transform database course data to the format expected by the UI
-        if (databaseCourse.topics && databaseCourse.topics.length > 0) {
-          console.log('🔍 Step 3 - Database topics found:', {
-            courseId: currentCourseId,
-            topicsFound: databaseCourse.topics.length,
-            topics: databaseCourse.topics.map(t => t.topic_name)
-          });
-          // Find the index of the first topic that matches URL parameter
-          let activeTopicIndex = -1;
-          if (topicParam) {
-            activeTopicIndex = databaseCourse.topics.findIndex(topic => 
-              topic.topic_name.toLowerCase().trim() === topicParam.toLowerCase().trim()
-            );
-          }
-          
-          // If no match found and we have topics, use first topic
-          if (activeTopicIndex === -1 && databaseCourse.topics.length > 0) {
-            activeTopicIndex = 0;
-          }
-          
-          const transformedTopics = databaseCourse.topics.map((topic, index) => ({
-            id: index + 1,
-            name: topic.topic_name,
-            dbTopic: topic, // Keep reference to original database topic
-            isActive: index === activeTopicIndex // Only ONE topic is active
-          }));
-          
-          console.log('🔄 Transformed database topics:', {
-            activeTopicIndex,
-            topicParam,
-            topics: transformedTopics.map(t => ({ name: t.name, isActive: t.isActive }))
-          });
-          
-          // CRITICAL FIX: Differentiate between three cases:
-          // 1. Fresh generation: course_TIMESTAMP_ID (e.g., course_1760070219554_jd70zm6tc)
-          // 2. LocalStorage reload: Same course_TIMESTAMP_ID, reload page
-          // 3. Database reload: UUID format (e.g., 7fce76ea-85c4-44c9-bcf9-77197b8d2ad2)
-          
-          // Check if courseId is a UUID (database reload) or timestamp-based (fresh/localStorage)
-          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentCourseId);
-          const isTimestampBased = currentCourseId.startsWith('course_');
-          
-          console.log('🔍 Course ID analysis:', {
-            courseId: currentCourseId,
-            isUUID,
-            isTimestampBased,
-            hasBatchMarker: !!(typeof localStorage !== 'undefined' && localStorage.getItem('proLearning_batchMarker'))
-          });
-          
-          if (isUUID) {
-            // Case 3: Database reload with UUID - completed course from database
-            console.log('✅ Database reload (UUID) - loading completed course from database');
-            setLoadScenario('reload');
-            try {
-              // Set course context explicitly with DB title to avoid any fallback generation flows
-              const title = databaseCourse.title || databaseCourse.course_name || courseTitle || 'Saved Course';
-              proContentManager.setCourse(title, currentCourseId);
-            } catch {}
-          } else if (isTimestampBased) {
-            // Case 1 or 2: Fresh generation or localStorage reload with course_TIMESTAMP_ID
-            // Check if there's an active batch marker indicating ongoing generation
-            const hasBatchMarker = typeof localStorage !== 'undefined' ? localStorage.getItem('proLearning_batchMarker') : null;
-            
-            if (hasBatchMarker) {
-              // Case 1: Fresh generation in progress
-              console.log('🆕 Fresh generation (course_TIMESTAMP) - progressive generation mode');
-              setLoadScenario('first-time');
-            } else {
-              // Case 2: LocalStorage reload - page refreshed during or after generation
-              console.log('💾 LocalStorage reload (course_TIMESTAMP) - using cached content');
-              setLoadScenario('reload');
-            }
-          } else {
-            // Fallback: treat as reload
-            console.log('⚠️ Unknown course ID format - defaulting to reload mode');
-            setLoadScenario('reload');
-          }
-          
-          handleTopicSelection(transformedTopics);
-          // Persist DB topics so they’re available on refresh
-          try {
-            const normalized = transformedTopics.map(t => ({ id: t.id, name: t.name }));
-            proContentManager.setCourse(databaseCourse.course_name || courseTitle || 'Database Course', currentCourseId);
-            await proContentManager.storeTopics(normalized, currentCourseId);
-            console.log('✅ Database topics stored successfully');
-          } catch (e) {
-            console.error('❌ Failed to store database topics:', e);
-          }          // CRITICAL: Set course context in ProContentManager for database-loaded courses
-          proContentManager.setCourse(databaseCourse.course_name, currentCourseId);
-          
-          return;
-        }
-      }
-      
-      // Step 3.5: If no stored/batch/db topics, but URL has topic(s), derive topics from URL
-      // IMPORTANT: Handle both multiple topics (||| delimiter) and single-topic URLs
-      // Only split by comma if ||| delimiter is present, otherwise treat as single topic
-      if (topicParam && topicParam.includes('|||')) {
-        try {
-          const topicNames = parseTopicsFromParam(topicParam);
-          if (topicNames.length > 1) { // Only if multiple topics in URL
-            const derivedTopics = topicNames.map((name, idx) => ({ 
-              id: idx + 1, 
-              name,
-              isActive: false // Will be set by handleTopicSelection
-            }));
-            
-            // Use handleTopicSelection for URL-derived topics
-            handleTopicSelection(derivedTopics);
-            
-            // Persist immediately so sidebar/progress work and refresh is safe
-            try {
-              proContentManager.setCourse(courseTitle || 'Generated Course', currentCourseId);
-              await proContentManager.storeTopics(derivedTopics, currentCourseId);
-            } catch (e) {
-            }
-            return; // We’ve initialized topics from URL; stop here
-          }
-        } catch (e) {
-        }
-      }
-      // Single-topic URL: still initialize topics list so sidebar shows the current topic
-      else if (topicParam) {
-        try {
-          const parsed = parseTopicsFromParam(topicParam);
-          const actualTopic = (parsed[0] || '').trim();
-          if (actualTopic) {
-            const derivedTopics = [{ id: 1, name: actualTopic, isActive: false }];
-
-            // Use handleTopicSelection to set active topic and sync URL/tab
-            handleTopicSelection(derivedTopics);
-
-            // Persist immediately so refresh shows topic in sidebar and progress isn’t 0/0
-            try {
-              proContentManager.setCourse(courseTitle || 'Generated Course', currentCourseId);
-              await proContentManager.storeTopics(derivedTopics, currentCourseId);
-            } catch (e) {
-            }
-            return; // Initialized from single-topic URL
-          }
-        } catch (e) {
-        }
-      }
-      
-  // Step 4: Fallback - if nothing is available, treat as invalid URL and redirect to NotFound
-  const hasBatchMarker = typeof localStorage !== 'undefined' ? localStorage.getItem('proLearning_batchMarker') : null;
-  if (!courseTitle && !topicParam && !hasBatchMarker && !foundFromBatch) {
-        console.warn('⚠️ No course context found (no title, topics, batch, or DB). Redirecting to 404.');
-        navigate('/not-found', { replace: true });
-        return;
-      } else {
-        // Could show error message to user here
-      }
-    };
+    // Create initializeCourseData function using factory with all required dependencies
+    const initializeCourseData = createInitializeCourseData({
+      getCourseId,
+      topicParam,
+      courseTitle,
+      setTopicsList,
+      setSelectedTopic,
+      setAvailableTabsForTopics,
+      proContentManager,
+      getCurrentTopicFromParam,
+      navigate,
+      setActiveTab,
+      loadScenario,
+      loadContentForReloadMode,
+      loadTopicContent,
+      parseTopicsFromParam,
+      detectLoadScenario,
+      setLoadScenario,
+      handleReloadScenario,
+      fetchCourseFromDB
+    });
 
     // Properly await the async initialization
     initializeCourseData().catch(error => {
@@ -804,161 +485,6 @@ const ProLearningPage = () => {
     } catch {}
   };
 
-  // Helper to set content while preserving FIRST reading and controlling sanitization
-  // Behavior:
-  // - First reading wins; later variants are ignored to prevent visual flips
-  // - During progressive generation (or when sourceLabel starts with 'progressive:'),
-  //   we DO NOT sanitize the first reading — we render it raw immediately
-  // - Otherwise, first reading is pre-sanitized to avoid initial formatting flashes
-  const setContentWithSanitization = (incoming, sourceLabel = 'unknown') => {
-    // Only consider an existing reading if it belongs to the CURRENT selected topic
-    const belongsToCurrentTopic = !!(contentTopicName && selectedTopic?.name && contentTopicName === selectedTopic.name);
-    const hasExistingReading = !!(belongsToCurrentTopic && content && typeof content.reading === 'string' && content.reading.trim().length);
-
-    // Normalize incoming object (clone so we can safely adjust fields)
-    const newContent = incoming ? { ...incoming } : incoming;
-
-    if (newContent && typeof newContent.reading === 'string') {
-      // If we already have a reading shown, never overwrite it with a later variant
-      if (hasExistingReading) {
-        const oldHash = _debugHash(content.reading);
-        const newHash = _debugHash(newContent.reading);
-        if (newContent.reading !== content.reading) {
-          console.warn('🔒 [READING-PRESERVE] Incoming reading ignored to preserve first render', {
-            source: sourceLabel,
-            topicParam,
-            contentTopicName,
-            selectedTopic: selectedTopic?.name,
-            oldLen: content.reading?.length || 0,
-            newLen: newContent.reading?.length || 0,
-            oldHash,
-            newHash,
-            newPreview: _short(newContent.reading)
-          });
-          // Preserve existing reading and do NOT re-sanitize
-          newContent.reading = content.reading;
-        } else {
-          console.log('ℹ️ [READING-SAME] Incoming reading equals existing', { source: sourceLabel, hash: oldHash });
-        }
-        // Keep current sanitizedReading and readiness as-is
-      } else if (newContent.reading.trim()) {
-        // First time reading is arriving
-        console.log('✨ [READING-FIRST] Accepting first reading from', {
-          source: sourceLabel,
-          topicParam,
-          contentTopicName,
-          selectedTopic: selectedTopic?.name,
-          len: newContent.reading.length,
-          hash: _debugHash(newContent.reading),
-          preview: _short(newContent.reading)
-        });
-        
-        // ALWAYS sanitize reading content IMMEDIATELY when it arrives (for ALL topics)
-        // This ensures proper markup from first render and prevents broken code blocks
-        // The sanitized version is stored and will never be re-sanitized (first reading wins)
-        const sanitized = preSanitizeMarkdown(newContent.reading);
-        console.log('🧹 [SANITIZE] Pre-sanitized reading content', {
-          source: sourceLabel,
-          originalLen: newContent.reading.length,
-          sanitizedLen: sanitized.length,
-          originalHash: _debugHash(newContent.reading),
-          sanitizedHash: _debugHash(sanitized)
-        });
-        setSanitizedReading(sanitized);
-        setReadingRenderReady(true);
-        try {
-          const currentTopic = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || null;
-          setSanitizedReadingTopicName(currentTopic);
-        } catch {}
-      } else {
-        // Empty reading coming in: preserve existing sanitized reading if present
-        console.log('⚪ [READING-EMPTY] No reading in payload', { 
-          source: sourceLabel,
-          readingType: typeof newContent.reading,
-          readingLength: newContent.reading?.length || 0,
-          readingTrimLength: newContent.reading?.trim()?.length || 0,
-          readingPreview: newContent.reading ? newContent.reading.substring(0, 100) : 'N/A'
-        });
-        if (!(sanitizedReading && String(sanitizedReading).trim().length > 0)) {
-          setSanitizedReading('');
-          setReadingRenderReady(false);
-          setSanitizedReadingTopicName(null);
-        } else {
-          // Keep current sanitized reading as-is
-          debugLog('🛡️ [READING-PRESERVE-EMPTY] Keeping existing sanitized reading');
-        }
-      }
-    } else {
-      // No reading field provided: do not clear existing sanitized reading
-      // This can happen when other tabs update (videos/resources/quiz). Preserve reading UI.
-      debugLog('🛡️ [READING-PRESERVE-NONE] No reading field provided; preserving existing sanitized state');
-    }
-    // Merge strategy: do NOT wipe existing non-empty tabs when partial updates arrive
-    const prev = content || {};
-    const merged = { ...prev };
-
-    const isNonEmptyString = (s) => typeof s === 'string' && s.trim().length > 0;
-    const isNonEmptyArray = (a) => Array.isArray(a) && a.length > 0;
-
-    // Reading: if provided, keep the adjusted newContent.reading; else preserve previous
-    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'reading')) {
-      merged.reading = newContent.reading;
-    }
-
-    // Summary: only overwrite if new has non-empty; else keep existing if it has content
-    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'summary')) {
-      merged.summary = isNonEmptyString(newContent.summary)
-        ? newContent.summary
-        : (isNonEmptyString(prev.summary) ? prev.summary : (newContent.summary || ''));
-    }
-
-    // Videos: only overwrite if new has items; else keep existing if it has items
-    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'videos')) {
-      merged.videos = isNonEmptyArray(newContent.videos)
-        ? newContent.videos
-        : (isNonEmptyArray(prev.videos) ? prev.videos : (newContent.videos || []));
-    }
-
-    // Quiz: support both array and object-with-questions; avoid wiping non-empty with empty
-    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'quiz')) {
-      merged.quiz = quizHasItems(newContent.quiz)
-        ? newContent.quiz
-        : (quizHasItems(prev.quiz) ? prev.quiz : (newContent.quiz || (prev.quiz || [])));
-    }
-
-    // Resources: reflect current state even if empty (so empty-state can render), and always keep metadata if provided
-    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'resources')) {
-      merged.resources = Array.isArray(newContent.resources) ? newContent.resources : (prev.resources || []);
-    }
-    if (Object.prototype.hasOwnProperty.call(newContent || {}, 'resourcesMetadata')) {
-      merged.resourcesMetadata = newContent.resourcesMetadata || prev.resourcesMetadata || null;
-    }
-
-    // If newContent contains other keys (stats, metadata, etc.), shallow-merge them without clobbering known ones
-    if (newContent) {
-      for (const k of Object.keys(newContent)) {
-        if (!(k in merged)) merged[k] = newContent[k];
-      }
-    }
-
-    // Log non-reading tabs lengths for traceability
-    try {
-      debugLog('🧩 [CONTENT-SET]', {
-        source: sourceLabel,
-        topicParam,
-        contentTopicName,
-        selectedTopic: selectedTopic?.name,
-        readingLen: (merged?.reading || '').length,
-        summaryLen: (merged?.summary || '').length,
-        quizCount: Array.isArray(merged?.quiz) ? merged.quiz.length : (merged?.quiz?.questions?.length || 0),
-        videosCount: Array.isArray(merged?.videos) ? merged.videos.length : 0,
-        resourcesCount: Array.isArray(merged?.resources) ? merged.resources.length : 0
-      });
-    } catch {}
-
-    setContent(merged);
-  };
-
   // State-gated sanitized reading to ensure we never paint raw content
   const [sanitizedReading, setSanitizedReading] = useState('');
   const [readingRenderReady, setReadingRenderReady] = useState(false);
@@ -966,6 +492,26 @@ const ProLearningPage = () => {
   const [sanitizedReadingTopicName, setSanitizedReadingTopicName] = useState(null);
   // Note: Sanitization is now handled immediately in setContentWithSanitization helper
   // No useEffect needed since sanitization happens synchronously when content is set
+
+  // Helper to set content while preserving FIRST reading and controlling sanitization
+  // Behavior:
+  // - First reading wins; later variants are ignored to prevent visual flips
+  // - During progressive generation (or when sourceLabel starts with 'progressive:'),
+  //   we DO NOT sanitize the first reading — we render it raw immediately
+  // - Otherwise, first reading is pre-sanitized to avoid initial formatting flashes
+  const setContentWithSanitization = createSetContentWithSanitization({
+    contentTopicName,
+    selectedTopic,
+    content,
+    topicParam,
+    setSanitizedReading,
+    setReadingRenderReady,
+    getCurrentTopicFromParam,
+    setSanitizedReadingTopicName,
+    sanitizedReading,
+    debugLog,
+    setContent
+  });
 
   // Reset client-side readiness when switching topics to avoid flashing prior sanitized content
   useEffect(() => {
@@ -1622,257 +1168,8 @@ const ProLearningPage = () => {
     return !allTopicsGenerated;
   };
 
-  // Helper function to load topic content from batch-generated data
-  const loadTopicContent = async (topicName) => {
-    const currentCourseId = getCourseId();
-    if (!currentCourseId) return;
-
-    // During active progressive generation or fresh-batch window, avoid hydrating from storage/DB
-    // to ensure the reading shown is the raw progressive one.
-    try {
-      if (useProgressiveGeneration) {
-        const status = getProgressiveGenerationStatus();
-        const activelyGenerating = !!(status && status.isGenerating);
-        const freshBatch = shouldSkipOldCachedContent();
-        if (activelyGenerating || freshBatch) {
-          await loadProgressiveTopicContent(topicName, { showLoader: true });
-          return;
-        }
-      }
-    } catch {}
-
-    // OPTIMIZATION: Check if content is already loaded for this topic and user hasn't switched topics
-    if (selectedTopic?.name === topicName && content && content.reading && !isLoading) {
-      console.log('🚀 Content already loaded for topic:', topicName, '- updating tabs and skipping reload');
-      setContentTopicName(topicName);
-      
-      // CRITICAL: Even if content is loaded, always update available tabs for the topic
-      const availableTabs = [];
-      if (content.reading) availableTabs.push('reading');
-      if (content.summary) availableTabs.push('summary');
-      if (content.videos?.length > 0) availableTabs.push('videos');
-      if (content.quiz?.length > 0 || (content.quiz?.questions?.length > 0)) availableTabs.push('quiz');
-  // Consider resources generation complete if metadata.generatedAt exists (even with 0 results)
-  if ((content.resources?.length > 0) || (content.resourcesMetadata?.generatedAt)) availableTabs.push('resources');
-      
-      setAvailableTabsForTopics(prev => {
-        const prevTabs = prev[topicName] || [];
-        const same = prevTabs.length === availableTabs.length && prevTabs.every((t, i) => t === availableTabs[i]);
-        if (same) return prev; // idempotent - avoid unnecessary state update
-        return {
-          ...prev,
-          [topicName]: availableTabs
-        };
-      });
-      
-      console.log('🎯 Updated available tabs for already loaded topic:', topicName, availableTabs);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setLoadingStep(`Loading ${topicName} content...`);
-
-      // Attempting to load content for topic
-      // Course ID: currentCourseId
-      
-      // Try multiple ways to get stored content
-      let storedContent = null;
-      
-      // Method 1: Try the ProContentManager method
-      storedContent = await proContentManager.getStoredTopicContent(currentCourseId, topicName);
-      // Method 1 (ProContentManager): result
-      
-      // Method 2: Try direct storage access if Method 1 fails
-      if (!storedContent) {
-        try {
-          const courseContent = await proContentManager.getStoredCourseContent(currentCourseId);
-          // Course content structure
-          
-          if (courseContent && courseContent.topics) {
-            storedContent = courseContent.topics[topicName]?.content;
-            console.log('🔍 Method 2 (Direct access):', storedContent ? 'Found' : 'Not found');
-          }
-        } catch (err) {
-          console.warn('🔍 Method 2 failed:', err);
-        }
-      }
-      
-      // Method 3: Try checking with different topic name formats if still not found
-      if (!storedContent && topicName) {
-        const courseContent = await proContentManager.getStoredCourseContent(currentCourseId);
-        if (courseContent && courseContent.topics) {
-          // Try to find topic with similar names (case insensitive, trimmed)
-          const topicKeys = Object.keys(courseContent.topics);
-          const matchingKey = topicKeys.find(key => 
-            key.toLowerCase().trim() === topicName.toLowerCase().trim()
-          );
-          
-          if (matchingKey) {
-            storedContent = courseContent.topics[matchingKey]?.content;
-            console.log('🔍 Method 3 (Case insensitive):', storedContent ? `Found with key: ${matchingKey}` : 'Not found');
-          }
-        }
-      }
-      
-      if (storedContent && (storedContent.reading || storedContent.summary)) {
-        console.log('✅ Successfully found stored content for:', topicName);
-        
-        // Transform stored content to the expected format
-        const transformedContent = {
-          // Do NOT inject placeholder reading; keep empty string so first real reading can win
-          reading: typeof storedContent.reading === 'string' ? storedContent.reading : '',
-          summary: storedContent.summary || 'Summary not available',
-          quiz: storedContent.quiz || { questions: [], currentQuestion: 0 },
-          videos: storedContent.videos || [],
-          resources: storedContent.resources || []
-        };
-        
-  setContentWithSanitization(transformedContent, 'reload:transformedContent');
-  setContentTopicName(topicName);
-        
-        // Update available tabs for the topic based on loaded content
-        const availableTabs = [];
-        if (transformedContent.reading) availableTabs.push('reading');
-        if (transformedContent.summary) availableTabs.push('summary');
-        if (transformedContent.videos?.length > 0) availableTabs.push('videos');
-        if (transformedContent.quiz?.length > 0 || (transformedContent.quiz?.questions?.length > 0)) availableTabs.push('quiz');
-        if (transformedContent.resources?.length > 0) availableTabs.push('resources');
-        
-        setAvailableTabsForTopics(prev => {
-          const prevTabs = prev[topicName] || [];
-          const same = prevTabs.length === availableTabs.length && prevTabs.every((t, i) => t === availableTabs[i]);
-          if (same) return prev;
-          return {
-            ...prev,
-            [topicName]: availableTabs
-          };
-        });
-        
-        // Parse and set reading sections
-        if (storedContent.reading) {
-          const sections = parseReadingSections(storedContent.reading);
-          setReadingSections(sections);
-          setReadingSectionIndex(0);
-        }
-        
-        console.log('✅ Content loaded successfully from storage');
-        setIsLoading(false);
-        setLoadingStep('');
-        return; // CRITICAL: Exit here to avoid continuing to database fetch logic
-      } else {
-        // Fallback to generating content if not in storage
-        // No stored content found, attempting database then generation
-        // Available topic keys from storage
-        
-        // CRITICAL: Set course context in ProContentManager before calling getTopicContent
-        proContentManager.setCourse(courseTitle || "Database Course", currentCourseId);
-        
-        // Try to get database topic data - first check if it's already in the topics list
-        let dbTopic = null;
-        const topicWithDbData = topicsList.find(t => t.name === topicName && t.dbTopic);
-        if (topicWithDbData) {
-          dbTopic = topicWithDbData.dbTopic;
-          console.log('🗄️ Using cached database topic:', {
-            topicName,
-            hasDbTopic: !!dbTopic,
-            dbTopicKeys: dbTopic ? Object.keys(dbTopic) : [],
-            hasReadingMaterial: !!dbTopic?.reading_material,
-            hasSummary: !!dbTopic?.summary,
-            hasVideos: !!dbTopic?.videos?.length,
-            hasQuiz: !!dbTopic?.quiz_questions?.length,
-            hasResources: !!dbTopic?.resources?.length
-          });
-        } else {
-          // Fallback: fetch from database if not cached
-          console.log('⚠️ No cached database topic found, fetching from database');
-          const databaseCourse = await fetchCourseFromDB(currentCourseId);
-          if (databaseCourse?.topics) {
-            dbTopic = databaseCourse.topics.find(topic => topic.topic_name === topicName);
-            console.log('🗄️ Fetched database topic:', dbTopic ? 'Found' : 'Not found');
-          }
-        }
-        
-        console.log('🔄 Calling proContentManager.getTopicContent with:', {
-          topicName,
-          hasDbTopic: !!dbTopic,
-          hasGenerateCallback: !!generateProContent
-        });
-        
-        const result = await proContentManager.getTopicContent(topicName, generateProContent, dbTopic);
-        
-        console.log('📝 ProContentManager result for topic:', topicName, {
-          hasResult: !!result,
-          source: result?.source,
-          hasContent: !!result?.content,
-          contentKeys: result?.content ? Object.keys(result.content) : []
-        });
-        
-        if (result && result.content) {
-          console.log('✅ Setting content for topic:', topicName, {
-            hasReading: !!result.content.reading,
-            hasSummary: !!result.content.summary,
-            hasVideos: !!result.content.videos?.length,
-            hasQuiz: !!result.content.quiz?.length,
-            hasResources: !!result.content.resources?.length
-          });
-          
-          setContentWithSanitization(result.content, 'direct:generateProContent');
-          setContentTopicName(topicName);
-          
-          // Update available tabs for the topic based on generated content
-          const availableTabs = [];
-          if (result.content.reading) availableTabs.push('reading');
-          if (result.content.summary) availableTabs.push('summary');
-          if (result.content.videos?.length > 0) availableTabs.push('videos');
-          if (result.content.quiz?.length > 0 || (result.content.quiz?.questions?.length > 0)) availableTabs.push('quiz');
-          if (result.content.resources?.length > 0) availableTabs.push('resources');
-          
-          setAvailableTabsForTopics(prev => ({
-            ...prev,
-            [topicName]: availableTabs
-          }));
-          
-          // Parse and set reading sections for generated content
-          if (result.content && result.content.reading) {
-            const sections = parseReadingSections(result.content.reading);
-            setReadingSections(sections);
-            setReadingSectionIndex(0);
-          }
-          
-          // Clear loading states after content is successfully set
-          setIsLoading(false);
-          setLoadingStep('');
-          
-          // Content generated and loaded
-        } else {
-          throw new Error('Failed to generate or retrieve content');
-        }
-      }
-    } catch (error) {
-      console.error('❌ Failed to load topic content:', error);
-      const errorContent = {
-        reading: 'Failed to load content. Please try again.',
-        summary: 'Failed to load summary.',
-        quiz: { questions: [], currentQuestion: 0 },
-        videos: [],
-        resources: []
-      };
-  setContentWithSanitization(errorContent, 'progressive:loadError');
-  setContentTopicName(topicName);
-      
-      // Even for error content, set the reading tab as available
-      setAvailableTabsForTopics(prev => ({
-        ...prev,
-        [topicName]: ['reading', 'summary'] // At least show reading/summary tabs for error content
-      }));
-    } finally {
-      setIsLoading(false);
-      setLoadingStep('');
-    }
-  };
-
   // Helper function to load topic content from progressive generation data
+  // MOVED UP to be available for loadTopicContent factory
   const loadProgressiveTopicContent = (topicName, options = {}) => {
     return ContentHandlers.loadProgressiveTopicContent(topicName, options, {
       setIsLoading,
@@ -1891,6 +1188,29 @@ const ProLearningPage = () => {
       setReadingSectionIndex
     });
   };
+
+  // Helper function to load topic content from batch-generated data
+  const loadTopicContent = createLoadTopicContent({
+    getCourseId,
+    useProgressiveGeneration,
+    getProgressiveGenerationStatus,
+    shouldSkipOldCachedContent,
+    loadProgressiveTopicContent,
+    selectedTopic,
+    content,
+    isLoading,
+    setContentTopicName,
+    setAvailableTabsForTopics,
+    setIsLoading,
+    setLoadingStep,
+    setContentWithSanitization,
+    setReadingSections,
+    setReadingSectionIndex,
+    courseTitle,
+    topicsList,
+    fetchCourseFromDB,
+    generateProContent
+  });
 
   // Handle topic selection from sidebar using new storage system
   const handleTopicSelect = (topicId) => {
@@ -2238,12 +1558,6 @@ const ProLearningPage = () => {
     };
   }, []);
 
-  // Course ID management handlers
-  const { generateCourseId, getCourseId, setAndNavigateToCourseId } = ProLearningUtils.createCourseIdHandlers({
-    courseId,
-    navigate
-  });
-
   // Effect to handle missing courseId: do NOT auto-generate; redirect to NotFound
   useEffect(() => {
     if (!courseId) {
@@ -2400,89 +1714,6 @@ const ProLearningPage = () => {
     }
   }, [availableTabsForTopics, selectedTopic?.name, activeTab]);
 
-  // Enhanced loading component with batch generation support
-  const LoadingComponent = () => (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-3 sm:p-4">
-      <div className="w-full max-w-xs sm:max-w-md">
-        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-100 p-4 sm:p-8 text-center relative overflow-hidden">
-          {/* Background decoration */}
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-transparent to-purple-50 opacity-50"></div>
-          
-          {/* Main loading icon */}
-          <div className="relative z-10 mb-4 sm:mb-6">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg">
-              <BiLoaderAlt className="text-xl sm:text-2xl text-white animate-spin" />
-            </div>
-            {/* Floating particles */}
-            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-              </div>
-            </div>
-          </div>
-
-          {/* Progress section for batch generation */}
-          {isBatchGenerating && (
-            <div className="mb-4 sm:mb-6">
-              <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 mb-2 sm:mb-3">
-                <div 
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 sm:h-3 rounded-full transition-all duration-300"
-                  style={{ width: `${batchGenerationProgress}%` }}
-                ></div>
-              </div>
-              <div className="text-xs sm:text-sm text-gray-600 mb-2">
-                {batchGenerationProgress}% Complete
-              </div>
-            </div>
-          )}
-
-          {/* Status messages */}
-          <div className="relative z-10 mb-4 sm:mb-6">
-            <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2">
-              {isBatchGenerating ? '🚀 Generating Your Course' : 'Preparing Content'}
-            </h3>
-            <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">
-              {isBatchGenerating ? batchGenerationStatus : (loadingStep || 'Setting up your learning materials...')}
-            </p>
-          </div>
-
-          {/* Content types being generated */}
-          {isBatchGenerating && (
-            <div className="relative z-10 grid grid-cols-2 gap-2 sm:gap-3 mb-4 sm:mb-6">
-              <div className="flex items-center justify-center p-2 sm:p-3 bg-blue-50 rounded-lg">
-                <FaBookOpen className="text-blue-500 mr-1 sm:mr-2 text-sm sm:text-base" />
-                <span className="text-xs text-blue-700 font-medium">Reading</span>
-              </div>
-              <div className="flex items-center justify-center p-2 sm:p-3 bg-purple-50 rounded-lg">
-                <FaBrain className="text-purple-500 mr-1 sm:mr-2 text-sm sm:text-base" />
-                <span className="text-xs text-purple-700 font-medium">Summary</span>
-              </div>
-              <div className="flex items-center justify-center p-2 sm:p-3 bg-red-50 rounded-lg">
-                <FaVideo className="text-red-500 mr-1 sm:mr-2 text-sm sm:text-base" />
-                <span className="text-xs text-red-700 font-medium">Videos</span>
-              </div>
-              <div className="flex items-center justify-center p-2 sm:p-3 bg-green-50 rounded-lg">
-                <FaQuestionCircle className="text-green-500 mr-1 sm:mr-2 text-sm sm:text-base" />
-                <span className="text-xs text-green-700 font-medium">Quiz</span>
-              </div>
-            </div>
-          )}
-
-          {/* Loading dots animation */}
-          <div className="relative z-10">
-            <div className="flex justify-center space-x-2">
-              <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
-              <div className="w-3 h-3 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-3 h-3 bg-indigo-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   const renderTabContent = () => {
     return renderTabContentHandler({
       selectedTopic,
@@ -2498,8 +1729,11 @@ const ProLearningPage = () => {
       useProgressiveGeneration,
       availableTabsForTopics,
       isBatchGenerating,
+      batchGenerationProgress,
+      batchGenerationStatus,
       isGeneratingCourse,
       isLoading,
+      loadingStep,
       isProgressiveGenerating,
       progressiveGenerationProgress,
       allTopicsGenerated,
@@ -2562,420 +1796,48 @@ const ProLearningPage = () => {
           }
         `}</style>
         
-      {/* Batch Generation Status Indicator - REMOVED to eliminate duplicate loading cards */}
-      {/* 
-      <BatchGenerationStatus
-        isGenerating={isBatchGenerating}
-        progress={batchGenerationProgress}
-        status={batchGenerationStatus}
-        onClose={handleCloseBatchStatus}
-      />
-      */}
-      
-      {/* Enhanced Header */}
-      {/* <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50"> ... </header> */}
+
 
       {/* Main Content with Sidebar Layout */}
-      <div className="relative">
-        {/* Main Content Area */}
-        <div className={`transition-all duration-300 ${
-          sidebarVisible 
-            ? 'lg:mr-[400px]' // Add right margin on large screens when sidebar is visible
-            : ''
-        }`}>
-          <div className="w-full px-0 lg:px-6 py-0 lg:pt-20 lg:pb-4 max-w-full overflow-x-hidden">{/* Remove mobile padding for edge-to-edge design, add enough top padding for desktop to clear navbar */}
-              {/* Enhanced Tab Navigation - Desktop Only */}
-              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border mb-6 hidden lg:block overflow-hidden">
-                <div className="p-2">
-                  <nav className="flex space-x-2 overflow-x-auto scrollbar-hide" aria-label="Tabs">
-                    {tabs.map((tab) => {
-                      const IconComponent = tab.icon;
-                      const isActive = activeTab === tab.id;
-                      
-                      // Derive current topic name (fallback to URL param for single-topic flows)
-                      const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam);
-                      
-                      // Check if current topic is blocked (2nd topic onwards)
-                      const currentTopicBlocked = currentTopicName ? isTopicBlocked(currentTopicName) : false;
-                      
-                      // Check if tab has content already (treat as available even if tabs map isn’t filled yet)
-                      const hasTabContent = !!content && contentTopicName === currentTopicName && (
-                        (tab.id === 'reading' && !!content?.reading && String(content.reading).trim().length > 0) ||
-                        (tab.id === 'summary' && !!content?.summary && String(content.summary).trim().length > 0) ||
-                        (tab.id === 'videos' && Array.isArray(content?.videos) && content.videos.length > 0) ||
-                        (tab.id === 'quiz' && ((Array.isArray(content?.quiz) && content.quiz.length > 0) || (content?.quiz?.questions?.length > 0))) ||
-                        // Treat resources as ready if array has items OR metadata indicates completion
-                        (tab.id === 'resources' && (
-                          (Array.isArray(content?.resources) && content.resources.length > 0) ||
-                          !!content?.resourcesMetadata?.generatedAt ||
-                          // Reload/DB mode fallback: if other tabs exist, allow clicking to show empty state
-                          (loadScenario === 'reload' && (
-                            (!!content?.reading && String(content.reading).trim().length > 0) ||
-                            (!!content?.summary && String(content.summary).trim().length > 0) ||
-                            (Array.isArray(content?.videos) && content.videos.length > 0) ||
-                            (Array.isArray(content?.quiz) && content.quiz.length > 0) ||
-                            (!!content?.quiz?.questions && Array.isArray(content?.quiz?.questions) && content.quiz.questions.length > 0)
-                          ))
-                        ))
-                      );
-
-                      // Check if tab content is available for progressive generation
-                      let isTabAvailable = true;
-                      if (useProgressiveGeneration) {
-                        // Progressive gating per topic: if the topic is blocked (no tabs ready yet), keep hidden; otherwise allow ready tabs.
-                        // Reading-first rule: require reading to be ready before exposing other tabs while generating
-                        const readingReady = ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes('reading')) ||
-                          (content && contentTopicName === currentTopicName && typeof content.reading === 'string' && content.reading.trim().length > 0));
-                        // In reload/DB mode, if other tabs exist, let users click Resources to see the empty-state UI
-                        const otherTabsPresent = (
-                          (!!content?.reading && String(content.reading).trim().length > 0) ||
-                          (!!content?.summary && String(content.summary).trim().length > 0) ||
-                          (Array.isArray(content?.videos) && content.videos.length > 0) ||
-                          (Array.isArray(content?.quiz) && content.quiz.length > 0) ||
-                          (!!content?.quiz?.questions && Array.isArray(content?.quiz?.questions) && content.quiz.questions.length > 0)
-                        );
-
-                        if (currentTopicBlocked) {
-                          isTabAvailable = false;
-                        } else {
-                          isTabAvailable = ((currentTopicName && availableTabsForTopics[currentTopicName]?.includes(tab.id)) || hasTabContent);
-                          // Relax gating for Resources in reload mode so users can see the empty state
-                          if (!isTabAvailable && loadScenario === 'reload' && tab.id === 'resources' && otherTabsPresent) {
-                            isTabAvailable = true;
-                          }
-                          if ((isProgressiveGenerating) && tab.id !== 'reading' && !readingReady) {
-                            isTabAvailable = false;
-                          }
-                        }
-                        
-                        // Debug logging for resources tab
-                        // Avoid render-time logging to prevent noisy consoles and potential loops
-                      }
-                      
-                      // Tab is disabled if topic is blocked OR if progressive tab is not available
-                      const isTabDisabled = currentTopicBlocked || (useProgressiveGeneration && !isTabAvailable);
-                      
-                      // Avoid render-time logging to prevent noisy consoles and potential loops
-                      
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => {
-                            // DIAGNOSTIC LOGGING FOR TAB CLICK
-                            console.log(`🖱️ [TAB CLICK] User clicked ${tab.label} tab`, {
-                              tabId: tab.id,
-                              timestamp: new Date().toISOString(),
-                              currentTopicName,
-                              currentTopicBlocked,
-                              isTabDisabled,
-                              isTabAvailable,
-                              hasTabContent,
-                              willUpdateTab: !currentTopicBlocked && !isTabDisabled
-                            });
-                            
-                            if (tab.id === 'resources') {
-                              console.log(`🖱️ [RESOURCES TAB CLICK] Detailed resources state:`, {
-                                hasContent: !!content,
-                                resourcesInContent: 'resources' in (content || {}),
-                                resourcesType: typeof content?.resources,
-                                resourcesIsArray: Array.isArray(content?.resources),
-                                resourcesCount: content?.resources?.length || 0,
-                                hasResourcesMetadata: !!content?.resourcesMetadata,
-                                generatedAt: content?.resourcesMetadata?.generatedAt || 'MISSING',
-                                availableTabsForCurrentTopic: availableTabsForTopics[currentTopicName] || [],
-                                resourcesIsInAvailableTabs: (availableTabsForTopics[currentTopicName] || []).includes('resources')
-                              });
-                            }
-                            
-                            if (!currentTopicBlocked && !isTabDisabled) {
-                              console.log(`✅ [TAB CLICK] Tab ${tab.label} is clickable, updating active tab`);
-                              updateActiveTabDesktop(tab.id); // Use debounced version for desktop
-                              // Only reload content if progressive generation is enabled AND content is not already available
-                              if (useProgressiveGeneration && currentTopicName && isTabAvailable && !content?.[tab.id]) {
-                                console.log(`🔄 [TAB CLICK] Will reload content for ${tab.label}`);
-                                // Only refresh if this specific tab content doesn't exist yet
-                                loadProgressiveTopicContent(currentTopicName, { showLoader: false });
-                              } else {
-                                console.log(`✓ [TAB CLICK] Content already available for ${tab.label}, no reload needed`);
-                              }
-                            } else if (!currentTopicBlocked && useProgressiveGeneration && !isTabAvailable) {
-                              console.log(`⏳ [TAB CLICK] Tab ${tab.label} not ready yet, showing loading skeleton`);
-                              // If disabled due to not ready, show skeletons briefly to convey loading
-                              setShowSkeletons(true);
-                              setLoadingStep(`Preparing ${tab.label}...`);
-                            } else {
-                              console.log(`🚫 [TAB CLICK] Tab ${tab.label} is blocked or disabled:`, {
-                                currentTopicBlocked,
-                                isTabDisabled,
-                                reason: currentTopicBlocked ? 'Topic is blocked' : 'Tab is disabled'
-                              });
-                            }
-                          }}
-                          disabled={isLoading || isTabDisabled}
-                          className={`group flex-1 min-w-[120px] p-4 rounded-xl font-medium transition-all duration-300 ${
-                            isActive
-                              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg transform scale-105'
-                              : isTabDisabled
-                                ? 'text-gray-400 bg-gray-50 cursor-not-allowed'
-                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                          } ${(isLoading || isTabDisabled) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          title={
-                            currentTopicBlocked && loadScenario !== 'first-time'
-                              ? `${tab.label} will be available after course generation completes`
-                              : isTabDisabled 
-                                ? `${tab.label} is being generated...` 
-                                : tab.description
-                          }
-                        >
-                          <div className="flex flex-col items-center space-y-2">
-                            <div className={`relative p-2 rounded-lg transition-colors ${
-                              isActive 
-                                ? 'bg-white/20' 
-                                : isTabDisabled
-                                  ? 'bg-gray-200'
-                                  : 'bg-gray-100 group-hover:bg-gray-200'
-                            }`}>
-                              <IconComponent className="text-lg" />
-                              {/* Progressive generation status indicator - only show while generating */}
-                              {useProgressiveGeneration && (
-                                (() => {
-                                  const isGenerating = isProgressiveGenerating &&
-                                    progressiveGenerationProgress.topic === selectedTopic?.name &&
-                                    progressiveGenerationProgress.tabType === tab.id;
-                                  return isGenerating ? (
-                                    <div className="absolute -top-1 -right-1">
-                                      <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" title="Generating..." />
-                                    </div>
-                                  ) : null;
-                                })()
-                              )}
-                            </div>
-                            <span className="text-sm font-semibold whitespace-nowrap">{tab.label}</span>
-                            {/* Tiny status label: show only when generating */}
-                            {useProgressiveGeneration && isProgressiveGenerating &&
-                              progressiveGenerationProgress.topic === selectedTopic?.name &&
-                              progressiveGenerationProgress.tabType === tab.id && (
-                                <span className="text-[10px] leading-none text-blue-600" aria-live="polite">Loading…</span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </nav>
-                </div>
-              </div>
-
-              {/* Mobile Version */}
-              <ProLearningMobile
-                activeTab={activeTab}
-                setActiveTab={updateActiveTab}
-                content={content}
-                topicsList={topicsList}
-                completedTopics={completedTopics}
-                toggleTopicCompletion={toggleTopicCompletion}
-                handleTopicSelect={handleTopicSelect}
-                tabs={tabs}
-                renderTabContent={renderTabContent}
-                courseTitle={courseTitle}
-                isLoading={isLoading}
-                useProgressiveGeneration={useProgressiveGeneration}
-                availableTabsForTopics={availableTabsForTopics}
-                selectedTopic={selectedTopic}
-                isProgressiveGenerating={isProgressiveGenerating}
-                progressiveGenerationProgress={progressiveGenerationProgress}
-                currentTopicName={selectedTopic?.name || getCurrentTopicFromParam(topicParam)}
-                currentTopicBlocked={selectedTopic?.name ? isTopicBlocked(selectedTopic.name) : false}
-              />
-
-              {/* Desktop Tab Content */}
-              <div className="hidden lg:block bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border overflow-hidden">
-                <div className="p-4 lg:p-6 max-w-full overflow-x-hidden">
-                  {renderTabContent()}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar Toggle Button */}
-        <button
-          onClick={() => handleSidebarToggle(!sidebarVisible)}
-          className={`fixed transition-all duration-300 z-40 hover:bg-gray-50 ${
-            sidebarVisible 
-              ? 'top-20 right-[400px] lg:right-[400px] xl:right-[400px] transform bg-white p-3 shadow-md rounded-l-lg' 
-              : 'top-20 right-4 bg-white p-3 shadow-lg rounded-lg'
-          } hidden lg:flex items-center justify-center`}
-          aria-label={sidebarVisible ? "Close sidebar" : "Open sidebar"}
-        >
-          {sidebarVisible ? 
-            <IoChevronBack className="w-5 h-5 text-gray-600" /> : 
-            <IoMenu className="w-5 h-5 text-gray-600" />
-          }
-        </button>
-
-        {/* Mobile Sidebar Backdrop */}
-        {sidebarVisible && (
-          <div 
-            className="fixed inset-0 bg-black/50 z-[25] lg:hidden"
-            onClick={() => handleSidebarToggle(false)}
-          />
-        )}
-
-        {/* Sidebar */}
-        <div 
-          className={`fixed top-0 right-0 h-screen bg-white shadow-lg border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 flex flex-col ${
-            sidebarVisible ? 'translate-x-0' : 'translate-x-full'
-          } ${
-            // Responsive width
-            'w-full sm:w-[380px] md:w-[400px] lg:w-[400px] xl:w-[400px]'
-          } ${
-            // Hide on mobile by default, show only when explicitly opened
-            'lg:block'
-          }`}
-        >
-          {/* Sidebar Header */}
-          <div className="flex-shrink-0 pt-20 px-4 pb-3 border-b border-gray-200 bg-white">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-lg">Learning Guide</h2>
-              <button
-                onClick={() => handleSidebarToggle(false)}
-                className="p-2 rounded-md hover:bg-gray-100 transition-colors"
-                aria-label="Close sidebar"
-              >
-                <IoClose className="w-4 h-4 text-gray-600" />
-              </button>
-            </div>
-            
-            {/* Topic Information */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 mb-4">
-              <div className="flex items-center mb-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-3">
-                  <FaRobot className="text-white text-sm" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">
-                    {topicsList.length > 1 ? 'Learning Topics' : 'Current Topic'}
-                  </h3>
-                  {topicsList.length === 1 && (
-                    <p className="text-sm text-gray-700 mt-0.5 truncate max-w-[260px]">
-                      {topicsList[0]?.name}
-                    </p>
-                  )}
-                </div>
-              </div>
-              
-              {/* Display topics (both single and multiple) */}
-              <div className="space-y-2">
-                {topicsList.length > 1 && (
-                  <p className="text-blue-700 font-medium text-sm mb-3">
-                    Select a topic to focus on:
-                  </p>
-                )}
-                {(topicsList.length === 0 && topicParam) ? (
-                  // Edge case: no topics yet but URL has a topic — show a placeholder button
-                  <div className="text-sm text-gray-600">Loading topic…</div>
-                ) : topicsList.map((topicItem) => (
-                  <button
-                    key={topicItem.id}
-                    onClick={() => handleTopicSelect(topicItem.id)}
-                    className={`w-full text-left p-3 rounded-lg transition-all duration-200 relative group ${
-                      topicItem.isActive
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
-                        : completedTopics.includes(topicItem.id)
-                          ? 'bg-white text-gray-700 border border-gray-200 shadow-sm opacity-75'
-                          : 'bg-white text-blue-700 hover:bg-blue-50 border border-blue-200 hover:shadow-sm'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Completion checkbox - moved to left */}
-                      <div
-                        className={`relative flex items-center justify-center w-5 h-5 rounded border-2 cursor-pointer transition-all duration-200 hover:scale-110 ${
-                          completedTopics.includes(topicItem.id)
-                            ? 'bg-green-500 border-green-500 shadow-sm'
-                            : topicItem.isActive
-                              ? 'border-white/40 hover:border-white/60'
-                              : 'border-gray-300 hover:border-green-400 group-hover:border-green-400'
-                        }`}
-                        onClick={(e) => toggleTopicCompletion(topicItem.id, e)}
-                        title={
-                          topicItem.isActive 
-                            ? 'Complete this topic'
-                            : completedTopics.includes(topicItem.id) 
-                              ? 'Mark as incomplete' 
-                              : 'Mark as complete'
-                        }
-                      >
-                        {completedTopics.includes(topicItem.id) && (
-                          <IoCheckmarkCircle className="text-white text-sm" />
-                        )}
-                      </div>
-                      
-                      {/* Topic content */}
-                      <div className="flex items-center justify-between flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium capitalize">
-                            {topicItem.name}
-                          </span>
-                          {/* Completion status indicator */}
-                          {completedTopics.includes(topicItem.id) && (
-                            <span className="px-2 py-1 text-xs bg-green-100 text-green-600 rounded-full">
-                              Completed
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-                
-                {/* Progress indicator - show for both single and multiple topics */}
-                <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">Progress</span>
-                    <span className="text-sm font-semibold text-blue-600">
-                      {completedTopics.length} / {topicsList.length} completed
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-gradient-to-r from-green-400 to-green-500 h-2 rounded-full transition-all duration-500"
-                      style={{ 
-                        width: `${topicsList.length > 0 ? (completedTopics.length / topicsList.length) * 100 : 0}%` 
-                      }}
-                    ></div>
-                  </div>
-                  {completedTopics.length === topicsList.length && topicsList.length > 0 && (
-                    <div className="mt-2 flex items-center gap-1 text-green-600">
-                      <FaTrophy className="text-sm" />
-                      <span className="text-xs font-medium">
-                        {topicsList.length === 1 ? 'Topic completed! 🎉' : 'Course completed! 🎉'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Removed Learning Progress and Learning Tips sections from sidebar */}
-          </div>
-          
-          {/* Sidebar Content */}
-          <div className="flex-1 overflow-y-auto min-h-0 p-4">
-            <div className="space-y-4">
-              {/* Reading material now displays as a single, unified content block */}
-              {/* Removed Reading Sections navigation - content is no longer split into sections */}
-            </div>
-          </div>
-        </div>
-      </div>
+      <MainContentLayout
+        sidebarVisible={sidebarVisible}
+        handleSidebarToggle={handleSidebarToggle}
+        tabs={tabs}
+        activeTab={activeTab}
+        updateActiveTab={updateActiveTab}
+        updateActiveTabDesktop={updateActiveTabDesktop}
+        content={content}
+        contentTopicName={contentTopicName}
+        renderTabContent={renderTabContent}
+        topicsList={topicsList}
+        selectedTopic={selectedTopic}
+        topicParam={topicParam}
+        getCurrentTopicFromParam={getCurrentTopicFromParam}
+        isTopicBlocked={isTopicBlocked}
+        handleTopicSelect={handleTopicSelect}
+        completedTopics={completedTopics}
+        toggleTopicCompletion={toggleTopicCompletion}
+        useProgressiveGeneration={useProgressiveGeneration}
+        availableTabsForTopics={availableTabsForTopics}
+        isProgressiveGenerating={isProgressiveGenerating}
+        progressiveGenerationProgress={progressiveGenerationProgress}
+        loadProgressiveTopicContent={loadProgressiveTopicContent}
+        isLoading={isLoading}
+        loadScenario={loadScenario}
+        setShowSkeletons={setShowSkeletons}
+        setLoadingStep={setLoadingStep}
+        courseTitle={courseTitle}
+      />
+      
       {/* Global video modal */}
       <VideoModalComponent 
         isOpen={isVideoModalOpen}
         video={currentVideo}
         onClose={closeVideoModal}
       />
+      </div>
     </>
   );
 };
 
-export default ProLearningPage;
+export default ProLearningPage; 
