@@ -761,28 +761,12 @@ const ProLearningPage = () => {
         }
       }
       
-  // Step 4: Fallback - only create default topics when truly nothing else is available
+  // Step 4: Fallback - if nothing is available, treat as invalid URL and redirect to NotFound
   const hasBatchMarker = typeof localStorage !== 'undefined' ? localStorage.getItem('proLearning_batchMarker') : null;
   if (!courseTitle && !topicParam && !hasBatchMarker && !foundFromBatch) {
-        // No data found - create fresh default topics
-        const defaultTopics = [
-          { id: 1, name: "Introduction", isActive: true }, // First topic is active
-          { id: 2, name: "Getting Started", isActive: false },
-          { id: 3, name: "Key Concepts", isActive: false },
-          { id: 4, name: "Best Practices", isActive: false },
-          { id: 5, name: "Advanced Topics", isActive: false }
-        ];
-        setTopicsList(defaultTopics);
-        
-        // Set the first topic as selected
-        setSelectedTopic(defaultTopics[0]);
-        
-        try {
-          proContentManager.setCourse("Default Course", currentCourseId);
-          await proContentManager.storeTopics(defaultTopics, currentCourseId);
-        } catch (error) {
-          console.error('❌ Failed to store default topics:', error);
-        }
+        console.warn('⚠️ No course context found (no title, topics, batch, or DB). Redirecting to 404.');
+        navigate('/not-found', { replace: true });
+        return;
       } else {
         // Could show error message to user here
       }
@@ -1245,6 +1229,11 @@ const ProLearningPage = () => {
         isProgressiveGenerating,
         topicsCount: topicsList.length
       });
+      // If we've already completed generation, never auto-start again
+      if (allTopicsGenerated) {
+        console.log('✅ Progressive generation already completed; skipping auto-start');
+        return;
+      }
       
       // Auto-start progressive generation if:
       // 1. We're in first-time mode for an ephemeral course (course_...), OR
@@ -1295,7 +1284,7 @@ const ProLearningPage = () => {
         }, 500);
       }
     }
-  }, [topicsList, courseTitle, useProgressiveGeneration, loadScenario, isProgressiveGenerating]); // Depend on loadScenario to detect fresh generation
+  }, [topicsList, courseTitle, useProgressiveGeneration, loadScenario, isProgressiveGenerating, allTopicsGenerated]); // Depend on loadScenario to detect fresh generation
 
   // Load content for initially active topic using new storage system
   useEffect(() => {
@@ -3543,6 +3532,9 @@ const ProLearningPage = () => {
             setIsLoading(false);
             setCourseGenerationStatus('✅ All topics generated successfully!');
 
+            // Switch to reload mode to prevent any auto-restart loops
+            try { setLoadScenario('reload'); } catch {}
+
             // Hard reset progress state to prevent any stuck spinners
             setProgressiveGenerationProgress({});
             setShowSkeletons(false);
@@ -3879,16 +3871,12 @@ const ProLearningPage = () => {
     navigate(`/pro-learning/${id}${window.location.search}`, { replace: true });
   };
 
-  // Effect to handle course ID generation and redirection
+  // Effect to handle missing courseId: do NOT auto-generate; redirect to NotFound
   useEffect(() => {
     if (!courseId) {
-      const existingId = getCourseId();
-      if (existingId) {
-        setAndNavigateToCourseId(existingId);
-      } else {
-        const newId = generateCourseId();
-        setAndNavigateToCourseId(newId);
-      }
+      // Clear any stale ephemeral ID to avoid surprising redirects later
+      try { if (typeof localStorage !== 'undefined') localStorage.removeItem('currentCourseId'); } catch {}
+      navigate('/not-found', { replace: true });
     }
   }, [courseId, navigate]);
 
@@ -4087,6 +4075,8 @@ const ProLearningPage = () => {
               // All progressive content generation completed!
               setIsProgressiveGenerating(false);
               setAllTopicsGenerated(true);
+              // Prevent auto-restart by switching to reload mode
+              try { setLoadScenario('reload'); } catch {}
               // Clear any 'fresh' batch marker so tabs are not blocked after completion
               try { if (typeof localStorage !== 'undefined') localStorage.removeItem('proLearning_batchMarker'); } catch {}
 

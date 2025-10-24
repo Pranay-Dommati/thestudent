@@ -779,6 +779,27 @@ const ChatbotPage = () => {
 
   // Do not auto-close/open sidebar on resize; only set default on mount above.
 
+  // Auto-close topic confirmation modal if monthly limit reaches 0
+  useEffect(() => {
+    if (showTopicConfirmation && usageStats) {
+      const remainingTopics = (usageStats.monthly_limit || 15) - (usageStats.monthly_used || 0);
+      if (remainingTopics <= 0) {
+        // Close the modal and show limit message
+        setShowTopicConfirmation(false);
+        setPendingTopics([]);
+        setOriginalPrompt("");
+        
+        const limitMessage = {
+          id: generateMessageId(),
+          type: "bot",
+          content: "🚫 **Monthly limit reached!**\n\nYou've used all **15 topics** for this month. Your limit will reset on the **1st of next month**. Come back then to create more amazing courses! 🎓✨",
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+        setChatHistory((prev) => [...prev, limitMessage]);
+      }
+    }
+  }, [usageStats, showTopicConfirmation]);
+
   // Cleanup network error timeouts on unmount
   useEffect(() => {
     return () => {
@@ -851,6 +872,43 @@ const ChatbotPage = () => {
     if (isConnected) {
       // Connection is working - proceed directly to API call
       try {
+        // Early monthly limit guard for retry path as well
+        try {
+          let stats = usageStats;
+          if (!stats || (typeof stats.monthly_limit === 'undefined' && !stats?.rate_limits?.monthly)) {
+            try {
+              const fetched = await fetchUsageStats();
+              if (fetched) stats = fetched;
+            } catch (_) {}
+          }
+          if (stats) {
+            const topLevelLimit = typeof stats.monthly_limit === 'number' ? stats.monthly_limit : undefined;
+            const topLevelUsed = typeof stats.monthly_used === 'number' ? stats.monthly_used : undefined;
+            const nestedLimit = stats?.rate_limits?.monthly?.limit;
+            const nestedUsed = stats?.rate_limits?.monthly?.used;
+            const limit = (typeof topLevelLimit === 'number') ? topLevelLimit : (typeof nestedLimit === 'number' ? nestedLimit : 15);
+            const used = (typeof topLevelUsed === 'number') ? topLevelUsed : (typeof nestedUsed === 'number' ? nestedUsed : 0);
+            const remaining = Math.max(0, limit - used);
+            console.log('🛡️ Early monthly limit guard (retry):', { limit, used, remaining, raw: stats });
+            if (remaining <= 0) {
+              // Replace the network error message with limit reached info
+              setChatHistory((prev) => 
+                prev.map(msg => 
+                  msg.id === messageId 
+                    ? {
+                        ...msg,
+                        content: "🚫 Monthly limit reached!\n\nYou've used all **15 topics** for this month. Your limit resets on the **1st of next month**. Come back then to create more amazing courses! 🎓✨",
+                        isNetworkError: false,
+                        isReconnecting: false,
+                        showRetryButton: false
+                      }
+                    : msg
+                )
+              );
+              return;
+            }
+          }
+        } catch (_) {}
         // Clear the failed prompt before retry
         setLastFailedPrompt(null);
         
@@ -878,7 +936,7 @@ const ChatbotPage = () => {
             const maxPerRequest = 4;
             
             if (usageStats) {
-              const remainingToday = (usageStats.daily_limit || 16) - (usageStats.daily_used || 0);
+              const remainingToday = (usageStats.monthly_limit || 15) - (usageStats.monthly_used || 0);
               const maxPerRequestFromStats = usageStats.per_request_limit || 4;
               const maxAllowedTopics = Math.min(remainingToday, maxPerRequestFromStats);
               
@@ -1126,24 +1184,55 @@ const ChatbotPage = () => {
       }
     } catch (_) {}
 
-    // Do not block based on local heuristics; let AI validate if this is a study topic.
-    // We'll call the classifier first and only show guidance if AI couldn't extract any topics.
+  // Do not block based on local heuristics; let AI validate if this is a study topic.
+  // We want the loading UI to appear immediately after sending the prompt
+  // and remain visible while we assess limits and classify topics.
 
-    setIsLoading(true);
+  // Start loading BEFORE any async limit checks/classification so UI responds instantly
+  setIsLoading(true);
 
-    try {
-      // Pro Learning Mode - Always Active
-      // Check monthly quota before processing
-      if (usageStats) {
-        const remainingToday = (usageStats.monthly_limit || 15) - (usageStats.monthly_used || 0);
-        if (remainingToday <= 0) {
-          universalToast.error("🚫 Monthly limit reached! You've used all your topic creation quota for this month. Please try again next month.", {
-            duration: 5000
-          });
+  // BEFORE any AI/classification, enforce monthly quota and respond in chat if exhausted.
+  // Early monthly limit guard (ensure we have fresh stats)
+  try {
+      let stats = usageStats;
+      if (!stats || typeof stats.monthly_limit === 'undefined') {
+        try {
+          const fetched = await fetchUsageStats();
+          if (fetched) stats = fetched;
+        } catch (_) {}
+      }
+      if (stats) {
+        // Support multiple shapes of usage stats
+        const topLevelLimit = typeof stats.monthly_limit === 'number' ? stats.monthly_limit : undefined;
+        const topLevelUsed = typeof stats.monthly_used === 'number' ? stats.monthly_used : undefined;
+        const nestedLimit = stats?.rate_limits?.monthly?.limit;
+        const nestedUsed = stats?.rate_limits?.monthly?.used;
+        const limit = (typeof topLevelLimit === 'number') ? topLevelLimit : (typeof nestedLimit === 'number' ? nestedLimit : 15);
+        const used = (typeof topLevelUsed === 'number') ? topLevelUsed : (typeof nestedUsed === 'number' ? nestedUsed : 0);
+        const remaining = Math.max(0, limit - used);
+        console.log('🛡️ Early monthly limit guard:', { limit, used, remaining, raw: stats });
+        if (remaining <= 0) {
+          const reset = new Date();
+          // Set to the 1st of next month
+          reset.setMonth(reset.getMonth() + 1, 1);
+          const nextMonthName = reset.toLocaleString(undefined, { month: 'long' });
+          const limitReachedMessage = {
+            id: generateMessageId(),
+            type: "bot",
+            content: `🚫 Monthly limit reached!\n\nYou've used all **15 topics** for this month. Your limit resets on the **1st of ${nextMonthName}**. Come back then to create more amazing courses! 🎓✨`,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          };
+          setChatHistory((prev) => [...prev, limitReachedMessage]);
+          // Stop loading since we're exiting early due to limits
           setIsLoading(false);
           return;
         }
       }
+    } catch (_) {}
+
+
+    try {
+      // Pro Learning Mode - Always Active (monthly quota already checked above)
 
       // Extract topics using AI with rate limiting
       try {
@@ -1222,15 +1311,15 @@ const ChatbotPage = () => {
                 availableTopics = availableTopics.slice(0, maxAllowedTopics);
                 
                 if (remainingToday <= 0) {
-                  limitMessage = `⚠️ You've reached your daily limit of ${usageStats.daily_limit || 16} topics. Please try again tomorrow.`;
-                  // Show toast for daily limit reached
-                  universalToast.error(`🚫 Daily limit reached (${usageStats.daily_used || 0}/${usageStats.daily_limit || 16} used)`, {
+                  limitMessage = `⚠️ You've reached your monthly limit of ${usageStats.monthly_limit || 15} topics. Please try again next month.`;
+                  // Show toast for monthly limit reached
+                  universalToast.error(`🚫 Monthly limit reached (${usageStats.monthly_used || 0}/${usageStats.monthly_limit || 15} used)`, {
                     duration: 4000
                   });
                 } else if (remainingToday < availableTopics.length && availableTopics.length <= maxPerRequestFromStats) {
-                  limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you only have ${remainingToday} topic(s) remaining today. Showing first ${availableTopics.length} topic(s).`;
-                  // Show informational toast for daily quota limiting
-                  universalToast.show(`⚠️ Limited to ${availableTopics.length} topics due to daily quota`, {
+                  limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you only have ${remainingToday} topic(s) remaining this month. Showing first ${availableTopics.length} topic(s).`;
+                  // Show informational toast for monthly quota limiting
+                  universalToast.show(`⚠️ Limited to ${availableTopics.length} topics due to monthly quota`, {
                     duration: 4000
                   });
                 } else if (availableTopics.length > maxPerRequestFromStats && remainingToday >= maxPerRequestFromStats) {
@@ -1240,9 +1329,9 @@ const ChatbotPage = () => {
                     duration: 4000
                   });
                 } else if (availableTopics.length > maxPerRequestFromStats && remainingToday < maxPerRequestFromStats) {
-                  limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you can only create maximum ${maxPerRequestFromStats} topics at a time and have ${remainingToday} topic(s) remaining today. Showing first ${availableTopics.length} topic(s).`;
+                  limitMessage = `⚠️ I found ${extractedTopics.length} topics, but you can only create maximum ${maxPerRequestFromStats} topics at a time and have ${remainingToday} topic(s) remaining this month. Showing first ${availableTopics.length} topic(s).`;
                   // Show informational toast for combined limiting
-                  universalToast.show(`⚠️ Limited by daily quota (${remainingToday} left) and per-request limit (${maxPerRequestFromStats} max)`, {
+                  universalToast.show(`⚠️ Limited by monthly quota (${remainingToday} left) and per-request limit (${maxPerRequestFromStats} max)`, {
                     duration: 5000
                   });
                 }
@@ -1614,18 +1703,31 @@ const ChatbotPage = () => {
       const data = error?.response?.data || {};
       if (status === 429) {
         const msg = data?.message || 'You have hit the rate limit. Please try again later or reduce the number of requests.';
+        
+        // Check if it's a monthly limit reached error
+        const isMonthlyLimit = msg.toLowerCase().includes('monthly') || msg.toLowerCase().includes('month');
+        
         const botResponse = {
           id: generateMessageId(),
           type: "bot",
-          content: `🚫 ${msg}`,
+          content: isMonthlyLimit 
+            ? `🚫 **Monthly limit reached!**\n\nYou've used all **15 topics** for this month. Your limit will reset on the **1st of next month**. Come back then to create more amazing courses! 🎓✨`
+            : `🚫 ${msg}`,
           timestamp: new Date().toLocaleTimeString(),
           isRateLimit: true
         };
         setChatHistory(prev => [...prev, botResponse]);
         if (data?.usage_stats) setUsageStats(data.usage_stats);
-        // Do NOT clear topics; allow user to adjust and retry
-        // Keep the confirmation dialog open
-        setShowTopicConfirmation(true);
+        
+        // Close the confirmation dialog when monthly limit is reached
+        if (isMonthlyLimit) {
+          setShowTopicConfirmation(false);
+          setPendingTopics([]);
+          setOriginalPrompt("");
+        } else {
+          // For other rate limits (per-request), keep dialog open so user can adjust
+          setShowTopicConfirmation(true);
+        }
         return;
       }
 
@@ -1636,7 +1738,7 @@ const ChatbotPage = () => {
         timestamp: new Date().toLocaleTimeString(),
       };
       setChatHistory(prev => [...prev, errorResponse]);
-      // Keep topics so user can retry; close dialog only if needed
+      // For general errors, keep topics so user can retry
       setShowTopicConfirmation(true);
     } finally {
       creatingCourseRef.current = false;
@@ -2364,6 +2466,21 @@ const ChatbotPage = () => {
                       )}
                     </div>
 
+                    {/* Monthly Limit Warning - Show if limit reached */}
+                    {usageStats && ((usageStats.monthly_limit || 15) - (usageStats.monthly_used || 0)) <= 0 && (
+                      <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                        <div className="flex items-start gap-2">
+                          <span className="text-red-500 text-lg">🚫</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-red-800 mb-1">Monthly Limit Reached</p>
+                            <p className="text-xs text-red-600">
+                              You've used all <strong>15 topics</strong> for this month. Your limit will reset on the <strong>1st of next month</strong>. Come back then to create more amazing courses! 🎓✨
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Action Buttons */}
                     <div className="flex gap-3 pt-4 border-t border-gray-200">
                       <button
@@ -2374,9 +2491,15 @@ const ChatbotPage = () => {
                       </button>
                       <button
                         onClick={handleTopicConfirm}
-                        disabled={pendingTopics.length === 0 || isCreatingCourse}
+                        disabled={
+                          pendingTopics.length === 0 || 
+                          isCreatingCourse || 
+                          (usageStats && ((usageStats.monthly_limit || 15) - (usageStats.monthly_used || 0)) <= 0)
+                        }
                         className={`px-6 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-                          pendingTopics.length === 0 || isCreatingCourse
+                          pendingTopics.length === 0 || 
+                          isCreatingCourse || 
+                          (usageStats && ((usageStats.monthly_limit || 15) - (usageStats.monthly_used || 0)) <= 0)
                             ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                             : 'bg-indigo-600 text-white hover:bg-indigo-700'
                         }`}

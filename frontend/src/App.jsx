@@ -262,7 +262,8 @@ const App = () => {
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/privacy" element={<Navigate to="/privacy-policy" />} />
             <Route path="/chat" element={<ChatbotWrapper />} />
-            <Route path="/pro-learning" element={<ProLearningPage />} />
+            {/* Base Pro Learning path should not auto-create a course; show 404 */}
+            <Route path="/pro-learning" element={<NotFound />} />
             <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
@@ -342,6 +343,8 @@ const App = () => {
 
             {/* Mentoring routes removed */}
             
+            {/* Explicit NotFound route for programmatic redirects */}
+            <Route path="/not-found" element={<NotFound />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
