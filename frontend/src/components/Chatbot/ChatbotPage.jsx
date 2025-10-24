@@ -688,6 +688,10 @@ const ChatbotPage = () => {
       // Auto-send the message when coming from Home page
       setTimeout(() => {
         handleSendMessage(decodedMessage, { forceProMode: true });
+        // Clear the input field after sending
+        setTimeout(() => {
+          setMessage('');
+        }, 100);
       }, 500); // Slight delay to ensure pro mode is enabled first
       
       // Replace URL without parameters for cleaner history
@@ -699,6 +703,10 @@ const ChatbotPage = () => {
       setMessage(initialQuery);
       setTimeout(() => {
         handleSendMessage(initialQuery);
+        // Clear the input field after sending
+        setTimeout(() => {
+          setMessage('');
+        }, 100);
       }, 100);
       navigate("/chat", { replace: true });
     }
@@ -722,6 +730,10 @@ const ChatbotPage = () => {
       // Small delay to ensure UI is ready, then send
       setTimeout(() => {
         handleSendMessage(initialMessage, { forceProMode: forceProMode || true });
+        // Clear the input field after sending
+        setTimeout(() => {
+          setMessage('');
+        }, 100);
       }, 300);
     }
   }, [location.state?.initialMessage]);

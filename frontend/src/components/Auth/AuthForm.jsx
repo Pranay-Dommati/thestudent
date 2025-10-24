@@ -312,10 +312,11 @@ export default function AuthForm() {
                     />
                     
                     {/* Animated progress ring */}
-                    <motion.div
-                      className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-500"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                    <div
+                      className="absolute inset-0 rounded-full border-4 border-gray-200"
+                    />
+                    <div
+                      className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 animate-spin"
                     />
                     
                     {/* Center rocket icon */}
@@ -678,11 +679,7 @@ export default function AuthForm() {
                           exit={{ opacity: 0, y: -10 }}
                           className="flex items-center justify-center gap-2"
                         >
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
-                          />
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                           <span>Processing...</span>
                         </motion.div>
                       ) : (
