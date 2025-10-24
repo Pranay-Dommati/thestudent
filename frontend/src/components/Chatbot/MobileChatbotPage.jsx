@@ -21,6 +21,7 @@ import NewWelcomeCard from './NewWelcomeCard';
 // Use relative API paths; dev proxy routes to backend
 import apiAxios from '../../utils/axios';
 import aiAxios from '../../utils/axiosAi';
+import useOnlineStatus from '../../hooks/useOnlineStatus';
 
 // Helper function to parse markdown response (legacy - may not be used)
 const parseMarkdownResponse = (content) => {
@@ -63,6 +64,7 @@ const parseMarkdownResponse = (content) => {
 };
 
 const MobileChatbotPage = () => {
+  const online = useOnlineStatus();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -479,6 +481,12 @@ const MobileChatbotPage = () => {
     const forcePro = options?.forceProMode === true;
     const messageToSend = customMessage || message;
     if (!messageToSend.trim() || isLoading) return;
+
+    // Block send while offline and inform the user
+    if (!online) {
+      try { (await import('../../utils/universalToast')).default('You are offline. Please check your internet connection and try again.', 'info'); } catch (_) {}
+      return;
+    }
 
     console.log('📱 Mobile handleSendMessage called with:', { 
       messageToSend, 
@@ -1665,6 +1673,11 @@ const MobileChatbotPage = () => {
           <div className="px-4 sm:px-5 md:px-8 lg:px-12 xl:px-16 py-3">
             {/* Simple input field with send button */}
             <div className="relative">
+              {!online && (
+                <div className="mb-2 text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-center">
+                  You’re offline. Messages can’t be sent. We’ll resume when you’re back online.
+                </div>
+              )}
               <textarea
                 rows={1}
                 placeholder="Ask anything"
@@ -1678,7 +1691,7 @@ const MobileChatbotPage = () => {
                   } catch (_) {}
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && !isLoading) {
+                  if (e.key === "Enter" && !e.shiftKey && !isLoading && online) {
                     e.preventDefault();
                     handleSendMessage();
                   }
@@ -1692,10 +1705,10 @@ const MobileChatbotPage = () => {
               <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
                 <button
                   onClick={() => handleSendMessage()}
-                  disabled={!message.trim() || isLoading}
+                  disabled={!message.trim() || isLoading || !online}
                   aria-label="Send message"
                   className={`h-10 w-10 flex items-center justify-center rounded-full transition-all ${
-                    message.trim() && !isLoading 
+                    message.trim() && !isLoading && online 
                       ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md" 
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}

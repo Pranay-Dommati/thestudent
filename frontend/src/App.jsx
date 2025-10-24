@@ -39,6 +39,9 @@ import PrivacyPolicy from './components/Legal/PrivacyPolicy';
 import FeedbackPage from './components/Feedback/FeedbackPage';  // Add feedback import
 import './utils/axios';
 import ScrollManager from './components/Common/ScrollManager.jsx';
+import OnlineStatusToaster from './components/Common/OnlineStatusToaster.jsx';
+import OfflineRouterHandler from './components/Common/OfflineRouterHandler.jsx';
+import OfflinePage from './components/Common/OfflinePage.jsx';
 import CertificatePreview from './components/Certificates/CertificatePreview';
 import OnboardingModal from './components/Onboarding/OnboardingModal';
 
@@ -205,11 +208,17 @@ const App = () => {
         />
         <BrowserRouter>
           <ScrollManager />
+          {/* Global online/offline toast notifications */}
+          <OnlineStatusToaster />
+          {/* Auto-route to /offline when disconnected and back when restored */}
+          <OfflineRouterHandler />
           {/* Global Onboarding Modal - shows for new users on first login */}
           <OnboardingModal />
-        <Layout excludePaths={['/admin-p', '/chat']}>
+        <Layout excludePaths={['/admin-p', '/chat', '/offline']}>
           <Routes>
             <Route path="/" element={<HomePage />} />
+            {/* Offline fallback page */}
+            <Route path="/offline" element={<OfflinePage />} />
             
             {/* Admin Routes */}
             <Route path="/admin-p/*" element={<AdminDashboard />} />

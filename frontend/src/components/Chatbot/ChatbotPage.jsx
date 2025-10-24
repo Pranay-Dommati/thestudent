@@ -7,6 +7,7 @@ import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth } from '../../context/AuthContext';
+import useOnlineStatus from '../../hooks/useOnlineStatus';
 import { classifyTopics, formatRateLimitMessage } from "../ProLearning/topicclassifier";
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
@@ -496,6 +497,7 @@ const ChatbotPage = () => {
   const initialQueryProcessed = useRef(false);
   const autoSendProcessed = useRef(false); // Additional flag to prevent duplicate auto-sends
   const { width } = useWindowSize();
+  const online = useOnlineStatus();
   // Sidebar default: open on large desktop (>=1024px), closed otherwise
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const [chatSessions, setChatSessions] = useState([
@@ -1020,6 +1022,12 @@ const ChatbotPage = () => {
     const forcePro = options?.forceProMode === true;
     const messageToSend = customMessage || message;
     if (!messageToSend.trim() || isLoading) return;
+
+    // Block send while offline and inform the user
+    if (!online) {
+      try { universalToast('You are offline. Please check your internet connection and try again.', 'info'); } catch (_) {}
+      return;
+    }
 
     console.log('🔍 handleSendMessage called with:', { 
       messageToSend, 
@@ -2204,6 +2212,11 @@ const ChatbotPage = () => {
         {/* md+ open button is integrated into the header to avoid overlap */}
 
         {/* Chat messages - centered max-width container */}
+        {!online && (
+          <div className="w-full bg-amber-50 border-y border-amber-200 text-amber-800 text-sm text-center px-4 py-2">
+            You’re offline. Messages can’t be sent. We’ll resume when you’re back online.
+          </div>
+        )}
         {chatHistory.length === 0 ? (
           /* Centered welcome screen layout */
           <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
@@ -2227,7 +2240,7 @@ const ChatbotPage = () => {
                     onChange={(e) => setMessage(e.target.value)}
                     onInput={handleTextareaInput}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey && !isLoading) {
+                      if (e.key === "Enter" && !e.shiftKey && !isLoading && online) {
                         e.preventDefault();
                         handleSendMessage();
                       }
@@ -2241,10 +2254,10 @@ const ChatbotPage = () => {
                   <div className="absolute right-2 top-3 bottom-4 flex items-center">
                     <button
                       onClick={() => handleSendMessage()}
-                      disabled={!message.trim() || isLoading}
+                      disabled={!message.trim() || isLoading || !online}
                       aria-label="Send message"
                       className={`h-9 w-9 flex items-center justify-center rounded-xl transition-all shadow-sm ${
-                        message.trim() && !isLoading 
+                        message.trim() && !isLoading && online 
                           ? "bg-indigo-600 text-white hover:bg-indigo-700" 
                           : "bg-gray-200 text-gray-400 cursor-not-allowed"
                       }`}
@@ -2414,7 +2427,7 @@ const ChatbotPage = () => {
                   onChange={(e) => setMessage(e.target.value)}
                   onInput={handleTextareaInput}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey && !isLoading) {
+                    if (e.key === "Enter" && !e.shiftKey && !isLoading && online) {
                       e.preventDefault();
                       handleSendMessage();
                     }
@@ -2428,10 +2441,10 @@ const ChatbotPage = () => {
                 <div className="absolute right-2 top-4 bottom-4 flex items-center">
                   <button
                     onClick={() => handleSendMessage()}
-                    disabled={!message.trim() || isLoading}
+                    disabled={!message.trim() || isLoading || !online}
                     aria-label="Send message"
                     className={`h-9 w-9 flex items-center justify-center rounded-xl transition-all shadow-sm ${
-                      message.trim() && !isLoading 
+                      message.trim() && !isLoading && online 
                         ? "bg-indigo-600 text-white hover:bg-indigo-700" 
                         : "bg-gray-200 text-gray-400 cursor-not-allowed"
                     }`}
