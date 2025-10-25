@@ -1264,8 +1264,8 @@ export const handleSaveToLearningHub = async (dependencies) => {
       if (response.status === 401) {
         universalToast.error('Authentication failed. Please log in again.');
       } else if (response.status === 409) {
-        const toast = (await import('react-hot-toast')).default;
-        toast.warning('This course already exists in your Learning Hub.');
+        // Use central toast util to ensure de-duplication
+        universalToast.show('This course already exists in your Learning Hub.');
         // Mark as saved locally to reflect existing state
         try {
           const courseKey = `${currentCourseId}_${smartCourseName}`;

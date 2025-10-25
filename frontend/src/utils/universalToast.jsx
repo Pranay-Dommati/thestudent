@@ -10,6 +10,23 @@ const DEFAULT_DURATIONS = {
   loading: Infinity,
 };
 
+// Internal registry for optional debounce/diagnostics (not strictly required for dedupe via id)
+const activeToasts = new Set();
+
+// Normalize a message so identical texts map to the same id across mobile/desktop
+const normalizeMessage = (msg) => String(msg || '')
+  .trim()
+  .replace(/\s+/g, ' '); // collapse whitespace
+
+// Build a deterministic toast id so the same message/type can’t stack duplicates
+const buildToastId = (variant, message, explicitId, dedupeKey) => {
+  if (explicitId) return explicitId; // caller-provided id has priority
+  if (dedupeKey) return `key:${dedupeKey}`;
+  const base = normalizeMessage(message);
+  // Use variant + normalized message as stable id
+  return `${variant}|${base}`.slice(0, 180); // keep id reasonably short
+};
+
 // Helper to render content with a bottom progress bar timer
 const renderContent = (message, t, durationMs, barGradient = 'linear-gradient(90deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,1) 100%)', barShadow = '0 0 8px rgba(255, 255, 255, 0.6)') => {
   // Auto-dismiss when progress bar completes
@@ -97,9 +114,21 @@ const renderContent = (message, t, durationMs, barGradient = 'linear-gradient(90
 };
 
 const universalToast = {
+  // Success toast (deduped by default)
   success: (message, options = {}) => {
     const duration = options?.duration ?? DEFAULT_DURATIONS.success;
-    const computed = { ...options, duration: Infinity }; // Disable auto-dismiss, let our progress bar control it
+    const id = buildToastId('success', message, options?.id, options?.dedupeKey);
+    const onClosePrev = options?.onClose;
+    const computed = {
+      ...options,
+      id,
+      duration: Infinity, // Disable auto-dismiss, let our progress bar control it
+      onClose: (t) => {
+        activeToasts.delete(id);
+        onClosePrev?.(t);
+      },
+    };
+    activeToasts.add(id);
     return toast.success(
       (t) => renderContent(
         message, 
@@ -112,9 +141,21 @@ const universalToast = {
     );
   },
 
+  // Error toast (deduped by default)
   error: (message, options = {}) => {
     const duration = options?.duration ?? DEFAULT_DURATIONS.error;
-    const computed = { ...options, duration: Infinity }; // Disable auto-dismiss, let our progress bar control it
+    const id = buildToastId('error', message, options?.id, options?.dedupeKey);
+    const onClosePrev = options?.onClose;
+    const computed = {
+      ...options,
+      id,
+      duration: Infinity, // Disable auto-dismiss, let our progress bar control it
+      onClose: (t) => {
+        activeToasts.delete(id);
+        onClosePrev?.(t);
+      },
+    };
+    activeToasts.add(id);
     return toast.error(
       (t) => renderContent(
         message, 
@@ -130,7 +171,18 @@ const universalToast = {
   // Default toast (for info messages)
   show: (message, options = {}) => {
     const duration = options?.duration ?? DEFAULT_DURATIONS.show;
-    const computed = { ...options, duration: Infinity }; // Disable auto-dismiss, let our progress bar control it
+    const id = buildToastId('show', message, options?.id, options?.dedupeKey);
+    const onClosePrev = options?.onClose;
+    const computed = {
+      ...options,
+      id,
+      duration: Infinity, // Disable auto-dismiss, let our progress bar control it
+      onClose: (t) => {
+        activeToasts.delete(id);
+        onClosePrev?.(t);
+      },
+    };
+    activeToasts.add(id);
     return toast(
       (t) => renderContent(
         message, 
@@ -143,9 +195,21 @@ const universalToast = {
     );
   },
 
+  // Info toast (alias of show with same theming; kept for API parity)
   info: (message, options = {}) => {
     const duration = options?.duration ?? DEFAULT_DURATIONS.info;
-    const computed = { ...options, duration: Infinity }; // Disable auto-dismiss, let our progress bar control it
+    const id = buildToastId('info', message, options?.id, options?.dedupeKey);
+    const onClosePrev = options?.onClose;
+    const computed = {
+      ...options,
+      id,
+      duration: Infinity, // Disable auto-dismiss, let our progress bar control it
+      onClose: (t) => {
+        activeToasts.delete(id);
+        onClosePrev?.(t);
+      },
+    };
+    activeToasts.add(id);
     return toast(
       (t) => renderContent(
         message, 
@@ -161,7 +225,18 @@ const universalToast = {
   // Loading toast (persisting until dismissed or updated)
   loading: (message, options = {}) => {
     const duration = options?.duration ?? DEFAULT_DURATIONS.loading;
-    const computed = { ...options, duration };
+    const id = buildToastId('loading', message, options?.id, options?.dedupeKey);
+    const onClosePrev = options?.onClose;
+    const computed = {
+      ...options,
+      id,
+      duration,
+      onClose: (t) => {
+        activeToasts.delete(id);
+        onClosePrev?.(t);
+      },
+    };
+    activeToasts.add(id);
     // No timer bar for loading (indeterminate)
     return toast.loading((t) => renderContent(message, t, duration), computed);
   },
