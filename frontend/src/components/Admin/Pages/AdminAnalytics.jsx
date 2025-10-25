@@ -379,20 +379,27 @@ const AdminAnalytics = ({ isDarkMode }) => {
 
     const filtered = useMemo(() => {
       const list = sessions.map(s => ({
-        id: s.session_id,
+        id: s.session_id || s.id || s.distinct_id || s.sessionId || '',
         count: s.count,
         success: s.success,
         fail: s.fail,
         first: s.first ? new Date(s.first) : null,
         last: s.last ? new Date(s.last) : null,
-        durationMin: s.duration_min ?? 0,
+        durationMin: s.duration_min ?? s.duration_minute ?? 0,
+        // try to surface origin/host info to help find recordings from non-localhost devices
+        host: (s.host || s.origin || s.domain || s.hostname || (s.pages && s.pages[0] && (() => { try { const u = new URL(s.pages[0].url); return u.hostname; } catch { return null; } })()) || '')
       }));
       const ql = q.toLowerCase();
       return q ? list.filter(s => s.id?.toLowerCase().includes(ql)) : list;
     }, [sessions, q]);
 
     const copy = async (text) => { try { await navigator.clipboard.writeText(text); } catch {} };
-    const recordingUrl = (sid) => `${POSTHOG_APP_URL}/recordings?search=${encodeURIComponent(sid)}`;
+    const recordingUrl = (sid) => {
+      // Search for distinct_id or session_id across PostHog recordings. Use a quoted search to avoid partial matches.
+      const q = `distinct_id:\"${sid}\" OR session_id:\"${sid}\" OR id:\"${sid}\"`;
+      const base = (POSTHOG_APP_URL || 'https://us.posthog.com').replace(/\/$/, '');
+      return `${base}/recordings?search=${encodeURIComponent(q)}`;
+    };
 
     return (
       <div className="p-0">
@@ -427,14 +434,15 @@ const AdminAnalytics = ({ isDarkMode }) => {
         <div className="overflow-auto border rounded-xl">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Session</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Events</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Success/Fail</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">First</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
-                <th className="px-4 py-2"></th>
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Session</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Host</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Events</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Success/Fail</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">First</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                  <th className="px-4 py-2"></th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -442,9 +450,10 @@ const AdminAnalytics = ({ isDarkMode }) => {
                 <tr><td className="px-4 py-6" colSpan="7">Loading…</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td className="px-4 py-6" colSpan="7">No sessions found</td></tr>
-              ) : filtered.map(s => (
-                <tr key={s.id}>
-                  <td className="px-4 py-2 text-xs font-mono">{s.id}</td>
+                ) : filtered.map(s => (
+                <tr key={s.id || Math.random()}>
+                  <td className="px-4 py-2 text-xs font-mono">{s.id || '—'}</td>
+                  <td className="px-4 py-2 text-xs">{s.host || '—'}</td>
                   <td className="px-4 py-2 text-xs">{s.count}</td>
                   <td className="px-4 py-2 text-xs">{s.success} / {s.fail}</td>
                   <td className="px-4 py-2 text-xs">{s.first ? s.first.toLocaleString() : '—'}</td>
@@ -453,6 +462,7 @@ const AdminAnalytics = ({ isDarkMode }) => {
                   <td className="px-4 py-2 text-xs flex gap-2">
                     <button className="px-2 py-1 border rounded" onClick={() => copy(s.id)}>Copy ID</button>
                     <a className="px-2 py-1 border rounded" href={recordingUrl(s.id)} target="_blank" rel="noreferrer">Open PostHog</a>
+                    <a className="px-2 py-1 border rounded" href={`${POSTHOG_APP_URL.replace(/\/$/, '')}/recordings`} target="_blank" rel="noreferrer">All Recordings</a>
                   </td>
                 </tr>
               ))}

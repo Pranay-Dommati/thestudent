@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils.dateparse import parse_datetime
@@ -9,7 +9,7 @@ from django.db.models import Count, Min, Max, Sum, Case, When, IntegerField
 
 
 @api_view(["POST"])  # accepts a single event
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([AllowAny])
 def track_activity(request):
     """Track one analytics event.
 
@@ -62,7 +62,7 @@ def track_activity(request):
 
 
 @api_view(["POST"])  # accepts a batch of events
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([AllowAny])
 def track_activity_bulk(request):
     """Track multiple analytics events in a single request.
 
