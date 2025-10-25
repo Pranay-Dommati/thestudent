@@ -740,6 +740,26 @@ const ChatbotPage = () => {
     }
   }, [location.state?.initialMessage]);
 
+  // Fallback: if we stored a pending message during auth redirect, restore and auto-send it once
+  useEffect(() => {
+    if (autoSendProcessed.current) return;
+    try {
+      const pending = sessionStorage.getItem('pendingChatMessage');
+      if (pending && typeof pending === 'string' && pending.trim()) {
+        // Mark processed early to avoid duplicates
+        autoSendProcessed.current = true;
+        initialQueryProcessed.current = true;
+        // Clear the storage so it runs only once
+        sessionStorage.removeItem('pendingChatMessage');
+        setMessage(pending);
+        setTimeout(() => {
+          handleSendMessage(pending);
+          setTimeout(() => setMessage(''), 100);
+        }, 200);
+      }
+    } catch (_) {}
+  }, []);
+
   // Timeout fallback to prevent infinite "Loading stats..." when pro mode is enabled
   useEffect(() => {
     if (proMode && !usageStats) {
@@ -1168,7 +1188,21 @@ const ChatbotPage = () => {
     try {
       const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isAuthenticated;
       if (!authed) {
-        const returnTo = window.location.pathname + window.location.search;
+        // Preserve the user's typed message across auth redirect by embedding
+        // it into the returnTo URL and also saving a short-lived backup in sessionStorage.
+        try {
+          // Backup in case the auth page strips params
+          sessionStorage.setItem('pendingChatMessage', messageToSend);
+        } catch (_) {}
+
+        // Build a clean returnTo URL that includes the pending message so that
+        // ChatbotPage can auto-send it after successful login.
+  const currentUrl = new URL(window.location.href);
+  // Do not pre-encode; URLSearchParams will encode as needed
+  currentUrl.searchParams.set('message', messageToSend);
+        currentUrl.searchParams.set('prefill', 'true');
+        const returnTo = `${currentUrl.pathname}?${currentUrl.searchParams.toString()}`;
+
         const signInUrl = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
         const signUpUrl = `/auth?mode=signup&returnTo=${encodeURIComponent(returnTo)}`;
         const authPrompt = {
