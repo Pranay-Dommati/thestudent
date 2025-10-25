@@ -459,7 +459,7 @@ const AILearningPlans = () => {
       {/* Delete Confirmation Modal */}
       {deleteConfirm.show && createPortal((
         <div
-          className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-transparent flex items-center justify-center z-[1000] p-4"
           style={{ backdropFilter: 'none', WebkitBackdropFilter: 'none', backgroundColor: 'transparent' }}
           onClick={(e) => { if (e.target === e.currentTarget) cancelDelete(); }}
         >
