@@ -42,10 +42,47 @@ export default function AuthForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [otpOpen, setOtpOpen] = useState(false);
 
+  // Restore form data from sessionStorage when component mounts
+  useEffect(() => {
+    const savedFormData = sessionStorage.getItem('authFormData');
+    if (savedFormData) {
+      try {
+        const parsed = JSON.parse(savedFormData);
+        // Only restore if it matches current mode (signup/login)
+        if (parsed.mode === (isSignUp ? 'signup' : 'login')) {
+          setFormData({
+            name: parsed.name || '',
+            email: parsed.email || '',
+            password: parsed.password || '',
+            confirmPassword: parsed.confirmPassword || '',
+            agreedToTerms: parsed.agreedToTerms || false
+          });
+        }
+      } catch (e) {
+        // Invalid JSON, ignore
+      }
+    }
+  }, [isSignUp]);
+
+  // Save form data to sessionStorage whenever it changes
+  useEffect(() => {
+    if (formData.email || formData.name || formData.password) {
+      sessionStorage.setItem('authFormData', JSON.stringify({
+        ...formData,
+        mode: isSignUp ? 'signup' : 'login'
+      }));
+    }
+  }, [formData, isSignUp]);
+
+  // Clear saved form data when user successfully authenticates
+  const clearSavedFormData = () => {
+    sessionStorage.removeItem('authFormData');
+  };
+
   const toggleForm = () => {
     const newMode = !isSignUp;
     
-    // Clear form errors and data immediately for smooth transition
+    // Clear form errors, data, and sessionStorage immediately for smooth transition
     setFormErrors({});
     setFormData({
       name: '',
@@ -54,6 +91,9 @@ export default function AuthForm() {
       confirmPassword: '',
       agreedToTerms: false,
     });
+    
+    // Clear sessionStorage when user explicitly toggles between signup/login
+    clearSavedFormData();
     
     // Preserve the returnTo parameter if it exists
     const returnToParam = returnToPath ? `&returnTo=${encodeURIComponent(returnToPath)}` : '';
@@ -80,6 +120,8 @@ export default function AuthForm() {
       
       const success = await googleLogin(credential);
       if (success) {
+        // Clear saved form data on successful login
+        clearSavedFormData();
         // Toast is already shown in AuthContext with id 'auth-login', no duplicate
         navigate(returnToPath || '/', { replace: true });
       } else {
@@ -175,6 +217,8 @@ export default function AuthForm() {
         setIsLoading(false); // Stop loading immediately after response
         
         if (response?.success) {
+          // Clear saved form data on successful login
+          clearSavedFormData();
           // Redirect to the returnTo path if it exists, otherwise to the homepage
           navigate(returnToPath || '/', { replace: true });
         } else if (response?.suggestSignup) {
@@ -387,6 +431,8 @@ export default function AuthForm() {
         fullName={formData.name}
         onClose={() => setOtpOpen(false)}
         onVerified={async () => {
+          // Clear saved form data after successful signup verification
+          clearSavedFormData();
           await validateAuth();
           navigate(returnToPath || '/', { replace: true });
         }}
