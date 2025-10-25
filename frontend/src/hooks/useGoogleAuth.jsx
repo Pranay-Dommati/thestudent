@@ -11,6 +11,12 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
   const [isGoogleReady, setIsGoogleReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  // Basic mobile/iOS Safari detection for auth UX adjustments
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const isIOS = /iP(hone|od|ad)/i.test(ua);
+  const isMobile = /Android|iPhone|iPad|iPod|Mobi/i.test(ua);
+  const isSafari = /Safari/i.test(ua) && !/Chrome|CriOS|FxiOS|EdgiOS/i.test(ua);
+  const isMobileSafari = isMobile && isSafari;
 
   useEffect(() => {
     // Handle Google authentication response
@@ -87,8 +93,8 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
           client_id: GOOGLE_CLIENT_ID,
           callback: handleGoogleResponse,
           auto_select: false,
-          cancel_on_tap_outside: true,
-          use_fedcm_for_prompt: false,
+          // Enable FedCM on mobile Safari for better reliability
+          use_fedcm_for_prompt: isMobileSafari ? true : false,
           ux_mode: 'popup', // Use popup mode to avoid iframe issues
           context: 'signin', // Specify context
         });
@@ -129,7 +135,7 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
         if (notification.isNotDisplayed && notification.isNotDisplayed()) {
           console.log('Google Sign-In prompt not displayed, trying fallback method');
           // Fallback: try rendering a button and clicking it programmatically
-          // Don't call onError here - let the fallback try first
+          renderGoogleButtonAndClick({ visibleOnMobile: true });
           renderGoogleButtonAndClick();
         } else if (notification.isSkippedMoment && notification.isSkippedMoment()) {
           console.log('Google Sign-In prompt skipped');

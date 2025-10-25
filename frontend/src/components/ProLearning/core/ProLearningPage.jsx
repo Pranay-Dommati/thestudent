@@ -142,6 +142,10 @@ import MainContentLayout from './MainContentLayout.jsx';
 import LoadingComponent from './LoadingComponent.jsx';
 // Course Initialization
 import { createInitializeCourseData } from './CourseInitialization.jsx';
+// Content Loading Effect
+import { createContentLoadingEffect } from './ContentLoadingEffect.jsx';
+// Topics Initialization Effect
+import { createTopicsInitializationEffect } from './TopicsInitializationEffect.jsx';
 
 
 const ProLearningPage = () => {
@@ -291,126 +295,6 @@ const ProLearningPage = () => {
     checkIfCourseSaved();
   }, [courseId]);
 
-  // Set default topics and initialize with consistent course ID
-  useEffect(() => {
-    // Removed IndexedDB waits; Pro Learning no longer relies on IDB
-    // Note: using component-scoped loadContentForReloadMode declared above
-    
-    // Handle reload scenario - content already exists, load quickly
-    const handleReloadScenario = async (courseId, handleTopicSelection) => {
-      console.log('⚡ Reload scenario: Loading existing content quickly');
-      setIsLoading(true);
-      setLoadingStep('Loading course content...');
-      
-      try {
-        // Get all stored topics
-        const storedTopics = await proContentManager.getStoredTopics(courseId);
-        
-        if (storedTopics.length > 0) {
-          console.log('✅ Found stored topics for reload:', storedTopics.map(t => t.name));
-          
-          // Populate available tabs for all topics at once
-          const tabsMap = {};
-          for (const topic of storedTopics) {
-            try {
-              const content = await proContentManager.getStoredTopicContent(courseId, topic.name);
-              if (content) {
-                const availableTabs = [];
-                if (content.reading) availableTabs.push('reading');
-                if (content.summary) availableTabs.push('summary');
-                if (content.videos?.length > 0) availableTabs.push('videos');
-                if (content.quiz?.length > 0 || (content.quiz?.questions?.length > 0)) availableTabs.push('quiz');
-                if (content.resources?.length > 0) availableTabs.push('resources');
-                
-                if (availableTabs.length > 0) {
-                  tabsMap[topic.name] = availableTabs;
-                }
-              }
-            } catch (error) {
-              console.warn(`Failed to load content for topic: ${topic.name}`, error);
-            }
-          }
-          
-          // Set all available tabs at once
-          if (Object.keys(tabsMap).length > 0) {
-            setAvailableTabsForTopics(tabsMap);
-            console.log('🎯 Set available tabs for reload:', Object.keys(tabsMap));
-          }
-          
-          // Handle topic selection (this will load the specific topic content)
-          handleTopicSelection(storedTopics);
-          
-          setIsLoading(false);
-          setLoadingStep('');
-          console.log('✅ Reload scenario completed successfully');
-        } else {
-          console.warn('⚠️ No stored topics found in reload scenario, falling back to generation');
-          setIsLoading(false);
-          return false; // Indicate fallback needed
-        }
-        return true;
-      } catch (error) {
-        console.error('❌ Error in reload scenario:', error);
-        setIsLoading(false);
-        return false; // Indicate fallback needed
-      }
-    };
-    
-    // Helper function to detect if this is first-time generation vs subsequent reload
-    const detectLoadScenario = async (courseId) => {
-      try {
-        // Check if we have topics stored with content in ProContentManager
-        const storedTopics = await proContentManager.getStoredTopics(courseId);
-        
-        if (storedTopics.length === 0) {
-          return 'first-time'; // No topics stored at all
-        }
-        
-        // Check if any topics have generated content
-        let hasGeneratedContent = false;
-        for (const topic of storedTopics) {
-          const content = await proContentManager.getStoredTopicContent(courseId, topic.name);
-          if (content && content.reading) {
-            hasGeneratedContent = true;
-            break;
-          }
-        }
-        
-        return hasGeneratedContent ? 'reload' : 'first-time';
-      } catch (error) {
-        console.error('Error detecting load scenario:', error);
-        return 'first-time'; // Default to first-time on error
-      }
-    };
-    
-    // Create initializeCourseData function using factory with all required dependencies
-    const initializeCourseData = createInitializeCourseData({
-      getCourseId,
-      topicParam,
-      courseTitle,
-      setTopicsList,
-      setSelectedTopic,
-      setAvailableTabsForTopics,
-      proContentManager,
-      getCurrentTopicFromParam,
-      navigate,
-      setActiveTab,
-      loadScenario,
-      loadContentForReloadMode,
-      loadTopicContent,
-      parseTopicsFromParam,
-      detectLoadScenario,
-      setLoadScenario,
-      handleReloadScenario,
-      fetchCourseFromDB
-    });
-
-    // Properly await the async initialization
-    initializeCourseData().catch(error => {
-      console.error('❌ Failed to initialize course data:', error);
-    });
-  }, [courseTitle, courseId, topicParam]); // Add topicParam dependency for immediate sync
-  
   // Content state
   const [content, setContent] = useState(null);
   // Track which topic the current `content` belongs to to prevent cross-topic leaks
@@ -779,224 +663,6 @@ const ProLearningPage = () => {
     }
   }, [topicsList, courseTitle, useProgressiveGeneration, loadScenario, isProgressiveGenerating, allTopicsGenerated]); // Depend on loadScenario to detect fresh generation
 
-  // Load content for initially active topic using new storage system
-  useEffect(() => {
-    // If this page was opened for an already-saved course (DB reload),
-    // skip this effect entirely to avoid kicking off any new generation.
-    if (loadScenario === 'reload') {
-      return;
-    }
-    // Skip if we're handling URL-based topic loading directly or during direct URL generation
-    if (isDirectUrlGeneration || (topicParam && !topicsList.length)) {
-      return; // Let the URL topic loading useEffect handle this
-    }
-    
-    // Check if we're in fresh course creation mode using consistent logic
-    const shouldSkipOld = shouldSkipOldCachedContent();
-    const progressiveStatus = getProgressiveGenerationStatus();
-    const isProgressiveGeneration = progressiveStatus && progressiveStatus.isGenerating;
-    const shouldForceGeneration = shouldSkipOld || isProgressiveGeneration;
-    
-    if (shouldForceGeneration) {
-  debugLog('🔄 DEBUG: Fresh course creation detected - skipping cached content loading in initial topic effect');
-      return;
-    }
-    
-    if (topicsList.length > 0 && courseTitle) {
-      const activeTopic = topicsList.find(t => t.isActive);
-      if (activeTopic) {
-        // CRITICAL: Check if we're already generating content for this topic
-        const generationKey = `${getCourseId()}_${activeTopic.name}`;
-        if (generatingContentRef.current.has(generationKey)) {
-          console.log('🛑 Already generating content for:', activeTopic.name, '- skipping duplicate request');
-          return;
-        }
-        
-        // If we already have content in state, avoid hydrating from storage to prevent overwriting
-        // progressive content with a different post-generation copy.
-        if (content && (content.reading || content.summary || content.videos?.length || content.quiz?.length || content.resources?.length)) {
-          console.log('🛡️ Skipping stored content hydration to preserve already displayed content for:', activeTopic.name);
-          setIsLoading(false);
-          setShowSkeletons(false);
-          return;
-        }
-
-        // Check if content exists in storage for the active topic
-        const storedContent = getStoredTopicContent(activeTopic.name, courseTitle, getCourseId());
-        
-        if (storedContent) {
-            setContentWithSanitization(storedContent, 'initialActiveTopic:stored');
-          
-          // Parse reading content into sections if available
-          if (storedContent.reading) {
-            const sections = parseReadingSections(storedContent.reading);
-            setReadingSections(sections);
-            setReadingSectionIndex(0);
-          }
-          
-          setIsLoading(false);
-          setShowSkeletons(false);
-        } else if (isBatchGenerating) {
-          // Show loading if content is being generated in batch
-          setIsLoading(true);
-          setShowSkeletons(true);
-          setLoadingStep(`Generating content for ${activeTopic.name}... Please wait.`);
-          
-          // Check periodically if content becomes available in storage
-          const checkContentInterval = setInterval(() => {
-            const newStoredContent = getStoredTopicContent(activeTopic.name, courseTitle, getCourseId());
-            if (newStoredContent) {
-              setContentWithSanitization(newStoredContent, 'initialActiveTopic:storedPolling');
-              
-              // Parse reading content into sections
-              if (newStoredContent.reading) {
-                const sections = parseReadingSections(newStoredContent.reading);
-                setReadingSections(sections);
-                setReadingSectionIndex(0);
-              }
-              
-              setIsLoading(false);
-              setShowSkeletons(false);
-              clearInterval(checkContentInterval);
-            }
-          }, 1000); // Check every second
-          
-          // Clean up interval
-          return () => clearInterval(checkContentInterval);
-        } else {
-          // If not in batch generation and no stored content, load from ProContentManager
-          setIsLoading(true);
-          setShowSkeletons(true);
-          setSectionGenerating(true);
-          setGeneratingTopics(prev => [...prev, activeTopic.name]);
-          
-          // Pass database topic data if available
-          const dbTopic = activeTopic?.dbTopic || null;
-          
-          // Mark this topic as being generated
-          const generationKey = `${getCourseId()}_${activeTopic.name}`;
-          generatingContentRef.current.add(generationKey);
-          console.log('🚀 Starting content generation for:', activeTopic.name);
-          
-          proContentManager.getTopicContent(activeTopic.name, generateProContent, dbTopic)
-            .then(result => {
-              // Remove from generating set when done
-              generatingContentRef.current.delete(generationKey);
-              lastGeneratedTopicRef.current = activeTopic.name;
-              console.log('✅ Completed content generation for:', activeTopic.name);
-              
-              setSectionGenerating(false);
-              setGeneratingTopics(prev => prev.filter(t => t !== activeTopic.name));
-              if (result && result.content) {
-                setContentWithSanitization(result.content, 'initialActiveTopic:getTopicContent');
-                
-                // Parse reading content into sections
-                if (result.content && result.content.reading) {
-                  const sections = parseReadingSections(result.content.reading);
-                  setReadingSections(sections);
-                  setReadingSectionIndex(0);
-                } else {
-                  setReadingSections([]);
-                  setReadingSectionIndex(0);
-                }
-                
-              }
-              setIsLoading(false);
-              setShowSkeletons(false);
-            })
-            .catch(error => {
-              // Remove from generating set on error too
-              generatingContentRef.current.delete(generationKey);
-              console.error('❌ Failed to load content for:', activeTopic.name, error);
-              setIsLoading(false);
-              setShowSkeletons(false);
-            });
-        }
-      }
-    } else if (topicParam && !topicsList.length) {
-      // If no topics list but we have a topic from URL, handle content loading/generation
-      const actualTopic = getCurrentTopicFromParam(topicParam);
-      const currentCourseId = getCourseId();
-      
-      if (currentCourseId) {
-        // CRITICAL: Check if we're already generating content for this topic
-        const generationKey = `${currentCourseId}_${actualTopic}`;
-        if (generatingContentRef.current.has(generationKey)) {
-          console.log('🛑 Already generating content for:', actualTopic, '- skipping duplicate URL request');
-          return;
-        }
-        
-        setIsLoading(true);
-        setShowSkeletons(true);
-        setLoadingStep(`Loading content for ${actualTopic}...`);
-        
-        // Mark this topic as being generated
-        generatingContentRef.current.add(generationKey);
-        console.log('🚀 Starting URL-based content generation for:', actualTopic);
-        
-        // First try to get database topic data
-        const getDatabaseTopicData = async () => {
-          const databaseCourse = await fetchCourseFromDB(currentCourseId);
-          if (databaseCourse?.topics) {
-            // Set course context with database course name if courseTitle is empty
-            const courseName = courseTitle || databaseCourse.course_name || "Database Course";
-            proContentManager.setCourse(courseName, currentCourseId);
-            console.log('✅ ProContentManager initialized for direct URL with course:', courseName);
-            
-            return {
-              dbTopic: databaseCourse.topics.find(topic => topic.topic_name === actualTopic),
-              courseName: databaseCourse.course_name
-            };
-          }
-          return null;
-        };
-        
-  // Use ProContentManager to handle content retrieval/generation
-  proContentManager.setCourse(courseTitle || 'Generated Course', currentCourseId);
-        
-        getDatabaseTopicData().then(result => {
-          const dbTopic = result?.dbTopic || null;
-          return proContentManager.getTopicContent(actualTopic, generateProContent, dbTopic);
-        })
-          .then(result => {
-            // Remove from generating set when done
-            generatingContentRef.current.delete(generationKey);
-            lastGeneratedTopicRef.current = actualTopic;
-            console.log('✅ Completed URL-based content generation for:', actualTopic);
-            
-            if (result?.content?.reading) {
-              setContentWithSanitization(result.content, 'direct:getTopicContentWithReading');
-              const sections = parseReadingSections(result.content.reading);
-              setReadingSections(sections);
-              setReadingSectionIndex(0);
-              console.log('✅ Content ready:', result.source === 'storage' ? 'from storage' : result.source === 'database' ? 'from database' : 'newly generated');
-            } else {
-              throw new Error('Invalid content received');
-            }
-          })
-          .catch(error => {
-            // Remove from generating set on error
-            generatingContentRef.current.delete(generationKey);
-            console.error('❌ Failed to load/generate content for:', actualTopic, error);
-          })
-          .finally(() => {
-            setIsLoading(false);
-            setShowSkeletons(false);
-          });
-      }
-    }
-  }, [topicsList, courseTitle, isBatchGenerating, topicParam, isDirectUrlGeneration]);
-
-  // Watch for content updates and trigger regeneration if content is empty
-  const [regenerationAttempted, setRegenerationAttempted] = useState(false);
-  
-  // Reset regeneration flag when topic changes
-  useEffect(() => {
-    setRegenerationAttempted(false);
-    setIsDirectUrlGeneration(false); // Reset direct generation flag when topic changes
-  }, [topicParam]);
-  
-
   // Helper function to check if topic content exists in batch-generated data
   const hasTopicContent = (topicName) => {
     const currentCourseId = getCourseId();
@@ -1039,6 +705,51 @@ const ProLearningPage = () => {
       return false;
     }
   };
+
+  // Track content generation to prevent infinite loops
+  const generatingContentRef = useRef(new Set());
+  const lastGeneratedTopicRef = useRef(null);
+
+  // Load content for initially active topic using new storage system
+  useEffect(createContentLoadingEffect({
+    loadScenario,
+    isDirectUrlGeneration,
+    topicParam,
+    topicsList,
+    shouldSkipOldCachedContent,
+    getProgressiveGenerationStatus,
+    debugLog,
+    courseTitle,
+    getCourseId,
+    generatingContentRef,
+    content,
+    setIsLoading,
+    setShowSkeletons,
+    getStoredTopicContent,
+    setContentWithSanitization,
+    parseReadingSections,
+    setReadingSections,
+    setReadingSectionIndex,
+    isBatchGenerating,
+    setLoadingStep,
+    setSectionGenerating,
+    setGeneratingTopics,
+    proContentManager,
+    generateProContent,
+    lastGeneratedTopicRef,
+    getCurrentTopicFromParam,
+    fetchCourseFromDB
+  }), [topicsList, courseTitle, isBatchGenerating, topicParam, isDirectUrlGeneration]);
+
+  // Watch for content updates and trigger regeneration if content is empty
+  const [regenerationAttempted, setRegenerationAttempted] = useState(false);
+  
+  // Reset regeneration flag when topic changes
+  useEffect(() => {
+    setRegenerationAttempted(false);
+    setIsDirectUrlGeneration(false); // Reset direct generation flag when topic changes
+  }, [topicParam]);
+  
 
   // Helper function to check if content is freshly generated (very recent, within current session)
   const isContentFreshlyGenerated = (content, strictMode = false) => {
@@ -1444,10 +1155,6 @@ const ProLearningPage = () => {
   
   // Ref for debounced tab updates
   const debouncedUpdateActiveTab = useRef(null);
-  
-  // Track content generation to prevent infinite loops
-  const generatingContentRef = useRef(new Set());
-  const lastGeneratedTopicRef = useRef(null);
 
   // Tab navigation handlers
   const { updateActiveTab, updateActiveTabDesktop, updateTopicInUrl } = ProLearningUtils.createTabNavigationHandlers({
@@ -1457,6 +1164,29 @@ const ProLearningPage = () => {
     tabUrlSyncPendingRef,
     debouncedUpdateActiveTab
   });
+
+  // Set default topics and initialize with consistent course ID
+  useEffect(createTopicsInitializationEffect({
+    setIsLoading,
+    setLoadingStep,
+    proContentManager,
+    setAvailableTabsForTopics,
+    createInitializeCourseData,
+    getCourseId,
+    topicParam,
+    courseTitle,
+    setTopicsList,
+    setSelectedTopic,
+    getCurrentTopicFromParam,
+    navigate,
+    setActiveTab,
+    loadScenario,
+    loadContentForReloadMode,
+    loadTopicContent,
+    parseTopicsFromParam,
+    setLoadScenario,
+    fetchCourseFromDB
+  }), [courseTitle, courseId, topicParam]); // Add topicParam dependency for immediate sync
 
   // Handle URL tab parameter changes (after topic initialization is complete)
   // Coerce invalid/unready tabs to the first available tab for the current topic

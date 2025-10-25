@@ -38,7 +38,11 @@ export const AuthProvider = ({ children }) => {
       return false;
     } catch (error) {
       console.error('Token refresh failed:', error);
-      handleAuthFailure();
+      // Only clear auth on explicit invalid refresh (400/401). For network timeouts/offline, keep tokens.
+      const status = error.response?.status;
+      if (status === 400 || status === 401) {
+        handleAuthFailure();
+      }
       throw error;
     }
   };
@@ -82,8 +86,16 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Auth validation failed:', error);
-      handleAuthFailure();
-      return false;
+      const status = error.response?.status;
+      // Only log out on explicit auth failure. If network/timeout, keep tokens and try again later.
+      if (status === 401) {
+        handleAuthFailure();
+        return false;
+      }
+      // Network or server error: don't clear tokens. Consider user still logged in if tokens exist.
+      setIsLoggedIn(true);
+      setLastChecked(now);
+      return true;
     }
   };
 

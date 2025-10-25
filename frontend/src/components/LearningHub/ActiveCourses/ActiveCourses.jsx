@@ -18,6 +18,31 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
   const [removingCourseId, setRemovingCourseId] = useState(null);
   const [confirmState, setConfirmState] = useState({ visible: false, enrollmentId: null, courseTitle: '' });
   const { isLoggedIn } = useAuth();
+  
+  // Add smooth animation styles
+  React.useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fadeIn {
+        animation: fadeIn 0.4s ease-out forwards;
+      }
+      .skeleton {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: loading 1.5s infinite;
+      }
+      @keyframes loading {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
 
   useEffect(() => {
     const fetchEnrolledCourses = async () => {
@@ -253,9 +278,25 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
       </div>
 
       {loading ? (
-        <div className="text-center p-6 sm:p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="text-gray-600 mt-2">Loading your courses...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
+          {/* Skeleton Loading Cards */}
+          {[1, 2, 3].map((index) => (
+            <div key={index} className="bg-white border border-gray-100 rounded-lg overflow-hidden h-80 animate-pulse">
+              <div className="h-40 bg-gray-200 skeleton"></div>
+              <div className="p-4 flex flex-col flex-grow">
+                <div className="h-4 bg-gray-200 rounded mb-2 skeleton"></div>
+                <div className="h-3 bg-gray-200 rounded mb-3 w-3/4 skeleton"></div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="h-3 bg-gray-200 rounded w-1/3 skeleton"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/4 skeleton"></div>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full mb-2 skeleton"></div>
+                <div className="mt-auto pt-2">
+                  <div className="h-8 bg-gray-200 rounded skeleton"></div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : !isLoggedIn ? (
         <div className="text-center p-6 sm:p-8 bg-gray-50 rounded-xl">
@@ -278,8 +319,11 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
         <>
           {/* Course Grid with Properly Sized Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
-            {activeCourses.map((course) => (
-              <div key={course.enrollmentId} className="group bg-white border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 relative flex flex-col h-80">
+            {activeCourses.map((course, index) => (
+              <div key={course.enrollmentId} 
+                className={`group bg-white border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 relative flex flex-col h-80 opacity-0 animate-fadeIn`}
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
 
                 {/* Course Image - Increased Height */}
                 <Link to={course.courseUrl} className="block relative overflow-hidden flex-shrink-0">
