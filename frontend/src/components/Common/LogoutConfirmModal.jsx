@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { FaSignOutAlt } from 'react-icons/fa';
@@ -8,13 +8,26 @@ import { FaSignOutAlt } from 'react-icons/fa';
  * Used across Navbar menu and Profile page for consistent UX
  */
 const LogoutConfirmModal = ({ isOpen, onConfirm, onCancel }) => {
-  // Lock background scroll while modal is open
+  // Lock background scroll while modal is open (avoid layout shift by compensating scrollbar width)
+  const prevOverflowRef = useRef('');
+  const prevPaddingRightRef = useRef('');
+  const restoreScrollLock = () => {
+    document.body.style.overflow = prevOverflowRef.current || '';
+    document.body.style.paddingRight = prevPaddingRightRef.current || '';
+  };
   useEffect(() => {
     if (!isOpen) return;
-    const prevOverflow = document.body.style.overflow;
+    prevOverflowRef.current = document.body.style.overflow || '';
+    prevPaddingRightRef.current = document.body.style.paddingRight || '';
+    // Compensate for scrollbar disappearance to prevent horizontal layout shift
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
     document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = prevOverflow || '';
+      // In case component unmounts without exit animation
+      restoreScrollLock();
     };
   }, [isOpen]);
 
@@ -22,7 +35,7 @@ const LogoutConfirmModal = ({ isOpen, onConfirm, onCancel }) => {
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <AnimatePresence>
+    <AnimatePresence initial={false} mode="wait" onExitComplete={restoreScrollLock}>
       {isOpen && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -33,18 +46,18 @@ const LogoutConfirmModal = ({ isOpen, onConfirm, onCancel }) => {
         >
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/50 will-change-[opacity]"
             onClick={onCancel}
             aria-hidden="true"
           />
           {/* Centered modal with safe area padding and internal scrolling if needed */}
           <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-6">
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.98, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+              exit={{ scale: 0.98, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-6"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-6 will-change-[transform,opacity]"
               role="dialog"
               aria-modal="true"
               aria-labelledby="logout-title"

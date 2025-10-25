@@ -1,7 +1,43 @@
 // Safe storage utility with fallbacks and quota handling
-// Prefers localStorage; falls back to sessionStorage; then to in-memory map.
+// Prefers localStorage; falls back to sessionStorage; then to cookies; finally to in-memory map.
 
 const memoryStore = new Map();
+
+// --- Cookie helpers (used as durable fallback on browsers that block Web Storage, e.g., iOS private mode) ---
+function setCookie(key, value, days = 30) {
+  try {
+    const encodedKey = encodeURIComponent(key);
+    const encodedVal = encodeURIComponent(value);
+    const maxAge = Math.floor(days * 24 * 60 * 60);
+    const secure = typeof window !== 'undefined' && window.location && window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${encodedKey}=${encodedVal}; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getCookie(key) {
+  try {
+    const name = encodeURIComponent(key) + '=';
+    const parts = (document.cookie || '').split(';');
+    for (let part of parts) {
+      const trimmed = part.trim();
+      if (trimmed.startsWith(name)) {
+        return decodeURIComponent(trimmed.substring(name.length));
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function removeCookie(key) {
+  try {
+    const encodedKey = encodeURIComponent(key);
+    // Expire immediately
+    document.cookie = `${encodedKey}=; Path=/; Max-Age=0; SameSite=Lax`;
+  } catch {}
+}
 
 function isStorageAvailable(type) {
   try {
@@ -49,6 +85,11 @@ function setItem(key, value) {
       // ignore and fall through
     }
   }
+  // Try cookies (durable across reloads even if Web Storage unavailable)
+  if (typeof document !== 'undefined') {
+    const ok = setCookie(key, str, key.toLowerCase().includes('refresh') ? 30 : 7);
+    if (ok) return true;
+  }
   // Fallback to in-memory
   memoryStore.set(key, str);
   return true;
@@ -73,6 +114,11 @@ function getItem(key) {
       // ignore
     }
   }
+  // Then cookies
+  if (typeof document !== 'undefined') {
+    const val = getCookie(key);
+    if (val !== null) return val;
+  }
   // Memory fallback
   return memoryStore.get(key) ?? null;
 }
@@ -83,6 +129,9 @@ function removeItem(key) {
   }
   if (hasSession) {
     try { window.sessionStorage.removeItem(key); } catch {}
+  }
+  if (typeof document !== 'undefined') {
+    removeCookie(key);
   }
   memoryStore.delete(key);
 }

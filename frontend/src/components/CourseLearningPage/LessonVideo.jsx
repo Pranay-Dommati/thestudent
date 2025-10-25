@@ -30,14 +30,17 @@ const LessonVideo = ({ videoUrl, title }) => {
   }
 
   return (
-    <div className="relative aspect-video w-full">
+    <div
+      className="relative w-full aspect-[4/3] md:aspect-video"
+      /* Note: Avoid overflow-hidden so YouTube's in-iframe overlays aren't clipped */
+    >
       {videoSrc ? (
         <iframe
           src={videoSrc}
           title={title}
           className="absolute top-0 left-0 w-full h-full"
           allowFullScreen
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
           loading="lazy"
           frameBorder="0"
         ></iframe>

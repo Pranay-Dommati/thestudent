@@ -275,8 +275,10 @@ const ProfilePage = () => {
           {/* Profile Information Tab */}
           {activeTab === 'profile' && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              layout
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
               className="profile-card"
             >
               {/* Mobile-responsive header */}
@@ -304,8 +306,10 @@ const ProfilePage = () => {
           {/* Social Connections Card - Mobile optimized - Only show in profile tab */}
           {activeTab === 'profile' && Object.keys(socialAccounts).length > 0 && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              layout
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
               className="profile-card"
             >
               <div className="profile-header">
