@@ -61,6 +61,25 @@ axiosAi.interceptors.response.use(
       isRefreshing = true;
   const refreshToken = storage.getItem('refreshToken');
       if (!refreshToken) {
+        // No refresh token means user must login again. Preserve pending chat message if present.
+        try {
+          const data = originalRequest.data;
+          let pendingMessage = '';
+          if (data && typeof data === 'string') {
+            // Attempt to parse JSON body
+            try { pendingMessage = JSON.parse(data)?.query || JSON.parse(data)?.message || ''; } catch (_) {}
+          } else if (data && typeof data === 'object') {
+            pendingMessage = data.query || data.message || '';
+          }
+          if (pendingMessage && typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('pendingChatMessage', pendingMessage);
+            const current = new URL(window.location.href);
+            current.searchParams.set('message', pendingMessage);
+            current.searchParams.set('prefill', 'true');
+            const returnTo = `${current.pathname}?${current.searchParams.toString()}`;
+            window.location.href = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
+          }
+        } catch (_) {}
         isRefreshing = false;
         onRefreshed(null);
         return Promise.reject(error);
