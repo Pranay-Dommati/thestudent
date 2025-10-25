@@ -4,7 +4,11 @@ import authService from '../../../services/authService';
 
 const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('all');
+  // Filters
+  const [statusFilter, setStatusFilter] = useState('all'); // all|active|inactive
+  const [roleFilter, setRoleFilter] = useState('all'); // all|admin|user
+  const [joinedFilter, setJoinedFilter] = useState('all'); // all|last7|last30|thismonth
+  const [sortBy, setSortBy] = useState('recent'); // recent|oldest|name
   const [currentPage, setCurrentPage] = useState(1);
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState({ total_users: 0, active_users: 0, new_this_month: 0, inactive_users: 0 });
@@ -17,16 +21,18 @@ const AdminUsers = () => {
       setError('');
       const params = new URLSearchParams({
         q: searchQuery,
-        status: selectedFilter,
+        status: statusFilter,
+        role: roleFilter,
+        joined: joinedFilter,
+        order: sortBy,
         page: String(currentPage),
         page_size: '10',
       });
-  const resp = await authService.makeAuthenticatedRequest(`/auth/users/?${params.toString()}`);
+      const resp = await authService.makeAuthenticatedRequest(`/auth/users/?${params.toString()}`);
       const data = resp.data || {};
-  const results = Array.isArray(data.results) ? data.results : [];
-  // Ensure admins show on top even if backend ordering changes
-  results.sort((a, b) => (b.is_superuser === true) - (a.is_superuser === true));
-  setUsers(results);
+      const results = Array.isArray(data.results) ? data.results : [];
+      // Keep the order returned by backend; do not re-sort here
+      setUsers(results);
       setStats(data.stats || { total_users: 0, active_users: 0, new_this_month: 0, inactive_users: 0 });
     } catch (e) {
       console.error('Fetch users error:', e);
@@ -40,7 +46,7 @@ const AdminUsers = () => {
   useEffect(() => {
     fetchUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, selectedFilter, currentPage]);
+  }, [searchQuery, statusFilter, roleFilter, joinedFilter, sortBy, currentPage]);
 
   const handleUserAction = async (userId, action) => {
     try {
@@ -117,16 +123,49 @@ const AdminUsers = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+        {/* Status filter */}
         <select
-          value={selectedFilter}
-          onChange={(e) => setSelectedFilter(e.target.value)}
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
           className="w-full sm:w-40 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         >
-          <option value="all">All Users</option>
+          <option value="all">All Statuses</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
-          <option value="student">Students</option>
-          <option value="instructor">Instructors</option>
+        </select>
+
+        {/* Role filter */}
+        <select
+          value={roleFilter}
+          onChange={(e) => { setRoleFilter(e.target.value); setCurrentPage(1); }}
+          className="w-full sm:w-40 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="all">All Roles</option>
+          <option value="admin">Admins</option>
+          <option value="user">Non-admins</option>
+        </select>
+
+        {/* Joined date filter */}
+        <select
+          value={joinedFilter}
+          onChange={(e) => { setJoinedFilter(e.target.value); setCurrentPage(1); }}
+          className="w-full sm:w-44 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="all">All Time</option>
+          <option value="last7">Last 7 days</option>
+          <option value="last30">Last 30 days</option>
+          <option value="thismonth">This month</option>
+        </select>
+
+        {/* Sort */}
+        <select
+          value={sortBy}
+          onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1); }}
+          className="w-full sm:w-44 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="recent">Recently added</option>
+          <option value="oldest">Oldest first</option>
+          <option value="name">Name A–Z</option>
         </select>
       </div>
 

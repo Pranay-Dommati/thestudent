@@ -589,7 +589,10 @@ def admin_list_users(request):
     Admin-only endpoint to list users with basic filters and pagination.
     Query params:
       - q: search string (matches email or full_name)
-      - status: active|inactive|all
+            - status: active|inactive|all
+            - role: admin|user|all
+            - joined: all|last7|last30|thismonth
+            - order: recent|oldest|name
       - page: 1-based page index (default 1)
       - page_size: page size (default 10, max 100)
     """
@@ -600,6 +603,9 @@ def admin_list_users(request):
 
         q = (request.GET.get('q') or '').strip()
         status_filter = (request.GET.get('status') or 'all').strip().lower()
+        role_filter = (request.GET.get('role') or 'all').strip().lower()
+        joined_filter = (request.GET.get('joined') or 'all').strip().lower()
+        order = (request.GET.get('order') or 'recent').strip().lower()
         try:
             page = max(int(request.GET.get('page', '1') or '1'), 1)
         except Exception:
@@ -610,8 +616,8 @@ def admin_list_users(request):
             page_size = 10
         page_size = max(1, min(page_size, 100))
 
-        # Order admins first by default, then newest users
-        queryset = User.objects.all().order_by('-is_superuser', '-date_joined')
+        # Base queryset
+        queryset = User.objects.all()
 
         if q:
             queryset = queryset.filter(Q(email__icontains=q) | Q(full_name__icontains=q))
@@ -620,6 +626,35 @@ def admin_list_users(request):
             queryset = queryset.filter(is_active=True)
         elif status_filter == 'inactive':
             queryset = queryset.filter(is_active=False)
+
+        # Role filter
+        if role_filter == 'admin':
+            queryset = queryset.filter(is_superuser=True)
+        elif role_filter == 'user':
+            queryset = queryset.filter(is_superuser=False)
+
+        # Joined time filter
+        if joined_filter in {'last7', 'last30', 'thismonth'}:
+            from django.utils import timezone
+            from datetime import timedelta
+            now = timezone.now()
+            if joined_filter == 'last7':
+                start_dt = now - timedelta(days=7)
+            elif joined_filter == 'last30':
+                start_dt = now - timedelta(days=30)
+            else:
+                start_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            queryset = queryset.filter(date_joined__gte=start_dt)
+
+        # Ordering
+        if order == 'oldest':
+            queryset = queryset.order_by('date_joined')
+        elif order == 'name':
+            # Sort by full_name then email as tiebreaker
+            queryset = queryset.order_by('full_name', 'email')
+        else:
+            # Default: recently added first
+            queryset = queryset.order_by('-date_joined')
 
         total = queryset.count()
         start = (page - 1) * page_size
