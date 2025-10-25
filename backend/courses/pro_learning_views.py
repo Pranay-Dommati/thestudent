@@ -86,6 +86,9 @@ class ProLearningCourseDetailView(generics.RetrieveUpdateDestroyAPIView):
     lookup_field = 'id'
     
     def get_queryset(self):
+        # Allow admins to view any course
+        if getattr(self.request.user, 'is_staff', False) or getattr(self.request.user, 'is_superuser', False):
+            return ProLearningCourse.objects.all()
         return ProLearningCourse.objects.filter(user=self.request.user)
 
 
@@ -98,11 +101,15 @@ class ProLearningTopicListView(generics.ListAPIView):
     
     def get_queryset(self):
         course_id = self.kwargs['id']
-        course = get_object_or_404(
-            ProLearningCourse,
-            id=course_id,
-            user=self.request.user
-        )
+        # Admins can access any course topics
+        if getattr(self.request.user, 'is_staff', False) or getattr(self.request.user, 'is_superuser', False):
+            course = get_object_or_404(ProLearningCourse, id=course_id)
+        else:
+            course = get_object_or_404(
+                ProLearningCourse,
+                id=course_id,
+                user=self.request.user
+            )
         return course.topics.all().order_by('order')
 
 
@@ -179,11 +186,15 @@ def get_course_progress(request, course_id):
     GET /api/courses/pro-learning/{id}/progress/
     Get course progress statistics
     """
-    course = get_object_or_404(
-        ProLearningCourse,
-        id=course_id,
-        user=request.user
-    )
+    # Admins can view progress for any course
+    if getattr(request.user, 'is_staff', False) or getattr(request.user, 'is_superuser', False):
+        course = get_object_or_404(ProLearningCourse, id=course_id)
+    else:
+        course = get_object_or_404(
+            ProLearningCourse,
+            id=course_id,
+            user=request.user
+        )
     
     total_topics = course.topics.count()
     completed_topics = course.topics.filter(is_completed=True).count()

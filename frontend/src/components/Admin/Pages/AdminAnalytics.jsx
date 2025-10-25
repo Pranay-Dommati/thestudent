@@ -2,6 +2,18 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from '../../../utils/axios';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
+// Small util to format date/time consistently
+const fmt = (iso) => {
+  try {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    return d.toLocaleString();
+  } catch {
+    return String(iso || '—');
+  }
+};
+
 const StatCard = ({ title, value, subtitle, accent = 'blue' }) => (
   <div className="p-4 rounded-xl border bg-white shadow-sm">
     <div className="text-sm text-gray-500">{title}</div>
@@ -70,9 +82,36 @@ const AdminAnalytics = ({ isDarkMode }) => {
   const [events, setEvents] = useState([]);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({ last: '24h', feature: '', contains: '', success: '' });
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'replay'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'replay' | 'enrollments' | 'prolearning'
   const timerRef = useRef(null);
   const eventsRef = useRef([]);
+
+  // Admin: Course enrollments overview
+  const [courseStatsLoading, setCourseStatsLoading] = useState(false);
+  const [courseStatsError, setCourseStatsError] = useState(null);
+  const [coursesStats, setCoursesStats] = useState({ total_courses: 0, total_enrollments: 0, items: [] });
+
+  // Admin: Selected course enrollments detail modal
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(null);
+  const [detailMeta, setDetailMeta] = useState(null); // {id,title,type}
+  const [detailItems, setDetailItems] = useState([]); // [{name,email,enrolled_at,last_activity}]
+
+  // Admin: ProLearning topics across users
+  const [proTopicsLoading, setProTopicsLoading] = useState(false);
+  const [proTopicsError, setProTopicsError] = useState(null);
+  const [proTopics, setProTopics] = useState([]); // [{topic_id, topic_name, course_title, user_name, user_email, created_at, updated_at, completed_at, progress_percentage}]
+
+  const goToProLearning = (item) => {
+    if (!item || !item.course_id) return;
+    const url = `/pro-learning/${item.course_id}`;
+    try { window.open(url, '_blank', 'noopener'); } catch { window.location.href = url; }
+  };
+
+  // Removed: legacy overview course stats & users snapshot (moved/removed per design)
+
+  // Removed: legacy enrollments modal used on Overview
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -95,6 +134,75 @@ const AdminAnalytics = ({ isDarkMode }) => {
     }
   };
 
+  // Fetch admin course enrollment stats for the table
+  const fetchCourseStats = async () => {
+    setCourseStatsLoading(true);
+    setCourseStatsError(null);
+    try {
+      const res = await axios.get(`/courses/admin/enrollment-stats/`);
+      const data = res.data || {};
+      // Normalize both possible shapes
+      let items = [];
+      let totalCourses = 0;
+      let totalEnrollments = 0;
+      if (Array.isArray(data.items)) {
+        // Shape A
+        items = data.items.map((it) => ({
+          id: it.course_id,
+          title: it.title,
+          course_type: (it.type || '').toString().toLowerCase(),
+          enrollments: Number(it.enrollments || 0),
+          is_published: Boolean(it.published),
+        }));
+        totalCourses = Number(data.total_courses || items.length || 0);
+        totalEnrollments = Number(data.total_enrollments || 0);
+      } else if (Array.isArray(data.courses)) {
+        // Shape B
+        items = data.courses.map((it) => ({
+          id: it.id,
+          title: it.title,
+          course_type: (it.course_type || '').toString().toLowerCase(),
+          enrollments: Number(it.enrollments || 0),
+          is_published: Boolean(it.is_published),
+        }));
+        totalCourses = Number(data?.totals?.total_courses || items.length || 0);
+        totalEnrollments = Number(data?.totals?.total_enrollments || 0);
+      }
+      // Order by enrollments desc
+      items.sort((a, b) => (b.enrollments - a.enrollments) || (a.title || '').localeCompare(b.title || ''));
+      setCoursesStats({ total_courses: totalCourses, total_enrollments: totalEnrollments, items });
+    } catch (e) {
+      setCourseStatsError(e?.response?.data || e.message);
+      setCoursesStats({ total_courses: 0, total_enrollments: 0, items: [] });
+    } finally {
+      setCourseStatsLoading(false);
+    }
+  };
+
+  // Fetch admin ProLearning topics list
+  const fetchProTopics = async () => {
+    setProTopicsLoading(true);
+    setProTopicsError(null);
+    try {
+      const params = new URLSearchParams();
+      params.set('last', filters.last || '30d');
+      params.set('limit', '1000');
+      const res = await axios.get(`/courses/pro-learning/admin/topics/?${params.toString()}`);
+      const data = res.data || {};
+      const items = Array.isArray(data.items) ? data.items : [];
+      // sort by updated_at desc fallback created_at
+      items.sort((a,b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+      setProTopics(items);
+    } catch (e) {
+      setProTopicsError(e?.response?.data || e.message);
+      setProTopics([]);
+    } finally {
+      setProTopicsLoading(false);
+    }
+  };
+
+  // Removed: legacy data loaders for overview (course stats & users snapshot)
+
   useEffect(() => {
     fetchEvents();
     if (timerRef.current) clearInterval(timerRef.current);
@@ -102,6 +210,24 @@ const AdminAnalytics = ({ isDarkMode }) => {
     return () => timerRef.current && clearInterval(timerRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.last, filters.feature, filters.success, filters.contains]);
+
+  // Removed: initial enrollment stats fetch on mount; we fetch only when Enrollments tab is active
+
+  useEffect(() => {
+    if (activeTab === 'enrollments') {
+      fetchCourseStats();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'prolearning') {
+      fetchProTopics();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, filters.last]);
+
+  // Removed: legacy overview data (course stats & users snapshot) initial load
 
   const metrics = useMemo(() => {
     const total = events.length;
@@ -155,6 +281,29 @@ const AdminAnalytics = ({ isDarkMode }) => {
     a.download = `events_${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const openCourseDetail = async (course) => {
+    if (!course || !course.id) return;
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setDetailError(null);
+    setDetailMeta({ id: course.id, title: course.title, type: course.course_type });
+    setDetailItems([]);
+    try {
+      // backend expects lower-case 'engineering' or 'school'
+      const ctype = (course.course_type || '').toLowerCase();
+      const res = await axios.get(`/courses/admin/enrollments/${ctype}/${course.id}/`);
+      const data = res.data || {};
+      const list = Array.isArray(data.enrollments) ? data.enrollments : [];
+      setDetailItems(list);
+      // normalize title/type if provided
+      if (data.course) setDetailMeta({ id: data.course.id, title: data.course.title, type: (data.course.type || ctype).toString().toLowerCase() });
+    } catch (e) {
+      setDetailError(e?.response?.data || e.message);
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   const ReplayPanel = () => {
@@ -274,6 +423,8 @@ const AdminAnalytics = ({ isDarkMode }) => {
     );
   };
 
+  // Removed: legacy enrollments modal handlers for Overview
+
   return (
     <div className={`${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
       <div className="flex items-center justify-between mb-2">
@@ -290,9 +441,24 @@ const AdminAnalytics = ({ isDarkMode }) => {
           onClick={() => setActiveTab('replay')}
           className={`px-3 py-2 rounded-lg text-sm ${activeTab==='replay' ? 'bg-blue-600 text-white' : 'bg-white border'}`}
         >Replay</button>
+        <button
+          onClick={() => setActiveTab('enrollments')}
+          className={`px-3 py-2 rounded-lg text-sm ${activeTab==='enrollments' ? 'bg-blue-600 text-white' : 'bg-white border'}`}
+        >Enrollments</button>
+        <button
+          onClick={() => setActiveTab('prolearning')}
+          className={`px-3 py-2 rounded-lg text-sm ${activeTab==='prolearning' ? 'bg-blue-600 text-white' : 'bg-white border'}`}
+        >AI ProLearning</button>
       </div>
 
-      <FilterBar filters={filters} setFilters={setFilters} onRefresh={fetchEvents} onExport={exportCSV} />
+      {activeTab !== 'enrollments' && activeTab !== 'prolearning' && (
+        <FilterBar
+          filters={filters}
+          setFilters={setFilters}
+          onRefresh={() => { fetchEvents(); }}
+          onExport={exportCSV}
+        />
+      )}
 
       {error && (
         <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 mb-4">
@@ -302,7 +468,7 @@ const AdminAnalytics = ({ isDarkMode }) => {
 
       {activeTab === 'replay' ? (
         <ReplayPanel />
-      ) : (
+      ) : activeTab === 'overview' ? (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <StatCard title="Events" value={metrics.total} />
@@ -311,6 +477,8 @@ const AdminAnalytics = ({ isDarkMode }) => {
             <StatCard title="Save Attempts" value={metrics.saveAttempts} />
             <StatCard title="Avg Latency (ms)" value={Number.isFinite(metrics.avgLatency) ? metrics.avgLatency : '—'} />
           </div>
+
+          
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <div className="lg:col-span-2 p-4 bg-white rounded-xl border">
@@ -341,6 +509,8 @@ const AdminAnalytics = ({ isDarkMode }) => {
               </div>
             </div>
           </div>
+
+          {/* Removed: Overview enrollments and users snapshot per request */}
 
           <div className="overflow-auto border rounded-xl">
             <table className="min-w-full divide-y divide-gray-200">
@@ -378,7 +548,171 @@ const AdminAnalytics = ({ isDarkMode }) => {
               </tbody>
             </table>
           </div>
+
+          {/* Removed: legacy enrollments modal on Overview */}
         </>
+      ) : activeTab === 'enrollments' ? (
+        // Enrollments tab content
+        <div className="mb-6 p-4 bg-white rounded-xl border">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold">Course Enrollments</h3>
+            <div className="text-xs text-gray-500">Total: {coursesStats.total_courses}</div>
+          </div>
+          {courseStatsError && (
+            <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 mb-3 text-sm">
+              Failed to load course stats: {JSON.stringify(courseStatsError)}
+            </div>
+          )}
+          <div className="overflow-auto border rounded-xl">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enrollments</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Published</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {courseStatsLoading ? (
+                  <tr><td className="px-4 py-6" colSpan="4">Loading…</td></tr>
+                ) : (coursesStats.items?.length || 0) === 0 ? (
+                  <tr><td className="px-4 py-6" colSpan="4">No data</td></tr>
+                ) : (
+                  coursesStats.items.map((c) => (
+                    <tr key={`${c.course_type}-${c.id}`} className="hover:bg-gray-50 cursor-pointer" onClick={() => openCourseDetail(c)}>
+                      <td className="px-4 py-2 text-sm">{c.title}</td>
+                      <td className="px-4 py-2 text-sm">{c.course_type === 'engineering' ? 'Engineering' : 'School'}</td>
+                      <td className="px-4 py-2 text-sm">{c.enrollments}</td>
+                      <td className="px-4 py-2 text-sm">{c.is_published ? 'Yes' : 'No'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        // ProLearning tab content
+        <div className="mb-6 p-4 bg-white rounded-xl border">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold">AI ProLearning Topics (All Users)</h3>
+            <div className="flex items-center gap-3">
+              <div className="text-xs text-gray-500 hidden md:block">{proTopics.length} items</div>
+              <div className="text-xs text-gray-500 flex items-center gap-2">
+                <label className="text-gray-500">Range</label>
+                <select
+                  className="border rounded-lg px-2 py-1 text-xs"
+                  value={filters.last}
+                  onChange={(e) => setFilters((f) => ({ ...f, last: e.target.value }))}
+                >
+                  <option value="24h">Last 24h</option>
+                  <option value="7d">Last 7d</option>
+                  <option value="30d">Last 30d</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          {proTopicsError && (
+            <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 mb-3 text-sm">
+              Failed to load: {JSON.stringify(proTopicsError)}
+            </div>
+          )}
+          <div className="overflow-auto border rounded-xl">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Topic</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Updated</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {proTopicsLoading ? (
+                  <tr><td className="px-4 py-6" colSpan="9">Loading…</td></tr>
+                ) : proTopics.length === 0 ? (
+                  <tr><td className="px-4 py-6" colSpan="9">No data</td></tr>
+                ) : (
+                  proTopics.map((t) => (
+                    <tr key={t.topic_id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 text-sm">{t.topic_name}</td>
+                      <td className="px-4 py-2 text-sm">
+                        {t.course_id ? (
+                          <a className="text-blue-600 hover:underline" href={`/pro-learning/${t.course_id}`} target="_blank" rel="noreferrer">{t.course_title || t.course_id}</a>
+                        ) : (t.course_title || '—')}
+                      </td>
+                      <td className="px-4 py-2 text-sm">{t.user_name || '—'}</td>
+                      <td className="px-4 py-2 text-xs">{t.user_email || '—'}</td>
+                      <td className="px-4 py-2 text-xs">{fmt(t.created_at)}</td>
+                      <td className="px-4 py-2 text-xs">{fmt(t.updated_at)}</td>
+                      <td className="px-4 py-2 text-xs">{fmt(t.completed_at)}</td>
+                      <td className="px-4 py-2 text-xs">{typeof t.progress_percentage === 'number' ? `${Math.round(t.progress_percentage)}%` : '—'}</td>
+                      <td className="px-4 py-2 text-xs">
+                        {t.course_id && (
+                          <button className="px-2 py-1 border rounded" onClick={() => goToProLearning(t)}>Open</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Enrolled users detail modal */}
+      {detailOpen && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4" onClick={() => setDetailOpen(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b flex items-center justify-between">
+              <div>
+                <div className="font-semibold">Enrolled users</div>
+                <div className="text-xs text-gray-500">{detailMeta?.title} · {(detailMeta?.type || '').toString().toUpperCase()}</div>
+              </div>
+              <button className="px-3 py-1 border rounded" onClick={() => setDetailOpen(false)}>Close</button>
+            </div>
+            {detailError && (
+              <div className="px-4 py-3 text-sm text-red-700 bg-red-50 border-b border-red-200">{JSON.stringify(detailError)}</div>
+            )}
+            <div className="p-4 overflow-auto" style={{ maxHeight: '70vh' }}>
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enrolled at</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last activity</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {detailLoading ? (
+                    <tr><td className="px-4 py-6" colSpan="5">Loading…</td></tr>
+                  ) : detailItems.length === 0 ? (
+                    <tr><td className="px-4 py-6" colSpan="5">No enrollments</td></tr>
+                  ) : (
+                    detailItems.map((u, idx) => (
+                      <tr key={`${u.user_id || idx}`}>
+                        <td className="px-4 py-2 text-sm">{u.name || '—'}</td>
+                        <td className="px-4 py-2 text-sm">{u.email || '—'}</td>
+                        <td className="px-4 py-2 text-sm">{fmt(u.enrolled_at)}</td>
+                        <td className="px-4 py-2 text-sm">{fmt(u.last_activity)}</td>
+                        <td className="px-4 py-2 text-sm">{typeof u.progress_percentage === 'number' ? `${Math.round(u.progress_percentage)}%` : '—'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -634,6 +634,18 @@ def admin_list_users(request):
         new_this_month = User.objects.filter(date_joined__year=now.year, date_joined__month=now.month).count()
         inactive_users = total_users - active_users
 
+        # Compute enrolled courses count per listed user in one query
+        try:
+            from courses.models import UserStartedPredefinedCourse
+            from django.db.models import Count as _Count
+            user_ids = [u.id for u in items]
+            enrolled_map = {row['user_id']: row['c'] for row in (
+                UserStartedPredefinedCourse.objects.filter(user_id__in=user_ids)
+                .values('user_id').annotate(c=_Count('id'))
+            )}
+        except Exception:
+            enrolled_map = {}
+
         payload = {
             'results': [
                 {
@@ -642,7 +654,7 @@ def admin_list_users(request):
                     'email': u.email,
                     'status': 'active' if u.is_active else 'inactive',
                     'is_superuser': bool(getattr(u, 'is_superuser', False)),
-                    'enrolledCourses': 0,
+                    'enrolledCourses': int(enrolled_map.get(u.id, 0) or 0),
                     'joinDate': u.date_joined.isoformat() if getattr(u, 'date_joined', None) else None,
                 }
                 for u in items
