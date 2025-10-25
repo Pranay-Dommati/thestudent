@@ -95,7 +95,6 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
           auto_select: false,
           // Enable FedCM on mobile Safari for better reliability
           use_fedcm_for_prompt: isMobileSafari ? true : false,
-          use_fedcm_for_prompt: false,
           ux_mode: 'popup', // Use popup mode to avoid iframe issues
           context: 'signin', // Specify context
         });
