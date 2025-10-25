@@ -131,9 +131,12 @@ const Footer = () => {
 
         {/* Navigation Links */}
         <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-300">
-          <Link to="/feedback" className="hover:text-white">Feedback</Link>
-          <Link to="/privacy-policy" className="hover:text-white">Privacy Policy</Link>
-          <Link to="/terms-and-conditions" className="hover:text-white">Terms of Service</Link>
+          <Link to="/" className="hover:text-white transition-colors">Home</Link>
+          <Link to="/courses" className="hover:text-white transition-colors">Courses</Link>
+          <Link to="/chat" className="hover:text-white transition-colors">AI Chatbot</Link>
+          <Link to="/feedback" className="hover:text-white transition-colors">Feedback</Link>
+          <Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
+          <Link to="/terms-and-conditions" className="hover:text-white transition-colors">Terms of Service</Link>
         </div>
 
         {/* Social Media Icons */}
