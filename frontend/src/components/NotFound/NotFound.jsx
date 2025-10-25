@@ -19,12 +19,52 @@ const NotFound = () => {
     return () => clearTimeout(timer);
   }, [countdown, navigate]);
 
+  // Hide the fixed navbar when this component mounts
+  useEffect(() => {
+    // Find the fixed navbar and hide it
+    const fixedNavbar = document.querySelector('nav.fixed');
+    if (fixedNavbar) {
+      fixedNavbar.style.display = 'none';
+    }
+
+    // When component unmounts, show the navbar again
+    return () => {
+      if (fixedNavbar) {
+        fixedNavbar.style.display = '';
+      }
+    };
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-blue-600 to-indigo-700">
-      {/* Global Navbar is used; no custom override here to ensure auth state is accurate */}
+      {/* Custom Navbar for 404 page - matched to your site's style */}
+      <nav className="w-full bg-transparent py-4">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <Link to="/" className="flex items-center space-x-2">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl">S</div>
+                <span className="font-bold text-lg sm:text-xl text-white">EasyLearnova</span>
+              </Link>
+            </div>
+            <div className="hidden md:flex items-center justify-center flex-1 max-w-[600px]">
+              <div className="flex items-center space-x-8">
+                <Link to="/" className="font-medium transition-colors text-white hover:text-blue-200">Home</Link>
+                <Link to="/courses" className="font-medium transition-colors text-white hover:text-blue-200">Courses</Link>
+                <Link to="/chat" className="font-medium transition-colors text-white hover:text-blue-200">AI Chatbot</Link>
+                <Link to="/learning-hub" className="font-medium transition-colors text-white hover:text-blue-200">Learning Hub</Link>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              <Link to={`/auth?mode=login&returnTo=${encodeURIComponent(window.location.pathname + (window.location.search || '') + (window.location.hash || ''))}`} className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full font-medium transition-all duration-300 text-white border border-white hover:bg-white/20 text-sm sm:text-base">Log In</Link>
+              <Link to="/auth?mode=signup" className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-shadow text-sm sm:text-base">Sign Up</Link>
+            </div>
+          </div>
+        </div>
+      </nav>
 
       {/* Main Content with animation */}
-      <div className="flex-grow flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12 pt-24 sm:pt-28 text-center">
+      <div className="flex-grow flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12 text-center">
         <div className="bg-white shadow-xl rounded-2xl p-6 sm:p-8 md:p-10 max-w-md w-full border border-gray-100 hover:shadow-2xl transition-shadow duration-300">
           <div className="flex flex-col items-center gap-4 sm:gap-6">
             {/* Animated Ghost */}

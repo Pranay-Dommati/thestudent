@@ -621,8 +621,17 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
       .map((existing, i) => {
         const name = (existing?.name || '').trim() || `Chapter ${i + 1}`;
         const lessons = (existing?.lessons || []).length > 0
-          ? existing.lessons
-          : [{ id: null, title: 'Lesson 1', type: 'video', videoUrl: '', aboutLesson: '' }];
+          ? existing.lessons.map(lesson => ({
+              id: lesson.id || null,
+              title: lesson.title || '',
+              type: lesson.type || 'video',
+              videoUrl: lesson.videoUrl || '',
+              aboutLesson: lesson.aboutLesson || '',
+              hasResources: lesson.hasResources || false,
+              resources: lesson.resources || { downloadable: [], internet: [] },
+              quizQuestions: lesson.quizQuestions || []
+            }))
+          : [{ id: null, title: 'Lesson 1', type: 'video', videoUrl: '', aboutLesson: '', hasResources: false, resources: { downloadable: [], internet: [] }, quizQuestions: [] }];
         return { id: existing?.id || null, name, lessons };
       });
 

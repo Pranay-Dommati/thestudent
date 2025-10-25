@@ -42,56 +42,23 @@ export default function AuthForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [otpOpen, setOtpOpen] = useState(false);
 
-  // Restore form data from sessionStorage when component mounts
-  useEffect(() => {
-    const savedFormData = sessionStorage.getItem('authFormData');
-    if (savedFormData) {
-      try {
-        const parsed = JSON.parse(savedFormData);
-        // Only restore if it matches current mode (signup/login)
-        if (parsed.mode === (isSignUp ? 'signup' : 'login')) {
-          setFormData({
-            name: parsed.name || '',
-            email: parsed.email || '',
-            password: parsed.password || '',
-            confirmPassword: parsed.confirmPassword || '',
-            agreedToTerms: parsed.agreedToTerms || false
-          });
-        }
-      } catch (e) {
-        // Invalid JSON, ignore
-      }
-    }
-  }, [isSignUp]);
-
-  // Save form data to sessionStorage whenever it changes
-  useEffect(() => {
-    if (formData.email || formData.name || formData.password) {
-      sessionStorage.setItem('authFormData', JSON.stringify({
-        ...formData,
-        mode: isSignUp ? 'signup' : 'login'
-      }));
-    }
-  }, [formData, isSignUp]);
-
-  // Clear saved form data when user successfully authenticates
-  const clearSavedFormData = () => {
-    sessionStorage.removeItem('authFormData');
-  };
-
   const toggleForm = () => {
     const newMode = !isSignUp;
     
-    // Clear only errors immediately to avoid layout collapse before animation
+    // Clear form errors and data immediately for smooth transition
     setFormErrors({});
-
-    // Clear sessionStorage when user explicitly toggles between signup/login
-    clearSavedFormData();
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      agreedToTerms: false,
+    });
     
     // Preserve the returnTo parameter if it exists
     const returnToParam = returnToPath ? `&returnTo=${encodeURIComponent(returnToPath)}` : '';
     
-    // Navigate first (smoother on mobile); the new screen will mount with clean state
+    // Use replace to avoid adding to history
     navigate(`/auth?mode=${newMode ? 'signup' : 'login'}${returnToParam}`, { replace: true });
   };
 
@@ -113,8 +80,6 @@ export default function AuthForm() {
       
       const success = await googleLogin(credential);
       if (success) {
-        // Clear saved form data on successful login
-        clearSavedFormData();
         // Toast is already shown in AuthContext with id 'auth-login', no duplicate
         navigate(returnToPath || '/', { replace: true });
       } else {
@@ -210,8 +175,6 @@ export default function AuthForm() {
         setIsLoading(false); // Stop loading immediately after response
         
         if (response?.success) {
-          // Clear saved form data on successful login
-          clearSavedFormData();
           // Redirect to the returnTo path if it exists, otherwise to the homepage
           navigate(returnToPath || '/', { replace: true });
         } else if (response?.suggestSignup) {
@@ -424,8 +387,6 @@ export default function AuthForm() {
         fullName={formData.name}
         onClose={() => setOtpOpen(false)}
         onVerified={async () => {
-          // Clear saved form data after successful signup verification
-          clearSavedFormData();
           await validateAuth();
           navigate(returnToPath || '/', { replace: true });
         }}
@@ -448,13 +409,12 @@ export default function AuthForm() {
             <motion.div 
               key={isSignUp ? "mobile-signup" : "mobile-login"}
               className="min-h-screen flex flex-col"
-              style={{ willChange: 'opacity, transform' }}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
+              initial={{ opacity: 0, x: isSignUp ? 50 : -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: isSignUp ? -50 : 50 }}
               transition={{ 
                 type: "tween",
-                duration: 0.24,
+                duration: 0.3,
                 ease: [0.4, 0.0, 0.2, 1]
               }}
             >
@@ -492,8 +452,7 @@ export default function AuthForm() {
               </div>
 
               {/* Form Section - Takes remaining space */}
-              <div className="bg-white px-6 py-4 flex-1 overflow-y-auto">
-                <div className="min-h-[520px]">
+              <div className="bg-white px-6 py-4 flex-1 min-h-0 overflow-y-auto">
                 <motion.h2 
                   className="text-xl font-bold mb-4 text-gray-800 text-center"
                   initial={{ opacity: 0, y: 10 }}
@@ -752,7 +711,6 @@ export default function AuthForm() {
                     {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
                   </button>
                 </motion.div>
-                </div>
               </div>
             </motion.div>
           </AnimatePresence>

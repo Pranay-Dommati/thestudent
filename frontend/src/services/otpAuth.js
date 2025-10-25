@@ -13,10 +13,9 @@ function unwrapError(err) {
 }
 
 export async function otpSignup({ full_name, email, password, agreed_to_terms }) {
-  // Create abort controller for hard timeout (configurable via env)
-  const timeoutMs = parseInt(import.meta.env.VITE_OTP_SIGNUP_TIMEOUT_MS || '45000', 10);
+  // Create abort controller for hard timeout
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // Hard 10 second timeout
   
   try {
     const { data } = await axios.post('/auth/otp/signup/', {

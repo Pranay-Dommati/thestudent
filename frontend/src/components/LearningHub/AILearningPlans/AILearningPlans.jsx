@@ -17,31 +17,6 @@ const AILearningPlans = () => {
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, course: null });
 
   const COURSES_TO_SHOW = 6;
-  
-  // Add smooth animation styles
-  React.useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(15px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .animate-fadeInUp {
-        animation: fadeInUp 0.4s ease-out forwards;
-      }
-      .ai-course-skeleton {
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        animation: loading 1.5s infinite;
-      }
-      @keyframes loading {
-        0% { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => document.head.removeChild(style);
-  }, []);
 
   // Simple session cache to speed up UI. Stored shape: { ts: number, data: Array }
   const CACHE_KEY = 'ai_pro_courses_cache_v1';
@@ -290,23 +265,9 @@ const AILearningPlans = () => {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* AI Course Skeleton Loading Cards */}
-        {[1, 2, 3].map((index) => (
-          <div key={index} className="bg-white rounded-xl border border-gray-100 overflow-hidden h-72 animate-pulse">
-            <div className="h-32 ai-course-skeleton"></div>
-            <div className="p-4">
-              <div className="h-4 ai-course-skeleton rounded mb-2"></div>
-              <div className="h-3 ai-course-skeleton rounded mb-3 w-3/4"></div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="h-3 ai-course-skeleton rounded w-1/3"></div>
-                <div className="h-3 ai-course-skeleton rounded w-1/4"></div>
-              </div>
-              <div className="h-2 ai-course-skeleton rounded-full mb-4"></div>
-              <div className="h-8 ai-course-skeleton rounded"></div>
-            </div>
-          </div>
-        ))}
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+        <span className="ml-3 text-gray-600">Loading your AI-created courses...</span>
       </div>
     );
   }
@@ -363,11 +324,10 @@ const AILearningPlans = () => {
     <>
       {/* Course List */}
       <div className="space-y-2">
-        {coursesToDisplay.map((course, index) => (
+        {coursesToDisplay.map((course) => (
           <div 
             key={course.id} 
-            className="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-all duration-200 opacity-0 animate-fadeInUp"
-            style={{ animationDelay: `${index * 0.1}s` }}
+            className="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center justify-between">
               {/* Left: Course Info */}

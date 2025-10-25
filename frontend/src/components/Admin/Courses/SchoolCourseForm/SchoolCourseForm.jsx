@@ -643,23 +643,33 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       const chaptersData = Array.from({ length: desiredCount }, (_, i) => {
         const chapter = chapters[i];
         const name = (chapter?.name || '').trim() || `Chapter ${i + 1}`;
-        // Keep only lessons with a non-empty title
-        const validLessons = (chapter?.lessons || []).filter(lesson => (lesson.title || '').trim() !== '');
+        // Keep lessons that actually have content even if title is missing
+        const rawLessons = (chapter?.lessons || []);
 
-        const lessonsSource = validLessons.length > 0
-          ? validLessons
-          : [{
-              title: 'Lesson 1',
-              type: 'video',
-              videoUrl: '',
-              description: '',
-              aboutLesson: '',
-              hasResources: false,
-              resources: { downloadable: [], internet: [] },
-              quizQuestions: []
-            }];
+        const hasMeaningfulContent = (l) => {
+          const hasTitle = (l.title || '').trim() !== '';
+          const hasVideo = (l.videoUrl || '').trim() !== '';
+          const hasAbout = (l.aboutLesson || '').trim() !== '';
+          const hasQuiz = Array.isArray(l.quizQuestions) && l.quizQuestions.length > 0;
+          const hasResources = (l.resources && (
+            (Array.isArray(l.resources.downloadable) && l.resources.downloadable.length > 0) ||
+            (Array.isArray(l.resources.internet) && l.resources.internet.length > 0)
+          ));
+          return hasTitle || hasVideo || hasAbout || hasQuiz || hasResources;
+        };
 
-        const lessons = lessonsSource.map(lesson => {
+        const lessonsSource = rawLessons.filter(hasMeaningfulContent);
+
+        const lessons = (lessonsSource.length > 0 ? lessonsSource : [{
+          title: 'Lesson 1',
+          type: 'video',
+          videoUrl: '',
+          description: '',
+          aboutLesson: '',
+          hasResources: false,
+          resources: { downloadable: [], internet: [] },
+          quizQuestions: []
+        }]).map((lesson, idx) => {
           // Process resources and handle file uploads
           let processedResources = { downloadable: [], internet: [] };
           
@@ -688,8 +698,17 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
             }));
           }
           
+          // Title fallback: don't lose a reading/resources lesson just because admin forgot title
+          const fallbackTitle = () => {
+            const base = (lesson.type === 'reading' || lesson.type === 'instructions') ? 'Reading' :
+                         (lesson.type === 'resources') ? 'Resources' :
+                         (lesson.type === 'quiz') ? 'Quiz' : 'Lesson';
+            const snippet = (lesson.aboutLesson || '').replace(/[#*>_`\-]|\s+/g, ' ').trim().slice(0, 40);
+            return snippet ? `${base}: ${snippet}` : `${base} ${idx + 1}`;
+          };
+
           return {
-            title: lesson.title,
+            title: (lesson.title || '').trim() || fallbackTitle(),
             type: lesson.type,
             videoUrl: lesson.videoUrl,
             description: lesson.description,

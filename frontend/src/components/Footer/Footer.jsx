@@ -1,26 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { FaLinkedin, FaInstagram } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
-import axios from "../../utils/axios";
 
 const Footer = () => {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success" or "error"
-
-  // Auto-clear message after 5 seconds
-  useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => {
-        setMessage("");
-        setMessageType("");
-      }, 5000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [message]);
 
   // Email validation function
   const isValidEmail = (email) => {
@@ -59,33 +46,21 @@ const Footer = () => {
     setMessage("");
 
     try {
-      const response = await axios.post('/newsletter/', { email: email.trim() });
+        await axios.post('/newsletter/', { email: email.trim() });
 
-      if (response.status === 200 || response.status === 201) {
+      const data = await response.json();
+
+      if (response.ok) {
         setMessage("🎉 Successfully subscribed to newsletter!");
         setMessageType("success");
         setEmail("");
       } else {
-        setMessage(response.data?.message || "Failed to subscribe. Please try again.");
+        setMessage(data.message || "Failed to subscribe. Please try again.");
         setMessageType("error");
       }
     } catch (error) {
       console.error("Error subscribing to newsletter:", error);
-      // Prefer server-provided message; handle string or JSON bodies, then fall back by status
-      let serverMessage = null;
-      const data = error?.response?.data;
-      if (typeof data === 'string') {
-        serverMessage = data; // Sometimes proxies or servers return plain text
-      } else if (data && typeof data === 'object') {
-        serverMessage = data.message || data.detail || null;
-      }
-
-      if (!serverMessage && error?.response?.status === 400) {
-        // Common 400 scenarios for newsletter: invalid email or already subscribed
-        serverMessage = "⚠️ Please enter a valid email or this email is already subscribed.";
-      }
-
-      setMessage(serverMessage || "Network error. Please check your connection and try again.");
+      setMessage("Network error. Please check your connection and try again.");
       setMessageType("error");
     } finally {
       setIsSubmitting(false);

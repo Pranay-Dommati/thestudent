@@ -162,77 +162,22 @@ const LearningHubPage = () => {
     <>
       <Navbar initialStyle="gradient" />
       <div className="learning-hub-container learning-hub-page min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/30 to-indigo-50/50 pt-16 relative">
-        {/* Subtle background pattern - moved to after initial load */}
+        {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-[0.02]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.4'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
         }}></div>
-        
-        {/* Optimized CSS for smooth animations */}
-        <style jsx>{`
-          .learning-hub-page {
-            animation: hubFadeIn 0.4s ease-out forwards;
-          }
-          
-          @keyframes hubFadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-          
-          .hub-section {
-            opacity: 0;
-            animation: sectionSlide 0.3s ease-out forwards;
-            will-change: opacity, transform;
-          }
-          
-          @keyframes sectionSlide {
-            from {
-              opacity: 0;
-              transform: translateY(12px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-          
-          .hub-stagger-1 { animation-delay: 0.1s; }
-          .hub-stagger-2 { animation-delay: 0.2s; }
-          .hub-stagger-3 { animation-delay: 0.3s; }
-          .hub-stagger-4 { animation-delay: 0.4s; }
-          
-          /* Simplified hover effects */
-          .hub-hover {
-            transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
-          }
-          
-          .hub-hover:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-          }
-          
-          /* Reduced motion support */
-          @media (prefers-reduced-motion: reduce) {
-            .learning-hub-page,
-            .hub-section {
-              animation: none;
-              opacity: 1;
-              transform: none;
-            }
-          }
-        `}</style>
   {/* Final user object logging removed for production */}
         
         {/* Hero Section - Force real learning stats */}
-        <div className="hub-section">
-          <HeroSection 
-            user={{
-              ...user,
-              // EXPLICIT OVERRIDE: Use only real API data for learning stats
-              hoursThisWeek: learningStats?.weekly_hours ?? 0,
-              currentStreak: learningStats?.current_streak ?? 0
-            }} 
-          />
-        </div>
+        <HeroSection 
+          user={{
+            ...user,
+            // EXPLICIT OVERRIDE: Use only real API data for learning stats
+            hoursThisWeek: learningStats?.weekly_hours ?? 0,
+            currentStreak: learningStats?.current_streak ?? 0
+          }} 
+        />
+        
 
         
         {/* Main Content */}
@@ -243,7 +188,7 @@ const LearningHubPage = () => {
             <div className="xl:col-span-3 space-y-10">
               
               {/* Expert-Crafted Enrolled Courses Section */}
-              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 hub-section hub-stagger-1 hub-hover">
+              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center">
                     <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-3 rounded-xl mr-4 shadow-lg">
@@ -272,7 +217,7 @@ const LearningHubPage = () => {
               </section>
               
               {/* AI-Created Courses Section */}
-              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 hub-section hub-stagger-2 hub-hover">
+              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center">
                     <div className="bg-gradient-to-r from-purple-500 to-pink-600 p-3 rounded-xl mr-4 shadow-lg">
@@ -310,10 +255,10 @@ const LearningHubPage = () => {
               </section> */}
               
               {/* Minimalistic Call-to-Action Buttons Section */}
-              <section className="grid grid-cols-1 md:grid-cols-2 gap-4 learning-hub hub-section hub-stagger-3">
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-4 learning-hub">
                 
                 {/* Create Custom Course with AI */}
-                <div className="group bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl p-5 text-white hub-hover">
+                <div className="group bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl p-5 text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <div className="bg-white/20 p-2 rounded-lg mr-3">
@@ -343,7 +288,7 @@ const LearningHubPage = () => {
                 </div>
 
                 {/* Explore Expert Courses */}
-                <div className="group bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl p-5 text-white hub-hover">
+                <div className="group bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl p-5 text-white hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <div className="bg-white/20 p-2 rounded-lg mr-3">
@@ -377,7 +322,7 @@ const LearningHubPage = () => {
             </div>
 
             {/* Enhanced Sidebar - Learning Analytics */}
-            <div className="xl:col-span-1 hub-section hub-stagger-4">
+            <div className="xl:col-span-1">
               <div className="sticky top-24">
                 <LearningAnalytics 
                   user={{

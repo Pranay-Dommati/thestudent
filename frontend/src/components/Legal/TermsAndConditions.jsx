@@ -6,6 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 const TermsAndConditions = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const returnTo = location.state?.returnTo || '/';
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Handle scroll to show/hide the scroll top button
@@ -17,18 +18,10 @@ const TermsAndConditions = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-  
   const handleBack = () => {
-    // Check if there's a returnTo in location state, otherwise go back in history
-    const returnTo = location.state?.returnTo;
-    if (returnTo) {
-      console.log("Navigating back to:", returnTo);
-      navigate(returnTo);
-    } else {
-      // Use browser history to go back to previous page
-      console.log("Navigating back in history");
-      navigate(-1);
-    }
+    // Ensure navigation works by checking if returnTo exists
+    console.log("Navigating back to:", returnTo);
+    navigate(returnTo);
   };
   
   const scrollToTop = () => {

@@ -3,6 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import LessonVideo from './LessonVideo';
 import CourseProgress from './CourseProgress';
 import ResourcesPage from './templ/ResourcesPage';
@@ -688,30 +691,54 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   useEffect(() => {
     const currentLesson = getCurrentLesson();
     console.log('🎯 Current lesson for content type detection:', currentLesson);
-    if (currentLesson && currentLesson.type) {
+    if (!currentLesson) return;
+
+    // Prefer explicit type when present
+    if (currentLesson.type) {
       console.log('🎮 Setting content type based on lesson type:', currentLesson.type);
-      // Map lesson types to content types
       switch (currentLesson.type) {
         case 'quiz':
           setContentType('quiz');
-          break;
+          return;
         case 'reading':
         case 'instructions':
           setContentType('instructions');
-          break;
+          return;
         case 'resources':
           setContentType('resources');
-          break;
+          return;
         case 'video':
         default:
-          setContentType('video');
+          // Fall through to heuristics in case videoUrl is missing
           break;
       }
-    } else {
-      console.log('🎮 Defaulting to video content type - no lesson type specified');
-      // Default to video if no lesson type is specified
-      setContentType('video');
     }
+
+    // Heuristic fallback when type is missing or unreliable
+    const hasVideo = Boolean(currentLesson.videoUrl && String(currentLesson.videoUrl).trim());
+    const about = currentLesson.aboutLesson && String(currentLesson.aboutLesson).trim();
+    const hasAbout = Boolean(about);
+    const qlen = (currentLesson.quiz_questions || currentLesson.quizQuestions || []).length;
+    const hasQuiz = qlen > 0;
+    const res = currentLesson.resources || { downloadable: [], internet: [] };
+    const hasResources = (Array.isArray(res.downloadable) && res.downloadable.length > 0) ||
+                         (Array.isArray(res.internet) && res.internet.length > 0);
+
+    if (hasQuiz) {
+      setContentType('quiz');
+      return;
+    }
+    if (hasResources) {
+      setContentType('resources');
+      return;
+    }
+    if (hasAbout && !hasVideo) {
+      // Treat as reading/instructions when text exists but no video
+      setContentType('instructions');
+      return;
+    }
+    // Default: video
+    setContentType('video');
   }, [activeChapter, activeLesson, course]);
 
   // Add effect to notify parent when sidebar visibility changes
@@ -936,7 +963,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                       // Use actual lesson content if available with proper markdown components
                       <div>
                         <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
+                          remarkPlugins={[remarkGfm, remarkMath]}
+                          rehypePlugins={[rehypeKatex]}
                           components={{
                             ul: ({node, ...props}) => <ul className="list-disc pl-5 my-4 space-y-2" {...props} />,
                             ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-4 space-y-2" {...props} />,

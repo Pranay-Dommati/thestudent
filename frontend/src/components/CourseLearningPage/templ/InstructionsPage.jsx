@@ -2,6 +2,9 @@ import React from 'react';
 import { FaInfo, FaCheck, FaLaptopCode, FaDownload, FaTasks } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 const InstructionsPage = ({ lessonContent }) => {
   // If lesson content is provided, render it using ReactMarkdown
@@ -10,7 +13,8 @@ const InstructionsPage = ({ lessonContent }) => {
       <div className="p-6 max-w-4xl mx-auto">
         <div className="prose prose-lg max-w-none markdown-body">
           <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
             components={{
               ul: ({node, ...props}) => <ul className="list-disc pl-5 my-4 space-y-2" {...props} />,
               ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-4 space-y-2" {...props} />,

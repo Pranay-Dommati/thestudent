@@ -391,7 +391,9 @@ const ProfilePage = () => {
       />
       
       {/* Mobile-optimized footer */}
-      <Footer />
+      <div className="mt-4 sm:mt-8 lg:mt-12">
+        <Footer />
+      </div>
     </div>
   );
 };
