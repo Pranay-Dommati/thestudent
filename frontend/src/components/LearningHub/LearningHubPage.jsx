@@ -161,18 +161,33 @@ const LearningHubPage = () => {
   return (
     <>
       <Navbar initialStyle="gradient" />
-      <div className="learning-hub-container learning-hub-page min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/30 to-indigo-50/50 pt-16 relative opacity-0 animate-fadeIn">
-        {/* Subtle background pattern */}
+      <div className="learning-hub-container learning-hub-page min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/30 to-indigo-50/50 pt-16 relative">
+        {/* Subtle background pattern - moved to after initial load */}
         <div className="absolute inset-0 opacity-[0.02]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.4'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
         }}></div>
         
-        {/* Custom CSS for smooth animations */}
+        {/* Optimized CSS for smooth animations */}
         <style jsx>{`
-          @keyframes fadeIn {
+          .learning-hub-page {
+            animation: hubFadeIn 0.4s ease-out forwards;
+          }
+          
+          @keyframes hubFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          
+          .hub-section {
+            opacity: 0;
+            animation: sectionSlide 0.3s ease-out forwards;
+            will-change: opacity, transform;
+          }
+          
+          @keyframes sectionSlide {
             from {
               opacity: 0;
-              transform: translateY(10px);
+              transform: translateY(12px);
             }
             to {
               opacity: 1;
@@ -180,86 +195,35 @@ const LearningHubPage = () => {
             }
           }
           
-          @keyframes slideUp {
-            from {
-              opacity: 0;
-              transform: translateY(20px);
-            }
-            to {
+          .hub-stagger-1 { animation-delay: 0.1s; }
+          .hub-stagger-2 { animation-delay: 0.2s; }
+          .hub-stagger-3 { animation-delay: 0.3s; }
+          .hub-stagger-4 { animation-delay: 0.4s; }
+          
+          /* Simplified hover effects */
+          .hub-hover {
+            transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+          }
+          
+          .hub-hover:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+          }
+          
+          /* Reduced motion support */
+          @media (prefers-reduced-motion: reduce) {
+            .learning-hub-page,
+            .hub-section {
+              animation: none;
               opacity: 1;
-              transform: translateY(0);
-            }
-          }
-          
-          @keyframes scaleIn {
-            from {
-              opacity: 0;
-              transform: scale(0.95);
-            }
-            to {
-              opacity: 1;
-              transform: scale(1);
-            }
-          }
-          
-          .animate-fadeIn {
-            animation: fadeIn 0.6s ease-out forwards;
-          }
-          
-          .animate-slideUp {
-            animation: slideUp 0.4s ease-out forwards;
-          }
-          
-          .animate-scaleIn {
-            animation: scaleIn 0.3s ease-out forwards;
-          }
-          
-          .stagger-1 {
-            animation-delay: 0.1s;
-          }
-          
-          .stagger-2 {
-            animation-delay: 0.2s;
-          }
-          
-          .stagger-3 {
-            animation-delay: 0.3s;
-          }
-          
-          .stagger-4 {
-            animation-delay: 0.4s;
-          }
-          
-          /* Smooth transitions for interactive elements */
-          .smooth-hover {
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-          }
-          
-          .smooth-hover:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-          }
-          
-          /* Loading skeleton animation */
-          .skeleton {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-          }
-          
-          @keyframes loading {
-            0% {
-              background-position: 200% 0;
-            }
-            100% {
-              background-position: -200% 0;
+              transform: none;
             }
           }
         `}</style>
   {/* Final user object logging removed for production */}
         
         {/* Hero Section - Force real learning stats */}
-        <div className="opacity-0 animate-slideUp">
+        <div className="hub-section">
           <HeroSection 
             user={{
               ...user,
@@ -279,7 +243,7 @@ const LearningHubPage = () => {
             <div className="xl:col-span-3 space-y-10">
               
               {/* Expert-Crafted Enrolled Courses Section */}
-              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 opacity-0 animate-scaleIn stagger-1 smooth-hover">
+              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 hub-section hub-stagger-1 hub-hover">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center">
                     <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-3 rounded-xl mr-4 shadow-lg">
@@ -308,7 +272,7 @@ const LearningHubPage = () => {
               </section>
               
               {/* AI-Created Courses Section */}
-              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 opacity-0 animate-scaleIn stagger-2 smooth-hover">
+              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 hub-section hub-stagger-2 hub-hover">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center">
                     <div className="bg-gradient-to-r from-purple-500 to-pink-600 p-3 rounded-xl mr-4 shadow-lg">
@@ -346,10 +310,10 @@ const LearningHubPage = () => {
               </section> */}
               
               {/* Minimalistic Call-to-Action Buttons Section */}
-              <section className="grid grid-cols-1 md:grid-cols-2 gap-4 learning-hub opacity-0 animate-scaleIn stagger-3">
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-4 learning-hub hub-section hub-stagger-3">
                 
                 {/* Create Custom Course with AI */}
-                <div className="group bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl p-5 text-white smooth-hover">
+                <div className="group bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl p-5 text-white hub-hover">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <div className="bg-white/20 p-2 rounded-lg mr-3">
@@ -379,7 +343,7 @@ const LearningHubPage = () => {
                 </div>
 
                 {/* Explore Expert Courses */}
-                <div className="group bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl p-5 text-white smooth-hover">
+                <div className="group bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl p-5 text-white hub-hover">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <div className="bg-white/20 p-2 rounded-lg mr-3">
@@ -413,7 +377,7 @@ const LearningHubPage = () => {
             </div>
 
             {/* Enhanced Sidebar - Learning Analytics */}
-            <div className="xl:col-span-1 opacity-0 animate-slideUp stagger-4">
+            <div className="xl:col-span-1 hub-section hub-stagger-4">
               <div className="sticky top-24">
                 <LearningAnalytics 
                   user={{

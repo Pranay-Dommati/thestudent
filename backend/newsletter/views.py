@@ -36,12 +36,12 @@ class NewsletterAPIView(APIView):
                     'message': 'Please enter a valid email address'
                 }, status=400)
             
-            # Check if email already exists
+            # Check if email already exists (make idempotent)
             if Newsletter.objects.filter(email=email).exists():
-                return JsonResponse({
-                    'success': False,
-                    'message': 'This email is already subscribed to our newsletter'
-                }, status=400)
+                return Response({
+                    'success': True,
+                    'message': 'You are already subscribed to our newsletter.'
+                }, status=200)
             
             # Create newsletter subscription
             newsletter = Newsletter.objects.create(email=email)
