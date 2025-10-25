@@ -71,7 +71,21 @@ const Footer = () => {
       }
     } catch (error) {
       console.error("Error subscribing to newsletter:", error);
-      setMessage(error.response?.data?.message || "Network error. Please check your connection and try again.");
+      // Prefer server-provided message; handle string or JSON bodies, then fall back by status
+      let serverMessage = null;
+      const data = error?.response?.data;
+      if (typeof data === 'string') {
+        serverMessage = data; // Sometimes proxies or servers return plain text
+      } else if (data && typeof data === 'object') {
+        serverMessage = data.message || data.detail || null;
+      }
+
+      if (!serverMessage && error?.response?.status === 400) {
+        // Common 400 scenarios for newsletter: invalid email or already subscribed
+        serverMessage = "⚠️ Please enter a valid email or this email is already subscribed.";
+      }
+
+      setMessage(serverMessage || "Network error. Please check your connection and try again.");
       setMessageType("error");
     } finally {
       setIsSubmitting(false);

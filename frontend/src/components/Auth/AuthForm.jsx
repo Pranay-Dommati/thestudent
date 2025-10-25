@@ -82,23 +82,16 @@ export default function AuthForm() {
   const toggleForm = () => {
     const newMode = !isSignUp;
     
-    // Clear form errors, data, and sessionStorage immediately for smooth transition
+    // Clear only errors immediately to avoid layout collapse before animation
     setFormErrors({});
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-      agreedToTerms: false,
-    });
-    
+
     // Clear sessionStorage when user explicitly toggles between signup/login
     clearSavedFormData();
     
     // Preserve the returnTo parameter if it exists
     const returnToParam = returnToPath ? `&returnTo=${encodeURIComponent(returnToPath)}` : '';
     
-    // Use replace to avoid adding to history
+    // Navigate first (smoother on mobile); the new screen will mount with clean state
     navigate(`/auth?mode=${newMode ? 'signup' : 'login'}${returnToParam}`, { replace: true });
   };
 
@@ -455,12 +448,13 @@ export default function AuthForm() {
             <motion.div 
               key={isSignUp ? "mobile-signup" : "mobile-login"}
               className="min-h-screen flex flex-col"
-              initial={{ opacity: 0, x: isSignUp ? 50 : -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: isSignUp ? -50 : 50 }}
+              style={{ willChange: 'opacity, transform' }}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
               transition={{ 
                 type: "tween",
-                duration: 0.3,
+                duration: 0.24,
                 ease: [0.4, 0.0, 0.2, 1]
               }}
             >
@@ -498,7 +492,8 @@ export default function AuthForm() {
               </div>
 
               {/* Form Section - Takes remaining space */}
-              <div className="bg-white px-6 py-4 flex-1 min-h-0 overflow-y-auto">
+              <div className="bg-white px-6 py-4 flex-1 overflow-y-auto">
+                <div className="min-h-[520px]">
                 <motion.h2 
                   className="text-xl font-bold mb-4 text-gray-800 text-center"
                   initial={{ opacity: 0, y: 10 }}
@@ -757,6 +752,7 @@ export default function AuthForm() {
                     {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
                   </button>
                 </motion.div>
+                </div>
               </div>
             </motion.div>
           </AnimatePresence>
