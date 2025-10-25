@@ -58,12 +58,13 @@ def send_email_via_smtp(to_email: str, subject: str, html_content: str) -> bool:
         msg['To'] = to_email
         msg.attach(MIMEText(html_content, 'html'))
 
+        timeout = int(getattr(settings, 'SMTP_TIMEOUT', 12))
         if use_ssl:
-            with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=timeout) as server:
                 server.login(smtp_username, smtp_password)
                 server.send_message(msg)
         else:
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=timeout) as server:
                 if use_tls:
                     server.starttls()
                 server.login(smtp_username, smtp_password)
