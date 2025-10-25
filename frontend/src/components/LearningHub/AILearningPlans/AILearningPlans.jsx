@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 // logger removed for production cleanliness
 import { Link, useNavigate } from 'react-router-dom';
 import axios from '../../../utils/axios';
@@ -239,6 +240,14 @@ const AILearningPlans = () => {
     setDeleteConfirm({ show: false, course: null });
   };
 
+  // Lock background scroll when modal is open
+  useEffect(() => {
+    if (!deleteConfirm.show) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev || ''; };
+  }, [deleteConfirm.show]);
+
   const getProgressColor = (percentage) => {
     if (percentage >= 80) return 'bg-green-500';
     if (percentage >= 50) return 'bg-yellow-500';
@@ -448,8 +457,12 @@ const AILearningPlans = () => {
       )}
 
       {/* Delete Confirmation Modal */}
-      {deleteConfirm.show && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      {deleteConfirm.show && createPortal((
+        <div
+          className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4"
+          style={{ backdropFilter: 'none', WebkitBackdropFilter: 'none', backgroundColor: 'transparent' }}
+          onClick={(e) => { if (e.target === e.currentTarget) cancelDelete(); }}
+        >
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-2">Delete Course</h3>
             <p className="text-sm text-gray-600 mb-6">
@@ -479,7 +492,7 @@ const AILearningPlans = () => {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 // logger removed for production cleanliness
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
@@ -486,9 +487,18 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
         </div>
       )}
     </section>
-    {confirmState.visible && (
-      <div className="fixed inset-0 z-[1000]" role="dialog" aria-modal="true">
-        <div className="absolute inset-0 bg-black/40" onClick={cancelConfirm} />
+    {confirmState.visible && createPortal(
+      <div
+        className="fixed inset-0 z-[1000]"
+        role="dialog"
+        aria-modal="true"
+        style={{ backdropFilter: 'none', WebkitBackdropFilter: 'none' }}
+      >
+        <div
+          className="absolute inset-0 bg-transparent"
+          style={{ backdropFilter: 'none', WebkitBackdropFilter: 'none', backgroundColor: 'transparent' }}
+          onClick={cancelConfirm}
+        />
         <div className="absolute inset-0 flex items-center justify-center p-4">
           <div className="w-full max-w-md rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
             <div className="p-5">
@@ -515,7 +525,8 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
             </div>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     )}
     </>
   );
