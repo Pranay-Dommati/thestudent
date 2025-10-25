@@ -474,6 +474,23 @@ const MobileChatbotPage = () => {
     }
   }, [initialQuery, navigate, searchParams]);
 
+  // Fallback: if we stored a pending message during auth redirect, restore and auto-send it once (desktop parity)
+  useEffect(() => {
+    try {
+      const pending = sessionStorage.getItem('pendingChatMessage');
+      if (pending && pending.trim() && !autoSendProcessed.current) {
+        autoSendProcessed.current = true; // Prevent duplicate auto-sends
+        sessionStorage.removeItem('pendingChatMessage');
+        setMessage(pending);
+        setTimeout(() => {
+          handleSendMessage(pending);
+          // Clear the input shortly after submitting
+          setTimeout(() => setMessage(''), 100);
+        }, 150);
+      }
+    } catch (_) {}
+  }, []);
+
   // Timeout fallback to prevent infinite "Loading stats..." when pro mode is enabled (mobile)
   useEffect(() => {
     if (proMode && !usageStats) {
@@ -545,7 +562,20 @@ const MobileChatbotPage = () => {
     try {
       const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isLoggedIn;
       if (!authed) {
-        const returnTo = window.location.pathname + window.location.search;
+        // Preserve the user's typed message across auth redirect by embedding
+        // it into the returnTo URL and also saving a short-lived backup in sessionStorage.
+        try {
+          sessionStorage.setItem('pendingChatMessage', messageToSend);
+        } catch (_) {}
+
+        // Build a clean returnTo URL that includes the pending message so that
+        // MobileChatbotPage can auto-send it after successful login (desktop parity).
+        const currentUrl = new URL(window.location.href);
+        // Do not pre-encode; URLSearchParams will encode as needed
+        currentUrl.searchParams.set('message', messageToSend);
+        currentUrl.searchParams.set('prefill', 'true');
+        const returnTo = `${currentUrl.pathname}?${currentUrl.searchParams.toString()}`;
+
         const signInUrl = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
         const signUpUrl = `/auth?mode=signup&returnTo=${encodeURIComponent(returnTo)}`;
         const authPrompt = {
