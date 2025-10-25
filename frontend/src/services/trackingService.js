@@ -75,11 +75,24 @@ class TrackingService {
     const latency_ms = options.latency_ms;
     const client_ts = new Date().toISOString();
 
+    // Enrich with basic site context so we can distinguish localhost vs production
+    let siteContext = {};
+    try {
+      const loc = window.location;
+      siteContext = {
+        site_host: loc.host,
+        site_origin: loc.origin,
+        site_path: loc.pathname,
+      };
+    } catch {}
+
+    const props = { ...siteContext, ...properties };
+
     const event = {
       session_id: this.getSessionId(),
       event_type: eventType,
       feature,
-      metadata: properties,
+      metadata: props,
       success,
       error_code,
       latency_ms,
@@ -89,7 +102,7 @@ class TrackingService {
     // Send to PostHog if available
     try {
       if (posthog) {
-        posthog.capture(eventType, { ...properties, session_id: event.session_id, feature, success, error_code, latency_ms });
+        posthog.capture(eventType, { ...props, session_id: event.session_id, feature, success, error_code, latency_ms });
       }
     } catch (e) {}
 
