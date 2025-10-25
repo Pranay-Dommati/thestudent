@@ -48,6 +48,10 @@ const QuizIntro = ({ quizData, lessonId, onStart }) => {
       quizPath = `${currentPath}/quiz`;
     }
     
+    // Preserve any query parameters such as ?courseId=... to keep course context
+    if (location.search) {
+      quizPath = `${quizPath}${location.search}`;
+    }
     console.log('Navigating to quiz path:', quizPath);
     
     // Prepare quiz questions data

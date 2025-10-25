@@ -42,13 +42,18 @@ const ResponsiveCourseLearningPage = () => {
 
   // Determine the actual course ID based on URL pattern
   const determineCourseId = () => {
-    // If we have a direct courseId (like in engineering courses), use it
+    // 1) Prefer explicit courseId from query string to disambiguate (e.g., Maths 1A vs 1B)
+    const searchParams = new URLSearchParams(location.search || '');
+    const queryCourseId = searchParams.get('courseId');
+    if (queryCourseId) return queryCourseId;
+
+    // 2) If we have a path param courseId (like in engineering courses), use it
     if (courseId) return courseId;
     
-    // For school courses, the subject is the identifier
+    // 3) For school courses, the subject is the identifier
     if (subjectId) return subjectId;
     
-    // Extract from pathname as fallback
+    // 4) Extract from pathname as fallback
     const pathParts = location.pathname.split('/');
     
     // Return the last non-empty part before 'learning'

@@ -298,9 +298,9 @@ const TwelfthStandard = () => {
               {courses.map((course) => {
                 return (
                   <Link 
-                    to={selectedBoard.includes('state') 
+                    to={`${(selectedBoard.includes('state') 
                       ? `/courses/12th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
-                      : `/courses/12th/${selectedBoard}/${course.subject.toLowerCase()}`} 
+                      : `/courses/12th/${selectedBoard}/${course.subject.toLowerCase()}`)}?courseId=${encodeURIComponent(course.id)}`}
                     key={course.id}
                   >
                     <motion.div 

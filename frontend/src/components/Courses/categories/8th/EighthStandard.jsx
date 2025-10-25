@@ -187,9 +187,9 @@ const EighthStandard = () => {
             <div className="grid grid-cols-1 gap-3 px-4 md:px-0 md:grid-cols-2 lg:grid-cols-3 md:gap-6">
               {courses.map((course) => (
                 <Link 
-                  to={selectedBoard.includes('state') 
+                  to={`${(selectedBoard.includes('state') 
                     ? `/courses/8th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
-                    : `/courses/8th/${selectedBoard}/${course.subject.toLowerCase()}`} 
+                    : `/courses/8th/${selectedBoard}/${course.subject.toLowerCase()}`)}?courseId=${encodeURIComponent(course.id)}`}
                   key={course.id}
                 >
                   <motion.div 

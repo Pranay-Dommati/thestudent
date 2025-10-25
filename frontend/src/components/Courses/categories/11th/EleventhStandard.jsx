@@ -321,9 +321,11 @@ const EleventhStandard = () => {
           ) : courses.length > 0 ? (
             <div className="grid grid-cols-1 gap-3 px-4 md:px-0 md:grid-cols-2 lg:grid-cols-3 md:gap-6">
               {courses.map((course) => {
-                const to = selectedBoard.includes('state')
+                // Preserve a stable course identifier in the URL to disambiguate subjects with multiple variants (e.g., 1A vs 1B)
+                const basePath = selectedBoard.includes('state')
                   ? `/courses/11th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}`
                   : `/courses/11th/${selectedBoard}/${course.subject.toLowerCase()}`;
+                const to = `${basePath}?courseId=${encodeURIComponent(course.id)}`;
                 return (
                   <Link to={to} key={`${course.id}-${course.subject}`}>
                     <motion.div 

@@ -221,7 +221,9 @@ const FeaturedPlaylists = () => {
     
     // Navigate to course page
     if (classPath) {
-      navigate(navigationPath);
+      // Append ?courseId=<uuid> so downstream pages fetch by exact ID
+      const urlWithId = `${navigationPath}?courseId=${encodeURIComponent(course.id)}`;
+      navigate(urlWithId);
     } else {
   // Navigation path not determined; no console output in production
     }

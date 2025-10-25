@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { FaPlay, FaBookReader, FaClock, FaChalkboardTeacher, FaGlobe, FaBook, FaCheck } from 'react-icons/fa';
 import axios from '../../utils/axios';
+import { toAbsoluteMedia } from '../../utils/apiOrigin';
 import universalToast from '../../utils/universalToast';
 import LoadingSpinner from './LoadingSpinner';
 import Navbar from '../Navbar/Navbar';
@@ -75,6 +76,47 @@ const SchoolCourseDetails = () => {
     const fetchCourseData = async () => {
       setLoading(true);
       try {
+        // If a specific courseId is provided in the query string, prefer fetching by ID.
+        const searchParams = new URLSearchParams(location.search || '');
+        const selectedCourseId = searchParams.get('courseId');
+        if (selectedCourseId) {
+          logger.log('Fetching school course by ID from query param:', selectedCourseId);
+          const byId = await axios.get(`/courses/school/${selectedCourseId}/`);
+          const courseData = byId.data;
+
+          // Build absolute thumbnail URL when backend returns a relative media path
+          const absoluteThumb = toAbsoluteMedia(courseData.thumbnail);
+
+          const formattedCourse = {
+            id: courseData.id,
+            title: courseData.title,
+            subject: courseData.subject,
+            board: courseData.board === 'state' && courseData.state
+              ? `${courseData.state} State Board`
+              : (courseData.board || '').toUpperCase(),
+            class: courseData.class_level || '11th',
+            lastUpdated: courseData.last_updated ? new Date(courseData.last_updated).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : 'Recently updated',
+            features: [
+              { icon: <FaChalkboardTeacher />, title: 'Expert Teachers', desc: 'Learn from experienced educators' },
+              { icon: <FaBookReader />, title: 'Structured Learning', desc: 'Well-organized chapter-wise content' },
+              { icon: <FaClock />, title: 'Self-Paced', desc: 'Learn at your own convenience' }
+            ],
+            keyTopics: Array.isArray(courseData.key_topics) ? courseData.key_topics : [],
+            whatYouLearn: Array.isArray(courseData.learning_points) ? courseData.learning_points : [],
+            duration: courseData.duration || '20',
+            chapters: Array.isArray(courseData.chapters) ? courseData.chapters.length : 0,
+            sources: courseData.sources || 'YouTube',
+            thumbnail: absoluteThumb || courseData.thumbnail,
+            icon: SUBJECT_ICONS[courseData.subject] || '📚'
+          };
+
+          setCourse(formattedCourse);
+          if (isLoggedIn) {
+            checkEnrollmentStatus(formattedCourse.id);
+          }
+          return; // Done for by-id fetch
+        }
+
         // Extract parameters from the URL
         const classLevel = location.pathname.includes('/6th/') ? '6th' :
                           location.pathname.includes('/7th/') ? '7th' :
@@ -192,7 +234,7 @@ const SchoolCourseDetails = () => {
           chapters: chapterCount,
           sources: courseData.sources || "YouTube",
           // Use the actual thumbnail path from the database
-          thumbnail: courseData.thumbnail,
+          thumbnail: toAbsoluteMedia(courseData.thumbnail),
           icon: SUBJECT_ICONS[courseData.subject] || '📚'
         };
         
@@ -283,7 +325,8 @@ const SchoolCourseDetails = () => {
       if (isEnrolled) {
         logger.log('User already enrolled, navigating directly to learning page');
         universalToast.success('Welcome back! Continuing your learning journey.', { id: 'start-learning' });
-        navigate(`${location.pathname}/learning`);
+  // Preserve any query params (like ?courseId=...) for downstream pages
+  navigate({ pathname: `${location.pathname}/learning`, search: location.search });
         return;
       }
 

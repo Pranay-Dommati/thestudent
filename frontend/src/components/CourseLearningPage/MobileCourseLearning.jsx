@@ -42,7 +42,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         setLoading(true);
         
         // Check cache first for instant load
-        const cacheKey = courseCache.generateKey(pathname);
+  const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         const cachedData = courseCache.get(cacheKey);
         
         if (cachedData) {
@@ -70,11 +70,17 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       try {
     // axiosInstance already prefixes with '/api'
 
-        let apiUrl;
+  let apiUrl;
         let isSchoolCourse = false;
+  // Prefer explicit courseId from the query string if present (disambiguates 1A vs 1B)
+  const searchParams = new URLSearchParams(location.search || '');
+  const selectedCourseId = searchParams.get('courseId');
 
         if (pathParts.includes('6th') || pathParts.includes('7th') || pathParts.includes('8th') || pathParts.includes('9th') || pathParts.includes('10th') || pathParts.includes('11th') || pathParts.includes('12th')) {
           isSchoolCourse = true;
+          if (selectedCourseId) {
+            apiUrl = `/courses/school/${selectedCourseId}/`;
+          } else {
           const classLevel = pathParts.find(part => ['6th', '7th', '8th', '9th', '10th', '11th', '12th'].includes(part));
           const board = pathParts.find(part => ['cbse', 'state'].includes(part));
 
@@ -143,6 +149,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             const subj = decodeURIComponent(subjectId || '').toLowerCase();
             apiUrl = `/courses/school/?class=${classLevel}&board=${board}&subject=${encodeURIComponent(subj)}`;
             logger.log('📚 Mobile: CBSE query URL', apiUrl);
+          }
           }
         } else {
           apiUrl = `/courses/engineering/${courseId}/`;
@@ -220,7 +227,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         
         // Cache the course data for faster future loads
-        const cacheKey = courseCache.generateKey(pathname);
+  const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         courseCache.set(cacheKey, { course: transformedCourse });
         console.log('💾 Mobile: Course data cached for faster future loads');
       } catch (error) {
@@ -233,7 +240,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     };
 
     fetchData();
-  }, [courseId, pathname]);
+  }, [courseId, pathname, location.search]);
 
   // Progress tracking logic (reused from desktop)
   useEffect(() => {

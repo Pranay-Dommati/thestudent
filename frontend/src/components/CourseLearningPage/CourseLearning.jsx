@@ -35,6 +35,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [downloadResourcesOpen, setDownloadResourcesOpen] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0);
   const [certificate, setCertificate] = useState(null);
+  // When subject-only URL matches multiple courses (e.g., Mathematics 1A vs 1B), show chooser
+  const [disambiguationOptions, setDisambiguationOptions] = useState(null); // array of brief course objects
   const [issuingCert, setIssuingCert] = useState(false);
   const videoRef = useRef(null);
   const navigate = useNavigate();
@@ -73,7 +75,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         setLoading(true);
         
         // **OPTIMIZATION 1: Check cache first**
-        const cacheKey = courseCache.generateKey(pathname);
+  const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         const cachedData = courseCache.get(cacheKey);
         
         if (cachedData) {
@@ -108,10 +110,17 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         // Extract proper course type and ID from URL path
         let apiUrl;
         let isSchoolCourse = false;
+        // If a specific courseId is present in the query string, prefer fetching by ID
+        const searchParams = new URLSearchParams(location.search || '');
+        const selectedCourseId = searchParams.get('courseId');
         
         // Check if it's a school course (e.g., /courses/6th/cbse/math/learning)
         if (pathParts.includes('6th') || pathParts.includes('7th') || pathParts.includes('8th') || pathParts.includes('9th') || pathParts.includes('10th') || pathParts.includes('11th') || pathParts.includes('12th')) {
           isSchoolCourse = true;
+          // Short-circuit: fetch exact school course by ID when provided (avoids 1A vs 1B ambiguity)
+          if (selectedCourseId) {
+            apiUrl = `/courses/school/${selectedCourseId}/`;
+          } else {
           const classLevel = pathParts.find(part => ['6th', '7th', '8th', '9th', '10th', '11th', '12th'].includes(part));          const board = pathParts.find(part => ['cbse', 'state'].includes(part));
           
           // Handle state board case which has an additional parameter
@@ -194,6 +203,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               console.log(`📚 Fetching school course with: class=${classLevel}, board=${board}, subject=${subjectId.toLowerCase()}`);
             }
           }
+          }
         } else {
           // Engineering course
           apiUrl = `/courses/engineering/${courseId}/`;
@@ -205,18 +215,25 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           console.log("🔍 Fetching course from API URL:", apiUrl);
         const response = await axiosInstance.get(apiUrl);
         console.log("📝 API Response:", response.data);
-          let courseData;
+        let courseData;
         if (isSchoolCourse) {
-          if (Array.isArray(response.data) && response.data.length > 0) {
-            // For school courses, we get a list, so take the first matching course
-            courseData = response.data[0];
-            console.log("🎯 Selected course from list:", courseData);
-            // Now fetch the complete course details
-            const detailResponse = await axiosInstance.get(`/courses/school/${courseData.id}/`);
+          if (selectedCourseId) {
+            // Already fetched the exact course object
+            courseData = response.data;
+          } else if (Array.isArray(response.data) && response.data.length > 0) {
+            // If multiple courses match (e.g., 1A vs 1B), ask user to choose which exact course
+            if (response.data.length > 1) {
+              setDisambiguationOptions(response.data);
+              setContentType('disambiguate');
+              return; // Defer loading until user selects
+            }
+            // Single match: load its full details
+            const selected = response.data[0];
+            console.log("🎯 Selected course from list:", selected);
+            const detailResponse = await axiosInstance.get(`/courses/school/${selected.id}/`);
             console.log("📚 Complete course details:", detailResponse.data);
             courseData = detailResponse.data;
           } else {
-            // No courses found for the given criteria
             throw new Error(`No courses found for the specified criteria. Please check if the course exists.`);
           }
         } else {
@@ -294,7 +311,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             setCourse(updatedCourse);
             
             // **OPTIMIZATION 4: Cache the complete data**
-            const cacheKey = courseCache.generateKey(pathname);
+            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
             courseCache.set(cacheKey, {
               course: updatedCourse,
               progress: progressResponse.data
@@ -303,12 +320,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           } catch (progressError) {
             console.error('⚠️ Error fetching progress (non-critical):', progressError);
             // Still cache course without progress
-            const cacheKey = courseCache.generateKey(pathname);
+            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
             courseCache.set(cacheKey, { course: transformedCourse });
           }
         } else {
           // Cache course without progress for non-logged-in users
-          const cacheKey = courseCache.generateKey(pathname);
+          const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
           courseCache.set(cacheKey, { course: transformedCourse });
         }
         
@@ -317,7 +334,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
         
         // Special handling for state board course errors
-        const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
+  const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
         const isStateBoard = pathParts.includes('state');
         if (isStateBoard) {
           const stateIndex = pathParts.indexOf('state');
@@ -341,7 +358,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     };
 
     fetchData();
-  }, [courseId, pathname]);
+  }, [courseId, pathname, location.search]);
 
   // Add a useEffect to fetch user progress when course data is loaded
   useEffect(() => {
@@ -476,7 +493,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
       if (currentLesson.id) {
         // Fire and then sync progress from server response
-        const response = await axiosInstance.post(`/lessons/toggle-completion/${currentLesson.id}/`);
+  const response = await axiosInstance.post(`/lessons/toggle-completion/${currentLesson.id}/`);
         const pct = response?.data?.progress?.percentage;
         const completed = response?.data?.progress?.completed;
         const total = response?.data?.progress?.total;
@@ -488,7 +505,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         
         // **FIX: Invalidate and update cache after marking complete**
-        const cacheKey = courseCache.generateKey(pathname);
+  const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         courseCache.invalidate(cacheKey);
         console.log('🗑️ Cache invalidated after marking lesson complete');
         
@@ -804,6 +821,46 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             >
               Try Again
             </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Disambiguation UI when multiple courses match subject-only URL (e.g., 1A vs 1B)
+    if (contentType === 'disambiguate' && Array.isArray(disambiguationOptions)) {
+      const chooseCourse = (id) => {
+        // Navigate to same path with explicit courseId so we fetch exact course by UUID
+        navigate(`${pathname}?courseId=${encodeURIComponent(id)}`);
+      };
+      return (
+        <div className="p-6 md:p-8">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Select the exact course</h2>
+          <p className="text-gray-600 mb-6">We found multiple courses for this subject. Please choose one to continue.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {disambiguationOptions.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => chooseCourse(opt.id)}
+                className="flex items-start gap-3 p-4 border rounded-lg hover:shadow transition bg-white text-left"
+                aria-label={`Choose ${opt.title}`}
+              >
+                {opt.thumbnail ? (
+                  <img src={opt.thumbnail} alt="thumbnail" className="w-16 h-16 rounded object-cover" />
+                ) : (
+                  <div className="w-16 h-16 rounded bg-gray-100 flex items-center justify-center text-gray-400">📘</div>
+                )}
+                <div>
+                  <div className="font-semibold text-gray-900 line-clamp-2">{opt.title}</div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {(opt.class_level || '').toString()} • {(opt.board || '').toString()}
+                    {opt.board?.toLowerCase() === 'state' && opt.state ? ` • ${opt.state}` : ''}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="mt-6">
+            <button onClick={() => navigate('/courses')} className="text-sm text-gray-600 hover:text-gray-800 underline">Back to Courses</button>
           </div>
         </div>
       );
