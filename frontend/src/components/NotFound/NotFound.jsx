@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Ghost, ArrowLeft, Home, BookOpen, Bot, Lightbulb, LogIn, UserPlus } from "lucide-react";
+import { Ghost, ArrowLeft, Home, BookOpen, Bot, Lightbulb, LogIn, UserPlus, User } from "lucide-react";
+import { useAuth } from '../../context/AuthContext';
 import Footer from "../Footer/Footer"; // Import your existing Footer
 
 const NotFound = () => {
   const navigate = useNavigate();
+  const { isLoggedIn, userProfile } = useAuth();
   const currentYear = new Date().getFullYear();
   const [countdown, setCountdown] = useState(30);
   
@@ -52,12 +54,26 @@ const NotFound = () => {
                 <Link to="/" className="font-medium transition-colors text-white hover:text-blue-200">Home</Link>
                 <Link to="/courses" className="font-medium transition-colors text-white hover:text-blue-200">Courses</Link>
                 <Link to="/chat" className="font-medium transition-colors text-white hover:text-blue-200">AI Chatbot</Link>
-                <Link to="/learning-hub" className="font-medium transition-colors text-white hover:text-blue-200">Learning Hub</Link>
+                {isLoggedIn && (
+                  <Link to="/learning-hub" className="font-medium transition-colors text-white hover:text-blue-200">Learning Hub</Link>
+                )}
               </div>
             </div>
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <Link to={`/auth?mode=login&returnTo=${encodeURIComponent(window.location.pathname + (window.location.search || '') + (window.location.hash || ''))}`} className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full font-medium transition-all duration-300 text-white border border-white hover:bg-white/20 text-sm sm:text-base">Log In</Link>
-              <Link to="/auth?mode=signup" className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-shadow text-sm sm:text-base">Sign Up</Link>
+              {isLoggedIn ? (
+                <Link 
+                  to="/profile" 
+                  className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full font-medium transition-all duration-300 text-white border border-white hover:bg-white/20 text-sm sm:text-base flex items-center gap-2"
+                >
+                  <User className="w-4 h-4" />
+                  <span className="hidden sm:inline">{userProfile?.username || 'Profile'}</span>
+                </Link>
+              ) : (
+                <>
+                  <Link to={`/auth?mode=login&returnTo=${encodeURIComponent(window.location.pathname + (window.location.search || '') + (window.location.hash || ''))}`} className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full font-medium transition-all duration-300 text-white border border-white hover:bg-white/20 text-sm sm:text-base">Log In</Link>
+                  <Link to="/auth?mode=signup" className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full font-medium bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg transition-shadow text-sm sm:text-base">Sign Up</Link>
+                </>
+              )}
             </div>
           </div>
         </div>

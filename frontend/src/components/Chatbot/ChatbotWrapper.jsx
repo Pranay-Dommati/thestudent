@@ -26,9 +26,9 @@ const ChatbotWrapper = () => {
   return (
     <>
       <SEO
-        title="AI Course Creator - Build Personalized Learning Paths"
-        description="Create your own AI-powered course on EasyLearnova. Chat with AI to build personalized playlists and start learning instantly."
-        keywords="AI course creator, generate learning playlists, EasyLearnova AI chat, personalized learning, free online courses"
+        title="AI Chatbot - Create Custom Courses with Pro Learning | EasyLearnova"
+        description="Learn like a pro with EasyLearnova's AI-powered Pro Learning feature. Chat with our intelligent AI to create personalized courses, generate custom learning paths, and master any subject with curated videos, quizzes, and resources—all tailored just for you."
+        keywords="AI chatbot, Pro Learning, create custom courses, AI course generator, personalized learning paths, AI tutor, custom course creation, learn with AI, EasyLearnova chatbot"
         canonical="https://easylearnova.com/chat"
       />
       {width < 768 ? <MobileChatbotPage /> : <ChatbotPage />}

@@ -764,25 +764,9 @@ const ProLearningPage = () => {
   // Step 4: Fallback - only create default topics when truly nothing else is available
   const hasBatchMarker = typeof localStorage !== 'undefined' ? localStorage.getItem('proLearning_batchMarker') : null;
   if (!courseTitle && !topicParam && !hasBatchMarker && !foundFromBatch) {
-        // No data found - create fresh default topics
-        const defaultTopics = [
-          { id: 1, name: "Introduction", isActive: true }, // First topic is active
-          { id: 2, name: "Getting Started", isActive: false },
-          { id: 3, name: "Key Concepts", isActive: false },
-          { id: 4, name: "Best Practices", isActive: false },
-          { id: 5, name: "Advanced Topics", isActive: false }
-        ];
-        setTopicsList(defaultTopics);
-        
-        // Set the first topic as selected
-        setSelectedTopic(defaultTopics[0]);
-        
-        try {
-          proContentManager.setCourse("Default Course", currentCourseId);
-          await proContentManager.storeTopics(defaultTopics, currentCourseId);
-        } catch (error) {
-          console.error('❌ Failed to store default topics:', error);
-        }
+        // No data found - this shouldn't happen as courseId is required
+        // If somehow we get here, we just don't create default topics
+        console.warn('⚠️ ProLearning: No course data found and no batch marker - this should not happen');
       } else {
         // Could show error message to user here
       }
@@ -5656,6 +5640,9 @@ const ProLearningPage = () => {
     setBatchGenerationProgress(0);
     setBatchGenerationStatus('');
   };
+
+  // Note: /pro-learning without courseId is handled by 301 redirect in App.jsx
+  // This component only receives requests with valid courseId parameter
 
   return (
     <>

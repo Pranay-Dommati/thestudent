@@ -262,7 +262,8 @@ const App = () => {
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/privacy" element={<Navigate to="/privacy-policy" />} />
             <Route path="/chat" element={<ChatbotWrapper />} />
-            <Route path="/pro-learning" element={<ProLearningPage />} />
+            {/* 301 Redirect: Old /pro-learning URL (without courseId) redirects to /chat for SEO */}
+            <Route path="/pro-learning" element={<Navigate to="/chat" replace />} />
             <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<ResponsiveCourseLearningPage />} />

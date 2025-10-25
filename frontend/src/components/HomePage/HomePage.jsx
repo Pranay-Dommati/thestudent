@@ -10,9 +10,9 @@ const HomePage = () => {
     return (
         <>
             <SEO
-                title="EasyLearnova - AI-Powered Student Learning Hub"
-                description="EasyLearnova — AI-powered student learning hub. Discover free, structured course playlists for school and college and learn faster with personalized paths."
-                keywords="EasyLearnova, AI learning, free courses, student learning hub, curated playlists, online courses, 6th to 12th standard"
+                title="EasyLearnova - AI-Powered Learning Platform | Custom Courses & Board Syllabus"
+                description="Transform your learning with EasyLearnova's AI-powered platform. Create custom courses with our Pro Learning feature or access structured CBSE & State Board content for grades 6-12. Master any subject with personalized learning paths, curated videos, interactive quizzes, and comprehensive resources—all in one place."
+                keywords="EasyLearnova, AI learning platform, Pro Learning, custom course creation, CBSE courses, state board syllabus, 6th to 12th standard, AI chatbot tutor, personalized learning, structured courses, board exam preparation"
                 canonical="https://easylearnova.com/"
             />
             <Hero />
