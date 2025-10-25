@@ -90,6 +90,8 @@ const AdminAnalytics = ({ isDarkMode }) => {
   const [courseStatsLoading, setCourseStatsLoading] = useState(false);
   const [courseStatsError, setCourseStatsError] = useState(null);
   const [coursesStats, setCoursesStats] = useState({ total_courses: 0, total_enrollments: 0, items: [] });
+  // Local UI filters for Enrollments tab (client-side)
+  const [enrFilters, setEnrFilters] = useState({ q: '', type: 'all', published: 'all', sort: 'enroll_desc' });
 
   // Admin: Selected course enrollments detail modal
   const [detailOpen, setDetailOpen] = useState(false);
@@ -102,6 +104,8 @@ const AdminAnalytics = ({ isDarkMode }) => {
   const [proTopicsLoading, setProTopicsLoading] = useState(false);
   const [proTopicsError, setProTopicsError] = useState(null);
   const [proTopics, setProTopics] = useState([]); // [{topic_id, topic_name, course_title, user_name, user_email, created_at, updated_at, completed_at, progress_percentage}]
+  // Local UI filters for AI ProLearning tab (client-side)
+  const [proFilters, setProFilters] = useState({ q: '', completion: 'all', minProgress: '0', sort: 'recent' });
 
   const goToProLearning = (item) => {
     if (!item || !item.course_id) return;
@@ -282,6 +286,42 @@ const AdminAnalytics = ({ isDarkMode }) => {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Derived lists with client-side filtering
+  const filteredCourses = React.useMemo(() => {
+    let list = Array.isArray(coursesStats.items) ? [...coursesStats.items] : [];
+    const q = (enrFilters.q || '').toLowerCase();
+    if (q) list = list.filter(c => (c.title || '').toLowerCase().includes(q));
+    if (enrFilters.type !== 'all') list = list.filter(c => (c.course_type || '').toLowerCase() === enrFilters.type);
+    if (enrFilters.published !== 'all') list = list.filter(c => !!c.is_published === (enrFilters.published === 'yes'));
+    // Sorting
+    if (enrFilters.sort === 'enroll_desc') list.sort((a,b) => (b.enrollments - a.enrollments) || (a.title || '').localeCompare(b.title || ''));
+    else if (enrFilters.sort === 'enroll_asc') list.sort((a,b) => (a.enrollments - b.enrollments) || (a.title || '').localeCompare(b.title || ''));
+    else if (enrFilters.sort === 'name') list.sort((a,b) => (a.title || '').localeCompare(b.title || ''));
+    return list;
+  }, [coursesStats.items, enrFilters]);
+
+  const filteredProTopics = React.useMemo(() => {
+    let list = Array.isArray(proTopics) ? [...proTopics] : [];
+    const q = (proFilters.q || '').toLowerCase();
+    if (q) list = list.filter(t =>
+      (t.topic_name || '').toLowerCase().includes(q) ||
+      (t.course_title || '').toLowerCase().includes(q) ||
+      (t.user_email || '').toLowerCase().includes(q) ||
+      (t.user_name || '').toLowerCase().includes(q)
+    );
+    if (proFilters.completion !== 'all') {
+      const wantCompleted = proFilters.completion === 'completed';
+      list = list.filter(t => Boolean(t.completed_at) === wantCompleted);
+    }
+    const minP = Number(proFilters.minProgress || 0);
+    if (Number.isFinite(minP) && minP > 0) list = list.filter(t => Number(t.progress_percentage || 0) >= minP);
+    // Sorting
+    if (proFilters.sort === 'recent') list.sort((a,b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+    else if (proFilters.sort === 'progress') list.sort((a,b) => Number(b.progress_percentage || 0) - Number(a.progress_percentage || 0));
+    else if (proFilters.sort === 'topic') list.sort((a,b) => (a.topic_name || '').localeCompare(b.topic_name || ''));
+    return list;
+  }, [proTopics, proFilters]);
 
   const openCourseDetail = async (course) => {
     if (!course || !course.id) return;
@@ -558,6 +598,42 @@ const AdminAnalytics = ({ isDarkMode }) => {
             <h3 className="font-semibold">Course Enrollments</h3>
             <div className="text-xs text-gray-500">Total: {coursesStats.total_courses}</div>
           </div>
+          {/* Local filters */}
+          <div className="flex flex-col md:flex-row md:items-end gap-3 mb-3">
+            <div className="flex-1">
+              <label className="text-xs text-gray-500">Search</label>
+              <input
+                className="mt-1 w-full border rounded-lg px-3 py-2"
+                placeholder="Course title..."
+                value={enrFilters.q}
+                onChange={(e) => setEnrFilters(f => ({ ...f, q: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Type</label>
+              <select className="mt-1 w-40 border rounded-lg px-3 py-2" value={enrFilters.type} onChange={(e) => setEnrFilters(f => ({ ...f, type: e.target.value }))}>
+                <option value="all">All</option>
+                <option value="engineering">Engineering</option>
+                <option value="school">School</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Published</label>
+              <select className="mt-1 w-40 border rounded-lg px-3 py-2" value={enrFilters.published} onChange={(e) => setEnrFilters(f => ({ ...f, published: e.target.value }))}>
+                <option value="all">All</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Sort</label>
+              <select className="mt-1 w-48 border rounded-lg px-3 py-2" value={enrFilters.sort} onChange={(e) => setEnrFilters(f => ({ ...f, sort: e.target.value }))}>
+                <option value="enroll_desc">Enrollments (High → Low)</option>
+                <option value="enroll_asc">Enrollments (Low → High)</option>
+                <option value="name">Name A–Z</option>
+              </select>
+            </div>
+          </div>
           {courseStatsError && (
             <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 mb-3 text-sm">
               Failed to load course stats: {JSON.stringify(courseStatsError)}
@@ -579,7 +655,7 @@ const AdminAnalytics = ({ isDarkMode }) => {
                 ) : (coursesStats.items?.length || 0) === 0 ? (
                   <tr><td className="px-4 py-6" colSpan="4">No data</td></tr>
                 ) : (
-                  coursesStats.items.map((c) => (
+                  filteredCourses.map((c) => (
                     <tr key={`${c.course_type}-${c.id}`} className="hover:bg-gray-50 cursor-pointer" onClick={() => openCourseDetail(c)}>
                       <td className="px-4 py-2 text-sm">{c.title}</td>
                       <td className="px-4 py-2 text-sm">{c.course_type === 'engineering' ? 'Engineering' : 'School'}</td>
@@ -598,7 +674,7 @@ const AdminAnalytics = ({ isDarkMode }) => {
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">AI ProLearning Topics (All Users)</h3>
             <div className="flex items-center gap-3">
-              <div className="text-xs text-gray-500 hidden md:block">{proTopics.length} items</div>
+              <div className="text-xs text-gray-500 hidden md:block">{filteredProTopics.length} items</div>
               <div className="text-xs text-gray-500 flex items-center gap-2">
                 <label className="text-gray-500">Range</label>
                 <select
@@ -611,6 +687,43 @@ const AdminAnalytics = ({ isDarkMode }) => {
                   <option value="30d">Last 30d</option>
                 </select>
               </div>
+            </div>
+          </div>
+          {/* ProLearning local filters */}
+          <div className="flex flex-col md:flex-row md:items-end gap-3 mb-3">
+            <div className="flex-1">
+              <label className="text-xs text-gray-500">Search</label>
+              <input
+                className="mt-1 w-full border rounded-lg px-3 py-2"
+                placeholder="Topic, course, user/email..."
+                value={proFilters.q}
+                onChange={(e) => setProFilters(f => ({ ...f, q: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Completion</label>
+              <select className="mt-1 w-40 border rounded-lg px-3 py-2" value={proFilters.completion} onChange={(e) => setProFilters(f => ({ ...f, completion: e.target.value }))}>
+                <option value="all">All</option>
+                <option value="completed">Completed</option>
+                <option value="inprogress">In progress</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Min progress</label>
+              <select className="mt-1 w-40 border rounded-lg px-3 py-2" value={proFilters.minProgress} onChange={(e) => setProFilters(f => ({ ...f, minProgress: e.target.value }))}>
+                <option value="0">0%</option>
+                <option value="25">25%</option>
+                <option value="50">50%</option>
+                <option value="75">75%</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Sort</label>
+              <select className="mt-1 w-48 border rounded-lg px-3 py-2" value={proFilters.sort} onChange={(e) => setProFilters(f => ({ ...f, sort: e.target.value }))}>
+                <option value="recent">Recently updated</option>
+                <option value="progress">Progress (High → Low)</option>
+                <option value="topic">Topic A–Z</option>
+              </select>
             </div>
           </div>
           {proTopicsError && (
@@ -636,10 +749,10 @@ const AdminAnalytics = ({ isDarkMode }) => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {proTopicsLoading ? (
                   <tr><td className="px-4 py-6" colSpan="9">Loading…</td></tr>
-                ) : proTopics.length === 0 ? (
+                ) : filteredProTopics.length === 0 ? (
                   <tr><td className="px-4 py-6" colSpan="9">No data</td></tr>
                 ) : (
-                  proTopics.map((t) => (
+                  filteredProTopics.map((t) => (
                     <tr key={t.topic_id} className="hover:bg-gray-50">
                       <td className="px-4 py-2 text-sm">{t.topic_name}</td>
                       <td className="px-4 py-2 text-sm">

@@ -9,6 +9,8 @@ const AdminUsers = () => {
   const [roleFilter, setRoleFilter] = useState('all'); // all|admin|user
   const [joinedFilter, setJoinedFilter] = useState('all'); // all|last7|last30|thismonth
   const [sortBy, setSortBy] = useState('recent'); // recent|oldest|name
+  // Additional filter: enrollment count quick filter (client-side)
+  const [enrollmentFilter, setEnrollmentFilter] = useState('all'); // all|none|1plus|5plus
   const [currentPage, setCurrentPage] = useState(1);
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState({ total_users: 0, active_users: 0, new_this_month: 0, inactive_users: 0 });
@@ -47,6 +49,18 @@ const AdminUsers = () => {
     fetchUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, statusFilter, roleFilter, joinedFilter, sortBy, currentPage]);
+
+  // Derive client-side filter for enrollment counts (backend may ignore this param)
+  const usersToRender = React.useMemo(() => {
+    if (!Array.isArray(users) || enrollmentFilter === 'all') return users;
+    return users.filter(u => {
+      const cnt = Number(u.enrolledCourses || u.enrolled_courses || 0);
+      if (enrollmentFilter === 'none') return cnt === 0;
+      if (enrollmentFilter === '1plus') return cnt >= 1;
+      if (enrollmentFilter === '5plus') return cnt >= 5;
+      return true;
+    });
+  }, [users, enrollmentFilter]);
 
   const handleUserAction = async (userId, action) => {
     try {
@@ -157,6 +171,18 @@ const AdminUsers = () => {
           <option value="thismonth">This month</option>
         </select>
 
+        {/* Enrollment count (client-side) */}
+        <select
+          value={enrollmentFilter}
+          onChange={(e) => { setEnrollmentFilter(e.target.value); setCurrentPage(1); }}
+          className="w-full sm:w-44 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="all">All Enrollments</option>
+          <option value="none">No enrollments</option>
+          <option value="1plus">1+ enrollments</option>
+          <option value="5plus">5+ enrollments</option>
+        </select>
+
         {/* Sort */}
         <select
           value={sortBy}
@@ -203,7 +229,7 @@ const AdminUsers = () => {
                   <td className="px-6 py-6 text-center text-sm text-gray-500" colSpan={5}>{error || 'No users found'}</td>
                 </tr>
               )}
-              {!loading && users.map((user) => (
+              {!loading && usersToRender.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
