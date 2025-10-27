@@ -2,18 +2,20 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from .models import ProLearningCourse, ProLearningTopic
+from .models import ProLearningCourse, ProLearningTopic, ProLearningShareLink
 from .serializers import (
     ProLearningCourseSerializer,
     ProLearningCourseCreateSerializer,
     ProLearningTopicSerializer,
     ProLearningTopicCreateSerializer,
-    ProLearningTopicUpdateSerializer
+    ProLearningTopicUpdateSerializer,
+    PublicProLearningCourseSerializer,
+    ProLearningShareLinkSerializer,
 )
 
 
@@ -181,18 +183,18 @@ def mark_topic_complete(request, course_id, topic_id):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def get_course_progress(request, course_id):
+def get_course_progress(request, id):
     """
     GET /api/courses/pro-learning/{id}/progress/
     Get course progress statistics
     """
     # Admins can view progress for any course
     if getattr(request.user, 'is_staff', False) or getattr(request.user, 'is_superuser', False):
-        course = get_object_or_404(ProLearningCourse, id=course_id)
+        course = get_object_or_404(ProLearningCourse, id=id)
     else:
         course = get_object_or_404(
             ProLearningCourse,
-            id=course_id,
+            id=id,
             user=request.user
         )
     
@@ -276,3 +278,66 @@ def save_course_from_localStorage(request):
             {'error': f'Failed to save course: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+# ==================== PUBLIC SHARING ENDPOINTS ====================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_share_link(request, id):
+    """
+    POST /api/courses/pro-learning/{id}/share/
+    Create (or return existing) active public share link for a course owned by the user.
+    """
+    course = get_object_or_404(ProLearningCourse, id=id, user=request.user)
+
+    # Return an existing active link if present, otherwise create one
+    link = (
+        ProLearningShareLink.objects
+        .filter(course=course, is_active=True)
+        .order_by('-created_at')
+        .first()
+    )
+    if not link:
+        link = ProLearningShareLink.objects.create(course=course, created_by=request.user)
+
+    serializer = ProLearningShareLinkSerializer(link, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def revoke_share_link(request, share_id):
+    """
+    DELETE/PATCH /api/courses/pro-learning/share/{share_id}/
+    Revoke/deactivate a share link. Only the course owner can revoke.
+    """
+    link = get_object_or_404(ProLearningShareLink, id=share_id)
+    if link.created_by != request.user and link.course.user != request.user and not getattr(request.user, 'is_staff', False):
+        return Response({'detail': 'Not authorized to revoke this link.'}, status=status.HTTP_403_FORBIDDEN)
+
+    link.is_active = False
+    link.save(update_fields=['is_active'])
+    return Response({'status': 'revoked', 'id': str(link.id)}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_shared_course(request, share_id):
+    """
+    GET /api/courses/pro-learning/share/{share_id}/
+    Public, unauthenticated endpoint to fetch a shared course's read-only content.
+    """
+    link = get_object_or_404(ProLearningShareLink, id=share_id)
+    if not link.is_usable():
+        return Response({'detail': 'This shared link is no longer available.'}, status=status.HTTP_410_GONE)
+
+    course = link.course
+    data = PublicProLearningCourseSerializer(course).data
+    # Include minimal share metadata for client UX
+    data['share'] = {
+        'id': str(link.id),
+        'created_at': link.created_at,
+        'expires_at': link.expires_at,
+    }
+    return Response(data, status=status.HTTP_200_OK)

@@ -742,7 +742,7 @@ const ProLearningPage = () => {
     lastGeneratedTopicRef,
     getCurrentTopicFromParam,
     fetchCourseFromDB
-  }), [topicsList, courseTitle, isBatchGenerating, topicParam, isDirectUrlGeneration]);
+  }), [topicsList, courseTitle, isBatchGenerating, topicParam, isDirectUrlGeneration, loadScenario]);
 
   // Watch for content updates and trigger regeneration if content is empty
   const [regenerationAttempted, setRegenerationAttempted] = useState(false);
@@ -1532,13 +1532,10 @@ const ProLearningPage = () => {
               transform: translateY(100%);
               opacity: 0;
             }
-            try {
-              if (typeof localStorage !== 'undefined') {
-                localStorage.removeItem('proLearning_batchGeneration');
-                localStorage.removeItem('proLearning_batchMarker');
-              }
-            } catch {}
-            animation: slide-up 0.3s ease-out forwards;
+            to {
+              transform: translateY(0);
+              opacity: 1;
+            }
           }
         `}</style>
         

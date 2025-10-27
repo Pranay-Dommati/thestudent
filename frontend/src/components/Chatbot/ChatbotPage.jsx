@@ -2228,28 +2228,39 @@ const ChatbotPage = () => {
                         </div>
                       </a>
                       <button
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          const shareUrl = `${window.location.origin}${href}`;
-                          if (navigator.share) {
-                            navigator.share({
-                              title: friendlyName,
-                              text: `Check out this course: ${friendlyName}`,
-                              url: shareUrl
-                            }).catch((error) => {
-                              if (error.name !== 'AbortError') {
-                                console.error('Error sharing:', error);
+                          try {
+                            // Ask backend to create or fetch an active share link for this course
+                            const { data } = await apiAxios.post(`/courses/pro-learning/${course.id}/share/`);
+                            const shareUrl = data?.web_url || `${window.location.origin}/pro-learning/share/${data?.id}`;
+
+                            if (!shareUrl) {
+                              throw new Error('Share URL not available');
+                            }
+
+                            if (navigator.share) {
+                              try {
+                                await navigator.share({
+                                  title: friendlyName,
+                                  text: `Check out this course: ${friendlyName}`,
+                                  url: shareUrl
+                                });
+                              } catch (error) {
+                                if (error?.name !== 'AbortError') {
+                                  console.warn('Native share failed, falling back to clipboard:', error);
+                                  await navigator.clipboard.writeText(shareUrl);
+                                  universalToast.success('Share link copied to clipboard', { duration: 2000 });
+                                }
                               }
-                            });
-                          } else {
-                            // Fallback: copy to clipboard
-                            navigator.clipboard.writeText(shareUrl).then(() => {
-                              universalToast.success('Course link copied to clipboard!', { duration: 2000 });
-                            }).catch((error) => {
-                              console.error('Error copying to clipboard:', error);
-                              universalToast.error('Failed to copy link', { duration: 2000 });
-                            });
+                            } else {
+                              await navigator.clipboard.writeText(shareUrl);
+                              universalToast.success('Share link copied to clipboard', { duration: 2000 });
+                            }
+                          } catch (err) {
+                            console.error('Failed to create share link:', err);
+                            universalToast.error('Could not create a shareable link. Please try again.', { duration: 2500 });
                           }
                         }}
                         className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex-shrink-0"

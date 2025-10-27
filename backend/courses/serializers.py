@@ -1,9 +1,10 @@
 from rest_framework import serializers
+from django.urls import reverse
 from .models import (
     SchoolCourse, EngineeringCourse, CourseChapter, 
     CourseSection, Lesson, LessonResource, QuizQuestion, UserLessonProgress,
     ProLearningCourse, ProLearningTopic, ProLearningVideo, 
-    ProLearningQuizQuestion, ProLearningResource, Certification
+    ProLearningQuizQuestion, ProLearningResource, Certification, ProLearningShareLink
 )
 
 class LessonResourceSerializer(serializers.ModelSerializer):
@@ -138,6 +139,9 @@ class CertificationSerializer(serializers.ModelSerializer):
 # Pro Learning Serializers
 
 class ProLearningResourceSerializer(serializers.ModelSerializer):
+
+        # ==================== PUBLIC SHARE SERIALIZERS ====================
+
     """Serializer for ProLearningResource model"""
     
     class Meta:
@@ -149,12 +153,14 @@ class ProLearningResourceSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
+
 class ProLearningQuizQuestionSerializer(serializers.ModelSerializer):
     """Serializer for ProLearningQuizQuestion model"""
     
     class Meta:
         model = ProLearningQuizQuestion
         fields = [
+
             'id', 'question_text', 'question_type', 'options', 'correct_answer', 
             'explanation', 'points', 'order', 'created_at'
         ]
@@ -163,6 +169,7 @@ class ProLearningQuizQuestionSerializer(serializers.ModelSerializer):
 
 class ProLearningVideoSerializer(serializers.ModelSerializer):
     """Serializer for ProLearningVideo model"""
+
     
     class Meta:
         model = ProLearningVideo
@@ -177,6 +184,7 @@ class ProLearningTopicSerializer(serializers.ModelSerializer):
     """Serializer for ProLearningTopic model"""
     videos = ProLearningVideoSerializer(many=True, read_only=True)
     quiz_questions = ProLearningQuizQuestionSerializer(many=True, read_only=True)
+
     resources = ProLearningResourceSerializer(many=True, read_only=True)
     
     class Meta:
@@ -187,6 +195,7 @@ class ProLearningTopicSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
 
 
 class ProLearningCourseSerializer(serializers.ModelSerializer):
@@ -418,3 +427,66 @@ class ProLearningTopicUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProLearningTopic
         fields = ['is_completed']
+
+
+# ==================== PUBLIC SHARE SERIALIZERS ====================
+
+class PublicProLearningVideoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProLearningVideo
+        fields = ['id', 'title', 'video_url', 'description', 'duration', 'order']
+
+
+class PublicProLearningQuizQuestionSerializer(serializers.ModelSerializer):
+    """
+    Public serializer for quiz questions. Does NOT expose correct answers to avoid spoilers.
+    """
+    class Meta:
+        model = ProLearningQuizQuestion
+        fields = ['id', 'question_text', 'question_type', 'options', 'explanation', 'points', 'order']
+
+
+class PublicProLearningResourceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProLearningResource
+        fields = ['id', 'title', 'url', 'resource_type', 'description', 'order']
+
+
+class PublicProLearningTopicSerializer(serializers.ModelSerializer):
+    videos = PublicProLearningVideoSerializer(many=True, read_only=True)
+    quiz_questions = PublicProLearningQuizQuestionSerializer(many=True, read_only=True)
+    resources = PublicProLearningResourceSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ProLearningTopic
+        fields = [
+            'id', 'topic_name', 'order', 'reading_material', 'summary',
+            'videos', 'quiz_questions', 'resources'
+        ]
+
+
+class PublicProLearningCourseSerializer(serializers.ModelSerializer):
+    topics = PublicProLearningTopicSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ProLearningCourse
+        fields = ['id', 'course_name', 'description', 'topics']
+
+
+class ProLearningShareLinkSerializer(serializers.ModelSerializer):
+    web_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProLearningShareLink
+        fields = ['id', 'is_active', 'expires_at', 'created_at', 'web_url']
+
+    def get_web_url(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return str(obj.id)
+        # Return the frontend route for viewing the shared course (public, unauthenticated)
+        frontend_path = f"/pro-learning/share/{obj.id}"
+        if request:
+            base = request.build_absolute_uri('/')[:-1]
+            return f"{base}{frontend_path}"
+        return frontend_path

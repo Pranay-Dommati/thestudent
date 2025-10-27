@@ -396,6 +396,46 @@ class ProLearningResource(models.Model):
 
 # ==================== USER COURSE TRACKING MODELS ====================
 
+class ProLearningShareLink(models.Model):
+    """
+    Public share link for a ProLearningCourse.
+    Enables read-only, unauthenticated access to a course via a UUID token.
+    The UUID primary key itself serves as the share token.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(
+        ProLearningCourse,
+        on_delete=models.CASCADE,
+        related_name='share_links',
+        db_constraint=False  # Avoid MySQL FK mismatch issues seen in legacy UUID columns
+    )
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_share_links')
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Optional expiry; if set and in the past, treat as inactive
+    expires_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Pro Learning Share Link'
+        verbose_name_plural = 'Pro Learning Share Links'
+        indexes = [
+            models.Index(fields=['course'], name='idx_share_course'),
+            models.Index(fields=['created_by'], name='idx_share_creator'),
+            models.Index(fields=['is_active'], name='idx_share_active'),
+        ]
+
+    def __str__(self):
+        status = 'active' if self.is_active else 'inactive'
+        return f"ShareLink({self.id}) for {self.course.course_name} [{status}]"
+
+    @property
+    def is_expired(self):
+        return self.expires_at is not None and timezone.now() > self.expires_at
+
+    def is_usable(self):
+        return self.is_active and not self.is_expired
+
 class UserStartedPredefinedCourse(models.Model):
     """
     Model to track when users start learning predefined courses (School/Engineering)

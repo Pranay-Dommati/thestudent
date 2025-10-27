@@ -6,6 +6,7 @@ import Courses from './components/Courses/Courses';
 import CoursesWrapper from './components/Courses/CoursesWrapper';
 import ChatbotWrapper from './components/Chatbot/ChatbotWrapper';
 import ProLearningPage from './components/ProLearning'; // Updated to use index.js
+import SharedProLearningPage from './components/ProLearning/public/SharedProLearningPage';
 import CourseDetailsPage from './components/CourseDetails/CourseDetailsPage/CourseDetailsPage';
 import ResponsiveCourseLearningPage from './components/CourseLearningPage/ResponsiveCourseLearningPage';
 import LearningHubWrapper from './components/LearningHub/LearningHubWrapper';
@@ -265,6 +266,7 @@ const App = () => {
             {/* 301 Redirect: Old /pro-learning URL (without courseId) redirects to /chat for SEO */}
             <Route path="/pro-learning" element={<Navigate to="/chat" replace />} />
             <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
+            <Route path="/pro-learning/share/:shareId" element={<SharedProLearningPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/:courseId/certificate" element={<ProtectedRoute><CertificatePreview /></ProtectedRoute>} />

@@ -7,6 +7,9 @@ from .pro_learning_views import (
     ProLearningTopicDetailView,
     mark_topic_complete,
     get_course_progress,
+    create_share_link,
+    revoke_share_link,
+    get_shared_course,
 )
 from .working_views import save_pro_learning_course  # Use robust save handler for production
 ## Dev-only endpoints imported under DEBUG at bottom
@@ -29,6 +32,11 @@ urlpatterns = [
     path('<uuid:id>/topics/', ProLearningTopicListView.as_view(), name='topic-list'),
     path('<uuid:id>/topics/<uuid:topic_id>/', ProLearningTopicDetailView.as_view(), name='topic-detail'),
     path('<uuid:id>/topics/<uuid:topic_id>/complete/', mark_topic_complete, name='topic-complete'),
+
+    # Sharing
+    path('<uuid:id>/share/', create_share_link, name='create-share-link'),
+    path('share/<uuid:share_id>/', get_shared_course, name='get-shared-course'),
+    path('share/<uuid:share_id>/revoke/', revoke_share_link, name='revoke-share-link'),
 ]
 
 # Dev/test-only endpoints
