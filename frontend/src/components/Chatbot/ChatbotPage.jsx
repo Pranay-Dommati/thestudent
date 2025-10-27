@@ -1,7 +1,7 @@
 import universalToast from "../../utils/universalToast";
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate, useLocation } from "react-router-dom";
-import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline, IoBook, IoBookmark, IoInformationCircle, IoChevronForward, IoRocket } from "react-icons/io5";
+import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoTimeOutline, IoBook, IoBookmark, IoInformationCircle, IoChevronForward, IoRocket, IoShareSocial } from "react-icons/io5";
 import { FaGraduationCap, FaBook as FaBookAlt, FaRegUser } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
@@ -2210,23 +2210,55 @@ const ChatbotPage = () => {
                   friendlyName = course.course_name.trim();
                 }
                 return (
-                  <a
+                  <div
                     key={course.id}
-                    href={href}
                     className="block p-3 rounded-xl hover:bg-gray-50 transition-all duration-200 group border border-transparent hover:border-gray-200"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0"></div>
-                      <div className="flex-1 min-w-0">
+                      <a
+                        href={href}
+                        className="flex-1 min-w-0"
+                      >
                         <div className="text-sm font-medium text-gray-800 line-clamp-1 group-hover:text-indigo-600 truncate">
                           {friendlyName}
                         </div>
                         <div className="text-xs text-gray-500 mt-0.5">
                           {new Date(course.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </div>
-                      </div>
+                      </a>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const shareUrl = `${window.location.origin}${href}`;
+                          if (navigator.share) {
+                            navigator.share({
+                              title: friendlyName,
+                              text: `Check out this course: ${friendlyName}`,
+                              url: shareUrl
+                            }).catch((error) => {
+                              if (error.name !== 'AbortError') {
+                                console.error('Error sharing:', error);
+                              }
+                            });
+                          } else {
+                            // Fallback: copy to clipboard
+                            navigator.clipboard.writeText(shareUrl).then(() => {
+                              universalToast.success('Course link copied to clipboard!', { duration: 2000 });
+                            }).catch((error) => {
+                              console.error('Error copying to clipboard:', error);
+                              universalToast.error('Failed to copy link', { duration: 2000 });
+                            });
+                          }
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex-shrink-0"
+                        title="Share course"
+                      >
+                        <IoShareSocial size={16} />
+                      </button>
                     </div>
-                  </a>
+                  </div>
                 );
               })}
             </div>
