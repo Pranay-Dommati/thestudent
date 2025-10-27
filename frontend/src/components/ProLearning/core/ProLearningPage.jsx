@@ -358,6 +358,9 @@ const ProLearningPage = () => {
   
   // Copy code functionality
   const [copySuccessMap, setCopySuccessMap] = useState({});
+  
+  // Quiz submission state - topic-specific to prevent cross-topic interference
+  const [quizSubmittedByTopic, setQuizSubmittedByTopic] = useState({});
 
   // Lightweight debug logger to reduce console noise; enable by setting window.__PRO_LEARNING_DEBUG = true
   const debugLog = (...args) => {
@@ -1148,7 +1151,6 @@ const ProLearningPage = () => {
   
   const [activeTab, setActiveTab] = useState(activeTabParam);
   const [completedTabs, setCompletedTabs] = useState([]); // Track completed tabs
-  const [quizSubmitted, setQuizSubmitted] = useState(false); // Track if quiz is submitted
 
   // Guard to avoid double-switching when URL sync is pending
   const tabUrlSyncPendingRef = useRef(false);
@@ -1445,6 +1447,20 @@ const ProLearningPage = () => {
   }, [availableTabsForTopics, selectedTopic?.name, activeTab]);
 
   const renderTabContent = () => {
+    // Get current topic name for quiz submission state
+    const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam);
+    const quizSubmitted = currentTopicName ? (quizSubmittedByTopic[currentTopicName] || false) : false;
+    
+    // Create setter that updates the topic-specific quiz submission state
+    const setQuizSubmitted = (value) => {
+      if (currentTopicName) {
+        setQuizSubmittedByTopic(prev => ({
+          ...prev,
+          [currentTopicName]: value
+        }));
+      }
+    };
+    
     return renderTabContentHandler({
       selectedTopic,
       getCurrentTopicFromParam,
