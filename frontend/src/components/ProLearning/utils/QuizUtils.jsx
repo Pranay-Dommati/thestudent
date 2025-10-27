@@ -246,9 +246,21 @@ export const QuizQuestionCard = ({ question, index, quizSubmitted, onAnswerSelec
 /**
  * Submit Quiz Card Component
  */
-export const SubmitQuizCard = ({ quizLength, onSubmit }) => {
+export const SubmitQuizCard = React.forwardRef(({ quizLength, onSubmit }, ref) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6 text-center shadow-sm">
+    <div 
+      ref={ref}
+      className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-6 text-center shadow-lg animate-pulse-once"
+      style={{
+        animation: 'gentle-pulse 1s ease-in-out'
+      }}
+    >
+      <style>{`
+        @keyframes gentle-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+        }
+      `}</style>
       <div className="w-12 h-12 mx-auto mb-3 flex items-center justify-center rounded-full bg-blue-100">
         <FaQuestionCircle className="w-6 h-6 text-blue-600" />
       </div>
@@ -264,7 +276,10 @@ export const SubmitQuizCard = ({ quizLength, onSubmit }) => {
       </button>
     </div>
   );
-};
+});
+
+// Add display name for better debugging
+SubmitQuizCard.displayName = 'SubmitQuizCard';
 
 /**
  * Quiz Results Card Component
@@ -361,6 +376,23 @@ export const QuizRenderer = ({ content, quizSubmitted, setQuizSubmitted, setCont
   const quizArray = getQuizArray(content.quiz);
   const stats = calculateQuizStats(content.quiz);
   const allQuestionsAnswered = areAllQuestionsAnswered(content.quiz);
+  
+  // Ref for submit button to enable auto-scroll
+  const submitButtonRef = React.useRef(null);
+
+  // Auto-scroll to submit button when all questions are answered
+  React.useEffect(() => {
+    if (allQuestionsAnswered && !quizSubmitted && submitButtonRef.current) {
+      // Wait a tiny bit for the button to render, then scroll
+      const timer = setTimeout(() => {
+        submitButtonRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [allQuestionsAnswered, quizSubmitted]);
 
   // Handle answer selection
   const handleAnswerSelect = (question, optionIndex) => {
@@ -413,6 +445,7 @@ export const QuizRenderer = ({ content, quizSubmitted, setQuizSubmitted, setCont
           <SubmitQuizCard 
             quizLength={stats.total}
             onSubmit={handleSubmit}
+            ref={submitButtonRef}
           />
         )}
         
