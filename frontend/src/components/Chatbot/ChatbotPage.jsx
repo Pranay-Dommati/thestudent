@@ -2231,7 +2231,7 @@ const ChatbotPage = () => {
                       <ShareCourseButton
                         courseId={course.id}
                         courseTitle={friendlyName}
-                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex-shrink-0"
+                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200 flex-shrink-0"
                         title="Share course"
                         preventDefault
                       />
@@ -2294,7 +2294,9 @@ const ChatbotPage = () => {
                 <IoMenu size={18} />
               </button>
             )}
-            <div className="text-lg font-semibold text-gray-900">EasyLearnova</div>
+            <Link to="/" className="text-lg font-semibold text-gray-900 hover:text-indigo-600 transition-colors">
+              EasyLearnova
+            </Link>
           </div>
           <Link to="/" className="flex items-center gap-2 text-gray-700 hover:text-gray-900">
             <IoChevronBack size={18} />

@@ -4,7 +4,9 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from '../../../utils/axios';
 import { FaBrain, FaPlay, FaCheckCircle, FaClock, FaChartLine, FaTrash, FaEllipsisV, FaSpinner } from 'react-icons/fa';
+import { IoShareSocial } from 'react-icons/io5';
 import universalToast from '../../../utils/universalToast';
+import ShareCourseButton from '../../Shared/ShareCourseButton.jsx';
 
 // Use axios baseURL and dev proxy
 
@@ -337,6 +339,7 @@ const AILearningPlans = () => {
           <div 
             key={course.id} 
             className="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+            style={{ pointerEvents: 'auto' }}
           >
             <div className="flex items-center justify-between">
               {/* Left: Course Info */}
@@ -346,10 +349,10 @@ const AILearningPlans = () => {
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-gray-900 truncate">
+                  <h3 className="text-sm font-medium text-gray-900 truncate" style={{ userSelect: 'text', cursor: 'text' }}>
                     {formatCourseName(course)}
                   </h3>
-                  <div className="text-xs text-gray-500 mt-0.5">
+                  <div className="text-xs text-gray-500 mt-0.5" style={{ userSelect: 'text', cursor: 'text' }}>
                     <span className={course.is_completed ? 'text-green-600' : 'text-blue-600'}>
                       {course.is_completed ? 'Completed' : 'In Progress'}
                     </span>
@@ -358,9 +361,9 @@ const AILearningPlans = () => {
               </div>
 
               {/* Right: Progress & Actions */}
-              <div className="flex items-center space-x-4 flex-shrink-0">
+              <div className="flex items-center space-x-4 flex-shrink-0 relative z-10" style={{ pointerEvents: 'auto' }}>
                 {/* Progress */}
-                <div className="text-xs text-gray-500 font-medium">
+                <div className="text-xs text-gray-500 font-medium" style={{ userSelect: 'text', cursor: 'text' }}>
                   {Math.round(course.completion_percentage || 0)}%
                 </div>
                 
@@ -371,13 +374,24 @@ const AILearningPlans = () => {
                     e.stopPropagation();
                     handleStartCourse(course.id, formatCourseName(course));
                   }}
-                  className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-colors flex items-center"
-                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-colors flex items-center relative z-10"
+                  style={{ cursor: 'pointer', pointerEvents: 'auto', position: 'relative' }}
                   type="button"
                 >
                   <FaPlay className="mr-1 text-[10px]" />
                   Start
                 </button>
+                
+                {/* Share Button */}
+                <div style={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
+                  <ShareCourseButton
+                    courseId={course.id}
+                    courseTitle={formatCourseName(course)}
+                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors relative z-10"
+                    title="Share course"
+                    preventDefault
+                  />
+                </div>
                 
                 {/* Delete Button */}
                 <button
@@ -387,9 +401,9 @@ const AILearningPlans = () => {
                     handleDeleteClick(course);
                   }}
                   disabled={deleteLoading === course.id}
-                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded transition-colors"
+                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded transition-colors relative z-10"
                   title="Delete"
-                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                  style={{ cursor: 'pointer', pointerEvents: 'auto', position: 'relative' }}
                   type="button"
                 >
                   {deleteLoading === course.id ? (
