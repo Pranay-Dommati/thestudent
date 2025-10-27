@@ -1,6 +1,7 @@
 from django.urls import path, include
 from . import views
 from .working_views import save_pro_learning_course
+from .pro_learning_admin_views import admin_pro_learning_topics
 
 """Courses app URL patterns.
 
@@ -18,6 +19,10 @@ urlpatterns = [
     path('api/courses/all/', views.list_all_courses, name='list-all-courses'),
     path('api/courses/school/', views.list_school_courses, name='list-school-courses'),
     path('api/courses/school/<str:course_id>/', views.get_school_course_by_id, name='get-school-course-by-id'),
+
+    # Admin analytics endpoints (must precede generic <course_id> route)
+    path('api/courses/admin/enrollment-stats/', views.admin_enrollment_stats, name='admin-enrollment-stats'),
+    path('api/courses/admin/enrollments/<str:course_type>/<str:course_id>/', views.admin_course_enrollments, name='admin-course-enrollments'),
 
     # Course enrollment endpoints (must precede generic <course_id> route)
     path('api/courses/enroll/', views.start_predefined_course, name='start-predefined-course'),
@@ -42,6 +47,8 @@ urlpatterns = [
     path('api/resources/', views.get_resources, name='get-resources'),
     path('api/resources/download/<int:resource_id>/', views.download_resource, name='download-resource'),
 
+    # Admin Pro Learning analytics (place BEFORE include to avoid capture by generic routes)
+    path('api/courses/pro-learning/admin/topics/', admin_pro_learning_topics, name='admin-pro-learning-topics'),
     # Pro Learning endpoints
     path('api/courses/pro-learning/', include('courses.pro_learning_urls')),
     # Direct Pro Learning save endpoint (bypasses DRF)
@@ -54,6 +61,9 @@ urlpatterns = [
     # Learning activity tracking endpoints (MUST come before generic <course_id> route)
     path('api/courses/track-activity/', views.track_learning_activity, name='track-learning-activity'),
     path('api/courses/learning-stats/', views.get_learning_stats, name='get-learning-stats'),
+
+    # Admin analytics: enrollment statistics per course
+    path('api/courses/admin/enrollment-stats/', views.admin_enrollment_stats, name='admin-enrollment-stats'),
 
     # Generic course CRUD (placed AFTER specific routes to avoid conflicts)
     path('api/courses/<str:course_id>/', views.get_course_by_id, name='get-course-by-id'),

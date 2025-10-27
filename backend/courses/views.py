@@ -31,6 +31,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.utils.text import get_valid_filename
 from urllib.parse import quote as urlquote
+from django.db.models import Count
+from django.db.models import Q
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
@@ -521,6 +523,150 @@ def list_all_courses(request):
             {"error": "Internal server error", "details": str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+###############################################
+# Admin analytics: Enrollment stats and details
+###############################################
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminUser])
+def admin_enrollment_stats(request):
+    """Return enrollment counts grouped by course for admin analytics.
+
+    Response shape:
+    {
+      "total_courses": 33,
+      "total_enrollments": 45,
+      "items": [
+         {"course_id": "uuid", "title": "...", "type": "Engineering|School", "enrollments": 7, "published": true}
+      ]
+    }
+    """
+    try:
+        from .models import UserStartedPredefinedCourse as USP
+
+        # Pre-compute counts for each course type
+        eng_counts_qs = (
+            USP.objects.filter(course_type='engineering', engineering_course__isnull=False)
+            .values('engineering_course_id')
+            .annotate(c=Count('id'))
+        )
+        eng_count_map = {str(row['engineering_course_id']): int(row['c'] or 0) for row in eng_counts_qs}
+
+        sch_counts_qs = (
+            USP.objects.filter(course_type='school', school_course__isnull=False)
+            .values('school_course_id')
+            .annotate(c=Count('id'))
+        )
+        sch_count_map = {str(row['school_course_id']): int(row['c'] or 0) for row in sch_counts_qs}
+
+        items = []
+        total_enrollments = 0
+
+        # List all engineering courses
+        for c in EngineeringCourse.objects.all().only('id', 'title', 'is_published'):
+            cid = str(c.id)
+            cnt = eng_count_map.get(cid, 0)
+            total_enrollments += cnt
+            items.append({
+                'course_id': cid,
+                'title': c.title,
+                'type': 'Engineering',
+                'enrollments': cnt,
+                'published': bool(getattr(c, 'is_published', False)),
+            })
+
+        # List all school courses
+        for c in SchoolCourse.objects.all().only('id', 'title', 'is_published'):
+            cid = str(c.id)
+            cnt = sch_count_map.get(cid, 0)
+            total_enrollments += cnt
+            items.append({
+                'course_id': cid,
+                'title': c.title,
+                'type': 'School',
+                'enrollments': cnt,
+                'published': bool(getattr(c, 'is_published', False)),
+            })
+
+        # Sort by enrollments desc, then title
+        items.sort(key=lambda x: (-int(x.get('enrollments', 0)), (x.get('title') or '').lower()))
+
+        return Response({
+            'total_courses': len(items),
+            'total_enrollments': total_enrollments,
+            'items': items,
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminUser])
+def admin_course_enrollments(request, course_type, course_id):
+    """Return the list of users enrolled in a given course for admin.
+
+    Response:
+    {
+      "course": {"id": "uuid", "title": "...", "type": "Engineering|School"},
+      "count": 3,
+      "enrollments": [
+         {"user_id": 1, "name": "Alice", "email": "a@x", "enrolled_at": "ISO", "last_activity": "ISO"}
+      ]
+    }
+    """
+    try:
+        from .models import UserStartedPredefinedCourse as USP
+        course_type = (course_type or '').lower()
+
+        # Validate course and build base filter
+        if course_type == 'engineering':
+            course = get_object_or_404(EngineeringCourse, id=course_id)
+            qs = USP.objects.filter(course_type='engineering', engineering_course_id=course_id)
+            ctitle = getattr(course, 'title', str(course_id))
+            ctype = 'Engineering'
+        elif course_type == 'school':
+            course = get_object_or_404(SchoolCourse, id=course_id)
+            qs = USP.objects.filter(course_type='school', school_course_id=course_id)
+            ctitle = getattr(course, 'title', str(course_id))
+            ctype = 'School'
+        else:
+            return Response({'error': 'Invalid course_type'}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = qs.select_related('user').order_by('-started_at')
+
+        def safe_name(u):
+            try:
+                return (getattr(u, 'full_name', None) or getattr(u, 'first_name', None) or getattr(u, 'username', None) or '').strip() or u.email
+            except Exception:
+                return getattr(u, 'email', '')
+
+        enrollments = []
+        for e in qs:
+            u = getattr(e, 'user', None)
+            enrollments.append({
+                'user_id': getattr(u, 'id', None),
+                'name': safe_name(u) if u else None,
+                'email': getattr(u, 'email', None) if u else None,
+                'enrolled_at': e.started_at.isoformat() if getattr(e, 'started_at', None) else None,
+                'last_activity': e.last_activity.isoformat() if getattr(e, 'last_activity', None) else None,
+                'is_completed': bool(getattr(e, 'is_completed', False)),
+                'progress_percentage': float(getattr(e, 'progress_percentage', 0) or 0),
+            })
+
+        return Response({
+            'course': {'id': str(course_id), 'title': ctitle, 'type': ctype},
+            'count': len(enrollments),
+            'enrollments': enrollments,
+        })
+    except Http404:
+        return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -2122,6 +2268,76 @@ def update_course_progress(request, enrollment_id):
         )
 
 
+# ==================== ADMIN ENROLLMENT ANALYTICS ====================
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminUser])
+def admin_enrollment_stats(request):
+    """Return enrollment counts per published course (school and engineering).
+
+    Response shape:
+    {
+      "totals": { "total_courses": n, "total_enrollments": m },
+      "courses": [
+        { "id": str, "title": str, "course_type": "school|engineering", "enrollments": int, "is_published": bool, "last_updated": ISO }, ...
+      ]
+    }
+    """
+    try:
+        # Engineering courses with enroll counts
+        eng_qs = (
+            EngineeringCourse.objects.all()
+            .annotate(enrollments=Count('enrolled_users'))
+        )
+        # School courses with enroll counts
+        school_qs = (
+            SchoolCourse.objects.all()
+            .annotate(enrollments=Count('enrolled_users'))
+        )
+
+        courses = []
+        total_enrollments = 0
+
+        for c in eng_qs:
+            cnt = int(getattr(c, 'enrollments', 0) or 0)
+            total_enrollments += cnt
+            courses.append({
+                'id': str(c.id),
+                'title': c.title,
+                'course_type': 'engineering',
+                'enrollments': cnt,
+                'is_published': bool(c.is_published),
+                'last_updated': c.last_updated.isoformat() if getattr(c, 'last_updated', None) else None,
+            })
+
+        for c in school_qs:
+            cnt = int(getattr(c, 'enrollments', 0) or 0)
+            total_enrollments += cnt
+            courses.append({
+                'id': str(c.id),
+                'title': c.title,
+                'course_type': 'school',
+                'enrollments': cnt,
+                'is_published': bool(c.is_published),
+                'last_updated': c.last_updated.isoformat() if getattr(c, 'last_updated', None) else None,
+            })
+
+        # Sort by enrollments desc, then title
+        courses.sort(key=lambda x: (-x['enrollments'], (x['title'] or '').lower()))
+
+        return Response({
+            'totals': {
+                'total_courses': len(courses),
+                'total_enrollments': total_enrollments,
+            },
+            'courses': courses,
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response({'error': f'Failed to compute enrollment stats: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 # ==================== LEARNING ACTIVITY TRACKING API ====================
 
 @api_view(['POST'])

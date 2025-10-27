@@ -22,13 +22,13 @@ urlpatterns = [
 
     # Course management
     path('', ProLearningCourseListCreateView.as_view(), name='course-list-create'),
-    path('<str:id>/', ProLearningCourseDetailView.as_view(), name='course-detail'),
-    path('<str:id>/progress/', get_course_progress, name='course-progress'),
+    path('<uuid:id>/', ProLearningCourseDetailView.as_view(), name='course-detail'),
+    path('<uuid:id>/progress/', get_course_progress, name='course-progress'),
     
     # Topic management
-    path('<str:id>/topics/', ProLearningTopicListView.as_view(), name='topic-list'),
-    path('<str:id>/topics/<int:topic_id>/', ProLearningTopicDetailView.as_view(), name='topic-detail'),
-    path('<str:id>/topics/<int:topic_id>/complete/', mark_topic_complete, name='topic-complete'),
+    path('<uuid:id>/topics/', ProLearningTopicListView.as_view(), name='topic-list'),
+    path('<uuid:id>/topics/<uuid:topic_id>/', ProLearningTopicDetailView.as_view(), name='topic-detail'),
+    path('<uuid:id>/topics/<uuid:topic_id>/complete/', mark_topic_complete, name='topic-complete'),
 ]
 
 # Dev/test-only endpoints

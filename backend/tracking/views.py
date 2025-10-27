@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils.dateparse import parse_datetime
@@ -9,7 +9,7 @@ from django.db.models import Count, Min, Max, Sum, Case, When, IntegerField
 
 
 @api_view(["POST"])  # accepts a single event
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([AllowAny])
 def track_activity(request):
     """Track one analytics event.
 
@@ -62,7 +62,7 @@ def track_activity(request):
 
 
 @api_view(["POST"])  # accepts a batch of events
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([AllowAny])
 def track_activity_bulk(request):
     """Track multiple analytics events in a single request.
 
@@ -348,6 +348,19 @@ def recent_sessions(request):
         first = row["first"]
         last_dt = row["last"]
         duration_sec = int(max(0, (last_dt - first).total_seconds())) if first and last_dt else 0
+        # Try to extract a representative host/origin from the most recent event in this session
+        host = None
+        try:
+            latest = (
+                UserActivity.objects.filter(session_id=row["session_id"])
+                .order_by("-created_at")
+                .only("metadata")
+                .first()
+            )
+            if latest and isinstance(latest.metadata, dict):
+                host = latest.metadata.get("site_host") or latest.metadata.get("host")
+        except Exception:
+            host = None
         sessions.append(
             {
                 "id": row["session_id"] or "unknown",
@@ -357,6 +370,7 @@ def recent_sessions(request):
                 "first": first.isoformat() if first else None,
                 "last": last_dt.isoformat() if last_dt else None,
                 "duration_sec": duration_sec,
+                "host": host,
             }
         )
 
