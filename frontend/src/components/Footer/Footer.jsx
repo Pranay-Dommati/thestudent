@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
+import axios from '../../utils/axios';
 import { FaLinkedin, FaInstagram } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 
@@ -8,6 +9,7 @@ const Footer = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState(""); // "success" or "error"
+  const messageTimeoutRef = useRef(null);
 
   // Email validation function
   const isValidEmail = (email) => {
@@ -46,26 +48,58 @@ const Footer = () => {
     setMessage("");
 
     try {
-        await axios.post('/newsletter/', { email: email.trim() });
+      const response = await axios.post('/newsletter/', { email: email.trim() });
+      const data = response?.data || {};
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage("🎉 Successfully subscribed to newsletter!");
+      // Treat 201 or explicit success flag as success
+      if (response.status === 201 || data.success) {
+        setMessage(data.message || "🎉 Successfully subscribed to newsletter!");
         setMessageType("success");
         setEmail("");
       } else {
         setMessage(data.message || "Failed to subscribe. Please try again.");
         setMessageType("error");
+        // Clear input even on error if desired by UX
+        setEmail("");
       }
+      // Start/refresh auto-hide timer for messages
+      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+      messageTimeoutRef.current = setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
     } catch (error) {
       console.error("Error subscribing to newsletter:", error);
-      setMessage("Network error. Please check your connection and try again.");
+      // If the server returned a JSON error message (e.g., 400 duplicate), show it
+      const serverMessage = error?.response?.data?.message || error?.response?.data?.detail || error?.response?.data?.error;
+      if (serverMessage) {
+        setMessage(serverMessage);
+      } else if (error?.response) {
+        // Non-JSON response from server (status present)
+        setMessage(error.response.statusText || "Failed to subscribe. Please try again.");
+      } else {
+        // Network / CORS / client error
+        setMessage("Network error. Please check your connection and try again.");
+      }
       setMessageType("error");
+      // Clear input on error as requested
+      setEmail("");
+      // Auto-hide the message after a short delay
+      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+      messageTimeoutRef.current = setTimeout(() => {
+        setMessage("");
+        setMessageType("");
+      }, 5000);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+    };
+  }, []);
 
   // Button is always enabled and looks good
   const isButtonDisabled = isSubmitting;
