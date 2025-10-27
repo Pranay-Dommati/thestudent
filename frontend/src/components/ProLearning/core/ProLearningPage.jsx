@@ -284,9 +284,22 @@ const ProLearningPage = () => {
   };
 
   // Check if course is already saved when loading
+  // Skip this check for shared links (they're already loaded from public endpoint)
   useEffect(() => {
     const checkIfCourseSaved = async () => {
       if (!courseId) return;
+      
+      // Skip DB check for shared courses (they're loaded via public endpoint)
+      try {
+        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(`course_content_${courseId}`) : null;
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.metadata?.source === 'shared-link') {
+            return;
+          }
+        }
+      } catch {}
+      
       const databaseCourse = await fetchCourseFromDB(courseId);
       if (databaseCourse) {
         console.log('✅ Course found in database');
@@ -552,6 +565,29 @@ const ProLearningPage = () => {
   useEffect(() => {
     if (!courseTitle || courseTitle === "") return;
 
+    // Skip topic classification for shared courses (topics already loaded)
+    try {
+      const raw = typeof localStorage !== 'undefined' && courseId ? localStorage.getItem(`course_content_${courseId}`) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.metadata?.source === 'shared-link' && parsed?.topics) {
+          // Extract topics from shared course data
+          const topicsObj = parsed.topics || {};
+          const topicsArray = Object.keys(topicsObj).map(name => ({
+            name,
+            id: topicsObj[name]?.id
+          }));
+          if (topicsArray.length > 0) {
+            setTopicsList(topicsArray);
+            console.log('✅ Using topics from shared course:', topicsArray.length);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to check for shared course topics:', e);
+    }
+
     // If cached, use it immediately
     if (geminiCache.current[courseTitle]) {
       setTopicsList(geminiCache.current[courseTitle]);
@@ -588,7 +624,7 @@ const ProLearningPage = () => {
     // Cleanup on unmount/change
     return () => clearTimeout(debounceTimeout.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseTitle, GEMINI_API_KEY]);
+  }, [courseTitle, courseId, GEMINI_API_KEY]);
 
   // Separate useEffect to handle batch/progressive generation when topics are available
   useEffect(() => {

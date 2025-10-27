@@ -59,8 +59,23 @@ axiosAi.interceptors.response.use(
       }
 
       isRefreshing = true;
-  const refreshToken = storage.getItem('refreshToken');
+      const refreshToken = storage.getItem('refreshToken');
       if (!refreshToken) {
+        // Check if we're on a shared Pro Learning route - don't redirect to auth
+        const currentPath = window.location.pathname;
+        const courseId = currentPath.split('/').pop();
+        const courseDataKey = `course_content_${courseId}`;
+        const courseData = localStorage.getItem(courseDataKey);
+        
+        const isSharedProLearning = currentPath.startsWith('/pro-learning/share/') || 
+                                    (currentPath.startsWith('/pro-learning/') && courseData?.includes('"source":"shared-link"'));
+        
+        if (isSharedProLearning) {
+          isRefreshing = false;
+          onRefreshed(null);
+          return Promise.reject(new Error('Authentication not available for shared content'));
+        }
+        
         // No refresh token means user must login again. Preserve pending chat message if present.
         try {
           const data = originalRequest.data;

@@ -17,6 +17,7 @@ import proLearningHistoryService from '../../services/ProLearningHistoryService'
 // Use relative API paths; dev proxy routes to backend
 import apiAxios from '../../utils/axios';
 import aiAxios from '../../utils/axiosAi';
+import ShareCourseButton from '../../components/Shared/ShareCourseButton.jsx';
 
 // Extract learning context from user's prompt - Used for Pro Learning personalization
 const extractLearningContext = (prompt) => {
@@ -2227,47 +2228,13 @@ const ChatbotPage = () => {
                           {new Date(course.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </div>
                       </a>
-                      <button
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          try {
-                            // Ask backend to create or fetch an active share link for this course
-                            const { data } = await apiAxios.post(`/courses/pro-learning/${course.id}/share/`);
-                            const shareUrl = data?.web_url || `${window.location.origin}/pro-learning/share/${data?.id}`;
-
-                            if (!shareUrl) {
-                              throw new Error('Share URL not available');
-                            }
-
-                            if (navigator.share) {
-                              try {
-                                await navigator.share({
-                                  title: friendlyName,
-                                  text: `Check out this course: ${friendlyName}`,
-                                  url: shareUrl
-                                });
-                              } catch (error) {
-                                if (error?.name !== 'AbortError') {
-                                  console.warn('Native share failed, falling back to clipboard:', error);
-                                  await navigator.clipboard.writeText(shareUrl);
-                                  universalToast.success('Share link copied to clipboard', { duration: 2000 });
-                                }
-                              }
-                            } else {
-                              await navigator.clipboard.writeText(shareUrl);
-                              universalToast.success('Share link copied to clipboard', { duration: 2000 });
-                            }
-                          } catch (err) {
-                            console.error('Failed to create share link:', err);
-                            universalToast.error('Could not create a shareable link. Please try again.', { duration: 2500 });
-                          }
-                        }}
+                      <ShareCourseButton
+                        courseId={course.id}
+                        courseTitle={friendlyName}
                         className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 flex-shrink-0"
                         title="Share course"
-                      >
-                        <IoShareSocial size={16} />
-                      </button>
+                        preventDefault
+                      />
                     </div>
                   </div>
                 );

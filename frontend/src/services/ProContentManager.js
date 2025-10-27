@@ -201,6 +201,19 @@ class ProContentManager {
         return null;
       }
     } catch {}
+    
+    // Skip fetching from authenticated endpoint for shared courses
+    // (they're already loaded via public share endpoint)
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(`course_content_${courseId}`) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.metadata?.source === 'shared-link') {
+          return null; // Return null to avoid auth request; course is already in localStorage
+        }
+      }
+    } catch {}
+    
     // Short-circuit if we recently got a 404 for this course to avoid spamming
     try {
       const last404 = this.notFoundCache.get(courseId);
@@ -223,7 +236,9 @@ class ProContentManager {
       try {
         // Optionally skip if no token to avoid predictable 401 spam
         const hasToken = typeof localStorage !== 'undefined' && !!localStorage.getItem('accessToken');
-        if (!hasToken) return null;
+        if (!hasToken) {
+          return null;
+        }
 
         const data = await tryFetch();
         // On success, warm the course content cache with aggregated structure

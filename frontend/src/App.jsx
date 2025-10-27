@@ -124,19 +124,56 @@ const Layout = ({ children, excludePaths = [] }) => {
 
 // Add a protected route component
 const ProtectedRoute = ({ children }) => {
-  const { isLoggedIn, validateAuth } = useAuth();
+  const { validateAuth } = useAuth();
   const location = useLocation();
   const [isValidating, setIsValidating] = useState(true);
   const [isValid, setIsValid] = useState(false);
 
+  // Allow public access for shared Pro Learning views (no auth required)
+  const isPublicProLearningView = (() => {
+    try {
+      const path = location.pathname || '';
+      
+      // Always allow the /pro-learning/share/ route (it redirects internally)
+      if (path.startsWith('/pro-learning/share/')) {
+        return true;
+      }
+      
+      // Check if viewing a UUID-based Pro Learning course loaded from a share link
+      const match = path.match(/^\/pro-learning\/([0-9a-fA-F-]{36})(?:\/?|$)/);
+      if (!match) return false;
+      const courseId = match[1];
+      
+      // UUID sanity check (8-4-4-4-12)
+      const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(courseId);
+      if (!uuidLike) return false;
+      
+      // Check localStorage for shared-link marker
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(`course_content_${courseId}`) : null;
+      if (!raw) return false;
+      
+      const parsed = JSON.parse(raw);
+      return parsed?.metadata?.source === 'shared-link';
+    } catch (e) {
+      return false;
+    }
+  })();
+
   useEffect(() => {
+    // Bypass auth validation entirely for public Pro Learning views
+    if (isPublicProLearningView) {
+      setIsValid(true);
+      setIsValidating(false);
+      return;
+    }
+
     const validate = async () => {
       const valid = await validateAuth();
       setIsValid(valid);
       setIsValidating(false);
     };
     validate();
-  }, [validateAuth]);
+  }, [validateAuth, isPublicProLearningView, location.pathname, location.search, location.hash]);
 
   if (isValidating) {
     // Show a loading spinner while validating
@@ -148,6 +185,12 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!isValid) {
+    // NEVER redirect Pro Learning routes to login - they should be publicly accessible
+    // or handle their own auth requirements internally
+    if (location.pathname.startsWith('/pro-learning/')) {
+      return children;
+    }
+    
     // Redirect with return URL (preserve query and hash)
     const currentPath = `${location.pathname}${location.search || ''}${location.hash || ''}`;
     return <Navigate to={`/auth?mode=login&returnTo=${encodeURIComponent(currentPath)}`} replace />;

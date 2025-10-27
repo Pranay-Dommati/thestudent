@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import apiAxios from '../../../utils/axios';
 import { IoBook, IoFilm, IoList, IoLink, IoTimeOutline, IoChevronBack } from 'react-icons/io5';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import proContentManager from '../../../services/ProContentManager';
 
 const TabButton = ({ active, onClick, icon: Icon, children }) => (
   <button
@@ -96,6 +97,7 @@ const TopicViewer = ({ topic }) => {
 
 const SharedProLearningPage = () => {
   const { shareId } = useParams();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [course, setCourse] = useState(null);
@@ -108,6 +110,53 @@ const SharedProLearningPage = () => {
         setLoading(true);
         const { data } = await apiAxios.get(`/courses/pro-learning/share/${shareId}/`);
         if (ignore) return;
+        // Transform shared course into aggregated structure used by ProLearningPage
+        const topics = Array.isArray(data?.topics) ? data.topics : [];
+        const topicsObj = {};
+        const firstName = topics[0] ? (topics[0].topic_name || topics[0].name || 'Topic 1') : null;
+        topics.forEach((t, idx) => {
+          const name = t.topic_name || t.name || `Topic ${idx + 1}`;
+          const transformed = proContentManager.transformDatabaseContent(t) || {};
+          topicsObj[name] = {
+            id: t.id || idx + 1,
+            name,
+            content: transformed,
+            status: 'completed'
+          };
+        });
+
+        const aggregated = {
+          courseId: shareId,
+          topics: topicsObj,
+          metadata: {
+            source: 'shared-link',
+            updatedAt: new Date().toISOString(),
+            totalTopics: Object.keys(topicsObj).length,
+            status: 'completed'
+          }
+        };
+
+        // Write to localStorage SYNCHRONOUSLY before navigation
+        try {
+          localStorage.setItem(`course_content_${shareId}`, JSON.stringify(aggregated));
+          // Force a micro-delay to ensure localStorage write is flushed
+          await new Promise(resolve => setTimeout(resolve, 10));
+        } catch (e) {
+          console.error('Failed to write shared course to localStorage:', e);
+        }
+
+        // Navigate to the standard Pro Learning UI using the shared id as courseId
+        if (firstName) {
+          const sp = new URLSearchParams();
+          sp.set('courseTitle', data?.course_name || 'Shared Course');
+          sp.set('topic', firstName);
+          sp.set('tab', 'reading');
+          const targetUrl = `/pro-learning/${shareId}?${sp.toString()}`;
+          navigate(targetUrl, { replace: true });
+          return;
+        }
+
+        // Fallback: still render in-place if navigation is not possible
         setCourse(data);
         const firstTopicId = data?.topics?.[0]?.id || null;
         setSelectedTopicId(firstTopicId);
@@ -119,7 +168,7 @@ const SharedProLearningPage = () => {
       }
     })();
     return () => { ignore = true; };
-  }, [shareId]);
+  }, [shareId, navigate]);
 
   const selectedTopic = useMemo(() => {
     if (!course || !selectedTopicId) return null;
