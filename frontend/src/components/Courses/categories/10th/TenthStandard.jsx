@@ -5,7 +5,7 @@ import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
 import { stateBoards } from '../../data/states';
-import { getSchoolCourses } from '../../../../services/courseApi';
+import { getSchoolCourses, getSchoolCourseById } from '../../../../services/courseApi';
 import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
 import MobileBoardSelector from '../../shared/MobileBoardSelector';
 import Footer from '../../../Footer/Footer';
@@ -227,6 +227,9 @@ const TenthStandard = () => {
                     ? `/courses/10th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
                     : `/courses/10th/${selectedBoard}/${course.subject.toLowerCase()}`)}?courseId=${encodeURIComponent(course.id)}`}
                   key={course.id}
+                  onMouseEnter={() => { try { getSchoolCourseById(course.id); } catch {} }}
+                  onFocus={() => { try { getSchoolCourseById(course.id); } catch {} }}
+                  onTouchStart={() => { try { getSchoolCourseById(course.id); } catch {} }}
                 >
                   <motion.div 
                     whileHover={{ y: -5 }} 
