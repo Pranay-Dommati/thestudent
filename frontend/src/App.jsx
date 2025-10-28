@@ -258,7 +258,7 @@ const App = () => {
           <OfflineRouterHandler />
           {/* Global Onboarding Modal - shows for new users on first login */}
           <OnboardingModal />
-        <Layout excludePaths={['/admin-p', '/chat', '/offline']}>
+        <Layout excludePaths={['/admin-p', '/chat', '/offline', '/pro-learning']}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             {/* Offline fallback page */}

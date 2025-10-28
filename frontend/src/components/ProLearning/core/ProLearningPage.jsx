@@ -153,6 +153,9 @@ const ProLearningPage = () => {
   const navigate = useNavigate();
   const params = useParams();
   
+  // Mobile detection state
+  const [isMobile, setIsMobile] = useState(false);
+  
   // UI state
   const [sidebarVisible, setSidebarVisible] = useState(false);
   // Video modal state
@@ -235,6 +238,18 @@ const ProLearningPage = () => {
       try { tracking.capture('pro_learning.page_leave', { courseId: courseId || null }, { feature: 'pro_learning' }); } catch {}
     };
   }, []); // Empty dependency array - run once on mount/unmount
+
+  // Mobile detection useEffect - Hide navbar on mobile for immersive experience
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768); // Use 768px as mobile breakpoint
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
   // Simple content loader for reload mode - no generation, just load from storage
   const loadContentForReloadMode = async (topicName) => {
@@ -1543,8 +1558,9 @@ const ProLearningPage = () => {
 
   return (
     <>
-      <Navbar initialStyle="light" />
-      <div className="bg-gradient-to-br from-gray-50 via-white to-blue-50 pt-14 lg:pt-0">
+      {/* Only show navbar on desktop for less distracting mobile experience */}
+      {!isMobile && <Navbar initialStyle="light" />}
+      <div className={`bg-gradient-to-br from-gray-50 via-white to-blue-50 ${!isMobile ? 'pt-14 lg:pt-0' : 'pt-0'}`}>
         <style>{`
           body {
             background: linear-gradient(to bottom right, #f9fafb, #ffffff, #eff6ff);

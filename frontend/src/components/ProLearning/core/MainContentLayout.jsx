@@ -349,9 +349,27 @@ const MainContentLayout = ({
                     Select a topic to focus on:
                   </p>
                 )}
-                {(topicsList.length === 0 && topicParam) ? (
-                  // Edge case: no topics yet but URL has a topic — show a placeholder button
-                  <div className="text-sm text-gray-600">Loading topic…</div>
+                {topicsList.length === 0 ? (
+                  // Loading skeleton for topics
+                  <>
+                    {[1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className="w-full p-3 rounded-lg bg-gray-100 animate-pulse"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-5 h-5 bg-gray-300 rounded"></div>
+                          <div className="flex-1">
+                            <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="mt-4 p-3 bg-gray-100 rounded-lg animate-pulse">
+                      <div className="h-3 bg-gray-300 rounded w-1/2 mb-2"></div>
+                      <div className="h-2 bg-gray-300 rounded w-full"></div>
+                    </div>
+                  </>
                 ) : topicsList.map((topicItem) => (
                   <button
                     key={topicItem.id}

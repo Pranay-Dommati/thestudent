@@ -948,6 +948,17 @@ export const autoSaveToBackend = async (dependencies) => {
         // ignore toast/localStorage failures
       }
       
+      // 🔥 IMPORTANT: Dispatch event to invalidate cache in chat page sidebar
+      // This ensures newly saved courses appear immediately in /chat after auto-save completes
+      try {
+        localStorage.removeItem('prolearning_courses_cache');
+        localStorage.removeItem('prolearning_courses_cache_timestamp');
+        window.dispatchEvent(new Event('prolearning-courses-updated'));
+        console.log('✅ [AUTO-SAVE] Cache invalidated and event dispatched for course:', currentCourseId);
+      } catch (e) {
+        console.warn('[AUTO-SAVE] Failed to dispatch cache invalidation event:', e);
+      }
+      
     } else {
       console.error('❌ AUTO-SAVE: Failed to auto-save course. Status:', response.status, 'Response:', responseData);
       // Don't show UI errors for auto-save failures
@@ -1255,6 +1266,17 @@ export const handleSaveToLearningHub = async (dependencies) => {
         localStorage.setItem(`proLearning_savedNotified_${currentCourseId}`, 'true');
       } catch (_) {}
       
+      // 🔥 IMPORTANT: Dispatch event to invalidate cache in chat page sidebar
+      // This ensures newly saved courses appear immediately in /chat
+      try {
+        localStorage.removeItem('prolearning_courses_cache');
+        localStorage.removeItem('prolearning_courses_cache_timestamp');
+        window.dispatchEvent(new Event('prolearning-courses-updated'));
+        console.log('✅ Cache invalidated and event dispatched for course:', currentCourseId);
+      } catch (e) {
+        console.warn('Failed to dispatch cache invalidation event:', e);
+      }
+      
     } else {
       console.error('❌ Failed to save course:', responseData);
       try { 
@@ -1275,6 +1297,12 @@ export const handleSaveToLearningHub = async (dependencies) => {
             savedCourses.push(courseKey);
             localStorage.setItem('coursesSavedToHub', JSON.stringify(savedCourses));
           }
+          
+          // 🔥 IMPORTANT: Dispatch event even for 409 - course exists in backend but not in chat cache
+          localStorage.removeItem('prolearning_courses_cache');
+          localStorage.removeItem('prolearning_courses_cache_timestamp');
+          window.dispatchEvent(new Event('prolearning-courses-updated'));
+          console.log('✅ Cache invalidated for existing course:', currentCourseId);
         } catch {}
       } else {
         universalToast.error(responseData.error || 'Failed to save course');
