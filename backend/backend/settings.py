@@ -25,17 +25,22 @@ except Exception:
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env files
-# Priority: backend/.env takes precedence over root .env for local development
-# This allows developers to override root settings without changing docker-compose values
+# Priority: backend/.env takes precedence over root .env for local development.
+# Additionally load root .env.development if present to support local workflows
+# without requiring a manual copy to .env.
 try:
     from dotenv import load_dotenv
     root_env = BASE_DIR.parent / '.env'
+    root_env_development = BASE_DIR.parent / '.env.development'
     backend_env = BASE_DIR / '.env'
     backend_env_local = BASE_DIR / '.env.local'
     
     # Load root .env first without override (docker-compose compatibility)
     if root_env.exists():
         load_dotenv(dotenv_path=root_env, override=False)
+    # Load root .env.development (if present) without override to provide sane dev defaults
+    if root_env_development.exists():
+        load_dotenv(dotenv_path=root_env_development, override=False)
     
     # Load backend/.env with override=True so it takes precedence for local dev
     if backend_env.exists():
@@ -172,6 +177,24 @@ INSTALLED_APPS = [
     'social_django',  # Add social-auth-app-django
     'tracking',  # Custom analytics/tracking app
 ]
+
+# Optional: Cloudinary for persistent media storage
+# Enabled automatically when CLOUDINARY_URL is provided, or USE_CLOUDINARY=true
+USE_CLOUDINARY = os.environ.get('USE_CLOUDINARY', '').lower() in ('1', 'true', 'yes') or bool(os.environ.get('CLOUDINARY_URL'))
+if USE_CLOUDINARY:
+    # Fail-safe: if credentials are missing, fall back to filesystem in dev to avoid runtime 400s
+    _has_url = bool(os.environ.get('CLOUDINARY_URL'))
+    _has_parts = all(os.environ.get(k) for k in ('CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'))
+    if not (_has_url or _has_parts):
+        if os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes'):
+            print("[WARN] USE_CLOUDINARY=true but no Cloudinary credentials found (.env or env vars). Falling back to FileSystemStorage.")
+        USE_CLOUDINARY = False
+if USE_CLOUDINARY:
+    # Only add when configured to avoid import errors in minimal local setups
+    INSTALLED_APPS += [
+        'cloudinary',
+        'cloudinary_storage',
+    ]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # Add this at the top
@@ -329,10 +352,47 @@ if not DEBUG:
     # Cache-busting and long max-age are handled by Manifest storage
     WHITENOISE_MAX_AGE = int(os.environ.get('WHITENOISE_MAX_AGE', 60 * 60 * 24 * 365))
 
-# Media files (uploads)
-# Media configuration (overridable via env for production)
+# Media files (uploads) and persistent storage
+# Default to filesystem; switch to Cloudinary when configured
 MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
 MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, 'media'))
+
+if USE_CLOUDINARY:
+    # Use Cloudinary for media storage
+    # django-cloudinary-storage supports Django 4/5 via STORAGES
+    _existing_storages = globals().get('STORAGES')
+    _existing_static = None
+    if isinstance(_existing_storages, dict):
+        _existing_static = _existing_storages.get('staticfiles')
+
+    # Always set Cloudinary as the default storage
+    STORAGES = {
+        "default": {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"},
+        # Ensure 'staticfiles' storage is defined to satisfy Django system check
+        "staticfiles": _existing_static or {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+    # Optional prefixes to keep uploads organized
+    CLOUDINARY_STORAGE = {
+        'PREFIX': os.environ.get('CLOUDINARY_MEDIA_PREFIX', 'easylearnova'),
+        'RESOURCE_TYPE': 'image',
+    }
+    # Allow credentials via individual env vars if CLOUDINARY_URL is not set
+    try:
+        import cloudinary
+        if not os.environ.get('CLOUDINARY_URL'):
+            cloudinary.config(
+                cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME') or None,
+                api_key=os.environ.get('CLOUDINARY_API_KEY') or None,
+                api_secret=os.environ.get('CLOUDINARY_API_SECRET') or None,
+                secure=True,
+            )
+    except Exception:
+        # If cloudinary is not installed or config fails, rely on CLOUDINARY_URL env if provided
+        pass
+    # MEDIA_URL is not used by Cloudinary storage for URL generation;
+    # keeping it defined is harmless and preserves local dev behavior.
 
 # ProLearning topic rate limits (read by backend.ai.rate_limiter)
 # Daily limits are disabled by default (ENFORCE_DAILY_LIMIT=false).
