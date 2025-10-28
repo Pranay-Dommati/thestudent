@@ -78,7 +78,7 @@ const Layout = ({ children, excludePaths = [] }) => {
                      isLearningPage; // Exclude profile, certificate and learning pages for focused layout
 
   // Paths where we don't want mobile navigation (like auth, admin, chat, etc.)
-  const noMobileNavPaths = ['/auth', '/admin-p', '/not-found', '/chat'];
+  const noMobileNavPaths = ['/auth', '/admin-p', '/not-found', '/chat', '/pro-learning'];
   const shouldShowMobileNav = !noMobileNavPaths.some(path => location.pathname.startsWith(path)) && !isCertificatePage && !isLearningPage;
 
   // Determine the navbar style based on the current route

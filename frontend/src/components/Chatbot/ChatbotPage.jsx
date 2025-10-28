@@ -595,22 +595,64 @@ const ChatbotPage = () => {
     }
   };
 
-  // Load ProLearning history (fallback) and backend courses on mount
+  // Load ProLearning history (fallback) and backend courses on mount with caching
   useEffect(() => {
+    const CACHE_KEY = 'prolearning_courses_cache';
+    const CACHE_TIMESTAMP_KEY = 'prolearning_courses_cache_timestamp';
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+
     const loadHistory = () => {
       const history = proLearningHistoryService.getHistory();
       setProLearningHistory(history);
     };
-    const loadBackendCourses = async () => {
-      setIsLoadingCourses(true);
+
+    const loadBackendCourses = async (forceRefresh = false) => {
       try {
         const token = await getAuthToken();
         if (!token) {
           setIsLoadingCourses(false);
           return;
         }
+
+        // Check cache first (only if not forcing refresh)
+        if (!forceRefresh) {
+          try {
+            const cachedData = localStorage.getItem(CACHE_KEY);
+            const cacheTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+            
+            if (cachedData && cacheTimestamp) {
+              const age = Date.now() - parseInt(cacheTimestamp, 10);
+              if (age < CACHE_DURATION) {
+                const parsed = JSON.parse(cachedData);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  console.log('📦 Using cached courses data');
+                  setProLearningCourses(parsed);
+                  setIsLoadingCourses(false);
+                  return;
+                }
+              }
+            }
+          } catch (cacheError) {
+            console.warn('Cache read error, fetching fresh data:', cacheError);
+          }
+        }
+
+        // Fetch from backend
+        setIsLoadingCourses(true);
         const { data } = await apiAxios.get('/courses/pro-learning/');
-        if (Array.isArray(data)) setProLearningCourses(data);
+        
+        if (Array.isArray(data)) {
+          setProLearningCourses(data);
+          
+          // Update cache
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+            console.log('💾 Courses cached successfully');
+          } catch (cacheError) {
+            console.warn('Failed to cache courses:', cacheError);
+          }
+        }
       } catch (e) {
         console.warn('Failed to load ProLearning courses from backend:', e);
       } finally {
@@ -627,14 +669,24 @@ const ChatbotPage = () => {
     };
     
     // Listen for custom history update events
-  const handleHistoryUpdate = () => { loadHistory(); };
+    const handleHistoryUpdate = () => { 
+      loadHistory(); 
+    };
+
+    // Listen for cache invalidation events (when a new course is created)
+    const handleCacheInvalidation = () => {
+      console.log('🔄 Cache invalidated, refreshing courses');
+      loadBackendCourses(true);
+    };
     
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('prolearning-history-updated', handleHistoryUpdate);
+    window.addEventListener('prolearning-courses-updated', handleCacheInvalidation);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('prolearning-history-updated', handleHistoryUpdate);
+      window.removeEventListener('prolearning-courses-updated', handleCacheInvalidation);
     };
   }, []);
 
@@ -1690,6 +1742,16 @@ const ChatbotPage = () => {
       setShowTopicConfirmation(false);
       setPendingTopics([]);
       setOriginalPrompt("");
+      
+      // Invalidate cache to trigger refresh
+      try {
+        localStorage.removeItem('prolearning_courses_cache');
+        localStorage.removeItem('prolearning_courses_cache_timestamp');
+        window.dispatchEvent(new Event('prolearning-courses-updated'));
+        console.log('🔄 Cache invalidated after course creation');
+      } catch (e) {
+        console.warn('Failed to invalidate cache:', e);
+      }
       
     } catch (error) {
       console.error('Error creating course:', error);

@@ -1,7 +1,7 @@
 import universalToast from "../../utils/universalToast";
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate, useLocation } from "react-router-dom";
-import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoBook, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline, IoChevronForward, IoSearchOutline, IoRocket } from "react-icons/io5";
+import { IoSend, IoChevronBack, IoPlayCircle, IoSchoolOutline, IoCheckmarkCircle, IoBook, IoPersonOutline, IoHomeOutline, IoMenuOutline, IoClose, IoTimeOutline, IoChevronForward, IoSearchOutline, IoRocket, IoShareSocial } from "react-icons/io5";
 // Removed FaRobot - using IoSchoolOutline for Pro Learning branding
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
@@ -12,6 +12,7 @@ import ErrorBoundary from '../Common/ErrorBoundary';
 import RateLimitStatus from './RateLimitStatus';
 import CompactRateLimitStatus from './CompactRateLimitStatus';
 import proLearningHistoryService from '../../services/ProLearningHistoryService';
+import ShareCourseButton from '../../components/Shared/ShareCourseButton.jsx';
 
 // Custom CSS - added for DeepSeek-like UI and welcome card fix
 import './mobileChatStyles.css';
@@ -166,18 +167,59 @@ const MobileChatbotPage = () => {
     }
   }, [location.state?.initialMessage]); // Only depend on initialMessage
 
-  // Load ProLearning history on component mount and fetch backend courses
+  // Load ProLearning history on component mount and fetch backend courses with caching
   useEffect(() => {
+    const CACHE_KEY = 'prolearning_courses_cache';
+    const CACHE_TIMESTAMP_KEY = 'prolearning_courses_cache_timestamp';
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+
     const loadHistory = () => {
       const history = proLearningHistoryService.getHistory();
       setProLearningHistory(history);
     };
-  const loadBackendCourses = async () => {
+
+    const loadBackendCourses = async (forceRefresh = false) => {
       try {
-    const token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
+        const token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
         if (!token) return;
+
+        // Check cache first (only if not forcing refresh)
+        if (!forceRefresh) {
+          try {
+            const cachedData = localStorage.getItem(CACHE_KEY);
+            const cacheTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+            
+            if (cachedData && cacheTimestamp) {
+              const age = Date.now() - parseInt(cacheTimestamp, 10);
+              if (age < CACHE_DURATION) {
+                const parsed = JSON.parse(cachedData);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  console.log('📦 [Mobile] Using cached courses data');
+                  setProLearningCourses(parsed);
+                  return;
+                }
+              }
+            }
+          } catch (cacheError) {
+            console.warn('[Mobile] Cache read error, fetching fresh data:', cacheError);
+          }
+        }
+
+        // Fetch from backend
         const { data } = await apiAxios.get('/courses/pro-learning/');
-        if (Array.isArray(data)) setProLearningCourses(data);
+        
+        if (Array.isArray(data)) {
+          setProLearningCourses(data);
+          
+          // Update cache
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+            console.log('💾 [Mobile] Courses cached successfully');
+          } catch (cacheError) {
+            console.warn('[Mobile] Failed to cache courses:', cacheError);
+          }
+        }
       } catch (e) {
         console.warn('Failed to load backend ProLearning courses (mobile):', e);
       }
@@ -195,28 +237,76 @@ const MobileChatbotPage = () => {
     const handleHistoryUpdate = () => {
       loadHistory();
     };
+
+    // Listen for cache invalidation events (when a new course is created)
+    const handleCacheInvalidation = () => {
+      console.log('🔄 [Mobile] Cache invalidated, refreshing courses');
+      loadBackendCourses(true);
+    };
     
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('prolearning-history-updated', handleHistoryUpdate);
+    window.addEventListener('prolearning-courses-updated', handleCacheInvalidation);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('prolearning-history-updated', handleHistoryUpdate);
+      window.removeEventListener('prolearning-courses-updated', handleCacheInvalidation);
     };
   }, []);
 
-  // Open drawer and ensure courses are fetched
+  // Open drawer and ensure courses are fetched with cache support
   const openCoursesDrawer = async () => {
     setIsCoursesDrawerOpen(true);
     setVisibleCoursesCount(10);
     setCoursesSearch("");
+    
+    // Only fetch if we have no courses in memory
     if (!proLearningCourses || proLearningCourses.length === 0) {
+      const CACHE_KEY = 'prolearning_courses_cache';
+      const CACHE_TIMESTAMP_KEY = 'prolearning_courses_cache_timestamp';
+      const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
       try {
         setIsLoadingCourses(true);
         const token = (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || localStorage.getItem('token'));
         if (!token) return;
+
+        // Try cache first
+        try {
+          const cachedData = localStorage.getItem(CACHE_KEY);
+          const cacheTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+          
+          if (cachedData && cacheTimestamp) {
+            const age = Date.now() - parseInt(cacheTimestamp, 10);
+            if (age < CACHE_DURATION) {
+              const parsed = JSON.parse(cachedData);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                console.log('📦 [Mobile Drawer] Using cached courses data');
+                setProLearningCourses(parsed);
+                setIsLoadingCourses(false);
+                return;
+              }
+            }
+          }
+        } catch (cacheError) {
+          console.warn('[Mobile Drawer] Cache read error:', cacheError);
+        }
+
+        // Fetch from backend if cache miss
         const { data } = await apiAxios.get('/courses/pro-learning/');
-        if (Array.isArray(data)) setProLearningCourses(data);
+        if (Array.isArray(data)) {
+          setProLearningCourses(data);
+          
+          // Update cache
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+            localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+            console.log('💾 [Mobile Drawer] Courses cached successfully');
+          } catch (cacheError) {
+            console.warn('[Mobile Drawer] Failed to cache courses:', cacheError);
+          }
+        }
       } catch (e) {
         console.warn('Failed to (re)load ProLearning courses for drawer:', e);
       } finally {
@@ -917,6 +1007,16 @@ const MobileChatbotPage = () => {
   setPendingTopics([]);
   setOriginalPrompt("");
       
+      // Invalidate cache to trigger refresh
+      try {
+        localStorage.removeItem('prolearning_courses_cache');
+        localStorage.removeItem('prolearning_courses_cache_timestamp');
+        window.dispatchEvent(new Event('prolearning-courses-updated'));
+        console.log('🔄 [Mobile] Cache invalidated after course creation');
+      } catch (e) {
+        console.warn('[Mobile] Failed to invalidate cache:', e);
+      }
+      
     } catch (error) {
       console.error('❌ Error creating course:', error);
       console.error('Error response data:', error?.response?.data);
@@ -1447,9 +1547,9 @@ const MobileChatbotPage = () => {
                     friendlyName = course.course_name.trim();
                   }
                   return (
-                    <Link key={course.id} to={href} onClick={closeCoursesDrawer} className="block p-3 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition-all">
+                    <div key={course.id} className="p-3 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition-all">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
+                        <Link to={href} onClick={closeCoursesDrawer} className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="bg-indigo-50 rounded-lg p-2">
                             <IoBook className="w-4 h-4 text-indigo-600" />
                           </div>
@@ -1459,10 +1559,16 @@ const MobileChatbotPage = () => {
                               {new Date(course.created_at).toLocaleDateString()} • {new Date(course.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </div>
                           </div>
-                        </div>
-                        <IoChevronForward className="text-gray-300" />
+                        </Link>
+                        <ShareCourseButton
+                          courseId={course.id}
+                          courseTitle={friendlyName}
+                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200 flex-shrink-0"
+                          title="Share course"
+                          preventDefault
+                        />
                       </div>
-                    </Link>
+                    </div>
                   );
                 })}
 
@@ -1624,19 +1730,28 @@ const MobileChatbotPage = () => {
                     friendlyName = course.course_name.trim();
                   }
                   return (
-                    <a key={course.id} href={href} className="block p-3 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-indigo-50 rounded-lg p-2">
-                          <IoBook className="w-4 h-4 text-indigo-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-medium text-sm text-gray-800 truncate">{friendlyName}</div>
-                          <div className="text-[10px] text-gray-500">
-                            {new Date(course.created_at).toLocaleDateString()} • {new Date(course.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <div key={course.id} className="p-3 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all">
+                      <div className="flex items-center justify-between gap-3">
+                        <a href={href} className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="bg-indigo-50 rounded-lg p-2">
+                            <IoBook className="w-4 h-4 text-indigo-600" />
                           </div>
-                        </div>
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm text-gray-800 truncate">{friendlyName}</div>
+                            <div className="text-[10px] text-gray-500">
+                              {new Date(course.created_at).toLocaleDateString()} • {new Date(course.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </a>
+                        <ShareCourseButton
+                          courseId={course.id}
+                          courseTitle={friendlyName}
+                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200 flex-shrink-0"
+                          title="Share course"
+                          preventDefault
+                        />
                       </div>
-                    </a>
+                    </div>
                   );
                 })}
               </div>
