@@ -1,6 +1,6 @@
 import './App.css';
+import React, { Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useLocation, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
 import HomePage from './components/HomePage/HomePage';
 import Courses from './components/Courses/Courses';
 import CoursesWrapper from './components/Courses/CoursesWrapper';
@@ -8,7 +8,8 @@ import ChatbotWrapper from './components/Chatbot/ChatbotWrapper';
 import ProLearningPage from './components/ProLearning'; // Updated to use index.js
 import SharedProLearningPage from './components/ProLearning/public/SharedProLearningPage';
 import CourseDetailsPage from './components/CourseDetails/CourseDetailsPage/CourseDetailsPage';
-import ResponsiveCourseLearningPage from './components/CourseLearningPage/ResponsiveCourseLearningPage';
+// Lazy load heavy learning and certificate pages
+const ResponsiveCourseLearningPage = React.lazy(() => import('./components/CourseLearningPage/ResponsiveCourseLearningPage'));
 import LearningHubWrapper from './components/LearningHub/LearningHubWrapper';
 import FloatingChatButton from './components/Chatbot/FloatingChatButton';
 import AuthForm from './components/Auth/AuthForm';
@@ -23,8 +24,8 @@ import EleventhStandard from './components/Courses/categories/11th/EleventhStand
 import TwelfthStandard from './components/Courses/categories/12th/TwelfthStandard';
 import Undergraduate from './components/Courses/categories/engineering/ResponsiveEngineeringCourses';
 import ProfileLayout from './components/Profile/ProfilePageNew';
-import CourseDetails from './components/CourseDetails/CourseDetails';
-import SchoolCourseDetails from './components/CourseDetails/SchoolCourseDetails';
+const CourseDetails = React.lazy(() => import('./components/CourseDetails/CourseDetails'));
+const SchoolCourseDetails = React.lazy(() => import('./components/CourseDetails/SchoolCourseDetails'));
 import Navbar from './components/Navbar/Navbar';
 import MobileBottomNavigation from './components/Navigation/MobileBottomNavigation';
 import AdminDashboard from './components/Admin/Dashboard/AdminDashboard';
@@ -43,7 +44,7 @@ import ScrollManager from './components/Common/ScrollManager.jsx';
 import OnlineStatusToaster from './components/Common/OnlineStatusToaster.jsx';
 import OfflineRouterHandler from './components/Common/OfflineRouterHandler.jsx';
 import OfflinePage from './components/Common/OfflinePage.jsx';
-import CertificatePreview from './components/Certificates/CertificatePreview';
+const CertificatePreview = React.lazy(() => import('./components/Certificates/CertificatePreview'));
 import OnboardingModal from './components/Onboarding/OnboardingModal';
 
 const CourseDetailsWrapper = () => {
@@ -55,10 +56,14 @@ const CourseDetailsWrapper = () => {
 
   const courseType = determineCourseType(courseId);
   
-  return courseType === 'school' ? (
-    <SchoolCourseDetails courseId={courseId} />
-  ) : (
-    <CourseDetails courseId={courseId} />
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
+      {courseType === 'school' ? (
+        <SchoolCourseDetails courseId={courseId} />
+      ) : (
+        <CourseDetails courseId={courseId} />
+      )}
+    </Suspense>
   );
 };
 
@@ -258,7 +263,9 @@ const App = () => {
           <OfflineRouterHandler />
           {/* Global Onboarding Modal - shows for new users on first login */}
           <OnboardingModal />
+          
         <Layout excludePaths={['/admin-p', '/chat', '/offline', '/pro-learning']}>
+            <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             {/* Offline fallback page */}
@@ -390,6 +397,7 @@ const App = () => {
             
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </Layout>
         <FloatingChatButton />
       </BrowserRouter>

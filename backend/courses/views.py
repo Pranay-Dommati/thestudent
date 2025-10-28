@@ -33,6 +33,27 @@ from django.utils.text import get_valid_filename
 from urllib.parse import quote as urlquote
 from django.db.models import Count
 from django.db.models import Q
+from django.core.files.storage import default_storage
+
+# Module-level helper: build robust thumbnail URL with file-existence check and placeholder fallback
+def _build_thumbnail_url(obj_with_thumbnail, request):
+    placeholder = os.environ.get(
+        'DEFAULT_THUMBNAIL_PLACEHOLDER',
+        'https://images.unsplash.com/photo-1635070041078-e363dbe005cb'
+    )
+    try:
+        thumb = getattr(obj_with_thumbnail, 'thumbnail', None)
+        if thumb and getattr(thumb, 'name', None):
+            storage = getattr(thumb, 'storage', None) or default_storage
+            if storage.exists(thumb.name):
+                url = thumb.url
+                if isinstance(url, str) and url.lower().startswith('http'):
+                    return url
+                return request.build_absolute_uri(url)
+    except Exception as e:
+        if settings.DEBUG:
+            print(f"[WARN] build thumbnail url failed: {e}")
+    return placeholder
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
@@ -74,6 +95,26 @@ def create_course(request):
                     return list(default)
             # Fallback
             return list(default)
+        
+        # Helper: build robust thumbnail URL with file-existence check and placeholder fallback
+        def _build_thumbnail_url(obj_with_thumbnail, request):
+            placeholder = os.environ.get(
+                'DEFAULT_THUMBNAIL_PLACEHOLDER',
+                'https://images.unsplash.com/photo-1635070041078-e363dbe005cb'
+            )
+            try:
+                thumb = getattr(obj_with_thumbnail, 'thumbnail', None)
+                if thumb and getattr(thumb, 'name', None):
+                    storage = getattr(thumb, 'storage', None) or default_storage
+                    if storage.exists(thumb.name):
+                        url = thumb.url
+                        if isinstance(url, str) and url.lower().startswith('http'):
+                            return url
+                        return request.build_absolute_uri(url)
+            except Exception as e:
+                if settings.DEBUG:
+                    print(f"[WARN] build thumbnail url failed: {e}")
+            return placeholder
         # Helper: validate and attach thumbnail
         def _attach_thumbnail(files_dict, key='thumbnail'):
             if key not in files_dict:
@@ -97,17 +138,25 @@ def create_course(request):
         MAX_RESOURCES_PER_LESSON = int(os.environ.get('MAX_RESOURCES_PER_LESSON', '50'))
         MAX_QUIZ_PER_LESSON = int(os.environ.get('MAX_QUIZ_PER_LESSON', '100'))
 
+        # Helper to fetch first present value among multiple possible keys (snake/camel compatibility)
+        def _first(keys, default=''):
+            for k in keys:
+                if k in data and data.get(k) not in (None, ''):
+                    return data.get(k)
+            return default
+
         # For School courses (10th, 11th, 12th)
-        if 'class_level' in data:
+        if 'class_level' in data or 'classLevel' in data or 'educationLevel' in data:
             # Extract the form data
             course_data = {
-                'title': data.get('title', ''),
-                'class_level': data.get('class_level', ''),
-                'board': data.get('board', ''),
-                'state': data.get('state', ''),
-                'subject': data.get('subject', ''),
-                'sources': data.get('sources', ''),
-                'duration': data.get('duration', ''),
+                'title': _first(['title', 'courseTitle']),
+                # Accept common variants from frontend
+                'class_level': _first(['class_level', 'classLevel', 'educationLevel']),
+                'board': _first(['board', 'Board', 'educationBoard']),
+                'state': _first(['state', 'State']),
+                'subject': _first(['subject', 'Subject', 'courseSubject']),
+                'sources': _first(['sources']),
+                'duration': _first(['duration']),
                 'is_published': True,
             }
             
@@ -125,21 +174,24 @@ def create_course(request):
                 course_data['learning_points'] = []
             
             # If 'shortDescription' is in data, use it, otherwise use title
-            course_data['short_description'] = data.get('shortDescription', data.get('title', ''))
+            course_data['short_description'] = data.get('shortDescription', course_data.get('title', ''))
             # If 'description' is in data, use it, otherwise generate one
-            course_data['description'] = data.get('description', f"{data.get('title')} - {data.get('class_level')} - {data.get('subject')}")
+            course_data['description'] = data.get(
+                'description',
+                f"{course_data.get('title')} - {course_data.get('class_level')} - {course_data.get('subject')}"
+            )
             
             # Validate required fields
             missing_fields = []
             for field in ['title', 'class_level', 'board', 'subject']:
-                if not course_data[field]:
+                if not course_data.get(field):
                     missing_fields.append(field)
             
             if missing_fields:
-                return Response(
-                    {'error': f'Missing required fields: {", ".join(missing_fields)}'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                detail = {'error': f'Missing required fields: {", ".join(missing_fields)}'}
+                if settings.DEBUG:
+                    detail['received_keys'] = list(data.keys())
+                return Response(detail, status=status.HTTP_400_BAD_REQUEST)
             
             if 'thumbnail' in request.FILES:
                 try:
@@ -408,7 +460,7 @@ def list_engineering_courses(request):
             course_data = {
                 'id': str(course.id),
                 'title': course.title,
-                'thumbnail': request.build_absolute_uri(course.thumbnail.url) if course.thumbnail else None,
+                'thumbnail': _build_thumbnail_url(course, request),
                 'short_description': course.short_description,
                 'description': course.description,
                 'duration': course.duration,
@@ -487,7 +539,7 @@ def list_all_courses(request):
             course_data = {
                 'id': str(course.id),
                 'title': course.title,
-                'thumbnail': request.build_absolute_uri(course.thumbnail.url) if course.thumbnail else None,
+                'thumbnail': _build_thumbnail_url(course, request),
                 'short_description': course.short_description,
                 'course_type': 'engineering',
                 'category': course.category or 'Engineering',
@@ -502,7 +554,7 @@ def list_all_courses(request):
             course_data = {
                 'id': str(course.id),
                 'title': course.title,
-                'thumbnail': request.build_absolute_uri(course.thumbnail.url) if course.thumbnail else None,
+                'thumbnail': _build_thumbnail_url(course, request),
                 'short_description': course.short_description,
                 'course_type': 'school',
                 'category': course.subject,
@@ -718,7 +770,7 @@ def list_school_courses(request):
             {
                 'id': str(course.id),
                 'title': course.title,
-                'thumbnail': request.build_absolute_uri(course.thumbnail.url) if course.thumbnail else None,
+                'thumbnail': _build_thumbnail_url(course, request),
                 'subject': course.subject,
                 'short_description': course.short_description,
                 'class_level': course.class_level,
@@ -2080,7 +2132,7 @@ def get_user_enrolled_courses(request):
                     'class_level': safe_field(enrollment.school_course, 'class_level'),
                     'board': safe_field(enrollment.school_course, 'board'),
                     'state': safe_field(enrollment.school_course, 'state'),
-                    'thumbnail': request.build_absolute_uri(enrollment.school_course.thumbnail.url) if enrollment.school_course.thumbnail else "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
+                    'thumbnail': _build_thumbnail_url(enrollment.school_course, request),
                     'duration': safe_field(enrollment.school_course, 'duration'),
                     'sources': safe_field(enrollment.school_course, 'sources'),
                     'description': safe_field(enrollment.school_course, 'description'),
@@ -2104,7 +2156,7 @@ def get_user_enrolled_courses(request):
                     'subject': safe_field(enrollment.engineering_course, 'subject'),
                     'proficiency': safe_field(enrollment.engineering_course, 'proficiency'),
                     'category': safe_field(enrollment.engineering_course, 'category'),
-                    'thumbnail': request.build_absolute_uri(enrollment.engineering_course.thumbnail.url) if enrollment.engineering_course.thumbnail else "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
+                    'thumbnail': _build_thumbnail_url(enrollment.engineering_course, request),
                     'duration': safe_field(enrollment.engineering_course, 'duration'),
                     'sources': safe_field(enrollment.engineering_course, 'sources'),
                     'description': safe_field(enrollment.engineering_course, 'description'),
@@ -3099,7 +3151,7 @@ def update_course(request, course_id):
             'title': course.title,
             'description': course.description,
             'short_description': course.short_description,
-            'thumbnail': course.thumbnail.url if course.thumbnail else None,
+            'thumbnail': _build_thumbnail_url(course, request),
             'duration': course.duration,
             'is_published': course.is_published,
             'course_type': course_type,
@@ -3181,7 +3233,7 @@ def get_course_by_id(request, course_id):
                 'title': course.title,
                 'description': course.description,
                 'short_description': course.short_description,
-                'thumbnail': course.thumbnail.url if course.thumbnail else None,
+                'thumbnail': _build_thumbnail_url(course, request),
                 'duration': course.duration,
                 'is_published': course.is_published,
                 'course_type': course_type,
@@ -3278,7 +3330,7 @@ def get_course_by_id(request, course_id):
                 'title': course.title,
                 'description': course.description,
                 'short_description': course.short_description,
-                'thumbnail': course.thumbnail.url if course.thumbnail else None,
+                'thumbnail': _build_thumbnail_url(course, request),
                 'duration': course.duration,
                 'is_published': course.is_published,
                 'course_type': course_type,
@@ -3401,7 +3453,7 @@ def get_user_certificates(request):
                 'course': {
                     'id': str(cert.course.id),
                     'title': cert.course.title,
-                    'thumbnail': request.build_absolute_uri(cert.course.thumbnail.url) if cert.course.thumbnail else "https://images.unsplash.com/photo-1635070041078-e363dbe005cb",
+                    'thumbnail': _build_thumbnail_url(cert.course, request),
                     'category': getattr(cert.course, 'category', None) or getattr(cert.course, 'subject', 'Course'),
                     'proficiency': getattr(cert.course, 'proficiency', 'Beginner')
                 },

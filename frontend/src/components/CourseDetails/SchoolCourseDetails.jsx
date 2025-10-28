@@ -11,6 +11,8 @@ import { useAuth } from '../../context/AuthContext';
 import { startLearningTracking, stopLearningTracking } from '../../services/activityTracker';
 import logger from '../../utils/logger';
 import { stateCodeToName } from '../../utils/stateMapping';
+import cache, { schoolCourseKey } from '../../services/cacheService';
+import { getSchoolCourseById, getSchoolCourses } from '../../services/courseApi';
 
 // Use shared axios instance baseURL and dev proxy for API calls
 
@@ -81,8 +83,39 @@ const SchoolCourseDetails = () => {
         const selectedCourseId = searchParams.get('courseId');
         if (selectedCourseId) {
           logger.log('Fetching school course by ID from query param:', selectedCourseId);
-          const byId = await axios.get(`/courses/school/${selectedCourseId}/`);
-          const courseData = byId.data;
+
+          const cacheKey = schoolCourseKey({ courseId: selectedCourseId });
+          // Serve from cache immediately if available
+          const cached = cache.get(cacheKey);
+          if (cached) {
+            logger.log('Cache hit for course by ID');
+            const absoluteThumbCached = toAbsoluteMedia(cached.thumbnail);
+            setCourse({
+              id: cached.id,
+              title: cached.title,
+              subject: cached.subject,
+              board: cached.board === 'state' && cached.state
+                ? `${cached.state} State Board`
+                : (cached.board || '').toUpperCase(),
+              class: cached.class_level || '11th',
+              lastUpdated: cached.last_updated ? new Date(cached.last_updated).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : 'Recently updated',
+              features: [
+                { icon: <FaChalkboardTeacher />, title: 'Expert Teachers', desc: 'Learn from experienced educators' },
+                { icon: <FaBookReader />, title: 'Structured Learning', desc: 'Well-organized chapter-wise content' },
+                { icon: <FaClock />, title: 'Self-Paced', desc: 'Learn at your own convenience' }
+              ],
+              keyTopics: Array.isArray(cached.key_topics) ? cached.key_topics : [],
+              whatYouLearn: Array.isArray(cached.learning_points) ? cached.learning_points : [],
+              duration: cached.duration || '20',
+              chapters: Array.isArray(cached.chapters) ? cached.chapters.length : (Array.isArray(cached.sections) ? cached.sections.length : 0),
+              sources: cached.sources || 'YouTube',
+              thumbnail: absoluteThumbCached || cached.thumbnail,
+              icon: SUBJECT_ICONS[cached.subject] || '📚'
+            });
+            setLoading(false);
+          }
+
+          const courseData = await getSchoolCourseById(selectedCourseId);
 
           // Build absolute thumbnail URL when backend returns a relative media path
           const absoluteThumb = toAbsoluteMedia(courseData.thumbnail);
@@ -111,6 +144,8 @@ const SchoolCourseDetails = () => {
           };
 
           setCourse(formattedCourse);
+          // Cache the raw API response instead of formatted object for key consistency across pages
+          cache.set(cacheKey, courseData, 10 * 60_000);
           if (isLoggedIn) {
             checkEnrollmentStatus(formattedCourse.id);
           }
@@ -130,30 +165,49 @@ const SchoolCourseDetails = () => {
 
   logger.log('Fetching course with params:', { classLevel, board, subject, state });
         
-        // Build API URL to fetch courses matching the parameters
-  let apiUrl = `/courses/school/?class=${classLevel}`;
-        
-        // Add board parameter only if it exists
-        if (board) {
-          apiUrl += `&board=${board}`;
+        // Build normalized params
+        const stateValue = state && (board === 'state' || board === '') ? stateCodeToName(state) : '';
+        const swrKey = schoolCourseKey({ classLevel, board, state: stateValue, subject });
+
+        // Instant cache serve if present
+        const cached = cache.get(swrKey);
+        if (cached) {
+          logger.log('Cache hit for school course preview');
+          const absoluteThumb = toAbsoluteMedia(cached.thumbnail);
+          const displayBoardCached = cached.board === 'state' && cached.state ? `${cached.state} State Board` : (cached.board || '').toUpperCase();
+          const keyTopicsCached = typeof cached.key_topics === 'string' ? (JSON.parse(cached.key_topics || '[]')) : cached.key_topics;
+          const learningCached = typeof cached.learning_points === 'string' ? (JSON.parse(cached.learning_points || '[]')) : cached.learning_points;
+          setCourse({
+            id: cached.id,
+            title: cached.title,
+            subject: cached.subject,
+            board: displayBoardCached,
+            class: classLevel,
+            lastUpdated: cached.last_updated ? new Date(cached.last_updated).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : 'Recently updated',
+            features: [
+              { icon: <FaChalkboardTeacher />, title: 'Expert Teachers', desc: 'Learn from experienced educators' },
+              { icon: <FaBookReader />, title: 'Structured Learning', desc: 'Well-organized chapter-wise content' },
+              { icon: <FaClock />, title: 'Self-Paced', desc: 'Learn at your own convenience' }
+            ],
+            keyTopics: Array.isArray(keyTopicsCached) ? keyTopicsCached : [],
+            whatYouLearn: Array.isArray(learningCached) ? learningCached : [],
+            duration: cached.duration || '20',
+            chapters: Array.isArray(cached.chapters) ? cached.chapters.length : 0,
+            sources: cached.sources || 'YouTube',
+            thumbnail: absoluteThumb,
+            icon: SUBJECT_ICONS[cached.subject] || '📚'
+          });
+          setLoading(false);
         }
-        
-        if (state && (board === 'state' || board === '')) {
-          // Convert short code (e.g., ts) to proper state name expected by backend filters
-          const stateValue = stateCodeToName(state);
-          apiUrl += `&state=${stateValue}`;
-        }
-        
-  logger.log('API URL:', apiUrl);
-        
-        // Fetch courses matching these parameters
-  const response = await axios.get(apiUrl);
-  logger.log('API response:', response.data);
+
+        // Fetch courses list (cached per list) then find subject
+        const list = await getSchoolCourses(classLevel, board || (state ? 'state' : ''), stateValue);
+        logger.log('API/list response:', list);
         
         // Find the course matching the subject
         let courseData = null;
-        if (response.data && Array.isArray(response.data)) {
-          courseData = response.data.find(c => 
+        if (list && Array.isArray(list)) {
+          courseData = list.find(c => 
             c.subject.toLowerCase() === subject.toLowerCase()
           );
           logger.log('Found matching course:', courseData);
@@ -243,6 +297,8 @@ const SchoolCourseDetails = () => {
   logger.log('Processed Learning Points:', formattedCourse.whatYouLearn);
         
         setCourse(formattedCourse);
+        // Store raw course object in cache for direct reuse
+        cache.set(swrKey, courseData, 10 * 60_000);
         
         // Check enrollment status if user is logged in
         if (isLoggedIn) {
@@ -454,6 +510,7 @@ const SchoolCourseDetails = () => {
                 {/* Main Image Container with Thin Transparent Border */}
                 <div className="relative bg-transparent border border-white/20 rounded-2xl overflow-hidden shadow-lg backdrop-blur-sm">
                   <img 
+                    loading="lazy"
                     src={course.thumbnail} 
                     alt={course.title} 
                     className="w-full h-[280px] sm:h-[320px] md:h-[360px] lg:h-[400px] object-cover transition-all duration-300 hover:scale-105"

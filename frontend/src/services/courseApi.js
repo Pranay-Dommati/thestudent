@@ -1,6 +1,7 @@
 import axios from '../utils/axios';
 import universalToast from '../utils/universalToast';
 import logger from '../utils/logger';
+import cache, { schoolCourseKey } from './cacheService';
 
 // Base URL comes from axios instance (VITE_API_BASE_URL or default http://127.0.0.1:8000/api)
 // For endpoints defined without /api prefix in courses.urls, we need to call absolute paths.
@@ -62,7 +63,16 @@ export const getEngineeringCourses = async (category = 'all') => {
   logger.log('Fetching courses for category:', category);
   const response = await axios.get(`/courses/engineering/`, { params: { category } });
   logger.log('Course data received:', response.data);
-    return response.data;
+    const list = response.data || [];
+    // Warm per-course cache for details page fast load and refresh-resilience
+    try {
+      list.forEach((c) => {
+        if (c?.id) {
+          cache.set(`eng:byId:${c.id}`, c, 10 * 60_000);
+        }
+      });
+    } catch {}
+    return list;
   } catch (error) {
   logger.error('Error fetching courses:', error);
     throw error;
@@ -72,9 +82,12 @@ export const getEngineeringCourses = async (category = 'all') => {
 export const getEngineeringCourseById = async (courseId) => {
   try {
   logger.log('Fetching course details for ID:', courseId);
-  const response = await axios.get(`/courses/engineering/${courseId}/`);
-  logger.log('Course details received:', response.data);
+  const key = `eng:byId:${courseId}`;
+  // Cache for 10 minutes
+  return await cache.getOrFetch(key, async () => {
+    const response = await axios.get(`/courses/engineering/${courseId}/`);
     return response.data;
+  }, { ttlMs: 10 * 60_000 });
   } catch (error) {
   logger.error('Error fetching course details:', error);
     throw error;
@@ -102,9 +115,21 @@ export const getSchoolCourses = async (classLevel, board, state = '') => {
     const params = { class: classLevel, board };
     if (board === 'state' && state) params.state = state;
     logger.log('Requesting school courses with params:', params);
-    const response = await axios.get(`/courses/school/`, { params });
-  logger.log(`Received ${response.data.length} courses from API`); 
-    return response.data;
+      const listKey = `school:list:${(classLevel||'').toLowerCase()}:${(board||'').toLowerCase()}:${(state||'').toLowerCase()}`;
+      const data = await cache.getOrFetch(listKey, async () => {
+        const response = await axios.get(`/courses/school/`, { params });
+        return response.data || [];
+      }, { ttlMs: 5 * 60_000 }); // 5 minutes
+      // Warm per-course cache by ID so detail pages can render instantly and survive refresh
+      try {
+        (data || []).forEach((c) => {
+          if (c?.id) {
+            cache.set(schoolCourseKey({ courseId: c.id }), c, 10 * 60_000);
+          }
+        });
+      } catch {}
+      logger.log(`Received ${data.length} courses (possibly from cache)`);
+      return data;
   } catch (error) {
   logger.error('Error fetching school courses:', error);
     return [];
@@ -119,6 +144,21 @@ export const getCourseById = async (courseId) => {
     return response.data;
   } catch (error) {
   logger.error('Error fetching course by ID:', error);
+    throw error;
+  }
+};
+
+// Fetch School course by ID with caching
+export const getSchoolCourseById = async (courseId) => {
+  try {
+    logger.log('Fetching school course by ID:', courseId);
+    const key = schoolCourseKey({ courseId });
+    return await cache.getOrFetch(key, async () => {
+      const response = await axios.get(`/courses/school/${courseId}/`);
+      return response.data;
+    }, { ttlMs: 10 * 60_000 });
+  } catch (error) {
+    logger.error('Error fetching school course by ID:', error);
     throw error;
   }
 };
