@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FaUserCircle, FaSignOutAlt, FaUserPlus, FaSignInAlt } from 'react-icons/fa';
+import { FaUserCircle, FaSignOutAlt, FaUserPlus, FaSignInAlt, FaChevronRight, FaHome } from 'react-icons/fa';
 import { HiBookOpen } from 'react-icons/hi2';
 import { useAuth } from '../../context/AuthContext';
 import LogoutConfirmModal from '../common/LogoutConfirmModal';
@@ -15,15 +15,47 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Mobile detection
+  // Generate breadcrumbs from current path
+  const generateBreadcrumbs = () => {
+    const pathSegments = location.pathname.split('/').filter(Boolean);
+    const breadcrumbs = [
+      { name: 'Home', path: '/', icon: <FaHome className="w-3 h-3" /> }
+    ];
+
+    let currentPath = '';
+    pathSegments.forEach((segment, index) => {
+      currentPath += `/${segment}`;
+      
+      // Create readable names for common segments
+      let name = segment.charAt(0).toUpperCase() + segment.slice(1);
+      if (segment === 'learning-hub') name = 'Learning Hub';
+      if (segment === 'chat') name = 'AI Chatbot';
+      if (segment === 'courses') name = 'Courses';
+      if (segment === 'pro-learning') name = 'Pro Learning';
+      if (segment === 'auth') name = 'Authentication';
+      if (segment.includes('th') || segment === 'engineering') {
+        name = segment.charAt(0).toUpperCase() + segment.slice(1);
+      }
+      
+      breadcrumbs.push({
+        name,
+        path: currentPath,
+        isLast: index === pathSegments.length - 1
+      });
+    });
+
+    return breadcrumbs;
+  };
+
+  // Mobile and tablet detection
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 1024); // Treat tablets as mobile for navigation
     };
     
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
   useEffect(() => {
@@ -89,8 +121,8 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   } else if (initialStyle === 'light') {
     backgroundClass = 'bg-white shadow-sm';
   } else if (isMobile && isCourseSelectionPage) {
-    // For course selection pages on mobile (grade/board/state), use light background for visibility.
-    // Desktop keeps the blended transparent navbar with the hero.
+    // For course selection pages on mobile/tablet (grade/board/state), use light background for visibility.
+    // Large desktop keeps the blended transparent navbar with the hero.
     backgroundClass = 'bg-white shadow-sm';
   } else {
     // Transparent navbar for hero sections
@@ -138,43 +170,88 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             </Link>
           </div>
           
-          {/* Center the navigation items */}
-          <div className="hidden md:flex items-center justify-center flex-1 max-w-[600px]">
-            <div className="flex items-center space-x-8">
-              <Link to="/" className={`font-medium transition-colors ${textColor}`}>Home</Link>
-              <Link 
-                to="/courses" 
-                className={`font-medium transition-colors ${textColor}`}
-              >
-                Courses
-              </Link>
-              {isLoggedIn && (
+          {/* Navigation: Desktop = full nav, Tablet/Mobile = breadcrumbs */}
+          {isMobile ? (
+            // Breadcrumb navigation for tablet and mobile (only show if not on home page)
+            location.pathname !== '/' ? (
+              <div className="flex-1 flex items-center justify-center px-4 max-w-[400px] mx-auto">
+                <div 
+                  className="flex items-center space-x-2 overflow-x-auto" 
+                  style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}
+                >
+                  <style jsx>{`
+                    div::-webkit-scrollbar {
+                      display: none;
+                    }
+                  `}</style>
+                  {generateBreadcrumbs().map((breadcrumb, index) => (
+                    <div key={breadcrumb.path} className="flex items-center whitespace-nowrap">
+                      {index > 0 && (
+                        <FaChevronRight className={`w-3 h-3 mx-2 ${
+                          isScrolled || initialStyle === 'light' ? 'text-gray-400' : 'text-white/60'
+                        }`} />
+                      )}
+                      {breadcrumb.isLast ? (
+                        <span className={`text-sm font-medium ${
+                          isScrolled || initialStyle === 'light' ? 'text-gray-900' : 'text-white'
+                        }`}>
+                          {breadcrumb.icon && <span className="mr-1 inline-flex">{breadcrumb.icon}</span>}
+                          {breadcrumb.name}
+                        </span>
+                      ) : (
+                        <Link 
+                          to={breadcrumb.path} 
+                          className={`text-sm font-medium transition-colors ${
+                            isScrolled || initialStyle === 'light' 
+                              ? 'text-gray-600 hover:text-blue-600' 
+                              : 'text-white/80 hover:text-white'
+                          }`}
+                        >
+                          {breadcrumb.icon && <span className="mr-1 inline-flex">{breadcrumb.icon}</span>}
+                          {breadcrumb.name}
+                        </Link>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              // Empty space on home page - no breadcrumbs needed
+              <div className="flex-1"></div>
+            )
+          ) : (
+            // Full navigation for desktop
+            <div className="flex items-center justify-center flex-1 max-w-[600px]">
+              <div className="flex items-center space-x-8">
+                <Link to="/" className={`font-medium transition-colors ${textColor}`}>Home</Link>
                 <Link 
-                  to="/learning-hub" 
+                  to="/courses" 
                   className={`font-medium transition-colors ${textColor}`}
                 >
-                  Learning Hub
+                  Courses
                 </Link>
-              )}
-              <Link 
-                to="/chat" 
-                className={`font-medium transition-colors ${textColor}`}
-              >
-                AI Chatbot
-              </Link>
-              {/* Mentoring Link - commented out as requested */}
-              {/* <Link 
-                to="/mentoring" 
-                className="text-gray-600 hover:text-blue-600 transition-colors"
-              >
-                Mentoring
-              </Link> */}
+                {isLoggedIn && (
+                  <Link 
+                    to="/learning-hub" 
+                    className={`font-medium transition-colors ${textColor}`}
+                  >
+                    Learning Hub
+                  </Link>
+                )}
+                <Link 
+                  to="/chat" 
+                  className={`font-medium transition-colors ${textColor}`}
+                >
+                  AI Chatbot
+                </Link>
+              </div>
             </div>
-          </div>
+          )}
           
-          {/* Profile section - Add md:block to hide on mobile */}
-          <div className="flex items-center justify-end w-[200px]">            {isLoggedIn ? (
-              <div className="hidden md:flex">
+          {/* Profile section - Hide on tablet/mobile, show on desktop */}
+          <div className="flex items-center justify-end w-[200px]">
+            {isLoggedIn ? (
+              <div className="hidden xl:flex">
                 <Link 
                   to="/profile"
                   className="flex items-center space-x-2 focus:outline-none"
@@ -185,7 +262,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 </Link>
               </div>
             ) : (
-              <div className="hidden md:flex items-center space-x-4">
+              <div className="hidden xl:flex items-center space-x-4">
                 <Link to={`/auth?mode=login&returnTo=${encodeURIComponent(location.pathname + (location.search || '') + (location.hash || ''))}`}
                   className={`px-4 py-2 rounded-full font-medium transition-all duration-300 
                     ${isScrolled || initialStyle === 'light' || (isMobile && isCourseSelectionPage) ? 'text-blue-600 border border-blue-600 hover:bg-blue-50' : 'text-white border border-white hover:bg-white/10'}`}
@@ -205,10 +282,10 @@ const Navbar = ({ initialStyle = "transparent" }) => {
               </div>
             )}
 
-            {/* Mobile profile button - Clean and professional */}
+            {/* Mobile/Tablet profile button - Clean and professional */}
             {isLoggedIn ? (
               <button 
-                className="md:hidden ml-4 menu-toggle-button"
+                className="xl:hidden ml-4 menu-toggle-button"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               >
                 <div className={`w-8 h-8 rounded-full ${isScrolled || initialStyle === 'light' ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-white/20 backdrop-blur-sm'} flex items-center justify-center`}>
@@ -218,7 +295,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             ) : (
               <Link 
                 to={`/auth?mode=login&returnTo=${encodeURIComponent(location.pathname + (location.search || '') + (location.hash || ''))}`}
-                className="md:hidden ml-4 flex items-center"
+                className="xl:hidden ml-4 flex items-center"
               >
                 <div className={`px-3 py-1.5 rounded-full ${
                   isScrolled || initialStyle === 'light' 
@@ -232,15 +309,15 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           </div>
         </div>
         
-        {/* Mobile profile menu - Only profile-related options */}
+        {/* Mobile/Tablet profile menu - Only profile-related options */}
         {isMobileMenuOpen && isLoggedIn && (
           <>
             {/* Semi-transparent overlay for better UX */}
             <div 
-              className="fixed inset-0 bg-black/30 z-40 md:hidden" 
+              className="fixed inset-0 bg-black/30 z-40 xl:hidden" 
               onClick={closeAllMenus}
             ></div>
-            <div className="md:hidden mt-4 py-3 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-100 mx-4 navbar-menu z-50 relative">
+            <div className="xl:hidden mt-4 py-3 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-100 mx-4 navbar-menu z-50 relative">
               <div className="px-4 py-2 border-b border-gray-100">
                 <p className="text-sm font-medium text-gray-900">Profile Options</p>
               </div>
@@ -263,15 +340,15 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           </>
         )}
         
-        {/* Mobile auth menu - Login/Signup options */}
+        {/* Mobile/Tablet auth menu - Login/Signup options */}
         {isAuthMenuOpen && !isLoggedIn && (
           <>
             {/* Semi-transparent overlay for better UX */}
             <div 
-              className="fixed inset-0 bg-black/30 z-40 md:hidden" 
+              className="fixed inset-0 bg-black/30 z-40 xl:hidden" 
               onClick={closeAllMenus}
             ></div>
-            <div className="md:hidden mt-4 py-3 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-100 mx-4 navbar-menu z-50 relative">
+            <div className="xl:hidden mt-4 py-3 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-100 mx-4 navbar-menu z-50 relative">
               <div className="px-4 py-2 border-b border-gray-100">
                 <p className="text-sm font-medium text-gray-900">Account Options</p>
               </div>
