@@ -1,0 +1,446 @@
+================================================================================
+🐍 PYTHON CODE BLOCKS FOUND IN RAW CONTENT
+================================================================================
+
+--- PYTHON BLOCK #1 ---
+Block length: 83 characters
+Lines: 3
+----------------------------------------
+        for item in [1, 2, 3]:
+            # code to execute for each item
+
+----------------------------------------
+📊 DETAILED INDENTATION ANALYSIS:
+   • Total lines: 3
+
+   🔍 First 10 lines (showing spaces as dots):
+   Line  1 [ 8 spaces]: ········for·item·in·[1,·2,·3]:
+   Line  2 [12 spaces]: ············#·code·to·execute·for·each·item
+   Line  3 [ 8 spaces]: ········
+
+   • Lines with 4+ space indentation: 3
+   • Indentation ratio: 100.0%
+
+--- PYTHON BLOCK #2 ---
+Block length: 149 characters
+Lines: 5
+----------------------------------------
+        count = 0
+        while count < 5:
+            # code to execute
+            count += 1 # ensures condition eventually becomes False
+
+----------------------------------------
+📊 DETAILED INDENTATION ANALYSIS:
+   • Total lines: 5
+
+   🔍 First 10 lines (showing spaces as dots):
+   Line  1 [ 8 spaces]: ········count·=·0
+   Line  2 [ 8 spaces]: ········while·count·<·5:
+   Line  3 [12 spaces]: ············#·code·to·execute
+   Line  4 [12 spaces]: ············count·+=·1·#·ensures·condition·eventually·becomes·False
+   Line  5 [ 8 spaces]: ········
+
+   • Lines with 4+ space indentation: 5
+   • Indentation ratio: 100.0%
+
+--- PYTHON BLOCK #3 ---
+Block length: 2489 characters
+Lines: 57
+----------------------------------------
+def run_task_manager():
+    tasks = [
+        {"name": "Review PR", "status": "pending", "priority": "high"},
+        {"name": "Write documentation", "status": "completed", "priority": "medium"},
+        {"name": "Fix bug #123", "status": "pending", "priority": "high"},
+        {"name": "Schedule meeting", "status": "pending", "priority": "low"},
+        {"name": "Invalid Task", "status": None, "priority": "unknown"} # Example of invalid task        
+    ]
+
+    print("--- Simple Task Manager ---")
+
+    # Main menu loop using while True and break
+    while True:
+        print("\nMenu:")
+        print("1. View all tasks")
+        print("2. Process pending tasks")
+        print("3. Exit")
+
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            print("\n--- All Tasks ---")
+            for task in tasks: # Iterate through tasks using a for loop
+                # Conditional display based on task status
+                if task["status"] == "completed":
+                    print(f"[X] {task['name']} (Priority: {task['priority']})")
+                elif task["status"] == "pending":
+                    print(f"[ ] {task['name']} (Priority: {task['priority']})")
+                else:
+                    print(f"[?] {task['name']} (Status: {task['status']}) - Invalid status!")
+
+        elif choice == '2':
+            print("\n--- Processing Pending Tasks ---")
+            for task in tasks:
+                # Use continue to skip tasks that are not pending or are invalid
+                if task["status"] != "pending":
+                    print(f"Skipping '{task['name']}' (Status: {task['status']})")
+                    continue # Skip to the next task if not pending
+
+                # Process pending tasks based on priority using if/elif/else
+                if task["priority"] == "high":
+                    print(f"ACTION: Immediately address high priority task: '{task['name']}'")
+                elif task["priority"] == "medium":
+                    print(f"ACTION: Schedule medium priority task: '{task['name']}'")
+                else: # Low priority
+                    print(f"ACTION: Defer low priority task: '{task['name']}'")
+            print("--- Finished processing pending tasks ---")
+
+        elif choice == '3':
+            print("Exiting Task Manager. Goodbye!")
+            break # Exit the while loop
+
+        else:
+            print("Invalid choice. Please try again.")
+
+run_task_manager()
+
+----------------------------------------
+📊 DETAILED INDENTATION ANALYSIS:
+   • Total lines: 57
+
+   🔍 First 10 lines (showing spaces as dots):
+   Line  1 [ 0 spaces]: def·run_task_manager():
+   Line  2 [ 4 spaces]: ····tasks·=·[
+   Line  3 [ 8 spaces]: ········{"name":·"Review·PR",·"status":·"pending",·"priority":·"high"},
+   Line  4 [ 8 spaces]: ········{"name":·"Write·documentation",·"status":·"completed",·"priority":·"medium"},
+   Line  5 [ 8 spaces]: ········{"name":·"Fix·bug·#123",·"status":·"pending",·"priority":·"high"},       
+   Line  6 [ 8 spaces]: ········{"name":·"Schedule·meeting",·"status":·"pending",·"priority":·"low"},    
+   Line  7 [ 8 spaces]: ········{"name":·"Invalid·Task",·"status":·None,·"priority":·"unknown"}·#·Example·of·invalid·task
+   Line  8 [ 4 spaces]: ····]
+   Line  9 [ 0 spaces]:
+   Line 10 [ 4 spaces]: ····print("---·Simple·Task·Manager·---")
+
+   • Lines with 4+ space indentation: 50
+   • Indentation ratio: 87.7%
+================================================================================
+
+   🧹 Starting comprehensive sanitization...
+   ✅ Sanitization complete:
+      • LaTeX removed: 0
+      • Excessive inline code cleaned: 10
+      • Code fences sanitized: 0
+      • Indented blocks cleaned: 0
+      • Total changes: 10
+   • LaTeX $ symbols after cleanup: 0
+   • Backticks ` after cleanup: 0
+
+================================================================================
+🚨 CONTENT AFTER SANITIZATION
+================================================================================
+📥 CONTENT LENGTH: 6603 characters
+--------------------------------------------------------------------------------
+📥 SANITIZED CONTENT:
+--------------------------------------------------------------------------------
+## Introduction
+
+Python control flow dictates the order in which your program's instructions are executed. Without it, code would simply run from top to bottom, line by line, without any decision-making or repetition. Control flow structures enable your programs to make choices, execute specific blocks of code multiple times, or skip certain parts based on conditions.
+
+Mastering control flow is fundamental to writing dynamic and interactive Python applications. It allows you to build logic that responds to data, user input, or external events, transforming simple scripts into powerful, intelligent programs capable of handling complex scenarios and automating tasks efficiently.  
+
+## Core Concepts
+
+Python's primary control flow mechanisms include **conditional statements** for decision-making and **looping constructs** for repetition, along with **loop control statements** to manage loop execution.       
+
+*   **Conditional Statements (if, `elif`, `else`)**: These allow your program to execute different code blocks based on whether a condition evaluates to `True` or `False`.
+    *   if: Executes a block of code if its condition is `True`.
+    *   `elif` (else if): Checks an additional condition if the preceding if or `elif` conditions were `False`. You can have multiple `elif` blocks.
+    *   `else`: Executes a block of code if all preceding if and `elif` conditions were `False`. It's an optional catch-all.
+    *   **Indentation**: Python uses **indentation** (typically 4 spaces) to define code blocks for if, `elif`, `else`, and loops. This is crucial for correct program execution.
+
+*   **Looping Constructs**: These allow you to repeat a block of code multiple times.
+    *   for loop: Used for iterating over a sequence (like a list, tuple, string, or `range()`). It executes the code block once for each item in the sequence.
+    ```python
+    for item in [1, 2, 3]:
+    # code to execute for each item
+    ```
+    *   `while` loop: Repeats a block of code as long as its condition remains `True`. You must ensure the condition eventually becomes `False` to avoid an **infinite loop**.
+    ```python
+    count = 0
+    while count < 5:
+    # code to execute
+    count += 1 # ensures condition eventually becomes False
+    ```
+
+*   **Loop Control Statements**: These modify the normal flow of loops.
+    *   `break`: Immediately terminates the current loop (both for and `while`) and transfers control to the statement immediately following the loop.
+    *   `continue`: Skips the rest of the current iteration of the loop and proceeds to the next iteration.
+
+## Practical Example
+
+Let's create a simple task manager that processes a list of tasks, categorizes them, and allows the user to interact with a menu.
+
+```python
+def run_task_manager():
+    tasks = [
+    {"name": "Review PR", "status": "pending", "priority": "high"},
+    {"name": "Write documentation", "status": "completed", "priority": "medium"},
+    {"name": "Fix bug #123", "status": "pending", "priority": "high"},
+    {"name": "Schedule meeting", "status": "pending", "priority": "low"},
+    {"name": "Invalid Task", "status": None, "priority": "unknown"} # Example of invalid task
+    ]
+
+    print("--- Simple Task Manager ---")
+
+    # Main menu loop using while True and break
+    while True:
+    print(":")
+    print("1. View all tasks")
+    print("2. Process pending tasks")
+    print("3. Exit")
+
+    choice = input("Enter your choice: ")
+
+    if choice == '1':
+    print("--- All Tasks ---")
+    for task in tasks: # Iterate through tasks using a for loop
+    # Conditional display based on task status
+    if task["status"] == "completed":
+    print(f"[X] {task['name']} (Priority: {task['priority']})")
+    elif task["status"] == "pending":
+    print(f"[ ] {task['name']} (Priority: {task['priority']})")
+    else:
+    print(f"[?] {task['name']} (Status: {task['status']}) - Invalid status!")
+
+    elif choice == '2':
+    print("--- Processing Pending Tasks ---")
+    for task in tasks:
+    # Use continue to skip tasks that are not pending or are invalid
+    if task["status"] != "pending":
+    print(f"Skipping '{task['name']}' (Status: {task['status']})")
+    continue # Skip to the next task if not pending
+
+    # Process pending tasks based on priority using if/elif/else
+    if task["priority"] == "high":
+    print(f"ACTION: Immediately address high priority task: '{task['name']}'")
+    elif task["priority"] == "medium":
+    print(f"ACTION: Schedule medium priority task: '{task['name']}'")
+    else: # Low priority
+    print(f"ACTION: Defer low priority task: '{task['name']}'")
+    print("--- Finished processing pending tasks ---")
+
+    elif choice == '3':
+    print("Exiting Task Manager. Goodbye!")
+    break # Exit the while loop
+
+    else:
+    print("Invalid choice. Please try again.")
+
+run_task_manager()
+```
+
+## Common Patterns
+
+*   **Input Validation**: Using `if/else` to check user input for correctness (e.g., `if age.isdigit():`).
+*   **Menu-Driven Programs**: Employing a `while True` loop with `if/elif/else` statements to present options and respond to user choices, using `break` to exit.
+*   **Data Filtering/Processing**: Iterating through lists or other collections with a for loop, using if statements to filter items, and `continue` to skip unwanted ones.
+*   **Retry Mechanisms**: Implementing `while` loops to retry an operation (e.g., network request) a certain number of times or until successful.
+*   **State Machines**: Using `if/elif/else` to transition between different states in a program based on conditions.
+
+## Best Practices
+
+1.  **Clear Conditions**: Write conditions that are easy to understand and unambiguous. Avoid overly complex boolean expressions; break them down if necessary.
+2.  **Consistent Indentation**: Always use 4 spaces for indentation. Python relies heavily on it for code block definition, and inconsistent indentation leads to `IndentationError` or logical bugs.
+3.  **Avoid Infinite Loops**: When using `while` loops, ensure there's a mechanism (e.g., incrementing a counter, changing a boolean flag, or a `break` statement) that will eventually make the loop's condition `False`.
+4.  **Choose the Right Loop**: Use for loops when you know the number of iterations or are iterating over a sequence. Use `while` loops when the number of iterations is unknown and depends on a condition.      
+5.  **Use `break` and `continue` Sparingly**: While useful, overusing `break` and `continue` can make loop logic harder to follow. Sometimes, restructuring the loop condition or using `if/else` within the loop can lead to clearer code.
+--------------------------------------------------------------------------------
+================================================================================
+
+================================================================================
+🐍 PYTHON CODE BLOCKS AFTER SANITIZATION
+================================================================================
+
+--- PYTHON BLOCK #1 (AFTER SANITIZATION) ---
+Block length: 67 characters
+Lines: 3
+----------------------------------------
+    for item in [1, 2, 3]:
+    # code to execute for each item
+
+----------------------------------------
+📊 DETAILED INDENTATION ANALYSIS (AFTER):
+   • Total lines: 3
+
+   🔍 First 10 lines (showing spaces as dots):
+   Line  1 [ 4 spaces]: ····for·item·in·[1,·2,·3]:
+   Line  2 [ 4 spaces]: ····#·code·to·execute·for·each·item
+   Line  3 [ 4 spaces]: ····
+
+   🔍 Checking lines that SHOULD be indented:
+   Line  1 [4 spaces] ✅ OK: ····for·item·in·[1,·2,·3]:
+   Line  2 [4 spaces] ✅ OK: ····#·code·to·execute·for·each·item
+
+   • Lines with 4+ space indentation: 3
+   • Indentation ratio: 100.0%
+
+--- PYTHON BLOCK #2 (AFTER SANITIZATION) ---
+Block length: 121 characters
+Lines: 5
+----------------------------------------
+    count = 0
+    while count < 5:
+    # code to execute
+    count += 1 # ensures condition eventually becomes False
+
+----------------------------------------
+📊 DETAILED INDENTATION ANALYSIS (AFTER):
+   • Total lines: 5
+
+   🔍 First 10 lines (showing spaces as dots):
+   Line  1 [ 4 spaces]: ····count·=·0
+   Line  2 [ 4 spaces]: ····while·count·<·5:
+   Line  3 [ 4 spaces]: ····#·code·to·execute
+   Line  4 [ 4 spaces]: ····count·+=·1·#·ensures·condition·eventually·becomes·False
+   Line  5 [ 4 spaces]: ····
+
+   🔍 Checking lines that SHOULD be indented:
+   Line  1 [4 spaces] ✅ OK: ····count·=·0
+   Line  2 [4 spaces] ✅ OK: ····while·count·<·5:
+   Line  3 [4 spaces] ✅ OK: ····#·code·to·execute
+   Line  4 [4 spaces] ✅ OK: ····count·+=·1·#·ensures·condition·eventually·becomes·False
+
+   • Lines with 4+ space indentation: 5
+   • Indentation ratio: 100.0%
+
+--- PYTHON BLOCK #3 (AFTER SANITIZATION) ---
+Block length: 2095 characters
+Lines: 57
+----------------------------------------
+def run_task_manager():
+    tasks = [
+    {"name": "Review PR", "status": "pending", "priority": "high"},
+    {"name": "Write documentation", "status": "completed", "priority": "medium"},
+    {"name": "Fix bug #123", "status": "pending", "priority": "high"},
+    {"name": "Schedule meeting", "status": "pending", "priority": "low"},
+    {"name": "Invalid Task", "status": None, "priority": "unknown"} # Example of invalid task
+    ]
+
+    print("--- Simple Task Manager ---")
+
+    # Main menu loop using while True and break
+    while True:
+    print(":")
+    print("1. View all tasks")
+    print("2. Process pending tasks")
+    print("3. Exit")
+
+    choice = input("Enter your choice: ")
+
+    if choice == '1':
+    print("--- All Tasks ---")
+    for task in tasks: # Iterate through tasks using a for loop
+    # Conditional display based on task status
+    if task["status"] == "completed":
+    print(f"[X] {task['name']} (Priority: {task['priority']})")
+    elif task["status"] == "pending":
+    print(f"[ ] {task['name']} (Priority: {task['priority']})")
+    else:
+    print(f"[?] {task['name']} (Status: {task['status']}) - Invalid status!")
+
+    elif choice == '2':
+    print("--- Processing Pending Tasks ---")
+    for task in tasks:
+    # Use continue to skip tasks that are not pending or are invalid
+    if task["status"] != "pending":
+    print(f"Skipping '{task['name']}' (Status: {task['status']})")
+    continue # Skip to the next task if not pending
+
+    # Process pending tasks based on priority using if/elif/else
+    if task["priority"] == "high":
+    print(f"ACTION: Immediately address high priority task: '{task['name']}'")
+    elif task["priority"] == "medium":
+    print(f"ACTION: Schedule medium priority task: '{task['name']}'")
+    else: # Low priority
+    print(f"ACTION: Defer low priority task: '{task['name']}'")
+    print("--- Finished processing pending tasks ---")
+
+    elif choice == '3':
+    print("Exiting Task Manager. Goodbye!")
+    break # Exit the while loop
+
+    else:
+    print("Invalid choice. Please try again.")
+
+run_task_manager()
+
+----------------------------------------
+📊 DETAILED INDENTATION ANALYSIS (AFTER):
+   • Total lines: 57
+
+   🔍 First 10 lines (showing spaces as dots):
+   Line  1 [ 0 spaces]: def·run_task_manager():
+   Line  2 [ 4 spaces]: ····tasks·=·[
+   Line  3 [ 4 spaces]: ····{"name":·"Review·PR",·"status":·"pending",·"priority":·"high"},
+   Line  4 [ 4 spaces]: ····{"name":·"Write·documentation",·"status":·"completed",·"priority":·"medium"},
+   Line  5 [ 4 spaces]: ····{"name":·"Fix·bug·#123",·"status":·"pending",·"priority":·"high"},
+   Line  6 [ 4 spaces]: ····{"name":·"Schedule·meeting",·"status":·"pending",·"priority":·"low"},        
+   Line  7 [ 4 spaces]: ····{"name":·"Invalid·Task",·"status":·None,·"priority":·"unknown"}·#·Example·of·invalid·task
+   Line  8 [ 4 spaces]: ····]
+   Line  9 [ 0 spaces]:
+   Line 10 [ 4 spaces]: ····print("---·Simple·Task·Manager·---")
+
+   🔍 Checking lines that SHOULD be indented:
+   Line  2 [4 spaces] ✅ OK: ····tasks·=·[
+   Line  3 [4 spaces] ✅ OK: ····{"name":·"Review·PR",·"status":·"pending",·"priority":·"
+   Line  4 [4 spaces] ✅ OK: ····{"name":·"Write·documentation",·"status":·"completed",·"
+   Line  5 [4 spaces] ✅ OK: ····{"name":·"Fix·bug·#123",·"status":·"pending",·"priority"
+   Line  6 [4 spaces] ✅ OK: ····{"name":·"Schedule·meeting",·"status":·"pending",·"prior
+   Line  7 [4 spaces] ✅ OK: ····{"name":·"Invalid·Task",·"status":·None,·"priority":·"un
+   Line  8 [4 spaces] ✅ OK: ····]
+   Line 10 [4 spaces] ✅ OK: ····print("---·Simple·Task·Manager·---")
+
+   • Lines with 4+ space indentation: 50
+   • Indentation ratio: 87.7%
+================================================================================
+
+================================================================================
+🚨 FINAL CONTENT BEING STORED IN DATABASE
+================================================================================
+📥 Stored content length: 6603
+📥 Sanitized content length: 6603
+📥 Content matches: True
+
+🐍 PYTHON CODE IN FINAL STORED CONTENT:
+
+--- STORED PYTHON BLOCK #1 ---
+First 5 lines with exact spacing:
+   Line 1 [ 4 spaces]: ····for·item·in·[1,·2,·3]:
+   Line 2 [ 4 spaces]: ····#·code·to·execute·for·each·item
+   Line 3 [ 4 spaces]: ····
+
+--- STORED PYTHON BLOCK #2 ---
+First 5 lines with exact spacing:
+   Line 1 [ 4 spaces]: ····count·=·0
+   Line 2 [ 4 spaces]: ····while·count·<·5:
+   Line 3 [ 4 spaces]: ····#·code·to·execute
+   Line 4 [ 4 spaces]: ····count·+=·1·#·ensures·condition·eventually·becomes·False
+   Line 5 [ 4 spaces]: ····
+
+--- STORED PYTHON BLOCK #3 ---
+First 5 lines with exact spacing:
+   Line 1 [ 0 spaces]: def·run_task_manager():
+   Line 2 [ 4 spaces]: ····tasks·=·[
+   Line 3 [ 4 spaces]: ····{"name":·"Review·PR",·"status":·"pending",·"priority":·"high"},
+   Line 4 [ 4 spaces]: ····{"name":·"Write·documentation",·"status":·"completed",·"priority":·"medium"}, 
+   Line 5 [ 4 spaces]: ····{"name":·"Fix·bug·#123",·"status":·"pending",·"priority":·"high"},
+================================================================================
+
+   • Technical indicators found: ['code', '```']
+   ✅ Response appears to match TECHNICAL prompt
+📊 CLASSIFICATION SUMMARY:
+   • Topic: 'Python Control Flow'
+   • Category: 'technical'
+   • Method: AI-Powered
+   • Status: Success
+============================================================

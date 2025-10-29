@@ -4,11 +4,15 @@ Handles LaTeX, code fences, and excessive inline code formatting
 """
 
 import re
+import logging
+
+# Configure logger for sanitization debugging
+logger = logging.getLogger(__name__)
 
 def sanitize_ai_content(text: str, category: str = 'general'):
     """
-    Professional sanitization of AI-generated educational content.
-    Removes LaTeX, cleans up code fences, and removes excessive inline code formatting.
+    CODE-AWARE sanitization of AI-generated educational content.
+    Protects code block indentation while cleaning markdown formatting.
     
     Args:
         text: The content to sanitize
@@ -34,40 +38,134 @@ def sanitize_ai_content(text: str, category: str = 'general'):
             'total': 0
         }
     
-    # Step 1: Remove LaTeX syntax
+    # 🔍 LOG: Original content analysis
+    logger.info("=" * 80)
+    logger.info("🔍 SANITIZATION START - Analyzing content")
+    logger.info(f"Category: {category}")
+    logger.info(f"Original length: {len(text)} characters")
+    
+    # Check for Python code blocks
+    python_code_blocks = re.findall(r'```(?:python|py)\n([\s\S]*?)\n```', text, re.MULTILINE)
+    if python_code_blocks:
+        logger.info(f"🐍 Found {len(python_code_blocks)} Python code block(s)")
+        for idx, block in enumerate(python_code_blocks, 1):
+            logger.info(f"\n📝 Python Block #{idx} BEFORE sanitization:")
+            logger.info(f"Lines: {len(block.splitlines())}")
+            logger.info(f"First 200 chars: {block[:200]}")
+            # Log indentation analysis
+            lines = block.splitlines()
+            for line_num, line in enumerate(lines[:10], 1):  # First 10 lines
+                leading_spaces = len(line) - len(line.lstrip())
+                logger.info(f"  Line {line_num}: {leading_spaces} spaces | {line[:50]}")
+    
+    # 🛡️ STEP 1: EXTRACT AND PROTECT ALL FENCED CODE BLOCKS
+    logger.info("🛡️ Step 1: Extracting and protecting code blocks...")
+    code_pattern = re.compile(r'(```.*?```)', re.DOTALL)
+    code_blocks = {}
+    for i, match in enumerate(code_pattern.findall(text)):
+        key = f"__CODEBLOCK_{i}__"
+        code_blocks[key] = match
+        text = text.replace(match, key, 1)  # Replace only first occurrence
+    
+    logger.info(f"✅ Protected {len(code_blocks)} code block(s)")
+    
+    # 🧹 STEP 2: SANITIZE ONLY NON-CODE TEXT
+    logger.info("🧹 Step 2: Sanitizing non-code text...")
+    
+    # Remove LaTeX syntax
     text, latex_changes = _strip_latex_syntax(text)
     
-    # Step 2: Remove excessive bold markdown for academic content
+    # Remove excessive bold markdown for academic content
     text, bold_changes = _remove_excessive_bold(text, category)
+    logger.info(f"  • Bold removed: {bold_changes}")
     
-    # Step 3: Remove excessive inline code (backticks around simple numbers/words)
+    # Remove excessive inline code (backticks around simple numbers/words)
     # For academic content, be VERY aggressive - remove almost all backticks
     text, inline_changes = _remove_excessive_inline_code(text, category)
+    logger.info(f"  • Inline code cleaned: {inline_changes}")
     
-    # Step 4: Sanitize code fences
-    text, fence_changes = _sanitize_code_fences(text, category)
+    # Clean up whitespace in non-code text only
+    text = re.sub(r'[ \t]+', ' ', text)  # Collapse multiple spaces
+    text = re.sub(r'\n{3,}', '\n\n', text)  # Limit blank lines
+    text = text.strip()
     
-    # Step 5: Clean indented blocks
-    text, indent_changes = _clean_indented_blocks(text)
+    logger.info("✅ Non-code text sanitization complete")
     
-    # Step 6: Final safety - remove any remaining stray dollar signs
+    # 🔄 STEP 3: RESTORE CODE BLOCKS EXACTLY AS THEY WERE
+    logger.info("� Step 3: Restoring protected code blocks...")
+    for key, block in code_blocks.items():
+        text = text.replace(key, block)
+    
+    logger.info(f"✅ Restored {len(code_blocks)} code block(s) with original indentation")
+    
+    # 🔍 STEP 4: VERIFY FINAL PYTHON CODE BLOCKS
+    logger.info("🔍 Step 4: Verifying final Python code blocks...")
+    python_code_blocks_final = re.findall(r'```(?:python|py)\n([\s\S]*?)\n```', text, re.MULTILINE)
+    if python_code_blocks_final:
+        logger.info(f"🐍 FINAL: {len(python_code_blocks_final)} Python block(s) in final output")
+        for idx, block in enumerate(python_code_blocks_final, 1):
+            logger.info(f"\n📝 Python Block #{idx} FINAL STATE:")
+            lines = block.splitlines()
+            for line_num, line in enumerate(lines[:10], 1):  # First 10 lines
+                leading_spaces = len(line) - len(line.lstrip())
+                logger.info(f"  Line {line_num}: {leading_spaces} spaces | {line[:50]}")
+            
+            # Optional: Check indentation consistency
+            check_code_block_indentation(block, idx)
+    
+    # Final safety - remove any remaining stray dollar signs
     remaining_dollars = text.count('$')
     if remaining_dollars > 0:
         text = text.replace('$', '')
         latex_changes += 1
     
-    total_changes = latex_changes + bold_changes + inline_changes + fence_changes + indent_changes
+    total_changes = latex_changes + bold_changes + inline_changes
     
     changes_dict = {
         'latex_removed': latex_changes,
         'bold_removed': bold_changes,
         'inline_code_cleaned': inline_changes,
-        'fences_sanitized': fence_changes,
-        'indents_cleaned': indent_changes,
+        'fences_sanitized': 0,  # No longer modifying fences
+        'indents_cleaned': 0,   # No longer cleaning indents (protected)
         'total': total_changes
     }
     
+    logger.info(f"\n📊 SANITIZATION SUMMARY:")
+    logger.info(f"  LaTeX removed: {latex_changes}")
+    logger.info(f"  Bold removed: {bold_changes}")
+    logger.info(f"  Inline code cleaned: {inline_changes}")
+    logger.info(f"  Code blocks protected: {len(code_blocks)}")
+    logger.info(f"  Total changes: {total_changes}")
+    logger.info(f"  Final length: {len(text)} characters")
+    logger.info("=" * 80)
+    
     return text, changes_dict
+
+
+def check_code_block_indentation(code: str, block_num: int = 1):
+    """
+    Optional: Verify indentation consistency in code blocks.
+    Checks if all indented lines use multiples of 4 spaces.
+    
+    Args:
+        code: The code block content to check
+        block_num: Block number for logging purposes
+    """
+    lines = [l for l in code.splitlines() if l.strip()]
+    bad = []
+    
+    for i, line in enumerate(lines):
+        indent = len(line) - len(line.lstrip())
+        # Check if indentation is not a multiple of 4
+        if indent > 0 and indent % 4 != 0:
+            bad.append((i + 1, indent, line[:50]))
+    
+    if bad:
+        logger.warning(f"⚠️  Block #{block_num}: Irregular indentation detected:")
+        for line_num, indent, preview in bad[:5]:  # Show first 5 issues
+            logger.warning(f"    Line {line_num}: {indent} spaces (not multiple of 4) | {preview}")
+        return False
+    return True
 
 
 def _strip_latex_syntax(text: str):
