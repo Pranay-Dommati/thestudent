@@ -1,3 +1,13 @@
+// Silence all console logs in production for security
+if (import.meta.env.PROD) {
+  console.log = () => {};
+  console.debug = () => {};
+  console.info = () => {};
+  console.warn = () => {};
+  // Keep console.error for critical issues but you can remove it too
+  // console.error = () => {};
+}
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

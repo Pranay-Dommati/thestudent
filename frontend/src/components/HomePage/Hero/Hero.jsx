@@ -79,24 +79,24 @@ const Hero = () => {
             
             {/* Mobile/Tablet feature highlights - Responsive info badges */}
             <div className="flex items-center justify-center text-center opacity-90 max-w-xs mx-auto">
-              <div className="flex flex-col items-center space-y-2">
-                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/20 flex items-center justify-center">
+              <Link to="/courses" className="flex flex-col items-center space-y-2 transition-all duration-300 hover:scale-110 active:scale-95">
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
                   <svg className="w-3 h-3 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
                 </div>
                 <span className="text-xs sm:text-sm text-white/90 font-medium leading-tight">Expert<br/>Courses</span>
-              </div>
+              </Link>
               
               {/* Professional vertical divider */}
               <div className="mx-4 sm:mx-6 h-12 sm:h-16 w-px bg-gradient-to-b from-transparent via-white/40 to-transparent"></div>
               
-              <div className="flex flex-col items-center space-y-2">
-                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/20 flex items-center justify-center">
+              <Link to="/learning-hub#ai-courses" className="flex flex-col items-center space-y-2 transition-all duration-300 hover:scale-110 active:scale-95">
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
                   <span className="text-xs sm:text-sm font-bold text-white">AI</span>
                 </div>
                 <span className="text-xs sm:text-sm text-white/90 font-medium leading-tight">Study<br/>Materials</span>
-              </div>
+              </Link>
             </div>
           </div>
         </div>
@@ -171,23 +171,23 @@ const Hero = () => {
             
             {/* Feature highlights for tablet - more compact */}
             <div className="hidden md:flex items-center justify-center space-x-8 lg:space-x-12 opacity-90">
-              <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-white/20 flex items-center justify-center">
+              <Link to="/courses" className="flex items-center space-x-2 transition-all duration-300 hover:scale-110 active:scale-95 group">
+                <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
                   <svg className="w-3 h-3 lg:w-4 lg:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
                 </div>
-                <span className="text-xs lg:text-sm text-white/90 font-medium">Expert Courses</span>
-              </div>
+                <span className="text-xs lg:text-sm text-white/90 font-medium group-hover:text-white transition-colors">Expert Courses</span>
+              </Link>
               
               <div className="h-8 w-px bg-gradient-to-b from-transparent via-white/40 to-transparent"></div>
               
-              <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-white/20 flex items-center justify-center">
+              <Link to="/learning-hub#ai-courses" className="flex items-center space-x-2 transition-all duration-300 hover:scale-110 active:scale-95 group">
+                <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
                   <span className="text-xs lg:text-sm font-bold text-white">AI</span>
                 </div>
-                <span className="text-xs lg:text-sm text-white/90 font-medium">Study Materials</span>
-              </div>
+                <span className="text-xs lg:text-sm text-white/90 font-medium group-hover:text-white transition-colors">Study Materials</span>
+              </Link>
             </div>
           </div>
         </div>

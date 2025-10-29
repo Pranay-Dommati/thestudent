@@ -170,55 +170,10 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             </Link>
           </div>
           
-          {/* Navigation: Desktop = full nav, Tablet/Mobile = breadcrumbs */}
+          {/* Navigation: Desktop = full nav, Tablet/Mobile = no breadcrumbs */}
           {isMobile ? (
-            // Breadcrumb navigation for tablet and mobile (only show if not on home page)
-            location.pathname !== '/' ? (
-              <div className="flex-1 flex items-center justify-center px-4 max-w-[400px] mx-auto">
-                <div 
-                  className="flex items-center space-x-2 overflow-x-auto" 
-                  style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}
-                >
-                  <style jsx>{`
-                    div::-webkit-scrollbar {
-                      display: none;
-                    }
-                  `}</style>
-                  {generateBreadcrumbs().map((breadcrumb, index) => (
-                    <div key={breadcrumb.path} className="flex items-center whitespace-nowrap">
-                      {index > 0 && (
-                        <FaChevronRight className={`w-3 h-3 mx-2 ${
-                          isScrolled || initialStyle === 'light' ? 'text-gray-400' : 'text-white/60'
-                        }`} />
-                      )}
-                      {breadcrumb.isLast ? (
-                        <span className={`text-sm font-medium ${
-                          isScrolled || initialStyle === 'light' ? 'text-gray-900' : 'text-white'
-                        }`}>
-                          {breadcrumb.icon && <span className="mr-1 inline-flex">{breadcrumb.icon}</span>}
-                          {breadcrumb.name}
-                        </span>
-                      ) : (
-                        <Link 
-                          to={breadcrumb.path} 
-                          className={`text-sm font-medium transition-colors ${
-                            isScrolled || initialStyle === 'light' 
-                              ? 'text-gray-600 hover:text-blue-600' 
-                              : 'text-white/80 hover:text-white'
-                          }`}
-                        >
-                          {breadcrumb.icon && <span className="mr-1 inline-flex">{breadcrumb.icon}</span>}
-                          {breadcrumb.name}
-                        </Link>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              // Empty space on home page - no breadcrumbs needed
-              <div className="flex-1"></div>
-            )
+            // Empty space for tablet and mobile - no breadcrumbs
+            <div className="flex-1"></div>
           ) : (
             // Full navigation for desktop
             <div className="flex items-center justify-center flex-1 max-w-[600px]">

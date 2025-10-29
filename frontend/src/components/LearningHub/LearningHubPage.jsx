@@ -7,7 +7,7 @@ import AILearningPlans from './AILearningPlans/AILearningPlans';
 import LearningAnalytics from './LearningAnalytics/LearningAnalytics';
 import Certificates from '../Profile/tabs/Certificates';
 import { useAuth } from '../../context/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { FaRocket, FaBookOpen, FaBrain, FaGraduationCap, FaCertificate } from 'react-icons/fa';
 import { getLearningStats } from '../../services/activityTracker';
 import axios from '../../utils/axios';
@@ -17,6 +17,7 @@ import axios from '../../utils/axios';
 
 const LearningHubPage = () => {
   const { user: authUser, isLoggedIn } = useAuth();
+  const location = useLocation();
   const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(0);
   const [learningStats, setLearningStats] = useState({
     weekly_hours: 0,
@@ -26,6 +27,19 @@ const LearningHubPage = () => {
   
   // Cleaned up development logs
   useEffect(() => {}, [learningStats]);
+  
+  // Handle hash navigation to scroll to AI courses section
+  useEffect(() => {
+    if (location.hash === '#ai-courses') {
+      // Wait for the component to render, then scroll
+      setTimeout(() => {
+        const aiCoursesSection = document.getElementById('ai-courses-section');
+        if (aiCoursesSection) {
+          aiCoursesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 300);
+    }
+  }, [location.hash]);
   
   const refreshHubData = useCallback(async () => {
     if (!isLoggedIn) return;
@@ -217,7 +231,7 @@ const LearningHubPage = () => {
               </section>
               
               {/* AI-Created Courses Section */}
-              <section className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+              <section id="ai-courses-section" className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center">
                     <div className="bg-gradient-to-r from-purple-500 to-pink-600 p-3 rounded-xl mr-4 shadow-lg">

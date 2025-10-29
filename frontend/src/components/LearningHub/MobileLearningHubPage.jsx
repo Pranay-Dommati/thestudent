@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FaRocket, 
@@ -23,9 +23,17 @@ import { getLearningStats as fetchLearningStats } from '../../services/activityT
 
 const MobileLearningHubPage = () => {
   const { user: authUser, isLoggedIn } = useAuth();
+  const location = useLocation();
   const [learningStats, setLearningStats] = useState(null);
   const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(0);
   const [activeTab, setActiveTab] = useState('enrolled'); // Tab state
+
+  // Handle hash navigation to switch to AI courses tab
+  useEffect(() => {
+    if (location.hash === '#ai-courses') {
+      setActiveTab('ai');
+    }
+  }, [location.hash]);
 
   useEffect(() => {
     const refresh = async () => {
