@@ -199,65 +199,63 @@ const SixthStandard = () => {
               <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
             </div>
           ) : courses.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3 px-4 md:px-0 md:grid-cols-2 lg:grid-cols-3 md:gap-6">
-              {courses.map((course) => (
-                <Link 
-                  to={`${(selectedBoard.includes('state') 
-                    ? `/courses/6th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
-                    : `/courses/6th/${selectedBoard}/${course.subject.toLowerCase()}`)}?courseId=${encodeURIComponent(course.id)}`}
-                  key={course.id}
-                >
-                  <motion.div 
-                    whileHover={{ y: -5 }} 
-                    whileTap={{ scale: 0.98 }}
-                    className="bg-white rounded-lg md:rounded-xl shadow-sm border border-gray-200/80 hover:border-indigo-300 md:hover:shadow-lg transition-all duration-300 cursor-pointer h-full overflow-hidden"
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4 lg:gap-6 px-4 sm:px-0">
+              {courses.map((course) => {
+                // Format board name for display
+                let boardDisplay = selectedBoard.includes('state') 
+                  ? `State · ${stateBoards.find(s => selectedBoard.includes(s.id))?.name || 'TS'}`
+                  : boards.find(b => b.id === selectedBoard)?.name || 'CBSE';
+
+                return (
+                  <Link 
+                    to={`${(selectedBoard.includes('state') 
+                      ? `/courses/6th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
+                      : `/courses/6th/${selectedBoard}/${course.subject.toLowerCase()}`)}?courseId=${encodeURIComponent(course.id)}`}
+                    key={course.id}
                   >
-                    {/* Mobile: Simple header design */}
-                    <div className="md:hidden p-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-lg">{SUBJECT_ICONS[course.subject] || '📚'}</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-sm">Tap to choose</span>
+                    <motion.div 
+                      whileHover={{ scale: 1.02 }} 
+                      whileTap={{ scale: 0.98 }}
+                      className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden cursor-pointer h-full"
+                    >
+                      {/* Course thumbnail */}
+                      <div className="relative pb-[56.25%] rounded-t-xl overflow-hidden">
+                        <img 
+                          src={course.thumbnail || `https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80&text=${encodeURIComponent(course.subject)}`}
+                          alt={course.title}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
                       </div>
-                      <h3 className="text-base font-semibold">{course.subject}</h3>
-                      <p className="text-white/80 text-xs mt-1">{course.duration}+ hours</p>
-                    </div>
-
-                    {/* Desktop: Rich header design */}
-                    <div className="hidden md:block relative p-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
-                        <FaPlay className="opacity-75 text-base" />
-                      </div>
-                      <h3 className="text-xl font-bold mt-2">{course.subject}</h3>
-                      <p className="text-white/80 text-sm mt-1">{course.duration}+ hours of content</p>
-                    </div>
-
-                    {/* Mobile: Minimal content */}
-                    <div className="md:hidden p-4">
-                      <p className="text-gray-600 text-xs leading-relaxed mb-2">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-1.5">
-                          <FaBookReader className="text-indigo-500 text-xs" />
-                          <span className="text-xs text-gray-500">Structured</span>
+                      
+                      {/* Course info with better mobile spacing */}
+                      <div className="p-4 sm:p-4 lg:p-5">
+                        <h3 className="font-semibold text-gray-900 mb-2 sm:mb-2 line-clamp-2 text-base sm:text-base leading-tight">
+                          {course.title}
+                        </h3>
+                        
+                        <div className="flex items-center text-sm sm:text-sm text-gray-500 mb-3 sm:mb-3">
+                          <span>{course.duration}+ hours</span>
                         </div>
-                        <span className="text-indigo-600 text-xs font-medium">Preview →</span>
-                      </div>
-                    </div>
-
-                    {/* Desktop: Rich content */}
-                    <div className="hidden md:block p-5">
-                      <p className="text-gray-600 text-base leading-relaxed mb-4">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <FaBookReader className="text-indigo-600" />
-                          <span className="text-sm text-gray-600">Structured Learning</span>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center min-w-0 flex-1 mr-2">
+                            <div className="h-6 w-6 sm:h-6 sm:w-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-medium text-indigo-600 flex-shrink-0">
+                              {SUBJECT_ICONS[course.subject] || course.subject[0]}
+                            </div>
+                            <span className="ml-2 sm:ml-2 text-sm sm:text-sm text-gray-600 truncate">{course.subject}</span>
+                          </div>
+                          
+                          <div className="flex items-center flex-shrink-0">
+                            <span className="bg-blue-100 text-blue-800 text-xs px-2 sm:px-2 py-1 sm:py-1 rounded-full font-medium whitespace-nowrap">
+                              {boardDisplay}
+                            </span>
+                          </div>
                         </div>
-                        <span className="text-indigo-600 text-sm font-medium">Preview Course →</span>
                       </div>
-                    </div>
-                  </motion.div>
-                </Link>
-              ))}
+                    </motion.div>
+                  </Link>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
