@@ -239,10 +239,10 @@ const ProLearningPage = () => {
     };
   }, []); // Empty dependency array - run once on mount/unmount
 
-  // Mobile detection useEffect - Hide navbar on mobile for immersive experience
+  // Mobile detection useEffect - Hide navbar on mobile and tablet for immersive experience
   useEffect(() => {
     const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 768); // Use 768px as mobile breakpoint
+      setIsMobile(window.innerWidth < 1024); // Use 1024px as breakpoint to include tablets
     };
     
     checkScreenSize();
@@ -1558,7 +1558,7 @@ const ProLearningPage = () => {
 
   return (
     <>
-      {/* Only show navbar on desktop for less distracting mobile experience */}
+      {/* Only show navbar on desktop (>1024px) for immersive mobile/tablet experience */}
       {!isMobile && <Navbar initialStyle="light" />}
       <div className={`bg-gradient-to-br from-gray-50 via-white to-blue-50 ${!isMobile ? 'pt-14 lg:pt-0' : 'pt-0'}`}>
         <style>{`
