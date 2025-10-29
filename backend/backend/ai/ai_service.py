@@ -289,14 +289,42 @@ def call_intent_classifier(user_query: str, max_retries: int = 3):
 
     # Keep the instruction ultra-compact to avoid token waste and hidden reasoning.
     intent_prompt = (
-        "Return ONLY JSON. No prose, no code fences. "
-        "Decide if the user query is a study/learning topic request. If yes, classify as 'direct' (specific items like arrays, recursion, AES, DFS, lists with and/commas) "
-        "or 'broad' (general subjects like Python, React, calculus, DSA). "
-        "If the query is NOT related to studying/learning/course creation (e.g., greetings, small talk, random text, unrelated help), respond with: "
-        "{\"intent\": \"not_study\", \"message\": \"🤔 I didn't quite get that. Try a short topic like \"Basics of photosynthesis\" or \"Intro to networking\".\"}. "
-        "Otherwise, answer strictly as: {\"intent\": \"direct\"} or {\"intent\": \"broad\"}.\n\n"
-        f"Query: \"{user_query}\""
-    )
+    "Return ONLY valid JSON. No explanations, no extra text, no markdown, no code fences.\n"
+    "You are classifying the user's query into one of these categories:\n\n"
+    "1️⃣ DIRECT → Explicit lists of **two or more distinct topics or concepts**.\n"
+    "   Examples:\n"
+    "   - 'arrays and recursion'\n"
+    "   - 'RSA, AES, SHA-256'\n"
+    "   - 'mitosis + meiosis'\n"
+    "   Indicators:\n"
+    "   - Contains multiple distinct subjects separated by commas, 'and', 'or', or '+'.\n"
+    "   - Each part refers to a learnable concept or topic.\n\n"
+    "2️⃣ BROAD → A **single general subject**, **language**, or **learning request**.\n"
+    "   Examples:\n"
+    "   - 'Python'\n"
+    "   - 'learn calculus'\n"
+    "   - 'React for beginners'\n"
+    "   - 'Dutch language intermediate level'\n"
+    "   Indicators:\n"
+    "   - Refers to one topic only (no clear list).\n"
+    "   - Often includes learning intent words: 'learn', 'beginner', 'advanced', 'course', 'tutorial'.\n\n"
+    "3️⃣ NOT_STUDY → Greetings, small talk, off-topic, or unclear inputs.\n"
+    "   Examples:\n"
+    "   - 'hi', 'how are you', 'tell me a joke', 'what's the weather', 'can you help me'.\n"
+    "   - Vague or missing a clear educational topic.\n\n"
+    "Rules:\n"
+    "- If the query lists multiple specific concepts separated by commas, 'and', '+', or 'or' → DIRECT.\n"
+    "- If it's one clear subject or course-like request → BROAD.\n"
+    "- If it's unrelated, vague, or conversational → NOT_STUDY.\n"
+    "- Ignore punctuation differences, case, and stopwords when deciding.\n"
+    "- If unsure but it sounds educational → default to BROAD.\n\n"
+    "Output strictly one of the following JSON responses:\n"
+    "- {\"intent\": \"direct\"}\n"
+    "- {\"intent\": \"broad\"}\n"
+    "- {\"intent\": \"not_study\", \"message\": \"🤔 I didn't quite get that. Try a short topic like 'Basics of photosynthesis' or 'Intro to networking'.\"}\n\n"
+    f"User Query: \"{user_query.strip()}\""
+)
+
 
     # Helper for posting to a Gemini endpoint with a specific key
     def _post_to_model(url: str, temperature: float, max_tokens: int, timeout: int = 20):

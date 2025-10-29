@@ -502,23 +502,258 @@ def build_direct_retry_prompt(user_query: str) -> str:
                 )
 
 
-def _infer_global_context(user_query: str) -> str | None:
+def _extract_root_context_ai(user_query: str, max_retries: int = 2) -> str | None:
+    """AI-powered context extraction using Gemini Flash.
+    
+    Uses AI to intelligently extract the primary subject/domain from any user query,
+    handling cases that keyword matching would miss (e.g., "mental health", "startup").
+    
+    Returns:
+        A concise subject/domain string (e.g., "Mental Health", "Startup", "Python")
+        or None if extraction fails or query is unrelated to learning.
+    """
     try:
-        q = (user_query or '').lower()
-        context_candidates = [
-            ('python', 'Python'), ('javascript', 'JavaScript'), ('typescript', 'TypeScript'), ('js', 'JavaScript'),
-            ('java', 'Java'), ('c++', 'C++'), ('c#', 'C#'), ('golang', 'Go'), ('go', 'Go'), ('rust', 'Rust'),
-            ('react', 'React'), ('django', 'Django'), ('flask', 'Flask'),
-            ('dsa', 'DSA'), ('data structures', 'DSA'), ('algorithms', 'DSA'),
-            ('trigonometry', 'Trigonometry'), ('digital logic', 'Digital Logic'),
-            ('algebra', 'Algebra'), ('calculus', 'Calculus'), ('geometry', 'Geometry'), ('finance', 'Finance')
+        if not user_query or not isinstance(user_query, str) or len(user_query.strip()) < 3:
+            return None
+        
+        # Ultra-compact prompt for fast extraction
+        context_prompt = (
+            "Extract ONLY the primary subject/domain from this learning query. "
+            "Return a short phrase (1-4 words max) that describes what the course is about.\n\n"
+            "Examples:\n"
+            "- 'Dutch language beginner friendly' → 'Dutch language'\n"
+            "- 'mental health awareness' → 'Mental Health'\n"
+            "- 'startup business basics' → 'Startup'\n"
+            "- 'Python for data science' → 'Python'\n"
+            "- 'learn calculus' → 'Calculus'\n\n"
+            "Rules:\n"
+            "- Return ONLY the subject name, nothing else\n"
+            "- Use title case (e.g., 'Mental Health', not 'mental health')\n"
+            "- Keep it concise (max 4 words)\n"
+            "- If no clear subject, return 'General'\n\n"
+            f"Query: \"{user_query}\"\n\n"
+            "Subject:"
+        )
+        
+        from .ai_service import call_gemini_flash_api
+        
+        for attempt in range(max_retries):
+            try:
+                response = call_gemini_flash_api(context_prompt)
+                
+                # Extract text from response
+                text = None
+                if 'candidates' in response and response['candidates']:
+                    parts = response['candidates'][0].get('content', {}).get('parts', [])
+                    if parts:
+                        text = parts[0].get('text')
+                
+                if isinstance(text, str) and text.strip():
+                    # Clean up the response
+                    extracted = text.strip()
+                    
+                    # Remove common prefixes/suffixes
+                    for prefix in ['Subject:', 'Domain:', 'Topic:', 'The subject is', 'Answer:']:
+                        if extracted.startswith(prefix):
+                            extracted = extracted[len(prefix):].strip()
+                    
+                    # Remove quotes if present
+                    extracted = extracted.strip('"\'')
+                    
+                    # Validate: should be short (1-4 words) and not generic
+                    words = extracted.split()
+                    if 1 <= len(words) <= 4 and extracted.lower() not in ['general', 'learning', 'course', 'study']:
+                        if settings.DEBUG:
+                            logger.debug(f"AI context extraction: '{user_query}' → '{extracted}'")
+                        return extracted
+                    elif extracted.lower() == 'general':
+                        # AI couldn't determine specific subject
+                        return None
+                
+            except Exception as e:
+                if settings.DEBUG:
+                    logger.debug(f"AI context extraction attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    continue
+                break
+        
+        return None
+    except Exception as e:
+        logger.error(f"AI context extraction error: {e}")
+        return None
+
+
+def _extract_root_context_keyword(user_query: str) -> str | None:
+    """Keyword-based context extraction (fallback method).
+    
+    Uses pattern matching for common subjects when AI extraction fails.
+    This is the backup method - AI extraction should be tried first.
+    """
+    try:
+        q = (user_query or '').strip()
+        if not q:
+            return None
+        
+        q_lower = q.lower()
+        
+        # Human languages (highest priority - check before programming languages)
+        human_languages = [
+            ('dutch', 'Dutch'), ('spanish', 'Spanish'), ('french', 'French'), ('german', 'German'),
+            ('hindi', 'Hindi'), ('telugu', 'Telugu'), ('tamil', 'Tamil'), ('kannada', 'Kannada'),
+            ('malayalam', 'Malayalam'), ('bengali', 'Bengali'), ('marathi', 'Marathi'), ('gujarati', 'Gujarati'),
+            ('punjabi', 'Punjabi'), ('urdu', 'Urdu'), ('arabic', 'Arabic'), ('mandarin', 'Mandarin'),
+            ('chinese', 'Chinese'), ('japanese', 'Japanese'), ('korean', 'Korean'), ('italian', 'Italian'),
+            ('portuguese', 'Portuguese'), ('russian', 'Russian'), ('turkish', 'Turkish'), ('thai', 'Thai'),
+            ('vietnamese', 'Vietnamese'), ('swedish', 'Swedish'), ('norwegian', 'Norwegian'), ('danish', 'Danish'),
+            ('english', 'English')
         ]
-        for key, label in context_candidates:
-            if key in q:
+        
+        for key, label in human_languages:
+            if key in q_lower and 'language' in q_lower:
+                return f"{label} language"
+        
+        # Programming languages & frameworks
+        tech_contexts = [
+            ('python', 'Python'), ('javascript', 'JavaScript'), ('typescript', 'TypeScript'), ('js', 'JavaScript'),
+            ('java', 'Java'), ('c++', 'C++'), ('c#', 'C#'), ('golang', 'Go'), ('rust', 'Rust'),
+            ('react', 'React'), ('vue', 'Vue'), ('angular', 'Angular'), ('django', 'Django'), ('flask', 'Flask'),
+            ('node', 'Node.js'), ('express', 'Express')
+        ]
+        
+        for key, label in tech_contexts:
+            if key in q_lower:
                 return label
+        
+        # Academic subjects & common domains
+        academic_subjects = [
+            ('data structures', 'DSA'), ('algorithms', 'DSA'), (' dsa ', 'DSA'),
+            ('trigonometry', 'Trigonometry'), ('digital logic', 'Digital Logic'),
+            ('algebra', 'Algebra'), ('calculus', 'Calculus'), ('geometry', 'Geometry'),
+            ('physics', 'Physics'), ('chemistry', 'Chemistry'), ('biology', 'Biology'),
+            ('finance', 'Finance'), ('economics', 'Economics'), ('history', 'History'),
+            ('mental health', 'Mental Health'), ('psychology', 'Psychology'),
+            ('startup', 'Startup'), ('entrepreneurship', 'Entrepreneurship'),
+            ('marketing', 'Marketing'), ('business', 'Business')
+        ]
+        
+        for key, label in academic_subjects:
+            if key in q_lower:
+                return label
+        
         return None
     except Exception:
         return None
+
+
+def _extract_root_context(user_query: str) -> str | None:
+    """Extract the primary subject/domain from the user query.
+    
+    Strategy:
+    1. Try AI-powered extraction first (handles any subject intelligently)
+    2. Fallback to keyword matching if AI fails
+    3. Return None if both methods fail
+    
+    This ensures we can handle novel subjects like "mental health" or "startup"
+    that aren't in our keyword lists.
+    
+    Examples:
+    - "Dutch language beginner friendly" → "Dutch language"
+    - "mental health awareness" → "Mental Health"
+    - "startup business basics" → "Startup"
+    - "Python for data science" → "Python"
+    """
+    try:
+        # Strategy 1: AI-powered extraction (primary method)
+        ai_context = _extract_root_context_ai(user_query)
+        if ai_context:
+            return ai_context
+        
+        # Strategy 2: Keyword-based extraction (fallback)
+        keyword_context = _extract_root_context_keyword(user_query)
+        if keyword_context:
+            if settings.DEBUG:
+                logger.debug(f"Keyword fallback context: '{user_query}' → '{keyword_context}'")
+            return keyword_context
+        
+        # Both methods failed
+        if settings.DEBUG:
+            logger.warning(f"Context extraction failed for: '{user_query}'")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Context extraction error: {e}")
+        return None
+
+
+def _inject_context_into_topics(topics: list[dict], root_context: str | None, user_query: str) -> list[dict]:
+    """Inject root context into topic names to make them self-contained for downstream services.
+    
+    Strategy:
+    - If a topic name already contains the context (case-insensitive), leave it unchanged
+    - Otherwise, append " in {root_context}" to the topic name
+    - Store original name in metadata for reference
+    - Add root_context as separate metadata field
+    
+    Args:
+        topics: List of topic dicts with 'name' field
+        root_context: The extracted subject/domain (e.g., "Dutch language", "Python")
+        user_query: Original query for fallback context detection
+    
+    Returns:
+        Topics with context-enriched names and metadata
+    """
+    try:
+        if not topics or not isinstance(topics, list):
+            return topics
+        
+        # If no explicit root context, try to infer it
+        if not root_context:
+            root_context = _extract_root_context(user_query)
+        
+        # If still no context, return topics unchanged
+        if not root_context:
+            return topics
+        
+        enriched_topics = []
+        root_lower = root_context.lower()
+        
+        for topic in topics:
+            if not isinstance(topic, dict):
+                enriched_topics.append(topic)
+                continue
+            
+            original_name = topic.get('name', '')
+            if not original_name or not isinstance(original_name, str):
+                enriched_topics.append(topic)
+                continue
+            
+            # Check if context is already in the topic name
+            name_lower = original_name.lower()
+            has_context = root_lower in name_lower
+            
+            # Create enriched topic
+            enriched_topic = {**topic}  # Copy all existing fields
+            
+            if not has_context:
+                # Inject context: append " in {root_context}"
+                enriched_topic['name'] = f"{original_name} in {root_context}"
+            
+            # Add metadata for downstream services (always, even if context already present)
+            enriched_topic['root_context'] = root_context
+            enriched_topic['original_name'] = original_name
+            
+            enriched_topics.append(enriched_topic)
+        
+        return enriched_topics
+    except Exception as e:
+        logger.error(f"Error injecting context into topics: {e}")
+        # Return original topics on error
+        return topics
+
+
+def _infer_global_context(user_query: str) -> str | None:
+    """Legacy function - redirects to _extract_root_context for backward compatibility."""
+    return _extract_root_context(user_query)
 
 
 def _token_title(token: str) -> str:
@@ -1156,7 +1391,15 @@ def classify_topics(request):
                         error_payload['used_model'] = used_model
                     return JsonResponse(error_payload, status=422)
 
+            # CONTEXT INJECTION: Enrich topics with root context for downstream services
+            root_context = _extract_root_context(user_query)
+            formatted_topics = _inject_context_into_topics(formatted_topics, root_context, user_query)
+            
+            if settings.DEBUG and root_context:
+                logger.debug(f"Context injection (DIRECT): added '{root_context}' to {len(formatted_topics)} topics")
+
             debug_meta['topics_count'] = len(formatted_topics)
+            debug_meta['root_context'] = root_context  # Add to debug metadata
             return JsonResponse({
                 'topics': formatted_topics,
                 'personalization': derive_personalization(user_query),
@@ -1290,7 +1533,15 @@ def classify_topics(request):
                         ):
                             personalization_value = derive_personalization(user_query)
 
+                        # CONTEXT INJECTION: Enrich topics with root context for downstream services
+                        root_context = _extract_root_context(user_query)
+                        formatted_topics = _inject_context_into_topics(formatted_topics, root_context, user_query)
+                        
+                        if settings.DEBUG and root_context:
+                            logger.debug(f"Context injection: added '{root_context}' to {len(formatted_topics)} topics")
+
                         debug_meta['topics_count'] = len(formatted_topics)
+                        debug_meta['root_context'] = root_context  # Add to debug metadata
                         return JsonResponse({
                             'topics': formatted_topics,
                             'personalization': personalization_value,
