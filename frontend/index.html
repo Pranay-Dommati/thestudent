@@ -51,6 +51,36 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Global console silencer: runs BEFORE app to prevent any logs from any module -->
+    <script>
+      (function () {
+        try {
+          // If you ever need to re-enable in a session, set window.__ENABLE_CONSOLE = true in DevTools
+          if (window.__ENABLE_CONSOLE) return;
+          var noop = function () {};
+          var c = (window.console = window.console || {});
+          var methods = [
+            'log',
+            'info',
+            'debug',
+            'warn',
+            'error',
+            'trace',
+            'group',
+            'groupCollapsed',
+            'groupEnd',
+            'time',
+            'timeEnd',
+            'table'
+          ];
+          for (var i = 0; i < methods.length; i++) {
+            c[methods[i]] = noop;
+          }
+        } catch (e) {
+          // If silencing fails, do nothing; app will still run
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
