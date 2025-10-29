@@ -40,19 +40,19 @@ const renderContent = (message, t, durationMs, iconColor = '#22c55e', iconBg = '
   const getIcon = () => {
     if (iconColor === '#22c55e') { // Success
       return (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: iconColor, width: '20px', height: '20px' }}>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: iconColor, width: '16px', height: '16px' }}>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
         </svg>
       );
     } else if (iconColor === '#ef4444') { // Error
       return (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: iconColor, width: '20px', height: '20px' }}>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: iconColor, width: '16px', height: '16px' }}>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
         </svg>
       );
     } else { // Info/Default
       return (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: iconColor, width: '20px', height: '20px' }}>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: iconColor, width: '16px', height: '16px' }}>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       );
@@ -60,21 +60,24 @@ const renderContent = (message, t, durationMs, iconColor = '#22c55e', iconBg = '
   };
 
   return (
-    <div style={{ 
-      position: 'relative',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      padding: '16px',
-      backgroundColor: '#ffffff',
-      color: '#111827',
-      borderRadius: '12px',
-      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-      border: '1px solid #e5e7eb',
-      minWidth: '320px',
-      maxWidth: '500px',
-      animation: 'fadeIn 0.3s ease-out'
-    }}>
+    <div 
+      data-toast="true"
+      className="toast-container"
+      style={{ 
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '16px',
+        backgroundColor: '#ffffff',
+        color: '#111827',
+        borderRadius: '12px',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+        border: '1px solid #e5e7eb',
+        minWidth: '320px',
+        maxWidth: '500px',
+        animation: 'fadeIn 0.3s ease-out'
+      }}>
       {/* Inline keyframes for animations */}
       <style>{`
         @keyframes fadeIn {
@@ -154,7 +157,7 @@ const renderContent = (message, t, durationMs, iconColor = '#22c55e', iconBg = '
         
         {/* Circular timer progress */}
         {Number.isFinite(durationMs) && durationMs > 0 && (
-          <svg style={{ position: 'absolute', width: '24px', height: '24px', transform: 'rotate(-90deg)' }}>
+          <svg className="toast-timer" style={{ position: 'absolute', width: '24px', height: '24px', transform: 'rotate(-90deg)' }}>
             {/* Background circle */}
             <circle 
               cx="12" 
@@ -166,6 +169,7 @@ const renderContent = (message, t, durationMs, iconColor = '#22c55e', iconBg = '
             />
             {/* Progress circle */}
             <circle
+              className="toast-timer"
               cx="12"
               cy="12"
               r="10"

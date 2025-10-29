@@ -18,7 +18,7 @@
   /* Optimize animations for mobile - disable complex animations but keep essentials */
   @media (max-width: 768px) {
     /* Disable framer-motion and complex keyframe animations */
-    *:not(.animate-spin):not(.animate-bounce):not(.animate-pulse) {
+    *:not(.animate-spin):not(.animate-bounce):not(.animate-pulse):not([data-toast]):not(.toast-timer):not(.toast-container *) {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
     }
