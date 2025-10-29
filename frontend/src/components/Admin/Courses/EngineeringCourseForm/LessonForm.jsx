@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import preprocessLatex from '../../../../utils/latexPreprocessor';
 
 const LessonForm = ({
   sectionIndex,
@@ -415,7 +416,7 @@ const LessonForm = ({
                   remarkPlugins={[remarkGfm, remarkMath]}
                   rehypePlugins={[rehypeKatex]}
                 >
-                  {lesson.aboutLesson}
+                  {preprocessLatex(lesson.aboutLesson)}
                 </ReactMarkdown>
               ) : (
                 <p className="text-gray-500 text-sm">Start typing to see a preview. Math supported with $inline$ and $$block$$ syntax.</p>

@@ -17,6 +17,7 @@ import axiosInstance from '../../utils/axios';
 import courseCache from '../../utils/courseCache';
 import universalToast from '../../utils/universalToast';
 import { useAuth } from '../../context/AuthContext';
+import preprocessLatex from '../../utils/latexPreprocessor';
 
 // Update the function signature to accept the new props
 const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
@@ -1023,7 +1024,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                             a: ({node, ...props}) => <a className="text-blue-600 hover:text-blue-800 underline" {...props} />,                            hr: ({node, ...props}) => <hr className="my-6 border-gray-300" {...props} />,
                           }}
                         >
-                          {currentLesson.aboutLesson}
+                          {preprocessLatex(currentLesson.aboutLesson)}
                         </ReactMarkdown>
                       </div>
                     ) : currentLesson?.description ? (

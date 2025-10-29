@@ -16,6 +16,7 @@ import universalToast from '../../utils/universalToast';
 import courseCache from '../../utils/courseCache';
 import { useAuth } from '../../context/AuthContext';
 import MobileCourseLoadingSkeleton from './MobileCourseLoadingSkeleton';
+import preprocessLatex from '../../utils/latexPreprocessor';
 
 const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [course, setCourse] = useState(null);
@@ -604,7 +605,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                             a: ({node, ...props}) => <a className="text-blue-600 underline" {...props} />,
                           }}
                         >
-                          {currentLesson.aboutLesson}
+                          {preprocessLatex(currentLesson.aboutLesson)}
                         </ReactMarkdown>
                       </div>
                     ) : currentLesson?.description ? (
