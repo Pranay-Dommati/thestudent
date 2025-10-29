@@ -27,8 +27,8 @@ const buildToastId = (variant, message, explicitId, dedupeKey) => {
   return `${variant}|${base}`.slice(0, 180); // keep id reasonably short
 };
 
-// Helper to render content with a bottom progress bar timer
-const renderContent = (message, t, durationMs, barGradient = 'linear-gradient(90deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,1) 100%)', barShadow = '0 0 8px rgba(255, 255, 255, 0.6)') => {
+// Helper to render modern SaaS-style toast with circular timer
+const renderContent = (message, t, durationMs, iconColor = '#22c55e', iconBg = '#dcfce7', mainColor = '#22c55e') => {
   // Auto-dismiss when progress bar completes
   if (Number.isFinite(durationMs) && durationMs > 0) {
     setTimeout(() => {
@@ -36,79 +36,152 @@ const renderContent = (message, t, durationMs, barGradient = 'linear-gradient(90
     }, durationMs);
   }
 
+  // Get the appropriate icon based on color
+  const getIcon = () => {
+    if (iconColor === '#22c55e') { // Success
+      return (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: iconColor, width: '20px', height: '20px' }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+        </svg>
+      );
+    } else if (iconColor === '#ef4444') { // Error
+      return (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: iconColor, width: '20px', height: '20px' }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      );
+    } else { // Info/Default
+      return (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: iconColor, width: '20px', height: '20px' }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      );
+    }
+  };
+
   return (
-    <div style={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Inline keyframes so no external CSS needed */}
+    <div style={{ 
+      position: 'relative',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      padding: '16px',
+      backgroundColor: '#ffffff',
+      color: '#111827',
+      borderRadius: '12px',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      border: '1px solid #e5e7eb',
+      minWidth: '320px',
+      maxWidth: '500px',
+      animation: 'fadeIn 0.3s ease-out'
+    }}>
+      {/* Inline keyframes for animations */}
       <style>{`
-        @keyframes toastProgressShrink { 
-          from { transform: scaleX(1); } 
-          to { transform: scaleX(0); } 
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes circularTimer {
+          from { stroke-dashoffset: 0; }
+          to { stroke-dashoffset: 63; }
         }
       `}</style>
-      
-      {/* Message and close button row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '10px' }}>
-        <span style={{ flex: 1, fontSize: '15px', lineHeight: '1.5', fontWeight: '500' }}>{message}</span>
-        <button
-          onClick={() => toast.dismiss(t.id)}
-          style={{
-            flexShrink: 0,
-            width: '26px',
-            height: '26px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(255, 255, 255, 0.2)',
-            border: 'none',
-            borderRadius: '50%',
-            color: '#fff',
-            cursor: 'pointer',
-            fontSize: '20px',
-            fontWeight: '600',
-            lineHeight: '1',
-            padding: 0,
-            transition: 'all 0.2s ease',
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)';
-            e.currentTarget.style.transform = 'scale(1.1)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-          aria-label="Close"
-        >
-          ×
-        </button>
-      </div>
 
-      {/* Bottom progress bar (hidden for infinite/indeterminate durations) */}
-      {Number.isFinite(durationMs) && durationMs > 0 && (
-        <div
-          style={{
-            width: '100%',
-            height: '4px',
-            background: 'rgba(0, 0, 0, 0.2)',
-            borderRadius: '2px',
-            overflow: 'hidden',
-            marginTop: '2px',
+      {/* Icon container */}
+      <div style={{ 
+        flexShrink: 0,
+        backgroundColor: iconBg,
+        padding: '8px',
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        {getIcon()}
+      </div>
+      
+      {/* Message content */}
+      <span style={{ 
+        flex: 1,
+        fontSize: '14px', 
+        fontWeight: '500',
+        lineHeight: '1.4',
+        color: '#111827'
+      }}>
+        {message}
+      </span>
+      
+      {/* Close button with circular timer */}
+      <button 
+        onClick={() => toast.dismiss(t.id)}
+        style={{
+          marginLeft: 'auto',
+          position: 'relative',
+          width: '24px',
+          height: '24px',
+          border: 'none',
+          background: 'transparent',
+          cursor: 'pointer',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all 0.2s ease'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+        aria-label="Close notification"
+      >
+        {/* Close X icon */}
+        <svg 
+          style={{ 
+            position: 'absolute',
+            margin: 'auto',
+            width: '16px',
+            height: '16px',
+            color: '#9ca3af'
           }}
-          aria-hidden
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke="currentColor"
         >
-          <div
-            style={{
-              height: '100%',
-              width: '100%',
-              background: barGradient,
-              boxShadow: barShadow,
-              borderRadius: '2px',
-              animation: `toastProgressShrink ${durationMs}ms linear forwards`,
-              transformOrigin: 'right',
-            }}
-          />
-        </div>
-      )}
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        
+        {/* Circular timer progress */}
+        {Number.isFinite(durationMs) && durationMs > 0 && (
+          <svg style={{ position: 'absolute', width: '24px', height: '24px', transform: 'rotate(-90deg)' }}>
+            {/* Background circle */}
+            <circle 
+              cx="12" 
+              cy="12" 
+              r="10" 
+              stroke={`${mainColor}30`} 
+              strokeWidth="2.5" 
+              fill="none" 
+            />
+            {/* Progress circle */}
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              stroke={mainColor}
+              strokeWidth="2.5"
+              fill="none"
+              strokeDasharray="63"
+              strokeDashoffset="0"
+              strokeLinecap="round"
+              style={{
+                animation: `circularTimer ${durationMs}ms linear forwards`
+              }}
+            />
+          </svg>
+        )}
+      </button>
     </div>
   );
 };
@@ -134,10 +207,14 @@ const universalToast = {
         message, 
         t, 
         duration, 
-        'linear-gradient(90deg, rgba(72, 187, 120, 0.95) 0%, rgba(34, 197, 94, 1) 100%)',
-        '0 0 10px rgba(34, 197, 94, 0.7), 0 0 20px rgba(34, 197, 94, 0.4)'
+        '#22c55e', // iconColor
+        '#dcfce7', // iconBg (green-100)
+        '#22c55e'  // mainColor
       ), 
-      computed
+      {
+        ...computed,
+        icon: false, // Disable default react-hot-toast icon
+      }
     );
   },
 
@@ -161,10 +238,14 @@ const universalToast = {
         message, 
         t, 
         duration, 
-        'linear-gradient(90deg, rgba(248, 113, 113, 0.95) 0%, rgba(239, 68, 68, 1) 100%)',
-        '0 0 10px rgba(239, 68, 68, 0.7), 0 0 20px rgba(239, 68, 68, 0.4)'
+        '#ef4444', // iconColor
+        '#fecaca', // iconBg (red-200)
+        '#ef4444'  // mainColor
       ), 
-      computed
+      {
+        ...computed,
+        icon: false, // Disable default react-hot-toast icon
+      }
     );
   },
 
@@ -188,10 +269,14 @@ const universalToast = {
         message, 
         t, 
         duration, 
-        'linear-gradient(90deg, rgba(147, 197, 253, 0.95) 0%, rgba(96, 165, 250, 1) 100%)',
-        '0 0 10px rgba(96, 165, 250, 0.7), 0 0 20px rgba(96, 165, 250, 0.4)'
+        '#3b82f6', // iconColor
+        '#dbeafe', // iconBg (blue-100)
+        '#3b82f6'  // mainColor
       ), 
-      computed
+      {
+        ...computed,
+        icon: false, // Disable default react-hot-toast icon
+      }
     );
   },
 
@@ -215,10 +300,14 @@ const universalToast = {
         message, 
         t, 
         duration, 
-        'linear-gradient(90deg, rgba(147, 197, 253, 0.95) 0%, rgba(96, 165, 250, 1) 100%)',
-        '0 0 10px rgba(96, 165, 250, 0.7), 0 0 20px rgba(96, 165, 250, 0.4)'
+        '#3b82f6', // iconColor
+        '#dbeafe', // iconBg (blue-100)
+        '#3b82f6'  // mainColor
       ), 
-      computed
+      {
+        ...computed,
+        icon: false, // Disable default react-hot-toast icon
+      }
     );
   },
 
