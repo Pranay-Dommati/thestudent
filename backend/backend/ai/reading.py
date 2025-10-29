@@ -1004,7 +1004,55 @@ def handle_reading(request):
         # ========================================
         # Using shared sanitization module for consistent processing
         
-        print(f"   🧹 Starting comprehensive sanitization...")
+        import re
+        
+        print(f"\n{'='*80}")
+        print(f"� RAW AI CONTENT BEFORE ANY PROCESSING")
+        print(f"{'='*80}")
+        print(f"� TOPIC: '{topic}'")
+        print(f"📥 CATEGORY: '{category.upper()}'")
+        print(f"📥 CONTENT LENGTH: {len(content_text)} characters")
+        print(f"{'-'*80}")
+        print(f"📥 FULL RAW CONTENT:")
+        print(f"{'-'*80}")
+        print(content_text)
+        print(f"{'-'*80}")
+        print(f"{'='*80}")
+        
+        # Detect and analyze Python code blocks in raw content
+        raw_python_blocks = re.findall(r'```(?:python|py)\n(.*?)```', content_text, re.DOTALL)
+        if raw_python_blocks:
+            print(f"\n{'='*80}")
+            print(f"🐍 PYTHON CODE BLOCKS FOUND IN RAW CONTENT")
+            print(f"{'='*80}")
+            
+            for idx, block in enumerate(raw_python_blocks, 1):
+                lines = block.split('\n')
+                indented_lines = sum(1 for line in lines if line and len(line) - len(line.lstrip()) >= 4)
+                indent_ratio = (indented_lines / len(lines) * 100) if lines else 0
+                
+                print(f"\n--- PYTHON BLOCK #{idx} ---")
+                print(f"Block length: {len(block)} characters")
+                print(f"Lines: {len(lines)}")
+                print(f"{'-'*40}")
+                print(block)
+                print(f"{'-'*40}")
+                print(f"📊 DETAILED INDENTATION ANALYSIS:")
+                print(f"   • Total lines: {len(lines)}")
+                print(f"\n   🔍 First 10 lines (showing spaces as dots):")
+                
+                for line_num, line in enumerate(lines[:10], 1):
+                    leading_spaces = len(line) - len(line.lstrip())
+                    display_line = line.replace(' ', '·')
+                    print(f"   Line {line_num:2d} [{leading_spaces:2d} spaces]: {display_line}")
+                
+                print(f"\n   • Lines with 4+ space indentation: {indented_lines}")
+                print(f"   • Indentation ratio: {indent_ratio:.1f}%")
+            
+            print(f"{'='*80}")
+        
+        print(f"\n   🧹 Starting comprehensive sanitization...")
+        
         content_text, changes = sanitize_ai_content(content_text, category)
         
         if changes['total'] > 0:
@@ -1022,6 +1070,83 @@ def handle_reading(request):
             print(f"   • Backticks ` after cleanup: {backtick_count_after}")
         else:
             print(f"   ✅ No sanitization needed - content is clean")
+        
+        # LOG CONTENT AFTER SANITIZATION
+        print(f"\n{'='*80}")
+        print(f"🚨 CONTENT AFTER SANITIZATION")
+        print(f"{'='*80}")
+        print(f"📥 CONTENT LENGTH: {len(content_text)} characters")
+        print(f"{'-'*80}")
+        print(f"📥 SANITIZED CONTENT:")
+        print(f"{'-'*80}")
+        print(content_text)
+        print(f"{'-'*80}")
+        print(f"{'='*80}")
+        
+        # Detect and analyze Python code blocks after sanitization
+        sanitized_python_blocks = re.findall(r'```(?:python|py)\n(.*?)```', content_text, re.DOTALL)
+        if sanitized_python_blocks:
+            print(f"\n{'='*80}")
+            print(f"🐍 PYTHON CODE BLOCKS AFTER SANITIZATION")
+            print(f"{'='*80}")
+            
+            for idx, block in enumerate(sanitized_python_blocks, 1):
+                lines = block.split('\n')
+                indented_lines = sum(1 for line in lines if line and len(line) - len(line.lstrip()) >= 4)
+                indent_ratio = (indented_lines / len(lines) * 100) if lines else 0
+                
+                print(f"\n--- PYTHON BLOCK #{idx} (AFTER SANITIZATION) ---")
+                print(f"Block length: {len(block)} characters")
+                print(f"Lines: {len(lines)}")
+                print(f"{'-'*40}")
+                print(block)
+                print(f"{'-'*40}")
+                print(f"📊 DETAILED INDENTATION ANALYSIS (AFTER):")
+                print(f"   • Total lines: {len(lines)}")
+                print(f"\n   🔍 First 10 lines (showing spaces as dots):")
+                
+                for line_num, line in enumerate(lines[:10], 1):
+                    leading_spaces = len(line) - len(line.lstrip())
+                    display_line = line.replace(' ', '·')
+                    print(f"   Line {line_num:2d} [{leading_spaces:2d} spaces]: {display_line}")
+                
+                # Check for lines that should be indented
+                print(f"\n   🔍 Checking lines that SHOULD be indented:")
+                for line_num, line in enumerate(lines[:10], 1):
+                    if line.strip():  # Skip empty lines
+                        leading_spaces = len(line) - len(line.lstrip())
+                        display_line = line.replace(' ', '·')[:60]
+                        status = "✅ OK" if leading_spaces >= 4 or not line.strip().startswith(('print', 'if', 'elif', 'else', 'for', 'while', 'return')) else "❌ MISSING INDENT"
+                        if leading_spaces > 0 or 'MISSING' in status:
+                            print(f"   Line {line_num:2d} [{leading_spaces} spaces] {status}: {display_line}")
+                
+                print(f"\n   • Lines with 4+ space indentation: {indented_lines}")
+                print(f"   • Indentation ratio: {indent_ratio:.1f}%")
+            
+            print(f"{'='*80}")
+        
+        # LOG FINAL CONTENT BEING STORED
+        print(f"\n{'='*80}")
+        print(f"🚨 FINAL CONTENT BEING STORED IN DATABASE")
+        print(f"{'='*80}")
+        print(f"📥 Stored content length: {len(content_text)}")
+        print(f"📥 Sanitized content length: {len(content_text)}")
+        print(f"📥 Content matches: True")
+        
+        # Show final Python code blocks
+        final_python_blocks = re.findall(r'```(?:python|py)\n(.*?)```', content_text, re.DOTALL)
+        if final_python_blocks:
+            print(f"\n🐍 PYTHON CODE IN FINAL STORED CONTENT:")
+            for idx, block in enumerate(final_python_blocks, 1):
+                lines = block.split('\n')
+                print(f"\n--- STORED PYTHON BLOCK #{idx} ---")
+                print(f"First 5 lines with exact spacing:")
+                for line_num, line in enumerate(lines[:5], 1):
+                    leading_spaces = len(line) - len(line.lstrip())
+                    display_line = line.replace(' ', '·')
+                    print(f"   Line {line_num} [{leading_spaces:2d} spaces]: {display_line}")
+        
+        print(f"{'='*80}\n")
         
         # Update result with sanitized content
         if isinstance(result, dict) and 'content' in result:

@@ -292,9 +292,9 @@ const ProLearningMobile = ({
         </div>
       </main>
 
-      {/* Ultra Minimal Professional Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-white/95 backdrop-blur-xl border-r border-gray-200/50 transform transition-all duration-300 ease-out ${
-        showTopicsSidebar ? 'translate-x-0' : '-translate-x-full'
+      {/* Ultra Minimal Professional Sidebar - Slides from Right */}
+      <div className={`fixed inset-y-0 right-0 z-50 w-72 max-w-[85vw] bg-white/95 backdrop-blur-xl border-l border-gray-200/50 transform transition-all duration-300 ease-out ${
+        showTopicsSidebar ? 'translate-x-0' : 'translate-x-full'
       }`}>
         {/* Clean Header */}
         <div className="flex items-center justify-between px-4 py-4">
@@ -329,8 +329,25 @@ const ProLearningMobile = ({
                   <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500"></div>
                 )}
 
-                <div className="flex items-center px-3 py-3">
-                  {/* Topic Button */}
+                <div className="flex items-center px-3 py-3 gap-3">
+                  {/* Modern Number Badge */}
+                  <div className={`flex-shrink-0 relative flex items-center justify-center w-7 h-7 rounded-md text-xs font-medium transition-all ${
+                    isActive 
+                      ? 'bg-blue-500 text-white shadow-sm' 
+                      : isCompleted
+                      ? 'bg-green-50 text-green-600'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {isSelectingTopic && isActive ? (
+                      <BiLoaderAlt className="animate-spin w-3 h-3" />
+                    ) : isCompleted ? (
+                      <IoCheckmark className="w-3 h-3" />
+                    ) : (
+                      index + 1
+                    )}
+                  </div>
+                  
+                  {/* Topic Button - Takes available space */}
                   <button
                     onClick={() => {
                       if (!isActive && !isSelectingTopic) {
@@ -338,41 +355,22 @@ const ProLearningMobile = ({
                       }
                     }}
                     disabled={isSelectingTopic}
-                    className={`flex items-center gap-3 flex-1 text-left group-hover:opacity-90 transition-opacity ${
+                    className={`flex-1 min-w-0 text-left group-hover:opacity-90 transition-opacity ${
                       isSelectingTopic ? 'opacity-50' : ''
                     }`}
                   >
-                    {/* Modern Number Badge */}
-                    <div className={`relative flex items-center justify-center w-7 h-7 rounded-md text-xs font-medium transition-all ${
-                      isActive 
-                        ? 'bg-blue-500 text-white shadow-sm' 
-                        : isCompleted
-                        ? 'bg-green-50 text-green-600'
-                        : 'bg-gray-100 text-gray-500'
+                    {/* Topic Title - Properly constrained */}
+                    <h4 className={`font-medium text-sm leading-tight truncate pr-2 ${
+                      isActive ? 'text-blue-900' : 'text-gray-800'
                     }`}>
-                      {isSelectingTopic && isActive ? (
-                        <BiLoaderAlt className="animate-spin w-3 h-3" />
-                      ) : isCompleted ? (
-                        <IoCheckmark className="w-3 h-3" />
-                      ) : (
-                        index + 1
-                      )}
-                    </div>
-                    
-                    {/* Topic Title */}
-                    <div className="flex-1 min-w-0">
-                      <h4 className={`font-medium truncate text-sm leading-tight ${
-                        isActive ? 'text-blue-900' : 'text-gray-800'
-                      }`}>
-                        {topic.name}
-                      </h4>
-                      {isActive && (
-                        <span className="text-xs text-blue-600/70 font-medium">Current</span>
-                      )}
-                    </div>
+                      {topic.name}
+                    </h4>
+                    {isActive && (
+                      <span className="text-xs text-blue-600/70 font-medium">Current</span>
+                    )}
                   </button>
 
-                  {/* Circular, compact checkbox with larger hit area */}
+                  {/* Circular, compact checkbox with larger hit area - Fixed position */}
                   <button
                     onClick={(e) => {
                       const topicId = topic.id || topic.name;
@@ -380,7 +378,7 @@ const ProLearningMobile = ({
                         toggleTopicCompletion(topicId, e);
                       }
                     }}
-                    className="ml-2 inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-blue-50/40 transition-colors"
+                    className="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-blue-50/40 transition-colors"
                     aria-label={`${isCompleted ? 'Unmark' : 'Mark'} as complete`}
                   >
                     <span

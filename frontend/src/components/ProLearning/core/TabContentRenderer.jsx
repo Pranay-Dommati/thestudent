@@ -95,7 +95,27 @@ const TabContentRenderer = ({
             </div>
           </div>
           {/* Enhanced Content with better typography, all content together */}
-          <div className="prose prose-lg max-w-none">
+          <div className="prose prose-lg max-w-none px-0 sm:px-4">
+            <style>{`
+              @media (max-width: 640px) {
+                .prose ul,
+                .prose ol {
+                  padding-left: 1rem !important;
+                  margin-left: 0 !important;
+                }
+                .prose li {
+                  margin-left: 0 !important;
+                  padding-left: 0 !important;
+                }
+                .prose blockquote {
+                  margin-left: 0 !important;
+                  padding-left: 1rem !important;
+                }
+                .prose pre {
+                  margin-left: 0 !important;
+                }
+              }
+            `}</style>
             {(() => {
               const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
               // Prefer sanitized reading if it belongs to current topic
@@ -356,7 +376,27 @@ const TabContentRenderer = ({
           </div>
           
           {/* Enhanced Summary Content */}
-          <div className="prose prose-lg max-w-none">
+          <div className="prose prose-lg max-w-none px-0 sm:px-4">
+            <style>{`
+              @media (max-width: 640px) {
+                .prose ul,
+                .prose ol {
+                  padding-left: 1rem !important;
+                  margin-left: 0 !important;
+                }
+                .prose li {
+                  margin-left: 0 !important;
+                  padding-left: 0 !important;
+                }
+                .prose blockquote {
+                  margin-left: 0 !important;
+                  padding-left: 1rem !important;
+                }
+                .prose pre {
+                  margin-left: 0 !important;
+                }
+              }
+            `}</style>
             <ReactMarkdown 
               remarkPlugins={[remarkGfm, remarkMath]}
               rehypePlugins={[rehypeKatex]}
@@ -566,7 +606,15 @@ const TabContentRenderer = ({
           
           {/* Enhanced Video Grid */}
           <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {content.videos.map((video, index) => (
+            {content.videos
+              .sort((a, b) => {
+                // Sort by view count in descending order (highest views first)
+                const viewsA = a.viewCount || parseInt(a.formattedViewCount?.replace(/[^0-9]/g, '') || '0') || 0;
+                const viewsB = b.viewCount || parseInt(b.formattedViewCount?.replace(/[^0-9]/g, '') || '0') || 0;
+                return viewsB - viewsA;
+              })
+              .slice(0, 6) // Limit to maximum 6 videos
+              .map((video, index) => (
               <div key={video.id} className="group bg-white border border-gray-200 rounded-2xl hover:shadow-xl transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
                 <div className="flex flex-col">
                   {/* Video Thumbnail */}
@@ -595,18 +643,12 @@ const TabContentRenderer = ({
                   {/* Video Info */}
                   <div className="flex-1 p-6">
                     <div className="flex items-start justify-between mb-3">
-                      <h3 className="font-bold text-gray-900 text-lg line-clamp-2 group-hover:text-red-600 transition-colors">
+                      <h3 className="font-bold text-gray-900 text-lg line-clamp-1 group-hover:text-red-600 transition-colors">
                         {video.title}
                       </h3>
                       <div className="ml-2 flex-shrink-0">
-                        {video.isEducationalChannel && (
-                          <div className="flex items-center bg-blue-100 px-2 py-1 rounded-full">
-                            <IoCheckmarkCircle className="text-blue-500 mr-1 text-xs" />
-                            <span className="text-xs font-semibold text-blue-700">Verified</span>
-                          </div>
-                        )}
                         {video.difficulty && (
-                          <div className={`mt-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
                             video.difficulty === 'Beginner' ? 'bg-green-100 text-green-700' :
                             video.difficulty === 'Intermediate' ? 'bg-yellow-100 text-yellow-700' :
                             'bg-red-100 text-red-700'
@@ -640,41 +682,14 @@ const TabContentRenderer = ({
                       </div>
                     </div>
                     
-                    {/* Video Description/Key Topics */}
-                    {video.description && (
-                      <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                        {video.description}
-                      </p>
-                    )}
-                    
-                    {/* Key Topics Tags */}
-                    {video.keyTopics && video.keyTopics.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-4">
-                        {video.keyTopics.slice(0, 3).map((topic, idx) => (
-                          <span 
-                            key={idx}
-                            className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
-                          >
-                            {topic}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    
                     {/* Action buttons */}
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center">
                       <button 
                         onClick={() => openVideoModal(video)}
-                        className="flex-1 flex items-center justify-center px-3 py-2 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg text-sm"
+                        className="w-full flex items-center justify-center px-3 py-2 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg text-sm"
                       >
                         <IoPlayCircle className="mr-1" />
                         Watch
-                      </button>
-                      <button className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
-                        <IoBookmark className="text-lg" />
-                      </button>
-                      <button className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-colors">
-                        <IoShare className="text-lg" />
                       </button>
                     </div>
                   </div>
