@@ -113,7 +113,10 @@ axiosAi.interceptors.response.use(
         originalRequest.headers['Authorization'] = `Bearer ${newAccess}`;
         return axiosAi(originalRequest);
       } catch (refreshErr) {
-        storage.clearAuthTokens();
+        const st = refreshErr?.response?.status;
+        if (st === 400 || st === 401 || (typeof st === 'number' && st >= 500)) {
+          storage.clearAuthTokens();
+        }
         onRefreshed(null);
         return Promise.reject(refreshErr);
       } finally {

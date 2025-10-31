@@ -1429,6 +1429,9 @@ def validate_reset_token(request, uid, token):
 # Custom Token Refresh View with database retry logic
 from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshView
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+from rest_framework.response import Response
+from rest_framework import status
+import logging
 
 class TokenRefreshViewWithRetry(BaseTokenRefreshView):
     """
@@ -1439,7 +1442,23 @@ class TokenRefreshViewWithRetry(BaseTokenRefreshView):
     @db_retry_on_connection_error(max_retries=3, delay=0.5, backoff=2)
     def post(self, request, *args, **kwargs):
         """
-        Override post method to add database connection retry logic.
-        This ensures token refresh works even if MySQL connection is temporarily lost.
+        Override post method to add database connection retry logic and
+        guarantee we never respond with a 500 due to token issues.
+
+        - On InvalidToken/TokenError: return 401
+        - On malformed body: return 400
+        - On unexpected errors: log and return 401 (so clients can cleanly logout)
         """
-        return super().post(request, *args, **kwargs)
+        logger = logging.getLogger(__name__)
+        try:
+            return super().post(request, *args, **kwargs)
+        except (InvalidToken, TokenError) as e:
+            # Standardize invalid/expired refresh token to 401
+            return Response({'detail': 'Token is invalid or expired', 'code': 'invalid_token'}, status=status.HTTP_401_UNAUTHORIZED)
+        except KeyError:
+            # Likely missing 'refresh' in request body
+            return Response({'detail': "Missing 'refresh' field"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            # Never leak stack traces to clients; log for server-side diagnosis
+            logger.exception('Token refresh failed with unexpected error')
+            return Response({'detail': 'Token refresh failed'}, status=status.HTTP_401_UNAUTHORIZED)

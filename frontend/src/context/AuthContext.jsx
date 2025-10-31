@@ -38,9 +38,9 @@ export const AuthProvider = ({ children }) => {
       return false;
     } catch (error) {
       console.error('Token refresh failed:', error);
-      // Only clear auth on explicit invalid refresh (400/401). For network timeouts/offline, keep tokens.
+      // Clear auth on explicit invalid refresh (400/401) and also 5xx to prevent loops
       const status = error.response?.status;
-      if (status === 400 || status === 401) {
+      if (status === 400 || status === 401 || (typeof status === 'number' && status >= 500)) {
         handleAuthFailure();
       }
       throw error;

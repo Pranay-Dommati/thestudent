@@ -99,9 +99,10 @@ instance.interceptors.response.use(
         originalRequest.headers['Authorization'] = `Bearer ${newAccess}`;
         return instance(originalRequest);
       } catch (refreshErr) {
-        // Cleanup tokens only on explicit invalid refresh (400/401). For network errors, keep tokens.
+        // If refresh fails, clear tokens on explicit invalid refresh (400/401)
+        // and also on server-side errors (>=500) to avoid infinite retry loops.
         const st = refreshErr?.response?.status;
-        if (st === 400 || st === 401) {
+        if (st === 400 || st === 401 || (typeof st === 'number' && st >= 500)) {
           storage.clearAuthTokens();
         }
         onRefreshed(null);
