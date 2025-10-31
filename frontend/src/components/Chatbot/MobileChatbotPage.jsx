@@ -1424,7 +1424,7 @@ const MobileChatbotPage = () => {
           
           {/* Center: EasyLearnova branding */}
           <div className="flex-1 mx-3 md:mx-4 text-center">
-            <h1 className="text-base md:text-lg font-bold text-gray-900">EasyLearnova</h1>
+            <h1 className="text-base md:text-lg font-bold text-[#0A1A3F]">EasyLearnova</h1>
             <p className="text-xs md:text-sm text-gray-500">Course Creator</p>
           </div>
           

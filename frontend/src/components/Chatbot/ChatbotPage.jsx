@@ -2362,7 +2362,7 @@ const ChatbotPage = () => {
                 <IoMenu size={18} />
               </button>
             )}
-            <Link to="/" className="text-lg font-semibold text-gray-900 hover:text-indigo-600 transition-colors">
+            <Link to="/" className="text-lg font-semibold text-[#0A1A3F] hover:text-indigo-600 transition-colors">
               EasyLearnova
             </Link>
           </div>
