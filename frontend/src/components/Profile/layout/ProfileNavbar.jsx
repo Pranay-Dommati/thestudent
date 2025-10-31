@@ -5,7 +5,6 @@ import {
   FaGraduationCap, FaCog, FaSignOutAlt, FaBell, 
   FaUserCircle, FaShieldAlt, FaHistory, FaDownload 
 } from 'react-icons/fa';
-import { HiBookOpen } from 'react-icons/hi2';
 
 const ProfileNavbar = ({ isDarkMode, profileData, setActiveTab }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -27,14 +26,11 @@ const ProfileNavbar = ({ isDarkMode, profileData, setActiveTab }) => {
           {/* Logo - Now acts as home button */}
           <Link 
             to="/" 
-            className="flex items-center space-x-2 transition-transform hover:scale-[1.02]"
+            className="flex items-center transition-opacity hover:opacity-80"
           >
-            <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white">
-              <HiBookOpen className="text-lg" />
-            </div>
-            <span className={`font-bold text-xl ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+            <h1 className={`font-bold text-xl tracking-wide ${isDarkMode ? 'text-white' : 'text-[#0A1A3F]'}`}>
               EasyLearnova
-            </span>
+            </h1>
           </Link>
         </div>
       </div>

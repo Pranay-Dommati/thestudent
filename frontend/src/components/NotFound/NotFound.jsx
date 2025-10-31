@@ -44,9 +44,10 @@ const NotFound = () => {
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <Link to="/" className="flex items-center space-x-2">
-                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl">S</div>
-                <span className="font-bold text-lg sm:text-xl text-white">EasyLearnova</span>
+              <Link to="/" className="flex items-center">
+                <h1 className="font-bold text-xl tracking-wide text-white transition-opacity hover:opacity-80">
+                  EasyLearnova
+                </h1>
               </Link>
             </div>
             <div className="hidden md:flex items-center justify-center flex-1 max-w-[600px]">

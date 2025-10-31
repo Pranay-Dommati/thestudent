@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { HiBookOpen } from 'react-icons/hi2';
 
 const AuthNav = () => {
   return (
@@ -8,13 +7,10 @@ const AuthNav = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo Section */}
-          <Link to="/" className="flex items-center space-x-2 group">
-            <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white transition-transform group-hover:scale-110">
-              <HiBookOpen className="text-sm" />
-            </div>
-            <span className="font-bold text-lg bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+          <Link to="/" className="flex items-center group">
+            <h1 className="font-bold text-xl tracking-wide text-[#0A1A3F] transition-opacity group-hover:opacity-80">
               EasyLearnova
-            </span>
+            </h1>
           </Link>
 
           {/* Right Section */}

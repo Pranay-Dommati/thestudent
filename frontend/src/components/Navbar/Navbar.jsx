@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaUserPlus, FaSignInAlt, FaChevronRight, FaHome } from 'react-icons/fa';
-import { HiBookOpen } from 'react-icons/hi2';
 import { useAuth } from '../../context/AuthContext';
 import LogoutConfirmModal from '../common/LogoutConfirmModal';
 
@@ -162,11 +161,10 @@ const Navbar = ({ initialStyle = "transparent" }) => {
         <div className="flex justify-between items-center">
           {/* Logo section */}
           <div className="flex items-center w-[200px]">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center text-white">
-                <HiBookOpen className="text-sm" />
-              </div>
-              <span className={`font-bold text-lg ${isScrolled || initialStyle === 'light' || (isMobile && isCourseSelectionPage) ? 'text-gray-800' : 'text-white'}`}>EasyLearnova</span>
+            <Link to="/" className="flex items-center">
+              <h1 className={`font-bold text-xl tracking-wide transition-colors ${isScrolled || initialStyle === 'light' || (isMobile && isCourseSelectionPage) ? 'text-[#0A1A3F]' : 'text-white'}`}>
+                EasyLearnova
+              </h1>
             </Link>
           </div>
           
