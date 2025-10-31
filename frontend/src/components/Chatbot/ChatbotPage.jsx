@@ -402,6 +402,8 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
           <div className="mt-4 lg:mt-6 pt-4 border-t border-gray-200">
             <Link 
               to="/pro-learning"
+              target="_blank"
+              rel="noopener noreferrer"
               className="block w-full p-3 lg:p-4 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
             >
               <div className="flex items-center justify-between">
@@ -2051,6 +2053,8 @@ const ChatbotPage = () => {
                 <div className="w-full">
                   <Link 
                     to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
                     onClick={() => {
                       // Store the topics and course data for batch generation
@@ -2281,6 +2285,8 @@ const ChatbotPage = () => {
                       <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0"></div>
                       <a
                         href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="flex-1 min-w-0"
                       >
                         <div className="text-sm font-medium text-gray-800 line-clamp-1 group-hover:text-indigo-600 truncate">

@@ -1318,6 +1318,8 @@ const MobileChatbotPage = () => {
               {message.type === "bot" && isProCard && (
                 <Link 
                   to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center justify-between w-full px-5 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 group"
                     onClick={() => {
                       // Store the topics and course data for batch generation (same as desktop)
@@ -1549,7 +1551,7 @@ const MobileChatbotPage = () => {
                   return (
                     <div key={course.id} className="p-3 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition-all">
                       <div className="flex items-center justify-between gap-3">
-                        <Link to={href} onClick={closeCoursesDrawer} className="flex items-center gap-3 min-w-0 flex-1">
+                        <Link to={href} target="_blank" rel="noopener noreferrer" onClick={closeCoursesDrawer} className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="bg-indigo-50 rounded-lg p-2">
                             <IoBook className="w-4 h-4 text-indigo-600" />
                           </div>
@@ -1732,7 +1734,7 @@ const MobileChatbotPage = () => {
                   return (
                     <div key={course.id} className="p-3 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all">
                       <div className="flex items-center justify-between gap-3">
-                        <a href={href} className="flex items-center gap-3 min-w-0 flex-1">
+                        <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="bg-indigo-50 rounded-lg p-2">
                             <IoBook className="w-4 h-4 text-indigo-600" />
                           </div>

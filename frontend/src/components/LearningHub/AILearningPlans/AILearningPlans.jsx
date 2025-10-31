@@ -158,9 +158,14 @@ const AILearningPlans = () => {
       });
 
       if (response.data) {
-  universalToast.success('Course loaded successfully!', { id: `loading-${courseId}` });
-        // Navigate using React Router for better SPA experience
-        navigate(`/pro-learning/${courseId}`);
+        universalToast.success('Course loaded successfully!', { id: `loading-${courseId}` });
+        // Open in a new tab for a friendlier experience
+        try {
+          window.open(`/pro-learning/${courseId}`, '_blank', 'noopener');
+        } catch (_) {
+          // Fallback to same-tab navigation if popup blocked
+          navigate(`/pro-learning/${courseId}`);
+        }
       }
     } catch (error) {
   
