@@ -3,7 +3,8 @@ import storage from './storage';
 
 const instance = axios.create({
   baseURL: (import.meta.env.VITE_API_BASE_URL || '/api'),
-  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT_MS || '30000', 10), // 30 second default timeout
+  // Default to 120s to better support slower hosted backends (SMTP/AI pipelines)
+  timeout: parseInt(import.meta.env.VITE_API_TIMEOUT_MS || '120000', 10),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -13,9 +14,14 @@ const instance = axios.create({
 instance.interceptors.request.use(
   async (config) => {
     // Prefer the freshest token from localStorage only.
-    let token = storage.getItem('accessToken');
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+    // Do NOT attach Authorization when calling the refresh endpoint itself.
+    const url = String(config.url || '');
+    const isRefreshEndpoint = /\/auth\/token\/refresh\/?$/i.test(url);
+    if (!isRefreshEndpoint) {
+      const token = storage.getItem('accessToken');
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
     }
     return config;
   },

@@ -60,10 +60,22 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
     const initializeGoogle = async () => {
       try {
         setIsLoading(true);
+        // Watchdog: if script/init hangs, reset UI after 8s
+        let watchdogCleared = false;
+        const watchdog = setTimeout(() => {
+          if (!watchdogCleared) {
+            setIsGoogleReady(false);
+            setIsLoading(false);
+            try { universalToast.error('Google Sign-In is taking too long. Try again.'); } catch {}
+          }
+        }, 8000);
         
         if (!GOOGLE_CLIENT_ID) {
           console.error('VITE_GOOGLE_CLIENT_ID not found in environment variables');
           universalToast.error('Google Sign-In not configured');
+          // Mark as not loading and unavailable so button shows proper state
+          setIsGoogleReady(false);
+          setIsLoading(false);
           return;
         }
 
@@ -100,10 +112,15 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
 
         setIsGoogleReady(true);
         setIsLoading(false);
+        watchdogCleared = true;
+        clearTimeout(watchdog);
         console.log('Google Sign-In initialized successfully');
       } catch (error) {
         console.error('Google Sign-In initialization failed:', error);
         universalToast.error('Google Sign-In failed to load');
+        // Ensure loading state is reset and mark as unavailable
+        setIsGoogleReady(false);
+        setIsLoading(false);
       }
     };
 

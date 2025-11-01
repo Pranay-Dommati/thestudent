@@ -179,7 +179,7 @@ export default function AuthForm() {
           navigate(returnToPath || '/', { replace: true });
         } else if (response?.suggestSignup) {
           // Dismiss the toast before navigating to prevent duplication
-          toast.dismiss('auth-login');
+          universalToast.dismiss('auth-login');
           
           // Preserve the returnTo parameter if it exists
           const returnToParam = returnToPath ? `&returnTo=${encodeURIComponent(returnToPath)}` : '';
@@ -190,7 +190,7 @@ export default function AuthForm() {
           
           // Show toast AFTER navigation completes
           setTimeout(() => {
-            toast.error('No account found with this email. Please sign up to continue.', {
+            universalToast.error('No account found with this email. Please sign up to continue.', {
               id: 'suggest-signup',
               duration: 3000,
               icon: '📝'
@@ -248,7 +248,12 @@ export default function AuthForm() {
       
       // Check for timeout/abort
       if (error.code === 'TIMEOUT' || error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.name === 'AbortError') {
-        errorMessage = "Request timed out. The server is taking too long to respond. Please try again.";
+        errorMessage = "Request timed out. The server is taking too long to respond. If you receive an OTP email, you can enter it below.";
+        // If signup timed out, it's possible the server still sent the OTP.
+        // Proactively open the OTP modal so the user can verify if they received it.
+        if (isSignUp) {
+          setOtpOpen(true);
+        }
       }
       // Check for network error
       else if (error.message === 'Network Error' || !error.response) {

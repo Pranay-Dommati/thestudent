@@ -13,10 +13,17 @@ function unwrapError(err) {
 }
 
 export async function otpSignup({ full_name, email, password, agreed_to_terms }) {
-  // Create abort controller for hard timeout
+  // Use a generous, configurable hard timeout to tolerate slow SMTP in hosted environments
+  const HARD_TIMEOUT_MS = parseInt(
+    import.meta.env.VITE_OTP_SIGNUP_TIMEOUT_MS ||
+    import.meta.env.VITE_API_TIMEOUT_MS ||
+    '120000',
+    10
+  );
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // Hard 10 second timeout
-  
+  const timeoutId = HARD_TIMEOUT_MS > 0 ? setTimeout(() => controller.abort(), HARD_TIMEOUT_MS) : null;
+
   try {
     const { data } = await axios.post('/auth/otp/signup/', {
       full_name,
@@ -26,10 +33,10 @@ export async function otpSignup({ full_name, email, password, agreed_to_terms })
     }, {
       signal: controller.signal
     });
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
     return data; // { message }
   } catch (err) {
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
     // Check if this was an abort/timeout
     if (err.name === 'AbortError' || err.name === 'CanceledError') {
       const timeoutError = new Error('Request timed out. The server is taking too long to respond.');

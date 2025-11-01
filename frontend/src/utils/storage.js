@@ -4,13 +4,32 @@
 const memoryStore = new Map();
 
 // --- Cookie helpers (used as durable fallback on browsers that block Web Storage, e.g., iOS private mode) ---
+function getCookieDomain() {
+  try {
+    const host = window?.location?.hostname || '';
+    // Skip domain attribute for localhost or IP addresses
+    const isLocalhost = host === 'localhost' || host.endsWith('.localhost');
+    const isIP = /^(\d{1,3}\.){3}\d{1,3}$/.test(host);
+    if (isLocalhost || isIP || !host.includes('.')) return '';
+    // Use top-level domain (e.g., .example.com); handle multi-part TLDs cautiously
+    const parts = host.split('.');
+    if (parts.length >= 2) {
+      const base = parts.slice(-2).join('.');
+      return `.${base}`;
+    }
+  } catch {}
+  return '';
+}
+
 function setCookie(key, value, days = 30) {
   try {
     const encodedKey = encodeURIComponent(key);
     const encodedVal = encodeURIComponent(value);
     const maxAge = Math.floor(days * 24 * 60 * 60);
     const secure = typeof window !== 'undefined' && window.location && window.location.protocol === 'https:' ? '; Secure' : '';
-    document.cookie = `${encodedKey}=${encodedVal}; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+    const domain = getCookieDomain();
+    const domainAttr = domain ? `; Domain=${domain}` : '';
+    document.cookie = `${encodedKey}=${encodedVal}; Path=/; SameSite=Lax; Max-Age=${maxAge}${domainAttr}${secure}`;
     return true;
   } catch {
     return false;
@@ -34,8 +53,10 @@ function getCookie(key) {
 function removeCookie(key) {
   try {
     const encodedKey = encodeURIComponent(key);
+    const domain = getCookieDomain();
+    const domainAttr = domain ? `; Domain=${domain}` : '';
     // Expire immediately
-    document.cookie = `${encodedKey}=; Path=/; Max-Age=0; SameSite=Lax`;
+    document.cookie = `${encodedKey}=; Path=/; Max-Age=0; SameSite=Lax${domainAttr}`;
   } catch {}
 }
 

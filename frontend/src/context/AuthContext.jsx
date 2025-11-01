@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 import customToast from '../utils/customToast';
 import axiosInstance from '../utils/axios';
 import storage from '../utils/storage';
@@ -24,9 +25,13 @@ export const AuthProvider = ({ children }) => {
         throw new Error('No refresh token');
       }
 
-      const response = await axiosInstance.post('/auth/token/refresh/', {
-        refresh: refreshToken
-      });
+      // Use bare axios (no interceptors) and avoid Authorization header on refresh
+      const refreshUrl = `${axiosInstance.defaults.baseURL}/auth/token/refresh/`;
+      const response = await axios.post(
+        refreshUrl,
+        { refresh: refreshToken },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
 
       if (response.data.access) {
         storage.setItem('accessToken', response.data.access);
