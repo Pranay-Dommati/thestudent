@@ -167,8 +167,14 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
         let courseData;
         if (isSchoolCourse) {
-          if (Array.isArray(response.data) && response.data.length > 0) {
+          if (selectedCourseId) {
+            // Already fetched the exact course object by ID
+            courseData = response.data;
+          } else if (Array.isArray(response.data) && response.data.length > 0) {
+            // If multiple courses match (e.g., 1A vs 1B), pick the first one
+            // TODO: Show disambiguation UI if multiple matches exist
             const picked = response.data.find(c => !!c) || response.data[0];
+            logger.log('🎯 Mobile: Selected course from list:', picked);
             const detail = await axiosInstance.get(`/courses/school/${picked.id}/`);
             courseData = detail.data;
           } else {
@@ -290,7 +296,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         setCourse(updatedCourse);
         
         // Update cache with progress data
-        const cacheKey = courseCache.generateKey(pathname);
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         courseCache.set(cacheKey, { 
           course: updatedCourse,
           progress: response.data 
@@ -387,7 +393,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         const response = await axiosInstance.post(`/lessons/toggle-completion/${lesson.id}/`);
         
         // **FIX: Invalidate cache after successful completion toggle**
-        const cacheKey = courseCache.generateKey(pathname);
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         courseCache.invalidate(cacheKey);
         console.log('🗑️ Mobile: Cache invalidated after lesson completion toggle');
         
