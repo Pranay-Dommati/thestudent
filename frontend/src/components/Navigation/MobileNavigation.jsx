@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
   FaSearch, FaBell, FaUser, FaTimes, FaHome, FaGraduationCap, 
-  FaBrain, FaAward, FaCog, FaSignOutAlt, FaBookOpen, FaChartLine,
+  FaBook, FaAward, FaCog, FaSignOutAlt, FaBookOpen, FaChartLine,
   FaHeart, FaHistory, FaQuestionCircle, FaPhone, FaEllipsisV
 } from 'react-icons/fa';
 import { HiSparkles } from 'react-icons/hi';
@@ -24,7 +24,7 @@ const MobileNavigation = ({ showSearch = true, showNotifications = true }) => {
   const navigationItems = [
     { path: '/', icon: FaHome, label: 'Home' },
     { path: '/courses', icon: FaGraduationCap, label: 'Courses' },
-    { path: '/chat', icon: FaBrain, label: 'AI Chat' },
+    { path: '/chat', icon: FaBook, label: 'Creator' },
     ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub' }] : []),
     { path: isLoggedIn ? '/profile' : '/auth?mode=login', icon: FaUser, label: isLoggedIn ? 'Profile' : 'Login' }
   ];
@@ -41,7 +41,7 @@ const MobileNavigation = ({ showSearch = true, showNotifications = true }) => {
       { path: '/auth?mode=signup', icon: FaGraduationCap, label: 'Sign Up', description: 'Create new account' },
     ]),
     { path: '/courses', icon: FaBookOpen, label: 'All Courses', description: 'Browse our catalog' },
-    { path: '/chat', icon: FaBrain, label: 'AI Assistant', description: 'Get instant help' },
+    { path: '/chat', icon: FaBook, label: 'Course Creator', description: 'Create your courses' },
     { path: '/help', icon: FaQuestionCircle, label: 'Help & Support', description: 'Get assistance' },
     { path: '/contact', icon: FaPhone, label: 'Contact Us', description: 'Get in touch' },
   ];

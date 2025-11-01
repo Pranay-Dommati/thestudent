@@ -54,7 +54,7 @@ const NotFound = () => {
               <div className="flex items-center space-x-8">
                 <Link to="/" className="font-medium transition-colors text-white hover:text-blue-200">Home</Link>
                 <Link to="/courses" className="font-medium transition-colors text-white hover:text-blue-200">Courses</Link>
-                <Link to="/chat" className="font-medium transition-colors text-white hover:text-blue-200">AI Chatbot</Link>
+                <Link to="/chat" className="font-medium transition-colors text-white hover:text-blue-200">Course Creator</Link>
                 {isLoggedIn && (
                   <Link to="/learning-hub" className="font-medium transition-colors text-white hover:text-blue-200">Learning Hub</Link>
                 )}

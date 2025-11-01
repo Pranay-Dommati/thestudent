@@ -28,7 +28,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
       // Create readable names for common segments
       let name = segment.charAt(0).toUpperCase() + segment.slice(1);
       if (segment === 'learning-hub') name = 'Learning Hub';
-      if (segment === 'chat') name = 'AI Chatbot';
+      if (segment === 'chat') name = 'Course Creator';
       if (segment === 'courses') name = 'Courses';
       if (segment === 'pro-learning') name = 'Pro Learning';
       if (segment === 'auth') name = 'Authentication';
@@ -195,7 +195,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                   to="/chat" 
                   className={`font-medium transition-colors ${textColor}`}
                 >
-                  AI Chatbot
+                  Course Creator
                 </Link>
               </div>
             </div>
