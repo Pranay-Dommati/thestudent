@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaGoogle, FaGraduationCap, FaRegUser, FaRegEnvelope, FaLock } from "react-icons/fa";
+import { FaGoogle, FaGraduationCap, FaRegUser, FaRegEnvelope, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import universalToast from '../../utils/universalToast';
 import { useAuth } from '../../context/AuthContext';
@@ -41,6 +41,9 @@ export default function AuthForm() {
   const [formErrors, setFormErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [otpOpen, setOtpOpen] = useState(false);
+  const [touched, setTouched] = useState({ name: false, email: false, password: false, confirmPassword: false });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const toggleForm = () => {
     const newMode = !isSignUp;
@@ -64,10 +67,14 @@ export default function AuthForm() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [name]: value,
-    });
+    }));
+    // Mark field as touched on first change
+    setTouched((prev) => (prev[name] ? prev : { ...prev, [name]: true }));
+    // Live validate the changed field
+    runLiveValidation(name, value);
   };
 
   const { register, login, googleLogin, validateAuth } = useAuth();
@@ -154,6 +161,57 @@ export default function AuthForm() {
     }
 
     return errors;
+  };
+
+  // Live validation for individual fields
+  const runLiveValidation = (field, value) => {
+    setFormErrors((prev) => {
+      const next = { ...prev };
+      const v = value;
+
+      const setOrClear = (key, message) => {
+        if (message) next[key] = message; else delete next[key];
+      };
+
+      if (field === 'name' && isSignUp && touched.name) {
+        setOrClear('name', !v ? 'Full name is required' : v.length < 2 ? 'Please provide your full name' : '');
+      }
+
+      if (field === 'email' && touched.email) {
+        const emailErr = !v
+          ? 'Email is required'
+          : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+          ? ''
+          : 'Invalid email format';
+        setOrClear('email', emailErr);
+      }
+
+      if (field === 'password' && touched.password) {
+        let msg = '';
+        if (!v) msg = 'Password is required';
+        else if (isSignUp) {
+          if (v.length < 8) msg = 'Password must be at least 8 characters';
+          else if (!/(?=.*[a-z])/.test(v)) msg = 'Password must contain at least one lowercase letter';
+          else if (!/(?=.*[A-Z])/.test(v)) msg = 'Password must contain at least one uppercase letter';
+          else if (!/(?=.*\d)/.test(v)) msg = 'Password must contain at least one number';
+        } else if (v.length < 6) {
+          msg = 'Password must be at least 6 characters';
+        }
+        setOrClear('password', msg);
+        // Also update confirm password match if user already typed it
+        if (touched.confirmPassword) {
+          const cpMsg = isSignUp && formData.confirmPassword && v !== formData.confirmPassword ? 'Passwords do not match' : '';
+          setOrClear('confirmPassword', cpMsg);
+        }
+      }
+
+      if (field === 'confirmPassword' && isSignUp && touched.confirmPassword) {
+        const cpMsg = !v ? 'Please confirm your password' : v !== formData.password ? 'Passwords do not match' : '';
+        setOrClear('confirmPassword', cpMsg);
+      }
+
+      return next;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -557,20 +615,29 @@ export default function AuthForm() {
                   {/* Password Field */}
                   <div className="space-y-2">
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-4 pointer-events-none text-gray-400">
                         <FaLock />
                       </div>
                       <input 
-                        className={`w-full p-4 pl-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
+                        className={`w-full p-4 pl-12 pr-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
                           formErrors.password ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
                         }`} 
-                        type="password" 
+                        type={showPassword ? 'text' : 'password'} 
                         name="password"
                         placeholder="Password" 
                         value={formData.password}
                         onChange={handleChange}
+                        onBlur={() => setTouched((t) => ({ ...t, password: true }))}
                         autoComplete={isSignUp ? 'new-password' : 'current-password'}
                       />
+                      <button
+                        type="button"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowPassword((s) => !s)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
                     </div>
                     
                     {/* Password Requirements Indicator - Only show for signup when user starts typing */}
@@ -622,20 +689,29 @@ export default function AuthForm() {
                         transition={{ duration: 0.25, ease: [0.4, 0.0, 0.2, 1] }}
                       >
                         <div className="relative">
-                          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-4 pointer-events-none text-gray-400">
                             <FaLock />
                           </div>
                           <input 
-                            className={`w-full p-4 pl-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
+                            className={`w-full p-4 pl-12 pr-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
                               formErrors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
                             }`} 
-                            type="password" 
+                            type={showConfirmPassword ? 'text' : 'password'} 
                             name="confirmPassword"
                             placeholder="Confirm Password" 
                             value={formData.confirmPassword}
                             onChange={handleChange}
+                            onBlur={() => setTouched((t) => ({ ...t, confirmPassword: true }))}
                             autoComplete={isSignUp ? 'new-password' : 'off'}
                           />
+                          <button
+                            type="button"
+                            aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                            onClick={() => setShowConfirmPassword((s) => !s)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          >
+                            {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                          </button>
                           {formErrors.confirmPassword && <p className="text-red-500 text-sm mt-2">{formErrors.confirmPassword}</p>}
                         </div>
 
@@ -854,20 +930,29 @@ export default function AuthForm() {
                     </div>
                     
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-3 pointer-events-none text-gray-400">
                         <FaLock />
                       </div>
                       <input 
-                        className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                        className={`w-full p-3 pl-10 pr-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
                           formErrors.password ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
                         }`} 
-                        type="password" 
+                        type={showPassword ? 'text' : 'password'} 
                         name="password"
                         placeholder="Password" 
                         value={formData.password}
                         onChange={handleChange}
+                        onBlur={() => setTouched((t) => ({ ...t, password: true }))}
                         autoComplete={isSignUp ? 'new-password' : 'current-password'}
                       />
+                      <button
+                        type="button"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowPassword((s) => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
                       {formErrors.password && <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>}
                     </div>
 
@@ -892,20 +977,29 @@ export default function AuthForm() {
                           transition={{ duration: 0.25 }}
                         >
                           <div className="relative">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-3 pointer-events-none text-gray-400">
                               <FaLock />
                             </div>
                             <input 
-                              className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                              className={`w-full p-3 pl-10 pr-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
                                 formErrors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
                               }`} 
-                              type="password" 
+                              type={showConfirmPassword ? 'text' : 'password'} 
                               name="confirmPassword"
                               placeholder="Confirm Password" 
                               value={formData.confirmPassword}
                               onChange={handleChange}
+                              onBlur={() => setTouched((t) => ({ ...t, confirmPassword: true }))}
                               autoComplete={isSignUp ? 'new-password' : 'off'}
                             />
+                            <button
+                              type="button"
+                              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                              onClick={() => setShowConfirmPassword((s) => !s)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                              {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                            </button>
                             {formErrors.confirmPassword && <p className="text-red-500 text-xs mt-1">{formErrors.confirmPassword}</p>}
                           </div>
 
