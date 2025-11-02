@@ -45,7 +45,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const videoRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, validateAuth } = useAuth();
 
   // **HELPER FUNCTION: Update course with progress data**
   const updateCourseWithProgress = (courseData, progressData) => {
@@ -315,8 +315,14 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           setExpandedChapters({ 0: true });
         }
         
-        // **OPTIMIZATION 3: Fetch progress in parallel (if user is logged in)**
-        if (isLoggedIn && transformedCourse.id) {
+        // **OPTIMIZATION 3: Fetch progress once auth is definitely valid (fixes first-load 401)**
+        // We explicitly validate auth so the very first request after login has fresh tokens.
+        const canFetchProgress = transformedCourse.id && (await (async () => {
+          if (!isLoggedIn) return false;
+          try { await validateAuth(); return true; } catch { return false; }
+        })());
+
+        if (canFetchProgress) {
           try {
             const progressResponse = await axiosInstance.get(`/courses/progress/${transformedCourse.id}/`);
             setCourseProgress(progressResponse.data);
@@ -382,7 +388,10 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   useEffect(() => {
     // Only fetch progress if the user is logged in and we have a course
     const fetchUserProgress = async () => {
-      if (!isLoggedIn || !course || !course.id) return;
+      if (!course || !course.id) return;
+      // Ensure we really are authenticated before calling protected endpoints
+      if (!isLoggedIn) return;
+      try { await validateAuth(); } catch { return; }
       
       try {        // Call the backend API to get the user's progress for this course
         const response = await axiosInstance.get(`/courses/progress/${course.id}/`);

@@ -25,7 +25,7 @@ const CourseDetails = () => {
   const [isStarting, setIsStarting] = useState(false);
   const { courseId } = useParams();
   const navigate = useNavigate();
-  const { isLoggedIn } = useAuth(); // Get authentication state
+  const { isLoggedIn, validateAuth } = useAuth(); // Get authentication state and validator
 
   useEffect(() => {
     const fetchCourseDetails = async () => {
@@ -128,6 +128,10 @@ const CourseDetails = () => {
     }
 
     try {
+      // Ensure a fresh access token before first enrollment attempt (prevents initial 401)
+      if (isLoggedIn) {
+        try { await validateAuth(); } catch {}
+      }
       setIsStarting(true);
       const enrollmentData = {
         course_type: 'engineering',
