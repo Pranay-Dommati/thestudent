@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import logger from '../../utils/logger';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FaChevronLeft, FaChevronRight, FaList, FaTimes, FaPlay, FaCheck, FaBook, FaQuestionCircle, FaDownload, FaGlobe, FaArrowLeft } from 'react-icons/fa';
+import { FaChevronLeft, FaChevronRight, FaList, FaTimes, FaPlay, FaCheck, FaBook, FaQuestionCircle, FaDownload, FaGlobe, FaArrowLeft, FaLock } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -45,11 +45,17 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       try {
         setLoading(true);
         
-        // Check cache first for instant load
-  const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+        // Check cache first for instant load, but don't serve guest-locked cache to logged-in users
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         const cachedData = courseCache.get(cacheKey);
-        
-        if (cachedData) {
+        const cachedHasLocks = !!(cachedData?.course?.chapters || []).some(ch => {
+          const chapterLocked = !!ch.isLocked;
+          const anyLessonLocked = !!(ch.lessons || []).some(l => !!l.isLocked);
+          return chapterLocked || anyLessonLocked;
+        });
+        const canUseCache = !!cachedData && (!isLoggedIn || !cachedHasLocks);
+
+        if (canUseCache) {
           console.log('⚡ Mobile: Loading course from cache - instant load!');
           setCourse(cachedData.course);
           if (cachedData.progress) {
@@ -196,6 +202,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           chapters: courseData.chapters
             ? courseData.chapters.map((chapter) => ({
                 title: chapter.name,
+                isLocked: !!(chapter.is_locked || chapter.isLocked),
                 lessons: chapter.lessons.map((lesson) => ({
                   id: lesson.id,
                   title: lesson.title,
@@ -208,10 +215,12 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                   quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
                   quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
                   resources: lesson.resources || { downloadable: [], internet: [] },
+                  isLocked: !!(lesson.is_locked || lesson.isLocked),
                 })),
               }))
             : courseData.sections.map((section) => ({
                 title: section.name,
+                isLocked: !!(section.is_locked || section.isLocked),
                 lessons: section.lessons.map((lesson) => ({
                   id: lesson.id,
                   title: lesson.title,
@@ -224,6 +233,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                   quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
                   quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
                   resources: lesson.resources || { downloadable: [], internet: [] },
+                  isLocked: !!(lesson.is_locked || lesson.isLocked),
                 })),
               })),
         };
@@ -313,9 +323,15 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
   // Navigation helpers
   const handleLessonClick = (chapterIndex, lessonIndex) => {
+    const lesson = course.chapters[chapterIndex]?.lessons[lessonIndex];
+    // Block navigation to locked lessons for guests
+    if (lesson?.isLocked && !isLoggedIn) {
+      universalToast.info('Log in to access this lesson');
+      return;
+    }
+
     setActiveChapter(chapterIndex);
     setActiveLesson(lessonIndex);
-    const lesson = course.chapters[chapterIndex]?.lessons[lessonIndex];
     
     if (lesson?.type === 'quiz') {
       setContentType('quiz');
@@ -378,6 +394,10 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
     const lesson = course.chapters[chapterIndex]?.lessons[lessonIndex];
     if (!lesson) return;
+    if (lesson.isLocked) {
+      universalToast.info('This lesson is locked');
+      return;
+    }
 
     // Store previous state for potential rollback
     const prevCourse = course;
@@ -492,6 +512,26 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               Browse Courses
             </button>
           </div>
+        </div>
+      );
+    }
+
+    // For guests, show lock overlay instead of content for locked lessons
+    if (currentLesson?.isLocked && !isLoggedIn) {
+      const returnTo = encodeURIComponent((location?.pathname || '') + (location?.search || ''));
+      return (
+        <div className="p-6 flex flex-col items-center justify-center text-center">
+          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+            <FaLock className="w-7 h-7 text-gray-500" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">This lesson is locked</h2>
+          <p className="text-sm text-gray-600 mb-4">Log in to access the full course content.</p>
+          <button
+            onClick={() => navigate(`/auth?returnTo=${returnTo}`)}
+            className="px-4 py-2 rounded-md bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors"
+          >
+            Log in
+          </button>
         </div>
       );
     }
@@ -796,6 +836,24 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               </div>
             </div>
             
+            {/* Guest CTA */}
+            {!isLoggedIn && (
+              <div className="px-4 py-3 border-b border-gray-100">
+                <div className="p-3 rounded-lg border border-gray-200 bg-white text-center">
+                  <p className="text-sm text-gray-700 mb-2">Log in to access all lessons</p>
+                  <button
+                    onClick={() => {
+                      const returnTo = encodeURIComponent((location?.pathname || '') + (location?.search || ''));
+                      navigate(`/auth?returnTo=${returnTo}`);
+                    }}
+                    className="inline-flex items-center justify-center px-3 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    Log in
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Course chapters list */}
             <div className="overflow-y-auto h-full pb-48">
               {course?.chapters?.length === 0 && (
@@ -829,8 +887,11 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
-                          {chapter.title}
+                        <h3 className="font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors flex items-center">
+                          <span className="truncate">{chapter.title}</span>
+                          {chapter.isLocked && (
+                            <FaLock className="w-3.5 h-3.5 text-gray-400 ml-2 flex-shrink-0" title="Chapter locked" />
+                          )}
                         </h3>
                         <p className="text-xs text-gray-500 mt-0.5">
                           {chapter.lessons.length} lesson{chapter.lessons.length !== 1 ? 's' : ''}
@@ -867,7 +928,8 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                             activeChapter === chapterIndex && activeLesson === lessonIndex
                               ? 'bg-indigo-50 border-r-4 border-indigo-500'
                               : ''
-                          }`}
+                          } ${lesson.isLocked && !isLoggedIn ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          aria-disabled={lesson.isLocked && !isLoggedIn}
                           onClick={() => handleLessonClick(chapterIndex, lessonIndex)}
                         >
                           <div className="flex items-center flex-1 min-w-0">
@@ -907,6 +969,9 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                             </div>
                           </div>
                           <div className="flex items-center ml-2">
+                            {lesson.isLocked && (
+                              <FaLock className="w-3.5 h-3.5 text-gray-400 mr-2" title="Lesson locked" />
+                            )}
                             {activeChapter === chapterIndex && activeLesson === lessonIndex && (
                               <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
                             )}

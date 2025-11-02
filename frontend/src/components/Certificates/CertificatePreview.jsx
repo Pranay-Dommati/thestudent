@@ -341,10 +341,11 @@ const CertificatePreview = () => {
                     
                     try {
                       toast.loading('Starting download...');
-                      
-                      // Fetch the PDF
-                      const response = await fetch(certificate.download_url);
-                      const blob = await response.blob();
+                      // Authenticated download via axios to include JWT
+                      const res = await axiosInstance.get(certificate.download_url.replace('/api', ''), {
+                        responseType: 'blob'
+                      });
+                      const blob = res.data;
                       
                       // Create a download link
                       const url = window.URL.createObjectURL(blob);
@@ -480,9 +481,10 @@ const CertificatePreview = () => {
                           e.stopPropagation();
                           try {
                             toast.loading('Preparing download...');
-                            const res = await fetch(certificate.download_url);
-                            if (!res.ok) throw new Error('Network response was not ok');
-                            const blob = await res.blob();
+                            const res = await axiosInstance.get(certificate.download_url.replace('/api', ''), {
+                              responseType: 'blob'
+                            });
+                            const blob = res.data;
                             const url = window.URL.createObjectURL(blob);
                             const a = document.createElement('a');
                             a.href = url;

@@ -78,11 +78,17 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       try {
         setLoading(true);
         
-        // **OPTIMIZATION 1: Check cache first**
-  const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+        // **OPTIMIZATION 1: Check cache first (but avoid serving guest-locked cache to logged-in users)**
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         const cachedData = courseCache.get(cacheKey);
-        
-        if (cachedData) {
+        const cachedHasLocks = !!(cachedData?.course?.chapters || []).some(ch => {
+          const chapterLocked = !!ch.isLocked;
+          const anyLessonLocked = !!(ch.lessons || []).some(l => !!l.isLocked);
+          return chapterLocked || anyLessonLocked;
+        });
+        const canUseCache = !!cachedData && (!isLoggedIn || !cachedHasLocks);
+
+        if (canUseCache) {
           console.log('⚡ Loading course from cache - instant load!');
           setCourse(cachedData.course);
           if (cachedData.progress) {

@@ -61,102 +61,64 @@ const ResourcesPage = ({ lessonResources }) => {
       
       // For resources with download_url (backend files), use the API endpoint
       if (resource.download_url && resource.download_url.startsWith('/api/resources/download/')) {
-        // Use relative URL so Vite proxy handles it in dev
-        const response = await fetch(resource.download_url);
-        
-        if (!response.ok) {
-          throw new Error('Failed to download file');
-        }
-        
-        // Get the file content as blob
-        const blob = await response.blob();
-        
-        // Create a temporary URL for the blob
+        // Use authenticated request so JWT Authorization header is sent
+        const axios = (await import('../../../utils/axios')).default;
+        // axios baseURL already includes '/api', so strip leading '/api' if present
+        const urlPath = resource.download_url.startsWith('/api')
+          ? resource.download_url.replace('/api', '')
+          : resource.download_url;
+        const response = await axios.get(urlPath, { responseType: 'blob' });
+        const blob = response.data;
         const url = window.URL.createObjectURL(blob);
-        
-        // Create a temporary anchor element for download
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        
-        // Extract filename from Content-Disposition header or use resource title
         let filename = resource.title || 'download';
-        const contentDisposition = response.headers.get('content-disposition');
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-          if (filenameMatch) {
-            filename = filenameMatch[1];
-          }
+        const cd = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+        if (cd) {
+          const m = String(cd).match(/filename="(.+)"/);
+          if (m && m[1]) filename = m[1];
         } else {
-          // Add appropriate extension based on content type
-          const contentType = response.headers.get('content-type') || '';
-          if (contentType.includes('pdf') && !filename.endsWith('.pdf')) {
-            filename += '.pdf';
-          } else if (contentType.includes('image/jpeg') && !filename.endsWith('.jpg')) {
-            filename += '.jpg';
-          } else if (contentType.includes('image/png') && !filename.endsWith('.png')) {
-            filename += '.png';
-          } else if (contentType.includes('word') && !filename.endsWith('.docx')) {
-            filename += '.docx';
+          const ctype = response.headers['content-type'] || response.headers['Content-Type'] || '';
+          if (typeof ctype === 'string') {
+            if (ctype.includes('pdf') && !filename.endsWith('.pdf')) filename += '.pdf';
+            else if (ctype.includes('image/jpeg') && !filename.endsWith('.jpg')) filename += '.jpg';
+            else if (ctype.includes('image/png') && !filename.endsWith('.png')) filename += '.png';
+            else if (ctype.includes('word') && !filename.endsWith('.docx')) filename += '.docx';
           }
         }
-        
         a.download = filename;
-        
-        // Append to body, click, and remove
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        
-        // Clean up the URL
         window.URL.revokeObjectURL(url);
         
       } else {
-        // For direct URLs, try fetch first, then fallback to window.open
-        const response = await fetch(downloadUrl);
-        
-        if (!response.ok) {
-          throw new Error('Failed to download file');
-        }
-        
-        // Get the file content as blob
-        const blob = await response.blob();
-        
-        // Create a temporary URL for the blob
+        // For direct URLs, try authenticated fetch (in case the host needs headers)
+        const axios = (await import('../../../utils/axios')).default;
+        const response = await axios.get(downloadUrl, { responseType: 'blob' });
+        const blob = response.data;
         const url = window.URL.createObjectURL(blob);
-        
-        // Create a temporary anchor element for download
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        
-        // Extract filename from URL or use resource title
         let filename = resource.title;
-        const urlPath = downloadUrl.split('/').pop();
-        if (urlPath && urlPath.includes('.')) {
-          filename = urlPath;
+        const urlTail = downloadUrl.split('/').pop();
+        if (urlTail && urlTail.includes('.')) {
+          filename = urlTail;
         } else {
-          // Add appropriate extension based on content type
-          const contentType = response.headers.get('content-type') || '';
-          if (contentType.includes('pdf')) {
-            filename += '.pdf';
-          } else if (contentType.includes('image/jpeg')) {
-            filename += '.jpg';
-          } else if (contentType.includes('image/png')) {
-            filename += '.png';
-          } else if (contentType.includes('word')) {
-            filename += '.docx';
+          const ctype = response.headers['content-type'] || response.headers['Content-Type'] || '';
+          if (typeof ctype === 'string') {
+            if (ctype.includes('pdf')) filename += '.pdf';
+            else if (ctype.includes('image/jpeg')) filename += '.jpg';
+            else if (ctype.includes('image/png')) filename += '.png';
+            else if (ctype.includes('word')) filename += '.docx';
           }
         }
-        
         a.download = filename;
-        
-        // Append to body, click, and remove
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        
-        // Clean up the URL
         window.URL.revokeObjectURL(url);
       }
       

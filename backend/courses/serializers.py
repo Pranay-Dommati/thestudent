@@ -57,13 +57,31 @@ class LessonSerializer(serializers.ModelSerializer):
         }
         
         for resource in lesson_resources:
-            resource_data = {
-                'id': resource.id,
-                'name': resource.title,
-                'description': resource.description,
-                'link': resource.url if resource.url else (resource.file.url if resource.file else ''),
-                'download_url': f'/api/resources/download/{resource.id}/' if resource.file else None
-            }
+            # Never expose direct file URLs. For downloadable resources, only expose the
+            # protected download endpoint. External (internet) resources keep their URL.
+            is_file_based = bool(getattr(resource, 'file', None))
+            is_external = bool(getattr(resource, 'url', None))
+
+            if resource.type == 'downloadable':
+                resource_data = {
+                    'id': resource.id,
+                    'name': resource.title,
+                    'description': resource.description,
+                    # Intentionally do not include the raw file URL in 'link'
+                    # Frontend uses download_url for secure downloads
+                    'link': '',
+                    'download_url': f'/api/resources/download/{resource.id}/' if is_file_based else None
+                }
+            else:
+                # Internet/external resources
+                resource_data = {
+                    'id': resource.id,
+                    'name': resource.title,
+                    'description': resource.description,
+                    'link': resource.url if is_external else '',
+                    # No download endpoint for external links
+                    'download_url': None
+                }
             
             if resource.type == 'downloadable':
                 resources_data['downloadable'].append(resource_data)

@@ -34,6 +34,7 @@ from urllib.parse import quote as urlquote
 from django.db.models import Count
 from django.db.models import Q
 from django.core.files.storage import default_storage
+from django.urls import reverse
 
 # Module-level helper: build robust thumbnail URL with file-existence check and placeholder fallback
 def _build_thumbnail_url(obj_with_thumbnail, request):
@@ -488,7 +489,7 @@ def list_engineering_courses(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-@authentication_classes([])
+@authentication_classes([JWTAuthentication])
 def get_engineering_course_by_id(request, course_id):
     try:
         course = EngineeringCourse.objects.get(id=course_id)
@@ -572,7 +573,7 @@ def get_engineering_course_by_id(request, course_id):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-@authentication_classes([])
+@authentication_classes([JWTAuthentication])
 def get_school_course_by_id(request, course_id):
     try:
         course = SchoolCourse.objects.get(id=course_id)
@@ -3344,7 +3345,7 @@ def update_course(request, course_id):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-@authentication_classes([])
+@authentication_classes([JWTAuthentication])
 def get_course_by_id(request, course_id):
     """
     Get a specific course by ID (both school and engineering courses)
@@ -3423,20 +3424,33 @@ def get_course_by_id(request, course_id):
                     # Get lesson resources and group by type
                     resources = lesson.resources.all()
                     for resource in resources:
+                        # Start with common fields
                         resource_data = {
                             'id': resource.id,
                             'type': resource.type,
                             'title': resource.title,
                             'name': resource.title,  # Also include 'name' for frontend compatibility
                             'description': resource.description,
-                            'url': resource.url,
-                            'link': resource.url,  # Also include 'link' for frontend compatibility
-                            'file': resource.file.url if resource.file else None
                         }
-                        # Group by type
+                        # Security: never expose direct file URLs. For downloadable resources,
+                        # provide only the protected download endpoint. External resources keep link/url.
                         if resource.type == 'downloadable':
+                            resource_data.update({
+                                'url': '',
+                                'link': '',
+                                'file': None,
+                                'download_url': request.build_absolute_uri(
+                                    reverse('download-resource', args=[resource.id])
+                                )
+                            })
                             lesson_data['resources']['downloadable'].append(resource_data)
                         elif resource.type == 'internet':
+                            resource_data.update({
+                                'url': resource.url,
+                                'link': resource.url,
+                                'file': None,
+                                'download_url': None
+                            })
                             lesson_data['resources']['internet'].append(resource_data)
                     
                     # Get quiz questions
@@ -3524,20 +3538,33 @@ def get_course_by_id(request, course_id):
                     # Get lesson resources and group by type
                     resources = lesson.resources.all()
                     for resource in resources:
+                        # Start with common fields
                         resource_data = {
                             'id': resource.id,
                             'type': resource.type,
                             'title': resource.title,
                             'name': resource.title,  # Also include 'name' for frontend compatibility
                             'description': resource.description,
-                            'url': resource.url,
-                            'link': resource.url,  # Also include 'link' for frontend compatibility
-                            'file': resource.file.url if resource.file else None
                         }
-                        # Group by type
+                        # Security: never expose direct file URLs. For downloadable resources,
+                        # provide only the protected download endpoint. External resources keep link/url.
                         if resource.type == 'downloadable':
+                            resource_data.update({
+                                'url': '',
+                                'link': '',
+                                'file': None,
+                                'download_url': request.build_absolute_uri(
+                                    reverse('download-resource', args=[resource.id])
+                                )
+                            })
                             lesson_data['resources']['downloadable'].append(resource_data)
                         elif resource.type == 'internet':
+                            resource_data.update({
+                                'url': resource.url,
+                                'link': resource.url,
+                                'file': None,
+                                'download_url': None
+                            })
                             lesson_data['resources']['internet'].append(resource_data)
                     
                     # Get quiz questions

@@ -34,8 +34,9 @@ urlpatterns = [
 
     # Progress tracking endpoints
     path('api/courses/progress/<str:course_id>/', views.get_course_progress, name='get-course-progress'),
-    # Engineering progress (strictly engineering by ID)
-    path('api/courses/<str:course_id>/progress/', views.get_engineering_course_progress, name='get-engineering-course-progress'),
+    # Progress by course id in path (accepts both engineering and school)
+    # Previously this pointed to engineering-only and caused 404s for school courses.
+    path('api/courses/<str:course_id>/progress/', views.get_course_progress, name='get-course-progress-by-path'),
     path('api/lessons/complete/<int:lesson_id>/', views.toggle_lesson_completion, name='toggle-lesson-completion'),
     path('api/lessons/toggle-completion/<int:lesson_id>/', views.toggle_lesson_completion, name='toggle-lesson-completion'),
 
