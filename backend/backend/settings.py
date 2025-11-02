@@ -438,6 +438,15 @@ if DEBUG:
             'rest_framework.authentication.SessionAuthentication',
             'rest_framework.authentication.BasicAuthentication',
         ],
+        # Enable throttling in development to exercise limits (can be tuned via env)
+        'DEFAULT_THROTTLE_CLASSES': [
+            'rest_framework.throttling.AnonRateThrottle',
+            'rest_framework.throttling.UserRateThrottle',
+        ],
+        'DEFAULT_THROTTLE_RATES': {
+            'anon': os.environ.get('DRF_THROTTLE_RATE_ANON', '120/min'),
+            'user': os.environ.get('DRF_THROTTLE_RATE_USER', '240/min'),
+        },
     }
 else:
     # In production, avoid BasicAuth and rely on JWT (and Session if explicitly needed)
@@ -452,6 +461,15 @@ else:
         'DEFAULT_RENDERER_CLASSES': [
             'rest_framework.renderers.JSONRenderer',
         ],
+        # Global throttling for abuse resistance; tune via env
+        'DEFAULT_THROTTLE_CLASSES': [
+            'rest_framework.throttling.AnonRateThrottle',
+            'rest_framework.throttling.UserRateThrottle',
+        ],
+        'DEFAULT_THROTTLE_RATES': {
+            'anon': os.environ.get('DRF_THROTTLE_RATE_ANON', '60/min'),
+            'user': os.environ.get('DRF_THROTTLE_RATE_USER', '120/min'),
+        },
     }
 
 # CORS settings

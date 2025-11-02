@@ -473,7 +473,8 @@ def list_engineering_courses(request):
             }
             courses_data.append(course_data)
 
-        print(f"Successfully processed {len(courses_data)} courses")
+        if settings.DEBUG:
+            print(f"Successfully processed {len(courses_data)} courses")
         return Response(courses_data)
         
     except Exception as e:
@@ -697,11 +698,13 @@ def list_all_courses(request):
             }
             courses_data.append(course_data)
 
-        print(f"Successfully processed {len(courses_data)} courses")
+        if settings.DEBUG:
+            print(f"Successfully processed {len(courses_data)} courses")
         return Response(courses_data)
         
     except Exception as e:
-        print(f"Error in list_all_courses: {str(e)}")
+        if settings.DEBUG:
+            print(f"Error in list_all_courses: {str(e)}")
         import traceback
         traceback.print_exc()
         return Response(
@@ -863,7 +866,8 @@ def list_school_courses(request):
         state = request.query_params.get('state', '')
         subject = request.query_params.get('subject', '')
 
-        print(f"Filtering courses: class={class_level}, board={board}, state={state}, subject={subject}")
+        if settings.DEBUG:
+            print(f"Filtering courses: class={class_level}, board={board}, state={state}, subject={subject}")
 
         queryset = SchoolCourse.objects.all()
         
@@ -876,14 +880,16 @@ def list_school_courses(request):
 
         if subject:
             # Log the subject being searched for debugging
-            print(f"Searching for subject: '{subject}'")
+            if settings.DEBUG:
+                print(f"Searching for subject: '{subject}'")
             
             # Use iexact for case-insensitive but exact subject matching
             queryset = queryset.filter(subject__iexact=subject)
             
             # If no results with iexact, try icontains as fallback
             if queryset.count() == 0:
-                print(f"No exact matches found for subject '{subject}', trying partial match")
+                if settings.DEBUG:
+                    print(f"No exact matches found for subject '{subject}', trying partial match")
                 queryset = SchoolCourse.objects.filter(
                     class_level=class_level,
                     board__iexact=board,
@@ -894,9 +900,10 @@ def list_school_courses(request):
             # Use icontains for more flexible state matching
             queryset = queryset.filter(state__icontains=state)
 
-        print(f"Found {queryset.count()} courses matching the criteria:")
-        for course in queryset:
-            print(f"Course: {course.title}, Board: {course.board}, Class: {course.class_level}, State: {course.state}")
+        if settings.DEBUG:
+            print(f"Found {queryset.count()} courses matching the criteria:")
+            for course in queryset:
+                print(f"Course: {course.title}, Board: {course.board}, Class: {course.class_level}, State: {course.state}")
 
         # Serialize and return the courses
         courses_data = [
@@ -920,7 +927,8 @@ def list_school_courses(request):
 
         return Response(courses_data)
     except Exception as e:
-        print(f"Error in list_school_courses: {str(e)}")
+        if settings.DEBUG:
+            print(f"Error in list_school_courses: {str(e)}")
         return Response(
             {"error": "Internal server error", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -3556,7 +3564,116 @@ def get_course_by_id(request, course_id):
                     section_data['lessons'].append(lesson_data)
                 
                 course_data['sections'].append(section_data)
-        
+
+        # Apply preview gating for unauthenticated users to prevent data leakage
+        is_auth = request.user.is_authenticated if hasattr(request, 'user') else False
+        if not is_auth:
+            # Read preview limits from environment with safe defaults
+            try:
+                preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))
+            except Exception:
+                preview_limit = 2
+            try:
+                preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))
+            except Exception:
+                preview_lessons = 3
+
+            if course_type == 'school':
+                chapters = course_data.get('chapters') or []
+                gated_chapters = []
+                for c_idx, ch in enumerate(chapters):
+                    ch_copy = dict(ch)
+                    lessons = ch_copy.get('lessons') or []
+                    new_lessons = []
+                    if c_idx < preview_limit:
+                        ch_copy['is_preview'] = True
+                        ch_copy['is_locked'] = False
+                        for l_idx, l in enumerate(lessons):
+                            ld = dict(l)
+                            if l_idx < preview_lessons:
+                                ld['is_preview'] = True
+                                ld['is_locked'] = False
+                            else:
+                                ld['is_preview'] = False
+                                ld['is_locked'] = True
+                                ld['video_url'] = None
+                                ld['videoUrl'] = None
+                                ld['resources'] = {'downloadable': [], 'internet': []}
+                                ld['quiz_questions'] = []
+                                ld['quizQuestions'] = []
+                            new_lessons.append(ld)
+                        ch_copy['lessons'] = new_lessons
+                    else:
+                        ch_copy['is_preview'] = False
+                        ch_copy['is_locked'] = True
+                        scrubbed = []
+                        for l in lessons:
+                            ld = dict(l)
+                            ld['is_preview'] = False
+                            ld['is_locked'] = True
+                            ld['video_url'] = None
+                            ld['videoUrl'] = None
+                            ld['resources'] = {'downloadable': [], 'internet': []}
+                            ld['quiz_questions'] = []
+                            ld['quizQuestions'] = []
+                            scrubbed.append(ld)
+                        ch_copy['lessons'] = scrubbed
+                    gated_chapters.append(ch_copy)
+                course_data['chapters'] = gated_chapters
+                course_data['preview'] = {
+                    'sections_unlocked': min(preview_limit, len(gated_chapters)),
+                    'lessons_per_section_unlocked': preview_lessons,
+                    'message': 'Login to unlock all chapters and resources'
+                }
+            else:
+                # engineering
+                sections = course_data.get('sections') or []
+                gated_sections = []
+                for s_idx, sec in enumerate(sections):
+                    sec_copy = dict(sec)
+                    lessons = sec_copy.get('lessons') or []
+                    new_lessons = []
+                    if s_idx < preview_limit:
+                        sec_copy['is_preview'] = True
+                        sec_copy['is_locked'] = False
+                        for l_idx, l in enumerate(lessons):
+                            ld = dict(l)
+                            if l_idx < preview_lessons:
+                                ld['is_preview'] = True
+                                ld['is_locked'] = False
+                            else:
+                                ld['is_preview'] = False
+                                ld['is_locked'] = True
+                                ld['video_url'] = None
+                                ld['videoUrl'] = None
+                                ld['resources'] = {'downloadable': [], 'internet': []}
+                                ld['quiz_questions'] = []
+                                ld['quizQuestions'] = []
+                            new_lessons.append(ld)
+                        sec_copy['lessons'] = new_lessons
+                    else:
+                        sec_copy['is_preview'] = False
+                        sec_copy['is_locked'] = True
+                        scrubbed = []
+                        for l in lessons:
+                            ld = dict(l)
+                            ld['is_preview'] = False
+                            ld['is_locked'] = True
+                            ld['video_url'] = None
+                            ld['videoUrl'] = None
+                            ld['resources'] = {'downloadable': [], 'internet': []}
+                            ld['quiz_questions'] = []
+                            ld['quizQuestions'] = []
+                            scrubbed.append(ld)
+                        sec_copy['lessons'] = scrubbed
+                    gated_sections.append(sec_copy)
+                course_data['sections'] = gated_sections
+                course_data['preview'] = {
+                    'sections_unlocked': min(preview_limit, len(gated_sections)),
+                    'lessons_per_section_unlocked': preview_lessons,
+                    'message': 'Login to unlock all content, quizzes and resources'
+                }
+
         return Response(course_data, status=status.HTTP_200_OK)
         
     except Exception as e:
