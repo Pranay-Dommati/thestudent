@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { IoHelpCircle, IoSend, IoSparkles, IoClose } from 'react-icons/io5';
+import { IoHelpCircle, IoSend, IoSparkles } from 'react-icons/io5';
 import { askTutor } from '../services';
 
 const initialGreeting = `Hi, I'm Sia. Ask me anything about this reading.`;
@@ -137,36 +137,43 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
 
   const handleToggle = () => {
     const willOpen = !open;
-    setOpen(willOpen);
+    
     if (willOpen) {
-      // Begin smooth scroll immediately to the bottom of container
-      requestAnimationFrame(() => {
-        chatContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' });
-      });
+      // Open the chat immediately (button disappears, chat starts expanding)
+      setOpen(willOpen);
 
-      // Continuously ensure the input area is visible during the expand animation
-      const start = performance.now();
-      const ensureVisible = (now) => {
-        const maxDuration = 900; // stop after ~0.9s
+      // Kick off an immediate smooth scroll to the input area, then
+      // run a short rAF loop (~350ms) to keep the bottom in view while expanding
+      requestAnimationFrame(() => {
         const container = chatContainerRef.current;
         if (!container) return;
 
-        // Continuously compute where the bottom of the expanding chat sits
-        const rect = container.getBoundingClientRect();
-        const viewH = window.innerHeight || document.documentElement.clientHeight;
-        const currentBottom = rect.bottom; // distance of container bottom from viewport top
-        const margin = 12; // small breathing room
-
-        // If the bottom edge is below the viewport, nudge page scroll so the bottom is visible
-        if (currentBottom > viewH - margin) {
-          const absoluteBottom = window.scrollY + currentBottom;
-          const targetTop = absoluteBottom - (viewH - margin);
-          window.scrollTo({ top: targetTop, behavior: 'smooth' });
+        const inputArea = container.querySelector('[data-chat-input]');
+        if (inputArea) {
+          inputArea.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' });
         }
 
-        if (now - start < maxDuration) requestAnimationFrame(ensureVisible);
-      };
-      requestAnimationFrame(ensureVisible);
+        const start = performance.now();
+        const margin = 16; // breathing room at bottom
+        const ensureVisible = (now) => {
+          const c = chatContainerRef.current;
+          if (!c) return;
+          const rect = c.getBoundingClientRect();
+          const viewH = window.innerHeight || document.documentElement.clientHeight;
+
+          // If the bottom edge is below the viewport, nudge page scroll
+          if (rect.bottom > viewH - margin) {
+            const absoluteBottom = window.scrollY + rect.bottom;
+            const targetTop = absoluteBottom - (viewH - margin);
+            window.scrollTo({ top: targetTop, behavior: 'smooth' });
+          }
+          if (now - start < 380) requestAnimationFrame(ensureVisible);
+        };
+        requestAnimationFrame(ensureVisible);
+      });
+    } else {
+      // Closing - just close immediately
+      setOpen(willOpen);
     }
   };
 
@@ -226,25 +233,16 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
               className="bg-white border-2 border-gray-200 rounded-xl shadow-lg h-full flex flex-col"
               data-chat-panel
             >
-            {/* Header */}
+            {/* Header (close button removed per request) */}
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-4 border-b border-gray-200 flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                    <IoHelpCircle className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">Sia</div>
-                    <div className="text-sm text-gray-600">{topicName || 'Current Topic'}</div>
-                  </div>
+              <div className="flex items-center">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <IoHelpCircle className="w-6 h-6 text-white" />
                 </div>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
-                  title="Close chat"
-                >
-                  <IoClose className="w-5 h-5 text-gray-600" />
-                </button>
+                <div className="ml-3">
+                  <div className="font-semibold text-gray-900">Sia</div>
+                  <div className="text-sm text-gray-600">{topicName || 'Current Topic'}</div>
+                </div>
               </div>
             </div>
 
