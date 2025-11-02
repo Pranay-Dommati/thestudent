@@ -13,7 +13,9 @@ const ResponsiveCourseLearningPage = () => {
   const location = useLocation();
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
-  const { isLoggedIn } = useAuth();
+  // Avoid destructuring from null when provider hasn't mounted yet
+  const auth = useAuth();
+  const isLoggedIn = !!auth?.isLoggedIn;
 
   // Detect screen size
   useEffect(() => {
@@ -29,7 +31,7 @@ const ResponsiveCourseLearningPage = () => {
 
   // Activity tracking - Start tracking when learning
   useEffect(() => {
-    if (isLoggedIn) {
+  if (isLoggedIn) {
       console.log('🎯 Starting learning activity tracking for Course Learning page');
       startLearningTracking();
       
