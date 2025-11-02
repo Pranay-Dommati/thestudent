@@ -19,7 +19,7 @@ function extractTextFromAIResponse(result) {
   return '';
 }
 
-export async function askTutor({ readingContent, message, topic, courseId }) {
+export async function askTutor({ readingContent, message, topic, courseId, history }) {
   if (!message || typeof message !== 'string') {
     throw new Error('Message is required');
   }
@@ -31,12 +31,27 @@ export async function askTutor({ readingContent, message, topic, courseId }) {
   // Let the server enforce the tutoring rules; keep client prompt empty to avoid conflicts
   const systemPrompt = '';
 
+  // Prepare a compact chat history (last 6 turns max) to maintain context
+  let compactHistory = [];
+  try {
+    const raw = Array.isArray(history) ? history : [];
+    // Map to {role, content} and trim content length
+    const mapped = raw
+      .filter(h => h && typeof h.content === 'string' && (h.role === 'user' || h.role === 'assistant'))
+      .map(h => ({ role: h.role, content: h.content.slice(0, 1000) }));
+    // Keep only last 6 messages to limit size
+    compactHistory = mapped.slice(-6);
+  } catch (_) {
+    compactHistory = [];
+  }
+
   const payload = {
     topic: topic || null,
     course_id: courseId || null,
     message,
     reading_content: reading,
     system_prompt: systemPrompt,
+    history: compactHistory,
   };
 
   try {

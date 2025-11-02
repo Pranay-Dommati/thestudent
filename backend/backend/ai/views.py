@@ -944,6 +944,7 @@ def tutor(request):
         reading_content = (data.get('reading_content') or '').strip()
         topic = (data.get('topic') or '').strip()
         extra_system = (data.get('system_prompt') or '').strip()
+        history = data.get('history') or []
 
         if not message:
             return Response({'error': 'Message is required'}, status=400)
@@ -956,6 +957,22 @@ def tutor(request):
             reading_excerpt = reading_content[:MAX_READING_CHARS]
         else:
             reading_excerpt = reading_content or ''
+
+        # Build compact recent chat history for context (optional)
+        history_lines = []
+        try:
+            if isinstance(history, list):
+                # Keep last 6 messages, sanitize and cap each to 500 chars
+                for h in history[-6:]:
+                    role = str(h.get('role', 'user'))[:20]
+                    content = str(h.get('content', ''))[:500]
+                    if not content:
+                        continue
+                    prefix = 'User' if role == 'user' else 'Tutor'
+                    history_lines.append(f"{prefix}: {content}")
+        except Exception:
+            history_lines = []
+        history_block = ("\nRecent chat context:\n" + "\n".join(history_lines) + "\n") if history_lines else "\n"
 
         # Construct a compact, instruction-first prompt
         base_instructions = (
@@ -972,6 +989,7 @@ def tutor(request):
 
         prompt = (
             f"{base_instructions}\n{system_block}{topic_line}"
+            f"{history_block}"
             "Reading extract:\n"
             "\"\"\"\n"
             f"{reading_excerpt}\n"
