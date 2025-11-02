@@ -266,8 +266,8 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
           ref={chatContainerRef} 
           className="w-full px-0 lg:px-6 mt-8 mb-6"
         >
-          {/* Chat Panel - Always visible, fixed height */}
-          <div className="h-[600px] opacity-100">
+          {/* Chat Panel - Always visible, responsive height */}
+          <div className="h-[850px] sm:h-[900px] lg:h-[950px] opacity-100">
             <div 
               className="bg-white border-2 border-gray-200 rounded-xl shadow-lg h-full flex flex-col"
               data-chat-panel
