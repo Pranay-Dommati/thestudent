@@ -35,6 +35,7 @@ import {
   shouldRenderAsInlineCode,
   shouldRenderAsPlainText
 } from '../utils/ReadingUtils.js';
+import TextSelectionPopup from '../TutorChat/TextSelectionPopup.jsx';
 
 /**
  * TabContentRenderer - Renders all tab content for ProLearningPage
@@ -71,6 +72,49 @@ const TabContentRenderer = ({
 }) => {
   // Create ref for reading content container
   const readingContentRef = useRef(null);
+  const [selectionPopup, setSelectionPopup] = React.useState(null);
+  const [selectedText, setSelectedText] = React.useState('');
+
+  // Handle text selection in reading material
+  React.useEffect(() => {
+    const handleSelection = (e) => {
+      // Small delay to let selection stabilize
+      setTimeout(() => {
+        const selection = window.getSelection();
+        const text = selection?.toString().trim();
+        
+        if (text && text.length > 0 && readingContentRef.current?.contains(selection.anchorNode)) {
+          const range = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          
+          setSelectedText(text);
+          setSelectionPopup({
+            x: rect.left + rect.width / 2,
+            y: rect.top - 10, // Position above selection
+          });
+        } else {
+          setSelectionPopup(null);
+          setSelectedText('');
+        }
+      }, 10);
+    };
+
+    // Only use mouseup to avoid interfering with text selection
+    document.addEventListener('mouseup', handleSelection);
+    
+    return () => {
+      document.removeEventListener('mouseup', handleSelection);
+    };
+  }, []);
+
+  const handleAskSia = () => {
+    if (selectedText && onTextSelection) {
+      onTextSelection(selectedText);
+      setSelectionPopup(null);
+      setSelectedText('');
+      // Don't clear the browser selection - let it persist
+    }
+  };
 
   switch (activeTab) {
     case "reading":
@@ -84,6 +128,9 @@ const TabContentRenderer = ({
       
       return (
         <div className="max-w-none pt-6">
+          {/* Text Selection Popup */}
+          <TextSelectionPopup position={selectionPopup} onAskSia={handleAskSia} />
+          
           {/* Compact Reading Header */}
           <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-xl p-4 mb-6 shadow-sm">
             <div className="flex items-center justify-between">
@@ -133,6 +180,7 @@ const TabContentRenderer = ({
                 );
               }
               return (
+              <div ref={readingContentRef}>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
                 rehypePlugins={[rehypeKatex]}
@@ -341,6 +389,7 @@ const TabContentRenderer = ({
               >
                 {displayReading}
               </ReactMarkdown>
+              </div>
               );
             })()}
           </div>

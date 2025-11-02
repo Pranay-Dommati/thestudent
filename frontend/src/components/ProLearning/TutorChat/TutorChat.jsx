@@ -17,18 +17,53 @@ const initialGreeting = `Hi, I'm Sia. Ask me anything about this reading.`;
  * - courseId: string
  * - sidebarVisible: boolean (optional)
  */
-export default function TutorChat({ readingContent, topicName, courseId, sidebarVisible = false }) {
+const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisible = false }, ref) => {
   const [open, setOpen] = useState(true); // Show chat by default
   const [showFloatingButton, setShowFloatingButton] = useState(false); // Hide button initially
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [selectedContext, setSelectedContext] = useState('');
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
+  const inputRef = useRef(null);
   const [messages, setMessages] = useState(() => [
     { role: 'assistant', content: initialGreeting }
   ]);
   const [expanded, setExpanded] = useState(() => new Set());
+
+  // Expose method to parent component for text selection
+  useImperativeHandle(ref, () => ({
+    handleSelectedText: (text) => {
+      if (text) {
+        setSelectedContext(text);
+        setInput(`About this text: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"\n\n`);
+        
+        // Focus input after a brief delay
+        setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.setSelectionRange(inputRef.current.value.length, inputRef.current.value.length);
+          }
+        }, 100);
+        
+        // Scroll to chat
+        setTimeout(() => {
+          const container = chatContainerRef.current;
+          if (container) {
+            const inputArea = container.querySelector('[data-chat-input]');
+            if (inputArea) {
+              inputArea.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'end',
+                inline: 'nearest'
+              });
+            }
+          }
+        }, 150);
+      }
+    }
+  }), []);
 
   const canChat = useMemo(() => typeof readingContent === 'string' && readingContent.trim().length > 0, [readingContent]);
 
@@ -138,6 +173,11 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
     setError('');
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setBusy(true);
+    
+    // Clear selected context after sending
+    const contextToSend = selectedContext;
+    setSelectedContext('');
+    
     try {
       const reply = await askTutor({
         readingContent,
@@ -145,6 +185,7 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
         topic: topicName,
         courseId,
         history: messages,
+        selectedText: contextToSend
       });
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch (e) {
@@ -187,23 +228,29 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
             scroll-behavior: auto;
           }
         }
+        
+        .sia-floating-button {
+          position: fixed !important;
+          bottom: 24px !important;
+          right: 24px !important;
+          left: auto !important;
+          top: auto !important;
+          transform: none !important;
+          margin: 0 !important;
+          z-index: 9999 !important;
+        }
       `}</style>
 
-      {/* Floating Button - Only show when chat is off-screen */}
+      {/* Floating Button - Only show when chat is off-screen - FIXED POSITION FROM VIEWPORT */}
       {showFloatingButton && (
         <button
           onClick={handleToggle}
           disabled={!canChat}
-          style={{
-            bottom: '1.5rem',
-            right: sidebarVisible ? '1.5rem' : '1.5rem',
-            transition: 'right 300ms ease-in-out, transform 300ms ease-in-out'
-          }}
-          className={`fixed z-50 flex items-center rounded-full shadow-2xl transition-all duration-300 gap-2 px-3 lg:gap-3 lg:px-5 py-3 ${
+          className={`sia-floating-button flex items-center rounded-full shadow-2xl gap-2 px-3 lg:gap-3 lg:px-5 py-3 ${
             canChat
               ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white hover:scale-110 hover:shadow-blue-500/50'
               : 'bg-gray-400 cursor-not-allowed text-white'
-          } ${sidebarVisible ? 'lg:translate-x-[-400px]' : ''}`}
+          }`}
           title="Scroll to Sia"
         >
           <IoSparkles className="text-xl" />
@@ -339,6 +386,7 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
               <div className="flex items-end gap-3">
                 <div className="flex-1">
                   <textarea
+                    ref={inputRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => { 
@@ -387,4 +435,8 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
       </div>
     </>
   );
-}
+});
+
+TutorChat.displayName = 'TutorChat';
+
+export default TutorChat;

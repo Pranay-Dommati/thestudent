@@ -19,7 +19,7 @@ function extractTextFromAIResponse(result) {
   return '';
 }
 
-export async function askTutor({ readingContent, message, topic, courseId, history }) {
+export async function askTutor({ readingContent, message, topic, courseId, history, selectedText }) {
   if (!message || typeof message !== 'string') {
     throw new Error('Message is required');
   }
@@ -52,6 +52,7 @@ export async function askTutor({ readingContent, message, topic, courseId, histo
     reading_content: reading,
     system_prompt: systemPrompt,
     history: compactHistory,
+    selected_text: selectedText || null
   };
 
   try {
