@@ -422,8 +422,8 @@ const SchoolCourseDetails = () => {
           universalToast.success('Welcome back! Continuing your learning journey.', { id: 'start-learning' });
         }
         
-        // Navigate to the learning page
-        navigate(`${location.pathname}/learning`);
+        // Navigate to the learning page and PRESERVE query params (keeps ?courseId=... for ID-based fetch)
+        navigate({ pathname: `${location.pathname}/learning`, search: location.search });
       }
     } catch (error) {
       logger.error('Error enrolling in course:', error);

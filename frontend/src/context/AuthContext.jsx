@@ -70,19 +70,26 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      // First try with current access token
+      // First try with current access token using bare axios (avoid interceptor auto-refresh)
       try {
-        const response = await axiosInstance.get('/auth/profile/');
+        const profileUrl = `${axiosInstance.defaults.baseURL}/auth/profile/`;
+        const response = await axios.get(profileUrl, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         setUser(response.data);
         setIsLoggedIn(true);
         setLastChecked(now);
         return true;
       } catch (error) {
         if (error.response?.status === 401) {
-          // Token expired, try to refresh
+          // Token expired, try to refresh explicitly
           await refreshAccessToken();
-          // Retry with new token
-          const retryResponse = await axiosInstance.get('/auth/profile/');
+          // Retry with new token (again with bare axios to keep control)
+          const newToken = storage.getItem('accessToken');
+          const profileUrl = `${axiosInstance.defaults.baseURL}/auth/profile/`;
+          const retryResponse = await axios.get(profileUrl, {
+            headers: { 'Authorization': `Bearer ${newToken}` }
+          });
           setUser(retryResponse.data);
           setIsLoggedIn(true);
           setLastChecked(now);

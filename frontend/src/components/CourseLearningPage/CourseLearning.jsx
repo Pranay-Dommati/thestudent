@@ -201,7 +201,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                 console.warn(`⚠️ Warning: State code "${stateCode}" not found in state mapping. Using raw value instead.`);
               }
               
-              apiUrl = `/courses/school/?class=${classLevel}&board=${board}&state=${stateParam}&subject=${subjectId}`;
+              // Normalize subject to lowercase to match backend filtering behavior
+              apiUrl = `/courses/school/?class=${classLevel}&board=${board}&state=${stateParam}&subject=${(subjectId || '').toLowerCase()}`;
               console.log(`🔍 Looking for state board course: class=${classLevel}, state=${stateParam}, subject=${subjectId}`);
             }
           } else {
@@ -242,6 +243,14 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             console.log("🎯 Selected course from list:", selected);
             const detailResponse = await axiosInstance.get(`/courses/school/${selected.id}/`);
             console.log("📚 Complete course details:", detailResponse.data);
+            courseData = detailResponse.data;
+          } else if (response?.data && response.data.id) {
+            // Some backends return a single course object when filters match exactly one
+            courseData = response.data;
+          } else if (response?.data && Array.isArray(response.data.results) && response.data.results.length > 0) {
+            // Support paginated format: { results: [...] }
+            const selected = response.data.results[0];
+            const detailResponse = await axiosInstance.get(`/courses/school/${selected.id}/`);
             courseData = detailResponse.data;
           } else {
             throw new Error(`No courses found for the specified criteria. Please check if the course exists.`);
@@ -309,6 +318,17 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         };
 
         setCourse(transformedCourse);
+
+        // If we loaded a school course by filters and we have its exact ID but the URL
+        // lacks ?courseId, normalize the URL to an ID-locked variant to keep future
+        // API calls ID-based and avoid ambiguity on refresh.
+        if (isSchoolCourse && transformedCourse?.id) {
+          const params = new URLSearchParams(location.search || '');
+          if (!params.get('courseId')) {
+            params.set('courseId', transformedCourse.id);
+            navigate({ pathname, search: `?${params.toString()}` }, { replace: true });
+          }
+        }
         
         // Expand the first chapter by default
         if (transformedCourse.chapters.length > 0) {
