@@ -45,7 +45,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const videoRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, validateAuth } = useAuth();
 
   // **HELPER FUNCTION: Update course with progress data**
   const updateCourseWithProgress = (courseData, progressData) => {
@@ -201,7 +201,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                 console.warn(`⚠️ Warning: State code "${stateCode}" not found in state mapping. Using raw value instead.`);
               }
               
-              apiUrl = `/courses/school/?class=${classLevel}&board=${board}&state=${stateParam}&subject=${subjectId}`;
+              // Normalize subject to lowercase to match backend filtering behavior
+              apiUrl = `/courses/school/?class=${classLevel}&board=${board}&state=${stateParam}&subject=${(subjectId || '').toLowerCase()}`;
               console.log(`🔍 Looking for state board course: class=${classLevel}, state=${stateParam}, subject=${subjectId}`);
             }
           } else {
@@ -242,6 +243,14 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             console.log("🎯 Selected course from list:", selected);
             const detailResponse = await axiosInstance.get(`/courses/school/${selected.id}/`);
             console.log("📚 Complete course details:", detailResponse.data);
+            courseData = detailResponse.data;
+          } else if (response?.data && response.data.id) {
+            // Some backends return a single course object when filters match exactly one
+            courseData = response.data;
+          } else if (response?.data && Array.isArray(response.data.results) && response.data.results.length > 0) {
+            // Support paginated format: { results: [...] }
+            const selected = response.data.results[0];
+            const detailResponse = await axiosInstance.get(`/courses/school/${selected.id}/`);
             courseData = detailResponse.data;
           } else {
             throw new Error(`No courses found for the specified criteria. Please check if the course exists.`);
@@ -309,14 +318,31 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         };
 
         setCourse(transformedCourse);
+
+        // If we loaded a school course by filters and we have its exact ID but the URL
+        // lacks ?courseId, normalize the URL to an ID-locked variant to keep future
+        // API calls ID-based and avoid ambiguity on refresh.
+        if (isSchoolCourse && transformedCourse?.id) {
+          const params = new URLSearchParams(location.search || '');
+          if (!params.get('courseId')) {
+            params.set('courseId', transformedCourse.id);
+            navigate({ pathname, search: `?${params.toString()}` }, { replace: true });
+          }
+        }
         
         // Expand the first chapter by default
         if (transformedCourse.chapters.length > 0) {
           setExpandedChapters({ 0: true });
         }
         
-        // **OPTIMIZATION 3: Fetch progress in parallel (if user is logged in)**
-        if (isLoggedIn && transformedCourse.id) {
+        // **OPTIMIZATION 3: Fetch progress once auth is definitely valid (fixes first-load 401)**
+        // We explicitly validate auth so the very first request after login has fresh tokens.
+        const canFetchProgress = transformedCourse.id && (await (async () => {
+          if (!isLoggedIn) return false;
+          try { await validateAuth(); return true; } catch { return false; }
+        })());
+
+        if (canFetchProgress) {
           try {
             const progressResponse = await axiosInstance.get(`/courses/progress/${transformedCourse.id}/`);
             setCourseProgress(progressResponse.data);
@@ -382,7 +408,10 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   useEffect(() => {
     // Only fetch progress if the user is logged in and we have a course
     const fetchUserProgress = async () => {
-      if (!isLoggedIn || !course || !course.id) return;
+      if (!course || !course.id) return;
+      // Ensure we really are authenticated before calling protected endpoints
+      if (!isLoggedIn) return;
+      try { await validateAuth(); } catch { return; }
       
       try {        // Call the backend API to get the user's progress for this course
         const response = await axiosInstance.get(`/courses/progress/${course.id}/`);

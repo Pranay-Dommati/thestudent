@@ -26,7 +26,7 @@ const SchoolCourseDetails = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { boardId, stateId, subjectId } = useParams();
-  const { isLoggedIn } = useAuth(); // Get authentication state
+  const { isLoggedIn, validateAuth } = useAuth(); // Get authentication state and validator
 
   // Define subject icons mapping
   const SUBJECT_ICONS = {
@@ -375,6 +375,10 @@ const SchoolCourseDetails = () => {
     }
 
     try {
+      // Make sure we have a fresh access token before enrolling (prevents first-time 401)
+      if (isLoggedIn) {
+        try { await validateAuth(); } catch {}
+      }
       setIsStarting(true);
       // If user is already enrolled, navigate directly to learning page
       if (isEnrolled) {
@@ -418,8 +422,8 @@ const SchoolCourseDetails = () => {
           universalToast.success('Welcome back! Continuing your learning journey.', { id: 'start-learning' });
         }
         
-        // Navigate to the learning page
-        navigate(`${location.pathname}/learning`);
+        // Navigate to the learning page and PRESERVE query params (keeps ?courseId=... for ID-based fetch)
+        navigate({ pathname: `${location.pathname}/learning`, search: location.search });
       }
     } catch (error) {
       logger.error('Error enrolling in course:', error);

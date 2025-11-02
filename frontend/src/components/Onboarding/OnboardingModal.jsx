@@ -8,12 +8,16 @@ import '../Chatbot/welcomeCardFix.css';
 const OnboardingModal = () => {
   const [showModal, setShowModal] = useState(false);
   const [hasMarkedSeen, setHasMarkedSeen] = useState(false);
-  const { user, isLoggedIn, validateAuth } = useAuth();
+  // Be defensive: if AuthProvider hasn't mounted yet, use optional chaining
+  const auth = useAuth();
+  const user = auth?.user;
+  const isLoggedIn = !!auth?.isLoggedIn;
+  const validateAuth = auth?.validateAuth || (() => Promise.resolve());
   const navigate = useNavigate();
 
   useEffect(() => {
     // Only check when user is logged in
-    if (isLoggedIn && user) {
+  if (isLoggedIn && user) {
       // Check if user has seen onboarding from the user object
       // Also check our local flag to prevent re-showing after marking as seen
       if (!user.has_seen_onboarding && !hasMarkedSeen) {
@@ -27,13 +31,14 @@ const OnboardingModal = () => {
 
   const handleClose = async () => {
     setShowModal(false);
-    setHasMarkedSeen(true); // Immediately set local flag
+  setHasMarkedSeen(true); // Immediately set local flag
     
     // Mark onboarding as seen via API
     try {
+      // Only try to mark when we have auth context
       await apiAxios.post('/auth/onboarding/mark-seen/');
       // Re-validate auth to update user object with latest data
-      validateAuth();
+      try { await validateAuth(); } catch {}
     } catch (error) {
       console.error('Failed to mark onboarding as seen:', error);
     }
@@ -51,7 +56,8 @@ const OnboardingModal = () => {
     }
   };
 
-  if (!showModal) return null;
+  // If auth context is not ready or modal not needed, render nothing
+  if (!showModal || !auth) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 welcome-message-modal" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
