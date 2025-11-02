@@ -146,6 +146,8 @@ import { createInitializeCourseData } from './CourseInitialization.jsx';
 import { createContentLoadingEffect } from './ContentLoadingEffect.jsx';
 // Topics Initialization Effect
 import { createTopicsInitializationEffect } from './TopicsInitializationEffect.jsx';
+// Tutor Chat (Reading Assistant)
+import TutorChat from '../TutorChat/TutorChat.jsx';
 
 
 const ProLearningPage = () => {
@@ -1623,6 +1625,22 @@ const ProLearningPage = () => {
         setLoadingStep={setLoadingStep}
         courseTitle={courseTitle}
       />
+
+      {/* Reading-specific Tutor Chat: visible when Reading tab is active and reading exists */}
+      {(() => {
+        try {
+          const topicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || contentTopicName;
+          const hasReading = !!(content && contentTopicName === topicName && typeof content.reading === 'string' && content.reading.trim().length > 0);
+          const showTutor = activeTab === 'reading' && hasReading;
+          return showTutor ? (
+            <TutorChat
+              readingContent={content.reading}
+              topicName={topicName}
+              courseId={getCourseId()}
+            />
+          ) : null;
+        } catch { return null; }
+      })()}
       
       {/* Global video modal */}
       <VideoModalComponent 

@@ -29,3 +29,6 @@ export {
   filterVideosByDifficulty, 
   getVideosByTopic 
 } from './videosContentService.js';
+
+// Tutor chat service
+export { askTutor } from './tutorService.js';

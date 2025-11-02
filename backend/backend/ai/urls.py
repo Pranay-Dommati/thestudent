@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('chat/', views.chat, name='ai-chat'),
+    path('tutor/', views.tutor, name='ai-tutor'),
     path('quiz/', views.quiz, name='ai-quiz'),
     path('summary/', views.summary, name='ai-summary'),
     path('reading/', views.reading, name='ai-reading'),

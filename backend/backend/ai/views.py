@@ -924,6 +924,98 @@ def chat(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 @throttle_classes([AIChatThrottle])
+def tutor(request):
+    """Reading-aware tutor endpoint.
+    Expects JSON with:
+      - message: str (required)
+      - reading_content: str (optional but recommended)
+      - topic: str (optional)
+      - course_id: any (ignored in prompt; accepted for parity)
+      - system_prompt: str (optional; will be appended as extra guidance)
+
+    Behavior:
+      - Uses reading_content as the primary/only trusted context.
+      - If answer isn't found in reading_content, reply with uncertainty and ask one focused follow-up.
+      - Keeps answers concise (3–6 sentences) unless explicitly asked for more.
+    """
+    try:
+        data = request.data or {}
+        message = (data.get('message') or '').strip()
+        reading_content = (data.get('reading_content') or '').strip()
+        topic = (data.get('topic') or '').strip()
+        extra_system = (data.get('system_prompt') or '').strip()
+
+        if not message:
+            return Response({'error': 'Message is required'}, status=400)
+        if len(message) > 4000:
+            return Response({'error': 'Message too long'}, status=400)
+
+        # Cap reading content to a safe length to avoid oversized payloads
+        MAX_READING_CHARS = 12000
+        if reading_content and len(reading_content) > MAX_READING_CHARS:
+            reading_excerpt = reading_content[:MAX_READING_CHARS]
+        else:
+            reading_excerpt = reading_content or ''
+
+        # Construct a compact, instruction-first prompt
+        base_instructions = (
+            "You are an expert learning tutor. Prioritize the provided reading extract as your main source. "
+            "If the question goes beyond the extract, still answer concisely using widely accepted knowledge—without adding meta statements like 'beyond the reading'. "
+            "Style rules: Start with a direct one-line answer when applicable (e.g., 'Yes, because …' / 'No, because …'). Then add a brief 1–3 sentence explanation. "
+            "Formatting: Use lightweight Markdown only when it adds clarity—bullets for short lists (max 5), code blocks for code, a compact table ONLY if the user explicitly asks for 'tabulated' or 'table'. "
+            "Avoid preambles, disclaimers, citations, or links. Keep responses tight and helpful. If uncertain or implementation-specific, say so briefly and suggest what to check. "
+            "Aim for 1–5 sentences total (or a minimal code block)."
+        )
+
+        topic_line = f"\nTopic: {topic}\n" if topic else "\n"
+        system_block = (extra_system + "\n") if extra_system else ""
+
+        prompt = (
+            f"{base_instructions}\n{system_block}{topic_line}"
+            "Reading extract:\n"
+            "\"\"\"\n"
+            f"{reading_excerpt}\n"
+            "\"\"\"\n\n"
+            "User question:\n"
+            f"{message}\n\n"
+            "Answer:"
+        )
+
+        # Prefer flash family for responsiveness; fallback handled inside
+        try:
+            from .ai_service import call_gemini_flash_api
+            resp = call_gemini_flash_api(prompt)
+        except Exception:
+            resp = call_gemini_api(prompt)
+
+        # Extract text from Gemini response shape
+        text = None
+        try:
+            if isinstance(resp, dict) and resp.get('candidates'):
+                parts = resp['candidates'][0].get('content', {}).get('parts', [])
+                if parts:
+                    text = parts[0].get('text')
+        except Exception:
+            text = None
+
+        if not text:
+            return Response({'error': 'Empty AI response'}, status=502)
+
+        # Optional minimal sanitation
+        text = (text or '').strip()
+        if not text:
+            return Response({'error': 'Empty AI response'}, status=502)
+
+        return Response({'text': text})
+    except NetworkError as ne:
+        return Response({'error': str(ne)}, status=503)
+    except Exception:
+        return Response({'error': 'AI service error'}, status=502)
+
+@api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AIChatThrottle])
 def quiz(request):
     return handle_quiz(request)
 
