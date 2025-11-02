@@ -491,8 +491,78 @@ def list_engineering_courses(request):
 def get_engineering_course_by_id(request, course_id):
     try:
         course = EngineeringCourse.objects.get(id=course_id)
-        serializer = EngineeringCourseWithSectionsSerializer(course)
-        return Response(serializer.data)
+        # Include request in serializer context so lesson completion flags compute correctly
+        serializer = EngineeringCourseWithSectionsSerializer(course, context={'request': request})
+        data = serializer.data
+
+        # Preview gating for unauthenticated users
+        # Expose only first K sections, and within each of those,
+        # unlock only first L lessons (scrub the rest).
+        try:
+            preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))  # K
+        except Exception:
+            preview_limit = 2
+        try:
+            preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))  # L
+        except Exception:
+            preview_lessons = 3
+
+        is_auth = request.user.is_authenticated if hasattr(request, 'user') else False
+
+        if not is_auth:
+            sections = data.get('sections') or []
+            gated_sections = []
+            for s_idx, section in enumerate(sections):
+                sec = dict(section)
+                lessons = sec.get('lessons') or []
+                new_lessons = []
+                if s_idx < preview_limit:
+                    # First K sections: unlock only first L lessons
+                    sec['is_preview'] = True
+                    sec['is_locked'] = False
+                    for l_idx, l in enumerate(lessons):
+                        ld = dict(l)
+                        if l_idx < preview_lessons:
+                            ld['is_preview'] = True
+                            ld['is_locked'] = False
+                        else:
+                            # Scrub content for non-preview lessons in preview sections
+                            ld['is_preview'] = False
+                            ld['is_locked'] = True
+                            ld['video_url'] = None
+                            ld['resources'] = {'downloadable': [], 'internet': []}
+                            ld['quiz_questions'] = []
+                        new_lessons.append(ld)
+                    sec['lessons'] = new_lessons
+                else:
+                    # Sections beyond preview limit are fully locked
+                    sec['is_preview'] = False
+                    sec['is_locked'] = True
+                    scrubbed = []
+                    for l in lessons:
+                        ld = dict(l)
+                        ld['is_preview'] = False
+                        ld['is_locked'] = True
+                        ld['video_url'] = None
+                        ld['resources'] = {'downloadable': [], 'internet': []}
+                        ld['quiz_questions'] = []
+                        scrubbed.append(ld)
+                    sec['lessons'] = scrubbed
+                gated_sections.append(sec)
+
+            data['sections'] = gated_sections
+            data['preview'] = {
+                'sections_unlocked': min(preview_limit, len(gated_sections)),
+                'lessons_per_section_unlocked': preview_lessons,
+                'message': 'Login to unlock all content, quizzes and resources'
+            }
+        else:
+            # Provide explicit flags for UI convenience
+            for sec in data.get('sections') or []:
+                sec['is_preview'] = False
+                sec['is_locked'] = False
+
+        return Response(data)
     except EngineeringCourse.DoesNotExist:
         return Response(
             {"error": "Course not found"}, 
@@ -505,8 +575,71 @@ def get_engineering_course_by_id(request, course_id):
 def get_school_course_by_id(request, course_id):
     try:
         course = SchoolCourse.objects.get(id=course_id)
-        serializer = CourseWithChaptersSerializer(course)
-        return Response(serializer.data)
+        serializer = CourseWithChaptersSerializer(course, context={'request': request})
+        data = serializer.data
+
+        # Apply similar preview gating for school courses by chapters
+        try:
+            preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))
+        except Exception:
+            preview_limit = 2
+        try:
+            preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))
+        except Exception:
+            preview_lessons = 3
+
+        is_auth = request.user.is_authenticated if hasattr(request, 'user') else False
+
+        if not is_auth:
+            chapters = data.get('chapters') or []
+            gated_chapters = []
+            for c_idx, chapter in enumerate(chapters):
+                ch = dict(chapter)
+                lessons = ch.get('lessons') or []
+                new_lessons = []
+                if c_idx < preview_limit:
+                    ch['is_preview'] = True
+                    ch['is_locked'] = False
+                    for l_idx, l in enumerate(lessons):
+                        ld = dict(l)
+                        if l_idx < preview_lessons:
+                            ld['is_preview'] = True
+                            ld['is_locked'] = False
+                        else:
+                            ld['is_preview'] = False
+                            ld['is_locked'] = True
+                            ld['video_url'] = None
+                            ld['resources'] = {'downloadable': [], 'internet': []}
+                            ld['quiz_questions'] = []
+                        new_lessons.append(ld)
+                    ch['lessons'] = new_lessons
+                else:
+                    ch['is_preview'] = False
+                    ch['is_locked'] = True
+                    scrubbed = []
+                    for l in lessons:
+                        ld = dict(l)
+                        ld['is_preview'] = False
+                        ld['is_locked'] = True
+                        ld['video_url'] = None
+                        ld['resources'] = {'downloadable': [], 'internet': []}
+                        ld['quiz_questions'] = []
+                        scrubbed.append(ld)
+                    ch['lessons'] = scrubbed
+                gated_chapters.append(ch)
+
+            data['chapters'] = gated_chapters
+            data['preview'] = {
+                'sections_unlocked': min(preview_limit, len(gated_chapters)),
+                'lessons_per_section_unlocked': preview_lessons,
+                'message': 'Login to unlock all chapters and resources'
+            }
+        else:
+            for ch in data.get('chapters') or []:
+                ch['is_preview'] = False
+                ch['is_locked'] = False
+
+        return Response(data)
     except SchoolCourse.DoesNotExist:
         return Response(
             {"error": "Course not found"}, 

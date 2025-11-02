@@ -368,10 +368,9 @@ const SchoolCourseDetails = () => {
 
   const handleStartLearning = async () => {
     if (isStarting) return; // guard against rapid clicks
+    // Guests preview the course without enrollment
     if (!isLoggedIn) {
-      universalToast.error('Please log in to start learning', { id: 'start-learning' });
-      const returnTo = `${window.location.pathname}${window.location.search || ''}${window.location.hash || ''}`;
-      navigate(`/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`);
+      navigate({ pathname: `${location.pathname}/learning`, search: location.search });
       return;
     }
 
@@ -490,20 +489,20 @@ const SchoolCourseDetails = () => {
               >
                 <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span>
-                  {checkingEnrollment
-                    ? 'Checking...'
-                    : isStarting
-                      ? 'Starting...'
-                      : isEnrolled
-                        ? 'Continue Learning'
-                        : 'Start Learning Now'}
+                  {(!isLoggedIn) ? 'Preview Course' : (
+                    checkingEnrollment ? 'Checking...' : (
+                      isStarting ? 'Starting...' : (
+                        isEnrolled ? 'Continue Learning' : 'Start Learning Now'
+                      )
+                    )
+                  )}
                 </span>
               </button>
             </div>
 
             {/* Course Image with Elegant Frame */}
             <div className="relative mt-4 sm:mt-0">
-              <div className="relative">
+                <span>{isLoggedIn ? 'Start Learning Now' : 'Preview Course'}</span>
                 {/* Subtle Background Glow */}
                 <div className="absolute -inset-2 bg-white/10 rounded-2xl blur-sm"></div>
                 
@@ -527,7 +526,6 @@ const SchoolCourseDetails = () => {
             </div>
           </div>
         </div>
-      </div>
 
   <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-8 md:py-12 pb-16 md:pb-12">
         {/* Course Features */}

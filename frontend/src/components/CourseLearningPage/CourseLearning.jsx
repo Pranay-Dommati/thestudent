@@ -258,6 +258,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           chapters: isSchoolCourse 
             ? courseData.chapters.map((chapter) => ({
                 title: chapter.name,
+                isLocked: !!chapter.is_locked,
+                isPreview: !!chapter.is_preview,
                 lessons: chapter.lessons.map((lesson) => ({
                   id: lesson.id,
                   title: lesson.title,
@@ -267,6 +269,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                   aboutLesson: lesson.about_lesson || lesson.aboutLesson,
                   completed: lesson.completed || false,
                   isAIGenerated: false,
+                  isLocked: !!lesson.is_locked,
+                  isPreview: !!lesson.is_preview,
                   // Include quiz questions with both possible field names
                   quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
                   quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
@@ -276,6 +280,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               }))
             : courseData.sections.map((section) => ({
                 title: section.name,
+                isLocked: !!section.is_locked,
+                isPreview: !!section.is_preview,
                 lessons: section.lessons.map((lesson) => ({
                   id: lesson.id,
                   title: lesson.title,
@@ -285,6 +291,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                   aboutLesson: lesson.about_lesson || lesson.aboutLesson,
                   completed: lesson.completed || false,
                   isAIGenerated: false,
+                  isLocked: !!lesson.is_locked,
+                  isPreview: !!lesson.is_preview,
                   // Include quiz questions with both possible field names
                   quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
                   quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
@@ -677,6 +685,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     console.log('❓ Quiz questions:', lesson.quiz_questions);
     console.log('📚 About lesson:', lesson.aboutLesson);
     console.log('📂 Resources:', lesson.resources);
+    // Gate access for locked lessons when user is not logged in
+    if (!isLoggedIn && lesson.isLocked) {
+      // Soft nudge; prevent navigation
+      universalToast.info('Login to unlock this lesson');
+      return;
+    }
     
     // Only update state if we're actually changing lessons to prevent re-renders
     if (activeChapter !== chapterIndex || activeLesson !== lessonIndex) {
@@ -931,6 +945,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                 <LessonVideo 
                   videoUrl={currentLesson?.videoUrl} 
                   title={currentLesson?.title}
+                  locked={!isLoggedIn && (currentLesson?.isLocked === true)}
                 />
               </div>
                 {/* Content Tabs */}

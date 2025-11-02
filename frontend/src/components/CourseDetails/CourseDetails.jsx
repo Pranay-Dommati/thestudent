@@ -121,10 +121,9 @@ const CourseDetails = () => {
 
   const handleStartLearning = async () => {
     if (isStarting) return; // guard against double-clicks
+    // Guest users go straight to preview (no enrollment)
     if (!isLoggedIn) {
-      universalToast.error('Please log in to start learning', { id: 'start-learning' });
-      const returnTo = `${window.location.pathname}${window.location.search || ''}${window.location.hash || ''}`;
-      navigate(`/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`);
+      navigate(`/courses/engineering/${courseId}/learning`);
       return;
     }
 
@@ -217,7 +216,7 @@ const CourseDetails = () => {
                          flex items-center justify-center sm:justify-start space-x-2 transform transition hover:scale-105"
               >
                 <FaPlay className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span>Start Learning Now</span>
+                <span>{isLoggedIn ? 'Start Learning Now' : 'Preview Course'}</span>
               </button>
             </div>
 

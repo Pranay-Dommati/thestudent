@@ -6,6 +6,7 @@ import storage from '../utils/storage';
 import { courseCache } from '../utils/courseCache';
 
 const AuthContext = createContext(null);
+const IS_DEV = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV;
 
 const TOKEN_REFRESH_INTERVAL = 1000 * 60 * 4; // 4 minutes
 
@@ -20,7 +21,7 @@ export const AuthProvider = ({ children }) => {
     try {
   const refreshToken = storage.getItem('refreshToken');
       if (!refreshToken) {
-        console.error('No refresh token found');
+        if (IS_DEV) console.error('No refresh token found');
         handleAuthFailure();
         throw new Error('No refresh token');
       }
@@ -42,7 +43,7 @@ export const AuthProvider = ({ children }) => {
       }
       return false;
     } catch (error) {
-      console.error('Token refresh failed:', error);
+      if (IS_DEV) console.error('Token refresh failed:', error);
       // Clear auth on explicit invalid refresh (400/401) and also 5xx to prevent loops
       const status = error.response?.status;
       if (status === 400 || status === 401 || (typeof status === 'number' && status >= 500)) {
@@ -90,7 +91,7 @@ export const AuthProvider = ({ children }) => {
         throw error;
       }
     } catch (error) {
-      console.error('Auth validation failed:', error);
+      if (IS_DEV) console.error('Auth validation failed:', error);
       const status = error.response?.status;
       // Only log out on explicit auth failure. If network/timeout, keep tokens and try again later.
       if (status === 401) {
@@ -157,7 +158,7 @@ export const AuthProvider = ({ children }) => {
       customToast.success('Account created successfully!');
       return true;
     } catch (error) {
-      console.error('Registration error:', error.response?.data);
+      if (IS_DEV) console.error('Registration error:', error.response?.data);
       
       const errorData = error.response?.data;
       if (errorData) {
@@ -200,7 +201,7 @@ export const AuthProvider = ({ children }) => {
       customToast.success('Login successful!', { id: 'auth-login' });
       return { success: true };
     } catch (error) {
-      console.error('Login error:', error.response?.data);
+      if (IS_DEV) console.error('Login error:', error.response?.data);
       
       if (error.response?.status === 404) {
         // Email doesn't exist - suggest signup
@@ -261,7 +262,7 @@ export const AuthProvider = ({ children }) => {
       const status = error.response?.status;
       const data = error.response?.data;
       const detail = data || error.message || 'Unknown error';
-      console.error('Google login error:', { status, detail });
+      if (IS_DEV) console.error('Google login error:', { status, detail });
       
       if (error.response?.status === 400) {
         customToast.error('Google authentication failed. Please try again.', { id: 'auth-login' });

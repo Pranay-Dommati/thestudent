@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaSearch, FaChevronRight, FaChevronLeft, FaRobot, FaBook, FaCertificate, FaCheckCircle, FaDownload } from 'react-icons/fa';
+import { FaSearch, FaChevronRight, FaChevronLeft, FaRobot, FaBook, FaCertificate, FaCheckCircle, FaDownload, FaLock } from 'react-icons/fa';
 
 const Sidebar = ({ 
   isSidebarOpen, 
@@ -219,10 +219,10 @@ const Sidebar = ({
                   {chapter.lessons.map((lesson, lessonIndex) => (
                     <div
                       key={lessonIndex}
-                      className={`w-full p-3 pl-12 flex items-center text-left hover:bg-gray-50 transition-colors duration-150 ${
+                      className={`w-full p-3 pl-12 flex items-center text-left transition-colors duration-150 ${
                         activeChapter === chapterIndex && activeLesson === lessonIndex 
                           ? 'bg-indigo-50 border-l-4 border-indigo-600 pl-11' 
-                          : ''
+                          : 'hover:bg-gray-50'
                       }`}
                     >
                       {/* Clickable completion indicator - larger touch target for mobile */}
@@ -233,6 +233,7 @@ const Sidebar = ({
                         `}
                         onClick={(e) => {
                           e.stopPropagation(); // Prevent triggering the parent's onClick
+                          if (!isLoggedIn || lesson.isLocked) return; // don't allow when locked/guest
                           toggleLessonCompletion(chapterIndex, lessonIndex);
                         }}
                         role="checkbox"
@@ -242,6 +243,7 @@ const Sidebar = ({
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
+                            if (!isLoggedIn || lesson.isLocked) return;
                             toggleLessonCompletion(chapterIndex, lessonIndex);
                           }
                         }}
@@ -255,10 +257,16 @@ const Sidebar = ({
                       
                       {/* Lesson title and duration - clicking this navigates to lesson */}
                       <div 
-                        className="flex-1 flex items-center justify-between cursor-pointer min-w-0"
-                        onClick={() => handleLessonClick(chapterIndex, lessonIndex)}
+                        className={`flex-1 flex items-center justify-between min-w-0 ${lesson.isLocked && !isLoggedIn ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                        onClick={() => {
+                          if (lesson.isLocked && !isLoggedIn) return;
+                          handleLessonClick(chapterIndex, lessonIndex)
+                        }}
                       >
-                        <span className="text-sm text-gray-700 truncate pr-2">{lesson.title}</span>
+                        <span className="text-sm text-gray-700 truncate pr-2 flex items-center gap-2">
+                          {lesson.isLocked && !isLoggedIn && <FaLock className="text-gray-400 w-3.5 h-3.5" />}
+                          {lesson.title}
+                        </span>
                         {lesson.duration && <span className="text-xs text-gray-500 flex-shrink-0">{lesson.duration}</span>}
                       </div>
                     </div>
