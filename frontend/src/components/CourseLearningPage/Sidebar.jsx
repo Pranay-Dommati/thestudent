@@ -152,6 +152,31 @@ const Sidebar = ({
               )}
             </div>
           )}
+
+          {/* Preview banner for guests (minimal) */}
+          {!isLoggedIn && (
+            <div className="mt-5">
+              <div className="rounded-md border border-indigo-200 bg-indigo-50 p-3 mx-auto max-w-[360px]">
+                <div className="flex items-center gap-3 justify-center text-center">
+                  <FaLock className="w-4 h-4 text-indigo-600" />
+                  <div className="text-xs text-indigo-900/90">
+                    Log in to unlock the full course.
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-3 justify-center">
+                  <button
+                    onClick={() => {
+                      const returnTo = encodeURIComponent(window.location.pathname + window.location.search);
+                      navigate(`/auth?mode=login&returnTo=${returnTo}`);
+                    }}
+                    className="inline-flex items-center justify-center px-3 py-1.5 rounded-md bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm"
+                  >
+                    Log in
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* Course chapters list with scroll */}
@@ -162,52 +187,59 @@ const Sidebar = ({
               className="border-b border-gray-200 last:border-b-0"
               ref={(el) => (chapterRefs.current[chapterIndex] = el)}
             >
-              <button 
-                className="w-full p-4 flex justify-between items-center hover:bg-gray-50 transition-colors"
-                onClick={() => {
-                  // Toggle expand/collapse
-                  toggleChapter(chapterIndex);
-                  // After state update, scroll the expanded area into view
-                  // Use a short delay to allow DOM to render the expanded section
-                  setTimeout(() => {
-                    const container = listRef.current;
-                    const target = chapterRefs.current[chapterIndex];
-                    if (container && target) {
-                      const top = target.offsetTop;
-                      const targetHeight = target.offsetHeight || 0;
-                      const containerHeight = container.clientHeight || 0;
-                      // Try to ensure the bottom of the expanded area is visible, with some offset
-                      const desiredTop = Math.max(0, top + targetHeight - containerHeight + 80);
-                      // If content is small, still nudge a bit below the header
-                      const fallbackTop = Math.max(top - 80, 0);
-                      container.scrollTo({ top: Math.max(desiredTop, fallbackTop), behavior: 'smooth' });
-                    }
-                  }, 50);
-                }}
-              >
-                <div className="flex items-center">
-                  <span className="w-6 h-6 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs mr-3">
-                    {chapterIndex + 1}
-                  </span>
-                  <span className="font-medium">{chapter.title}</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="text-sm text-gray-500 mr-2">
-                    {chapter.lessons.filter(l => l.completed).length}/{chapter.lessons.length}
-                  </span>
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    className={`h-4 w-4 text-gray-500 transform transition-transform ${
-                      expandedChapters[chapterIndex] ? 'rotate-180' : ''
-                    }`}
-                    fill="none" 
-                    viewBox="0 0 24 24" 
-                    stroke="currentColor"
+              {(() => {
+                // Honor server-provided lock regardless of client auth state to avoid stale tokens causing mismatch
+                const chapterLocked = !!chapter.isLocked;
+                return (
+                  <button 
+                    className={`w-full p-4 flex justify-between items-center transition-colors hover:bg-gray-50`}
+                    onClick={() => {
+                      // Allow expanding even if locked so users can see lesson titles
+                      // Toggle expand/collapse
+                      toggleChapter(chapterIndex);
+                      // After state update, scroll the expanded area into view
+                      setTimeout(() => {
+                        const container = listRef.current;
+                        const target = chapterRefs.current[chapterIndex];
+                        if (container && target) {
+                          const top = target.offsetTop;
+                          const targetHeight = target.offsetHeight || 0;
+                          const containerHeight = container.clientHeight || 0;
+                          const desiredTop = Math.max(0, top + targetHeight - containerHeight + 80);
+                          const fallbackTop = Math.max(top - 80, 0);
+                          container.scrollTo({ top: Math.max(desiredTop, fallbackTop), behavior: 'smooth' });
+                        }
+                      }, 50);
+                    }}
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </button>
+                    <div className="flex items-center">
+                      <span className="w-6 h-6 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center text-xs mr-3">
+                        {chapterIndex + 1}
+                      </span>
+                      <span className="font-medium flex items-center gap-2">
+                        {chapterLocked && <FaLock className="text-gray-400 w-3.5 h-3.5" />}
+                        {chapter.title}
+                      </span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-sm text-gray-500 mr-2">
+                        {chapter.lessons.filter(l => l.completed).length}/{chapter.lessons.length}
+                      </span>
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        className={`h-4 w-4 ${chapterLocked ? 'text-gray-300' : 'text-gray-500'} transform transition-transform ${
+                          expandedChapters[chapterIndex] ? 'rotate-180' : ''
+                        }`}
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+                );
+              })()}
               
               {expandedChapters[chapterIndex] && (
                 <div>
@@ -257,14 +289,14 @@ const Sidebar = ({
                       
                       {/* Lesson title and duration - clicking this navigates to lesson */}
                       <div 
-                        className={`flex-1 flex items-center justify-between min-w-0 ${lesson.isLocked && !isLoggedIn ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                        className={`flex-1 flex items-center justify-between min-w-0 ${lesson.isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                         onClick={() => {
-                          if (lesson.isLocked && !isLoggedIn) return;
+                          if (lesson.isLocked) return;
                           handleLessonClick(chapterIndex, lessonIndex)
                         }}
                       >
                         <span className="text-sm text-gray-700 truncate pr-2 flex items-center gap-2">
-                          {lesson.isLocked && !isLoggedIn && <FaLock className="text-gray-400 w-3.5 h-3.5" />}
+                          {lesson.isLocked && <FaLock className="text-gray-400 w-3.5 h-3.5" />}
                           {lesson.title}
                         </span>
                         {lesson.duration && <span className="text-xs text-gray-500 flex-shrink-0">{lesson.duration}</span>}
