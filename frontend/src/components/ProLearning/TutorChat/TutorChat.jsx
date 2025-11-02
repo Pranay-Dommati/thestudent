@@ -20,6 +20,7 @@ export default function TutorChat({ readingContent, topicName, courseId }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const messagesEndRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(false);
   const [messages, setMessages] = useState(() => [
     { role: 'assistant', content: initialGreeting }
   ]);
@@ -32,6 +33,14 @@ export default function TutorChat({ readingContent, topicName, courseId }) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [open, messages]);
+
+  // Track mobile viewport to position the floating button above bottom bars
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // Heuristic: consider a message "long" if it exceeds thresholds
   const isLongMessage = (content, role) => {
@@ -117,15 +126,23 @@ export default function TutorChat({ readingContent, topicName, courseId }) {
   };
 
   return (
-    <div className="fixed z-[60]">
+    <div className="fixed z-[80]">
       {/* Floating Button (hidden when panel open) */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
           disabled={!canChat}
-          className={`fixed bottom-5 right-5 lg:bottom-8 lg:right-8 rounded-full shadow-lg px-4 py-3 flex items-center gap-2 transition-colors ${
+          className={`fixed rounded-full shadow-lg px-4 py-3 flex items-center gap-2 transition-colors ${
             canChat ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
+          style={{
+            // Place on bottom-right; use fixed pixel fallback plus safe-area margins for iOS/Android
+            bottom: isMobile ? '88px' : '32px',
+            right: isMobile ? '16px' : '32px',
+            marginRight: isMobile ? 'env(safe-area-inset-right)' : 0,
+            marginBottom: isMobile ? 'env(safe-area-inset-bottom)' : 0,
+            zIndex: 9999,
+          }}
           aria-label="Open tutor chat"
           title={canChat ? 'Ask the tutor about this reading' : 'Tutor available when reading content is loaded'}
         >
@@ -136,7 +153,8 @@ export default function TutorChat({ readingContent, topicName, courseId }) {
 
       {/* Panel */}
       {open && (
-        <div className="fixed bottom-0 right-0 left-0 lg:left-auto lg:w-[380px] lg:mr-8 lg:mb-8 w-full bg-white border border-gray-200 shadow-2xl rounded-t-2xl lg:rounded-2xl overflow-hidden">
+        <div className="fixed bottom-0 right-0 left-0 lg:left-auto lg:w-[380px] lg:mr-8 lg:mb-8 w-full bg-white border border-gray-200 shadow-2xl rounded-t-2xl lg:rounded-2xl overflow-hidden"
+             style={{ zIndex: 10000 }}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
             <div>

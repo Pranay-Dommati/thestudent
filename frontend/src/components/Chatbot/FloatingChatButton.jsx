@@ -18,12 +18,14 @@ const FloatingChatButton = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Don't show the button on the chat page, quiz pages, admin pages, legal pages, or on mobile
+  // Don't show the button on the chat page, quiz pages, admin pages, legal pages, Pro Learning routes, or on mobile
   if (
     location.pathname === '/chat' || 
     location.pathname.includes('/learning/quiz') ||
     location.pathname.startsWith('/admin-p') || // Add this condition
-    location.pathname === '/pro-learning' || // Hide on Pro Learning page
+    location.pathname === '/pro-learning' || // Legacy exact path
+    location.pathname.startsWith('/pro-learning/') || // Hide on all Pro Learning subroutes
+    location.pathname.startsWith('/pro-learning-share') || // Safety: any alternate share route naming
     location.pathname === '/terms-and-conditions' || // Hide on Terms & Conditions page
     location.pathname === '/privacy-policy' || // Hide on Privacy Policy page
     isMobile // Hide on mobile since we have bottom nav
