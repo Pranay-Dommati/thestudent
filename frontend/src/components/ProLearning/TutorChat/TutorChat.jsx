@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { IoHelpCircle, IoClose, IoSend } from 'react-icons/io5';
 import { askTutor } from '../services';
 
@@ -71,24 +73,39 @@ export default function TutorChat({ readingContent, topicName, courseId }) {
     });
   };
 
-  // Custom renderer for code blocks with a copy button
+  // Custom renderer for code blocks with syntax highlighting + copy button
   const CodeBlock = ({ inline, className, children, ...props }) => {
     const isInline = !!inline;
     const text = String(children || '').replace(/\n$/, '');
     if (isInline) {
       return <code className={className} {...props}>{children}</code>;
     }
-    const lang = (className || '').replace('language-', '') || 'text';
+
+    const match = /language-(\w+)/.exec(className || '');
+    const lang = match ? match[1] : undefined; // let highlighter auto-detect when undefined
+
     const onCopy = async () => {
       try {
         await navigator.clipboard.writeText(text);
       } catch (_) {}
     };
+
     return (
       <div className="relative group">
-        <pre className={`overflow-auto rounded-md p-3 bg-[#0b1021] text-gray-100`}>
-          <code className={className} data-lang={lang} {...props}>{text}</code>
-        </pre>
+        <SyntaxHighlighter
+          language={lang}
+          style={oneDark}
+          wrapLongLines
+          customStyle={{
+            margin: 0,
+            borderRadius: '0.375rem',
+            fontSize: '0.85rem',
+          }}
+          PreTag="div"
+          {...props}
+        >
+          {text}
+        </SyntaxHighlighter>
         <button
           onClick={onCopy}
           className="absolute top-2 right-2 hidden group-hover:inline-flex text-xs px-2 py-1 rounded bg-gray-800/80 text-gray-100 hover:bg-gray-700"
