@@ -18,7 +18,8 @@ const initialGreeting = `Hi, I'm Sia. Ask me anything about this reading.`;
  * - sidebarVisible: boolean (optional)
  */
 export default function TutorChat({ readingContent, topicName, courseId, sidebarVisible = false }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true); // Show chat by default
+  const [showFloatingButton, setShowFloatingButton] = useState(false); // Hide button initially
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +31,26 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
   const [expanded, setExpanded] = useState(() => new Set());
 
   const canChat = useMemo(() => typeof readingContent === 'string' && readingContent.trim().length > 0, [readingContent]);
+
+  // Check if user is near the bottom of the page to show/hide floating button
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!chatContainerRef.current) return;
+      
+      const chatRect = chatContainerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const chatBottom = chatRect.bottom;
+      
+      // If chat bottom is visible (within 100px of viewport), hide button
+      const isNearBottom = chatBottom <= viewportHeight + 100;
+      setShowFloatingButton(!isNearBottom);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Check initial position
+    
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     if (open && messagesEndRef.current) {
@@ -136,45 +157,20 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
   };
 
   const handleToggle = () => {
-    const willOpen = !open;
-    
-    if (willOpen) {
-      // Open the chat immediately (button disappears, chat starts expanding)
-      setOpen(willOpen);
-
-      // Kick off an immediate smooth scroll to the input area, then
-      // run a short rAF loop (~350ms) to keep the bottom in view while expanding
-      requestAnimationFrame(() => {
-        const container = chatContainerRef.current;
-        if (!container) return;
-
+    // Just scroll to the chat bottom when clicked
+    setTimeout(() => {
+      const container = chatContainerRef.current;
+      if (container) {
         const inputArea = container.querySelector('[data-chat-input]');
         if (inputArea) {
-          inputArea.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' });
+          inputArea.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'end',
+            inline: 'nearest'
+          });
         }
-
-        const start = performance.now();
-        const margin = 16; // breathing room at bottom
-        const ensureVisible = (now) => {
-          const c = chatContainerRef.current;
-          if (!c) return;
-          const rect = c.getBoundingClientRect();
-          const viewH = window.innerHeight || document.documentElement.clientHeight;
-
-          // If the bottom edge is below the viewport, nudge page scroll
-          if (rect.bottom > viewH - margin) {
-            const absoluteBottom = window.scrollY + rect.bottom;
-            const targetTop = absoluteBottom - (viewH - margin);
-            window.scrollTo({ top: targetTop, behavior: 'smooth' });
-          }
-          if (now - start < 380) requestAnimationFrame(ensureVisible);
-        };
-        requestAnimationFrame(ensureVisible);
-      });
-    } else {
-      // Closing - just close immediately
-      setOpen(willOpen);
-    }
+      }
+    }, 50);
   };
 
   return (
@@ -193,14 +189,14 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
         }
       `}</style>
 
-      {/* Floating Button - Always Visible */}
-      {!open && (
+      {/* Floating Button - Only show when chat is off-screen */}
+      {showFloatingButton && (
         <button
           onClick={handleToggle}
           disabled={!canChat}
           style={{
             bottom: '1.5rem',
-            right: sidebarVisible ? '1.5rem' : '1.5rem', // On mobile, always use 1.5rem
+            right: sidebarVisible ? '1.5rem' : '1.5rem',
             transition: 'right 300ms ease-in-out, transform 300ms ease-in-out'
           }}
           className={`fixed z-50 flex items-center rounded-full shadow-2xl transition-all duration-300 gap-2 px-3 lg:gap-3 lg:px-5 py-3 ${
@@ -208,7 +204,7 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
               ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white hover:scale-110 hover:shadow-blue-500/50'
               : 'bg-gray-400 cursor-not-allowed text-white'
           } ${sidebarVisible ? 'lg:translate-x-[-400px]' : ''}`}
-          title="Ask Sia"
+          title="Scroll to Sia"
         >
           <IoSparkles className="text-xl" />
           <span className="text-sm font-semibold hidden sm:inline">Ask Sia</span>
@@ -223,12 +219,8 @@ export default function TutorChat({ readingContent, topicName, courseId, sidebar
           ref={chatContainerRef} 
           className="w-full px-0 lg:px-6 mt-8 mb-6"
         >
-          {/* Chat Panel - Fixed height with proper flex layout */}
-          <div 
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              open ? 'h-[600px] opacity-100' : 'h-0 opacity-0'
-            }`}
-          >
+          {/* Chat Panel - Always visible, fixed height */}
+          <div className="h-[600px] opacity-100">
             <div 
               className="bg-white border-2 border-gray-200 rounded-xl shadow-lg h-full flex flex-col"
               data-chat-panel
