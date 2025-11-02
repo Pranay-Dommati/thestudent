@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -66,8 +66,12 @@ const TabContentRenderer = ({
   setContent,
   loadScenario,
   getCurrentTopic,
-  setActiveTab
+  setActiveTab,
+  onTextSelection // New prop for handling text selection
 }) => {
+  // Create ref for reading content container
+  const readingContentRef = useRef(null);
+
   switch (activeTab) {
     case "reading":
       // BLOCK CHECK: If topic is blocked, don't show empty content panels

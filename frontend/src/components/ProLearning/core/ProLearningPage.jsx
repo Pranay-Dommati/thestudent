@@ -1637,6 +1637,7 @@ const ProLearningPage = () => {
               readingContent={content.reading}
               topicName={topicName}
               courseId={getCourseId()}
+              sidebarVisible={sidebarVisible}
             />
           ) : null;
         } catch { return null; }
