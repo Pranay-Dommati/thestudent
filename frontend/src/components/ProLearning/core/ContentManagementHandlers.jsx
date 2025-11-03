@@ -404,31 +404,62 @@ export const handleTopicSelect = (
 /**
  * Toggle topic completion status
  */
-export const toggleTopicCompletion = (topicId, event, dependencies) => {
+export const toggleTopicCompletion = async (topicId, event, dependencies) => {
   const { setCompletedTopics, getCourseId } = dependencies;
 
   event.stopPropagation(); // Prevent topic selection when clicking the toggle
   
+  // Optimistically update UI first
   setCompletedTopics(prev => {
     const isCurrentlyCompleted = prev.includes(topicId);
     const updated = isCurrentlyCompleted
       ? prev.filter(id => id !== topicId)
       : [...prev, topicId];
     
-    // Save to localStorage with course-specific key
+    // Also save to localStorage as backup
     try {
       const courseId = getCourseId();
       const storageKey = courseId ? `proLearning_completedTopics_${courseId}` : 'proLearning_completedTopics';
       localStorage.setItem(storageKey, JSON.stringify(updated));
-      
-      // Show brief feedback
-      console.log(isCurrentlyCompleted ? '✅ Topic marked as incomplete' : '🎉 Topic completed!');
     } catch (error) {
-      console.warn('Failed to save completion status:', error);
+      console.warn('Failed to save to localStorage:', error);
     }
     
     return updated;
   });
+  
+  // Save to backend API
+  try {
+    const axiosInstance = (await import('../../../utils/axios')).default;
+    const response = await axiosInstance.post(`/api/lessons/complete/${topicId}/`);
+    
+    console.log(response.data.status === 'complete' ? '🎉 Topic completed!' : '✅ Topic marked as incomplete');
+    console.log('Progress:', response.data.progress);
+  } catch (error) {
+    console.error('Failed to save completion status to backend:', error);
+    
+    // Revert the UI change if API call fails
+    setCompletedTopics(prev => {
+      const isCurrentlyCompleted = prev.includes(topicId);
+      const reverted = isCurrentlyCompleted
+        ? prev.filter(id => id !== topicId)
+        : [...prev, topicId];
+      
+      // Update localStorage with reverted state
+      try {
+        const courseId = getCourseId();
+        const storageKey = courseId ? `proLearning_completedTopics_${courseId}` : 'proLearning_completedTopics';
+        localStorage.setItem(storageKey, JSON.stringify(reverted));
+      } catch (e) {
+        console.warn('Failed to revert localStorage:', e);
+      }
+      
+      return reverted;
+    });
+    
+    // Show error message to user
+    alert('Failed to save progress. Please try again or check your internet connection.');
+  }
 };
 
 /**

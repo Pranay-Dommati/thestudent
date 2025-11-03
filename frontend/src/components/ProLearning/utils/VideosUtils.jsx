@@ -371,25 +371,26 @@ export const VideoPlayerModal = ({ isOpen, video, onClose }) => {
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       
       {/* Modal container */}
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden">
+      <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-4">
+        <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b">
-            <div className="flex items-center gap-2">
-              <IoPlayCircle className="w-5 h-5" />
-              <span className="font-medium truncate">{video?.title || 'Playing video'}</span>
+          <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b flex-shrink-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <IoPlayCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+              <span className="font-medium truncate text-sm sm:text-base">{video?.title || 'Playing video'}</span>
             </div>
+            {/* Enhanced close button for mobile */}
             <button 
               onClick={onClose} 
-              className="p-2 hover:bg-gray-100 rounded-lg" 
+              className="p-2 sm:p-2 hover:bg-gray-100 rounded-lg ml-2 flex-shrink-0 text-gray-500 hover:text-gray-700 transition-colors bg-gray-50 sm:bg-transparent" 
               aria-label="Close video"
             >
-              <IoClose className="w-5 h-5" />
+              <IoClose className="w-7 h-7 sm:w-5 sm:h-5" />
             </button>
           </div>
           
           {/* Player */}
-          <div className="relative w-full" style={{ aspectRatio: '16 / 9' }}>
+          <div className="relative w-full flex-1" style={{ aspectRatio: '16 / 9' }}>
             {embedUrl ? (
               <iframe
                 src={embedUrl}
@@ -407,8 +408,8 @@ export const VideoPlayerModal = ({ isOpen, video, onClose }) => {
           </div>
           
           {/* Footer actions */}
-          <div className="px-4 py-3 border-t flex items-center justify-between">
-            <div className="text-sm text-gray-600 truncate">
+          <div className="px-3 sm:px-4 py-3 border-t flex items-center justify-between flex-shrink-0">
+            <div className="text-xs sm:text-sm text-gray-600 truncate">
               {getVideoChannel(video)}
             </div>
             {getVideoUrl(video) && (
@@ -416,7 +417,7 @@ export const VideoPlayerModal = ({ isOpen, video, onClose }) => {
                 href={getVideoUrl(video)} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="text-sm text-blue-600 hover:underline"
+                className="text-xs sm:text-sm text-blue-600 hover:underline ml-2 flex-shrink-0"
               >
                 Open on YouTube
               </a>

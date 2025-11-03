@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { IoHelpCircle, IoSend, IoSparkles } from 'react-icons/io5';
+import { IoHelpCircle, IoSend, IoSparkles, IoChevronDown } from 'react-icons/io5';
 import { askTutor } from '../services';
 
 const initialGreeting = `Hi, I'm Sia. Ask me anything about this reading.`;
@@ -18,7 +18,8 @@ const initialGreeting = `Hi, I'm Sia. Ask me anything about this reading.`;
  * - sidebarVisible: boolean (optional)
  */
 const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisible = false }, ref) => {
-  const [open, setOpen] = useState(true); // Show chat by default
+  const [open, setOpen] = useState(true); // Show chat by default on desktop
+  const [mobileOpen, setMobileOpen] = useState(false); // Mobile drawer state
   const [showFloatingButton, setShowFloatingButton] = useState(false); // Hide button initially
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -39,6 +40,11 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
         setSelectedContext(text);
         setInput(`About this text: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"\n\n`);
         
+        // On mobile, open the drawer
+        if (window.innerWidth < 1024) {
+          setMobileOpen(true);
+        }
+        
         // Focus input after a brief delay
         setTimeout(() => {
           if (inputRef.current) {
@@ -47,20 +53,22 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
           }
         }, 100);
         
-        // Scroll to chat
-        setTimeout(() => {
-          const container = chatContainerRef.current;
-          if (container) {
-            const inputArea = container.querySelector('[data-chat-input]');
-            if (inputArea) {
-              inputArea.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'end',
-                inline: 'nearest'
-              });
+        // Scroll to chat on desktop
+        if (window.innerWidth >= 1024) {
+          setTimeout(() => {
+            const container = chatContainerRef.current;
+            if (container) {
+              const inputArea = container.querySelector('[data-chat-input]');
+              if (inputArea) {
+                inputArea.scrollIntoView({ 
+                  behavior: 'smooth', 
+                  block: 'end',
+                  inline: 'nearest'
+                });
+              }
             }
-          }
-        }, 150);
+          }, 150);
+        }
       }
     }
   }), []);
@@ -198,7 +206,13 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
   };
 
   const handleToggle = () => {
-    // Just scroll to the chat bottom when clicked
+    // On mobile, toggle drawer
+    if (window.innerWidth < 1024) {
+      setMobileOpen(!mobileOpen);
+      return;
+    }
+    
+    // On desktop, just scroll to the chat bottom when clicked
     setTimeout(() => {
       const container = chatContainerRef.current;
       if (container) {
@@ -239,26 +253,234 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
           margin: 0 !important;
           z-index: 9999 !important;
         }
+        
+        /* Mobile drawer overlay */
+        .mobile-drawer-overlay {
+          position: fixed !important;
+          inset: 0 !important;
+          background: rgba(0, 0, 0, 0.5) !important;
+          z-index: 9998 !important;
+          transition: opacity 300ms ease-in-out !important;
+        }
+        
+        /* Mobile drawer */
+        .mobile-drawer {
+          position: fixed !important;
+          bottom: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          height: 85vh !important;
+          background: white !important;
+          z-index: 9999 !important;
+          border-radius: 32px 32px 0 0 !important;
+          box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.2) !important;
+          transform: translateY(100%) !important;
+          transition: transform 300ms ease-in-out !important;
+          overflow: hidden !important;
+        }
+        
+        .mobile-drawer.open {
+          transform: translateY(0) !important;
+        }
+        
+        @media (min-width: 1024px) {
+          .mobile-drawer,
+          .mobile-drawer-overlay {
+            display: none !important;
+          }
+        }
       `}</style>
 
-      {/* Floating Button - Only show when chat is off-screen - FIXED POSITION FROM VIEWPORT */}
-      {showFloatingButton && (
-        <button
-          onClick={handleToggle}
-          disabled={!canChat}
-          className={`sia-floating-button flex items-center rounded-full shadow-2xl gap-2 px-3 lg:gap-3 lg:px-5 py-3 ${
-            canChat
-              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white hover:scale-110 hover:shadow-blue-500/50'
-              : 'bg-gray-400 cursor-not-allowed text-white'
-          }`}
-          title="Scroll to Sia"
-        >
-          <IoSparkles className="text-xl" />
-          <span className="text-sm font-semibold hidden sm:inline">Ask Sia</span>
-        </button>
+      {/* Floating Button - Show on desktop when scrolled, always show on mobile */}
+      <div className="sia-floating-button">
+        {((showFloatingButton && window.innerWidth >= 1024) || (window.innerWidth < 1024 && !mobileOpen)) && (
+          <button
+            onClick={handleToggle}
+            disabled={!canChat}
+            className={`flex items-center rounded-full shadow-2xl gap-2 px-3 lg:gap-3 lg:px-5 py-3 w-full ${
+              canChat
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white hover:scale-110 hover:shadow-blue-500/50'
+                : 'bg-gray-400 cursor-not-allowed text-white'
+            }`}
+            title="Ask Sia"
+          >
+            <IoSparkles className="text-xl" />
+            <span className="text-sm font-semibold hidden sm:inline">Ask Sia</span>
+          </button>
+        )}
+      </div>
+
+      {/* Mobile Drawer Overlay */}
+      {mobileOpen && (
+        <div 
+          className="mobile-drawer-overlay"
+          onClick={() => setMobileOpen(false)}
+        />
       )}
 
-      {/* Inline Chat Interface - Matches MainContentLayout structure */}
+      {/* Mobile Drawer */}
+      <div className={`mobile-drawer ${mobileOpen ? 'open' : ''}`}>
+        <div className="h-full flex flex-col bg-white">
+          {/* Mobile Header with Close Button */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-4 border-b border-gray-200 flex-shrink-0 rounded-t-[32px]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <IoHelpCircle className="w-6 h-6 text-white" />
+                </div>
+                <div className="ml-3">
+                  <div className="font-semibold text-gray-900">Sia</div>
+                  <div className="text-sm text-gray-600">{topicName || 'Current Topic'}</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                aria-label="Close chat"
+              >
+                <IoChevronDown className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Messages - Same structure as desktop */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 bg-gray-50 min-h-0">
+            <div className="space-y-4">
+              {messages.map((m, i) => {
+                const long = isLongMessage(m.content, m.role);
+                const isExpanded = expanded.has(i);
+                const isUser = m.role === 'user';
+                
+                return (
+                  <div key={`mobile-${i}`} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] ${isUser ? 'order-2' : 'order-1'}`}>
+                      {!isUser && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                            <IoSparkles className="w-3.5 h-3.5 text-white" />
+                          </div>
+                          <span className="text-xs font-medium text-gray-600">Sia</span>
+                        </div>
+                      )}
+                      <div 
+                        className={`relative rounded-2xl px-4 py-3 ${
+                          isUser 
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white' 
+                            : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
+                        }`}
+                      >
+                        <div className={`${long && !isExpanded ? 'max-h-48 overflow-hidden' : ''}`}>
+                          {isUser ? (
+                            <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                              {m.content}
+                            </div>
+                          ) : (
+                            <div className="prose prose-sm max-w-none">
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={{ 
+                                  code: CodeBlock,
+                                  p: ({node, ...props}) => <p className="text-sm leading-relaxed my-2" {...props} />,
+                                  ul: ({node, ...props}) => <ul className="list-disc pl-4 my-2 space-y-1" {...props} />,
+                                  ol: ({node, ...props}) => <ol className="list-decimal pl-4 my-2 space-y-1" {...props} />,
+                                  li: ({node, ...props}) => <li className="text-sm" {...props} />,
+                                  strong: ({node, ...props}) => <strong className="font-semibold text-gray-900" {...props} />,
+                                }}
+                              >
+                                {m.content}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                        {long && !isExpanded && (
+                          <div className={`pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${
+                            isUser ? 'from-blue-600' : 'from-white'
+                          } to-transparent rounded-b-2xl`} />
+                        )}
+                      </div>
+                      {long && (
+                        <button
+                          onClick={() => toggleExpand(i)}
+                          className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                        >
+                          {isExpanded ? 'Show less' : 'Show more'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {busy && (
+                <div className="flex justify-start">
+                  <div className="max-w-[85%]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                        <IoSparkles className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      <span className="text-xs font-medium text-gray-600">Sia</span>
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        </div>
+                        <span className="text-xs text-gray-500">Thinking...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* Mobile Input */}
+          <div className="bg-white border-t border-gray-200 p-4 flex-shrink-0">
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { 
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      onSend();
+                    }
+                  }}
+                  placeholder={canChat ? 'Ask Sia about this topic…' : 'Reading not loaded yet'}
+                  disabled={!canChat || busy}
+                  rows={1}
+                  className={`w-full px-4 py-3 rounded-xl border-2 text-sm outline-none resize-none transition-all ${
+                    !canChat 
+                      ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed' 
+                      : 'bg-white border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                  }`}
+                  style={{ minHeight: '48px', maxHeight: '120px' }}
+                />
+              </div>
+              <button
+                onClick={onSend}
+                disabled={!canChat || busy || !input.trim()}
+                className={`flex-shrink-0 p-3 rounded-xl transition-all duration-200 ${
+                  (!canChat || !input.trim()) 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-lg hover:scale-105 active:scale-95'
+                }`}
+                aria-label="Send message"
+              >
+                <IoSend className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Inline Chat Interface - Hidden on mobile */}
+      <div className="hidden lg:block">
       <div className={`transition-all duration-300 ${
         sidebarVisible ? 'lg:mr-[400px]' : ''
       }`}>
@@ -267,7 +489,7 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
           className="w-full px-0 lg:px-6 mt-8 mb-6"
         >
           {/* Chat Panel - Always visible, responsive height */}
-          <div className="h-[850px] sm:h-[900px] lg:h-[950px] opacity-100">
+          <div className="h-[600px] sm:h-[650px] lg:h-[700px] opacity-100">
             <div 
               className="bg-white border-2 border-gray-200 rounded-xl shadow-lg h-full flex flex-col"
               data-chat-panel
@@ -432,6 +654,7 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
           </div>
         </div>
         </div>
+      </div>
       </div>
     </>
   );
