@@ -825,6 +825,52 @@ const ChatbotPage = () => {
     })();
   }, [loading]); // Re-run when auth loading completes
 
+  // 🎯 Auto-send pending prompt after login (UX improvement)
+  useEffect(() => {
+    // Guard: don't run if already processed
+    if (autoSendProcessed.current) {
+      console.log('🎯 Auto-send already processed, skipping');
+      return;
+    }
+    
+    if (loading) {
+      console.log('🎯 Auth still loading, waiting...');
+      return; // Wait for auth to complete
+    }
+    
+    const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isAuthenticated;
+    console.log('🎯 Checking for pending prompt. Authenticated:', authed);
+    
+    if (!authed) {
+      console.log('🎯 Not authenticated yet, skipping auto-send');
+      return; // Only run when authenticated
+    }
+    
+    // Check for saved prompt from pre-login attempt
+    const pendingPrompt = localStorage.getItem('pendingChatPrompt');
+    console.log('🎯 Pending prompt from localStorage:', pendingPrompt);
+    
+    if (pendingPrompt && pendingPrompt.trim()) {
+      console.log('🎯 Found pending prompt after login, auto-sending:', pendingPrompt);
+      
+      // Mark as processed immediately to prevent duplicate runs
+      autoSendProcessed.current = true;
+      initialQueryProcessed.current = true;
+      
+      // Clear it from storage
+      localStorage.removeItem('pendingChatPrompt');
+      
+      // Small delay to ensure UI is ready (stats loaded, etc.)
+      setTimeout(() => {
+        setMessage(pendingPrompt);
+        // Trigger send with the prompt
+        setTimeout(() => {
+          handleSendMessage(pendingPrompt);
+        }, 100);
+      }, 500);
+    }
+  }, [loading, isAuthenticated]); // Re-run when auth state changes
+
   // Expose setUsageStats globally for ProLearningPage to refresh after course save
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -1228,6 +1274,10 @@ const ChatbotPage = () => {
     try {
       const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isAuthenticated;
       if (!authed) {
+        // 💾 Save the prompt to localStorage so we can auto-send it after login
+        localStorage.setItem('pendingChatPrompt', messageToSend);
+        console.log('💾 Saved pending prompt for after login:', messageToSend);
+        
         const returnTo = window.location.pathname + window.location.search;
         const signInUrl = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
         const signUpUrl = `/auth?mode=signup&returnTo=${encodeURIComponent(returnTo)}`;

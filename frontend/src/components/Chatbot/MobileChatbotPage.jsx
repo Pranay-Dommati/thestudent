@@ -477,6 +477,36 @@ const MobileChatbotPage = () => {
     }
   }, [proMode, isLoggedIn, loading]); // Re-run when auth loading completes
 
+  // 🎯 Auto-send pending prompt after login (UX improvement) - Fallback for localStorage
+  useEffect(() => {
+    if (loading) return; // Wait for auth to complete
+    
+    const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isLoggedIn;
+    if (!authed) return; // Only run when authenticated
+    
+    // Check localStorage for pending prompt (fallback if URL params didn't work)
+    const pendingPrompt = localStorage.getItem('pendingChatPrompt');
+    if (pendingPrompt && pendingPrompt.trim() && !autoSendProcessed.current) {
+      console.log('🎯 Found pending mobile prompt in localStorage after login:', pendingPrompt);
+      
+      // Clear it immediately to prevent re-sending
+      localStorage.removeItem('pendingChatPrompt');
+      sessionStorage.removeItem('pendingChatMessage');
+      
+      // Mark as processed to prevent URL param handler from also running
+      autoSendProcessed.current = true;
+      initialQueryProcessed.current = true;
+      
+      // Small delay to ensure UI is ready
+      setTimeout(() => {
+        setMessage(pendingPrompt);
+        setTimeout(() => {
+          handleSendMessage(pendingPrompt);
+        }, 100);
+      }, 500);
+    }
+  }, [loading, isLoggedIn, isAuthenticated]); // Re-run when auth state changes
+
   // Handle ESC key to close welcome message and navigation menu
   useEffect(() => {
     const handleEscKey = (event) => {
@@ -712,9 +742,11 @@ const MobileChatbotPage = () => {
       const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isLoggedIn;
       if (!authed) {
         // Preserve the user's typed message across auth redirect by embedding
-        // it into the returnTo URL and also saving a short-lived backup in sessionStorage.
+        // it into the returnTo URL and also saving backups in both sessionStorage and localStorage.
         try {
           sessionStorage.setItem('pendingChatMessage', messageToSend);
+          localStorage.setItem('pendingChatPrompt', messageToSend); // Backup for cross-tab consistency
+          console.log('💾 Saved pending mobile prompt for after login:', messageToSend);
         } catch (_) {}
 
         // Build a clean returnTo URL that includes the pending message so that
