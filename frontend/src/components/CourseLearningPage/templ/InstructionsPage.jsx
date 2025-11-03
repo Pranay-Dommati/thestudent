@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import preprocessLatex from '../../../utils/latexPreprocessor';
 
 const InstructionsPage = ({ lessonContent }) => {
   // If lesson content is provided, render it using ReactMarkdown
@@ -61,7 +62,7 @@ const InstructionsPage = ({ lessonContent }) => {
               }
             }}
           >
-            {lessonContent.aboutLesson}
+            {preprocessLatex(lessonContent.aboutLesson)}
           </ReactMarkdown>
         </div>
       </div>
