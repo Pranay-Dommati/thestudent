@@ -78,23 +78,20 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       try {
         setLoading(true);
         
-        // **OPTIMIZATION 1: Check cache first (but avoid serving guest-locked cache to logged-in users)**
+        // **CRITICAL FIX: Never use cached progress for logged-in users**
+        // Always fetch fresh from backend to ensure progress persists after localStorage clear
         const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         const cachedData = courseCache.get(cacheKey);
-        const cachedHasLocks = !!(cachedData?.course?.chapters || []).some(ch => {
-          const chapterLocked = !!ch.isLocked;
-          const anyLessonLocked = !!(ch.lessons || []).some(l => !!l.isLocked);
-          return chapterLocked || anyLessonLocked;
-        });
-        const canUseCache = !!cachedData && (!isLoggedIn || !cachedHasLocks);
-
-        if (canUseCache) {
-          console.log('⚡ Loading course from cache - instant load!');
+        
+        // For logged-in users: ALWAYS fetch fresh data to get latest progress from database
+        // Cache is only used for guest users (performance optimization for locked content)
+        if (isLoggedIn) {
+          console.log('👤 Logged in user detected - fetching fresh data with progress from database');
+          // Skip cache for logged-in users to ensure progress is always current
+        } else if (cachedData) {
+          // Guest users can use cache safely (no progress to track)
+          console.log('👻 Guest user - using cached course data');
           setCourse(cachedData.course);
-          if (cachedData.progress) {
-            setCourseProgress(cachedData.progress);
-            setServerProgress(cachedData.progress.progress);
-          }
           setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
           setLoading(false);
           return;
