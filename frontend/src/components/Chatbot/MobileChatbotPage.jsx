@@ -69,7 +69,7 @@ const MobileChatbotPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated, isLoggedIn } = useAuth();
+  const { user, isAuthenticated, isLoggedIn, loading } = useAuth();
   const initialQuery = searchParams.get("q");
 
   const [message, setMessage] = useState("");
@@ -101,6 +101,8 @@ const MobileChatbotPage = () => {
   // Mobile ProLearning Courses drawer state
   const [isCoursesDrawerOpen, setIsCoursesDrawerOpen] = useState(false);
   const [isLoadingCourses, setIsLoadingCourses] = useState(false);
+  const isFetchingStatsRef = useRef(false); // Prevent duplicate concurrent stats fetches
+  const statsPromiseRef = useRef(null); // Store ongoing stats fetch promise for reuse
   const [visibleCoursesCount, setVisibleCoursesCount] = useState(10);
   const drawerContentRef = useRef(null);
   const [coursesSearch, setCoursesSearch] = useState("");
@@ -377,46 +379,103 @@ const MobileChatbotPage = () => {
   };
 
   // Fetch usage stats when component mounts or when pro mode is enabled (returns stats)
-  const fetchUsageStats = async () => {
-    try {
-      if (!isLoggedIn) return null;
-      const token = (
-        localStorage.getItem('accessToken') ||
-        localStorage.getItem('access_token') ||
-        localStorage.getItem('token')
-      );
-      const { data: result } = await aiAxios.get('/rate-limit-status/');
-      const stats = result?.rate_limit_info || null;
-      if (stats) setUsageStats(stats);
-      return stats;
-    } catch (error) {
-      console.error('📊 Error fetching usage stats:', error);
-      // Fallback default with monthly fields and fallback flag
-      const fallback = {
-        rate_limits: {
-          daily: { enforced: false },
-          monthly: { limit: 15, used: 0 },
-        },
-        per_request_limit: 4,
-        request_limit: 4,
-        monthly_used: 0,
-        monthly_limit: 15,
-        isFallback: true,
-        // Legacy fields for backward-compat (ignored when daily.enforced=false)
-        daily_used: 0,
-        daily_limit: 16,
-      };
-      setUsageStats(fallback);
-      return fallback;
+  const fetchUsageStats = async (retryCount = 0) => {
+    // 🔒 DEBOUNCING: If already fetching, return the existing promise
+    if (isFetchingStatsRef.current && statsPromiseRef.current) {
+      console.log('⏳ [Mobile] Stats fetch already in progress, reusing existing promise');
+      return statsPromiseRef.current;
     }
+    
+    // Mark as fetching and create the promise
+    isFetchingStatsRef.current = true;
+    
+    const fetchPromise = (async () => {
+      try {
+        if (!isLoggedIn) return null;
+        const token = (
+          localStorage.getItem('accessToken') ||
+          localStorage.getItem('access_token') ||
+          localStorage.getItem('token')
+        );
+        
+        // If no token, don't even try - use fallback immediately
+        if (!token) {
+          console.warn('⚠️ [Mobile] No auth token found, using fallback stats');
+          const fallback = {
+            rate_limits: {
+              daily: { enforced: false },
+              monthly: { limit: 15, used: 0 },
+            },
+            per_request_limit: 4,
+            request_limit: 4,
+            monthly_used: 0,
+            monthly_limit: 15,
+            isFallback: true,
+            daily_used: 0,
+            daily_limit: 16,
+          };
+          setUsageStats(fallback);
+          return fallback;
+        }
+        
+        const { data: result } = await aiAxios.get('/rate-limit-status/');
+        const stats = result?.rate_limit_info || null;
+        if (stats) {
+          console.log('✅ [Mobile] Usage stats fetched successfully:', stats);
+          setUsageStats(stats);
+        }
+        return stats;
+      } catch (error) {
+        const status = error?.response?.status;
+        console.error('📊 [Mobile] Error fetching usage stats:', { status, error: error.message });
+        
+        // If 401/403 and this is first try, wait and retry once (auth might still be initializing)
+        if ((status === 401 || status === 403) && retryCount === 0) {
+          console.log('🔄 [Mobile] Auth error on stats fetch, retrying after delay...');
+          await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5s for auth to settle
+          // Reset refs before retry to allow the retry to proceed
+          isFetchingStatsRef.current = false;
+          statsPromiseRef.current = null;
+          return fetchUsageStats(1); // Retry once
+        }
+        
+        // Fallback default with monthly fields and fallback flag
+        console.warn('⚠️ [Mobile] Using fallback stats after fetch failure');
+        const fallback = {
+          rate_limits: {
+            daily: { enforced: false },
+            monthly: { limit: 15, used: 0 },
+          },
+          per_request_limit: 4,
+          request_limit: 4,
+          monthly_used: 0,
+          monthly_limit: 15,
+          isFallback: true,
+          daily_used: 0,
+          daily_limit: 16,
+        };
+        setUsageStats(fallback);
+        return fallback;
+      } finally {
+        // Clean up refs after fetch completes
+        isFetchingStatsRef.current = false;
+        statsPromiseRef.current = null;
+      }
+    })();
+    
+    // Store the promise so concurrent calls can reuse it
+    statsPromiseRef.current = fetchPromise;
+    return fetchPromise;
   };
 
   // Fetch usage stats when component mounts and when pro mode changes
+  // WAIT for auth loading to complete first to avoid 401 errors
   useEffect(() => {
+    if (loading) return; // Don't fetch until auth is checked
     if (proMode && isLoggedIn) {
       fetchUsageStats();
     }
-  }, [proMode, isLoggedIn]);
+  }, [proMode, isLoggedIn, loading]); // Re-run when auth loading completes
 
   // Handle ESC key to close welcome message and navigation menu
   useEffect(() => {

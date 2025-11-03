@@ -468,7 +468,7 @@ const ChatbotPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated, isLoggedIn } = useAuth();
+  const { user, isAuthenticated, isLoggedIn, loading } = useAuth();
   const initialQuery = searchParams.get("q");
 
   const [message, setMessage] = useState("");
@@ -492,6 +492,8 @@ const ChatbotPage = () => {
   const [proLearningHistory, setProLearningHistory] = useState([]); // Legacy local history (fallback)
   const [proLearningCourses, setProLearningCourses] = useState([]); // Backend DB courses
   const [isLoadingCourses, setIsLoadingCourses] = useState(false); // Loading state for sidebar courses
+  const isFetchingStatsRef = useRef(false); // Prevent duplicate concurrent stats fetches
+  const statsPromiseRef = useRef(null); // Store ongoing stats fetch promise for reuse
 
   const generateMessageId = () => Date.now() + Math.random();
   const [chatHistory, setChatHistory] = useState([]);
@@ -810,7 +812,10 @@ const ChatbotPage = () => {
   }, [proMode, usageStats]);
 
   // Fetch usage stats on mount so desktop shows correct monthly stats immediately
+  // WAIT for auth to be validated first to avoid 401 errors
   useEffect(() => {
+    if (loading) return; // Don't fetch until auth is checked
+    
     (async () => {
       try {
         await fetchUsageStats();
@@ -818,7 +823,7 @@ const ChatbotPage = () => {
         // handled inside fetchUsageStats with fallback
       }
     })();
-  }, []);
+  }, [loading]); // Re-run when auth loading completes
 
   // Expose setUsageStats globally for ProLearningPage to refresh after course save
   useEffect(() => {
@@ -2151,24 +2156,68 @@ const ChatbotPage = () => {
   };
 
   // Fetch usage stats for rate limiting display (returns stats)
-  const fetchUsageStats = async () => {
-    try {
-      const token = (
-        localStorage.getItem('accessToken') ||
-        localStorage.getItem('access_token') ||
-        localStorage.getItem('token')
-      );
-      const { data: result } = await aiAxios.get('/rate-limit-status/');
-      const stats = result?.rate_limit_info || null;
-      if (stats) setUsageStats(stats);
-      return stats;
-    } catch (error) {
-      console.error('Failed to fetch usage stats:', error);
-      // Set fallback to prevent infinite "Loading stats..."
-      const fallback = { monthly_used: 0, monthly_limit: 15, per_request_limit: 4, isFallback: true };
-      setUsageStats(fallback);
-      return fallback;
+  const fetchUsageStats = async (retryCount = 0) => {
+    // 🔒 DEBOUNCING: If already fetching, return the existing promise
+    if (isFetchingStatsRef.current && statsPromiseRef.current) {
+      console.log('⏳ Stats fetch already in progress, reusing existing promise');
+      return statsPromiseRef.current;
     }
+    
+    // Mark as fetching and create the promise
+    isFetchingStatsRef.current = true;
+    
+    const fetchPromise = (async () => {
+      try {
+        const token = (
+          localStorage.getItem('accessToken') ||
+          localStorage.getItem('access_token') ||
+          localStorage.getItem('token')
+        );
+        
+        // If no token, don't even try - use fallback immediately
+        if (!token) {
+          console.warn('⚠️ No auth token found, using fallback stats');
+          const fallback = { monthly_used: 0, monthly_limit: 15, per_request_limit: 4, isFallback: true };
+          setUsageStats(fallback);
+          return fallback;
+        }
+        
+        const { data: result } = await aiAxios.get('/rate-limit-status/');
+        const stats = result?.rate_limit_info || null;
+        if (stats) {
+          console.log('✅ Usage stats fetched successfully:', stats);
+          setUsageStats(stats);
+        }
+        return stats;
+      } catch (error) {
+        const status = error?.response?.status;
+        console.error('Failed to fetch usage stats:', { status, error: error.message });
+        
+        // If 401/403 and this is first try, wait and retry once (auth might still be initializing)
+        if ((status === 401 || status === 403) && retryCount === 0) {
+          console.log('🔄 Auth error on stats fetch, retrying after delay...');
+          await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5s for auth to settle
+          // Reset refs before retry to allow the retry to proceed
+          isFetchingStatsRef.current = false;
+          statsPromiseRef.current = null;
+          return fetchUsageStats(1); // Retry once
+        }
+        
+        // Set fallback to prevent infinite "Loading stats..."
+        console.warn('⚠️ Using fallback stats after fetch failure');
+        const fallback = { monthly_used: 0, monthly_limit: 15, per_request_limit: 4, isFallback: true };
+        setUsageStats(fallback);
+        return fallback;
+      } finally {
+        // Clean up refs after fetch completes
+        isFetchingStatsRef.current = false;
+        statsPromiseRef.current = null;
+      }
+    })();
+    
+    // Store the promise so concurrent calls can reuse it
+    statsPromiseRef.current = fetchPromise;
+    return fetchPromise;
   };
 
   // Handle Create Course button with authentication check
