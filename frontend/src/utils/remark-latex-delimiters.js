@@ -1,4 +1,4 @@
-/**
+  /**
  * remark-latex-delimiters.js
  * ---------------------------
  * Preprocessor plugin to convert LaTeX-style delimiters to KaTeX/remark-math format
