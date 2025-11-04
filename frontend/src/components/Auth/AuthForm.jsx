@@ -595,12 +595,12 @@ export default function AuthForm() {
                   </AnimatePresence>
                   
                   {/* Email Field */}
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
-                      <FaRegEnvelope />
+                  <div className="relative min-h-[3.25rem] md:min-h-[3.5rem]">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 md:pl-4 pointer-events-none text-gray-400">
+                      <FaRegEnvelope className="w-5 h-5" />
                     </div>
                     <input 
-                      className={`w-full p-4 pl-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
+                      className={`w-full h-[3.25rem] md:h-14 p-3 md:p-4 pl-10 md:pl-12 border-2 rounded-lg md:rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
                         formErrors.email ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
                       }`} 
                       type="email" 
@@ -615,7 +615,7 @@ export default function AuthForm() {
                   {/* Password Field */}
                   <div className="space-y-2">
                     <div className="relative">
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-4 pointer-events-none text-gray-400">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
                         <FaLock />
                       </div>
                       <input 
@@ -630,14 +630,16 @@ export default function AuthForm() {
                         onBlur={() => setTouched((t) => ({ ...t, password: true }))}
                         autoComplete={isSignUp ? 'new-password' : 'current-password'}
                       />
-                      <button
-                        type="button"
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        onClick={() => setShowPassword((s) => !s)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {showPassword ? <FaEyeSlash /> : <FaEye />}
-                      </button>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4">
+                        <button
+                          type="button"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          onClick={() => setShowPassword((s) => !s)}
+                          className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                        >
+                          {showPassword ? <FaEyeSlash /> : <FaEye />}
+                        </button>
+                      </div>
                     </div>
                     
                     {/* Password Requirements Indicator - Only show for signup when user starts typing */}
@@ -688,12 +690,12 @@ export default function AuthForm() {
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.25, ease: [0.4, 0.0, 0.2, 1] }}
                       >
-                        <div className="relative">
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-4 pointer-events-none text-gray-400">
-                            <FaLock />
+                        <div className="relative min-h-[3.25rem] md:min-h-[3.5rem]">
+                          <div className="absolute inset-y-0 left-0 flex items-center pl-3 md:pl-4 pointer-events-none text-gray-400">
+                            <FaLock className="w-5 h-5 min-w-[1.25rem]" />
                           </div>
                           <input 
-                            className={`w-full p-4 pl-12 pr-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
+                            className={`w-full h-[3.25rem] md:h-14 p-3 md:p-4 pl-10 md:pl-12 pr-10 md:pr-12 border-2 rounded-lg md:rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
                               formErrors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
                             }`} 
                             type={showConfirmPassword ? 'text' : 'password'} 
@@ -704,14 +706,16 @@ export default function AuthForm() {
                             onBlur={() => setTouched((t) => ({ ...t, confirmPassword: true }))}
                             autoComplete={isSignUp ? 'new-password' : 'off'}
                           />
-                          <button
-                            type="button"
-                            aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                            onClick={() => setShowConfirmPassword((s) => !s)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                          >
-                            {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
-                          </button>
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 md:pr-4">
+                            <button
+                              type="button"
+                              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                              onClick={() => setShowConfirmPassword((s) => !s)}
+                              className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                            >
+                              {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                            </button>
+                          </div>
                           {formErrors.confirmPassword && <p className="text-red-500 text-sm mt-2">{formErrors.confirmPassword}</p>}
                         </div>
 
