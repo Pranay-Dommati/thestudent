@@ -6,11 +6,30 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
-import preprocessLatex from '../../../utils/latexPreprocessor';
+// Import our new enterprise-grade processor - no more regex preprocessing!
+import { processMarkdownSync } from '../../../utils/markdownProcessor';
 
 const InstructionsPage = ({ lessonContent }) => {
-  // If lesson content is provided, render it using ReactMarkdown
+  // If lesson content is provided, render it using our new unified processor
   if (lessonContent && lessonContent.aboutLesson) {
+    // Process markdown with the new AST-based pipeline
+    const processedContent = processMarkdownSync(lessonContent.aboutLesson, {
+      convertDelimiters: true, // Handle \(...\) and \[...\] 
+      autoLatex: true // Auto-wrap bare LaTeX environments
+    });
+    
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <div 
+          className="prose prose-lg max-w-none markdown-body"
+          dangerouslySetInnerHTML={{ __html: processedContent }}
+        />
+      </div>
+    );
+  }
+
+  // Fallback: if using ReactMarkdown for backward compatibility
+  if (lessonContent && lessonContent.aboutLesson && false) { // Disabled - using new processor above
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <div className="prose prose-lg max-w-none markdown-body">
@@ -92,7 +111,7 @@ const InstructionsPage = ({ lessonContent }) => {
               }
             }}
           >
-            {preprocessLatex(lessonContent.aboutLesson)}
+            {lessonContent.aboutLesson}
           </ReactMarkdown>
         </div>
       </div>
