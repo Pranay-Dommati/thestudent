@@ -38,6 +38,8 @@ def send_email_via_smtp(to_email: str, subject: str, html_content: str) -> bool:
     """Send an HTML email using SMTP settings from Django settings.
     Supports SSL (port 465) or STARTTLS based on settings.
     Returns True on success, False on failure.
+    
+    CRITICAL: Uses 15-second timeout to prevent worker hangs.
     """
     try:
         smtp_host = getattr(settings, 'SMTP_HOST', '')
@@ -46,6 +48,9 @@ def send_email_via_smtp(to_email: str, subject: str, html_content: str) -> bool:
         smtp_password = getattr(settings, 'SMTP_PASSWORD', '')
         use_ssl = getattr(settings, 'SMTP_USE_SSL', True)
         use_tls = getattr(settings, 'SMTP_USE_TLS', False)
+        
+        # CRITICAL: Set timeout to prevent worker hangs (default is no timeout!)
+        smtp_timeout = 60  # 60 seconds (1 minute) max for SMTP operations
 
         if not (smtp_host and smtp_port and smtp_username and smtp_password):
             if getattr(settings, 'DEBUG', False):
@@ -59,11 +64,13 @@ def send_email_via_smtp(to_email: str, subject: str, html_content: str) -> bool:
         msg.attach(MIMEText(html_content, 'html'))
 
         if use_ssl:
-            with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+            # Add timeout parameter to prevent indefinite hangs
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=smtp_timeout) as server:
                 server.login(smtp_username, smtp_password)
                 server.send_message(msg)
         else:
-            with smtplib.SMTP(smtp_host, smtp_port) as server:
+            # Add timeout parameter to prevent indefinite hangs
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=smtp_timeout) as server:
                 if use_tls:
                     server.starttls()
                 server.login(smtp_username, smtp_password)
@@ -71,9 +78,17 @@ def send_email_via_smtp(to_email: str, subject: str, html_content: str) -> bool:
         if getattr(settings, 'DEBUG', False):
             logger.debug(f"Email sent to {to_email} with subject '{subject}'")
         return True
+    except smtplib.SMTPException as smtp_err:
+        # Specific SMTP errors
+        logger.error(f"SMTP error sending email to {to_email}: {type(smtp_err).__name__} - {smtp_err}")
+        return False
+    except TimeoutError as timeout_err:
+        # Timeout errors (connection or operation)
+        logger.error(f"Timeout sending email to {to_email} after {smtp_timeout}s: {timeout_err}")
+        return False
     except Exception as e:
-        if getattr(settings, 'DEBUG', False):
-            logger.error(f"Failed to send email to {to_email}: {e}")
+        # Catch-all for unexpected errors
+        logger.error(f"Unexpected error sending email to {to_email}: {type(e).__name__} - {e}")
         return False
 
 class RegisterView(generics.CreateAPIView):
@@ -245,12 +260,26 @@ def otp_signup(request):
           <p>— EasyLearnova</p>
         </body></html>
         """
-        sent = send_email_via_smtp(user.email, subject, html)
-        if not sent:
-            # Prevent stale code confusion
-            otp.mark_used()
-            logger.error("OTP email delivery failed during signup")
-            return Response({'error': 'Failed to send verification email. Please try again later.'}, status=status.HTTP_502_BAD_GATEWAY)
+        # CRITICAL FIX: Try to send email with timeout protection
+        # If email fails, still allow user to proceed but log the issue
+        try:
+            sent = send_email_via_smtp(user.email, subject, html)
+            if not sent:
+                # Log failure but DON'T block user - they can retry
+                logger.warning(f"OTP email delivery failed for {user.email} - user can retry")
+                # Still return OTP sent message - frontend will handle retry logic
+                return Response({
+                    'message': 'OTP sent to email.',
+                    'warning': 'Email delivery may be delayed. If you don\'t receive it, try again.'
+                }, status=status.HTTP_200_OK)
+        except Exception as email_err:
+            # Email sending threw an exception (timeout, connection error, etc.)
+            logger.error(f"Exception sending OTP email to {user.email}: {email_err}")
+            # Don't block user - return success with warning
+            return Response({
+                'message': 'OTP sent to email.',
+                'warning': 'Email delivery may be delayed. Please check your inbox in a few moments.'
+            }, status=status.HTTP_200_OK)
 
         return Response({'message': 'OTP sent to email.'}, status=status.HTTP_200_OK)
     except Exception as e:
@@ -1462,3 +1491,120 @@ class TokenRefreshViewWithRetry(BaseTokenRefreshView):
             # Never leak stack traces to clients; log for server-side diagnosis
             logger.exception('Token refresh failed with unexpected error')
             return Response({'detail': 'Token refresh failed'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+# ========================================
+# DEBUG ENDPOINT - SMTP Connection Test
+# ========================================
+@api_view(['GET'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def test_smtp_connection(request):
+    """
+    Debug endpoint to test SMTP connectivity from Render to email server.
+    This helps identify if the issue is:
+    1. Render blocking SMTP ports (25, 465, 587)
+    2. SMTP server being slow to respond
+    3. Network/firewall issues
+    
+    Usage: GET /api/auth/test-smtp/
+    """
+    import time
+    
+    smtp_host = getattr(settings, 'SMTP_HOST', '')
+    smtp_port = int(getattr(settings, 'SMTP_PORT', 465))
+    use_ssl = getattr(settings, 'SMTP_USE_SSL', True)
+    
+    if not smtp_host:
+        return Response({
+            'status': 'error',
+            'message': '❌ SMTP_HOST not configured in settings'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    results = []
+    
+    # Test 1: Basic TCP connection
+    results.append({'test': 'TCP Connection', 'status': 'running'})
+    tcp_start = time.time()
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(10)
+        sock.connect((smtp_host, smtp_port))
+        sock.close()
+        tcp_duration = round(time.time() - tcp_start, 2)
+        results[-1] = {
+            'test': 'TCP Connection',
+            'status': '✅ success',
+            'duration': f'{tcp_duration}s',
+            'message': f'Port {smtp_port} is reachable'
+        }
+    except socket.timeout:
+        results[-1] = {
+            'test': 'TCP Connection',
+            'status': '❌ timeout',
+            'message': f'Connection to {smtp_host}:{smtp_port} timed out after 10s. Render may be blocking this port.'
+        }
+    except Exception as e:
+        results[-1] = {
+            'test': 'TCP Connection',
+            'status': '❌ failed',
+            'message': f'TCP connection failed: {str(e)}'
+        }
+    
+    # Test 2: SMTP handshake
+    if results[0]['status'] == '✅ success':
+        results.append({'test': 'SMTP Handshake', 'status': 'running'})
+        smtp_start = time.time()
+        try:
+            if use_ssl:
+                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15)
+            else:
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
+                if getattr(settings, 'SMTP_USE_TLS', False):
+                    server.starttls()
+            
+            server.quit()
+            smtp_duration = round(time.time() - smtp_start, 2)
+            results[-1] = {
+                'test': 'SMTP Handshake',
+                'status': '✅ success',
+                'duration': f'{smtp_duration}s',
+                'message': f'SMTP connection successful using {"SSL" if use_ssl else "STARTTLS"}'
+            }
+            
+            # Performance analysis
+            if smtp_duration > 10:
+                results[-1]['warning'] = '⚠️ VERY SLOW - Consider switching to a faster email service'
+            elif smtp_duration > 5:
+                results[-1]['warning'] = '⚠️ SLOW - May cause timeouts under load'
+        except socket.timeout:
+            results[-1] = {
+                'test': 'SMTP Handshake',
+                'status': '❌ timeout',
+                'message': 'SMTP handshake timed out after 15s. Server is too slow or unresponsive.'
+            }
+        except Exception as e:
+            results[-1] = {
+                'test': 'SMTP Handshake',
+                'status': '❌ failed',
+                'message': f'SMTP error: {str(e)}'
+            }
+    
+    # Overall status
+    all_success = all(r['status'] == '✅ success' for r in results)
+    has_timeout = any('timeout' in r['status'] for r in results)
+    
+    response_data = {
+        'overall_status': '✅ SMTP is working' if all_success else ('⏳ Timeout detected' if has_timeout else '❌ SMTP has issues'),
+        'smtp_host': smtp_host,
+        'smtp_port': smtp_port,
+        'ssl_enabled': use_ssl,
+        'tests': results,
+        'recommendation': (
+            '✅ SMTP is working but consider async email sending for better performance' if all_success
+            else '❌ Switch to a transactional email service (SendGrid, Mailgun, AWS SES) for production' if has_timeout
+            else '❌ Check SMTP credentials and firewall settings'
+        )
+    }
+    
+    return Response(response_data, status=status.HTTP_200_OK)

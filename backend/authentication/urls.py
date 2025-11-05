@@ -15,6 +15,7 @@ from .views import (
     otp_verify,
     otp_resend,
     smtp_test,
+    test_smtp_connection,  # Debug endpoint for SMTP testing
     forgot_password,
     admin_forgot_password,
     reset_password,
@@ -45,6 +46,9 @@ urlpatterns = [
     path('otp/verify/', otp_verify, name='otp_verify'),
     path('otp/resend/', otp_resend, name='otp_resend'),
     path('otp/smtp-test/', smtp_test, name='smtp_test'),
+    
+    # Debug endpoint - SMTP connection test
+    path('test-smtp/', test_smtp_connection, name='test_smtp_connection'),
     
     # Password reset endpoints
     path('forgot-password/', forgot_password, name='forgot_password'),

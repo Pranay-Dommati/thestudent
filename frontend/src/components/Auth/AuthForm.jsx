@@ -306,7 +306,7 @@ export default function AuthForm() {
       
       // Check for timeout/abort
       if (error.code === 'TIMEOUT' || error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.name === 'AbortError') {
-        errorMessage = "Request timed out. The server is taking too long to respond. If you receive an OTP email, you can enter it below.";
+          errorMessage = "Looks like it's taking too long. Please try signing in with Google 😊";
         // If signup timed out, it's possible the server still sent the OTP.
         // Proactively open the OTP modal so the user can verify if they received it.
         if (isSignUp) {

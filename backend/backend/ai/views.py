@@ -525,8 +525,13 @@ def _extract_root_context_ai(user_query: str, max_retries: int = 2) -> str | Non
             "- 'mental health awareness' → 'Mental Health'\n"
             "- 'startup business basics' → 'Startup'\n"
             "- 'Python for data science' → 'Python'\n"
-            "- 'learn calculus' → 'Calculus'\n\n"
+            "- 'learn calculus' → 'Calculus'\n"
+            "- 'arrays and strings' → 'Data Structures'\n"
+            "- 'recursion, dynamic programming' → 'Algorithms'\n"
+            "- 'HTML, CSS, JavaScript' → 'Web Development'\n"
+            "- 'react hooks and state' → 'React'\n\n"
             "Rules:\n"
+            "- If query lists multiple topics (e.g., 'arrays and strings'), identify the BROADER subject (e.g., 'Data Structures', NOT 'Arrays and Strings')\n"
             "- Return ONLY the subject name, nothing else\n"
             "- Use title case (e.g., 'Mental Health', not 'mental health')\n"
             "- Keep it concise (max 4 words)\n"
@@ -706,14 +711,22 @@ def _inject_context_into_topics(topics: list[dict], root_context: str | None, us
         if not topics or not isinstance(topics, list):
             return topics
         
+        # 🔍 LOGGING: Check if root_context was explicitly provided or needs inference
+        logger.info(f"[CONTEXT INJECTION] Starting with root_context='{root_context}', user_query='{user_query}'")
+        
         # If no explicit root context, try to infer it
         if not root_context:
             root_context = _extract_root_context(user_query)
+            logger.info(f"[CONTEXT INJECTION] Inferred root_context='{root_context}' (AI-based extraction)")
+        else:
+            logger.info(f"[CONTEXT INJECTION] Using provided root_context='{root_context}' (explicit)")
         
         # If still no context, return topics unchanged
         if not root_context:
+            logger.info(f"[CONTEXT INJECTION] No root_context available, returning topics unchanged")
             return topics
         
+        logger.info(f"[CONTEXT INJECTION] Will inject context: '{root_context}'")
         enriched_topics = []
         root_lower = root_context.lower()
         
@@ -731,12 +744,18 @@ def _inject_context_into_topics(topics: list[dict], root_context: str | None, us
             name_lower = original_name.lower()
             has_context = root_lower in name_lower
             
+            # 🔍 LOGGING: Show decision for each topic
+            logger.info(f"[TOPIC] '{original_name}' | has_context={has_context} | root_context='{root_context}'")
+            
             # Create enriched topic
             enriched_topic = {**topic}  # Copy all existing fields
             
             if not has_context:
                 # Inject context: append " in {root_context}"
                 enriched_topic['name'] = f"{original_name} in {root_context}"
+                logger.info(f"   [INJECTED] '{original_name}' -> '{enriched_topic['name']}'")
+            else:
+                logger.info(f"   [SKIPPED] '{original_name}' already contains context")
             
             # Add metadata for downstream services (always, even if context already present)
             enriched_topic['root_context'] = root_context
@@ -1502,8 +1521,21 @@ def classify_topics(request):
                     return JsonResponse(error_payload, status=422)
 
             # CONTEXT INJECTION: Enrich topics with root context for downstream services
+            # 🔍 LOGGING: Show what AI returned BEFORE context injection
+            logger.info(f"[AI OUTPUT - BEFORE CONTEXT] Topics returned by AI model:")
+            for idx, topic in enumerate(formatted_topics, 1):
+                logger.info(f"   {idx}. '{topic.get('name', 'N/A')}'")
+            
             root_context = _extract_root_context(user_query)
+            logger.info(f"[ROOT CONTEXT] Extracted from query '{user_query}': '{root_context}'")
+            
+            # Apply context injection
             formatted_topics = _inject_context_into_topics(formatted_topics, root_context, user_query)
+            
+            # 🔍 LOGGING: Show what topics look like AFTER context injection
+            logger.info(f"[AI OUTPUT - AFTER CONTEXT] Final topics sent to frontend:")
+            for idx, topic in enumerate(formatted_topics, 1):
+                logger.info(f"   {idx}. '{topic.get('name', 'N/A')}'")
             
             if settings.DEBUG and root_context:
                 logger.debug(f"Context injection (DIRECT): added '{root_context}' to {len(formatted_topics)} topics")
@@ -1644,8 +1676,21 @@ def classify_topics(request):
                             personalization_value = derive_personalization(user_query)
 
                         # CONTEXT INJECTION: Enrich topics with root context for downstream services
+                        # 🔍 LOGGING: Show what AI returned BEFORE context injection (BROAD mode)
+                        logger.info(f"[AI OUTPUT - BEFORE CONTEXT - BROAD] Topics returned by AI model:")
+                        for idx, topic in enumerate(formatted_topics, 1):
+                            logger.info(f"   {idx}. '{topic.get('name', 'N/A')}'")
+                        
                         root_context = _extract_root_context(user_query)
+                        logger.info(f"[ROOT CONTEXT - BROAD] Extracted from query '{user_query}': '{root_context}'")
+                        
+                        # Apply context injection
                         formatted_topics = _inject_context_into_topics(formatted_topics, root_context, user_query)
+                        
+                        # 🔍 LOGGING: Show what topics look like AFTER context injection (BROAD mode)
+                        logger.info(f"[AI OUTPUT - AFTER CONTEXT - BROAD] Final topics sent to frontend:")
+                        for idx, topic in enumerate(formatted_topics, 1):
+                            logger.info(f"   {idx}. '{topic.get('name', 'N/A')}'")
                         
                         if settings.DEBUG and root_context:
                             logger.debug(f"Context injection: added '{root_context}' to {len(formatted_topics)} topics")
