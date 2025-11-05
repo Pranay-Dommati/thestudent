@@ -269,6 +269,77 @@ class ProLearningCourseSerializer(serializers.ModelSerializer):
             return 0
 
 
+class ProLearningCourseListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for listing ProLearning courses quickly.
+    Excludes heavy nested relations like topics/videos/quizzes.
+    """
+    completion_percentage = serializers.SerializerMethodField()
+    display_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProLearningCourse
+        fields = [
+            'id', 'course_name', 'display_name', 'is_completed',
+            'completion_percentage', 'created_at', 'updated_at'
+        ]
+        read_only_fields = fields
+
+    def get_completion_percentage(self, obj):
+        try:
+            total = obj.topics.count()
+            if total == 0:
+                return 0
+            completed = obj.topics.filter(is_completed=True).count()
+            return round((completed / total) * 100, 2)
+        except Exception:
+            return 0
+
+    def get_display_name(self, obj):
+        """Return a friendly title for list cards.
+        Prefer non-generic course_name; otherwise fall back to first topic.
+        """
+        try:
+            name = (obj.course_name or '').strip()
+            # Clean common auto-generated prefixes
+            cleaned = name
+            for prefix in (
+                'AI Course:', 'AI Generated Course:', 'AI Generated Course',
+                'AI ', 'ProLearning Course', 'Generated Course', 'Database Course'
+            ):
+                cleaned = cleaned.replace(prefix, '').strip()
+
+            # Treat internal id-like names (e.g., "course_176..._abc") as generic
+            try:
+                import re as _re
+                if _re.match(r'^course_[A-Za-z0-9_]+$', cleaned or ''):
+                    cleaned = ''
+            except Exception:
+                pass
+
+            if cleaned and cleaned.lower() not in ('course', 'untitled course'):
+                return cleaned
+
+            # Fallback: use first topic name plus a compact indicator for more
+            first = obj.topics.order_by('order').first()
+            if first:
+                total = obj.topics.count() or 1
+                topic_name = getattr(first, 'topic_name', None) or getattr(first, 'name', '') or 'Topic'
+                additional = max(0, total - 1)
+                if additional == 0:
+                    return topic_name
+                if additional == 1:
+                    return f"{topic_name} +1"
+                if additional == 2:
+                    return f"{topic_name} +1 +2"
+                if additional == 3:
+                    return f"{topic_name} +1 +2 +3"
+                return f"{topic_name} +1 +2 +3 +..."
+        except Exception:
+            pass
+        # Last resort
+        return 'AI Generated Course'
+
+
 class ProLearningCourseCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating a new Pro Learning course with nested topics and content"""
     topics_data = serializers.JSONField(write_only=True)

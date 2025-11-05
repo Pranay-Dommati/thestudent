@@ -11,6 +11,7 @@ from .models import ProLearningCourse, ProLearningTopic, ProLearningShareLink
 from .serializers import (
     ProLearningCourseSerializer,
     ProLearningCourseCreateSerializer,
+    ProLearningCourseListSerializer,
     ProLearningTopicSerializer,
     ProLearningTopicCreateSerializer,
     ProLearningTopicUpdateSerializer,
@@ -51,7 +52,12 @@ class ProLearningCourseListCreateView(generics.ListCreateAPIView):
         """Override list method to add debugging"""
         try:
             queryset = self.get_queryset()
-            serializer = self.get_serializer(queryset, many=True)
+            # Use lightweight serializer when compact listing is requested to speed up UI
+            compact = str(request.GET.get('compact', '0')).lower() in ('1', 'true', 'yes')
+            if compact:
+                serializer = ProLearningCourseListSerializer(queryset, many=True)
+            else:
+                serializer = self.get_serializer(queryset, many=True)
             if settings.DEBUG:
                 print(f"🔍 Debug - Serializer data: {serializer.data}")
             return Response(serializer.data)
