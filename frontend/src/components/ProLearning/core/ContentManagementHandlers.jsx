@@ -423,6 +423,14 @@ export const toggleTopicCompletion = (topicId, event, dependencies) => {
       
       // Show brief feedback
       console.log(isCurrentlyCompleted ? '✅ Topic marked as incomplete' : '🎉 Topic completed!');
+
+      // Notify other parts of the app (Learning Hub) that progress changed
+      try {
+        const evt = new CustomEvent('learning:progress-updated', {
+          detail: { courseId, topicId, completed: !isCurrentlyCompleted, completedCount: updated.length }
+        });
+        window.dispatchEvent(evt);
+      } catch (_) {}
     } catch (error) {
       console.warn('Failed to save completion status:', error);
     }

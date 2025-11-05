@@ -6,7 +6,6 @@ import { useAuth } from '../../../context/AuthContext';
 import axios from '../../../utils/axios';
 import universalToast from '../../../utils/universalToast';
 import { FaTrash } from 'react-icons/fa';
-import { stateNameToCode } from '../../../utils/stateMapping';
 
 // Use shared axios instance with baseURL
 const COURSES_PER_PAGE = 4; // Show 4 courses initially
@@ -49,30 +48,10 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
                                daysDiff === 1 ? 'Yesterday' : 
                                `${daysDiff} days ago`;
 
-            // Build course URL based on type
-            let courseUrl = '';
-            if (courseType === 'school') {
-              const classLevel = enrollment.class_level;
-              const subject = enrollment.subject || course?.subject || '';
-              // Use enrollment.board first; fallback to nested course.board
-              const boardRaw = (enrollment.board && String(enrollment.board)) || (course?.board ? String(course.board) : '');
-              if (boardRaw === 'state') {
-                // When state board, include the state code segment in the route
-                const stateName = course?.state || '';
-                let stateCode = stateNameToCode(stateName);
-                if (!stateCode) {
-                  // safe slug fallback from the name
-                  stateCode = String(stateName).toLowerCase().replace(/\s+/g, '-');
-                }
-                courseUrl = `/courses/${classLevel}/state/${stateCode}/${subject}`;
-              } else {
-                const board = boardRaw || 'cbse'; // final fallback to keep URL valid
-                courseUrl = `/courses/${classLevel}/${board}/${subject}`;
-              }
-            } else {
-              // Engineering courses use course ID
-              courseUrl = `/courses/engineering/${course.id}`;
-            }
+            // Build course learning URL using course ID for both School and Engineering
+            // We standardize navigation to the generic ID-based learning route: /courses/:courseId/learning
+            const courseId = course.id;
+            const courseLearningUrl = `/courses/${courseId}/learning`;
 
             // Use the thumbnail URL directly from the API (backend should handle absolute URLs)
             const imageUrl = course.thumbnail || "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80";
@@ -104,8 +83,8 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
               timeLeft: "Not calculated",
               lastAccessed: lastAccessed,
               courseType: courseType,
-              courseUrl: courseUrl,
-              learningUrl: `${courseUrl}/learning`
+              courseUrl: courseLearningUrl,
+              learningUrl: courseLearningUrl
             };
           });
 
@@ -122,6 +101,28 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
     };
 
     fetchEnrolledCourses();
+
+    // Refresh helpers so progress updates reflect without full reload
+    const onFocus = () => fetchEnrolledCourses();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') fetchEnrolledCourses();
+    };
+    // When learning activity (time-on-task) is sent, progress may have changed server-side
+    const onLearningActivity = () => fetchEnrolledCourses();
+    // Generic progress event if emitted elsewhere in app
+    const onProgressEvent = () => fetchEnrolledCourses();
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('learning:activity-updated', onLearningActivity);
+    window.addEventListener('learning:progress-updated', onProgressEvent);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('learning:activity-updated', onLearningActivity);
+      window.removeEventListener('learning:progress-updated', onProgressEvent);
+    };
   }, [isLoggedIn]);
 
   const handleSortChange = () => {
@@ -283,7 +284,7 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
               <div key={course.enrollmentId} className="group bg-white border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 relative flex flex-col h-80">
 
                 {/* Course Image - Increased Height */}
-                <Link to={course.courseUrl} className="block relative overflow-hidden flex-shrink-0">
+                <Link to={course.learningUrl} className="block relative overflow-hidden flex-shrink-0">
                   <div className="h-40 bg-gray-100">
                     <img 
                       src={course.thumbnail} 
@@ -317,7 +318,7 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
                 {/* Course Content - Reduced Spacing */}
                 <div className="p-3 flex-1 flex flex-col justify-between">
                   <div className="flex-1">
-                    <Link to={course.courseUrl} className="group-hover:text-indigo-600 transition-colors">
+                    <Link to={course.learningUrl} className="group-hover:text-indigo-600 transition-colors">
                       <h3 className="font-semibold text-base line-clamp-2 mb-1">{course.title}</h3>
                     </Link>
                     <div className="flex items-center text-sm text-gray-600">

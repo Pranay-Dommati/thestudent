@@ -986,6 +986,32 @@ def toggle_lesson_completion(request, lesson_id):
         progress_percentage = 0
         if total_lessons > 0:
             progress_percentage = int((completed_lessons / total_lessons) * 100)
+
+        # Persist progress to the user's enrollment so Learning Hub reflects updates
+        try:
+            from .models import UserStartedPredefinedCourse
+
+            enrollment_qs = UserStartedPredefinedCourse.objects.filter(user=user)
+            if lesson.chapter and course:
+                # School course enrollment
+                enrollment_qs = enrollment_qs.filter(course_type='school', school_course=course)
+            elif lesson.section and course:
+                # Engineering course enrollment
+                enrollment_qs = enrollment_qs.filter(course_type='engineering', engineering_course=course)
+
+            enrollment = enrollment_qs.first()
+            if enrollment:
+                # Update persisted progress and completion flags
+                enrollment.progress_percentage = progress_percentage
+                enrollment.is_completed = progress_percentage == 100
+                # Track last accessed lesson for resume UX
+                enrollment.last_accessed_lesson = lesson
+                if enrollment.is_completed and not enrollment.completed_at:
+                    enrollment.completed_at = timezone.now()
+                enrollment.save(update_fields=['progress_percentage', 'is_completed', 'last_accessed_lesson', 'completed_at', 'last_activity'])
+        except Exception:
+            # Never break the toggle flow if persistence fails; surface progress in response anyway
+            pass
             
         return Response({
             'status': status_message,

@@ -120,12 +120,29 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         // Extract proper course type and ID from URL path
         let apiUrl;
         let isSchoolCourse = false;
+        let response;
         // If a specific courseId is present in the query string, prefer fetching by ID
         const searchParams = new URLSearchParams(location.search || '');
         const selectedCourseId = searchParams.get('courseId');
+        const grades = ['6th','7th','8th','9th','10th','11th','12th'];
+        const hasGradeInPath = grades.some(g => pathParts.includes(g));
+
+        // Support the generic ID-based learning route: /courses/:courseId/learning for both school and engineering
+        if (!hasGradeInPath && courseId) {
+          try {
+            isSchoolCourse = true;
+            apiUrl = `/courses/school/${courseId}/`;
+            response = await axiosInstance.get(apiUrl);
+          } catch (e) {
+            // Fallback to engineering by ID if not a school course
+            isSchoolCourse = false;
+            apiUrl = `/courses/engineering/${courseId}/`;
+            response = await axiosInstance.get(apiUrl);
+          }
+        } else {
         
         // Check if it's a school course (e.g., /courses/6th/cbse/math/learning)
-        if (pathParts.includes('6th') || pathParts.includes('7th') || pathParts.includes('8th') || pathParts.includes('9th') || pathParts.includes('10th') || pathParts.includes('11th') || pathParts.includes('12th')) {
+        if (hasGradeInPath) {
           isSchoolCourse = true;
           // Short-circuit: fetch exact school course by ID when provided (avoids 1A vs 1B ambiguity)
           if (selectedCourseId) {
@@ -216,15 +233,16 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           }
           }
         } else {
-          // Engineering course
+          // Engineering course by path structure
           apiUrl = `/courses/engineering/${courseId}/`;
         }
-        
+
         if (!apiUrl) {
           throw new Error("Could not determine API URL from path");
         }
-          console.log("🔍 Fetching course from API URL:", apiUrl);
-        const response = await axiosInstance.get(apiUrl);
+        console.log("🔍 Fetching course from API URL:", apiUrl);
+        response = await axiosInstance.get(apiUrl);
+        }
         console.log("📝 API Response:", response.data);
         let courseData;
         if (isSchoolCourse) {
@@ -571,6 +589,20 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           }
         });
         console.log('💾 Cache updated with new completion status');
+
+        // Notify other parts of the app (Learning Hub) so progress refreshes immediately
+        try {
+          const ev = new CustomEvent('learning:progress-updated', {
+            detail: {
+              courseId: course?.id,
+              lessonId: currentLesson.id,
+              percentage: pct,
+              completed,
+              total
+            }
+          });
+          window.dispatchEvent(ev);
+        } catch (_) {}
       }
     } catch (error) {
       console.error('Error marking lesson as complete:', error);

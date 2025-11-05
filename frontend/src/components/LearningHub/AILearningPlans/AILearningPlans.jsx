@@ -65,15 +65,21 @@ const AILearningPlans = () => {
       if (document.visibilityState === 'visible') refreshCourses(true);
     };
     const onFocus = () => refreshCourses(true);
+  const onLearningActivity = () => refreshCourses(true); // progress may change after activity updates
+  const onLearningProgress = () => refreshCourses(true); // explicit lesson/topic progress event
     window.addEventListener('prolearning:course-saved', onSaved);
     window.addEventListener('storage', onStorage);
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('focus', onFocus);
+  window.addEventListener('learning:activity-updated', onLearningActivity);
+  window.addEventListener('learning:progress-updated', onLearningProgress);
     return () => {
       window.removeEventListener('prolearning:course-saved', onSaved);
       window.removeEventListener('storage', onStorage);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('learning:activity-updated', onLearningActivity);
+      window.removeEventListener('learning:progress-updated', onLearningProgress);
     };
   }, [refreshCourses]);
 
