@@ -404,11 +404,12 @@ export const handleTopicSelect = (
 /**
  * Toggle topic completion status
  */
-export const toggleTopicCompletion = (topicId, event, dependencies) => {
+export const toggleTopicCompletion = async (topicId, event, dependencies) => {
   const { setCompletedTopics, getCourseId } = dependencies;
 
   event.stopPropagation(); // Prevent topic selection when clicking the toggle
   
+  // Optimistically update local UI immediately
   setCompletedTopics(prev => {
     const isCurrentlyCompleted = prev.includes(topicId);
     const updated = isCurrentlyCompleted
@@ -437,6 +438,37 @@ export const toggleTopicCompletion = (topicId, event, dependencies) => {
     
     return updated;
   });
+
+  // Persist completion to backend when working with DB courses (UUIDs)
+  try {
+    const courseId = getCourseId();
+    const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidLike.test(String(courseId)) && uuidLike.test(String(topicId))) {
+      const axios = (await import('../../../utils/axios')).default;
+      // Determine target state from current storage (toggle already applied in UI)
+      let wantCompleted = true;
+      try {
+        const storageKey = `proLearning_completedTopics_${courseId}`;
+        const arr = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        wantCompleted = arr.includes(topicId);
+      } catch {}
+
+      await axios.patch(`/courses/pro-learning/${courseId}/topics/${topicId}/complete/`, {
+        is_completed: wantCompleted,
+      });
+
+      // Invalidate AI courses cache so AILearningPlans shows fresh percentage immediately
+      try { sessionStorage.removeItem('ai_pro_courses_cache_v1'); } catch {}
+
+      // Fire an explicit event to force refreshes (listeners already wired)
+      try {
+        const ev = new CustomEvent('learning:progress-updated', { detail: { courseId, topicId, completed: wantCompleted } });
+        window.dispatchEvent(ev);
+      } catch {}
+    }
+  } catch (e) {
+    console.warn('⚠️ Failed to persist topic completion to backend (UI was updated optimistically):', e);
+  }
 };
 
 /**
