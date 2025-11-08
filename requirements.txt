@@ -18,6 +18,9 @@ pytest>=8.2.0
 pytest-django>=4.8.0
 gunicorn>=21.2.0
 
+# AWS SES for email delivery
+boto3>=1.40.0
+
 # Persistent media storage (Cloudinary)
 cloudinary>=1.39.1
 django-cloudinary-storage>=0.3.0

@@ -83,7 +83,20 @@ services:
       - key: GOOGLE_OAUTH2_CLIENT_SECRET
         sync: false
       
-      # SMTP Settings for emails (set manually)
+      # AWS SES API Settings (set manually in Render dashboard)
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      
+      - key: AWS_REGION
+        value: ap-south-1
+      
+      - key: DEFAULT_FROM_EMAIL
+        value: info@easylearnova.com
+      
+      # SMTP Settings for emails (DEPRECATED - using AWS SES API instead)
       - key: SMTP_HOST
         sync: false
       
