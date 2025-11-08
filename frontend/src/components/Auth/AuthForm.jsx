@@ -608,20 +608,22 @@ export default function AuthForm() {
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.25, ease: [0.4, 0.0, 0.2, 1] }}
                       >
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
-                            <FaRegUser />
+                        <div>
+                          <div className="relative">
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-4 pointer-events-none text-gray-400">
+                              <FaRegUser />
+                            </div>
+                            <input 
+                              className={`w-full p-4 pl-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
+                                formErrors.name ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
+                              }`}
+                              type="text" 
+                              name="name"
+                              placeholder="Full Name" 
+                              value={formData.name}
+                              onChange={handleChange}
+                            />
                           </div>
-                          <input 
-                            className={`w-full p-4 pl-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
-                              formErrors.name ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
-                            }`}
-                            type="text" 
-                            name="name"
-                            placeholder="Full Name" 
-                            value={formData.name}
-                            onChange={handleChange}
-                          />
                           {formErrors.name && <p className="text-red-500 text-sm mt-2">{formErrors.name}</p>}
                         </div>
                       </motion.div>
@@ -629,49 +631,45 @@ export default function AuthForm() {
                   </AnimatePresence>
                   
                   {/* Email Field */}
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
-                      <FaRegEnvelope />
+                  <div>
+                    <div className="relative">
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-4 pointer-events-none text-gray-400">
+                        <FaRegEnvelope />
+                      </div>
+                      <input 
+                        className={`w-full p-4 pl-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
+                          formErrors.email ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
+                        }`} 
+                        type="email" 
+                        name="email"
+                        placeholder="Email Address" 
+                        value={formData.email}
+                        onChange={handleChange}
+                      />
                     </div>
-                    <input 
-                      className={`w-full p-4 pl-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
-                        formErrors.email ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
-                      }`} 
-                      type="email" 
-                      name="email"
-                      placeholder="Email Address" 
-                      value={formData.email}
-                      onChange={handleChange}
-                    />
                     {formErrors.email && <p className="text-red-500 text-sm mt-2">{formErrors.email}</p>}
                   </div>
                   
                   {/* Password Field */}
                   <div className="space-y-2">
-                    <div className="relative">
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-4 pointer-events-none text-gray-400">
-                        <FaLock />
+                    <div>
+                      <div className="relative">
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-4 pointer-events-none text-gray-400">
+                          <FaLock />
+                        </div>
+                        <input 
+                          className={`w-full p-4 pl-12 pr-4 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
+                            formErrors.password ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
+                          }`} 
+                          type={showPassword ? 'text' : 'password'} 
+                          name="password"
+                          placeholder="Password" 
+                          value={formData.password}
+                          onChange={handleChange}
+                          onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+                          autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                        />
                       </div>
-                      <input 
-                        className={`w-full p-4 pl-12 pr-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
-                          formErrors.password ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
-                        }`} 
-                        type={showPassword ? 'text' : 'password'} 
-                        name="password"
-                        placeholder="Password" 
-                        value={formData.password}
-                        onChange={handleChange}
-                        onBlur={() => setTouched((t) => ({ ...t, password: true }))}
-                        autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                      />
-                      <button
-                        type="button"
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        onClick={() => setShowPassword((s) => !s)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {showPassword ? <FaEyeSlash /> : <FaEye />}
-                      </button>
                     </div>
                     
                     {/* Password Requirements Indicator - Only show for signup when user starts typing */}
@@ -722,30 +720,24 @@ export default function AuthForm() {
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.25, ease: [0.4, 0.0, 0.2, 1] }}
                       >
-                        <div className="relative">
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-4 pointer-events-none text-gray-400">
-                            <FaLock />
+                        <div>
+                          <div className="relative h-auto">
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-4 pointer-events-none text-gray-400 z-10">
+                              <FaLock />
+                            </div>
+                            <input 
+                              className={`w-full p-4 pl-12 pr-4 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
+                                formErrors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
+                              }`} 
+                              type={showConfirmPassword ? 'text' : 'password'} 
+                              name="confirmPassword"
+                              placeholder="Confirm Password" 
+                              value={formData.confirmPassword}
+                              onChange={handleChange}
+                              onBlur={() => setTouched((t) => ({ ...t, confirmPassword: true }))}
+                              autoComplete={isSignUp ? 'new-password' : 'off'}
+                            />
                           </div>
-                          <input 
-                            className={`w-full p-4 pl-12 pr-12 border-2 rounded-xl bg-gray-50 focus:ring-2 focus:outline-none transition-all text-base ${
-                              formErrors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-500'
-                            }`} 
-                            type={showConfirmPassword ? 'text' : 'password'} 
-                            name="confirmPassword"
-                            placeholder="Confirm Password" 
-                            value={formData.confirmPassword}
-                            onChange={handleChange}
-                            onBlur={() => setTouched((t) => ({ ...t, confirmPassword: true }))}
-                            autoComplete={isSignUp ? 'new-password' : 'off'}
-                          />
-                          <button
-                            type="button"
-                            aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                            onClick={() => setShowConfirmPassword((s) => !s)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                          >
-                            {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
-                          </button>
                           {formErrors.confirmPassword && <p className="text-red-500 text-sm mt-2">{formErrors.confirmPassword}</p>}
                         </div>
 
@@ -926,67 +918,65 @@ export default function AuthForm() {
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.25 }}
                         >
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
-                              <FaRegUser />
+                          <div>
+                            <div className="relative">
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-3 pointer-events-none text-gray-400">
+                                <FaRegUser />
+                              </div>
+                              <input 
+                                className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                                  formErrors.name ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                                }`}
+                                type="text" 
+                                name="name"
+                                placeholder="Full Name" 
+                                value={formData.name}
+                                onChange={handleChange}
+                              />
                             </div>
-                            <input 
-                              className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                                formErrors.name ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                              }`}
-                              type="text" 
-                              name="name"
-                              placeholder="Full Name" 
-                              value={formData.name}
-                              onChange={handleChange}
-                            />
                             {formErrors.name && <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
                           </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
                     
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
-                        <FaRegEnvelope />
+                    <div>
+                      <div className="relative">
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-3 pointer-events-none text-gray-400">
+                          <FaRegEnvelope />
+                        </div>
+                        <input 
+                          className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                            formErrors.email ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                          }`} 
+                          type="email" 
+                          name="email"
+                          placeholder="Email Address" 
+                          value={formData.email}
+                          onChange={handleChange}
+                        />
                       </div>
-                      <input 
-                        className={`w-full p-3 pl-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                          formErrors.email ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                        }`} 
-                        type="email" 
-                        name="email"
-                        placeholder="Email Address" 
-                        value={formData.email}
-                        onChange={handleChange}
-                      />
                       {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
                     </div>
                     
-                    <div className="relative">
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-3 pointer-events-none text-gray-400">
-                        <FaLock />
+                    <div>
+                      <div className="relative">
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-3 pointer-events-none text-gray-400">
+                          <FaLock />
+                        </div>
+                        <input 
+                          className={`w-full p-3 pl-10 pr-3 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                            formErrors.password ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                          }`} 
+                          type={showPassword ? 'text' : 'password'} 
+                          name="password"
+                          placeholder="Password" 
+                          value={formData.password}
+                          onChange={handleChange}
+                          onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+                          autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                        />
                       </div>
-                      <input 
-                        className={`w-full p-3 pl-10 pr-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                          formErrors.password ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                        }`} 
-                        type={showPassword ? 'text' : 'password'} 
-                        name="password"
-                        placeholder="Password" 
-                        value={formData.password}
-                        onChange={handleChange}
-                        onBlur={() => setTouched((t) => ({ ...t, password: true }))}
-                        autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                      />
-                      <button
-                        type="button"
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        onClick={() => setShowPassword((s) => !s)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {showPassword ? <FaEyeSlash /> : <FaEye />}
-                      </button>
                       {formErrors.password && <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>}
                     </div>
 
@@ -1010,30 +1000,24 @@ export default function AuthForm() {
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.25 }}
                         >
-                          <div className="relative">
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-3 pointer-events-none text-gray-400">
-                              <FaLock />
+                          <div>
+                            <div className="relative h-auto">
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 pl-3 pointer-events-none text-gray-400 z-10">
+                                <FaLock />
+                              </div>
+                              <input 
+                                className={`w-full p-3 pl-10 pr-3 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
+                                  formErrors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
+                                }`} 
+                                type={showConfirmPassword ? 'text' : 'password'} 
+                                name="confirmPassword"
+                                placeholder="Confirm Password" 
+                                value={formData.confirmPassword}
+                                onChange={handleChange}
+                                onBlur={() => setTouched((t) => ({ ...t, confirmPassword: true }))}
+                                autoComplete={isSignUp ? 'new-password' : 'off'}
+                              />
                             </div>
-                            <input 
-                              className={`w-full p-3 pl-10 pr-10 border rounded-lg bg-gray-50 focus:ring-2 focus:outline-none transition-all ${
-                                formErrors.confirmPassword ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-100 focus:border-blue-500'
-                              }`} 
-                              type={showConfirmPassword ? 'text' : 'password'} 
-                              name="confirmPassword"
-                              placeholder="Confirm Password" 
-                              value={formData.confirmPassword}
-                              onChange={handleChange}
-                              onBlur={() => setTouched((t) => ({ ...t, confirmPassword: true }))}
-                              autoComplete={isSignUp ? 'new-password' : 'off'}
-                            />
-                            <button
-                              type="button"
-                              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                              onClick={() => setShowConfirmPassword((s) => !s)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                              {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
-                            </button>
                             {formErrors.confirmPassword && <p className="text-red-500 text-xs mt-1">{formErrors.confirmPassword}</p>}
                           </div>
 
