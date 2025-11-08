@@ -34,13 +34,62 @@ from backend.db_utils import db_retry_on_connection_error
 logger = logging.getLogger(__name__)
 
 
-def send_email_via_smtp(to_email: str, subject: str, html_content: str) -> bool:
-    """Send an HTML email using SMTP settings from Django settings.
-    Supports SSL (port 465) or STARTTLS based on settings.
+def send_email_via_ses(to_email: str, subject: str, html_content: str) -> bool:
+    """Send an HTML email using AWS SES API (boto3).
+    Works on Render free tier since it uses HTTPS instead of SMTP ports.
     Returns True on success, False on failure.
-    
-    CRITICAL: Uses 15-second timeout to prevent worker hangs.
     """
+    try:
+        import boto3
+        from botocore.exceptions import BotoCoreError, ClientError
+        
+        aws_access_key = getattr(settings, 'AWS_ACCESS_KEY_ID', '')
+        aws_secret_key = getattr(settings, 'AWS_SECRET_ACCESS_KEY', '')
+        aws_region = getattr(settings, 'AWS_REGION', 'ap-south-1')
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'info@easylearnova.com')
+        
+        if not (aws_access_key and aws_secret_key):
+            if getattr(settings, 'DEBUG', False):
+                logger.error("AWS SES credentials not configured. Skipping email send.")
+            return False
+        
+        # Create SES client
+        ses = boto3.client(
+            'ses',
+            region_name=aws_region,
+            aws_access_key_id=aws_access_key,
+            aws_secret_access_key=aws_secret_key
+        )
+        
+        # Send email via SES API
+        response = ses.send_email(
+            Source=from_email,
+            Destination={'ToAddresses': [to_email]},
+            Message={
+                'Subject': {'Data': subject, 'Charset': 'UTF-8'},
+                'Body': {
+                    'Html': {'Data': html_content, 'Charset': 'UTF-8'}
+                }
+            }
+        )
+        
+        if getattr(settings, 'DEBUG', False):
+            logger.debug(f"AWS SES email sent to {to_email} - MessageId: {response.get('MessageId')}")
+        return True
+        
+    except (BotoCoreError, ClientError) as aws_err:
+        logger.error(f"AWS SES error sending email to {to_email}: {type(aws_err).__name__} - {aws_err}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error sending email to {to_email}: {type(e).__name__} - {e}")
+        return False
+
+# Keep legacy SMTP function for backward compatibility (deprecated)
+def send_email_via_smtp(to_email: str, subject: str, html_content: str) -> bool:
+    """DEPRECATED: Use send_email_via_ses() instead.
+    Legacy SMTP function kept for backward compatibility.
+    """
+    logger.warning("Using deprecated SMTP function. Switch to send_email_via_ses() for better reliability.")
     try:
         smtp_host = getattr(settings, 'SMTP_HOST', '')
         smtp_port = int(getattr(settings, 'SMTP_PORT', 465))
@@ -48,50 +97,31 @@ def send_email_via_smtp(to_email: str, subject: str, html_content: str) -> bool:
         smtp_password = getattr(settings, 'SMTP_PASSWORD', '')
         use_ssl = getattr(settings, 'SMTP_USE_SSL', True)
         use_tls = getattr(settings, 'SMTP_USE_TLS', False)
+        smtp_timeout = 60
         
-        # CRITICAL: Set timeout to prevent worker hangs (default is no timeout!)
-        smtp_timeout = 60  # 60 seconds (1 minute) max for SMTP operations
-
         if not (smtp_host and smtp_port and smtp_username and smtp_password):
-            if getattr(settings, 'DEBUG', False):
-                logger.error("SMTP settings are not fully configured. Skipping email send.")
             return False
-
-        # Get the proper sender email address (not SMTP username for AWS SES)
-        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', smtp_username)
         
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', smtp_username)
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         msg['From'] = from_email
         msg['To'] = to_email
         msg.attach(MIMEText(html_content, 'html'))
-
+        
         if use_ssl:
-            # Add timeout parameter to prevent indefinite hangs
             with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=smtp_timeout) as server:
                 server.login(smtp_username, smtp_password)
                 server.send_message(msg)
         else:
-            # Add timeout parameter to prevent indefinite hangs
             with smtplib.SMTP(smtp_host, smtp_port, timeout=smtp_timeout) as server:
                 if use_tls:
                     server.starttls()
                 server.login(smtp_username, smtp_password)
                 server.send_message(msg)
-        if getattr(settings, 'DEBUG', False):
-            logger.debug(f"Email sent to {to_email} with subject '{subject}'")
         return True
-    except smtplib.SMTPException as smtp_err:
-        # Specific SMTP errors
-        logger.error(f"SMTP error sending email to {to_email}: {type(smtp_err).__name__} - {smtp_err}")
-        return False
-    except TimeoutError as timeout_err:
-        # Timeout errors (connection or operation)
-        logger.error(f"Timeout sending email to {to_email} after {smtp_timeout}s: {timeout_err}")
-        return False
     except Exception as e:
-        # Catch-all for unexpected errors
-        logger.error(f"Unexpected error sending email to {to_email}: {type(e).__name__} - {e}")
+        logger.error(f"SMTP error: {e}")
         return False
 
 class RegisterView(generics.CreateAPIView):
@@ -263,10 +293,10 @@ def otp_signup(request):
           <p>— EasyLearnova</p>
         </body></html>
         """
-        # CRITICAL FIX: Try to send email with timeout protection
+        # CRITICAL FIX: Try to send email via AWS SES API
         # If email fails, still allow user to proceed but log the issue
         try:
-            sent = send_email_via_smtp(user.email, subject, html)
+            sent = send_email_via_ses(user.email, subject, html)
             if not sent:
                 # Log failure but DON'T block user - they can retry
                 logger.warning(f"OTP email delivery failed for {user.email} - user can retry")
@@ -376,7 +406,7 @@ def otp_resend(request):
       <p>— EasyLearnova</p>
     </body></html>
     """
-    sent = send_email_via_smtp(user.email, subject, html)
+    sent = send_email_via_ses(user.email, subject, html)
     if not sent:
         otp.mark_used()
         if getattr(settings, 'DEBUG', False):

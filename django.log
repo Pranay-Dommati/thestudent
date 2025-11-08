@@ -259,3 +259,4 @@ WARNING 2025-10-11 15:39:28,835 basehttp 69024 70188 "GET /api/courses/enrollmen
 INFO 2025-10-11 15:39:30,155 basehttp 69024 70188 "OPTIONS /api/courses/enroll/ HTTP/1.1" 200 0
 WARNING 2025-10-11 15:39:30,373 log 69024 70188 Not Found: /api/courses/enroll/
 WARNING 2025-10-11 15:39:30,374 basehttp 69024 70188 "POST /api/courses/enroll/ HTTP/1.1" 404 35
+ERROR 2025-11-09 00:58:17,007 views 25748 22320 AWS SES error sending email to gourishettyvarun@gmail.com: ClientError - An error occurred (SignatureDoesNotMatch) when calling the SendEmail operation: The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.

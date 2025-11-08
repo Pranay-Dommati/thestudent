@@ -713,32 +713,20 @@ LOGGING = {
 # Allow iframe embedding for certificate PDFs while maintaining security
 X_FRAME_OPTIONS = 'SAMEORIGIN'  # Allow framing from same origin (localhost:8000)
 
-# SMTP/Email settings (for transactional emails like OTP and password reset)
+# AWS SES Configuration (API-based, not SMTP - works on Render free tier)
 # Configure via environment variables
-# 
-# AWS SES Configuration (Recommended):
-# SMTP_HOST=email-smtp.ap-south-1.amazonaws.com
-# SMTP_PORT=587
-# SMTP_USERNAME=<AWS SES SMTP Access Key ID>
-# SMTP_PASSWORD=<AWS SES SMTP Secret Access Key>
-# SMTP_USE_SSL=false
-# SMTP_USE_TLS=true
-# DEFAULT_FROM_EMAIL=info@easylearnova.com
-#
-# Alternative - Hostinger:
-# SMTP_HOST=smtp.hostinger.com
-# SMTP_PORT=465
-# SMTP_USERNAME=info@easylearnova.com
-# SMTP_PASSWORD=your_app_password
-# SMTP_USE_SSL=true
-# SMTP_USE_TLS=false
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
+AWS_REGION = os.environ.get('AWS_REGION', 'ap-south-1')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'info@easylearnova.com')
+
+# Legacy SMTP settings (kept for backward compatibility, but AWS SES API is preferred)
 SMTP_HOST = os.environ.get('SMTP_HOST', '')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
 SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'false').lower() in ('1', 'true', 'yes')
 SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() in ('1', 'true', 'yes')
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', SMTP_USERNAME or 'noreply@easylearnova.com')
 
 # Optional: Frontend domain for building links in emails
 FRONTEND_DOMAIN = os.environ.get('FRONTEND_DOMAIN', 'http://localhost:5173')
