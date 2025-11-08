@@ -40,8 +40,13 @@ def send_email_via_ses(to_email: str, subject: str, html_content: str) -> bool:
     Returns True on success, False on failure.
     """
     try:
-        import boto3
-        from botocore.exceptions import BotoCoreError, ClientError
+        # Import boto3 dependencies
+        try:
+            import boto3
+            from botocore.exceptions import BotoCoreError, ClientError
+        except ImportError as import_err:
+            logger.error(f"boto3 not installed: {import_err}. Install with: pip install boto3")
+            return False
         
         aws_access_key = getattr(settings, 'AWS_ACCESS_KEY_ID', '')
         aws_secret_key = getattr(settings, 'AWS_SECRET_ACCESS_KEY', '')
@@ -77,11 +82,13 @@ def send_email_via_ses(to_email: str, subject: str, html_content: str) -> bool:
             logger.debug(f"AWS SES email sent to {to_email} - MessageId: {response.get('MessageId')}")
         return True
         
-    except (BotoCoreError, ClientError) as aws_err:
-        logger.error(f"AWS SES error sending email to {to_email}: {type(aws_err).__name__} - {aws_err}")
-        return False
     except Exception as e:
-        logger.error(f"Unexpected error sending email to {to_email}: {type(e).__name__} - {e}")
+        # Check if it's an AWS-specific error
+        error_name = type(e).__name__
+        if 'ClientError' in error_name or 'BotoCoreError' in error_name or 'SES' in error_name:
+            logger.error(f"AWS SES error sending email to {to_email}: {error_name} - {e}")
+        else:
+            logger.error(f"Unexpected error sending email to {to_email}: {error_name} - {e}")
         return False
 
 # Keep legacy SMTP function for backward compatibility (deprecated)
