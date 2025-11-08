@@ -14,6 +14,7 @@ const AILearningPlans = () => {
   const navigate = useNavigate();
   const [proCourses, setProCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false); // background refresh without blocking UI
   const [error, setError] = useState(null);
   const [showMore, setShowMore] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(null);
@@ -65,27 +66,37 @@ const AILearningPlans = () => {
       if (document.visibilityState === 'visible') refreshCourses(true);
     };
     const onFocus = () => refreshCourses(true);
+  const onLearningActivity = () => refreshCourses(true); // progress may change after activity updates
+  const onLearningProgress = () => refreshCourses(true); // explicit lesson/topic progress event
     window.addEventListener('prolearning:course-saved', onSaved);
     window.addEventListener('storage', onStorage);
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('focus', onFocus);
+  window.addEventListener('learning:activity-updated', onLearningActivity);
+  window.addEventListener('learning:progress-updated', onLearningProgress);
     return () => {
       window.removeEventListener('prolearning:course-saved', onSaved);
       window.removeEventListener('storage', onStorage);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('learning:activity-updated', onLearningActivity);
+      window.removeEventListener('learning:progress-updated', onLearningProgress);
     };
   }, [refreshCourses]);
 
   const fetchProCourses = async (force = false) => {
-    // If we have a fresh cache and not forcing, use it instantly
+    // Always attempt to show cached data instantly (stale-while-revalidate)
+    let hadCache = false;
     try {
       const cached = readCache();
-      if (!force && cached && (Date.now() - cached.ts) < CACHE_TTL) {
+      if (cached && Array.isArray(cached.data) && cached.data.length > 0) {
         setProCourses(cached.data);
         setLoading(false);
-        // still consider returning early; avoid network call
-        return cached.data;
+        hadCache = true;
+        // If cache is fresh and not forced, skip network
+        if (!force && (Date.now() - cached.ts) < CACHE_TTL) {
+          return cached.data;
+        }
       }
     } catch (_) {}
 
@@ -106,10 +117,11 @@ const AILearningPlans = () => {
       return;
     }
 
-    setLoading(true);
+    // Show full-page spinner only when no cache; otherwise do a quiet refresh
+    if (!hadCache) setLoading(true); else setRefreshing(true);
     const p = (async () => {
       try {
-        const response = await axios.get(`/courses/pro-learning/`, {
+        const response = await axios.get(`/courses/pro-learning/?compact=1`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -130,6 +142,7 @@ const AILearningPlans = () => {
         throw error;
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     })();
 
@@ -246,14 +259,25 @@ const AILearningPlans = () => {
 
   const formatCourseName = (course) => {
     if (!course) return 'Untitled Course';
+    // Prefer server-provided friendly name when available (from compact API)
+    if (course.display_name && typeof course.display_name === 'string') {
+      const s = course.display_name.trim();
+      if (s) {
+        // Guard against accidental id-like display names
+        if (/^course_[a-z0-9_]+$/i.test(s)) return 'AI Generated Course';
+        return s;
+      }
+    }
     const isIdLike = typeof course.course_name === 'string' && /^course_[a-z0-9_]+$/i.test(course.course_name);
+    // If it's an internal id-like name, show a friendly generic label instead of the raw id
+    if (isIdLike) return 'AI Generated Course';
     const isGenericTitle = (t) => !t || /^(AI Course:|AI Generated Course:?|ProLearning Course|Generated Course|Database Course)$/i.test(String(t).trim());
     // Prefer a non-generic title
     if (course.title && !isGenericTitle(course.title) && course.title !== course.course_name) {
       return String(course.title).trim();
     }
     // If course_name isn't an internal ID and looks fine, use it after cleaning prefixes
-    let base = !isIdLike && course.course_name ? String(course.course_name) : '';
+  let base = course.course_name ? String(course.course_name) : '';
     base = base
       .replace(/^AI Course:\s*/i, '')
       .replace(/^AI Generated Course:\s*/i, '')

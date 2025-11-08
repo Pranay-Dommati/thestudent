@@ -320,6 +320,38 @@ const ProLearningPage = () => {
       const databaseCourse = await fetchCourseFromDB(courseId);
       if (databaseCourse) {
         console.log('✅ Course found in database');
+        try {
+          // If topicsList lacks real DB IDs, hydrate it from the database so
+          // toggles use true UUIDs and can persist completion server-side.
+          const hasUuidIds = Array.isArray(topicsList) && topicsList.some(t => {
+            const id = t && (t.id || '').toString();
+            return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+          });
+          const dbTopics = Array.isArray(databaseCourse.topics) ? databaseCourse.topics : [];
+          if (!hasUuidIds && dbTopics.length > 0) {
+            const mapped = dbTopics
+              .slice()
+              .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+              .map(t => ({ name: t.topic_name || t.name || 'Topic', id: t.id }));
+            if (mapped.length > 0) {
+              setTopicsList(mapped);
+            }
+          }
+
+          // Seed completed topics from backend so progress survives reloads
+          const completedFromDb = dbTopics
+            .filter(t => !!t.is_completed)
+            .map(t => t.id);
+          if (completedFromDb.length >= 0) {
+            setCompletedTopics(completedFromDb);
+            try {
+              const storageKey = `proLearning_completedTopics_${courseId}`;
+              localStorage.setItem(storageKey, JSON.stringify(completedFromDb));
+            } catch {}
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to hydrate topics with DB ids:', e);
+        }
       }
     };
     checkIfCourseSaved();

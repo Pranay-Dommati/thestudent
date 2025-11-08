@@ -404,12 +404,13 @@ export const handleTopicSelect = (
 /**
  * Toggle topic completion status
  */
+
 export const toggleTopicCompletion = async (topicId, event, dependencies) => {
   const { setCompletedTopics, getCourseId } = dependencies;
 
   event.stopPropagation(); // Prevent topic selection when clicking the toggle
   
-  // Optimistically update UI first
+  // Optimistically update local UI immediately
   setCompletedTopics(prev => {
     const isCurrentlyCompleted = prev.includes(topicId);
     const updated = isCurrentlyCompleted
@@ -421,44 +422,53 @@ export const toggleTopicCompletion = async (topicId, event, dependencies) => {
       const courseId = getCourseId();
       const storageKey = courseId ? `proLearning_completedTopics_${courseId}` : 'proLearning_completedTopics';
       localStorage.setItem(storageKey, JSON.stringify(updated));
+      
+      // Show brief feedback
+      console.log(isCurrentlyCompleted ? '✅ Topic marked as incomplete' : '🎉 Topic completed!');
+
+      // Notify other parts of the app (Learning Hub) that progress changed
+      try {
+        const evt = new CustomEvent('learning:progress-updated', {
+          detail: { courseId, topicId, completed: !isCurrentlyCompleted, completedCount: updated.length }
+        });
+        window.dispatchEvent(evt);
+      } catch (_) {}
     } catch (error) {
       console.warn('Failed to save to localStorage:', error);
     }
     
     return updated;
   });
-  
-  // Save to backend API
+
+  // Persist completion to backend when working with DB courses (UUIDs)
   try {
-    const axiosInstance = (await import('../../../utils/axios')).default;
-    const response = await axiosInstance.post(`/api/lessons/complete/${topicId}/`);
-    
-    console.log(response.data.status === 'complete' ? '🎉 Topic completed!' : '✅ Topic marked as incomplete');
-    console.log('Progress:', response.data.progress);
-  } catch (error) {
-    console.error('Failed to save completion status to backend:', error);
-    
-    // Revert the UI change if API call fails
-    setCompletedTopics(prev => {
-      const isCurrentlyCompleted = prev.includes(topicId);
-      const reverted = isCurrentlyCompleted
-        ? prev.filter(id => id !== topicId)
-        : [...prev, topicId];
-      
-      // Update localStorage with reverted state
+    const courseId = getCourseId();
+    const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidLike.test(String(courseId)) && uuidLike.test(String(topicId))) {
+      const axios = (await import('../../../utils/axios')).default;
+      // Determine target state from current storage (toggle already applied in UI)
+      let wantCompleted = true;
       try {
-        const courseId = getCourseId();
-        const storageKey = courseId ? `proLearning_completedTopics_${courseId}` : 'proLearning_completedTopics';
-        localStorage.setItem(storageKey, JSON.stringify(reverted));
-      } catch (e) {
-        console.warn('Failed to revert localStorage:', e);
-      }
-      
-      return reverted;
-    });
-    
-    // Show error message to user
-    alert('Failed to save progress. Please try again or check your internet connection.');
+        const storageKey = `proLearning_completedTopics_${courseId}`;
+        const arr = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        wantCompleted = arr.includes(topicId);
+      } catch {}
+
+      await axios.patch(`/courses/pro-learning/${courseId}/topics/${topicId}/complete/`, {
+        is_completed: wantCompleted,
+      });
+
+      // Invalidate AI courses cache so AILearningPlans shows fresh percentage immediately
+      try { sessionStorage.removeItem('ai_pro_courses_cache_v1'); } catch {}
+
+      // Fire an explicit event to force refreshes (listeners already wired)
+      try {
+        const ev = new CustomEvent('learning:progress-updated', { detail: { courseId, topicId, completed: wantCompleted } });
+        window.dispatchEvent(ev);
+      } catch {}
+    }
+  } catch (e) {
+    console.warn('⚠️ Failed to persist topic completion to backend (UI was updated optimistically):', e);
   }
 };
 

@@ -11,6 +11,7 @@ from .models import ProLearningCourse, ProLearningTopic, ProLearningShareLink
 from .serializers import (
     ProLearningCourseSerializer,
     ProLearningCourseCreateSerializer,
+    ProLearningCourseListSerializer,
     ProLearningTopicSerializer,
     ProLearningTopicCreateSerializer,
     ProLearningTopicUpdateSerializer,
@@ -51,7 +52,12 @@ class ProLearningCourseListCreateView(generics.ListCreateAPIView):
         """Override list method to add debugging"""
         try:
             queryset = self.get_queryset()
-            serializer = self.get_serializer(queryset, many=True)
+            # Use lightweight serializer when compact listing is requested to speed up UI
+            compact = str(request.GET.get('compact', '0')).lower() in ('1', 'true', 'yes')
+            if compact:
+                serializer = ProLearningCourseListSerializer(queryset, many=True)
+            else:
+                serializer = self.get_serializer(queryset, many=True)
             if settings.DEBUG:
                 print(f"🔍 Debug - Serializer data: {serializer.data}")
             return Response(serializer.data)
@@ -142,14 +148,16 @@ class ProLearningTopicDetailView(generics.RetrieveUpdateAPIView):
 
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
-def mark_topic_complete(request, course_id, topic_id):
+def mark_topic_complete(request, id, topic_id):
     """
     PATCH /api/courses/pro-learning/{id}/topics/{topic_id}/complete/
     Mark a topic as completed/uncompleted
     """
+    # Note: URL pattern uses '<uuid:id>', so the parameter name here must be 'id'
+    # to correctly receive the course identifier from the route.
     course = get_object_or_404(
         ProLearningCourse,
-        id=course_id,
+        id=id,
         user=request.user
     )
     
@@ -167,11 +175,16 @@ def mark_topic_complete(request, course_id, topic_id):
     
     if serializer.is_valid():
         serializer.save()
-        
-        # Check if all topics are completed to mark course as complete
-        if course.topics.filter(is_completed=False).count() == 0:
-            course.is_completed = True
-            course.save()
+
+        # Persist course-wide completion percentage and flags
+        try:
+            # Recalculate and store completion percentage on the course model
+            course.update_completion_percentage()
+        except Exception:
+            # Fallback: still mark complete if all topics completed
+            if course.topics.filter(is_completed=False).count() == 0:
+                course.is_completed = True
+                course.save(update_fields=['is_completed'])
         
         return Response(
             ProLearningTopicSerializer(topic).data,
