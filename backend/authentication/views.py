@@ -66,9 +66,12 @@ def send_email_via_ses(to_email: str, subject: str, html_content: str) -> bool:
             aws_secret_access_key=aws_secret_key
         )
         
+        # Format sender with display name (RFC 5322 format)
+        sender = f"EasyLearnova <{from_email}>"
+        
         # Send email via SES API
         response = ses.send_email(
-            Source=from_email,
+            Source=sender,
             Destination={'ToAddresses': [to_email]},
             Message={
                 'Subject': {'Data': subject, 'Charset': 'UTF-8'},
