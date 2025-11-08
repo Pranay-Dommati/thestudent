@@ -1223,14 +1223,10 @@ token_generator = AccountActivationTokenGenerator()
 
 
 def send_password_reset_email(user_email, uid, token, is_admin=False):
-    """Send password reset email using Gmail SMTP"""
+    """Send password reset email — prefer AWS SES API with a friendly display name.
+    Falls back to the legacy SMTP sender if SES is not available.
+    """
     try:
-        # Email configuration
-        smtp_server = "smtp.gmail.com"
-        smtp_port = 587
-        sender_email = "easylearnova@gmail.com"
-        sender_password = "cedr hdik avgu gllp"
-        
         # Create reset URL - different for admin vs regular users
         frontend_domain = getattr(settings, 'FRONTEND_DOMAIN', 'http://localhost:5173')
         if is_admin:
@@ -1241,7 +1237,7 @@ def send_password_reset_email(user_email, uid, token, is_admin=False):
             reset_url = f"{frontend_domain}/reset-password/{uid}/{token}"
             subject = "Password Reset Request - EasyLearnova"
             title = "🎓 Password Reset"
-        
+
         # Email content
         html_content = f"""
         <!DOCTYPE html>
@@ -1283,27 +1279,48 @@ def send_password_reset_email(user_email, uid, token, is_admin=False):
         </body>
         </html>
         """
-        
-        # Create message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = sender_email
-        msg['To'] = user_email
-        
-        html_part = MIMEText(html_content, 'html')
-        msg.attach(html_part)
-        
-        # Send email
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-        
-        logger.info(f"Password reset email sent successfully to {user_email}")
-        return True
-        
+
+        # Prefer sending via AWS SES API to ensure consistent sender/display name
+        try:
+            sent = send_email_via_ses(user_email, subject, html_content)
+            if sent:
+                logger.info(f"Password reset email sent successfully to {user_email} via AWS SES")
+                return True
+            else:
+                logger.warning(f"send_email_via_ses returned False for {user_email}, falling back to SMTP")
+        except Exception as e:
+            logger.error(f"Error while sending via SES, will fallback to SMTP: {e}")
+
+        # Fallback: legacy SMTP (kept for compatibility)
+        try:
+            smtp_server = "smtp.gmail.com"
+            smtp_port = 587
+            sender_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'easylearnova@gmail.com')
+            sender_password = getattr(settings, 'SMTP_FALLBACK_PASSWORD', '')
+
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            # Use friendly display name with proper capitalization
+            msg['From'] = f"EasyLearnova <{sender_email}>"
+            msg['To'] = user_email
+
+            html_part = MIMEText(html_content, 'html')
+            msg.attach(html_part)
+
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()
+                if sender_password:
+                    server.login(sender_email, sender_password)
+                server.send_message(msg)
+
+            logger.info(f"Password reset email sent successfully to {user_email} via SMTP fallback")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send password reset email to {user_email}: {str(e)}")
+            return False
+
     except Exception as e:
-        logger.error(f"Failed to send password reset email to {user_email}: {str(e)}")
+        logger.error(f"Unexpected error in send_password_reset_email: {str(e)}")
         return False
 
 
