@@ -3,12 +3,30 @@ import axios from '../utils/axios';
 function unwrapError(err) {
   const status = err?.response?.status;
   const data = err?.response?.data;
-  const message = data?.error || data?.detail || err?.message || 'Request failed';
+  
+  // Extract message from various error formats
+  let message = data?.error || data?.detail;
+  
+  // Handle field-specific validation errors (e.g., {"email": ["error message"]})
+  if (!message && data && typeof data === 'object') {
+    // Get the first field error
+    const fieldErrors = Object.values(data).filter(v => v);
+    if (fieldErrors.length > 0) {
+      message = Array.isArray(fieldErrors[0]) ? fieldErrors[0][0] : fieldErrors[0];
+    }
+  }
+  
+  // Fallback to generic error message
+  if (!message) {
+    message = err?.message || 'Request failed';
+  }
+  
   const code = status === 429 ? 'RATE_LIMITED' : status === 400 ? 'BAD_REQUEST' : 'REQUEST_FAILED';
   const e = new Error(message);
   e.status = status;
   e.code = code;
   e.data = data;
+  e.response = err?.response; // Preserve original response for AuthForm field validation
   return e;
 }
 

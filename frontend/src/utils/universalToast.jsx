@@ -50,6 +50,12 @@ const renderContent = (message, t, durationMs, iconColor = '#22c55e', iconBg = '
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
         </svg>
       );
+    } else if (iconColor === '#f59e0b') { // Warning
+      return (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: iconColor, width: '16px', height: '16px' }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      );
     } else { // Info/Default
       return (
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: iconColor, width: '16px', height: '16px' }}>
@@ -307,6 +313,37 @@ const universalToast = {
         '#3b82f6', // iconColor
         '#dbeafe', // iconBg (blue-100)
         '#3b82f6'  // mainColor
+      ), 
+      {
+        ...computed,
+        icon: false, // Disable default react-hot-toast icon
+      }
+    );
+  },
+
+  // Warning toast (amber/yellow for neutral warnings)
+  warning: (message, options = {}) => {
+    const duration = options?.duration ?? DEFAULT_DURATIONS.info;
+    const id = buildToastId('warning', message, options?.id, options?.dedupeKey);
+    const onClosePrev = options?.onClose;
+    const computed = {
+      ...options,
+      id,
+      duration: Infinity, // Disable auto-dismiss, let our progress bar control it
+      onClose: (t) => {
+        activeToasts.delete(id);
+        onClosePrev?.(t);
+      },
+    };
+    activeToasts.add(id);
+    return toast(
+      (t) => renderContent(
+        message, 
+        t, 
+        duration, 
+        '#f59e0b', // iconColor (amber-500)
+        '#fef3c7', // iconBg (amber-100)
+        '#f59e0b'  // mainColor
       ), 
       {
         ...computed,

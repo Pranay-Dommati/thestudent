@@ -293,9 +293,43 @@ export default function AuthForm() {
             : backendErrors.full_name;
         }
         
-        // If we have field errors, set them and return
+        // If we have field errors, set them and show toast notification
         if (Object.keys(newFormErrors).length > 0) {
+          // Check if this is an "account already exists" error on the email field
+          const isAccountExistsError = newFormErrors.email && 
+            (newFormErrors.email.toLowerCase().includes('already exists') || 
+             newFormErrors.email.toLowerCase().includes('account with this email'));
+          
+          if (isAccountExistsError) {
+            // Auto-navigate to login page with a friendly message
+            setIsLoading(false);
+            setFormErrors({}); // Clear all form errors before switching to login
+            setIsSignUp(false);
+            
+            // Preserve the returnTo parameter if it exists
+            const returnToParam = returnToPath ? `&returnTo=${encodeURIComponent(returnToPath)}` : '';
+            navigate(`/auth?mode=login${returnToParam}`, { replace: true });
+            
+            // Show warning toast after navigation
+            setTimeout(() => {
+              universalToast.warning('This email is already registered. Please log in instead.', {
+                duration: 5000,
+                id: 'account-exists-redirect'
+              });
+            }, 100);
+            
+            return;
+          }
+          
+          // For other validation errors, show inline + toast
           setFormErrors(newFormErrors);
+          
+          // Show a toast with the first field error
+          const firstError = Object.values(newFormErrors)[0];
+          universalToast.error(firstError, {
+            duration: 4000
+          });
+          
           setIsLoading(false);
           return;
         }

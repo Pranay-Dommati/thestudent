@@ -57,9 +57,12 @@ def send_email_via_smtp(to_email: str, subject: str, html_content: str) -> bool:
                 logger.error("SMTP settings are not fully configured. Skipping email send.")
             return False
 
+        # Get the proper sender email address (not SMTP username for AWS SES)
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', smtp_username)
+        
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
-        msg['From'] = smtp_username
+        msg['From'] = from_email
         msg['To'] = to_email
         msg.attach(MIMEText(html_content, 'html'))
 

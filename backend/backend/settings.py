@@ -714,7 +714,18 @@ LOGGING = {
 X_FRAME_OPTIONS = 'SAMEORIGIN'  # Allow framing from same origin (localhost:8000)
 
 # SMTP/Email settings (for transactional emails like OTP and password reset)
-# Configure via environment. Example for Hostinger:
+# Configure via environment variables
+# 
+# AWS SES Configuration (Recommended):
+# SMTP_HOST=email-smtp.ap-south-1.amazonaws.com
+# SMTP_PORT=587
+# SMTP_USERNAME=<AWS SES SMTP Access Key ID>
+# SMTP_PASSWORD=<AWS SES SMTP Secret Access Key>
+# SMTP_USE_SSL=false
+# SMTP_USE_TLS=true
+# DEFAULT_FROM_EMAIL=info@easylearnova.com
+#
+# Alternative - Hostinger:
 # SMTP_HOST=smtp.hostinger.com
 # SMTP_PORT=465
 # SMTP_USERNAME=info@easylearnova.com
@@ -722,11 +733,12 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'  # Allow framing from same origin (localhost:8000
 # SMTP_USE_SSL=true
 # SMTP_USE_TLS=false
 SMTP_HOST = os.environ.get('SMTP_HOST', '')
-SMTP_PORT = int(os.environ.get('SMTP_PORT', '465'))
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
-SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'true').lower() in ('1', 'true', 'yes')
-SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'false').lower() in ('1', 'true', 'yes')
+SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'false').lower() in ('1', 'true', 'yes')
+SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() in ('1', 'true', 'yes')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', SMTP_USERNAME or 'noreply@easylearnova.com')
 
 # Optional: Frontend domain for building links in emails
 FRONTEND_DOMAIN = os.environ.get('FRONTEND_DOMAIN', 'http://localhost:5173')
