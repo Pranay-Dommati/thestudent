@@ -4,7 +4,8 @@
  */
 
 const CACHE_PREFIX = 'course_cache_';
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+const CACHE_TTL = 60 * 60 * 1000; // 60 minutes in milliseconds (1 hour)
+const STALE_TIME = 30 * 60 * 1000; // 30 minutes - cache is fresh during this time
 
 export const courseCache = {
   /**
@@ -19,19 +20,45 @@ export const courseCache = {
 
       const { data, timestamp } = JSON.parse(cached);
       const now = Date.now();
+      const age = now - timestamp;
 
-      // Check if cache is still valid
-      if (now - timestamp > CACHE_TTL) {
+      // Check if cache is completely expired (hard TTL)
+      if (age > CACHE_TTL) {
         console.log('🗑️ Cache expired for:', cacheKey);
         this.remove(cacheKey);
         return null;
       }
 
-      console.log('✅ Cache hit for:', cacheKey);
+      // Log cache freshness status
+      if (age < STALE_TIME) {
+        console.log('✅ Cache hit (fresh) for:', cacheKey, `- ${Math.round(age / 1000)}s old`);
+      } else {
+        console.log('✅ Cache hit (stale but valid) for:', cacheKey, `- ${Math.round(age / 1000)}s old`);
+      }
+      
       return data;
     } catch (error) {
       console.error('❌ Error reading cache:', error);
       return null;
+    }
+  },
+
+  /**
+   * Check if cached data is fresh (within stale time)
+   * @param {string} cacheKey - Unique identifier for the course
+   * @returns {boolean} - True if cache is fresh, false otherwise
+   */
+  isFresh(cacheKey) {
+    try {
+      const cached = localStorage.getItem(`${CACHE_PREFIX}${cacheKey}`);
+      if (!cached) return false;
+
+      const { timestamp } = JSON.parse(cached);
+      const age = Date.now() - timestamp;
+      
+      return age < STALE_TIME;
+    } catch (error) {
+      return false;
     }
   },
 

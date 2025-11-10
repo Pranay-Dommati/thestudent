@@ -77,7 +77,15 @@ export default function AuthForm() {
     runLiveValidation(name, value);
   };
 
-  const { register, login, googleLogin, validateAuth } = useAuth();
+  const { register, login, googleLogin, validateAuth, isLoggedIn } = useAuth();
+  
+  // Redirect logged-in users to home page
+  useEffect(() => {
+    if (isLoggedIn) {
+      console.log('User is already logged in, redirecting to home...');
+      navigate('/', { replace: true });
+    }
+  }, [isLoggedIn, navigate]);
   
   // Enhanced Google Sign-In with proper error handling
   const handleGoogleSuccess = async (credential) => {

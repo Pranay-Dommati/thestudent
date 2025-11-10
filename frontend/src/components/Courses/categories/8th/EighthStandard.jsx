@@ -35,6 +35,26 @@ const EighthStandard = () => {
   const [availableBoards, setAvailableBoards] = useState([]);
   const [checkingAvailability, setCheckingAvailability] = useState(true);
 
+  // Redirect external visitors (from Google, search engines, etc.) to main courses page
+  useEffect(() => {
+    const referrer = document.referrer;
+    const currentDomain = window.location.origin;
+    const currentPath = window.location.pathname;
+    
+    // Check if user came from external source (not from our own site)
+    const cameFromExternal = referrer && !referrer.startsWith(currentDomain);
+    
+    // Only redirect if:
+    // 1. User came from external source (Google, social media, etc.)
+    // 2. User is on the base /courses/8th route (not on board/state specific routes)
+    const isBaseEighthRoute = currentPath === '/courses/8th' || currentPath === '/courses/8th/';
+    
+    if (cameFromExternal && isBaseEighthRoute) {
+      console.log('External visitor detected on /courses/8th, redirecting to /courses');
+      navigate('/courses', { replace: true });
+    }
+  }, [navigate]);
+
   // Check course availability for each board
   useEffect(() => {
     const checkAvailability = async () => {

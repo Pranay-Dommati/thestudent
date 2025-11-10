@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaEnvelope, FaLock, FaArrowRight } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import universalToast from '../../utils/universalToast';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import authService from '../../services/authService';
 
 const AdminLogin = ({ onLoginSuccess }) => {
@@ -12,6 +13,18 @@ const AdminLogin = ({ onLoginSuccess }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { isLoggedIn, user } = useAuth();
+
+  // Redirect if user is already logged in as admin
+  useEffect(() => {
+    if (isLoggedIn && user?.is_superuser) {
+      console.log('Admin is already logged in, redirecting to admin panel...');
+      navigate('/admin-p', { replace: true });
+    } else if (isLoggedIn) {
+      console.log('Regular user is logged in, redirecting to home...');
+      navigate('/', { replace: true });
+    }
+  }, [isLoggedIn, user, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

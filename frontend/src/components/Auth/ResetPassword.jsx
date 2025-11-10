@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { FaLock, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import universalToast from '../../utils/universalToast';
+import { useAuth } from '../../context/AuthContext';
 import AuthNav from './AuthNav';
 import AuthFooter from './AuthFooter';
 import api from '../../utils/axios';
@@ -10,6 +11,7 @@ import api from '../../utils/axios';
 export default function ResetPassword() {
   const { uid, token } = useParams();
   const navigate = useNavigate();
+  const { isLoggedIn } = useAuth();
   
   const [formData, setFormData] = useState({
     newPassword: '',
@@ -21,6 +23,14 @@ export default function ResetPassword() {
   const [tokenValid, setTokenValid] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
+
+  // Redirect logged-in users to home page
+  useEffect(() => {
+    if (isLoggedIn) {
+      console.log('User is already logged in, redirecting to home...');
+      navigate('/', { replace: true });
+    }
+  }, [isLoggedIn, navigate]);
 
   // Validate token on component mount
   useEffect(() => {

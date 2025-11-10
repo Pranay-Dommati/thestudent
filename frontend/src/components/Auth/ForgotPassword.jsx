@@ -1,17 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { FaRegEnvelope, FaArrowLeft, FaCheckCircle } from "react-icons/fa";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import universalToast from '../../utils/universalToast';
+import { useAuth } from '../../context/AuthContext';
 import AuthNav from './AuthNav';
 import AuthFooter from './AuthFooter';
 import api from '../../utils/axios';
 
 export default function ForgotPassword() {
+  const navigate = useNavigate();
+  const { isLoggedIn } = useAuth();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [formError, setFormError] = useState('');
+
+  // Redirect logged-in users to home page
+  useEffect(() => {
+    if (isLoggedIn) {
+      console.log('User is already logged in, redirecting to home...');
+      navigate('/', { replace: true });
+    }
+  }, [isLoggedIn, navigate]);
 
   const validateEmail = (email) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

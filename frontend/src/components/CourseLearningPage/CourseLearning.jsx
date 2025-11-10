@@ -70,6 +70,34 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     return updatedCourse;
   };
 
+  // **HELPER FUNCTION: Fetch progress in background for logged-in users**
+  const fetchProgressInBackground = async (courseId, courseData, cacheKey) => {
+    try {
+      await validateAuth();
+      const progressResponse = await axiosInstance.get(`/courses/progress/${courseId}/`);
+      
+      // Silently update progress without loading state
+      setCourseProgress(progressResponse.data);
+      if (progressResponse?.data?.progress) {
+        setServerProgress(progressResponse.data.progress);
+      }
+      
+      // Update course with fresh progress
+      const updatedCourse = updateCourseWithProgress(courseData, progressResponse.data);
+      setCourse(updatedCourse);
+      
+      // Update cache with fresh data
+      courseCache.set(cacheKey, {
+        course: updatedCourse,
+        progress: progressResponse.data
+      });
+      console.log('🔄 Background progress sync completed');
+    } catch (error) {
+      console.error('⚠️ Background progress sync failed (non-critical):', error);
+      // Don't show error to user - cache is good enough
+    }
+  };
+
   useEffect(() => {
     // Extract URL path to determine course type and proper API endpoint
     const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
@@ -78,27 +106,69 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       try {
         setLoading(true);
         
-        // **CRITICAL FIX: Never use cached progress for logged-in users**
-        // Always fetch fresh from backend to ensure progress persists after localStorage clear
+        // **IMPROVED CACHING STRATEGY**
+        // 1. For guest users: Use cache freely (no progress to worry about)
+        // 2. For logged-in users: Use cache if fresh, but always sync progress in background
         const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         const cachedData = courseCache.get(cacheKey);
+        const isCacheFresh = courseCache.isFresh(cacheKey);
         
-        // For logged-in users: ALWAYS fetch fresh data to get latest progress from database
-        // Cache is only used for guest users (performance optimization for locked content)
-        if (isLoggedIn) {
-          console.log('👤 Logged in user detected - fetching fresh data with progress from database');
-          // Skip cache for logged-in users to ensure progress is always current
+        // Use cache if available (for both guest and logged-in users)
+        // Validate cache has proper structure before using
+        if (cachedData && cachedData.course && cachedData.course.chapters && Array.isArray(cachedData.course.chapters)) {
+          if (!isLoggedIn) {
+            // Guest users: Use cache and stop (no progress to fetch)
+            console.log('👻 Guest user - using cached course data');
+            setCourse(cachedData.course);
+            setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
+            setLoading(false);
+            return;
+          } else if (isCacheFresh) {
+            // Logged-in users with fresh cache: Use cache immediately for instant load
+            console.log('👤 Logged in user - using fresh cache for instant load');
+            setCourse(cachedData.course);
+            if (cachedData.progress) {
+              setCourseProgress(cachedData.progress);
+              if (cachedData.progress?.progress) {
+                setServerProgress(cachedData.progress.progress);
+              }
+              // Update course with cached progress
+              const updatedCourse = updateCourseWithProgress(cachedData.course, cachedData.progress);
+              setCourse(updatedCourse);
+            }
+            setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
+            setLoading(false);
+            
+            // Optionally fetch progress in background to ensure it's up-to-date
+            // This happens silently without blocking the UI
+            if (cachedData.course?.id) {
+              fetchProgressInBackground(cachedData.course.id, cachedData.course, cacheKey);
+            }
+            return;
+          } else {
+            // Logged-in users with stale cache: Use cache to show content quickly,
+            // but also fetch fresh data
+            console.log('� Logged in user - using stale cache while fetching fresh data');
+            setCourse(cachedData.course);
+            if (cachedData.progress) {
+              setCourseProgress(cachedData.progress);
+              if (cachedData.progress?.progress) {
+                setServerProgress(cachedData.progress.progress);
+              }
+              const updatedCourse = updateCourseWithProgress(cachedData.course, cachedData.progress);
+              setCourse(updatedCourse);
+            }
+            setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
+            setLoading(false);
+            // Continue to fetch fresh data below
+          }
         } else if (cachedData) {
-          // Guest users can use cache safely (no progress to track)
-          console.log('👻 Guest user - using cached course data');
-          setCourse(cachedData.course);
-          setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
-          setLoading(false);
-          return;
+          // Cache exists but has invalid structure - clear it
+          console.warn('⚠️ Cached data has invalid structure, clearing cache');
+          courseCache.invalidate(cacheKey);
         }
         
-        // **OPTIMIZATION 2: Parallel API requests**
-        // Fetch course and progress data in parallel
+        // Fetch fresh data from server
         await fetchRegularCourse(pathParts);
         
       } catch (error) {
@@ -129,12 +199,21 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           try {
             isSchoolCourse = true;
             apiUrl = `/courses/school/${courseId}/`;
+            console.log('🔍 Fetching school course by ID:', courseId);
             response = await axiosInstance.get(apiUrl);
+            console.log('✅ School course fetched successfully');
           } catch (e) {
             // Fallback to engineering by ID if not a school course
+            console.log('⚠️ Not a school course, trying engineering course by ID:', courseId);
             isSchoolCourse = false;
             apiUrl = `/courses/engineering/${courseId}/`;
-            response = await axiosInstance.get(apiUrl);
+            try {
+              response = await axiosInstance.get(apiUrl);
+              console.log('✅ Engineering course fetched successfully');
+            } catch (engError) {
+              console.error('❌ Course not found in either school or engineering:', courseId);
+              throw new Error(`Course with ID "${courseId}" not found. It may have been deleted or you may not have access to it.`);
+            }
           }
         } else {
         
@@ -144,6 +223,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           // Short-circuit: fetch exact school course by ID when provided (avoids 1A vs 1B ambiguity)
           if (selectedCourseId) {
             apiUrl = `/courses/school/${selectedCourseId}/`;
+            console.log('🔍 Fetching school course by query courseId:', selectedCourseId);
           } else {
           const classLevel = pathParts.find(part => ['6th', '7th', '8th', '9th', '10th', '11th', '12th'].includes(part));          const board = pathParts.find(part => ['cbse', 'state'].includes(part));
           
@@ -239,13 +319,28 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         console.log("🔍 Fetching course from API URL:", apiUrl);
         response = await axiosInstance.get(apiUrl);
+        
+        // Validate response
+        if (!response || !response.data) {
+          console.error('❌ Empty response from API');
+          throw new Error('Server returned empty response. Please try again.');
         }
-        console.log("📝 API Response:", response.data);
+        console.log("📝 API Response status:", response.status);
+        console.log("📝 API Response data:", response.data);
+        }
+        console.log("📝 Processing API Response:", response.data);
         let courseData;
         if (isSchoolCourse) {
           if (selectedCourseId) {
             // Already fetched the exact course object
             courseData = response.data;
+            
+            // Validate that we got valid course data with ID
+            if (!courseData || !courseData.id) {
+              console.error('❌ Invalid course data received for ID:', selectedCourseId);
+              throw new Error(`Course with ID "${selectedCourseId}" returned invalid data. Please try refreshing the page.`);
+            }
+            console.log('✅ Course data validated for ID:', courseData.id);
           } else if (Array.isArray(response.data) && response.data.length > 0) {
             // If multiple courses match (e.g., 1A vs 1B), ask user to choose which exact course
             if (response.data.length > 1) {
@@ -332,6 +427,13 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               }))
         };
 
+        // Final validation before setting course
+        if (!transformedCourse || !transformedCourse.chapters || transformedCourse.chapters.length === 0) {
+          console.error('❌ Transformed course has no chapters:', transformedCourse);
+          throw new Error('Course has no content available. Please contact support.');
+        }
+        
+        console.log('✅ Course transformation complete. Chapters:', transformedCourse.chapters.length);
         setCourse(transformedCourse);
 
         // If we loaded a school course by filters and we have its exact ID but the URL
@@ -390,10 +492,24 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         
       } catch (error) {
         console.error('❌ Error fetching course data:', error);
+        console.error('Error details:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          message: error.message,
+          pathname,
+          courseId: searchParams.get('courseId')
+        });
+        
+        // Clear potentially corrupted cache
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+        courseCache.invalidate(cacheKey);
+        console.log('🗑️ Cleared cache due to error');
+        
         const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
         
         // Special handling for state board course errors
-  const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
+        const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
         const isStateBoard = pathParts.includes('state');
         if (isStateBoard) {
           const stateIndex = pathParts.indexOf('state');
@@ -401,17 +517,15 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             const stateId = pathParts[stateIndex + 1];
             console.error(`⚠️ State board course error with state code: ${stateId}`);
             setError(`Unable to find courses for the specified state. Make sure state code "${stateId}" is correct.`);
-          } else {
-            setError('Unable to find state board courses. Invalid URL format.');
+            setCourse(null);
+            setContentType('notFound');
+            return;
           }
-        } else {
-          setError(errorMessage);
         }
         
+        // Don't overwrite specific error messages
+        setError(errorMessage);
         setCourse(null);
-        
-        // Standard error handling for course loading
-        setError('Unable to load the course. Please check if the URL is correct.');
         setContentType('notFound');
       }
     };
@@ -566,10 +680,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           setServerProgress({ completed, total, percentage: pct });
         }
         
-        // **FIX: Invalidate and update cache after marking complete**
-  const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
-        courseCache.invalidate(cacheKey);
-        console.log('🗑️ Cache invalidated after marking lesson complete');
+        // **OPTIMIZATION: Update cache directly instead of invalidating**
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         
         // Update cache with new course state
         courseCache.set(cacheKey, {
@@ -643,12 +755,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           setServerProgress({ completed, total, percentage: pct });
         }
         
-        // **FIX: Invalidate cache after successful completion toggle**
-        const cacheKey = courseCache.generateKey(pathname);
-        courseCache.invalidate(cacheKey);
-        console.log('🗑️ Cache invalidated after lesson completion toggle');
-        
-        // **FIX: Update cache with new course state**
+        // **OPTIMIZATION: Update cache directly with new state**
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
         courseCache.set(cacheKey, {
           course: updatedCourse,
           progress: {
