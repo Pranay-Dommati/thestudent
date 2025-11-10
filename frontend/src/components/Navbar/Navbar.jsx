@@ -5,14 +5,14 @@ import { useAuth } from '../../context/AuthContext';
 import LogoutConfirmModal from '../common/LogoutConfirmModal';
 
 const Navbar = ({ initialStyle = "transparent" }) => {
-  const { isLoggedIn, logout } = useAuth();
+  const { isLoggedIn, logout, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
   // Generate breadcrumbs from current path
   const generateBreadcrumbs = () => {
@@ -172,6 +172,45 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           {isMobile ? (
             // Empty space for tablet and mobile - no breadcrumbs
             <div className="flex-1"></div>
+          ) : loading ? (
+            // Skeleton for desktop nav links while loading
+            <div className="flex items-center justify-center flex-1 max-w-[600px]">
+              <div className="flex items-center space-x-8">
+                <div className={`h-5 w-12 rounded ${
+                  isScrolled || initialStyle === 'light' 
+                    ? 'bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100' 
+                    : 'bg-gradient-to-r from-white/20 via-white/40 to-white/20'
+                } relative overflow-hidden`}>
+                  <div className={`absolute inset-0 ${
+                    isScrolled || initialStyle === 'light' 
+                      ? 'bg-gradient-to-r from-transparent via-white/60 to-transparent' 
+                      : 'bg-gradient-to-r from-transparent via-white/30 to-transparent'
+                  } animate-shimmer`}></div>
+                </div>
+                <div className={`h-5 w-16 rounded ${
+                  isScrolled || initialStyle === 'light' 
+                    ? 'bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100' 
+                    : 'bg-gradient-to-r from-white/20 via-white/40 to-white/20'
+                } relative overflow-hidden`}>
+                  <div className={`absolute inset-0 ${
+                    isScrolled || initialStyle === 'light' 
+                      ? 'bg-gradient-to-r from-transparent via-white/60 to-transparent' 
+                      : 'bg-gradient-to-r from-transparent via-white/30 to-transparent'
+                  } animate-shimmer`}></div>
+                </div>
+                <div className={`h-5 w-24 rounded ${
+                  isScrolled || initialStyle === 'light' 
+                    ? 'bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100' 
+                    : 'bg-gradient-to-r from-white/20 via-white/40 to-white/20'
+                } relative overflow-hidden`}>
+                  <div className={`absolute inset-0 ${
+                    isScrolled || initialStyle === 'light' 
+                      ? 'bg-gradient-to-r from-transparent via-white/60 to-transparent' 
+                      : 'bg-gradient-to-r from-transparent via-white/30 to-transparent'
+                  } animate-shimmer`}></div>
+                </div>
+              </div>
+            </div>
           ) : (
             // Full navigation for desktop
             <div className="flex items-center justify-center flex-1 max-w-[600px]">
@@ -203,7 +242,35 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           
           {/* Profile section - Hide on tablet/mobile, show on desktop */}
           <div className="flex items-center justify-end w-[200px]">
-            {isLoggedIn ? (
+            {loading ? (
+              // Skeleton for desktop auth buttons while loading
+              <div className="hidden xl:flex items-center space-x-4">
+                {/* Login button skeleton */}
+                <div className={`h-10 w-20 rounded-full border ${
+                  isScrolled || initialStyle === 'light' 
+                    ? 'bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 border-gray-200' 
+                    : 'bg-gradient-to-r from-white/20 via-white/40 to-white/20 border-white/30'
+                } relative overflow-hidden`}>
+                  <div className={`absolute inset-0 ${
+                    isScrolled || initialStyle === 'light' 
+                      ? 'bg-gradient-to-r from-transparent via-white/60 to-transparent' 
+                      : 'bg-gradient-to-r from-transparent via-white/30 to-transparent'
+                  } animate-shimmer`}></div>
+                </div>
+                {/* Sign Up button skeleton */}
+                <div className={`h-10 w-24 rounded-full ${
+                  isScrolled || initialStyle === 'light' 
+                    ? 'bg-gradient-to-r from-blue-400 via-blue-500 to-blue-400' 
+                    : 'bg-gradient-to-r from-blue-400 via-purple-500 to-blue-400'
+                } relative overflow-hidden`}>
+                  <div className={`absolute inset-0 ${
+                    isScrolled || initialStyle === 'light' 
+                      ? 'bg-gradient-to-r from-transparent via-white/30 to-transparent' 
+                      : 'bg-gradient-to-r from-transparent via-white/20 to-transparent'
+                  } animate-shimmer`}></div>
+                </div>
+              </div>
+            ) : isLoggedIn ? (
               <div className="hidden xl:flex">
                 <Link 
                   to="/profile"
@@ -236,7 +303,23 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             )}
 
             {/* Mobile/Tablet profile button - Clean and professional */}
-            {isLoggedIn ? (
+            {loading ? (
+              // Skeleton loader while checking auth state on mobile
+              <div className="xl:hidden ml-4 flex items-center">
+                <div className={`w-8 h-8 rounded-full ${
+                  isScrolled || initialStyle === 'light' 
+                    ? 'bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200' 
+                    : 'bg-gradient-to-r from-white/30 via-white/50 to-white/30'
+                } relative overflow-hidden`}>
+                  {/* Shimmer effect */}
+                  <div className={`absolute inset-0 ${
+                    isScrolled || initialStyle === 'light' 
+                      ? 'bg-gradient-to-r from-transparent via-white/60 to-transparent' 
+                      : 'bg-gradient-to-r from-transparent via-white/40 to-transparent'
+                  } animate-shimmer`}></div>
+                </div>
+              </div>
+            ) : isLoggedIn ? (
               <button 
                 className="xl:hidden ml-4 menu-toggle-button"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

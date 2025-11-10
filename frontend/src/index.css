@@ -575,3 +575,121 @@ body {
 .toast-container {
   z-index: 9999 !important;
 }
+
+/* Shimmer animation for skeleton loaders */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+/* Mobile Learning Content - Math Formula Scrolling */
+@media (max-width: 768px) {
+  /* Make block-level math formulas scrollable horizontally with professional styling */
+  .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem -0.75rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    position: relative;
+  }
+  
+  /* Ensure the math content doesn't wrap */
+  .katex-display > .katex {
+    white-space: nowrap;
+    display: inline-block;
+    min-width: fit-content;
+  }
+  
+  /* Keep inline math from breaking layout */
+  .katex {
+    max-width: 100%;
+  }
+  
+  /* Prevent inline math from causing horizontal overflow */
+  .katex-html {
+    overflow-x: visible;
+    overflow-y: hidden;
+  }
+  
+  /* Enhanced scrollbar for math formulas */
+  .katex-display::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .katex-display::-webkit-scrollbar-track {
+    background: #f8fafc;
+    border-radius: 4px;
+  }
+
+  .katex-display::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, #cbd5e0, #a0aec0);
+    border-radius: 4px;
+  }
+
+  .katex-display::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, #a0aec0, #718096);
+  }
+}
+
+  /* Enhanced table scrolling */
+  .overflow-x-auto {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar-track {
+    background: #f7fafc;
+    border-radius: 4px;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, #cbd5e0, #a0aec0);
+    border-radius: 4px;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, #a0aec0, #718096);
+  }
+
+  /* Table container enhancement */
+  .overflow-x-auto table {
+    border-spacing: 0;
+  }
+
+  /* Ensure proper text wrapping for normal content on mobile */
+  .prose {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+  
+  /* Allow long words and URLs to break */
+  .prose p,
+  .prose li,
+  .prose h1,
+  .prose h2,
+  .prose h3,
+  .prose h4,
+  .prose h5,
+  .prose h6 {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }

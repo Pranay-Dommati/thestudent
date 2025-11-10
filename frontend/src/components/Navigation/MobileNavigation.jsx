@@ -9,7 +9,7 @@ import {
 import { HiSparkles } from 'react-icons/hi';
 
 const MobileNavigation = ({ showSearch = true, showNotifications = true }) => {
-  const { isLoggedIn, logout, user } = useAuth();
+  const { isLoggedIn, logout, user, loading } = useAuth();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
@@ -76,28 +76,44 @@ const MobileNavigation = ({ showSearch = true, showNotifications = true }) => {
 
             {/* Right Actions */}
             <div className="flex items-center space-x-3">
-              {showSearch && (
-                <button 
-                  onClick={() => setIsSearchOpen(true)}
-                  className="p-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
-                >
-                  <FaSearch className="w-4 h-4 text-gray-600" />
-                </button>
+              {loading ? (
+                // Skeleton loader while checking auth state
+                <>
+                  {showSearch && (
+                    <div className="w-9 h-9 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 rounded-xl relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"></div>
+                    </div>
+                  )}
+                  <div className="w-9 h-9 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 rounded-xl relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"></div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {showSearch && (
+                    <button 
+                      onClick={() => setIsSearchOpen(true)}
+                      className="p-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                    >
+                      <FaSearch className="w-4 h-4 text-gray-600" />
+                    </button>
+                  )}
+                  
+                  {isLoggedIn && showNotifications && (
+                    <button className="p-2 bg-gray-100 rounded-xl relative hover:bg-gray-200 transition-colors">
+                      <FaBell className="w-4 h-4 text-gray-600" />
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
+                    </button>
+                  )}
+                  
+                  <button 
+                    onClick={() => setIsMenuOpen(true)}
+                    className="p-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                  >
+                    <FaEllipsisV className="w-5 h-5 text-gray-600" />
+                  </button>
+                </>
               )}
-              
-              {isLoggedIn && showNotifications && (
-                <button className="p-2 bg-gray-100 rounded-xl relative hover:bg-gray-200 transition-colors">
-                  <FaBell className="w-4 h-4 text-gray-600" />
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
-                </button>
-              )}
-              
-              <button 
-                onClick={() => setIsMenuOpen(true)}
-                className="p-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
-              >
-                <FaEllipsisV className="w-5 h-5 text-gray-600" />
-              </button>
             </div>
           </div>
         </div>
@@ -245,23 +261,39 @@ const MobileNavigation = ({ showSearch = true, showNotifications = true }) => {
       {/* Bottom Tab Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40 md:hidden">
         <div className="flex justify-around items-center">
-          {navigationItems.map((item, index) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <Link 
-                key={index}
-                to={item.path} 
-                className={`flex flex-col items-center py-2 px-3 rounded-xl transition-colors ${
-                  isActive 
-                    ? 'text-blue-600 bg-blue-50' 
-                    : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
-                }`}
-              >
-                <item.icon className="w-5 h-5 mb-1" />
-                <span className="text-xs font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
+          {loading ? (
+            // Skeleton loaders for bottom nav while checking auth state
+            <>
+              {[1, 2, 3, 4, 5].map((index) => (
+                <div key={index} className="flex flex-col items-center py-2 px-3 space-y-2">
+                  <div className="w-5 h-5 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 rounded relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"></div>
+                  </div>
+                  <div className="w-10 h-2 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 rounded relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer"></div>
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            navigationItems.map((item, index) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link 
+                  key={index}
+                  to={item.path} 
+                  className={`flex flex-col items-center py-2 px-3 rounded-xl transition-colors ${
+                    isActive 
+                      ? 'text-blue-600 bg-blue-50' 
+                      : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <item.icon className="w-5 h-5 mb-1" />
+                  <span className="text-xs font-medium">{item.label}</span>
+                </Link>
+              );
+            })
+          )}
         </div>
       </div>
     </>

@@ -109,7 +109,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         // **IMPROVED CACHING STRATEGY**
         // 1. For guest users: Use cache freely (no progress to worry about)
         // 2. For logged-in users: Use cache if fresh, but always sync progress in background
-        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+        // IMPORTANT: Include auth state in cache key to prevent showing locked content after login
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
         const cachedData = courseCache.get(cacheKey);
         const isCacheFresh = courseCache.isFresh(cacheKey);
         
@@ -472,7 +473,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             setCourse(updatedCourse);
             
             // **OPTIMIZATION 4: Cache the complete data**
-            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
             courseCache.set(cacheKey, {
               course: updatedCourse,
               progress: progressResponse.data
@@ -481,12 +482,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           } catch (progressError) {
             console.error('⚠️ Error fetching progress (non-critical):', progressError);
             // Still cache course without progress
-            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
             courseCache.set(cacheKey, { course: transformedCourse });
           }
         } else {
           // Cache course without progress for non-logged-in users
-          const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+          const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
           courseCache.set(cacheKey, { course: transformedCourse });
         }
         
@@ -502,7 +503,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         });
         
         // Clear potentially corrupted cache
-        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
         courseCache.invalidate(cacheKey);
         console.log('🗑️ Cleared cache due to error');
         
@@ -681,7 +682,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         
         // **OPTIMIZATION: Update cache directly instead of invalidating**
-        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
         
         // Update cache with new course state
         courseCache.set(cacheKey, {
@@ -756,7 +757,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         
         // **OPTIMIZATION: Update cache directly with new state**
-        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
         courseCache.set(cacheKey, {
           course: updatedCourse,
           progress: {

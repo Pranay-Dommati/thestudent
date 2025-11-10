@@ -45,25 +45,53 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       try {
         setLoading(true);
         
-        // **CRITICAL FIX: Never use cached progress for logged-in users**
-        // Always fetch fresh from backend to ensure progress persists after localStorage clear
-        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+        // **IMPROVED CACHING STRATEGY FOR MOBILE**
+        // 1. For guest users: Use cache freely (no progress to worry about)
+        // 2. For logged-in users: Use cache if fresh, but always sync progress in background
+        // IMPORTANT: Include auth state in cache key to prevent showing locked content after login
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
         const cachedData = courseCache.get(cacheKey);
+        const isCacheFresh = courseCache.isFresh(cacheKey);
         
-        // For logged-in users: ALWAYS fetch fresh data to get latest progress from database
-        // Cache is only used for guest users (performance optimization for locked content)
-        if (isLoggedIn) {
-          console.log('📱 Mobile: Logged in user - fetching fresh data with progress from database');
-          // Skip cache for logged-in users to ensure progress is always current
+        // Use cache if available (for both guest and logged-in users)
+        // Validate cache has proper structure before using
+        if (cachedData && cachedData.course && cachedData.course.chapters && Array.isArray(cachedData.course.chapters)) {
+          if (!isLoggedIn) {
+            // Guest users: Use cache and stop (no progress to fetch)
+            logger.log('📱 Guest user - using cached course data');
+            setCourse(cachedData.course);
+            setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
+            setLoading(false);
+            return;
+          } else if (isCacheFresh) {
+            // Logged-in users with fresh cache: Use cache immediately for instant load
+            logger.log('📱 Logged in user - using fresh cache for instant load');
+            setCourse(cachedData.course);
+            if (cachedData.progress) {
+              setCourseProgress(cachedData.progress);
+            }
+            setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
+            setLoading(false);
+            return;
+          } else {
+            // Logged-in users with stale cache: Use cache to show content quickly,
+            // but also fetch fresh data
+            logger.log('📱 Logged in user - using stale cache while fetching fresh data');
+            setCourse(cachedData.course);
+            if (cachedData.progress) {
+              setCourseProgress(cachedData.progress);
+            }
+            setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
+            setLoading(false);
+            // Continue to fetch fresh data below
+          }
         } else if (cachedData) {
-          // Guest users can use cache safely (no progress to track)
-          console.log('📱 Mobile: Guest user - using cached course data');
-          setCourse(cachedData.course);
-          setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
-          setLoading(false);
-          return;
+          // Cache exists but has invalid structure - clear it
+          logger.warn('⚠️ Cached data has invalid structure, clearing cache');
+          courseCache.invalidate(cacheKey);
         }
         
+        // Fetch fresh data from server
         await fetchRegularCourse(pathParts);
       } catch (error) {
         logger.error('❌ Error fetching course data:', error);
@@ -245,7 +273,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         
         // Cache the course data for faster future loads
-  const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+  const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
         courseCache.set(cacheKey, { course: transformedCourse });
         console.log('💾 Mobile: Course data cached for faster future loads');
       } catch (error) {
@@ -304,7 +332,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         setCourse(updatedCourse);
         
         // Update cache with progress data
-        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
         courseCache.set(cacheKey, { 
           course: updatedCourse,
           progress: response.data 
@@ -411,7 +439,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         const response = await axiosInstance.post(`/lessons/toggle-completion/${lesson.id}/`);
         
         // **FIX: Invalidate cache after successful completion toggle**
-        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || ''));
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
         courseCache.invalidate(cacheKey);
         console.log('🗑️ Mobile: Cache invalidated after lesson completion toggle');
         
@@ -602,51 +630,67 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               {/* Tab Content - Compact padding */}
               <div className="px-3">
                 {activeTab === 'about' && (
-                  <div className="prose prose-sm max-w-none">
+                  <div className="prose prose-sm max-w-none break-words overflow-wrap-anywhere">
                     {currentLesson?.aboutLesson ? (
-                      <div>
+                      <div className="break-words">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm, remarkMath]}
                           rehypePlugins={[rehypeKatex]}
                           components={{
-                            ul: ({node, ...props}) => <ul className="list-disc pl-4 my-2 space-y-1" {...props} />,
-                            ol: ({node, ...props}) => <ol className="list-decimal pl-4 my-2 space-y-1" {...props} />,
+                            ul: ({node, ...props}) => <ul className="list-disc pl-4 my-2 space-y-1 break-words" {...props} />,
+                            ol: ({node, ...props}) => <ol className="list-decimal pl-4 my-2 space-y-1 break-words" {...props} />,
                             li: ({node, children, ...props}) => {
                               if (!children || (Array.isArray(children) && children.length === 0) || 
                                   (typeof children === 'string' && children.trim() === '')) {
                                 return null;
                               }
-                              return <li className="ml-1 my-1" {...props}>{children}</li>;
+                              return <li className="ml-1 my-1 break-words" {...props}>{children}</li>;
                             },
-                            h1: ({node, ...props}) => <h1 className="text-lg font-bold my-2" {...props} />,
-                            h2: ({node, ...props}) => <h2 className="text-base font-bold my-2" {...props} />,
-                            h3: ({node, ...props}) => <h3 className="text-sm font-bold my-2" {...props} />,
-                            h4: ({node, ...props}) => <h4 className="text-sm font-bold my-1" {...props} />,
+                            h1: ({node, ...props}) => <h1 className="text-lg font-bold my-2 break-words" {...props} />,
+                            h2: ({node, ...props}) => <h2 className="text-base font-bold my-2 break-words" {...props} />,
+                            h3: ({node, ...props}) => <h3 className="text-sm font-bold my-2 break-words" {...props} />,
+                            h4: ({node, ...props}) => <h4 className="text-sm font-bold my-1 break-words" {...props} />,
                             p: ({node, children, ...props}) => {
                               if (!children || (Array.isArray(children) && children.length === 0) || 
                                   (typeof children === 'string' && children.trim() === '')) {
                                 return null;
                               }
-                              return <p className="my-2 leading-relaxed text-sm" {...props}>{children}</p>;
+                              return <p className="my-2 leading-relaxed text-sm break-words overflow-wrap-anywhere" {...props}>{children}</p>;
                             },
-                            table: ({node, ...props}) => <div className="overflow-x-auto"><table className="min-w-full border border-gray-200 my-2 text-sm" {...props} /></div>,
-                            th: ({node, ...props}) => <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 border border-gray-200" {...props} />,
-                            td: ({node, ...props}) => <td className="px-2 py-1 text-xs text-gray-500 border border-gray-200" {...props} />,
+                            table: ({node, ...props}) => (
+                              <div className="overflow-x-auto my-4 -mx-3 px-3 bg-white rounded-lg shadow-sm">
+                                <div className="min-w-max">
+                                  <table className="w-full border-collapse border border-gray-300 text-sm bg-white rounded-lg overflow-hidden" {...props} />
+                                </div>
+                                {/* Custom scrollbar indicator */}
+                                <div className="flex justify-center mt-2 text-xs text-gray-400">
+                                  <span className="bg-gray-100 px-2 py-1 rounded-full">← Scroll horizontally →</span>
+                                </div>
+                              </div>
+                            ),
+                            th: ({node, ...props}) => <th className="px-3 py-2 text-left text-sm font-semibold text-gray-800 bg-gray-50 border border-gray-300 whitespace-nowrap" {...props} />,
+                            td: ({node, ...props}) => <td className="px-3 py-2 text-sm text-gray-700 border border-gray-300 whitespace-nowrap" {...props} />,
                             code: ({node, inline, className, children, ...props}) => {
                               if (inline) {
-                                return <code className="bg-gray-100 px-1 py-0.5 rounded text-xs" {...props}>{children}</code>
+                                return <code className="bg-gray-100 px-1 py-0.5 rounded text-xs break-words" {...props}>{children}</code>
                               }
                               return (
-                                <div className="bg-gray-800 rounded-md my-2">
-                                  <pre className="p-3 overflow-x-auto">
-                                    <code className="text-green-400 text-xs" {...props}>{children}</code>
+                                <div className="bg-white border border-gray-300 rounded-lg my-4 overflow-x-auto -mx-3 shadow-sm">
+                                  <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 text-xs font-medium text-gray-600">
+                                    Code
+                                  </div>
+                                  <pre className="p-3 bg-gray-800">
+                                    <code className="text-green-400 text-sm whitespace-pre" {...props}>{children}</code>
                                   </pre>
+                                  <div className="flex justify-center py-2 text-xs text-gray-400 bg-gray-50 border-t border-gray-200">
+                                    <span className="bg-gray-100 px-2 py-1 rounded-full">← Scroll horizontally →</span>
+                                  </div>
                                 </div>
                               )
                             },
-                            blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-300 pl-3 my-2 italic text-gray-600 text-sm" {...props} />,
-                            strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
-                            a: ({node, ...props}) => <a className="text-blue-600 underline" {...props} />,
+                            blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-300 pl-3 my-2 italic text-gray-600 text-sm break-words" {...props} />,
+                            strong: ({node, ...props}) => <strong className="font-bold break-words" {...props} />,
+                            a: ({node, ...props}) => <a className="text-blue-600 underline break-words" {...props} />,
                           }}
                         >
                           {preprocessLatex(currentLesson.aboutLesson)}

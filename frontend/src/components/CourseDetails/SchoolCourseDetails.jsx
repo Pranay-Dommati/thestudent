@@ -506,7 +506,6 @@ const SchoolCourseDetails = () => {
 
             {/* Course Image with Elegant Frame */}
             <div className="relative mt-4 sm:mt-0">
-                <span>{isLoggedIn ? 'Start Learning Now' : 'Preview Course'}</span>
                 {/* Subtle Background Glow */}
                 <div className="absolute -inset-2 bg-white/10 rounded-2xl blur-sm"></div>
                 
