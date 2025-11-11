@@ -85,49 +85,57 @@ const Courses = () => {
             return;
         }
 
-        console.log('🔄 Fetching fresh course availability data');
+        console.log('🔄 Fetching fresh course availability data (parallel)');
         setLoading(true);
-        const levelsWithCourses = [];
 
         try {
-            // Check school courses (6th to 12th)
             const schoolLevels = allEducationLevels.filter(level => level.apiClass !== 'engineering');
-            
-            for (const level of schoolLevels) {
-                try {
-                    const { data } = await api.get('/courses/school/', { params: { class: level.apiClass } });
-                    if (data) {
-                        if (data && data.length > 0) {
-                            levelsWithCourses.push(level);
-                            // Cache individual level data as well
-                            courseCache.setCoursesForLevel(level.apiClass, data);
-                        }
-                    }
-                } catch (error) {
-                    logger.error(`Error checking courses for ${level.apiClass}:`, error);
-                }
-            }
 
-            // Check engineering courses
-            try {
-                const { data: engineeringData } = await api.get('/courses/engineering/');
-                if (engineeringData) {
-                    if (engineeringData && engineeringData.length > 0) {
-                        const engineeringLevel = allEducationLevels.find(level => level.apiClass === 'engineering');
-                        if (engineeringLevel) {
-                            levelsWithCourses.push(engineeringLevel);
-                            // Cache engineering data
-                            courseCache.setCoursesForLevel('engineering', engineeringData);
-                        }
-                    }
-                }
-            } catch (error) {
-                logger.error('Error checking engineering courses:', error);
-            }
+            // Fire all requests in parallel and keep payloads tiny using limit=1 when supported
+            const schoolPromises = schoolLevels.map(level =>
+                api.get('/courses/school/', { params: { class: level.apiClass, limit: 1 } })
+                    .then(({ data }) => ({ level, data }))
+                    .catch(error => ({ level, error }))
+            );
 
-            // Cache the availability results
-            courseCache.setCourseAvailability(levelsWithCourses);
-            setAvailableLevels(levelsWithCourses);
+            // Engineering (if/when enabled)
+            const engineeringLevel = allEducationLevels.find(l => l.apiClass === 'engineering');
+            const engineeringPromise = engineeringLevel
+                ? api.get('/courses/engineering/', { params: { limit: 1 } })
+                    .then(({ data }) => ({ level: engineeringLevel, data }))
+                    .catch(error => ({ level: engineeringLevel, error }))
+                : Promise.resolve(null);
+
+            const results = await Promise.allSettled([
+                ...schoolPromises,
+                engineeringPromise,
+            ]);
+
+            const levelsWithCourses = [];
+
+            results.forEach(result => {
+                if (!result || result.status !== 'fulfilled') return;
+                const payload = result.value;
+                if (!payload || payload.error) {
+                    if (payload?.error) logger.error(`Error checking courses for ${payload.level?.apiClass}:`, payload.error);
+                    return;
+                }
+
+                const { level, data } = payload;
+                if (Array.isArray(data) ? data.length > 0 : (data?.results?.length || 0) > 0) {
+                    levelsWithCourses.push(level);
+                    // Optionally cache the tiny payload to warm level cache
+                    const items = Array.isArray(data) ? data : (data?.results || []);
+                    courseCache.setCoursesForLevel(level.apiClass, items);
+                }
+            });
+
+            // If nothing detected (API shape unknown or blocked), fallback to showing all
+            const finalLevels = levelsWithCourses.length > 0 ? levelsWithCourses : allEducationLevels;
+
+            // Cache and update state
+            courseCache.setCourseAvailability(finalLevels);
+            setAvailableLevels(finalLevels);
         } catch (error) {
             logger.error('Error checking course availability:', error);
             // Fallback: show all levels if API fails
