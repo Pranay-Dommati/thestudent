@@ -42,29 +42,12 @@ const ResponsiveCourseLearningPage = () => {
     }
   }, [isLoggedIn]);
 
-  // Determine the actual course ID based on URL pattern
+  // Determine the actual course ID (ID-based only; no subject/slug fallback)
   const determineCourseId = () => {
-    // 1) Prefer explicit courseId from query string to disambiguate (e.g., Maths 1A vs 1B)
     const searchParams = new URLSearchParams(location.search || '');
     const queryCourseId = searchParams.get('courseId');
-    if (queryCourseId) return queryCourseId;
-
-    // 2) If we have a path param courseId (like in engineering courses), use it
-    if (courseId) return courseId;
-    
-    // 3) For school courses, the subject is the identifier
-    if (subjectId) return subjectId;
-    
-    // 4) Extract from pathname as fallback
-    const pathParts = location.pathname.split('/');
-    
-    // Return the last non-empty part before 'learning'
-    const learningIndex = pathParts.indexOf('learning');
-    if (learningIndex > 1) {
-      return pathParts[learningIndex - 1];
-    }
-    
-    return null;
+    // Prefer explicit query param, then path param. If neither exists we return null.
+    return queryCourseId || courseId || null;
   };
 
   // Callback to receive sidebar visibility changes from CourseLearning component

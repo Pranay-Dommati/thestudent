@@ -190,8 +190,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         let isSchoolCourse = false;
         let response;
         // If a specific courseId is present in the query string, prefer fetching by ID
-        const searchParams = new URLSearchParams(location.search || '');
-        const selectedCourseId = searchParams.get('courseId');
+  const searchParams = new URLSearchParams(location.search || '');
+  const selectedCourseId = searchParams.get('courseId');
         const grades = ['6th','7th','8th','9th','10th','11th','12th'];
         const hasGradeInPath = grades.some(g => pathParts.includes(g));
 
@@ -221,94 +221,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         // Check if it's a school course (e.g., /courses/6th/cbse/math/learning)
         if (hasGradeInPath) {
           isSchoolCourse = true;
-          // Short-circuit: fetch exact school course by ID when provided (avoids 1A vs 1B ambiguity)
           if (selectedCourseId) {
             apiUrl = `/courses/school/${selectedCourseId}/`;
             console.log('🔍 Fetching school course by query courseId:', selectedCourseId);
           } else {
-          const classLevel = pathParts.find(part => ['6th', '7th', '8th', '9th', '10th', '11th', '12th'].includes(part));          const board = pathParts.find(part => ['cbse', 'state'].includes(part));
-          
-          // Handle state board case which has an additional parameter
-          if (board === 'state') {
-            const stateIndex = pathParts.indexOf('state');
-            if (stateIndex !== -1 && stateIndex + 1 < pathParts.length) {
-              const stateId = pathParts[stateIndex + 1];
-              const subjectId = pathParts[stateIndex + 2];
-                // Map state codes to full state names
-              const stateMap = {
-                // Southern States
-                'ts': 'Telangana',
-                'ap': 'Andhra Pradesh',
-                'ka': 'Karnataka',
-                'tn': 'Tamil Nadu',
-                'kl': 'Kerala',
-                
-                // Western States
-                'mh': 'Maharashtra',
-                'gj': 'Gujarat',
-                'rj': 'Rajasthan',
-                'ga': 'Goa',
-                
-                // Northern States
-                'dl': 'Delhi',
-                'pb': 'Punjab',
-                'hr': 'Haryana',
-                'hp': 'Himachal Pradesh',
-                'up': 'Uttar Pradesh',
-                'uk': 'Uttarakhand',
-                'jk': 'Jammu and Kashmir',
-                
-                // Eastern States
-                'wb': 'West Bengal',
-                'br': 'Bihar',
-                'or': 'Odisha',
-                'jh': 'Jharkhand',
-                
-                // Central States
-                'mp': 'Madhya Pradesh',
-                'cg': 'Chhattisgarh',
-                
-                // North Eastern States
-                'as': 'Assam',
-                'sk': 'Sikkim',
-                'nl': 'Nagaland',
-                'mn': 'Manipur',
-                'ml': 'Meghalaya',
-                'tr': 'Tripura',
-                'ar': 'Arunachal Pradesh',
-                'mz': 'Mizoram',
-                
-                // Union Territories
-                'ch': 'Chandigarh',
-                'an': 'Andaman and Nicobar Islands',
-                'dn': 'Dadra and Nagar Haveli and Daman and Diu',
-                'ld': 'Lakshadweep',
-                'py': 'Puducherry',
-                'la': 'Ladakh'
-              };                // Use the full state name if available, otherwise use the code
-              const stateCode = stateId.toLowerCase();
-              const stateParam = stateMap[stateCode] || stateId;
-              
-              console.log(`🗺️ State code mapping: "${stateCode}" → "${stateParam}"`);
-              
-              // Warn if state code is not found in the mapping
-              if (!stateMap[stateCode]) {
-                console.warn(`⚠️ Warning: State code "${stateCode}" not found in state mapping. Using raw value instead.`);
-              }
-              
-              // Normalize subject to lowercase to match backend filtering behavior
-              apiUrl = `/courses/school/?class=${classLevel}&board=${board}&state=${stateParam}&subject=${(subjectId || '').toLowerCase()}`;
-              console.log(`🔍 Looking for state board course: class=${classLevel}, state=${stateParam}, subject=${subjectId}`);
-            }
-          } else {
-            const subjectIndex = pathParts.indexOf(board) + 1;
-            if (subjectIndex < pathParts.length) {
-              const subjectId = pathParts[subjectIndex];
-              // Convert subjectId to lowercase to ensure case-insensitive matching with database
-              apiUrl = `/courses/school/?class=${classLevel}&board=${board}&subject=${subjectId.toLowerCase()}`;
-              console.log(`📚 Fetching school course with: class=${classLevel}, board=${board}, subject=${subjectId.toLowerCase()}`);
-            }
-          }
+            // Strict ID-only mode: do not attempt subject/state fallbacks
+            throw new Error('Missing courseId. Please start learning from the course page so we can lock to the correct course.');
           }
         } else {
           // Engineering course by path structure
@@ -331,44 +249,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         console.log("📝 Processing API Response:", response.data);
         let courseData;
-        if (isSchoolCourse) {
-          if (selectedCourseId) {
-            // Already fetched the exact course object
-            courseData = response.data;
-            
-            // Validate that we got valid course data with ID
-            if (!courseData || !courseData.id) {
-              console.error('❌ Invalid course data received for ID:', selectedCourseId);
-              throw new Error(`Course with ID "${selectedCourseId}" returned invalid data. Please try refreshing the page.`);
-            }
-            console.log('✅ Course data validated for ID:', courseData.id);
-          } else if (Array.isArray(response.data) && response.data.length > 0) {
-            // If multiple courses match (e.g., 1A vs 1B), ask user to choose which exact course
-            if (response.data.length > 1) {
-              setDisambiguationOptions(response.data);
-              setContentType('disambiguate');
-              return; // Defer loading until user selects
-            }
-            // Single match: load its full details
-            const selected = response.data[0];
-            console.log("🎯 Selected course from list:", selected);
-            const detailResponse = await axiosInstance.get(`/courses/school/${selected.id}/`);
-            console.log("📚 Complete course details:", detailResponse.data);
-            courseData = detailResponse.data;
-          } else if (response?.data && response.data.id) {
-            // Some backends return a single course object when filters match exactly one
-            courseData = response.data;
-          } else if (response?.data && Array.isArray(response.data.results) && response.data.results.length > 0) {
-            // Support paginated format: { results: [...] }
-            const selected = response.data.results[0];
-            const detailResponse = await axiosInstance.get(`/courses/school/${selected.id}/`);
-            courseData = detailResponse.data;
-          } else {
-            throw new Error(`No courses found for the specified criteria. Please check if the course exists.`);
-          }
-        } else {
-          courseData = response.data;
-        }
+        courseData = response.data;
           console.log("Fetched Course Data:", courseData);
         
         // Check if courseData is valid and has the expected structure

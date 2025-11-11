@@ -2,6 +2,15 @@ import React from 'react';
 import { FaClock, FaListAlt, FaRedo, FaCheck } from 'react-icons/fa';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 
+/**
+ * QuizIntro
+ * Canonicalizes quiz navigation to ID-based learning route only.
+ * Previous implementation rebuilt many hierarchical class / board / state paths
+ * which led to inconsistent loading when refreshing or deep-linking.
+ * Now we ALWAYS navigate to: /courses/:courseId/learning/quiz
+ * where courseId is sourced from either route params or ?courseId= query param.
+ */
+
 const QuizIntro = ({ quizData, lessonId, onStart }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -12,65 +21,49 @@ const QuizIntro = ({ quizData, lessonId, onStart }) => {
   console.log('URL params:', params);
   console.log('Current path:', location.pathname);
   console.log('Quiz questions available:', 
-    Array.isArray(quizData?.questions) && quizData.questions.length > 0);    const handleStartQuiz = () => {
-    // Determine the correct quiz URL based on the current path
-    const currentPath = location.pathname;
-    let quizPath;
-    
-    console.log('Building quiz path from current path:', currentPath);
-    
-    if (currentPath.includes('/engineering/')) {
-      // Engineering course path
-      quizPath = `/courses/engineering/${params.courseId}/learning/quiz`;
-    } else if (currentPath.includes('/10th/')) {
-      // 10th class course paths
-      if (currentPath.includes('/state/')) {
-        quizPath = `/courses/10th/state/${params.stateId}/${params.subjectId}/learning/quiz`;
-      } else {
-        quizPath = `/courses/10th/cbse/${params.subjectId}/learning/quiz`;
-      }
-    } else if (currentPath.includes('/11th/')) {
-      // 11th class course paths
-      if (currentPath.includes('/state/')) {
-        quizPath = `/courses/11th/state/${params.stateId}/${params.subjectId}/learning/quiz`;
-      } else {
-        quizPath = `/courses/11th/cbse/${params.subjectId}/learning/quiz`;
-      }
-    } else if (currentPath.includes('/12th/')) {
-      // 12th class course paths
-      if (currentPath.includes('/state/')) {
-        quizPath = `/courses/12th/state/${params.stateId}/${params.subjectId}/learning/quiz`;
-      } else {
-        quizPath = `/courses/12th/cbse/${params.subjectId}/learning/quiz`;
-      }
-    } else {
-      // Default fallback - append /quiz to current learning path
-      quizPath = `${currentPath}/quiz`;
+    Array.isArray(quizData?.questions) && quizData.questions.length > 0);
+
+  const handleStartQuiz = () => {
+    // Derive courseId strictly from param or query string (canonical ID approach)
+    const searchParams = new URLSearchParams(location.search || '');
+    const courseId = params.courseId || searchParams.get('courseId');
+
+    if (!courseId) {
+      console.error('QuizIntro: Missing courseId; cannot start quiz.');
+      // Optionally we could navigate back or show a toast here.
+      return;
     }
-    
-    // Preserve any query parameters such as ?courseId=... to keep course context
-    if (location.search) {
-      quizPath = `${quizPath}${location.search}`;
+
+    // Build canonical quiz path
+    let quizPath = `/courses/${courseId}/learning/quiz`;
+
+    // Preserve other query params EXCEPT courseId to avoid duplication
+    const preserved = [];
+    searchParams.forEach((value, key) => {
+      if (key !== 'courseId') preserved.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+    });
+    if (preserved.length) {
+      quizPath += `?${preserved.join('&')}`;
     }
-    console.log('Navigating to quiz path:', quizPath);
-    
-    // Prepare quiz questions data
+
+    console.log('Navigating (canonical) to quiz path:', quizPath);
+
+    // Normalize / enrich quiz questions ensuring each has an id
     const preparedQuizData = {
       ...quizData,
-      questions: Array.isArray(quizData.questions) ? 
-        quizData.questions.map(q => ({
-          ...q,
-          // Ensure each question has an id
-          id: q.id || Math.random().toString(36).substr(2, 9)
-        })) : []
+      questions: Array.isArray(quizData?.questions)
+        ? quizData.questions.map(q => ({
+            ...q,
+            id: q.id || Math.random().toString(36).slice(2, 11)
+          }))
+        : []
     };
-    
-    // Navigate to the standalone quiz page with quiz data
+
     navigate(quizPath, {
-      state: { 
+      state: {
         quizData: preparedQuizData,
-        lessonId: lessonId,
-        from: location.pathname 
+        lessonId,
+        from: location.pathname
       }
     });
   };

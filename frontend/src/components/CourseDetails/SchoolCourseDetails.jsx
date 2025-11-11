@@ -384,8 +384,12 @@ const SchoolCourseDetails = () => {
       if (isEnrolled) {
         logger.log('User already enrolled, navigating directly to learning page');
         universalToast.success('Welcome back! Continuing your learning journey.', { id: 'start-learning' });
-  // Preserve any query params (like ?courseId=...) for downstream pages
-  navigate({ pathname: `${location.pathname}/learning`, search: location.search });
+        // ID-BASED NAVIGATION: Always use canonical /courses/:courseId/learning route
+        if (course?.id) {
+          navigate(`/courses/${course.id}/learning`);
+        } else {
+          universalToast.error('Course ID missing. Please refresh.', { id: 'start-learning' });
+        }
         return;
       }
 
@@ -422,8 +426,12 @@ const SchoolCourseDetails = () => {
           universalToast.success('Welcome back! Continuing your learning journey.', { id: 'start-learning' });
         }
         
-        // Navigate to the learning page and PRESERVE query params (keeps ?courseId=... for ID-based fetch)
-        navigate({ pathname: `${location.pathname}/learning`, search: location.search });
+        // ID-BASED NAVIGATION after enrollment
+        if (course?.id) {
+          navigate(`/courses/${course.id}/learning`);
+        } else {
+          universalToast.error('Course ID missing after enrollment. Please retry.', { id: 'start-learning' });
+        }
       }
     } catch (error) {
       logger.error('Error enrolling in course:', error);

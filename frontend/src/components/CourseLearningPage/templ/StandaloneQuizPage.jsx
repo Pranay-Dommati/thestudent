@@ -23,19 +23,18 @@ const StandaloneQuizPage = () => {
     console.log('Questions available:', 
       passedQuizData?.questions && Array.isArray(passedQuizData.questions) ? 
       passedQuizData.questions.length : 0);
-      // Construct return path based on current URL pattern
-    let defaultReturnPath;
-    const currentPath = location.pathname;
-    
-    if (currentPath.includes('/engineering/')) {
-      // Engineering course path
-      defaultReturnPath = `/courses/engineering/${params.courseId}/learning`;
-    } else {
-      // School course path - remove /quiz from current path
-      defaultReturnPath = currentPath.replace('/quiz', '');
-    }
-    
-    const previousPath = location.state?.from || defaultReturnPath;
+      // Canonical return path: always /courses/:courseId/learning
+      const currentPath = location.pathname;
+      const searchParams = new URLSearchParams(location.search || '');
+      const courseId = params.courseId || searchParams.get('courseId');
+      let defaultReturnPath;
+      if (courseId) {
+        defaultReturnPath = `/courses/${courseId}/learning`;
+      } else {
+        // Fallback: remove /quiz segment (legacy) if courseId missing
+        defaultReturnPath = currentPath.replace('/quiz', '');
+      }
+      const previousPath = location.state?.from || defaultReturnPath;
     
     setReturnPath(previousPath);
       if (passedQuizData && passedQuizData.questions && passedQuizData.questions.length > 0) {

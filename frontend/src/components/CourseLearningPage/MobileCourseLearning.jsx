@@ -103,187 +103,105 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     };
     
   const fetchRegularCourse = async (pathParts = pathname ? pathname.split('/').filter(Boolean) : []) => {
-      try {
-    // axiosInstance already prefixes with '/api'
+    try {
+      let apiUrl = null;
+      let isSchoolCourse = false;
+      const searchParams = new URLSearchParams(location.search || '');
+      const selectedCourseId = searchParams.get('courseId');
+      const hasGradeInPath = ['6th','7th','8th','9th','10th','11th','12th'].some(g => pathParts.includes(g));
 
-  let apiUrl;
-        let isSchoolCourse = false;
-  // Prefer explicit courseId from the query string if present (disambiguates 1A vs 1B)
-  const searchParams = new URLSearchParams(location.search || '');
-  const selectedCourseId = searchParams.get('courseId');
-
-        if (pathParts.includes('6th') || pathParts.includes('7th') || pathParts.includes('8th') || pathParts.includes('9th') || pathParts.includes('10th') || pathParts.includes('11th') || pathParts.includes('12th')) {
+      if (hasGradeInPath) {
+        if (!selectedCourseId) {
+          throw new Error('Missing courseId. Please use Start Learning from the course page to lock to the exact course.');
+        }
+        isSchoolCourse = true;
+        apiUrl = `/courses/school/${selectedCourseId}/`;
+      } else if (pathParts.includes('engineering')) {
+        apiUrl = `/courses/engineering/${courseId}/`;
+      } else {
+        if (!courseId) throw new Error('Missing courseId in URL.');
+        // Try school first, then engineering by ID
+        try {
           isSchoolCourse = true;
-          if (selectedCourseId) {
-            apiUrl = `/courses/school/${selectedCourseId}/`;
-          } else {
-          const classLevel = pathParts.find(part => ['6th', '7th', '8th', '9th', '10th', '11th', '12th'].includes(part));
-          const board = pathParts.find(part => ['cbse', 'state'].includes(part));
-
-          if (board === 'state') {
-            const stateIndex = pathParts.indexOf('state');
-            if (stateIndex !== -1 && stateIndex + 2 < pathParts.length) {
-              const stateId = pathParts[stateIndex + 1];
-              const subjectId = pathParts[stateIndex + 2];
-              const stateMap = {
-                // Southern States
-                ts: 'Telangana',
-                ap: 'Andhra Pradesh',
-                ka: 'Karnataka',
-                tn: 'Tamil Nadu',
-                kl: 'Kerala',
-                // Western States
-                mh: 'Maharashtra',
-                gj: 'Gujarat',
-                rj: 'Rajasthan',
-                ga: 'Goa',
-                // Northern States
-                dl: 'Delhi',
-                pb: 'Punjab',
-                hr: 'Haryana',
-                hp: 'Himachal Pradesh',
-                up: 'Uttar Pradesh',
-                uk: 'Uttarakhand',
-                jk: 'Jammu and Kashmir',
-                // Eastern/Central
-                wb: 'West Bengal',
-                br: 'Bihar',
-                or: 'Odisha',
-                jh: 'Jharkhand',
-                mp: 'Madhya Pradesh',
-                cg: 'Chhattisgarh',
-                // North East
-                as: 'Assam',
-                sk: 'Sikkim',
-                nl: 'Nagaland',
-                mn: 'Manipur',
-                ml: 'Meghalaya',
-                tr: 'Tripura',
-                ar: 'Arunachal Pradesh',
-                mz: 'Mizoram',
-                // UTs
-                ch: 'Chandigarh',
-                an: 'Andaman and Nicobar Islands',
-                dn: 'Dadra and Nagar Haveli and Daman and Diu',
-                ld: 'Lakshadweep',
-                py: 'Puducherry',
-                la: 'Ladakh',
-              };
-
-              const stateCode = (stateId || '').toLowerCase();
-              const stateParam = stateMap[stateCode] || stateId;
-              // Decode subject from URL (handles cases like "social%20science"), normalize to lowercase, then re-encode
-              const subj = decodeURIComponent(subjectId || '').toLowerCase();
-              apiUrl = `/courses/school/?class=${classLevel}&board=${board}&state=${encodeURIComponent(stateParam)}&subject=${encodeURIComponent(subj)}`;
-              logger.log('🔍 Mobile: state board query URL', apiUrl);
-            } else {
-              throw new Error('Invalid state board URL format');
-            }
-          } else {
-            const subjectIndex = pathParts.indexOf(board) + 1;
-            const subjectId = pathParts[subjectIndex];
-            const subj = decodeURIComponent(subjectId || '').toLowerCase();
-            apiUrl = `/courses/school/?class=${classLevel}&board=${board}&subject=${encodeURIComponent(subj)}`;
-            logger.log('📚 Mobile: CBSE query URL', apiUrl);
-          }
-          }
-        } else {
+          apiUrl = `/courses/school/${courseId}/`;
+          await axiosInstance.get(apiUrl); // probe existence
+        } catch {
+          isSchoolCourse = false;
           apiUrl = `/courses/engineering/${courseId}/`;
         }
-
-        if (!apiUrl) throw new Error('Could not determine API URL from path');
-
-  logger.log('🔥 Fetching course list/details from:', apiUrl);
-        // Use shared axios instance for auth/interceptors
-        const response = await axiosInstance.get(apiUrl);
-
-        let courseData;
-        if (isSchoolCourse) {
-          if (selectedCourseId) {
-            // Already fetched the exact course object by ID
-            courseData = response.data;
-          } else if (Array.isArray(response.data) && response.data.length > 0) {
-            // If multiple courses match (e.g., 1A vs 1B), pick the first one
-            // TODO: Show disambiguation UI if multiple matches exist
-            const picked = response.data.find(c => !!c) || response.data[0];
-            logger.log('🎯 Mobile: Selected course from list:', picked);
-            const detail = await axiosInstance.get(`/courses/school/${picked.id}/`);
-            courseData = detail.data;
-          } else {
-            throw new Error('No courses found for the specified criteria.');
-          }
-        } else {
-          courseData = response.data;
-        }
-
-        if (!courseData || (!courseData.chapters && !courseData.sections)) {
-          throw new Error('No course data found or unexpected format');
-        }
-
-        const transformedCourse = {
-          id: courseData.id,
-          title: courseData.title || courseData.name,
-          description: courseData.description,
-          instructor: courseData.instructor,
-          chapters: courseData.chapters
-            ? courseData.chapters.map((chapter) => ({
-                title: chapter.name,
-                isLocked: !!(chapter.is_locked || chapter.isLocked),
-                lessons: chapter.lessons.map((lesson) => ({
-                  id: lesson.id,
-                  title: lesson.title,
-                  type: lesson.type,
-                  videoUrl: lesson.video_url,
-                  description: lesson.description,
-                  aboutLesson: lesson.about_lesson || lesson.aboutLesson,
-                  completed: lesson.completed || false,
-                  isAIGenerated: false,
-                  quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
-                  quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
-                  resources: lesson.resources || { downloadable: [], internet: [] },
-                  isLocked: !!(lesson.is_locked || lesson.isLocked),
-                })),
-              }))
-            : courseData.sections.map((section) => ({
-                title: section.name,
-                isLocked: !!(section.is_locked || section.isLocked),
-                lessons: section.lessons.map((lesson) => ({
-                  id: lesson.id,
-                  title: lesson.title,
-                  type: lesson.type,
-                  videoUrl: lesson.video_url,
-                  description: lesson.description,
-                  aboutLesson: lesson.about_lesson || lesson.aboutLesson,
-                  completed: lesson.completed || false,
-                  isAIGenerated: false,
-                  quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
-                  quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
-                  resources: lesson.resources || { downloadable: [], internet: [] },
-                  isLocked: !!(lesson.is_locked || lesson.isLocked),
-                })),
-              })),
-        };
-
-        setCourse(transformedCourse);
-        if (transformedCourse.chapters.length > 0) {
-          setExpandedChapters({ 0: true });
-          // Ensure first lesson is selected so content type reflects its type (video/reading/resources/quiz)
-          setActiveChapter(0);
-          setActiveLesson(0);
-        }
-        
-        // Cache the course data for faster future loads
-  const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
-        courseCache.set(cacheKey, { course: transformedCourse });
-        console.log('💾 Mobile: Course data cached for faster future loads');
-      } catch (error) {
-        logger.error('❌ Error fetching course data:', error);
-        const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
-        setError(errorMessage);
-        setCourse(null);
-        setContentType('notFound');
       }
-    };
+
+      if (!apiUrl) throw new Error('Could not determine API URL from path');
+
+      const response = await axiosInstance.get(apiUrl);
+      const courseData = response.data;
+
+      if (!courseData || (!courseData.chapters && !courseData.sections)) {
+        throw new Error('No course data found or unexpected format');
+      }
+
+      const transformedCourse = {
+        id: courseData.id,
+        title: courseData.title || courseData.name,
+        description: courseData.description,
+        instructor: courseData.instructor,
+        chapters: courseData.chapters
+          ? courseData.chapters.map((chapter) => ({
+              title: chapter.name,
+              isLocked: !!(chapter.is_locked || chapter.isLocked),
+              lessons: chapter.lessons.map((lesson) => ({
+                id: lesson.id,
+                title: lesson.title,
+                type: lesson.type,
+                videoUrl: lesson.video_url,
+                description: lesson.description,
+                aboutLesson: lesson.about_lesson || lesson.aboutLesson,
+                completed: lesson.completed || false,
+                isAIGenerated: false,
+                quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
+                quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
+                resources: lesson.resources || { downloadable: [], internet: [] },
+                isLocked: !!(lesson.is_locked || lesson.isLocked),
+              })),
+            }))
+          : courseData.sections.map((section) => ({
+              title: section.name,
+              isLocked: !!(section.is_locked || section.isLocked),
+              lessons: section.lessons.map((lesson) => ({
+                id: lesson.id,
+                title: lesson.title,
+                type: lesson.type,
+                videoUrl: lesson.video_url,
+                description: lesson.description,
+                aboutLesson: lesson.about_lesson || lesson.aboutLesson,
+                completed: lesson.completed || false,
+                isAIGenerated: false,
+                quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
+                quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
+                resources: lesson.resources || { downloadable: [], internet: [] },
+                isLocked: !!(lesson.is_locked || lesson.isLocked),
+              })),
+            })),
+      };
+
+      setCourse(transformedCourse);
+      if (transformedCourse.chapters.length > 0) {
+        setExpandedChapters({ 0: true });
+        setActiveChapter(0);
+        setActiveLesson(0);
+      }
+
+      const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+      courseCache.set(cacheKey, { course: transformedCourse });
+      logger.log('💾 Mobile: Course data cached for faster future loads');
+    } catch (error) {
+      logger.error('❌ Error fetching course data:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
+      setError(errorMessage);
+      setCourse(null);
+      setContentType('notFound');
+    }
+  };
 
     fetchData();
   }, [courseId, pathname, location.search]);

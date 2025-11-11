@@ -123,7 +123,8 @@ const CourseDetails = () => {
     if (isStarting) return; // guard against double-clicks
     // Guest users go straight to preview (no enrollment)
     if (!isLoggedIn) {
-      navigate(`/courses/engineering/${courseId}/learning`);
+  // ID-BASED NAVIGATION (engineering)
+  navigate(`/courses/${courseId}/learning`);
       return;
     }
 
@@ -150,7 +151,8 @@ const CourseDetails = () => {
         }
         
         // Navigate to the learning page
-        navigate(`/courses/engineering/${courseId}/learning`);
+  // Canonical ID-only learning route
+  navigate(`/courses/${courseId}/learning`);
       }
     } catch (error) {
       console.error('Error enrolling in engineering course:', error);

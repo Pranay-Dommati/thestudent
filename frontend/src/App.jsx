@@ -323,6 +323,8 @@ const App = () => {
             <Route path="/pro-learning/share/:shareId" element={<SharedProLearningPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
+            {/* Canonical ID-based quiz route */}
+            <Route path="/courses/:courseId/learning/quiz" element={<StandaloneQuizPage />} />
             <Route path="/courses/:courseId/certificate" element={<ProtectedRoute><CertificatePreview /></ProtectedRoute>} />
             <Route path="/learning-hub" element={
               <ProtectedRoute>
@@ -352,7 +354,7 @@ const App = () => {
             <Route path="/courses/engineering/:courseId" element={<CourseDetails />} />
             
             {/* Learning Routes */}
-            {/* Engineering Course Routes */}
+            {/* Engineering Course Routes (legacy paths retained for backward compatibility) */}
             <Route path="/courses/engineering/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
             <Route path="/courses/engineering/:courseId/learning/quiz" element={<StandaloneQuizPage />} />
             
