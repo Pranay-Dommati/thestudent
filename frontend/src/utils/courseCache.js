@@ -180,7 +180,16 @@ export const courseCache = {
    * @param {Array} availableLevels - Array of available course levels
    */
   setCourseAvailability(availableLevels) {
-    this.set('course_availability', availableLevels);
+    try {
+      // Don't persist an empty array to avoid users getting stuck on a blank state
+      if (Array.isArray(availableLevels) && availableLevels.length === 0) {
+        this.remove('course_availability');
+        return;
+      }
+      this.set('course_availability', availableLevels);
+    } catch (e) {
+      // best-effort caching; ignore failures
+    }
   },
 
   /**

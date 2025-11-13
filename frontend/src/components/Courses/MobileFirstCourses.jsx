@@ -115,47 +115,59 @@ const MobileFirstCourses = () => {
 
         console.log('🔄 Fetching fresh course availability data (Mobile)');
         setLoading(true);
-        const levelsWithCourses = [];
 
         try {
-            // Check school courses (6th to 12th)
             const schoolLevels = allEducationLevels.filter(level => level.apiClass !== 'engineering');
-            
-            for (const level of schoolLevels) {
-                try {
-                    const { data } = await api.get(`/courses/school/`, { params: { class: level.apiClass } });
-                    if (data) {
-                        if (data && data.length > 0) {
-                            levelsWithCourses.push(level);
-                            // Cache individual level data as well
-                            courseCache.setCoursesForLevel(level.apiClass, data);
-                        }
-                    }
-                } catch (error) {
-                    logger.error(`Error checking courses for ${level.apiClass}:`, error);
-                }
-            }
 
-            // Check engineering courses
-            try {
-                const { data: engineeringData } = await api.get('/courses/engineering/');
-                if (engineeringData) {
-                    if (engineeringData && engineeringData.length > 0) {
-                        const engineeringLevel = allEducationLevels.find(level => level.apiClass === 'engineering');
-                        if (engineeringLevel) {
-                            levelsWithCourses.push(engineeringLevel);
-                            // Cache engineering data
-                            courseCache.setCoursesForLevel('engineering', engineeringData);
-                        }
-                    }
-                }
-            } catch (error) {
-                logger.error('Error checking engineering courses:', error);
-            }
+            // Fire requests in parallel and keep payloads small
+            const schoolPromises = schoolLevels.map(level =>
+                api.get('/courses/school/', { params: { class: level.apiClass, limit: 1 } })
+                    .then(({ data }) => ({ level, data }))
+                    .catch(error => ({ level, error }))
+            );
 
-            // Cache the availability results
-            courseCache.setCourseAvailability(levelsWithCourses);
-            setAvailableLevels(levelsWithCourses);
+            // Engineering (currently hidden, but keep logic resilient)
+            const engineeringLevel = allEducationLevels.find(l => l.apiClass === 'engineering');
+            const engineeringPromise = engineeringLevel
+                ? api.get('/courses/engineering/', { params: { limit: 1 } })
+                    .then(({ data }) => ({ level: engineeringLevel, data }))
+                    .catch(error => ({ level: engineeringLevel, error }))
+                : Promise.resolve(null);
+
+            const results = await Promise.allSettled([
+                ...schoolPromises,
+                engineeringPromise,
+            ]);
+
+            const levelsWithCourses = [];
+
+            results.forEach(result => {
+                if (!result || result.status !== 'fulfilled') return;
+                const payload = result.value;
+                if (!payload || payload.error) {
+                    if (payload?.error) logger.error(`Error checking courses for ${payload.level?.apiClass}:`, payload.error);
+                    return;
+                }
+
+                const { level, data } = payload;
+                const count = Array.isArray(data) ? data.length : (data?.results?.length || 0);
+                if (count > 0) {
+                    levelsWithCourses.push(level);
+                    // Optionally cache tiny payload to warm level cache
+                    const items = Array.isArray(data) ? data : (data?.results || []);
+                    courseCache.setCoursesForLevel(level.apiClass, items);
+                }
+            });
+
+            // Mobile previously showed an empty state when nothing detected.
+            // Align with desktop: fall back to showing all levels so the page is never blank.
+            const finalLevels = levelsWithCourses.length > 0 ? levelsWithCourses : allEducationLevels;
+
+            // Cache only non-empty availability to avoid persisting a blank screen
+            if (levelsWithCourses.length > 0) {
+                courseCache.setCourseAvailability(levelsWithCourses);
+            }
+            setAvailableLevels(finalLevels);
         } catch (error) {
             logger.error('Error checking course availability:', error);
             // Fallback: show all levels if API fails
