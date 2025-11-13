@@ -2360,6 +2360,10 @@ const ChatbotPage = () => {
         const stats = result?.rate_limit_info || null;
         if (stats) {
           console.log('✅ Usage stats fetched successfully:', stats);
+          console.log('📊 FRONTEND: monthly_used =', stats.monthly_used);
+          console.log('📊 FRONTEND: monthly_limit =', stats.monthly_limit);
+          console.log('📊 FRONTEND: monthly_remaining =', stats.monthly_remaining);
+          console.log('📊 FRONTEND: Full stats object:', JSON.stringify(stats, null, 2));
           setUsageStats(stats);
         }
         return stats;

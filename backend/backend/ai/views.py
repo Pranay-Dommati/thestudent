@@ -1110,10 +1110,30 @@ def topics(request):
 @authentication_classes([])
 @permission_classes([AllowAny])
 def get_topic_rate_limit_status(request):
-    """Get current rate limiting status for the user (supports both authenticated and anonymous users)"""
+    """Get current rate limiting status for the user (supports both authenticated and anonymous users)
+    Attempts to authenticate via Bearer token if present so that monthly counters reflect the logged-in user.
+    """
     try:
         from .rate_limiter import TopicRateLimiter, get_user_ip
-        user = request.user if request.user and request.user.is_authenticated else None
+        from django.contrib.auth import get_user_model
+        
+        # Try to identify user via Authorization header (Bearer token) first
+        user = None
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+            try:
+                import jwt
+                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+                user_id = payload.get('user_id')
+                if user_id:
+                    User = get_user_model()
+                    user = User.objects.get(id=user_id)
+            except Exception:
+                user = getattr(request, 'user', None)
+        else:
+            user = request.user if getattr(request, 'user', None) and request.user.is_authenticated else None
+        
         user_ip = get_user_ip(request)
         
         # Debug logging only in development
@@ -1125,6 +1145,22 @@ def get_topic_rate_limit_status(request):
         
         limiter = TopicRateLimiter(user=user, user_ip=user_ip)
         usage_stats = limiter.get_usage_stats()
+        
+        # CRITICAL LOGGING (ASCII-only): Track monthly count for debugging
+        is_auth = bool(user and getattr(user, 'is_authenticated', False))
+        logger.info(
+            f"[RATE LIMIT STATUS] Authenticated={is_auth} UserID={getattr(user, 'id', 'Anonymous')}"
+        )
+        logger.info(
+            f"[RATE LIMIT STATUS] Monthly Used={usage_stats.get('monthly_used', 'MISSING')}"
+        )
+        logger.info(
+            f"[RATE LIMIT STATUS] Monthly Limit={usage_stats.get('monthly_limit', 'MISSING')}"
+        )
+        logger.info(
+            f"[RATE LIMIT STATUS] Monthly Remaining={usage_stats.get('monthly_remaining', 'MISSING')}"
+        )
+        logger.info(f"[RATE LIMIT STATUS] Full stats: {usage_stats}")
         
         if settings.DEBUG:
             logger.debug(f"Usage stats returned: {usage_stats}")
@@ -1849,32 +1885,14 @@ def check_topic_rate_limit_with_auth(request, requested_topics):
         return False, "Rate limiting error occurred", {}
 
 def record_topic_creation_with_auth(request, topics_created):
-    """Enhanced topic creation recording with proper authentication and security"""
+    """Enhanced topic creation recording with proper authentication and security
+    
+    IMPORTANT: This function must record actual topic creation to track monthly limits.
+    We no longer bypass recording in dev mode to ensure monthly limits work correctly.
+    """
     from .rate_limiter import TopicRateLimiter, get_user_ip, validate_topic_input
     from django.contrib.auth import get_user_model
     
-    # Dev bypass to avoid caching usage while iterating locally (enabled when DEBUG or explicit flag)
-    if getattr(settings, 'DEBUG', False) or getattr(settings, 'TOPIC_RATE_LIMIT_BYPASS_DEV', False):
-        try:
-            validate_topic_input(topics_created)
-        except ValueError:
-            return {}
-        return {
-            'daily_used': 0,
-            'daily_limit': getattr(settings, 'MAX_TOPICS_PER_DAY', 1000),
-            'daily_remaining': getattr(settings, 'MAX_TOPICS_PER_DAY', 1000),
-            'per_request_limit': getattr(settings, 'MAX_TOPICS_PER_REQUEST', 4),
-            'rate_limits': {
-                'monthly': {
-                    'limit': getattr(settings, 'MAX_TOPICS_PER_MONTH', 15),
-                    'used': 0,
-                    'remaining': getattr(settings, 'MAX_TOPICS_PER_MONTH', 15),
-                    'percent_used': 0,
-                },
-                'daily': { 'enforced': getattr(settings, 'ENFORCE_DAILY_LIMIT', False) }
-            }
-        }
-
     try:
         # Validate input first
         validate_topic_input(topics_created)
@@ -1967,7 +1985,12 @@ def create_course_topics(request):
             }, status=429)
         
         # Record the topic creation (only when actually creating)
+        logger.info(f"[TOPIC CREATE] Recording topic creation for {len(topics)} topics")
         updated_usage_stats = record_topic_creation_with_auth(request, topics)
+        
+        logger.info(f"[TOPIC CREATE] After recording - monthly_used: {updated_usage_stats.get('monthly_used', 'MISSING')}")
+        logger.info(f"[TOPIC CREATE] After recording - monthly_limit: {updated_usage_stats.get('monthly_limit', 'MISSING')}")
+        logger.info(f"[TOPIC CREATE] After recording - monthly_remaining: {updated_usage_stats.get('monthly_remaining', 'MISSING')}")
         
         if settings.DEBUG:
             logger.debug("Course created successfully!")

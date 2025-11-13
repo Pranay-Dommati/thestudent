@@ -133,17 +133,31 @@ else:
     SECURE_CROSS_ORIGIN_OPENER_POLICY = (None if DEBUG else 'same-origin-allow-popups')
 
 # Cache Configuration - Required for Rate Limiting
+# Use database cache for persistent caching across server restarts
+# This is better than LocMemCache for development
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
-        'TIMEOUT': 86400,  # 24 hours
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'django_cache_table',
+        'TIMEOUT': 2592000,  # 30 days (for monthly tracking)
         'OPTIONS': {
             'MAX_ENTRIES': 10000,
-            'CULL_FREQUENCY': 3,
         }
     }
 }
+
+# OLD: LocMemCache (loses data on server restart/reload)
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+#         'LOCATION': 'unique-snowflake',
+#         'TIMEOUT': 86400,  # 24 hours
+#         'OPTIONS': {
+#             'MAX_ENTRIES': 10000,
+#             'CULL_FREQUENCY': 3,
+#         }
+#     }
+# }
 
 # For production, use Redis:
 # CACHES = {

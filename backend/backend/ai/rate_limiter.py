@@ -199,22 +199,28 @@ class TopicRateLimiter:
         return start, end
 
     def _get_user_monthly_count(self):
-        """Count topics created for this user in the current month via DB.
-        Fallback to 0 if user or model unavailable.
+        """Count topics created for this user in the current month.
+        
+        Uses cache-based tracking for immediate topic generation, not DB records.
+        This ensures monthly limits are enforced at generation time, not at save time.
         """
         if not (self.user and getattr(self.user, 'is_authenticated', False)):
+            logger.info("[MONTHLY] User not authenticated; returning 0")
             return 0
-        if ProLearningTopic is None:
-            return 0
+        
+        # Use cache to track monthly topic generation count
         start, end = self._get_month_start_end()
+        cache_key = f"topic_monthly_count_user_{self.user.id}_{start.strftime('%Y-%m')}"
+        cache_key = sanitize_cache_key(cache_key)
+        
+        logger.info(f"[MONTHLY] Cache key: {cache_key}")
+        
         try:
-            return ProLearningTopic.objects.filter(
-                course__user=self.user,
-                created_at__gte=start,
-                created_at__lt=end,
-            ).count()
+            monthly_count = cache.get(cache_key, 0)
+            logger.info(f"[MONTHLY] Cache read for user {self.user.id}: {monthly_count}")
+            return int(monthly_count) if monthly_count is not None else 0
         except Exception as e:
-            logger.error(f"Monthly count query failed: {e}")
+            logger.error(f"Monthly count cache retrieval failed: {e}")
             return 0
 
     def check_monthly_limit(self, requested_topics):
@@ -324,6 +330,39 @@ class TopicRateLimiter:
             except Exception as e:
                 logger.error(f"Failed to cache usage data: {e}")
         
+        # CRITICAL: Record monthly topic count for authenticated users in cache
+        # This ensures monthly limits are enforced at generation time, not at save time
+        if self.user and getattr(self.user, 'is_authenticated', False):
+            try:
+                start, _ = self._get_month_start_end()
+                monthly_cache_key = f"topic_monthly_count_user_{self.user.id}_{start.strftime('%Y-%m')}"
+                monthly_cache_key = sanitize_cache_key(monthly_cache_key)
+                
+                logger.info(f"[MONTHLY] Recording count for user {self.user.id}")
+                logger.info(f"[MONTHLY] Cache key: {monthly_cache_key}")
+                
+                # Calculate cache timeout until end of month
+                if start.month == 12:
+                    next_month = start.replace(year=start.year + 1, month=1, day=1)
+                else:
+                    next_month = start.replace(month=start.month + 1, day=1)
+                monthly_timeout = int((next_month - now).total_seconds())
+                
+                # Increment the monthly count atomically
+                current_monthly = cache.get(monthly_cache_key, 0)
+                new_monthly = int(current_monthly) + topics_count
+                logger.info(f"[MONTHLY] Increment: {current_monthly} + {topics_count} = {new_monthly}")
+                logger.info(f"[MONTHLY] Cache timeout: {monthly_timeout} seconds")
+                
+                cache.set(monthly_cache_key, new_monthly, timeout=monthly_timeout)
+                logger.info(f"[MONTHLY] Updated monthly count for user {self.user.id}: {current_monthly} -> {new_monthly}")
+                
+                # Verify the write
+                verify_count = cache.get(monthly_cache_key, 'NOT_FOUND')
+                logger.info(f"[MONTHLY] Verification read: {verify_count}")
+            except Exception as e:
+                logger.error(f"Failed to update monthly count in cache: {e}")
+        
         return usage_data
     
     def get_usage_stats(self):
@@ -370,6 +409,10 @@ class TopicRateLimiter:
             'recent_requests': recent_requests,
             'reset_info': reset_info,
             'current_time': now.isoformat(),
+            # Top-level monthly fields for frontend compatibility
+            'monthly_used': monthly_used,
+            'monthly_limit': MAX_TOPICS_PER_MONTH,
+            'monthly_remaining': monthly_remaining,
             'rate_limits': {
                 'daily': {
                     'limit': MAX_TOPICS_PER_DAY,

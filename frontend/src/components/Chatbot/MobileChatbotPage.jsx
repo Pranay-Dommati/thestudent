@@ -516,6 +516,10 @@ const MobileChatbotPage = () => {
         const stats = result?.rate_limit_info || null;
         if (stats) {
           console.log('✅ [Mobile] Usage stats fetched successfully:', stats);
+          console.log('📊 [Mobile] FRONTEND: monthly_used =', stats.monthly_used);
+          console.log('📊 [Mobile] FRONTEND: monthly_limit =', stats.monthly_limit);
+          console.log('📊 [Mobile] FRONTEND: monthly_remaining =', stats.monthly_remaining);
+          console.log('📊 [Mobile] FRONTEND: Full stats object:', JSON.stringify(stats, null, 2));
           setUsageStats(stats);
         }
         return stats;
