@@ -11,7 +11,7 @@ import CourseDetailsPage from './components/CourseDetails/CourseDetailsPage/Cour
 // Lazy load heavy learning and certificate pages
 const ResponsiveCourseLearningPage = React.lazy(() => import('./components/CourseLearningPage/ResponsiveCourseLearningPage'));
 import LearningHubWrapper from './components/LearningHub/LearningHubWrapper';
-import FloatingChatButton from './components/Chatbot/FloatingChatButton';
+
 import AuthForm from './components/Auth/AuthForm';
 import ForgotPassword from './components/Auth/ForgotPassword';
 import ResetPassword from './components/Auth/ResetPassword';
@@ -405,7 +405,6 @@ const App = () => {
           </Routes>
           </Suspense>
         </Layout>
-        <FloatingChatButton />
       </BrowserRouter>
       </ThemeProvider>
     </AuthProvider>

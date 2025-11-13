@@ -51,13 +51,39 @@ const Navbar = ({ initialStyle = "transparent" }) => {
     const checkScreenSize = () => {
       setIsMobile(window.innerWidth < 1024); // Treat tablets as mobile for navigation
     };
-    
+
     checkScreenSize();
     window.addEventListener('resize', checkScreenSize);
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
+  // Auto-close modal on scroll (mobile UX best practice)
   useEffect(() => {
+    const handleScroll = () => {
+      if (isMobileMenuOpen || isAuthMenuOpen) {
+        closeAllMenus();
+      }
+    };
+
+    if (isMobileMenuOpen || isAuthMenuOpen) {
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      return () => window.removeEventListener('scroll', handleScroll);
+    }
+  }, [isMobileMenuOpen, isAuthMenuOpen]);
+
+  // Close modal on Escape key (accessibility best practice)
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && (isMobileMenuOpen || isAuthMenuOpen)) {
+        closeAllMenus();
+      }
+    };
+
+    if (isMobileMenuOpen || isAuthMenuOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isMobileMenuOpen, isAuthMenuOpen]);  useEffect(() => {
     window.scrollTo(0, 0);
     setIsScrolled(window.scrollY > 10);
   }, []);
@@ -366,8 +392,22 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                      boxShadow: '-2px -2px 8px rgba(0, 0, 0, 0.1)' 
                    }}></div>
               
+              {/* Header with close button */}
+              <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100/30">
+                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Account</span>
+                <button
+                  onClick={closeAllMenus}
+                  className="w-5 h-5 bg-gray-100/60 hover:bg-gray-200/80 rounded-full flex items-center justify-center transition-all duration-200 group"
+                  aria-label="Close menu"
+                >
+                  <svg className="w-3 h-3 text-gray-500 group-hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
               {/* Menu items */}
-              <div className="py-3">
+              <div>
                 <Link 
                   to="/profile" 
                   className="flex items-center px-4 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 transition-all duration-200 group"
@@ -420,8 +460,22 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                      boxShadow: '-2px -2px 8px rgba(0, 0, 0, 0.1)' 
                    }}></div>
               
+              {/* Header with close button */}
+              <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100/30">
+                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Get Started</span>
+                <button
+                  onClick={closeAllMenus}
+                  className="w-5 h-5 bg-gray-100/60 hover:bg-gray-200/80 rounded-full flex items-center justify-center transition-all duration-200 group"
+                  aria-label="Close menu"
+                >
+                  <svg className="w-3 h-3 text-gray-500 group-hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
               {/* Menu items */}
-              <div className="py-3">
+              <div>
                 <Link 
                   to="/auth?mode=login" 
                   className="flex items-center px-4 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 transition-all duration-200 group"
