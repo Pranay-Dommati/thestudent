@@ -69,8 +69,8 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- Global console silencer: runs BEFORE app to prevent any logs from any module -->
-    <script>
+    <!-- Global console silencer: TEMPORARILY DISABLED FOR DEBUGGING -->
+    <!-- <script>
       (function () {
         try {
           // If you ever need to re-enable in a session, set window.__ENABLE_CONSOLE = true in DevTools
@@ -98,7 +98,7 @@
           // If silencing fails, do nothing; app will still run
         }
       })();
-    </script>
+    </script> -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

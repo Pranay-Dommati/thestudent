@@ -113,6 +113,33 @@ const MobileChatbotPage = () => {
   const [showSaveCourseModal, setShowSaveCourseModal] = useState(false);
   const [pendingCourseToSave, setPendingCourseToSave] = useState(null);
 
+  // Lock body scroll when modal is open (important for mobile)
+  useEffect(() => {
+    if (showSaveCourseModal) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    };
+  }, [showSaveCourseModal]);
+
+  // Debug: Log modal state changes on mobile
+  useEffect(() => {
+    console.log('🔍 [Mobile] Modal state changed:', {
+      showSaveCourseModal,
+      pendingCourseToSave: pendingCourseToSave ? 'exists' : 'null',
+      shouldRender: showSaveCourseModal && pendingCourseToSave
+    });
+  }, [showSaveCourseModal, pendingCourseToSave]);
+
   // Rotating suggestions for empty-state heading (same as desktop)
   const rotatingSuggestions = [
     "Help me get started with algebra basics",
@@ -804,49 +831,14 @@ const MobileChatbotPage = () => {
     setChatHistory((prev) => [...prev, userMessageObj]);
     if (!customMessage) setMessage("");
 
-    // Freemium Feature: Allow 1 free course creation without authentication
+    // Freemium Feature: Allow unlimited free course creation without authentication
+    // Removed login requirement to increase user engagement
     try {
       const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isLoggedIn;
       if (!authed) {
-        // Check if user has already created a free course
+        // Track free courses created for analytics (no limit enforced)
         const freeCoursesCreated = parseInt(localStorage.getItem('freeCoursesCreated') || '0');
-        
-        if (freeCoursesCreated >= 1) {
-          // User has already used their free course - require login
-          // Preserve the user's typed message across auth redirect by embedding
-          // it into the returnTo URL and also saving backups in both sessionStorage and localStorage.
-          try {
-            sessionStorage.setItem('pendingChatMessage', messageToSend);
-            localStorage.setItem('pendingChatPrompt', messageToSend); // Backup for cross-tab consistency
-            console.log('💾 Saved pending mobile prompt for after login:', messageToSend);
-          } catch (_) {}
-
-          // Build a clean returnTo URL that includes the pending message so that
-          // MobileChatbotPage can auto-send it after successful login (desktop parity).
-          const currentUrl = new URL(window.location.href);
-          // Do not pre-encode; URLSearchParams will encode as needed
-          currentUrl.searchParams.set('message', messageToSend);
-          currentUrl.searchParams.set('prefill', 'true');
-          const returnTo = `${currentUrl.pathname}?${currentUrl.searchParams.toString()}`;
-
-          const signInUrl = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
-          const signUpUrl = `/auth?mode=signup&returnTo=${encodeURIComponent(returnTo)}`;
-          const authPrompt = {
-            id: generateUniqueId(),
-            type: "bot",
-            isAuthPrompt: true,
-            signInUrl,
-            signUpUrl,
-            isFreemiumLimit: true, // Flag to customize message
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          };
-          setChatHistory((prev) => [...prev, authPrompt]);
-          setIsLoading(false);
-          return;
-        }
-        
-        // User gets 1 free course - allow them to continue
-        console.log('🎁 Allowing free course creation on mobile (user has created:', freeCoursesCreated, 'of 1)');
+        console.log('🎁 Allowing free course creation on mobile (user has created:', freeCoursesCreated, 'courses so far)');
         // Will increment counter after successful course creation
       }
     } catch (_) {}
@@ -1173,8 +1165,6 @@ const MobileChatbotPage = () => {
   // Update chat history and close confirmation dialog
   setChatHistory((prev) => [...prev, proResponse]);
   setShowTopicConfirmation(false);
-  setPendingTopics([]);
-  setOriginalPrompt("");
       
       // Freemium: Store course data and increment counter for anonymous users
       try {
@@ -1202,6 +1192,10 @@ const MobileChatbotPage = () => {
       } catch (e) {
         console.warn('[Mobile] Failed to update free course counter:', e);
       }
+
+      // Clear pending topics and prompt AFTER saving for freemium users (align with desktop)
+      setPendingTopics([]);
+      setOriginalPrompt("");
       
       // Invalidate cache to trigger refresh
       try {
@@ -1531,6 +1525,9 @@ const MobileChatbotPage = () => {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-between w-full px-5 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 group"
                     onClick={() => {
+                      // Set session flag for back button navigation
+                      sessionStorage.setItem('cameFromChat', 'true');
+                      
                       // Store the topics and course data for batch generation (same as desktop)
                       try {
                         const batchGenerationData = {
@@ -1760,7 +1757,7 @@ const MobileChatbotPage = () => {
                   return (
                     <div key={course.id} className="p-3 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition-all">
                       <div className="flex items-center justify-between gap-3">
-                        <Link to={href} target="_blank" rel="noopener noreferrer" onClick={closeCoursesDrawer} className="flex items-center gap-3 min-w-0 flex-1">
+                        <Link to={href} target="_blank" rel="noopener noreferrer" onClick={() => { sessionStorage.setItem('cameFromChat', 'true'); closeCoursesDrawer(); }} className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="bg-indigo-50 rounded-lg p-2">
                             <IoBook className="w-4 h-4 text-indigo-600" />
                           </div>
@@ -1943,7 +1940,7 @@ const MobileChatbotPage = () => {
                   return (
                     <div key={course.id} className="p-3 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all">
                       <div className="flex items-center justify-between gap-3">
-                        <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 min-w-0 flex-1">
+                        <a href={href} target="_blank" rel="noopener noreferrer" onClick={() => sessionStorage.setItem('cameFromChat', 'true')} className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="bg-indigo-50 rounded-lg p-2">
                             <IoBook className="w-4 h-4 text-indigo-600" />
                           </div>
@@ -2186,8 +2183,8 @@ const MobileChatbotPage = () => {
 
       {/* Freemium: Save Course Modal (Mobile) */}
       {showSaveCourseModal && pendingCourseToSave && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-fade-in">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-fade-in max-h-[90vh] overflow-y-auto">
             {/* Success Icon */}
             <div className="flex justify-center mb-4">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
@@ -2196,31 +2193,28 @@ const MobileChatbotPage = () => {
             </div>
             
             {/* Title */}
-            <h2 className="text-xl font-bold text-center text-gray-900 mb-2">
-              🎉 Course Created!
+            <h2 className="text-lg font-bold text-center text-gray-900 mb-2">
+              � Course Ready!
             </h2>
             
             {/* Message */}
-            <p className="text-center text-gray-600 text-sm mb-2">
-              Your course is ready! Sign up now to save it to your Learning Hub.
-            </p>
-            <p className="text-center text-xs text-gray-500 mb-4">
-              ✨ Unlock progress tracking & certificates!
+            <p className="text-center text-gray-600 text-xs mb-3">
+              Sign up to keep this course and unlock your learning experience.
             </p>
             
             {/* Benefits List */}
-            <div className="bg-indigo-50 rounded-xl p-3 mb-4 space-y-2">
-              <div className="flex items-start gap-2">
-                <IoBookmark className="text-indigo-600 mt-0.5 flex-shrink-0" size={16} />
-                <span className="text-xs text-gray-700">Save courses to your hub</span>
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-2.5 mb-3 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
+                <span className="text-xs text-gray-700">Track progress across topics</span>
               </div>
-              <div className="flex items-start gap-2">
-                <IoRocket className="text-indigo-600 mt-0.5 flex-shrink-0" size={16} />
-                <span className="text-xs text-gray-700">Track learning progress</span>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
+                <span className="text-xs text-gray-700">Save to Learning Hub</span>
               </div>
-              <div className="flex items-start gap-2">
-                <FaGraduationCap className="text-indigo-600 mt-0.5 flex-shrink-0" size={16} />
-                <span className="text-xs text-gray-700">Earn certificates</span>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
+                <span className="text-xs text-gray-700">Access expert courses</span>
               </div>
             </div>
             
@@ -2228,25 +2222,28 @@ const MobileChatbotPage = () => {
             <div className="space-y-2">
               <Link
                 to="/auth?mode=signup"
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg text-sm"
+                className="w-full flex items-center justify-center px-3 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm"
               >
-                <FaGraduationCap size={18} />
-                Sign Up & Save
+                Save Course
               </Link>
               <Link
                 to="/auth?mode=login"
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all text-sm"
+                className="w-full flex items-center justify-center px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors text-xs"
               >
-                Log In
+                Already have an account?
               </Link>
               <button
                 onClick={() => {
+                  // Clear the pending course so modal can show for next course
+                  localStorage.removeItem('pendingFreemiumCourse');
+                  console.log('🧹 [Mobile] Cleared pendingFreemiumCourse - modal dismissed by user');
+                  
                   setShowSaveCourseModal(false);
                   setPendingCourseToSave(null);
                 }}
-                className="w-full px-4 py-2 text-gray-500 hover:text-gray-700 text-xs font-medium transition-colors"
+                className="w-full px-3 py-1.5 text-gray-400 hover:text-gray-600 text-xs font-medium transition-colors"
               >
-                Maybe Later
+                Continue without saving
               </button>
             </div>
           </div>

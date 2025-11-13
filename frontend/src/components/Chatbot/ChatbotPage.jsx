@@ -499,6 +499,33 @@ const ChatbotPage = () => {
   const [showSaveCourseModal, setShowSaveCourseModal] = useState(false);
   const [pendingCourseToSave, setPendingCourseToSave] = useState(null);
 
+  // Lock body scroll when modal is open (important for mobile)
+  useEffect(() => {
+    if (showSaveCourseModal) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    };
+  }, [showSaveCourseModal]);
+
+  // Debug: Log modal state changes
+  useEffect(() => {
+    console.log('🔍 Modal state changed:', {
+      showSaveCourseModal,
+      pendingCourseToSave: pendingCourseToSave ? 'exists' : 'null',
+      shouldRender: showSaveCourseModal && pendingCourseToSave
+    });
+  }, [showSaveCourseModal, pendingCourseToSave]);
+
   const generateMessageId = () => Date.now() + Math.random();
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -1260,6 +1287,12 @@ const ChatbotPage = () => {
       return;
     }
 
+    // Clear any stale pending prompts when user manually sends a message
+    // This prevents old prompts from being auto-sent later
+    try {
+      localStorage.removeItem('pendingChatPrompt');
+    } catch (_) {}
+
     console.log('🔍 handleSendMessage called with:', { 
       messageToSend, 
       proMode, 
@@ -1337,37 +1370,14 @@ const ChatbotPage = () => {
     setChatHistory((prev) => [...prev, userMessageObj]);
     if (!customMessage) setMessage("");
 
-    // Freemium Feature: Allow 1 free course creation without authentication
+    // Freemium Feature: Allow unlimited free course creation without authentication
+    // Removed login requirement to increase user engagement
     try {
       const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isAuthenticated;
       if (!authed) {
-        // Check if user has already created a free course
+        // Track free courses created for analytics (no limit enforced)
         const freeCoursesCreated = parseInt(localStorage.getItem('freeCoursesCreated') || '0');
-        
-        if (freeCoursesCreated >= 1) {
-          // User has already used their free course - require login
-          // 💾 Save the prompt to localStorage so we can auto-send it after login
-          localStorage.setItem('pendingChatPrompt', messageToSend);
-          console.log('💾 Saved pending prompt for after login:', messageToSend);
-          
-          const returnTo = window.location.pathname + window.location.search;
-          const signInUrl = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
-          const signUpUrl = `/auth?mode=signup&returnTo=${encodeURIComponent(returnTo)}`;
-          const authPrompt = {
-            id: generateMessageId(),
-            type: "bot",
-            isAuthPrompt: true,
-            signInUrl,
-            signUpUrl,
-            isFreemiumLimit: true, // Flag to customize message
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          };
-          setChatHistory((prev) => [...prev, authPrompt]);
-          return;
-        }
-        
-        // User gets 1 free course - allow them to continue
-        console.log('🎁 Allowing free course creation (user has created:', freeCoursesCreated, 'of 1)');
+        console.log('🎁 Allowing free course creation (user has created:', freeCoursesCreated, 'courses so far)');
         // Will increment counter after successful course creation
       }
     } catch (_) {}
@@ -1875,10 +1885,9 @@ const ChatbotPage = () => {
       // Update chat history and close confirmation dialog
       setChatHistory((prev) => [...prev, proResponse]);
       setShowTopicConfirmation(false);
-      setPendingTopics([]);
-      setOriginalPrompt("");
       
       // Freemium: Check if user is anonymous and store course data for later save
+      // IMPORTANT: Do this BEFORE clearing pendingTopics and originalPrompt
       const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isAuthenticated;
       if (!authed) {
         // Store the course data to be saved when user logs in
@@ -1886,9 +1895,9 @@ const ChatbotPage = () => {
           courseId,
           topicString,
           topicNames,
-          topics: pendingTopics,
+          topics: pendingTopics, // Save before clearing
           createdAt: Date.now(),
-          originalPrompt,
+          originalPrompt, // Save before clearing
           learningContext,
           personalization
         };
@@ -1899,7 +1908,18 @@ const ChatbotPage = () => {
         const currentCount = parseInt(localStorage.getItem('freeCoursesCreated') || '0');
         localStorage.setItem('freeCoursesCreated', String(currentCount + 1));
         console.log(`🎊 Freemium course created! Counter: ${currentCount} -> ${currentCount + 1}`);
+        
+        // Clear any pending chat prompt since the course was successfully created
+        localStorage.removeItem('pendingChatPrompt');
+        console.log('🧹 Cleared pendingChatPrompt after successful freemium course creation');
+        
+        // Note: Modal will be shown from ProLearningPage after full course generation
+        // Not showing modal here - only after course is fully generated
       }
+      
+      // Clear pending topics and prompt AFTER saving for freemium users
+      setPendingTopics([]);
+      setOriginalPrompt("");
       
       // Invalidate cache to trigger refresh
       try {
@@ -2213,6 +2233,9 @@ const ChatbotPage = () => {
                     rel="noopener noreferrer"
                     className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
                     onClick={() => {
+                      // Set session flag for back button navigation
+                      sessionStorage.setItem('cameFromChat', 'true');
+                      
                       // Store the topics and course data for batch generation
                       try {
                           const batchGenerationData = {
@@ -2487,6 +2510,7 @@ const ChatbotPage = () => {
                         href={href}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => sessionStorage.setItem('cameFromChat', 'true')}
                         className="flex-1 min-w-0"
                       >
                         <div className="text-sm font-medium text-gray-800 line-clamp-1 group-hover:text-indigo-600 truncate">
@@ -2870,8 +2894,8 @@ const ChatbotPage = () => {
 
       {/* Freemium: Save Course Modal */}
       {showSaveCourseModal && pendingCourseToSave && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 animate-fade-in">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 animate-fade-in max-h-[90vh] overflow-y-auto">
             {/* Success Icon */}
             <div className="flex justify-center mb-6">
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
@@ -2880,57 +2904,57 @@ const ChatbotPage = () => {
             </div>
             
             {/* Title */}
-            <h2 className="text-2xl font-bold text-center text-gray-900 mb-3">
-              🎉 Course Created!
+            <h2 className="text-xl font-bold text-center text-gray-900 mb-2">
+              Your Learning Path Starts Here
             </h2>
             
             {/* Message */}
-            <p className="text-center text-gray-600 mb-2">
-              Your course is ready! Sign up now to save it to your Learning Hub and access it anytime.
-            </p>
-            <p className="text-center text-sm text-gray-500 mb-6">
-              ✨ Unlock progress tracking, certificates, and unlimited courses!
+            <p className="text-center text-gray-600 text-sm mb-4">
+              Sign in to unlock a personalized and enhanced learning experience.
             </p>
             
             {/* Benefits List */}
-            <div className="bg-indigo-50 rounded-xl p-4 mb-6 space-y-2">
-              <div className="flex items-start gap-3">
-                <IoBookmark className="text-indigo-600 mt-0.5 flex-shrink-0" size={18} />
-                <span className="text-sm text-gray-700">Save courses to your personal hub</span>
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 mb-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                <span className="text-sm text-gray-700">Seamless progress tracking</span>
               </div>
-              <div className="flex items-start gap-3">
-                <IoRocket className="text-indigo-600 mt-0.5 flex-shrink-0" size={18} />
-                <span className="text-sm text-gray-700">Track your learning progress</span>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                <span className="text-sm text-gray-700">One-click access from your Learning Hub</span>
               </div>
-              <div className="flex items-start gap-3">
-                <FaGraduationCap className="text-indigo-600 mt-0.5 flex-shrink-0" size={18} />
-                <span className="text-sm text-gray-700">Earn completion certificates</span>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                <span className="text-sm text-gray-700">Premium academic content curated for you</span>
               </div>
             </div>
             
             {/* Action Buttons */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <Link
                 to="/auth?mode=signup"
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
               >
-                <FaGraduationCap size={20} />
-                Sign Up & Save Course
+                Save Course
               </Link>
               <Link
                 to="/auth?mode=login"
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all"
+                className="w-full flex items-center justify-center px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors text-sm"
               >
-                Already have an account? Log In
+                Already have an account?
               </Link>
               <button
                 onClick={() => {
+                  // Clear the pending course so modal can show for next course
+                  localStorage.removeItem('pendingFreemiumCourse');
+                  console.log('🧹 Cleared pendingFreemiumCourse - modal dismissed by user');
+                  
                   setShowSaveCourseModal(false);
                   setPendingCourseToSave(null);
                 }}
-                className="w-full px-6 py-2 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
+                className="w-full px-4 py-1.5 text-gray-400 hover:text-gray-600 text-xs font-medium transition-colors"
               >
-                Maybe Later
+                Continue without saving
               </button>
             </div>
           </div>

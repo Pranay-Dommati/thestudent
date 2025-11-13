@@ -152,7 +152,21 @@ const ProLearningMobile = ({
           <div className="flex items-center gap-3">
             {/* Integrated Back Button */}
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => {
+                // Check if we have referrer info or came from chat
+                const referrer = document.referrer;
+                const cameFromChat = referrer.includes('/chat') || 
+                                   sessionStorage.getItem('cameFromChat') === 'true';
+                
+                if (cameFromChat || window.history.length > 2) {
+                  // Clear the session flag and go back
+                  sessionStorage.removeItem('cameFromChat');
+                  navigate(-1);
+                } else {
+                  // Direct access or no history - go to chat
+                  navigate('/chat');
+                }
+              }}
               className="flex items-center justify-center w-8 h-8 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-all duration-200 touch-manipulation"
               aria-label="Go back"
             >

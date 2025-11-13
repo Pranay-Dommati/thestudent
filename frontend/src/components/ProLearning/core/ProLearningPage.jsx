@@ -470,6 +470,38 @@ const ProLearningPage = () => {
   const [pendingCourseToSave, setPendingCourseToSave] = useState(null);
   const autoSaveAttempted = useRef(false); // Prevent duplicate save attempts
 
+  // Lock body scroll when modal is open (important for mobile)
+  useEffect(() => {
+    if (showSaveCourseModal) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = '0';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+    };
+  }, [showSaveCourseModal]);
+
+  // Debug: Log modal state changes in ProLearningPage
+  useEffect(() => {
+    console.log('🔍 [ProLearningPage] Modal state changed:', {
+      showSaveCourseModal,
+      pendingCourseToSave: pendingCourseToSave ? 'exists' : 'null',
+      shouldRender: showSaveCourseModal && pendingCourseToSave,
+      isMobile,
+      viewport: { width: window.innerWidth, height: window.innerHeight }
+    });
+  }, [showSaveCourseModal, pendingCourseToSave, isMobile]);
+
   // Safety: when generation stops, clear any lingering progress UI/flags
   useEffect(() => {
     if (!isProgressiveGenerating) {
@@ -482,32 +514,89 @@ const ProLearningPage = () => {
 
   // Safety: if we ever mark all topics as generated, also ensure generation flag is down
   useEffect(() => {
+    console.log('🔍 [Generation State] allTopicsGenerated changed to:', allTopicsGenerated);
     if (allTopicsGenerated) {
       setIsProgressiveGenerating(false);
+      console.log('✅ [Generation State] All topics generated! isProgressiveGenerating set to false');
     }
   }, [allTopicsGenerated]);
   
   // Freemium: Show save course modal when generation completes for anonymous users
   useEffect(() => {
+    console.log('🔍 [Modal Trigger Check] Conditions:', {
+      allTopicsGenerated,
+      user: user ? 'logged in' : 'null/anonymous',
+      loading,
+      courseId,
+      allConditionsMet: allTopicsGenerated && user === null && !loading
+    });
+
     if (allTopicsGenerated && user === null && !loading) {
       // Check if there's a pending freemium course
       const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
+      console.log('🔍 [Modal Trigger] Checking pendingFreemiumCourse:', pendingCourse ? 'exists' : 'null');
+      
       if (pendingCourse) {
         try {
           const courseData = JSON.parse(pendingCourse);
+          console.log('🔍 [Modal Trigger] Parsed courseData:', {
+            storedCourseId: courseData.courseId,
+            currentCourseId: courseId,
+            match: courseData.courseId === courseId
+          });
+          
           // Check if this is the course that was just created (match by courseId)
           if (courseData.courseId === courseId) {
+            console.log('✅ [Modal Trigger] Course ID matches! Setting timeout to show modal...');
             // Show modal after a short delay to let the UI settle
             setTimeout(() => {
+              console.log('🎉 [Modal Trigger] Timeout complete - setting modal state NOW');
               setPendingCourseToSave(courseData);
               setShowSaveCourseModal(true);
               console.log('🎉 Showing freemium save modal for course:', courseId);
+
+              // Also notify any open Chatbot pages (desktop & mobile) so they can show their own modal if needed
+              try {
+                window.dispatchEvent(
+                  new CustomEvent('show-freemium-save-modal', { detail: courseData })
+                );
+                console.log('📢 Dispatched show-freemium-save-modal event from ProLearningPage');
+              } catch (eventError) {
+                console.error('Failed to dispatch show-freemium-save-modal event:', eventError);
+              }
             }, 2000); // 2 second delay after generation completes
+          } else {
+            console.log('❌ [Modal Trigger] Course ID mismatch - considering fallback...');
+            const now = Date.now();
+            const isRecent = courseData?.createdAt && (now - courseData.createdAt) < (10 * 60 * 1000);
+            const looksClientId = typeof courseId === 'string' && courseId.startsWith('course_');
+            if (isRecent && looksClientId) {
+              console.log('✅ [Fallback] Recent anonymous generation detected - showing modal anyway');
+              setTimeout(() => {
+                try {
+                  // Update localStorage to point to the current course so future checks match
+                  const updated = { ...courseData, courseId };
+                  localStorage.setItem('pendingFreemiumCourse', JSON.stringify(updated));
+                } catch {}
+                console.log('🎉 [Fallback] Timeout complete - setting modal state NOW');
+                setPendingCourseToSave(courseData);
+                setShowSaveCourseModal(true);
+                try {
+                  window.dispatchEvent(new CustomEvent('show-freemium-save-modal', { detail: courseData }));
+                } catch {}
+              }, 1500);
+            } else {
+              console.log('🚫 [Fallback] Conditions not met - modal will NOT show');
+            }
           }
         } catch (e) {
-          console.error('Failed to parse pending freemium course:', e);
+          console.error('❌ [Modal Trigger] Failed to parse pending freemium course:', e);
         }
+      } else {
+        console.log('❌ [Modal Trigger] No pendingFreemiumCourse in localStorage - modal will NOT show');
       }
+    } else {
+      console.log('❌ [Modal Trigger] Conditions not met - modal will NOT show');
     }
   }, [allTopicsGenerated, user, loading, courseId]);
 
@@ -1848,9 +1937,20 @@ const ProLearningPage = () => {
       />
       
       {/* Freemium: Save Course Modal */}
-      {showSaveCourseModal && pendingCourseToSave && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 animate-fade-in">
+      {(() => {
+        console.log('🔍 [Modal Render Check] Evaluating condition:', {
+          showSaveCourseModal,
+          pendingCourseToSave: pendingCourseToSave ? 'exists' : 'null',
+          willRender: showSaveCourseModal && pendingCourseToSave
+        });
+        return showSaveCourseModal && pendingCourseToSave;
+      })() && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 overflow-y-auto">
+          {(() => {
+            console.log('✅ [Modal Render] RENDERING MODAL NOW!');
+            return null;
+          })()}
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 animate-fade-in max-h-[90vh] overflow-y-auto my-auto">
             {/* Success Icon */}
             <div className="flex justify-center mb-6">
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
@@ -1859,57 +1959,58 @@ const ProLearningPage = () => {
             </div>
             
             {/* Title */}
-            <h2 className="text-2xl font-bold text-center text-gray-900 mb-3">
-              🎉 Course Complete!
+            <h2 className="text-xl font-bold text-center text-gray-900 mb-2">
+              Your Learning Path Starts Here
+
             </h2>
             
             {/* Message */}
-            <p className="text-center text-gray-600 mb-2">
-              Your course is fully generated! Sign up now to save it to your Learning Hub and access it anytime.
-            </p>
-            <p className="text-center text-sm text-gray-500 mb-6">
-              ✨ Unlock progress tracking, certificates, and unlimited courses!
+            <p className="text-center text-gray-600 text-sm mb-4">
+Sign in to unlock a personalized and enhanced learning experience.
             </p>
             
             {/* Benefits List */}
-            <div className="bg-indigo-50 rounded-xl p-4 mb-6 space-y-2">
-              <div className="flex items-start gap-3">
-                <IoBookmark className="text-indigo-600 mt-0.5 flex-shrink-0" size={18} />
-                <span className="text-sm text-gray-700">Save courses to your personal hub</span>
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 mb-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                <span className="text-sm text-gray-700">Seamless progress tracking</span>
               </div>
-              <div className="flex items-start gap-3">
-                <IoRocket className="text-indigo-600 mt-0.5 flex-shrink-0" size={18} />
-                <span className="text-sm text-gray-700">Track your learning progress</span>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                <span className="text-sm text-gray-700">One-click access from your Learning Hub</span>
               </div>
-              <div className="flex items-start gap-3">
-                <FaGraduationCap className="text-indigo-600 mt-0.5 flex-shrink-0" size={18} />
-                <span className="text-sm text-gray-700">Earn completion certificates</span>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                <span className="text-sm text-gray-700">Premium academic content curated for you</span>
               </div>
             </div>
             
             {/* Action Buttons */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <Link
                 to={`/auth?mode=signup&returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
               >
-                <FaGraduationCap size={20} />
-                Sign Up & Save Course
+                Save Course
               </Link>
               <Link
                 to={`/auth?mode=login&returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all"
+                className="w-full flex items-center justify-center px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors text-sm"
               >
-                Already have an account? Log In
+                Already have an account?
               </Link>
               <button
                 onClick={() => {
+                  // Clear the pending course so modal can show for next course
+                  localStorage.removeItem('pendingFreemiumCourse');
+                  console.log('🧹 Cleared pendingFreemiumCourse - modal dismissed by user');
+                  
                   setShowSaveCourseModal(false);
                   setPendingCourseToSave(null);
                 }}
-                className="w-full px-6 py-2 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
+                className="w-full px-4 py-1.5 text-gray-400 hover:text-gray-600 text-xs font-medium transition-colors"
               >
-                Maybe Later
+                Continue without saving
               </button>
             </div>
           </div>
