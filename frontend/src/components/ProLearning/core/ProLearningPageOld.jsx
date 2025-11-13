@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useSearchParams, useNavigate, useParams } from "react-router-dom";
 import universalToast from '../../../utils/universalToast';
-import { useAuth } from '../../../context/AuthContext';
 import { 
   IoHome, IoChevronBack, IoPlayCircle, IoBookmark, IoDownload, 
   IoCheckmarkCircle, IoTime, IoEye, IoStar, IoSparkles, IoRocket, 
@@ -155,7 +154,6 @@ const ProLearningPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const params = useParams();
-  const { user, loading } = useAuth();
   
   // Mobile detection state
   const [isMobile, setIsMobile] = useState(false);
@@ -242,84 +240,6 @@ const ProLearningPage = () => {
       try { tracking.capture('pro_learning.page_leave', { courseId: courseId || null }, { feature: 'pro_learning' }); } catch {}
     };
   }, []); // Empty dependency array - run once on mount/unmount
-
-  // Freemium: Auto-save course when user logs in (on ProLearningPage)
-  useEffect(() => {
-    console.log('🔍 [Freemium Auto-Save Check] useEffect triggered:', {
-      user: user ? 'exists' : 'null',
-      loading,
-      courseId,
-      pendingCourse: localStorage.getItem('pendingFreemiumCourse') ? 'exists' : 'none',
-      autoSaveAttempted: autoSaveAttempted.current
-    });
-    
-    if (user && !loading && !autoSaveAttempted.current) {
-      console.log('✅ User is authenticated and not loading');
-      // Check if there's a pending course to save
-      const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
-      console.log('📦 Pending course data:', pendingCourse);
-      
-      if (pendingCourse) {
-        try {
-          const courseData = JSON.parse(pendingCourse);
-          console.log('📝 Parsed course data:', courseData);
-          console.log('🔍 Comparing courseIds:', { 
-            pending: courseData.courseId, 
-            current: courseId,
-            match: courseData.courseId === courseId 
-          });
-          
-          // Check if this is the course currently being viewed
-          if (courseData.courseId === courseId) {
-            console.log('💾 User logged in while viewing course! Auto-saving:', courseData);
-            autoSaveAttempted.current = true; // Mark as attempted
-            
-            // Import the service dynamically to avoid circular dependencies
-            import('../../../services/ProLearningHistoryService').then(({ default: proLearningHistoryService }) => {
-              console.log('📚 ProLearningHistoryService loaded, calling saveCourse...');
-              proLearningHistoryService.saveCourse({
-                courseId: courseData.courseId,
-                topics: courseData.topics || [],
-                originalPrompt: courseData.originalPrompt || '',
-                learningContext: courseData.learningContext || '',
-                personalization: courseData.personalization || ''
-              }).then(() => {
-                console.log('✅ Save successful! Cleaning up...');
-                // Clear the pending course
-                localStorage.removeItem('pendingFreemiumCourse');
-                
-                // Close modal if open
-                setShowSaveCourseModal(false);
-                setPendingCourseToSave(null);
-                
-                // Show success toast
-                universalToast.success('🎉 Your course has been saved to your Learning Hub!', {
-                  duration: 5000
-                });
-                
-                console.log('✅ Freemium course auto-saved successfully!');
-              }).catch((error) => {
-                console.error('❌ Failed to auto-save freemium course:', error);
-                universalToast.error('Failed to save your course. Please try again.', {
-                  duration: 4000
-                });
-              });
-            }).catch((importError) => {
-              console.error('❌ Failed to import ProLearningHistoryService:', importError);
-            });
-          } else {
-            console.log('⚠️ CourseId mismatch - not saving');
-          }
-        } catch (e) {
-          console.error('❌ Failed to parse pending freemium course:', e);
-        }
-      } else {
-        console.log('ℹ️ No pending course found in localStorage');
-      }
-    } else {
-      console.log('⏳ Waiting... user:', user ? 'exists' : 'null', 'loading:', loading);
-    }
-  }, [user, loading, courseId]);
 
   // Mobile detection useEffect - Hide navbar on mobile and tablet for immersive experience
   useEffect(() => {
@@ -464,11 +384,6 @@ const ProLearningPage = () => {
   const [availableTabsForTopics, setAvailableTabsForTopics] = useState({});
   const [useProgressiveGeneration, setUseProgressiveGeneration] = useState(true); // Feature flag
   const [loadScenario, setLoadScenario] = useState(null); // 'first-time' or 'reload'
-  
-  // Freemium: Save course modal state
-  const [showSaveCourseModal, setShowSaveCourseModal] = useState(false);
-  const [pendingCourseToSave, setPendingCourseToSave] = useState(null);
-  const autoSaveAttempted = useRef(false); // Prevent duplicate save attempts
 
   // Safety: when generation stops, clear any lingering progress UI/flags
   useEffect(() => {
@@ -486,30 +401,6 @@ const ProLearningPage = () => {
       setIsProgressiveGenerating(false);
     }
   }, [allTopicsGenerated]);
-  
-  // Freemium: Show save course modal when generation completes for anonymous users
-  useEffect(() => {
-    if (allTopicsGenerated && user === null && !loading) {
-      // Check if there's a pending freemium course
-      const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
-      if (pendingCourse) {
-        try {
-          const courseData = JSON.parse(pendingCourse);
-          // Check if this is the course that was just created (match by courseId)
-          if (courseData.courseId === courseId) {
-            // Show modal after a short delay to let the UI settle
-            setTimeout(() => {
-              setPendingCourseToSave(courseData);
-              setShowSaveCourseModal(true);
-              console.log('🎉 Showing freemium save modal for course:', courseId);
-            }, 2000); // 2 second delay after generation completes
-          }
-        } catch (e) {
-          console.error('Failed to parse pending freemium course:', e);
-        }
-      }
-    }
-  }, [allTopicsGenerated, user, loading, courseId]);
 
   // If we arrive with a UUID course (DB-saved), proactively clear any stale fresh-generation marker
   useEffect(() => {
@@ -689,7 +580,7 @@ const ProLearningPage = () => {
         if (!courseId) return;
         
         // Fetch course progress from backend
-  const response = await axiosInstance.get(`/courses/${courseId}/progress/`);
+        const response = await axiosInstance.get(`/api/courses/${courseId}/progress/`);
         
         if (response.data) {
           const completedLessonIds = [];
@@ -1846,76 +1737,6 @@ const ProLearningPage = () => {
         video={currentVideo}
         onClose={closeVideoModal}
       />
-      
-      {/* Freemium: Save Course Modal */}
-      {showSaveCourseModal && pendingCourseToSave && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 animate-fade-in">
-            {/* Success Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
-                <IoCheckmarkCircle className="text-white" size={48} />
-              </div>
-            </div>
-            
-            {/* Title */}
-            <h2 className="text-2xl font-bold text-center text-gray-900 mb-3">
-              🎉 Course Complete!
-            </h2>
-            
-            {/* Message */}
-            <p className="text-center text-gray-600 mb-2">
-              Your course is fully generated! Sign up now to save it to your Learning Hub and access it anytime.
-            </p>
-            <p className="text-center text-sm text-gray-500 mb-6">
-              ✨ Unlock progress tracking, certificates, and unlimited courses!
-            </p>
-            
-            {/* Benefits List */}
-            <div className="bg-indigo-50 rounded-xl p-4 mb-6 space-y-2">
-              <div className="flex items-start gap-3">
-                <IoBookmark className="text-indigo-600 mt-0.5 flex-shrink-0" size={18} />
-                <span className="text-sm text-gray-700">Save courses to your personal hub</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <IoRocket className="text-indigo-600 mt-0.5 flex-shrink-0" size={18} />
-                <span className="text-sm text-gray-700">Track your learning progress</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <FaGraduationCap className="text-indigo-600 mt-0.5 flex-shrink-0" size={18} />
-                <span className="text-sm text-gray-700">Earn completion certificates</span>
-              </div>
-            </div>
-            
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <Link
-                to={`/auth?mode=signup&returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
-              >
-                <FaGraduationCap size={20} />
-                Sign Up & Save Course
-              </Link>
-              <Link
-                to={`/auth?mode=login&returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all"
-              >
-                Already have an account? Log In
-              </Link>
-              <button
-                onClick={() => {
-                  setShowSaveCourseModal(false);
-                  setPendingCourseToSave(null);
-                }}
-                className="w-full px-6 py-2 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
-              >
-                Maybe Later
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
       </div>
     </>
   );

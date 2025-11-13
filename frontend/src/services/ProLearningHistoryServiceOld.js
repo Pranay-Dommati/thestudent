@@ -1,6 +1,4 @@
 import logger from '../utils/logger';
-import axios from '../utils/axios';
-import contentStorageService from './ContentStorageService.js';
 // ProLearningHistoryService.js
 // Service to manage ProLearning course history with localStorage-backed persistence (IndexedDB removed)
 
@@ -8,83 +6,6 @@ class ProLearningHistoryService {
   constructor() {
     this.storageKey = 'prolearning_history';
     this.maxHistoryItems = 50; // Limit history to prevent storage bloat
-  }
-
-  /**
-   * Save a generated Pro Learning course to backend (Learning Hub)
-   * Gathers per-topic content from local storage and posts to /courses/pro-learning/save-course/
-   * @param {Object} params
-   * @param {string} params.courseId - Ephemeral course id (e.g., course_...)
-   * @param {Array} params.topics - Array of topic objects or names
-   * @param {string} [params.originalPrompt]
-   * @param {string} [params.learningContext]
-   * @param {string} [params.personalization]
-   */
-  async saveCourse({ courseId, topics, originalPrompt = '', learningContext = '', personalization = '' } = {}) {
-    if (!courseId) throw new Error('courseId is required');
-    const topicList = Array.isArray(topics) ? topics : [];
-    if (topicList.length === 0) throw new Error('topics are required to save the course');
-
-    // Build smart title from topics
-    const topicNames = topicList.map(t => (typeof t === 'string' ? t : (t?.name || '')).trim()).filter(Boolean);
-    let title = 'AI Generated Course';
-    if (topicNames.length > 0) {
-      const first = topicNames[0];
-      const extra = topicNames.length - 1;
-      if (extra <= 0) title = first;
-      else if (extra === 1) title = `${first} +1`;
-      else if (extra === 2) title = `${first} +1 +2`;
-      else title = `${first} +1 +2 +3 +...`;
-    }
-
-    // Gather content for each topic from ContentStorageService
-    const topicsPayload = {};
-    for (const name of topicNames) {
-      try {
-        const stored = contentStorageService.getContentByTopicName(name, courseId) || {};
-        // Normalize fields to match backend expectations
-        const reading = stored.reading || '';
-        const summary = stored.summary || '';
-        const videos = Array.isArray(stored.videos) ? stored.videos : [];
-        let quiz = [];
-        if (Array.isArray(stored.quiz)) quiz = stored.quiz;
-        else if (stored.quiz && Array.isArray(stored.quiz.questions)) quiz = stored.quiz.questions;
-        const resources = Array.isArray(stored.resources) ? stored.resources : [];
-
-        topicsPayload[name] = {
-          content: { reading, summary, videos, quiz, resources },
-          readingMaterial: reading,
-          topicSummary: summary,
-          videos,
-          quiz,
-          resources
-        };
-      } catch (e) {
-        logger.warn('Failed to gather content for topic, saving minimal placeholder:', name, e);
-        topicsPayload[name] = {
-          content: { reading: '', summary: '', videos: [], quiz: [], resources: [] },
-          readingMaterial: '',
-          topicSummary: '',
-          videos: [],
-          quiz: [],
-          resources: []
-        };
-      }
-    }
-
-    const payload = {
-      course_name: courseId,
-      title,
-      overwrite: true,
-      topics: topicsPayload,
-      // Attach metadata if the backend wants to log it (ignored if not used)
-      meta: { originalPrompt, learningContext, personalization }
-    };
-
-    logger.log('🚀 Saving course to Learning Hub...', { courseId, title, topicsCount: Object.keys(topicsPayload).length });
-    const resp = await axios.post('/courses/pro-learning/save-course/', payload);
-    logger.log('✅ Course saved to backend', resp?.data);
-    return resp?.data;
   }
 
   // Add a new ProLearning course URL to history

@@ -108,6 +108,10 @@ const MobileChatbotPage = () => {
   const [coursesSearch, setCoursesSearch] = useState("");
   // Feature flag: hide ProLearning courses preview in mobile chat by default
   const [showMobileCoursesPreview, setShowMobileCoursesPreview] = useState(false);
+  
+  // Freemium: Save course modal state
+  const [showSaveCourseModal, setShowSaveCourseModal] = useState(false);
+  const [pendingCourseToSave, setPendingCourseToSave] = useState(null);
 
   // Rotating suggestions for empty-state heading (same as desktop)
   const rotatingSuggestions = [
@@ -246,16 +250,79 @@ const MobileChatbotPage = () => {
       loadBackendCourses(true);
     };
     
+    // Freemium: Listen for save course modal trigger from ProLearningPage
+    const handleShowSaveModal = (event) => {
+      const courseData = event.detail;
+      console.log('📢 [Mobile] Received freemium save modal event:', courseData);
+      setPendingCourseToSave(courseData);
+      setShowSaveCourseModal(true);
+    };
+    
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('prolearning-history-updated', handleHistoryUpdate);
     window.addEventListener('prolearning-courses-updated', handleCacheInvalidation);
+    window.addEventListener('show-freemium-save-modal', handleShowSaveModal);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('prolearning-history-updated', handleHistoryUpdate);
       window.removeEventListener('prolearning-courses-updated', handleCacheInvalidation);
+      window.removeEventListener('show-freemium-save-modal', handleShowSaveModal);
     };
   }, []);
+
+  // Freemium: Auto-save course when user logs in (Mobile)
+  useEffect(() => {
+    const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isLoggedIn;
+    
+    if (authed && user && !loading) {
+      // Check if there's a pending course to save
+      const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
+      if (pendingCourse) {
+        try {
+          const courseData = JSON.parse(pendingCourse);
+          console.log('💾 [Mobile] User logged in! Auto-saving freemium course:', courseData);
+          
+          // Save to backend using proLearningHistoryService
+          const saveCourse = async () => {
+            try {
+              await proLearningHistoryService.saveCourse({
+                courseId: courseData.courseId,
+                topics: courseData.topics || [],
+                originalPrompt: courseData.originalPrompt || '',
+                learningContext: courseData.learningContext || '',
+                personalization: courseData.personalization || ''
+              });
+              
+              // Clear the pending course
+              localStorage.removeItem('pendingFreemiumCourse');
+              
+              // Show success toast
+              universalToast.success('🎉 Your course has been saved to your Learning Hub!', {
+                duration: 5000
+              });
+              
+              // Refresh courses list via global event (decoupled from local scope)
+              try {
+                window.dispatchEvent(new Event('prolearning-courses-updated'));
+              } catch (_) {}
+              
+              console.log('✅ [Mobile] Freemium course saved successfully!');
+            } catch (error) {
+              console.error('[Mobile] Failed to save freemium course:', error);
+              universalToast.error('Failed to save your course. Please try again.', {
+                duration: 4000
+              });
+            }
+          };
+          
+          saveCourse();
+        } catch (e) {
+          console.error('[Mobile] Failed to parse pending freemium course:', e);
+        }
+      }
+    }
+  }, [user, isAuthenticated, isLoggedIn, loading]);
 
   // Open drawer and ensure courses are fetched with cache support
   const openCoursesDrawer = async () => {
@@ -737,39 +804,50 @@ const MobileChatbotPage = () => {
     setChatHistory((prev) => [...prev, userMessageObj]);
     if (!customMessage) setMessage("");
 
-    // If not authenticated, show a friendly sign-in prompt and stop
+    // Freemium Feature: Allow 1 free course creation without authentication
     try {
       const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isLoggedIn;
       if (!authed) {
-        // Preserve the user's typed message across auth redirect by embedding
-        // it into the returnTo URL and also saving backups in both sessionStorage and localStorage.
-        try {
-          sessionStorage.setItem('pendingChatMessage', messageToSend);
-          localStorage.setItem('pendingChatPrompt', messageToSend); // Backup for cross-tab consistency
-          console.log('💾 Saved pending mobile prompt for after login:', messageToSend);
-        } catch (_) {}
+        // Check if user has already created a free course
+        const freeCoursesCreated = parseInt(localStorage.getItem('freeCoursesCreated') || '0');
+        
+        if (freeCoursesCreated >= 1) {
+          // User has already used their free course - require login
+          // Preserve the user's typed message across auth redirect by embedding
+          // it into the returnTo URL and also saving backups in both sessionStorage and localStorage.
+          try {
+            sessionStorage.setItem('pendingChatMessage', messageToSend);
+            localStorage.setItem('pendingChatPrompt', messageToSend); // Backup for cross-tab consistency
+            console.log('💾 Saved pending mobile prompt for after login:', messageToSend);
+          } catch (_) {}
 
-        // Build a clean returnTo URL that includes the pending message so that
-        // MobileChatbotPage can auto-send it after successful login (desktop parity).
-        const currentUrl = new URL(window.location.href);
-        // Do not pre-encode; URLSearchParams will encode as needed
-        currentUrl.searchParams.set('message', messageToSend);
-        currentUrl.searchParams.set('prefill', 'true');
-        const returnTo = `${currentUrl.pathname}?${currentUrl.searchParams.toString()}`;
+          // Build a clean returnTo URL that includes the pending message so that
+          // MobileChatbotPage can auto-send it after successful login (desktop parity).
+          const currentUrl = new URL(window.location.href);
+          // Do not pre-encode; URLSearchParams will encode as needed
+          currentUrl.searchParams.set('message', messageToSend);
+          currentUrl.searchParams.set('prefill', 'true');
+          const returnTo = `${currentUrl.pathname}?${currentUrl.searchParams.toString()}`;
 
-        const signInUrl = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
-        const signUpUrl = `/auth?mode=signup&returnTo=${encodeURIComponent(returnTo)}`;
-        const authPrompt = {
-          id: generateUniqueId(),
-          type: "bot",
-          isAuthPrompt: true,
-          signInUrl,
-          signUpUrl,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        };
-        setChatHistory((prev) => [...prev, authPrompt]);
-        setIsLoading(false);
-        return;
+          const signInUrl = `/auth?mode=login&returnTo=${encodeURIComponent(returnTo)}`;
+          const signUpUrl = `/auth?mode=signup&returnTo=${encodeURIComponent(returnTo)}`;
+          const authPrompt = {
+            id: generateUniqueId(),
+            type: "bot",
+            isAuthPrompt: true,
+            signInUrl,
+            signUpUrl,
+            isFreemiumLimit: true, // Flag to customize message
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          };
+          setChatHistory((prev) => [...prev, authPrompt]);
+          setIsLoading(false);
+          return;
+        }
+        
+        // User gets 1 free course - allow them to continue
+        console.log('🎁 Allowing free course creation on mobile (user has created:', freeCoursesCreated, 'of 1)');
+        // Will increment counter after successful course creation
       }
     } catch (_) {}
 
@@ -1098,6 +1176,33 @@ const MobileChatbotPage = () => {
   setPendingTopics([]);
   setOriginalPrompt("");
       
+      // Freemium: Store course data and increment counter for anonymous users
+      try {
+        const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isLoggedIn;
+        if (!authed) {
+          // Store the course data to be saved when user logs in
+          const courseData = {
+            courseId,
+            topicString,
+            topicNames,
+            topics: pendingTopics,
+            createdAt: Date.now(),
+            originalPrompt,
+            learningContext,
+            personalization
+          };
+          localStorage.setItem('pendingFreemiumCourse', JSON.stringify(courseData));
+          console.log('💾 [Mobile] Stored pending freemium course for later save:', courseData);
+          
+          const currentCount = parseInt(localStorage.getItem('freeCoursesCreated') || '0');
+          const newCount = currentCount + 1;
+          localStorage.setItem('freeCoursesCreated', newCount.toString());
+          console.log('🎁 [Mobile] Free course created! Count:', newCount, 'of 1');
+        }
+      } catch (e) {
+        console.warn('[Mobile] Failed to update free course counter:', e);
+      }
+      
       // Invalidate cache to trigger refresh
       try {
         localStorage.removeItem('prolearning_courses_cache');
@@ -1186,27 +1291,40 @@ const MobileChatbotPage = () => {
   const MessageBubble = React.memo(({ message }) => {
     // Inline auth prompt bubble
     if (message.isAuthPrompt) {
+      const isFreemiumLimit = message.isFreemiumLimit;
       return (
         <div className="w-full mb-4">
           <div className="flex justify-start">
             <div className="max-w-[90%] min-w-0">
-              <div className="px-4 py-3 bg-white text-gray-800 border border-gray-200 rounded-2xl rounded-bl-md shadow-sm">
-                <p className="mb-3 text-sm">
-                  <span className="mr-1">🔒</span>
-                  To create personalized learning plans, please sign in.
-                </p>
+              <div className="px-4 py-3 bg-gradient-to-br from-blue-50 to-indigo-50 text-gray-800 border border-blue-200 rounded-2xl rounded-bl-md shadow-md">
+                {isFreemiumLimit ? (
+                  <>
+                    <p className="mb-2 text-base font-semibold text-indigo-900">
+                      <span className="mr-2">🎉</span>
+                      You've tried your free course!
+                    </p>
+                    <p className="mb-3 text-sm text-gray-700">
+                      Want unlimited courses, progress tracking, and all features? <strong>Sign in or create a free account!</strong>
+                    </p>
+                  </>
+                ) : (
+                  <p className="mb-3 text-sm">
+                    <span className="mr-1">🔒</span>
+                    To create personalized learning plans, please sign in.
+                  </p>
+                )}
                 <div className="flex items-center gap-2 flex-wrap">
                   <Link
                     to={message.signInUrl || '/auth?mode=login'}
-                    className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                    className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
                   >
                     Sign In
                   </Link>
                   <Link
                     to={message.signUpUrl || '/auth?mode=signup'}
-                    className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                    className="px-3 py-2 bg-white border border-indigo-300 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors shadow-sm"
                   >
-                    Create Account
+                    Create Free Account
                   </Link>
                 </div>
                 <div className="text-xs mt-2 text-gray-500">{message.timestamp}</div>
@@ -2065,6 +2183,75 @@ const MobileChatbotPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Freemium: Save Course Modal (Mobile) */}
+      {showSaveCourseModal && pendingCourseToSave && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-fade-in">
+            {/* Success Icon */}
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
+                <IoCheckmarkCircle className="text-white" size={40} />
+              </div>
+            </div>
+            
+            {/* Title */}
+            <h2 className="text-xl font-bold text-center text-gray-900 mb-2">
+              🎉 Course Created!
+            </h2>
+            
+            {/* Message */}
+            <p className="text-center text-gray-600 text-sm mb-2">
+              Your course is ready! Sign up now to save it to your Learning Hub.
+            </p>
+            <p className="text-center text-xs text-gray-500 mb-4">
+              ✨ Unlock progress tracking & certificates!
+            </p>
+            
+            {/* Benefits List */}
+            <div className="bg-indigo-50 rounded-xl p-3 mb-4 space-y-2">
+              <div className="flex items-start gap-2">
+                <IoBookmark className="text-indigo-600 mt-0.5 flex-shrink-0" size={16} />
+                <span className="text-xs text-gray-700">Save courses to your hub</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <IoRocket className="text-indigo-600 mt-0.5 flex-shrink-0" size={16} />
+                <span className="text-xs text-gray-700">Track learning progress</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <FaGraduationCap className="text-indigo-600 mt-0.5 flex-shrink-0" size={16} />
+                <span className="text-xs text-gray-700">Earn certificates</span>
+              </div>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="space-y-2">
+              <Link
+                to="/auth?mode=signup"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg text-sm"
+              >
+                <FaGraduationCap size={18} />
+                Sign Up & Save
+              </Link>
+              <Link
+                to="/auth?mode=login"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all text-sm"
+              >
+                Log In
+              </Link>
+              <button
+                onClick={() => {
+                  setShowSaveCourseModal(false);
+                  setPendingCourseToSave(null);
+                }}
+                className="w-full px-4 py-2 text-gray-500 hover:text-gray-700 text-xs font-medium transition-colors"
+              >
+                Maybe Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Auth modal removed - gating is inline within chat conversation */}
     </div>
