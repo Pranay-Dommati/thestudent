@@ -147,202 +147,8 @@ def derive_personalization(user_query: str) -> str:
         return 'Accessible, example-driven learning with clear steps and quick feedback.'
 
 
-def extract_explicit_topics(user_query: str):
-    """Extract explicitly mentioned topics when the user names them, especially for DSA.
-    Returns a list of topic objects or an empty list when nothing explicit is found.
-    """
-    try:
-        text = (user_query or '').lower()
-
-        # Do NOT attempt to append language/framework or domain suffixes here.
-        # Only detect the base topics; context enrichment will be handled by AI in direct mode.
-
-        # Detect DSA domain suffix
-        dsa_suffix = ''
-        if any(k in text for k in [' dsa', 'data structures', 'algorithms']):
-            dsa_suffix = ' in DSA'
-
-        # Token-to-topic mapping for DSA (structures + techniques)
-        dsa_topic_map = [
-            (['array', 'arrays'], 'Arrays'),
-            (['string', 'strings'], 'Strings'),
-            (['stack', 'stacks'], 'Stacks'),
-            (['queue', 'queues'], 'Queues'),
-            (['linked list', 'linked lists'], 'Linked Lists'),
-            (['hash map', 'hash maps', 'hashmap', 'hash table', 'hash tables'], 'Hash Maps'),
-            (['tree', 'trees', 'bst', 'binary search tree'], 'Trees'),
-            (['graph', 'graphs'], 'Graphs'),
-            (['heap', 'heaps', 'priority queue', 'priority queues'], 'Heaps & Priority Queues'),
-            (['trie', 'tries'], 'Tries'),
-            (['sort', 'sorting'], 'Sorting'),
-            (['search', 'searching', 'binary search'], 'Searching'),
-            (['dp', 'dynamic programming'], 'Dynamic Programming'),
-            (['recursion', 'recursive'], 'Recursion'),
-            (['backtracking', 'back-track'], 'Backtracking'),
-            (['two pointers', 'two-pointers', 'two pointer'], 'Two Pointers'),
-            (['sliding window', 'sliding-window'], 'Sliding Window'),
-            (['greedy'], 'Greedy Algorithms'),
-            (['divide and conquer', 'divide & conquer', 'divide-and-conquer'], 'Divide & Conquer'),
-            (['bfs', 'breadth first search', 'breadth-first search'], 'BFS'),
-            (['dfs', 'depth first search', 'depth-first search'], 'DFS'),
-            (['topological sort', 'topo sort'], 'Topological Sort'),
-            (['prefix sum', 'prefix sums'], 'Prefix Sums'),
-            (['bit manipulation', 'bitmask', 'bitwise'], 'Bit Manipulation'),
-        ]
-
-        # Trigonometry detection (including common misspelling)
-        is_trig = any(k in text for k in [
-            'trigonometry', 'trigonometric', 'trignometric', 'trigonometric ratios', 'trigonometric ratio',
-            'trig ratios', 'sine', 'cosine', 'tangent', 'secant', 'cosecant', 'cotangent', 'unit circle',
-            'radians', 'degrees'
-        ])
-        trig_suffix = ' in Trigonometry'
-        trig_topic_map = []
-        if is_trig:
-            trig_topic_map = [
-                (['trigonometric ratios', 'trigonometric ratio', 'trig ratios'], 'Trigonometric Ratios: sin, cos, tan'),
-                (['sine', 'cosine', 'tangent'], 'Trigonometric Ratios: sin, cos, tan'),
-                (['secant', 'cosecant', 'cotangent'], 'Reciprocal & Co-function Ratios: sec, csc, cot'),
-                (['unit circle', 'special angles'], 'Unit Circle & Special Angles'),
-                (['radians', 'degrees', 'angle measure', 'angle measurement'], 'Angles, Degrees & Radians'),
-                (['identities', 'trigonometric identities', 'trig identities'], 'Trigonometric Identities'),
-                (['inverse trig', 'inverse trigonometric'], 'Inverse Trig Functions'),
-                (['graphs', 'graphing'], 'Trig Graphs & Transformations'),
-                (['law of sines'], 'Law of Sines'),
-                (['law of cosines'], 'Law of Cosines'),
-                (['applications', 'problem solving'], 'Applications & Problem Solving'),
-            ]
-
-        # Digital Logic detection
-        is_digital = any(k in text for k in [
-            'digital logic', 'logic gate', 'logic gates', 'boolean algebra', 'karnaugh', 'k-map', 'k map', 'truth table',
-            'combinational', 'sequential', 'flip-flop', 'flip flops', 'flipflop', 'latch', 'fsm', 'state machine',
-            'multiplexer', 'decoder', 'encoder', 'adder', 'subtractor', 'register', 'counter', 'binary', 'hexadecimal',
-            'octal', 'number system'
-        ])
-        digital_topic_map = []
-        if is_digital:
-            digital_topic_map = [
-                (['number system', 'binary', 'octal', 'hexadecimal'], 'Number Systems & Conversions'),
-                (['boolean algebra', 'truth table'], 'Boolean Algebra & Truth Tables'),
-                (['logic gate', 'logic gates', 'and', 'or', 'not', 'nand', 'nor', 'xor', 'xnor'], 'Logic Gates & Minimization'),
-                (['karnaugh', 'k-map', 'k map'], 'Karnaugh Maps (K-Map) Simplification'),
-                (['combinational', 'adder', 'subtractor', 'multiplexer', 'decoder', 'encoder'], 'Combinational Circuits: Adders, MUX/Decoder'),
-                (['sequential', 'flip-flop', 'flip flops', 'flipflop', 'latch', 'register', 'counter'], 'Sequential Circuits: Flip-Flops, Counters & Registers'),
-                (['fsm', 'state machine'], 'Finite State Machines (FSM) Design'),
-                (['timing', 'waveform'], 'Timing Diagrams & Hazards'),
-            ]
-
-        # Collect matches with their earliest index to preserve input order
-        matches = []  # list of tuples: (index, title)
-        # DSA matches
-        for keys, name in dsa_topic_map:
-            idxs = [text.find(k) for k in keys if k in text]
-            if idxs:
-                # Return base name only; no suffixes here
-                title = name
-                matches.append((min(idxs), title))
-        # Trigonometry matches
-        for keys, name in trig_topic_map:
-            idxs = [text.find(k) for k in keys if k in text]
-            if idxs:
-                # Return base name only; no suffixes here
-                title = name
-                matches.append((min(idxs), title))
-        # Digital logic matches
-        for keys, name in digital_topic_map:
-            idxs = [text.find(k) for k in keys if k in text]
-            if idxs:
-                # Return base name only; no suffixes here
-                title = name
-                matches.append((min(idxs), title))
-
-        # Cryptography / Security detection (RSA, AES, SHA, ECC, etc.)
-        is_crypto = any(k in text for k in [
-            'rsa','aes','des','3des','triple des','ecc','ecdsa','dsa','diffie-hellman','diffie hellman','dh',
-            'hmac','sha-256','sha256','sha 256','sha-1','sha1','sha 1','sha-3','sha3','sha 3','md5',
-            'digital signature','digital signatures','public key','public-key','asymmetric encryption',
-            'symmetric encryption','pki','public key infrastructure','certificate','certificates','x.509','x509'
-        ])
-        crypto_topic_map = []
-        if is_crypto:
-            crypto_topic_map = [
-                (['rsa','rivest-shamir-adleman'], 'RSA'),
-                (['aes','advanced encryption standard'], 'AES'),
-                (['des','3des','triple des','data encryption standard'], 'DES / 3DES'),
-                (['ecc','elliptic curve cryptography'], 'Elliptic Curve Cryptography (ECC)'),
-                (['ecdsa'], 'ECDSA'),
-                (['dsa'], 'DSA'),
-                (['diffie-hellman','diffie hellman','dh key exchange','dh'], 'Diffie-Hellman Key Exchange'),
-                (['hmac'], 'HMAC'),
-                (['sha-256','sha256','sha 256'], 'SHA-256'),
-                (['sha-1','sha1','sha 1'], 'SHA-1'),
-                (['sha-3','sha3','sha 3'], 'SHA-3'),
-                (['md5'], 'MD5'),
-                (['digital signature','digital signatures'], 'Digital Signatures'),
-                (['public key','public-key','public key cryptography','asymmetric encryption'], 'Public-Key Cryptography'),
-                (['symmetric encryption','secret key encryption'], 'Symmetric Encryption'),
-                (['pki','public key infrastructure','certificate','certificates','x.509','x509'], 'PKI & Certificates'),
-            ]
-        for keys, name in crypto_topic_map:
-            idxs = [text.find(k) for k in keys if k in text]
-            if idxs:
-                title = name
-                matches.append((min(idxs), title))
-
-        if matches:
-            # Sort by appearance order, then deduplicate while preserving order
-            matches.sort(key=lambda x: x[0])
-            ordered = []
-            seen = set()
-            for _, title in matches:
-                if title not in seen:
-                    seen.add(title)
-                    ordered.append(title)
-
-            topics = [
-                {'id': i + 1, 'name': ordered[i], 'isActive': True}
-                for i in range(min(len(ordered), MAX_TOPICS_PER_REQUEST))
-            ]
-            return topics
-
-        return []
-    except Exception:
-        return []
-
-
-def _merge_with_fallback(user_query: str, explicit_topics: list):
-    """If explicit topics are fewer than MAX_TOPICS_PER_REQUEST, merge with domain fallback.
-    Preserves order: explicit first, then fallback topics excluding duplicates by name (case-insensitive).
-    Returns topics with sequential ids starting at 1.
-    """
-    try:
-        names_ci = set(t.get('name', '').strip().lower() for t in explicit_topics if isinstance(t, dict))
-        fallback = generate_simple_fallback_topics(user_query)
-        merged = []
-        # Start with explicit (keep original order and fields where present)
-        for t in explicit_topics:
-            if isinstance(t, dict) and t.get('name'):
-                merged.append({'id': len(merged) + 1, 'name': t['name'], 'isActive': True, **({k: v for k, v in t.items() if k in ('context',)})})
-        # Add fallback excluding duplicates
-        for t in fallback:
-            name = t.get('name') if isinstance(t, dict) else None
-            if not name:
-                continue
-            if name.strip().lower() in names_ci:
-                continue
-            merged.append({'id': len(merged) + 1, 'name': name, 'isActive': True})
-            names_ci.add(name.strip().lower())
-            if len(merged) >= MAX_TOPICS_PER_REQUEST:
-                break
-        # Cap and reassign ids
-        merged = merged[:MAX_TOPICS_PER_REQUEST]
-        for idx, t in enumerate(merged):
-            t['id'] = idx + 1
-        return merged
-    except Exception:
-        # On error, just fallback
-        return generate_simple_fallback_topics(user_query)
+# REMOVED: extract_explicit_topics() - unused fallback keyword matching
+# REMOVED: _merge_with_fallback() - unused fallback merging logic
 
 
 def _normalize_single_topic_name(user_query: str) -> str:
@@ -444,10 +250,10 @@ Return only the JSON, no explanations.
 
 
 def build_direct_extraction_prompt(user_query: str) -> str:
-                """Prompt to extract topics directly from a short user query that lists items and possibly a global context.
+                """Prompt to extract topics directly from a short user query that lists items.
                 Goals:
                 - Preserve the items/topics the user named; do NOT invent new ones.
-                - Infer any global context (e.g., a programming language or domain) present in the query and apply it to each item.
+                - DO NOT infer or apply "global context" - if user says "python and c++", return ["Python", "C++"], NOT ["Python", "C++ in Python"].
                 - Keep the original order of items from the query.
                 - If the query is a single specific term (e.g., 'rsa', 'aes'), return exactly one normalized topic.
                 - Output strictly JSON with topics array; 1–4 topics maximum.
@@ -463,17 +269,25 @@ STRICT OUTPUT REQUIREMENTS:
 }
 
 Guidelines:
-- Detect a single shared context if present (like "Python", "JavaScript", "DSA", "Trigonometry") and prepend/append it appropriately. Example: "python arrays strings" -> ["Python Arrays", "Python Strings"].
-- Split multiple items when the query uses connectors such as commas, semicolons, "and", "as well as", plus (+). Do NOT return the entire sentence as one topic when multiple items are present.
-- Correct minor spelling mistakes in item names (e.g., "recurstion" -> "Recursion").
-- Do not expand into subtopics or a curriculum; only reflect exactly the items the user mentioned.
+- Split items on connectors (commas, semicolons, "and", "as well as", "+"). Each item becomes one topic.
+- Context rule: ONLY apply shared context when user explicitly writes "<context> <item1> and <item2>". Examples:
+  * "python arrays and strings" → ["Python Arrays", "Python Strings"] (Python is explicit context)
+  * "python and c++" → ["Python", "C++"] (NO shared context - these are separate languages)
+  * "rust and solidity" → ["Rust", "Solidity"] (NO shared context - separate languages)
+- NEVER treat first item as context for second item. "A and B" means TWO separate topics unless A is explicitly modifying B.
+- Correct minor spelling mistakes (e.g., "recurstion" → "Recursion").
 - Keep each topic name concise (<= 60 chars) and properly cased.
 - Maximum 4 topics.
 
 Examples (follow exactly these output conventions):
 - Input: "i wanna learn python arrays and recursion as well as hash maps" → Topics: ["Python Arrays", "Python Recursion", "Python Hash Maps"]
 - Input: "i want to learn python arrays and recurstion and hash maps" → Topics: ["Python Arrays", "Python Recursion", "Python Hash Maps"]
+- Input: "rust and solidity" → Topics: ["Rust", "Solidity"] (separate languages, no shared context)
+- Input: "python and c++" → Topics: ["Python", "C++"] (separate languages, NOT "C++ in Python")
+- Input: "java and python" → Topics: ["Java", "Python"] (separate languages)
 - Input: "aes" → Topics: ["AES"]
+
+CRITICAL: Programming languages like Python, Java, C++, Rust, JavaScript are ALWAYS separate topics. NEVER combine them like "C++ in Python".
 
 User Query: """ + user_query + """
 
@@ -492,7 +306,8 @@ def build_direct_retry_prompt(user_query: str) -> str:
                         "  \"topics\": [\"Topic 1\", \"Topic 2\"]\n"
                         "}.\n"
                         "Rules:\n"
-                        "- Detect a single global context like 'Python' and apply it to each item if present in the query.\n"
+                        "- ONLY detect shared context if user EXPLICITLY mentions it (e.g., 'Python arrays'). If items are distinct subjects (e.g., 'rust and solidity'), keep them SEPARATE.\n"
+                        "- PROGRAMMING LANGUAGES are ALWAYS SEPARATE. Examples: 'Python and C++' -> ['Python', 'C++'], NOT 'C++ in Python'.\n"
                         "- Split items on connectors (commas, semicolons, 'and', '+', 'as well as'). Preserve original order.\n"
                         "- Correct minor spelling mistakes (e.g., 'recurstion' -> 'Recursion').\n"
                         "- 1 to 4 items maximum. No subtopics or curriculum.\n"
@@ -521,21 +336,28 @@ def _extract_root_context_ai(user_query: str, max_retries: int = 2) -> str | Non
             "Extract ONLY the primary subject/domain from this learning query. "
             "Return a short phrase (1-4 words max) that describes what the course is about.\n\n"
             "Examples:\n"
-            "- 'Dutch language beginner friendly' → 'Dutch language'\n"
+            "- 'i wanna learn portugues' → 'Portuguese'\n"
+            "- 'Dutch language beginner friendly' → 'Dutch'\n"
             "- 'mental health awareness' → 'Mental Health'\n"
             "- 'startup business basics' → 'Startup'\n"
             "- 'Python for data science' → 'Python'\n"
             "- 'learn calculus' → 'Calculus'\n"
             "- 'arrays and strings' → 'Data Structures'\n"
             "- 'recursion, dynamic programming' → 'Algorithms'\n"
-            "- 'HTML, CSS, JavaScript' → 'Web Development'\n"
-            "- 'react hooks and state' → 'React'\n\n"
+            "- 'react hooks and state' → 'React'\n"
+            "- 'python arrays and strings' → 'Python'\n\n"
+            "Examples that should return 'None' (DISTINCT subjects):\n"
+            "- 'rust and solidity' → 'None'\n"
+            "- 'python and c++' → 'None'\n"
+            "- 'python and java' → 'None'\n"
+            "- 'HTML, CSS, JavaScript' → 'None'\n\n"
             "Rules:\n"
-            "- If query lists multiple topics (e.g., 'arrays and strings'), identify the BROADER subject (e.g., 'Data Structures', NOT 'Arrays and Strings')\n"
-            "- Return ONLY the subject name, nothing else\n"
-            "- Use title case (e.g., 'Mental Health', not 'mental health')\n"
-            "- Keep it concise (max 4 words)\n"
-            "- If no clear subject, return 'General'\n\n"
+            "- If query is about ONE subject/language (e.g., 'learn Portuguese', 'Python arrays'), return that subject\n"
+            "- If query lists related subtopics of ONE domain (e.g., 'python arrays and strings'), return the domain\n"
+            "- If query lists DISTINCT/UNRELATED subjects (e.g., 'Rust and Solidity', 'Python and Java'), return 'None'\n"
+            "- Return ONLY the subject name or 'None', nothing else\n"
+            "- Use title case (e.g., 'Portuguese', not 'portugues')\n"
+            "- Keep it concise (max 3 words)\n\n"
             f"Query: \"{user_query}\"\n\n"
             "Subject:"
         )
@@ -565,15 +387,18 @@ def _extract_root_context_ai(user_query: str, max_retries: int = 2) -> str | Non
                     # Remove quotes if present
                     extracted = extracted.strip('"\'')
                     
+                    # If AI explicitly returns "None" (unrelated topics), honor it
+                    if extracted.lower() in ['none', 'n/a', 'general', 'learning', 'course', 'study']:
+                        if settings.DEBUG:
+                            logger.debug(f"AI context extraction: '{user_query}' → None (distinct/unrelated topics)")
+                        return None
+                    
                     # Validate: should be short (1-4 words) and not generic
                     words = extracted.split()
-                    if 1 <= len(words) <= 4 and extracted.lower() not in ['general', 'learning', 'course', 'study']:
+                    if 1 <= len(words) <= 4:
                         if settings.DEBUG:
                             logger.debug(f"AI context extraction: '{user_query}' → '{extracted}'")
                         return extracted
-                    elif extracted.lower() == 'general':
-                        # AI couldn't determine specific subject
-                        return None
                 
             except Exception as e:
                 if settings.DEBUG:
@@ -791,25 +616,7 @@ def _token_title(token: str) -> str:
     return t.title()
 
 
-def _fallback_direct_items(user_query: str) -> list[str]:
-    """Non-regex, minimal fallback: split by commas/semicolons/and, or space list with a global context prefix.
-    Returns up to 4 cleaned items in order.
-    """
-    try:
-        q = (user_query or '').strip()
-        if not q:
-            return []
-
-        # Split on common list connectors while preserving order
-        # Connectors: commas, semicolons, pipes, "and", "as well as", "+", "plus"
-        parts = [p.strip() for p in re.split(r"\b(?:,|;|\||and|as well as|\+|plus)\b", q, flags=re.IGNORECASE) if p and p.strip()]
-        if len(parts) > 1:
-            return parts[:MAX_TOPICS_PER_REQUEST]
-
-        # If no connectors, return single trimmed query as one item
-        return [q]
-    except Exception:
-        return []
+# REMOVED: _fallback_direct_items() - unused regex-based fallback splitting
 
 
 def _dedup_adjacent_words(name: str) -> str:
@@ -866,14 +673,10 @@ def classify_query_intent(user_query: str) -> str:
             # Acronym-like or library/util single token
             if tok.isalpha() and 2 <= len(tok) <= 6:
                 return 'direct'
-        # Phrases like 'learn about <x>' where x is a single specific concept
-        if any(p in q for p in ['learn about ', 'study ', 'deep dive into ', 'explain ']):
-            # If extractor finds specific topics, consider direct
-            if extract_explicit_topics(user_query):
-                return 'direct'
+        # Removed fallback extraction calls - AI-only mode
 
-        # Default
-        return 'direct' if extract_explicit_topics(user_query) else 'broad'
+        # Default to 'broad' since this function is no longer actively used
+        return 'broad'
     except Exception:
         return 'broad'
 
@@ -1349,12 +1152,7 @@ def classify_topics(request):
                 'usage_stats': None,
                 'debug_meta': debug_meta,
             }, status=200)
-        # We no longer use heuristic explicit extraction to generate topics; keep names for potential AI guidance only
-        try:
-            explicit_topics = extract_explicit_topics(user_query)
-        except Exception:
-            explicit_topics = []
-        explicit_names = [t.get('name') for t in explicit_topics if isinstance(t, dict) and t.get('name')]
+        # Removed fallback keyword extraction - pure AI mode only
 
         # Direct intent: AI-only extraction with context; do not use regex/keyword extraction or client-side parsing for multiple items
         if intent == 'direct':
@@ -1520,25 +1318,25 @@ def classify_topics(request):
                         error_payload['used_model'] = used_model
                     return JsonResponse(error_payload, status=422)
 
-            # CONTEXT INJECTION: Enrich topics with root context for downstream services
-            # 🔍 LOGGING: Show what AI returned BEFORE context injection
+            # SMART CONTEXT INJECTION FOR DIRECT MODE
+            # AI determines if query has a single subject (e.g., "learn Portuguese") 
+            # or multiple distinct subjects (e.g., "Python and C++")
             logger.info(f"[AI OUTPUT - BEFORE CONTEXT] Topics returned by AI model:")
             for idx, topic in enumerate(formatted_topics, 1):
                 logger.info(f"   {idx}. '{topic.get('name', 'N/A')}'")
             
-            root_context = _extract_root_context(user_query)
+            # Let AI decide if there's a root context
+            root_context = _extract_root_context_ai(user_query)
             logger.info(f"[ROOT CONTEXT] Extracted from query '{user_query}': '{root_context}'")
             
-            # Apply context injection
-            formatted_topics = _inject_context_into_topics(formatted_topics, root_context, user_query)
-            
-            # 🔍 LOGGING: Show what topics look like AFTER context injection
-            logger.info(f"[AI OUTPUT - AFTER CONTEXT] Final topics sent to frontend:")
-            for idx, topic in enumerate(formatted_topics, 1):
-                logger.info(f"   {idx}. '{topic.get('name', 'N/A')}'")
-            
-            if settings.DEBUG and root_context:
-                logger.debug(f"Context injection (DIRECT): added '{root_context}' to {len(formatted_topics)} topics")
+            # Only inject if AI confirms there IS a valid context
+            if root_context:
+                formatted_topics = _inject_context_into_topics(formatted_topics, root_context, user_query)
+                logger.info(f"[AI OUTPUT - AFTER CONTEXT] Topics with context injected:")
+                for idx, topic in enumerate(formatted_topics, 1):
+                    logger.info(f"   {idx}. '{topic.get('name', 'N/A')}'")
+            else:
+                logger.info(f"[CONTEXT SKIPPED] No root context detected - topics are distinct subjects")
 
             debug_meta['topics_count'] = len(formatted_topics)
             debug_meta['root_context'] = root_context  # Add to debug metadata
@@ -1675,25 +1473,25 @@ def classify_topics(request):
                         ):
                             personalization_value = derive_personalization(user_query)
 
-                        # CONTEXT INJECTION: Enrich topics with root context for downstream services
-                        # 🔍 LOGGING: Show what AI returned BEFORE context injection (BROAD mode)
+                        # SMART CONTEXT INJECTION FOR BROAD MODE
+                        # AI determines if query has a single subject (e.g., "learn Portuguese") 
+                        # or multiple distinct subjects (e.g., "Python and C++")
                         logger.info(f"[AI OUTPUT - BEFORE CONTEXT - BROAD] Topics returned by AI model:")
                         for idx, topic in enumerate(formatted_topics, 1):
                             logger.info(f"   {idx}. '{topic.get('name', 'N/A')}'")
                         
-                        root_context = _extract_root_context(user_query)
+                        # Let AI decide if there's a root context
+                        root_context = _extract_root_context_ai(user_query)
                         logger.info(f"[ROOT CONTEXT - BROAD] Extracted from query '{user_query}': '{root_context}'")
                         
-                        # Apply context injection
-                        formatted_topics = _inject_context_into_topics(formatted_topics, root_context, user_query)
-                        
-                        # 🔍 LOGGING: Show what topics look like AFTER context injection (BROAD mode)
-                        logger.info(f"[AI OUTPUT - AFTER CONTEXT - BROAD] Final topics sent to frontend:")
-                        for idx, topic in enumerate(formatted_topics, 1):
-                            logger.info(f"   {idx}. '{topic.get('name', 'N/A')}'")
-                        
-                        if settings.DEBUG and root_context:
-                            logger.debug(f"Context injection: added '{root_context}' to {len(formatted_topics)} topics")
+                        # Only inject if AI confirms there IS a valid context
+                        if root_context:
+                            formatted_topics = _inject_context_into_topics(formatted_topics, root_context, user_query)
+                            logger.info(f"[AI OUTPUT - AFTER CONTEXT - BROAD] Topics with context injected:")
+                            for idx, topic in enumerate(formatted_topics, 1):
+                                logger.info(f"   {idx}. '{topic.get('name', 'N/A')}'")
+                        else:
+                            logger.info(f"[CONTEXT SKIPPED - BROAD] No root context detected - topics are distinct subjects")
 
                         debug_meta['topics_count'] = len(formatted_topics)
                         debug_meta['root_context'] = root_context  # Add to debug metadata

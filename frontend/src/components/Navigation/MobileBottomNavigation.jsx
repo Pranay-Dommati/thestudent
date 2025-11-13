@@ -18,14 +18,14 @@ const MobileBottomNavigation = () => {
   const scrollTimeoutRef = useRef(null);
   const lastToggleTime = useRef(0);
 
-  // Set initial html class on mount (only on small screens)
+  // Set initial html class on mount (mobile + tablet)
   useEffect(() => {
     const rootElement = document.documentElement;
-    const isSmallScreen = window.innerWidth < 768;
+    const isMobileOrTablet = window.innerWidth < 1024;
     if (hideNav) {
       // Ensure classes are cleared when nav is hidden
       rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
-    } else if (isSmallScreen) {
+    } else if (isMobileOrTablet) {
       rootElement.classList.add('mobile-nav-visible');
     } else {
       rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
@@ -36,10 +36,10 @@ const MobileBottomNavigation = () => {
     };
   }, [hideNav]);
 
-  // Scroll detection effect (only on small screens)
+  // Scroll detection effect (mobile + tablet)
   useEffect(() => {
-    // Skip on desktop/tablet
-    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+    // Skip on desktop only
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
       const rootElement = document.documentElement;
       rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
       return;
@@ -133,13 +133,13 @@ const MobileBottomNavigation = () => {
     };
   }, [lastScrollY, hideNav]);
 
-  // Dynamic padding based on navigation visibility (small screens only)
+  // Dynamic padding based on navigation visibility (mobile + tablet)
   useEffect(() => {
     const rootElement = document.documentElement;
-    const isSmallScreen = window.innerWidth < 768;
+    const isMobileOrTablet = window.innerWidth < 1024;
     if (hideNav) {
       rootElement.classList.remove('mobile-nav-visible', 'mobile-nav-hidden');
-    } else if (isSmallScreen) {
+    } else if (isMobileOrTablet) {
       if (isVisible) {
         rootElement.classList.add('mobile-nav-visible');
         rootElement.classList.remove('mobile-nav-hidden');
@@ -291,7 +291,7 @@ const MobileBottomNavigation = () => {
 
   return (
     <div 
-      className={`fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 md:hidden transition-transform duration-300 ease-in-out ${
+      className={`fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 lg:hidden transition-transform duration-300 ease-in-out ${
         isVisible ? 'translate-y-0' : 'translate-y-full'
       }`}
       style={{

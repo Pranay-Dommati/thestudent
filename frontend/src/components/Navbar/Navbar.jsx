@@ -345,66 +345,112 @@ const Navbar = ({ initialStyle = "transparent" }) => {
           </div>
         </div>
         
-        {/* Mobile/Tablet profile menu - Only profile-related options */}
+        {/* Mobile/Tablet profile menu - Professional Design */}
         {isMobileMenuOpen && isLoggedIn && (
           <>
-            {/* Semi-transparent overlay for better UX */}
+            {/* Enhanced overlay */}
             <div 
-              className="fixed inset-0 bg-black/30 z-40 xl:hidden" 
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 xl:hidden" 
               onClick={closeAllMenus}
             ></div>
-            <div className="xl:hidden mt-4 py-3 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-100 mx-4 navbar-menu z-50 relative">
-              <div className="px-4 py-2 border-b border-gray-100">
-                <p className="text-sm font-medium text-gray-900">Profile Options</p>
+            <div className="xl:hidden absolute top-full right-0 mt-2 w-56 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-100/50 navbar-menu z-50 overflow-hidden transform -translate-x-2 md:-translate-x-40" 
+                 style={{ 
+                   boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1)' 
+                 }}>
+              {/* Subtle gradient border */}
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-b from-white/20 to-transparent pointer-events-none"></div>
+              
+              {/* Arrow with enhanced styling */}
+              <div className="absolute -top-2 right-4 md:right-12 w-4 h-4 bg-white/95 backdrop-blur-xl border border-gray-100/50 transform rotate-45" 
+                   style={{ 
+                     boxShadow: '-2px -2px 8px rgba(0, 0, 0, 0.1)' 
+                   }}></div>
+              
+              {/* Menu items */}
+              <div className="py-3">
+                <Link 
+                  to="/profile" 
+                  className="flex items-center px-4 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 transition-all duration-200 group"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <div className="w-8 h-8 bg-gray-100 group-hover:bg-blue-100 rounded-lg flex items-center justify-center mr-3 transition-colors">
+                    <FaUserCircle className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium">View Profile</span>
+                    <p className="text-xs text-gray-500">Settings & preferences</p>
+                  </div>
+                </Link>
+                
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center w-full px-4 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 hover:text-red-700 transition-all duration-200 group"
+                >
+                  <div className="w-8 h-8 bg-gray-100 group-hover:bg-red-100 rounded-lg flex items-center justify-center mr-3 transition-colors">
+                    <FaSignOutAlt className="w-4 h-4 text-gray-600 group-hover:text-red-600" />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-sm font-medium">Sign Out</span>
+                    <p className="text-xs text-gray-500">End your session</p>
+                  </div>
+                </button>
               </div>
-            <Link 
-              to="/profile" 
-              className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              <FaUserCircle className="w-4 h-4 mr-3 text-gray-500" />
-              <span>View Profile</span>
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="flex items-center w-full px-4 py-3 text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <FaSignOutAlt className="w-4 h-4 mr-3" />
-              <span>Sign Out</span>
-            </button>
-          </div>
+            </div>
           </>
         )}
         
-        {/* Mobile/Tablet auth menu - Login/Signup options */}
+        {/* Mobile/Tablet auth menu - Professional Design */}
         {isAuthMenuOpen && !isLoggedIn && (
           <>
-            {/* Semi-transparent overlay for better UX */}
+            {/* Enhanced overlay */}
             <div 
-              className="fixed inset-0 bg-black/30 z-40 xl:hidden" 
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 xl:hidden" 
               onClick={closeAllMenus}
             ></div>
-            <div className="xl:hidden mt-4 py-3 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-100 mx-4 navbar-menu z-50 relative">
-              <div className="px-4 py-2 border-b border-gray-100">
-                <p className="text-sm font-medium text-gray-900">Account Options</p>
+            <div className="xl:hidden absolute top-full right-0 mt-2 w-56 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-100/50 navbar-menu z-50 overflow-hidden transform -translate-x-2 md:-translate-x-40" 
+                 style={{ 
+                   boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1)' 
+                 }}>
+              {/* Subtle gradient border */}
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-b from-white/20 to-transparent pointer-events-none"></div>
+              
+              {/* Arrow with enhanced styling */}
+              <div className="absolute -top-2 right-4 md:right-12 w-4 h-4 bg-white/95 backdrop-blur-xl border border-gray-100/50 transform rotate-45" 
+                   style={{ 
+                     boxShadow: '-2px -2px 8px rgba(0, 0, 0, 0.1)' 
+                   }}></div>
+              
+              {/* Menu items */}
+              <div className="py-3">
+                <Link 
+                  to="/auth?mode=login" 
+                  className="flex items-center px-4 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 transition-all duration-200 group"
+                  onClick={() => setIsAuthMenuOpen(false)}
+                >
+                  <div className="w-8 h-8 bg-gray-100 group-hover:bg-blue-100 rounded-lg flex items-center justify-center mr-3 transition-colors">
+                    <FaSignInAlt className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium">Log In</span>
+                    <p className="text-xs text-gray-500">Access your account</p>
+                  </div>
+                </Link>
+                
+                <Link
+                  to="/auth?mode=signup"
+                  className="flex items-center px-4 py-3 text-gray-700 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 hover:text-indigo-700 transition-all duration-200 group"
+                  onClick={() => setIsAuthMenuOpen(false)}
+                >
+                  <div className="w-8 h-8 bg-gray-100 group-hover:bg-indigo-100 rounded-lg flex items-center justify-center mr-3 transition-colors">
+                    <FaUserPlus className="w-4 h-4 text-gray-600 group-hover:text-indigo-600" />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-sm font-medium">Sign Up</span>
+                    <p className="text-xs text-gray-500">Create new account</p>
+                  </div>
+                </Link>
               </div>
-            <Link 
-              to="/auth?mode=login" 
-              className="flex items-center px-4 py-3 text-blue-600 hover:bg-blue-50 transition-colors"
-              onClick={() => setIsAuthMenuOpen(false)}
-            >
-              <FaSignInAlt className="w-4 h-4 mr-3" />
-              <span>Log In</span>
-            </Link>
-            <Link
-              to="/auth?mode=signup"
-              className="flex items-center px-4 py-3 text-indigo-600 hover:bg-indigo-50 transition-colors"
-              onClick={() => setIsAuthMenuOpen(false)}
-            >
-              <FaUserPlus className="w-4 h-4 mr-3" />
-              <span>Sign Up</span>
-            </Link>
-          </div>
+            </div>
           </>
         )}
       </div>
