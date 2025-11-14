@@ -20,10 +20,8 @@ const AdminLogin = ({ onLoginSuccess }) => {
     if (isLoggedIn && user?.is_superuser) {
       console.log('Admin is already logged in, redirecting to admin panel...');
       navigate('/admin-p', { replace: true });
-    } else if (isLoggedIn) {
-      console.log('Regular user is logged in, redirecting to home...');
-      navigate('/', { replace: true });
     }
+    // Note: Regular users trying to access admin should see the login form, not auto-redirect
   }, [isLoggedIn, user, navigate]);
 
   const handleChange = (e) => {
