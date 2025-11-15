@@ -3,6 +3,13 @@ import { FaTrash, FaVideo, FaFileAlt, FaQuestionCircle, FaBook } from 'react-ico
 import ResourcesInput from './ResourcesInput';
 import QuizQuestions from './QuizQuestions';
 import MDEditor from '@uiw/react-md-editor';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+// Use new enterprise-grade processor instead of regex preprocessor
+import { processMarkdownSync } from '../../../../utils/markdownProcessor';
 
 const LessonForm = ({
   sectionIndex,
@@ -175,7 +182,7 @@ const LessonForm = ({
       
       {/* Reading specific fields */}
       {lesson.type === 'reading' && (
-        <div className="space-y-2">
+        <div className="space-y-2" data-color-mode="dark">
           <label className="block text-gray-700">
             Content <span className="text-red-500">*</span>          </label>          <MDEditor            value={lesson.aboutLesson}
             onChange={(e) => handleLessonChange(sectionIndex, lessonIndex, 'aboutLesson', e)}              height={300}            preview="edit"
@@ -398,6 +405,25 @@ const LessonForm = ({
             <div className="text-sm">
               <p className="font-medium">Paste formatting supported</p>
               <p>You can paste formatted text from Word, Google Docs, or other rich text editors to preserve headings, lists, bold, and italic formatting.</p>
+            </div>
+          </div>
+
+          {/* Live Preview with KaTeX rendering - Enterprise AST-based processor */}
+          <div className="mt-4 border border-gray-200 rounded-md">
+            <div className="px-3 py-2 text-sm bg-gray-50 border-b text-gray-700">Live Preview</div>
+            <div className="p-4 prose prose-slate max-w-none">
+              {lesson.aboutLesson ? (
+                <div 
+                  dangerouslySetInnerHTML={{ 
+                    __html: processMarkdownSync(lesson.aboutLesson, {
+                      convertDelimiters: true,
+                      autoLatex: true
+                    })
+                  }}
+                />
+              ) : (
+                <p className="text-gray-500 text-sm">Start typing to see a preview. Math supported with $inline$ and $$block$$ syntax.</p>
+              )}
             </div>
           </div>
         </div>

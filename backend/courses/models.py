@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 import uuid
 from django.core.exceptions import ValidationError
 import json
@@ -20,6 +21,10 @@ class BaseCourse(models.Model):
 
 class SchoolCourse(BaseCourse):
     LEVEL_CHOICES = (
+        ('6th', 'Class 6'),
+        ('7th', 'Class 7'),
+        ('8th', 'Class 8'),
+        ('9th', 'Class 9'),
         ('10th', 'Class 10'),
         ('11th', 'Class 11'),
         ('12th', 'Class 12'),
@@ -61,6 +66,27 @@ class EngineeringCourse(BaseCourse):
     def __str__(self):
         return f"Engineering - {self.title} ({self.proficiency})"
 
+
+class Certification(models.Model):
+    """Certificate issued to a user for completing an EngineeringCourse."""
+    id = models.BigAutoField(primary_key=True)
+    # Store as hyphenated UUID string to avoid DB length mismatches across engines
+    def generate_uuid_str():
+        return str(uuid.uuid4())
+
+    certificate_id = models.CharField(max_length=36, default=generate_uuid_str, unique=True, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='certificates')
+    course = models.ForeignKey('EngineeringCourse', on_delete=models.CASCADE, related_name='certificates')
+    issued_at = models.DateTimeField(auto_now_add=True)
+    file = models.FileField(upload_to='certificates/', null=True, blank=True)
+
+    class Meta:
+        unique_together = ('user', 'course')
+        ordering = ['-issued_at']
+
+    def __str__(self):
+        return f"Certificate {self.certificate_id} - {self.user} - {self.course.title}"
+
 class CourseChapter(models.Model):
     """For School Courses"""
     school_course = models.ForeignKey(SchoolCourse, on_delete=models.CASCADE, related_name='chapters')
@@ -97,7 +123,7 @@ class Lesson(models.Model):
     section = models.ForeignKey(CourseSection, on_delete=models.CASCADE, related_name='lessons', null=True, blank=True)
     title = models.CharField(max_length=255)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='video')
-    video_url = models.URLField(blank=True)
+    video_url = models.URLField(blank=True, max_length=500)
     description = models.TextField(blank=True)
     about_lesson = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=0)
@@ -118,7 +144,7 @@ class LessonResource(models.Model):
     type = models.CharField(max_length=20, choices=RESOURCE_TYPE_CHOICES)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    url = models.URLField(blank=True)
+    url = models.URLField(blank=True, max_length=500)
     file = models.FileField(upload_to='lesson_resources/', null=True, blank=True)
     
     def __str__(self):
@@ -172,130 +198,522 @@ class UserLessonProgress(models.Model):
     def __str__(self):
         return f"{self.user} - {self.lesson.title} - {self.completed_at.strftime('%Y-%m-%d')}"
 
-# AI-Generated Learning Plan Model - Single unified model
-class AILearningPlan(models.Model):
-    """Unified model for AI-generated learning plans with all data stored in JSON fields"""
+
+# ==================== PRO LEARNING MODELS ====================
+
+class ProLearningCourse(models.Model):
+    """
+    Model to store AI-generated Pro Learning courses
+    Each course belongs to a specific user and can have multiple topics
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ai_learning_plans')
-    title = models.CharField(max_length=255)  # The learning goal
-    description = models.TextField(blank=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='pro_courses'
+    )
+    course_name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_completed = models.BooleanField(default=False)
-    
-    # Store all learning plan data as JSON
-    plan_data = models.JSONField(default=dict, help_text="Complete learning plan data including days, topics, projects, and videos")
-    
-    # Optional metadata
-    duration_days = models.PositiveIntegerField(default=7)
-    difficulty_level = models.CharField(max_length=20, default='beginner')
-    category = models.CharField(max_length=100, blank=True)
+    completion_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     
     class Meta:
         ordering = ['-created_at']
-        verbose_name = 'AI Learning Plan'
-        verbose_name_plural = 'AI Learning Plans'
-        constraints = [
-            models.UniqueConstraint(
-                fields=['user', 'title'],
-                name='unique_user_learning_plan_title'
-            ),
-        ]
+        verbose_name = 'Pro Learning Course'
+        verbose_name_plural = 'Pro Learning Courses'
+    
+    def __str__(self):
+        return f"{self.course_name} - {self.user.username}"
+    
+    def get_total_topics(self):
+        """Get total number of topics in this course"""
+        return self.topics.count()
+    
+    def get_completed_topics(self):
+        """Get number of completed topics in this course"""
+        return self.topics.filter(is_completed=True).count()
+    
+    def update_completion_percentage(self):
+        """Update course completion percentage based on completed topics"""
+        total_topics = self.get_total_topics()
+        if total_topics > 0:
+            completed_topics = self.get_completed_topics()
+            self.completion_percentage = (completed_topics / total_topics) * 100
+            self.is_completed = self.completion_percentage == 100
+            self.save(update_fields=['completion_percentage', 'is_completed'])
+
+
+class ProLearningTopic(models.Model):
+    """
+    Model to store individual topics within a Pro Learning course
+    Each topic contains 5 tabs of content: reading_material, summary, videos, quiz, resources
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(
+        ProLearningCourse, 
+        on_delete=models.CASCADE, 
+        related_name='topics'
+    )
+    topic_name = models.CharField(max_length=255)
+    order = models.PositiveIntegerField(default=0)  # For ordering topics within a course
+    
+    # Content for the 5 tabs
+    reading_material = models.TextField(blank=True, null=True)
+    summary = models.TextField(blank=True, null=True)
+    
+    # Completion tracking
+    is_completed = models.BooleanField(default=False)
+    progress_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['course', 'order']
+        unique_together = ['course', 'order']  # Ensure unique ordering within course
+        verbose_name = 'Pro Learning Topic'
+        verbose_name_plural = 'Pro Learning Topics'
+    
+    def __str__(self):
+        return f"{self.course.course_name} - {self.topic_name}"
+    
+    def mark_completed(self):
+        """Mark this topic as completed and update course progress"""
+        if not self.is_completed:
+            self.is_completed = True
+            self.completed_at = timezone.now()
+            self.progress_percentage = 100.00
+            self.save(update_fields=['is_completed', 'completed_at', 'progress_percentage'])
+            
+            # Update parent course completion
+            self.course.update_completion_percentage()
+
+
+class ProLearningVideo(models.Model):
+    """
+    Model to store video content for each topic
+    Each topic can have multiple videos
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    topic = models.ForeignKey(
+        ProLearningTopic, 
+        on_delete=models.CASCADE, 
+        related_name='videos'
+    )
+    title = models.CharField(max_length=255)
+    video_url = models.URLField(max_length=500)  # YouTube or other video URLs
+    description = models.TextField(blank=True, null=True)
+    duration = models.CharField(max_length=20, blank=True, null=True)  # e.g., "10:30"
+    order = models.PositiveIntegerField(default=0)
+    is_watched = models.BooleanField(default=False)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['topic', 'order']
+        verbose_name = 'Pro Learning Video'
+        verbose_name_plural = 'Pro Learning Videos'
+    
+    def __str__(self):
+        return f"{self.topic.topic_name} - {self.title}"
+
+
+class ProLearningQuizQuestion(models.Model):
+    """
+    Model to store quiz questions for each topic
+    Each topic can have multiple quiz questions
+    """
+    QUESTION_TYPES = (
+        ('mcq', 'Multiple Choice'),
+        ('true_false', 'True/False'),
+        ('short_answer', 'Short Answer'),
+    )
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    topic = models.ForeignKey(
+        ProLearningTopic, 
+        on_delete=models.CASCADE, 
+        related_name='quiz_questions'
+    )
+    question_text = models.TextField()
+    question_type = models.CharField(max_length=20, choices=QUESTION_TYPES, default='mcq')
+    options = models.JSONField(default=list)  # Store multiple choice options as JSON list
+    correct_answer = models.CharField(max_length=255)
+    explanation = models.TextField(blank=True, null=True)
+    points = models.PositiveIntegerField(default=1)
+    order = models.PositiveIntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['topic', 'order']
+        verbose_name = 'Pro Learning Quiz Question'
+        verbose_name_plural = 'Pro Learning Quiz Questions'
+    
+    def __str__(self):
+        return f"{self.topic.topic_name} - Q{self.order}: {self.question_text[:50]}..."
+
+
+class ProLearningResource(models.Model):
+    """
+    Model to store additional resources for each topic
+    Each topic can have multiple resources (links, documents, etc.)
+    """
+    RESOURCE_TYPES = (
+        ('link', 'External Link'),
+        ('document', 'Document'),
+        ('article', 'Article'),
+        ('tool', 'Online Tool'),
+        ('reference', 'Reference Material'),
+    )
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    topic = models.ForeignKey(
+        ProLearningTopic, 
+        on_delete=models.CASCADE, 
+        related_name='resources'
+    )
+    title = models.CharField(max_length=255)
+    resource_type = models.CharField(max_length=20, choices=RESOURCE_TYPES, default='link')
+    url = models.URLField(max_length=500)
+    description = models.TextField(blank=True, null=True)
+    order = models.PositiveIntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['topic', 'order']
+        verbose_name = 'Pro Learning Resource'
+        verbose_name_plural = 'Pro Learning Resources'
+    
+    def __str__(self):
+        return f"{self.topic.topic_name} - {self.title}"
+
+
+# ==================== USER COURSE TRACKING MODELS ====================
+
+class ProLearningShareLink(models.Model):
+    """
+    Public share link for a ProLearningCourse.
+    Enables read-only, unauthenticated access to a course via a UUID token.
+    The UUID primary key itself serves as the share token.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(
+        ProLearningCourse,
+        on_delete=models.CASCADE,
+        related_name='share_links',
+        db_constraint=False  # Avoid MySQL FK mismatch issues seen in legacy UUID columns
+    )
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_share_links')
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Optional expiry; if set and in the past, treat as inactive
+    expires_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Pro Learning Share Link'
+        verbose_name_plural = 'Pro Learning Share Links'
         indexes = [
-            models.Index(fields=['user', 'created_at'], name='idx_user_created_at'),
-            models.Index(fields=['category', 'difficulty_level'], name='idx_category_difficulty'),
+            models.Index(fields=['course'], name='idx_share_course'),
+            models.Index(fields=['created_by'], name='idx_share_creator'),
+            models.Index(fields=['is_active'], name='idx_share_active'),
+        ]
+
+    def __str__(self):
+        status = 'active' if self.is_active else 'inactive'
+        return f"ShareLink({self.id}) for {self.course.course_name} [{status}]"
+
+    @property
+    def is_expired(self):
+        return self.expires_at is not None and timezone.now() > self.expires_at
+
+    def is_usable(self):
+        return self.is_active and not self.is_expired
+
+class UserStartedPredefinedCourse(models.Model):
+    """
+    Model to track when users start learning predefined courses (School/Engineering)
+    Provides one-to-many relationship from User to course tracking
+    """
+    COURSE_TYPE_CHOICES = (
+        ('school', 'School Course'),
+        ('engineering', 'Engineering Course'),
+    )
+    
+    BOARD_CHOICES = (
+        ('cbse', 'CBSE'),
+        ('icse', 'ICSE'),
+        ('state', 'State Board'),
+        ('ib', 'International Baccalaureate'),
+    )
+    
+    CLASS_CHOICES = (
+        ('6th', '6th Grade'),
+        ('7th', '7th Grade'), 
+        ('8th', '8th Grade'),
+        ('9th', '9th Grade'),
+        ('10th', '10th Grade'),
+        ('11th', '11th Grade'),
+        ('12th', '12th Grade'),
+    )
+    
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='started_predefined_courses'
+    )
+    course_type = models.CharField(max_length=20, choices=COURSE_TYPE_CHOICES)
+    
+    # For School Courses
+    school_course = models.ForeignKey(
+        SchoolCourse, 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True,
+        related_name='enrolled_users'
+    )
+    class_level = models.CharField(max_length=10, choices=CLASS_CHOICES, null=True, blank=True)
+    board = models.CharField(max_length=20, choices=BOARD_CHOICES, null=True, blank=True)
+    subject = models.CharField(max_length=100, null=True, blank=True)
+    
+    # For Engineering Courses
+    engineering_course = models.ForeignKey(
+        EngineeringCourse, 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True,
+        related_name='enrolled_users'
+    )
+    
+    # Progress tracking
+    progress_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    is_completed = models.BooleanField(default=False)
+    last_accessed_lesson = models.ForeignKey(
+        Lesson, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='last_accessed_by_users'
+    )
+    
+    # Timestamps
+    started_at = models.DateTimeField(auto_now_add=True)
+    last_activity = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-started_at']
+        unique_together = [
+            ['user', 'school_course'],
+            ['user', 'engineering_course']
+        ]
+        verbose_name = 'User Started Predefined Course'
+        verbose_name_plural = 'User Started Predefined Courses'
+        indexes = [
+            models.Index(fields=['user', 'course_type'], name='idx_user_course_type'),
+            models.Index(fields=['started_at'], name='idx_course_started_at'),
+            models.Index(fields=['progress_percentage'], name='idx_course_progress'),
         ]
     
     def __str__(self):
-        return f"{self.title} - {self.user.email if self.user else 'No User'}"
+        if self.course_type == 'school':
+            return f"{self.user.username} - {self.school_course.title} ({self.class_level} {self.board})"
+        else:
+            return f"{self.user.username} - {self.engineering_course.title}"
     
-    def clean(self):
-        """Validate the model before saving"""
-        super().clean()
+    def get_course(self):
+        """Get the actual course object based on course type"""
+        if self.course_type == 'school':
+            return self.school_course
+        elif self.course_type == 'engineering':
+            return self.engineering_course
+        return None
+    
+    def get_course_title(self):
+        """Get the course title regardless of course type"""
+        course = self.get_course()
+        return course.title if course else "Unknown Course"
+    
+    def update_progress(self):
+        """Calculate and update progress based on completed lessons"""
+        course = self.get_course()
+        if not course:
+            return
         
-        # Validate plan_data structure
-        if self.plan_data:
-            required_keys = ['goal', 'days']
-            for key in required_keys:
-                if key not in self.plan_data:
-                    raise ValidationError(f"plan_data must contain '{key}' field")
+        if self.course_type == 'school':
+            total_lessons = Lesson.objects.filter(chapter__school_course=course).count()
+            completed_lessons = UserLessonProgress.objects.filter(
+                user=self.user,
+                lesson__chapter__school_course=course
+            ).count()
+        else:  # engineering
+            total_lessons = Lesson.objects.filter(section__engineering_course=course).count()
+            completed_lessons = UserLessonProgress.objects.filter(
+                user=self.user,
+                lesson__section__engineering_course=course
+            ).count()
+        
+        if total_lessons > 0:
+            self.progress_percentage = (completed_lessons / total_lessons) * 100
+            self.is_completed = self.progress_percentage == 100
             
-            # Validate days structure
-            days = self.plan_data.get('days', [])
-            if not isinstance(days, list):
-                raise ValidationError("plan_data.days must be a list")
+            if self.is_completed and not self.completed_at:
+                self.completed_at = timezone.now()
             
-            for i, day in enumerate(days):
-                if not isinstance(day, dict):
-                    raise ValidationError(f"Day {i+1} must be a dictionary")
-                
-                required_day_keys = ['day', 'topic']
-                for key in required_day_keys:
-                    if key not in day:
-                        raise ValidationError(f"Day {i+1} must contain '{key}' field")
-                
-                # Validate videos structure
-                videos = day.get('videos', [])
-                if not isinstance(videos, list):
-                    raise ValidationError(f"Day {i+1} videos must be a list")
-                
-                for j, video in enumerate(videos):
-                    if not isinstance(video, dict):
-                        raise ValidationError(f"Day {i+1}, Video {j+1} must be a dictionary")
-                    
-                    if 'title' not in video:
-                        raise ValidationError(f"Day {i+1}, Video {j+1} must have a title")
+            self.save(update_fields=['progress_percentage', 'is_completed', 'completed_at'])
     
-    def save(self, *args, **kwargs):
-        """Override save to run validation and ensure plan_data is a dict"""
-        if isinstance(self.plan_data, str):
-            try:
-                self.plan_data = json.loads(self.plan_data)
-            except json.JSONDecodeError:
-                self.plan_data = {}
-        self.clean()
-        super().save(*args, **kwargs)
-    
-    @property
-    def days_count(self):
-        """Get the number of days in the learning plan"""
-        return len(self.plan_data.get('days', []))
-    
-    @property
-    def total_videos(self):
-        """Get the total number of videos across all days"""
-        total = 0
-        for day in self.plan_data.get('days', []):
-            total += len(day.get('videos', []))
-        return total
+    def get_next_lesson(self):
+        """Get the next lesson to be completed in this course"""
+        course = self.get_course()
+        if not course:
+            return None
+        
+        if self.course_type == 'school':
+            completed_lesson_ids = UserLessonProgress.objects.filter(
+                user=self.user,
+                lesson__chapter__school_course=course
+            ).values_list('lesson_id', flat=True)
+            
+            next_lesson = Lesson.objects.filter(
+                chapter__school_course=course
+            ).exclude(id__in=completed_lesson_ids).order_by('order').first()
+        else:  # engineering
+            completed_lesson_ids = UserLessonProgress.objects.filter(
+                user=self.user,
+                lesson__section__engineering_course=course
+            ).values_list('lesson_id', flat=True)
+            
+            next_lesson = Lesson.objects.filter(
+                section__engineering_course=course
+            ).exclude(id__in=completed_lesson_ids).order_by('order').first()
+        
+        return next_lesson
     
     @classmethod
-    def find_similar_plans(cls, user, title, threshold=0.8):
-        """Find similar learning plans for the same user"""
-        from difflib import SequenceMatcher
+    def start_course(cls, user, course_type, **course_data):
+        """
+        Helper method to start a course for a user
         
-        existing_plans = cls.objects.filter(user=user)
-        similar_plans = []
+        Args:
+            user: User instance
+            course_type: 'school' or 'engineering'
+            **course_data: Course-specific data (course_id, class_level, board, subject, etc.)
+        """
+        enrollment_data = {
+            'user': user,
+            'course_type': course_type,
+        }
         
-        for plan in existing_plans:
-            similarity = SequenceMatcher(None, title.lower(), plan.title.lower()).ratio()
-            if similarity >= threshold:
-                similar_plans.append((plan, similarity))
+        if course_type == 'school':
+            enrollment_data.update({
+                'school_course_id': course_data.get('course_id'),
+                'class_level': course_data.get('class_level'),
+                'board': course_data.get('board'),
+                'subject': course_data.get('subject'),
+            })
+        elif course_type == 'engineering':
+            enrollment_data.update({
+                'engineering_course_id': course_data.get('course_id'),
+            })
         
-        return sorted(similar_plans, key=lambda x: x[1], reverse=True)
+        # Create or get existing enrollment
+        enrollment, created = cls.objects.get_or_create(**enrollment_data)
+        
+        return enrollment, created
+
+
+class LearningActivity(models.Model):
+    """
+    Tracks daily learning activity for each user.
+    Used to calculate learning streaks and weekly time spent.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='learning_activities')
+    date = models.DateField(default=timezone.now)  # One record per day
+    time_spent_minutes = models.PositiveIntegerField(default=0)  # Accumulated minutes for the day
+    sessions_count = models.PositiveIntegerField(default=0)  # Number of learning sessions
+    last_activity = models.DateTimeField(auto_now=True)  # Last time activity was recorded
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('user', 'date')  # One record per user per day
+        verbose_name = "Learning Activity"
+        verbose_name_plural = "Learning Activities"
+        ordering = ['-date']
+    
+    def __str__(self):
+        hours = self.time_spent_minutes / 60
+        return f"{self.user.username} - {self.date} - {hours:.1f}h ({self.time_spent_minutes}m)"
+    
+    @property
+    def time_spent_hours(self):
+        """Convert minutes to hours for display"""
+        return round(self.time_spent_minutes / 60, 1)
     
     @classmethod
-    def create_with_duplicate_check(cls, user, title, **kwargs):
-        """Create a learning plan with duplicate checking"""
-        # Check for exact duplicates
-        if cls.objects.filter(user=user, title=title).exists():
-            raise ValueError(f"Learning plan with title '{title}' already exists for this user")
+    def add_learning_time(cls, user, minutes):
+        """
+        Add learning time for the current day.
+        Creates new record if none exists for today.
+        """
+        today = timezone.now().date()
+        activity, created = cls.objects.get_or_create(
+            user=user,
+            date=today,
+            defaults={'time_spent_minutes': 0, 'sessions_count': 0}
+        )
         
-        # Check for similar plans
-        similar_plans = cls.find_similar_plans(user, title)
-        if similar_plans:
-            similar_titles = [plan[0].title for plan in similar_plans[:3]]
-            raise ValueError(f"Similar learning plans found: {similar_titles}")
+        activity.time_spent_minutes += minutes
+        activity.sessions_count += 1
+        activity.save()
         
-        # Create the plan
-        return cls.objects.create(user=user, title=title, **kwargs)
+        return activity
+    
+    @classmethod
+    def get_weekly_hours(cls, user):
+        """Get total hours spent learning this week"""
+        from datetime import timedelta
+        today = timezone.now().date()
+        start_of_week = today - timedelta(days=today.weekday())
+        
+        week_activities = cls.objects.filter(
+            user=user,
+            date__gte=start_of_week,
+            date__lte=today
+        )
+        
+        total_minutes = sum(activity.time_spent_minutes for activity in week_activities)
+        return round(total_minutes / 60, 1)
+    
+    @classmethod
+    def get_current_streak(cls, user):
+        """Calculate current learning streak (consecutive days)"""
+        from datetime import timedelta
+        
+        streak = 0
+        current_date = timezone.now().date()
+        
+        # Check if user has activity today or yesterday (allow for different time zones)
+        has_recent_activity = cls.objects.filter(
+            user=user,
+            date__in=[current_date, current_date - timedelta(days=1)]
+        ).exists()
+        
+        if not has_recent_activity:
+            return 0
+        
+        # Count consecutive days backwards
+        check_date = current_date
+        while True:
+            if cls.objects.filter(user=user, date=check_date).exists():
+                streak += 1
+                check_date -= timedelta(days=1)
+            else:
+                break
+                
+        return streak

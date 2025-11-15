@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../../../utils/logger';
 import { motion } from 'framer-motion';
 import { FaPlay, FaBookReader } from 'react-icons/fa';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
 import { stateBoards } from '../../data/states';
-import { getSchoolCourses } from '../../../../services/courseApi';
+import { getSchoolCourses, getSchoolCourseById } from '../../../../services/courseApi';
+import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
+import MobileBoardSelector from '../../shared/MobileBoardSelector';
+import Footer from '../../../Footer/Footer';
+import SEO from '../../../SEO/SEO';
 
 const SUBJECT_ICONS = {
   'Mathematics': '📐',
@@ -19,21 +24,6 @@ const SUBJECT_ICONS = {
   'General': '📘'
 };
 
-const boards = [
-  { 
-    id: 'cbse', 
-    name: 'CBSE',
-    fullName: 'Central Board of Secondary Education',
-    available: true
-  },
-  { 
-    id: 'state', 
-    name: 'State Board',
-    fullName: 'State Board of Secondary and Higher Secondary Education',
-    available: true
-  }
-];
-
 const TenthStandard = () => {
   const navigate = useNavigate();
   const { boardId, stateId } = useParams();
@@ -42,15 +32,43 @@ const TenthStandard = () => {
   const [showStateBoards, setShowStateBoards] = useState(false);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [availableBoards, setAvailableBoards] = useState([]);
+  const [checkingAvailability, setCheckingAvailability] = useState(true);
+  const [availableStates, setAvailableStates] = useState([]);
+  const [checkingStates, setCheckingStates] = useState(false);
 
-  // Set selected board based on URL
+  // Check course availability for each board
   useEffect(() => {
-    if (location.pathname.includes('/state/')) {
+    const checkAvailability = async () => {
+      setCheckingAvailability(true);
+      try {
+        const availableBoards = await checkBoardAvailability('10th');
+        setAvailableBoards(availableBoards);
+      } catch (error) {
+        logger.error('Error checking board availability:', error);
+        setAvailableBoards([]);
+      } finally {
+        setCheckingAvailability(false);
+      }
+    };
+
+    checkAvailability();
+  }, []);
+
+  // Sync selected board with URL; also reset on base route
+  useEffect(() => {
+    const path = location.pathname;
+    if (path.includes('/state/')) {
       setSelectedBoard(`state-${stateId}`);
-    } else if (location.pathname.includes('/cbse')) {
+      setShowStateBoards(false);
+    } else if (path.includes('/cbse')) {
       setSelectedBoard('cbse');
+      setShowStateBoards(false);
+    } else {
+      setSelectedBoard(null);
+      setShowStateBoards(false);
     }
-  }, [location, stateId]);
+  }, [location.pathname, stateId]);
 
   // Fetch courses when board/state is selected
   useEffect(() => {
@@ -68,14 +86,13 @@ const TenthStandard = () => {
             const stateValue = stateCode === 'ts' ? 'Telangana' : 
                              stateCode === 'ap' ? 'Andhra Pradesh' : stateCode;
             
-            console.log(`Fetching state board courses: class=10th, board=state, state=${stateValue}`);
+            logger.log(`Fetching state board courses: class=10th, board=state, state=${stateValue}`);
             data = await getSchoolCourses('10th', 'state', stateValue);
           } else {
-            console.log(`Fetching courses: class=10th, board=${selectedBoard}`);
+            logger.log(`Fetching courses: class=10th, board=${selectedBoard}`);
             data = await getSchoolCourses('10th', selectedBoard);
           }
-
-          console.log('API returned courses:', data);
+          logger.log('API returned courses:', data);
 
           // Filter courses for exact matches but do not double-filter by board
           // since the API should already return correct board courses
@@ -91,7 +108,7 @@ const TenthStandard = () => {
               stateMatch = course.state === stateValue;
             }
             
-            console.log(`Filtering course:`, {
+            logger.log(`Filtering course:`, {
               course: course.title,
               class: course.class_level,
               board: course.board,
@@ -106,10 +123,10 @@ const TenthStandard = () => {
             return classMatch && stateMatch;
           });
 
-          console.log('Filtered courses:', filteredCourses);
+          logger.log('Filtered courses:', filteredCourses);
           setCourses(filteredCourses);
         } catch (error) {
-          console.error("Error fetching courses:", error);
+          logger.error("Error fetching courses:", error);
         } finally {
           setLoading(false);
         }
@@ -119,16 +136,31 @@ const TenthStandard = () => {
     }
   }, [selectedBoard, stateId]);
 
-  const handleBoardSelect = (board) => {
-    if (board === 'state') {
+  const handleBoardSelect = async (boardId) => {
+    if (boardId === 'state') {
+      // Show state UI immediately for snappy UX; load availability in background
       setShowStateBoards(true);
+      setCheckingStates(true);
+      setAvailableStates([]);
+      try {
+        const states = await checkStateAvailability('10th');
+        setAvailableStates(states);
+      } catch (error) {
+        logger.error('Error checking state availability:', error);
+        setAvailableStates([]);
+      } finally {
+        setCheckingStates(false);
+      }
     } else {
-      navigate(`/courses/10th/${board}`);
+      // Navigate first; URL-derived effect will sync selectedBoard
+      navigate(`/courses/10th/${boardId}`);
     }
   };
 
   const handleStateSelect = (stateId) => {
-    navigate(`/courses/10th/state/${stateId}`);
+    const to = `/courses/10th/state/${stateId}`;
+    // Navigate immediately; URL effect will set selectedBoard
+    navigate(to);
     setShowStateBoards(false);
   };
 
@@ -137,13 +169,42 @@ const TenthStandard = () => {
       setShowStateBoards(false);
     } else if (selectedBoard) {
       setSelectedBoard(null);
+      navigate('/courses/10th');
     } else {
       navigate('/courses');
     }
   };
 
+  // Add a bit more breathing room on board/state selection screens (mobile)
+  const isBoardSelection = !selectedBoard && !showStateBoards;
+  const isStateSelection = showStateBoards;
+  const containerPadding = (isBoardSelection || isStateSelection)
+    ? 'pt-24 pb-16 md:pt-0 md:pb-0' // selection
+    : 'pt-24 pb-16 md:pt-0 md:pb-0'; // subject listing
+
   return (
-    <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 pt-16 sm:pt-20">
+    <>
+    <SEO
+      title="10th Standard Courses - CBSE & State Board Free Learning"
+      description="Explore 10th standard courses: CBSE and state board playlists for Mathematics, Science, English & more. Prepare for board exams with structured lessons."
+      keywords="10th standard courses, CBSE 10th, state board 10th, board exam preparation, 10th class subjects, free 10th courses"
+      canonical="https://easylearnova.com/courses/10th"
+    />
+    <div className={`container mx-auto px-4 ${containerPadding}`}>
+      {/* Mobile-only friendly selector */}
+      <MobileBoardSelector
+        availableBoards={availableBoards}
+        availableStates={availableStates}
+        checkingAvailability={checkingAvailability}
+        checkingStates={checkingStates}
+        isBoardSelection={!selectedBoard && !showStateBoards}
+        isStateSelection={showStateBoards}
+        onSelectBoard={handleBoardSelect}
+        onSelectState={handleStateSelect}
+        onBack={handleBack}
+      />
+
+      {/* Subject listing should render on all sizes when a board/state is selected */}
       {selectedBoard ? (
         <>
           <BackButton 
@@ -155,99 +216,164 @@ const TenthStandard = () => {
           />
 
           {loading ? (
-            <div className="flex justify-center my-6 sm:my-8">
-              <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-t-2 border-b-2 border-blue-500"></div>
+            <div className="flex justify-center my-12">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
             </div>
           ) : courses.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
-              {courses.map((course) => (
-                <Link 
-                  to={selectedBoard.includes('state') 
-                    ? `/courses/10th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
-                    : `/courses/10th/${selectedBoard}/${course.subject.toLowerCase()}`} 
-                  key={course.id}
-                >
-                  <motion.div 
-                    whileHover={{ y: -5 }} 
-                    className="bg-white rounded-lg sm:rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4 lg:gap-6 px-4 sm:px-0">
+              {courses.map((course) => {
+                // Format board name for display
+                let boardDisplay = selectedBoard.includes('state') 
+                  ? `State · ${stateBoards.find(s => selectedBoard.includes(s.id))?.name || 'TS'}`
+                  : boards.find(b => b.id === selectedBoard)?.name || 'CBSE';
+
+                return (
+                  <Link 
+                    to={`${(selectedBoard.includes('state') 
+                      ? `/courses/10th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}` 
+                      : `/courses/10th/${selectedBoard}/${course.subject.toLowerCase()}`)}?courseId=${encodeURIComponent(course.id)}`}
+                    key={course.id}
+                    onMouseEnter={() => { try { getSchoolCourseById(course.id); } catch {} }}
+                    onFocus={() => { try { getSchoolCourseById(course.id); } catch {} }}
+                    onTouchStart={() => { try { getSchoolCourseById(course.id); } catch {} }}
                   >
-                    <div className="relative p-3 sm:p-4 lg:p-6 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-90 rounded-t-lg sm:rounded-t-xl text-white">
-                      <div className="flex items-center justify-between">
-                        <span className="text-lg sm:text-xl lg:text-2xl">{SUBJECT_ICONS[course.subject] || '📚'}</span>
-                        <FaPlay className="opacity-75 h-4 w-4 sm:h-5 sm:w-5" />
+                    <motion.div 
+                      whileHover={{ scale: 1.02 }} 
+                      whileTap={{ scale: 0.98 }}
+                      className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden cursor-pointer h-full"
+                    >
+                      {/* Course thumbnail */}
+                      <div className="relative pb-[56.25%] rounded-t-xl overflow-hidden">
+                        <img 
+                          src={course.thumbnail || `https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80&text=${encodeURIComponent(course.subject)}`}
+                          alt={course.title}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
                       </div>
-                      <h3 className="text-base sm:text-lg lg:text-xl font-bold mt-2">{course.subject}</h3>
-                      <p className="text-white/80 text-xs sm:text-sm mt-1">{course.duration}+ hours of content</p>
-                    </div>
-                    <div className="p-3 sm:p-4 lg:p-6">
-                      <p className="text-gray-600 text-xs sm:text-sm lg:text-base mb-3 sm:mb-4">{course.short_description || `Complete curriculum for ${course.class_level} ${course.subject}`}</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 sm:gap-2">
-                          <FaBookReader className="text-indigo-600 h-3 w-3 sm:h-4 sm:w-4" />
-                          <span className="text-xs sm:text-sm text-gray-600">Structured Learning</span>
+                      
+                      {/* Course info with better mobile spacing */}
+                      <div className="p-4 sm:p-4 lg:p-5">
+                        <h3 className="font-semibold text-gray-900 mb-2 sm:mb-2 line-clamp-2 text-base sm:text-base leading-tight">
+                          {course.title}
+                        </h3>
+                        
+                        <div className="flex items-center text-sm sm:text-sm text-gray-500 mb-3 sm:mb-3">
+                          <span>{course.duration}+ hours</span>
                         </div>
-                        <span className="text-indigo-600 text-xs sm:text-sm font-medium">Preview Course →</span>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center min-w-0 flex-1 mr-2">
+                            <div className="h-6 w-6 sm:h-6 sm:w-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-medium text-indigo-600 flex-shrink-0">
+                              {SUBJECT_ICONS[course.subject] || course.subject[0]}
+                            </div>
+                            <span className="ml-2 sm:ml-2 text-sm sm:text-sm text-gray-600 truncate">{course.subject}</span>
+                          </div>
+                          
+                          <div className="flex items-center flex-shrink-0">
+                            <span className="bg-blue-100 text-blue-800 text-xs px-2 sm:px-2 py-1 sm:py-1 rounded-full font-medium whitespace-nowrap">
+                              {boardDisplay}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
-                </Link>
-              ))}
+                    </motion.div>
+                  </Link>
+                );
+              })}
             </div>
           ) : (
-            <div className="text-center py-6 sm:py-8">
-              <p className="text-gray-500 text-sm sm:text-base">No courses found for this selection.</p>
-              <p className="text-xs sm:text-sm text-gray-400 mt-2">Check back later or try a different board.</p>
+            <div className="text-center py-12">
+              <p className="text-gray-500">No courses found for this selection.</p>
+              <p className="text-sm text-gray-400 mt-2">Check back later or try a different board.</p>
             </div>
           )}
         </>
-      ) : (
-        <>
+      ) : showStateBoards ? (
+        <div className="hidden md:block">
           <BackButton 
-            title="Select Your Board" 
-            subtitle="Choose your board to see available subjects"
+            title="Select Your State" 
+            subtitle="Choose your state board" 
             onBack={handleBack}
           />
-          
-          <div className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <motion.button
-                onClick={() => handleBoardSelect('cbse')}
-                className="bg-white p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 text-left"
-              >
-                <h3 className="text-base sm:text-lg lg:text-xl font-bold text-blue-600 mb-1 sm:mb-2">CBSE Board</h3>
-                <p className="text-xs sm:text-sm text-gray-600">Central Board of Secondary Education</p>
-              </motion.button>
-              
-              <motion.button
-                onClick={() => setShowStateBoards(true)}
-                className="bg-white p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 text-left"
-              >
-                <h3 className="text-base sm:text-lg lg:text-xl font-bold text-green-600 mb-1 sm:mb-2">State Board</h3>
-                <p className="text-xs sm:text-sm text-gray-600">Select your state board</p>
-              </motion.button>
+          {checkingStates ? (
+            <div className="flex justify-center my-12">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
             </div>
-
-            {/* State Boards Grid */}
-            {showStateBoards && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-                {stateBoards.map((state) => (
+          ) : availableStates.length > 0 ? (
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {availableStates.map((state) => (
                   <motion.button
                     key={state.id}
                     onClick={() => handleStateSelect(state.id)}
-                    className="bg-white p-3 sm:p-4 lg:p-6 rounded-lg sm:rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 text-left"
+                    className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
                     whileHover={{ y: -5 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-1 sm:mb-2">{state.name}</h3>
-                    <p className="text-xs sm:text-sm text-gray-600">{state.fullName}</p>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">{state.name}</h3>
+                    <p className="text-gray-500 text-sm">{state.fullName}</p>
                   </motion.button>
                 ))}
               </div>
-            )}
-          </div>
-        </>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-8">
+                <h3 className="text-xl font-semibold text-yellow-800 mb-2">No State Courses Available Yet</h3>
+                <p className="text-yellow-700">State board courses for 10th standard are being prepared and will be available soon.</p>
+                <p className="text-sm text-yellow-600 mt-2">Please check back later or try CBSE board.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="hidden md:block">
+          <BackButton 
+            title="Select Your Board" 
+            subtitle="Choose your education board to view relevant courses" 
+            onBack={handleBack}
+          />
+          {checkingAvailability ? (
+            <div className="flex justify-center my-12">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : availableBoards.length > 0 ? (
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {availableBoards.filter(board => board.available).map((board) => (
+                  <motion.button
+                    key={board.id}
+                    onClick={() => handleBoardSelect(board.id)}
+                    className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
+                    whileHover={{ y: -5 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">{board.name}</h3>
+                    <p className="text-gray-500 text-sm">{board.fullName}</p>
+                  </motion.button>
+                ))}
+              </div>
+
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-center">
+                <h3 className="text-lg font-semibold text-indigo-900 mb-2">More Boards Coming Soon!</h3>
+                <p className="text-indigo-700">We're working hard to bring you content for ICSE, NIOS, and other boards. Stay tuned for updates!</p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-8">
+                <h3 className="text-xl font-semibold text-yellow-800 mb-2">No Courses Available Yet</h3>
+                <p className="text-yellow-700">Courses for 10th standard are being prepared and will be available soon.</p>
+                <p className="text-sm text-yellow-600 mt-2">Please check back later or try a different class.</p>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
+      
+
+    </>
   );
 };
 

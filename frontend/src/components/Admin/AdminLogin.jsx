@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaEnvelope, FaLock, FaArrowRight } from 'react-icons/fa';
 import { motion } from 'framer-motion';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../utils/universalToast';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import authService from '../../services/authService';
 
 const AdminLogin = ({ onLoginSuccess }) => {
   const [credentials, setCredentials] = useState({
@@ -11,6 +13,16 @@ const AdminLogin = ({ onLoginSuccess }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { isLoggedIn, user } = useAuth();
+
+  // Redirect if user is already logged in as admin
+  useEffect(() => {
+    if (isLoggedIn && user?.is_superuser) {
+      console.log('Admin is already logged in, redirecting to admin panel...');
+      navigate('/admin-p', { replace: true });
+    }
+    // Note: Regular users trying to access admin should see the login form, not auto-redirect
+  }, [isLoggedIn, user, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -24,27 +36,16 @@ const AdminLogin = ({ onLoginSuccess }) => {
     e.preventDefault();
     
     if (!credentials.email || !credentials.password) {
-      toast.error('Please enter both email and password');
+  universalToast.error('Please enter both email and password');
       return;
     }
     
     setIsLoading(true);
     
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const data = await authService.adminLogin(credentials.email, credentials.password);
       
-      // Store admin authentication status with timestamp
-      const authData = {
-        isAuthenticated: true,
-        email: credentials.email,
-        timestamp: new Date().getTime(),
-        // You can add more secure data here later
-      };
-      
-      localStorage.setItem('adminAuth', JSON.stringify(authData));
-      
-      toast.success('Login successful');
+  universalToast.success(`Welcome back, ${data.user.first_name || data.user.username}!`);
       
       if (onLoginSuccess) {
         onLoginSuccess();
@@ -52,7 +53,15 @@ const AdminLogin = ({ onLoginSuccess }) => {
 
       navigate('/admin-p');
     } catch (error) {
-      toast.error('Login failed. Please try again.');
+      console.error('Admin login error:', error);
+      
+      if (error.message.includes('Access denied')) {
+  universalToast.error('Access denied. Only superusers can access the admin panel.');
+      } else if (error.message.includes('Invalid email')) {
+  universalToast.error('Invalid email or password');
+      } else {
+  universalToast.error(error.message || 'Login failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -66,7 +75,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
             Admin Login
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Enter your credentials to access the admin panel
+            Enter your superuser credentials to access the admin panel
           </p>
         </div>
         
@@ -95,7 +104,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
                   value={credentials.email}
                   onChange={handleChange}
                   className="pl-10 py-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter any email"
+                  placeholder="Enter your superuser email"
                 />
               </div>
             </div>
@@ -117,7 +126,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
                   value={credentials.password}
                   onChange={handleChange}
                   className="pl-10 py-2 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter any password"
+                  placeholder="Enter your superuser password"
                 />
               </div>
             </div>
@@ -161,9 +170,9 @@ const AdminLogin = ({ onLoginSuccess }) => {
         </motion.form>
         
         <div className="text-center mt-4">
-          <a href="/" className="text-sm text-gray-600 hover:text-blue-500">
+          <Link to="/" className="text-sm text-gray-600 hover:text-blue-500">
             Return to main website
-          </a>
+          </Link>
         </div>
       </div>
     </div>

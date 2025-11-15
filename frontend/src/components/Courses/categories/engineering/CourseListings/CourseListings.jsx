@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../../../utils/universalToast';
 import { getEngineeringCourses } from '../../../../../services/courseApi';
+import logger from '../../../../../utils/logger';
 import CourseCard from '../CourseCard/CourseCard';
-
-const API_URL = 'http://localhost:8000';
+import { toAbsoluteMedia } from '../../../../../utils/apiOrigin';
 
 const CourseListings = ({ category, filters }) => {
     const [courses, setCourses] = useState([]);
@@ -16,12 +16,12 @@ const CourseListings = ({ category, filters }) => {
             setError(null);
             try {
                 const data = await getEngineeringCourses(category);
-                console.log('Fetched courses:', data);
+                logger.log('Fetched courses:', data);
                 setCourses(Array.isArray(data) ? data : []);
             } catch (error) {
-                console.error('Error fetching courses:', error);
+                logger.error('Error fetching courses:', error);
                 setError('Failed to load courses');
-                toast.error(error.response?.data?.details || 'Failed to load courses');
+                universalToast.error(error.response?.data?.details || 'Failed to load courses');
             } finally {
                 setLoading(false);
             }
@@ -58,9 +58,7 @@ const CourseListings = ({ category, filters }) => {
                             key={course.id} 
                             course={{
                                 id: course.id,
-                                thumbnail: course.thumbnail?.startsWith('http') 
-                                    ? course.thumbnail 
-                                    : `${API_URL}${course.thumbnail}`,
+                                thumbnail: toAbsoluteMedia(course.thumbnail),
                                 title: course.title,
                                 instructor: course.sources,
                                 duration: course.duration,

@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { IoSend, IoHome, IoMenu, IoChevronBack, IoPlayCircle } from "react-icons/io5";
-import { FaRobot, FaHistory } f            </button>
-          </div>ons/fa";
+import { FaRobot, FaHistory } from "react-icons/fa";
 import { BiLoaderAlt } from "react-icons/bi";
 import ReactMarkdown from "react-markdown";
-import { useNavigate } from "react-router-dom";
-import { callGeminiAPI, getYoutubeResources, generateLearningPlan, getLearningPath } from "./ChatbotAPI";
 
 const useWindowSize = () => {
   const [windowSize, setWindowSize] = useState({

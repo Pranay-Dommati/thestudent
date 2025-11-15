@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../../utils/universalToast';
 import BasicInfoStep from './BasicInfoStep';
 import CourseStructureStep from './CourseStructureStep';
 import { createCourse } from '../../../../services/courseApi';
 import { sanitizeFileName } from '../../../../utils/fileHelpers';
 
 const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
+  const STORAGE_KEY = 'draft_engineering_course';
+  const saveTimer = useRef(null);
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(1);
+  const preventSubmitRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
   
@@ -53,6 +56,37 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     }
   ]);
   
+  // Load draft on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.courseInfo) setCourseInfo(ci => ({ ...ci, ...parsed.courseInfo, thumbnail: null }));
+        if (parsed.sections) setSections(parsed.sections);
+      }
+    } catch (_) { /* ignore */ }
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, []);
+
+  // Debounced autosave
+  const autosave = useMemo(() => (data) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try {
+        const sanitized = {
+          courseInfo: { ...data.courseInfo, thumbnail: null },
+          sections: data.sections
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+      } catch (e) { /* ignore */ }
+    }, 400);
+  }, []);
+
+  useEffect(() => {
+    autosave({ courseInfo, sections });
+  }, [courseInfo, sections, autosave]);
+
   // Errors for validation
   const [errors, setErrors] = useState({});
   // Handle thumbnail upload
@@ -61,7 +95,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     if (!file) return;
     
     if (file.size > 5 * 1024 * 1024) { // 5MB
-      toast('Image size must be less than 5MB', {
+  universalToast.show('Image size must be less than 5MB', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -75,7 +109,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     const sanitizedFile = sanitizeFileName(file, 100);
     
     if (file.name !== sanitizedFile.name) {
-      toast('File name was too long and has been truncated', {
+  universalToast.show('File name was too long and has been truncated', {
         icon: 'ℹ️',
         style: {
           backgroundColor: '#3B82F6',
@@ -120,7 +154,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   // Remove item from array field
   const removeArrayField = (fieldName, index) => {
     if (fieldName === 'learningPoints' && courseInfo.learningPoints.length <= 2) {
-      toast('At least 2 learning points are required', {
+  universalToast.show('At least 2 learning points are required', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -206,7 +240,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   // Remove lesson from section
   const removeLesson = (sectionIndex, lessonIndex) => {
     if (sections[sectionIndex].lessons.length <= 1) {
-      toast('Each section must have at least one lesson', {
+  universalToast.show('Each section must have at least one lesson', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -427,8 +461,11 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   // Handle step navigation
   const handleNext = () => {
     if (validateForm()) {
+      // Prevent accidental submit when the button switches to a submit button under the cursor
+      preventSubmitRef.current = true;
       setActiveStep(activeStep + 1);
       window.scrollTo(0, 0);
+      setTimeout(() => { preventSubmitRef.current = false; }, 400);
     }
   };
   
@@ -440,7 +477,16 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (preventSubmitRef.current) {
+      // Ignore submits that happen immediately after advancing step
+      return;
+    }
+    // If not on the final step yet, treat submit as a Next action (e.g., Enter key pressed)
+    if (activeStep < 2) {
+      handleNext();
+      return;
+    }
+    // Allow quick submit with safe defaults
     
     setIsSubmitting(true);
     try {
@@ -451,17 +497,17 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       if (courseInfo.thumbnail) {
         formData.append('thumbnail', courseInfo.thumbnail);
       }
-      formData.append('title', courseInfo.title);
-      formData.append('shortDescription', courseInfo.shortDescription);
-      formData.append('description', courseInfo.description);
-      formData.append('duration', courseInfo.duration);
-      formData.append('proficiency', courseInfo.proficiency);
+      formData.append('title', courseInfo.title || 'Untitled Engineering Course');
+      formData.append('shortDescription', courseInfo.shortDescription || '');
+      formData.append('description', courseInfo.description || '');
+      formData.append('duration', courseInfo.duration || '0');
+      formData.append('proficiency', courseInfo.proficiency || 'beginner');
       formData.append('certificateGiven', courseInfo.certificateGiven ? 'true' : 'false');
       formData.append('projectBased', courseInfo.projectBased ? 'true' : 'false');
-      formData.append('sources', courseInfo.sources);
-      formData.append('category', courseInfo.category);
-      formData.append('learningPoints', JSON.stringify(courseInfo.learningPoints));
-      formData.append('requirements', JSON.stringify(courseInfo.requirements));
+      formData.append('sources', courseInfo.sources || '');
+      formData.append('category', courseInfo.category || '');
+      formData.append('learningPoints', JSON.stringify(courseInfo.learningPoints || []));
+      formData.append('requirements', JSON.stringify(courseInfo.requirements || []));
       
       // Track resource files with unique identifiers
       let resourceFileCounter = 0;
@@ -531,19 +577,21 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       
       // Call createCourse API
       await createCourse(formData);
-      toast('Course created successfully!', {
+  universalToast.show('Course created successfully!', {
         icon: '🎉',
         style: {
           backgroundColor: '#10B981',
           color: 'white',
         }
       });
+      // Clear draft on success
+      try { localStorage.removeItem(STORAGE_KEY); } catch (_) { /* ignore */ }
       navigate('/admin-p/courses');
     } catch (error) {
       console.error('Error creating course:', error);
       if (error.response?.data) {
         console.error('Error response:', error.response.data);
-        toast(`Failed to create course: ${JSON.stringify(error.response.data)}`, {
+  universalToast.show(`Failed to create course: ${JSON.stringify(error.response.data)}`, {
           icon: '❌',
           style: {
             backgroundColor: '#EF4444',
@@ -551,7 +599,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
           }
         });
       } else {
-        toast('Failed to create course. Please try again.', {
+  universalToast.show('Failed to create course. Please try again.', {
           icon: '❌',
           style: {
             backgroundColor: '#EF4444',
@@ -569,7 +617,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     
     // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast('File size must be less than 10MB', {
+  universalToast.show('File size must be less than 10MB', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -583,7 +631,7 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
     const sanitizedFile = sanitizeFileName(file, 100);
     
     if (file.name !== sanitizedFile.name) {
-      toast('File name was too long and has been truncated', {
+  universalToast.show('File name was too long and has been truncated', {
         icon: 'ℹ️',
         style: {
           backgroundColor: '#3B82F6',
@@ -634,7 +682,12 @@ const EngineeringCourseForm = ({ onSubmit, onCancel }) => {
       </div>
       
       {/* Form Content */}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} onKeyDown={(e) => {
+        // Prevent Enter from submitting the form on step 1
+        if (e.key === 'Enter' && activeStep < 2) {
+          e.preventDefault();
+        }
+      }}>
         <AnimatePresence mode="sync">
           <motion.div
             key={activeStep}

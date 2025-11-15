@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaRegCircle, FaRegDotCircle, FaExclamationCircle } from 'react-icons/fa';
 import axiosInstance from '../../../utils/axios';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 
 const StandaloneQuizPage = () => {
   const params = useParams();
@@ -23,23 +23,18 @@ const StandaloneQuizPage = () => {
     console.log('Questions available:', 
       passedQuizData?.questions && Array.isArray(passedQuizData.questions) ? 
       passedQuizData.questions.length : 0);
-      // Construct return path based on current URL pattern
-    let defaultReturnPath;
-    const currentPath = location.pathname;
-    
-    if (currentPath.includes('/learning/') && currentPath.includes('/quiz')) {
-      // AI Learning Plan path: /learning/:learningPlanId/quiz
-      const learningPlanId = params.learningPlanId;
-      defaultReturnPath = `/learning/${learningPlanId}`;
-    } else if (currentPath.includes('/engineering/')) {
-      // Engineering course path
-      defaultReturnPath = `/courses/engineering/${params.courseId}/learning`;
-    } else {
-      // School course path - remove /quiz from current path
-      defaultReturnPath = currentPath.replace('/quiz', '');
-    }
-    
-    const previousPath = location.state?.from || defaultReturnPath;
+      // Canonical return path: always /courses/:courseId/learning
+      const currentPath = location.pathname;
+      const searchParams = new URLSearchParams(location.search || '');
+      const courseId = params.courseId || searchParams.get('courseId');
+      let defaultReturnPath;
+      if (courseId) {
+        defaultReturnPath = `/courses/${courseId}/learning`;
+      } else {
+        // Fallback: remove /quiz segment (legacy) if courseId missing
+        defaultReturnPath = currentPath.replace('/quiz', '');
+      }
+      const previousPath = location.state?.from || defaultReturnPath;
     
     setReturnPath(previousPath);
       if (passedQuizData && passedQuizData.questions && passedQuizData.questions.length > 0) {
@@ -157,7 +152,27 @@ const StandaloneQuizPage = () => {
     setSubmitting(true);
     try {
       // Get the lesson ID from the quiz data or location state
-      const lessonId = location.state?.lessonId;
+      let lessonId = location.state?.lessonId;
+      
+      // If lessonId is still undefined, try to extract it from URL or create a fallback
+      if (!lessonId) {
+        const currentPath = location.pathname;
+        
+        // For school courses, try to extract from URL pattern or use a fallback
+        if (currentPath.startsWith('/courses/')) {
+          // For school courses, we can use a default lesson ID or get it from params
+          // Since school course quizzes might not have explicit lesson IDs,
+          // we'll use the courseId and a quiz identifier
+          const pathParts = currentPath.split('/');
+          const courseType = pathParts[2]; // '9th', '10th', etc.
+          const stateCode = pathParts[4]; // 'ap', etc.
+          const subject = pathParts[5]; // 'hindi', etc.
+          
+          // Create a unique identifier for this quiz
+          lessonId = `${courseType}_${stateCode}_${subject}_quiz`;
+          console.log('Generated fallback lesson ID for school course:', lessonId);
+        }
+      }
       
       console.log('Submitting quiz with lesson ID:', lessonId);
       console.log('Selected answers:', selectedAnswers);
@@ -173,41 +188,49 @@ const StandaloneQuizPage = () => {
       });
       
       if (!lessonId) {
-        toast.error('Lesson ID not found. Unable to submit quiz.');
+        toast.error('Unable to identify lesson. Please try navigating back and starting the quiz again.');
         setSubmitting(false);
         return;
       }
 
-      // Determine if this is an AI learning plan based on URL pattern
+      // Handle quiz submission based on lesson type
       const currentPath = location.pathname;
-      const isAILearningPlan = currentPath.includes('/learning/') && currentPath.includes('/quiz');
       
       let response;
       
-      if (isAILearningPlan) {
-        // Use AI learning plan endpoint for string-based lesson IDs
-        const learningPlanId = params.learningPlanId;
-        console.log('Submitting AI learning plan quiz:', { learningPlanId, lessonId });
+      // Check if this is a school course (has generated lesson ID) or regular course
+      const isSchoolCourse = typeof lessonId === 'string' && lessonId.includes('_');
+      
+      if (isSchoolCourse) {
+        // Use school quiz endpoint for school courses
+        console.log('Submitting school course quiz:', { lessonId });
         
         response = await axiosInstance.post(
-          `http://127.0.0.1:8000/api/learning/submit-quiz/${learningPlanId}/${lessonId}/`,
-          { answers: selectedAnswers }
+          `quiz/submit-school/${lessonId}/`,
+          { 
+            answers: selectedAnswers,
+            questions: quizData.questions // Send quiz questions for score calculation
+          }
         );
       } else {
         // Use regular course endpoint for integer lesson IDs
         console.log('Submitting regular course quiz');
         
         response = await axiosInstance.post(
-          `http://127.0.0.1:8000/api/quiz/submit/${lessonId}/`,
-          { answers: selectedAnswers }
-        );
+            `quiz/submit/${lessonId}/`,
+            { 
+              answers: selectedAnswers,
+              // Send questions as fallback in case backend lacks persisted quiz questions
+              questions: quizData.questions 
+            }
+          );
       }
 
       const result = response.data;
       setQuizResult(result);
       setShowResults(true);
         if (result.passed) {
-        toast(`🎉 Congratulations! You scored ${result.score.toFixed(1)}% and passed the quiz!`, {
+  universalToast.show(`🎉 Congratulations! You scored ${result.score.toFixed(1)}% and passed the quiz!`, {
           style: {
             backgroundColor: '#10B981',
             color: 'white',
@@ -215,14 +238,15 @@ const StandaloneQuizPage = () => {
           duration: 4000
         });
       } else {
-        toast(`You scored ${result.score.toFixed(1)}%. You need 80% to pass. Try again!`, {
+  universalToast.show(`You scored ${result.score.toFixed(1)}%. You need 80% to pass. Try again!`, {
           icon: '📊',
           duration: 4000
         });
       }
       
-    } catch (error) {      console.error('Error submitting quiz:', error);
-      toast('Failed to submit quiz. Please try again.', {
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+  universalToast.show('Failed to submit quiz. Please try again.', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',

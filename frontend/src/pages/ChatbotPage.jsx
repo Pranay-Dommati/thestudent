@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { getLearningResources } from "../components/Chatbot/ChatbotAPI";
 
 const ChatbotPage = () => {
   const [userQuery, setUserQuery] = useState("");
@@ -18,8 +17,9 @@ const ChatbotPage = () => {
     setLearningResources(null);
 
     try {
-      const resources = await getLearningResources(userQuery);
-      setLearningResources(resources);
+      // Placeholder for the removed getLearningResources function
+      // Replace with actual implementation if needed
+      console.log("Placeholder for getLearningResources function");
     } catch (err) {
       console.error("Error fetching learning resources:", err);
       setError("Failed to fetch learning resources. Please try again.");

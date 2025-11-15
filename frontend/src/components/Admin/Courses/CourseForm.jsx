@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { FaPlus, FaTrash, FaUpload } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
-import toast from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
 import BasicInfoTab from './tabs/BasicInfoTab';
 import CourseContentTab from './tabs/CourseContentTab';
 import RequirementsTab from './tabs/RequirementsTab';
@@ -10,6 +10,10 @@ import EngineeringCourseForm from './EngineeringCourseForm/index';
 import SchoolCourseForm from './SchoolCourseForm/index'; // Add this import
 
 const courseCategories = [
+  { level: '6th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
+  { level: '7th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
+  { level: '8th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
+  { level: '9th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
   { level: '10th', boards: ['CBSE', 'SSC (TS)', 'SSC (AP)'] },
   { level: '11th', boards: ['CBSE'] },
   { level: '12th', boards: ['CBSE'] },
@@ -23,6 +27,10 @@ const subjects = {
 
 const EDUCATION_LEVELS = [
   { id: 'engineering', label: 'Engineering' },
+  { id: '6th', label: 'Class 6' },
+  { id: '7th', label: 'Class 7' },
+  { id: '8th', label: 'Class 8' },
+  { id: '9th', label: 'Class 9' },
   { id: '10th', label: 'Class 10' },
   { id: '11th', label: 'Class 11' },
   { id: '12th', label: 'Class 12' }
@@ -124,6 +132,15 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
   };
 
   const handleLevelSelect = (level) => {
+    // For School classes, ensure a fresh form by clearing any saved draft
+    try {
+      const schoolLevels = new Set(['6th','7th','8th','9th','10th','11th','12th']);
+      if (schoolLevels.has(level.id)) {
+        const key = `draft_school_course_${level.id}`;
+        localStorage.removeItem(key);
+      }
+    } catch {}
+
     setSelectedLevel(level);
     setShowLevelSelection(false);
   };
@@ -132,6 +149,10 @@ const CourseForm = ({ onSubmit, onCancel, initialData = null }) => {
     switch(selectedLevel?.id) {
       case 'engineering':
         return <EngineeringCourseForm onCancel={onCancel} />;
+      case '6th':
+      case '7th':
+      case '8th':
+      case '9th':
       case '10th':
       case '11th':
       case '12th':

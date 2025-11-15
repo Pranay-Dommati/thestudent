@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaGoogle, FaFacebook, FaGraduationCap, FaRegUser, FaRegEnvelope, FaLock } from "react-icons/fa";
+import { FaGoogle, FaGraduationCap, FaRegUser, FaRegEnvelope, FaLock } from "react-icons/fa";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
@@ -361,20 +361,13 @@ export default function AuthForm() {
                     </div>
                   </div>
 
-                  <div className="mt-6 grid grid-cols-2 gap-3">
+                  <div className="mt-6">
                     <button
                       type="button"
                       className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                     >
                       <FaGoogle className="h-5 w-5 text-red-500" />
                       <span className="ml-2">Google</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                    >
-                      <FaFacebook className="h-5 w-5 text-blue-600" />
-                      <span className="ml-2">Facebook</span>
                     </button>
                   </div>
                 </div>

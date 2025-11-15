@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../../utils/universalToast';
 import BasicInfoStep from './BasicInfoStep';
 import CourseStructureStep from './CourseStructureStep';
 import { createCourse } from '../../../../services/courseApi';
 import { sanitizeFileName } from '../../../../utils/fileHelpers';
 
 const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
+  const STORAGE_KEY = `draft_school_course_${classLevel || 'unknown'}`;
+  const saveTimer = useRef(null);
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,8 +29,8 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     learningPoints: ['', ''],
     chapterCount: 1
   });
-  
-  // Course Structure
+
+  // Course Structure (must be declared before effects that use it)
   const [chapters, setChapters] = useState([
     {
       name: '',
@@ -50,6 +52,82 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     }
   ]);
   
+  // Load draft on mount (but ensure a 'new' form is empty by allowing caller to clear draft beforehand)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.courseInfo) setCourseInfo(ci => ({ ...ci, ...parsed.courseInfo, thumbnail: null }));
+        if (parsed.chapters) setChapters(parsed.chapters);
+      }
+    } catch (_) { /* ignore */ }
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [STORAGE_KEY]);
+
+  // If admin navigates back to "Add Course" for same class, ensure a clean slate when query param new=true
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('new') === 'true') {
+        localStorage.removeItem(STORAGE_KEY);
+        // reset local states
+        setCourseInfo({
+          thumbnail: null,
+          title: '',
+          board: '',
+          state: '',
+          subject: '',
+          sources: '',
+          duration: '',
+          lastUpdated: new Date().toISOString().split('T')[0],
+          keyTopics: [''],
+          learningPoints: ['', ''],
+          chapterCount: 1
+        });
+        setChapters([
+          {
+            name: '',
+            lessons: [
+              {
+                type: 'video',
+                title: '',
+                videoUrl: '',
+                description: '',
+                aboutLesson: '',
+                hasResources: false,
+                resources: { downloadable: [], internet: [] },
+                quizQuestions: []
+              }
+            ]
+          }
+        ]);
+        setThumbnailPreview(null);
+        setActiveStep(1);
+      }
+    } catch {}
+  }, [STORAGE_KEY]);
+
+  // Debounced autosave
+  const autosave = useMemo(() => (data) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try {
+        const sanitized = {
+          courseInfo: { ...data.courseInfo, thumbnail: null },
+          chapters: data.chapters
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+      } catch (e) { /* ignore */ }
+    }, 400);
+  }, [STORAGE_KEY]);
+
+  useEffect(() => {
+    autosave({ courseInfo, chapters });
+  }, [courseInfo, chapters, autosave]);
+  
+  
+  
   // Errors for validation
   const [errors, setErrors] = useState({});
   // Handle thumbnail upload
@@ -58,7 +136,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     if (!file) return;
     
     if (file.size > 5 * 1024 * 1024) { // 5MB
-      toast('Image size must be less than 5MB', {
+  universalToast.show('Image size must be less than 5MB', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -72,7 +150,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     const sanitizedFile = sanitizeFileName(file, 100);
     
     if (file.name !== sanitizedFile.name) {
-      toast('File name was too long and has been truncated', {
+  universalToast.show('File name was too long and has been truncated', {
         icon: 'ℹ️',
         style: {
           backgroundColor: '#3B82F6',
@@ -117,7 +195,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   // Remove item from array field
   const removeArrayField = (fieldName, index) => {
     if (fieldName === 'learningPoints' && courseInfo.learningPoints.length <= 2) {
-      toast('At least 2 learning points are required', {
+  universalToast.show('At least 2 learning points are required', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -128,7 +206,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     }
     
     if (fieldName === 'keyTopics' && courseInfo.keyTopics.length <= 1) {
-      toast('At least 1 key topic is required', {
+  universalToast.show('At least 1 key topic is required', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -214,7 +292,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   // Remove lesson from chapter
   const removeLesson = (chapterIndex, lessonIndex) => {
     if (chapters[chapterIndex].lessons.length <= 1) {
-      toast('Each chapter must have at least one lesson', {
+  universalToast.show('Each chapter must have at least one lesson', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -365,7 +443,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     
     // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast('File size must be less than 10MB', {
+  universalToast.show('File size must be less than 10MB', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -379,7 +457,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     const sanitizedFile = sanitizeFileName(file, 100);
     
     if (file.name !== sanitizedFile.name) {
-      toast('File name was too long and has been truncated', {
+  universalToast.show('File name was too long and has been truncated', {
         icon: 'ℹ️',
         style: {
           backgroundColor: '#3B82F6',
@@ -501,7 +579,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       window.scrollTo(0, 0);
     } else {
       console.log("Form validation failed", errors);
-      toast("Please fill in all required fields correctly", {
+  universalToast.show("Please fill in all required fields correctly", {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -518,20 +596,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate form data
-    const errors = validateForm();
-    if (Object.keys(errors).length > 0) {
-      setErrors(errors);
-      toast('Please fix the form errors', {
-        icon: '❌',
-        style: {
-          backgroundColor: '#EF4444',
-          color: 'white',
-        }
-      });
-      return;
-    }
+    // Allow quick submit with safe defaults instead of blocking
     
     setIsSubmitting(true);
     
@@ -539,23 +604,26 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       const formData = new FormData();
       
       // Add basic info
-      formData.append('title', courseInfo.title);
-      formData.append('short_description', courseInfo.title); // Use title as shortDescription
-      formData.append('description', `${courseInfo.title} - ${classLevel} - ${courseInfo.subject}`); // Generate a description
+      const title = courseInfo.title || 'Untitled School Course';
+      const board = courseInfo.board || 'cbse';
+      const subject = courseInfo.subject || 'general';
+      formData.append('title', title);
+      formData.append('short_description', title); // Use title as shortDescription
+      formData.append('description', courseInfo.description || `${title} - ${classLevel} - ${subject}`);
       formData.append('class_level', classLevel);
-      formData.append('board', courseInfo.board);
+      formData.append('board', board);
       
-      if (courseInfo.board === 'state') {
-        formData.append('state', courseInfo.state);
+      if (board === 'state') {
+        formData.append('state', courseInfo.state || '');
       }
       
-      formData.append('subject', courseInfo.subject);
-      formData.append('duration', courseInfo.duration);
-      formData.append('sources', courseInfo.sources);
+      formData.append('subject', subject);
+      formData.append('duration', courseInfo.duration || '0');
+      formData.append('sources', courseInfo.sources || '');
       
       // Add key topics and learning points - use the field names expected by the backend
-      const filteredKeyTopics = courseInfo.keyTopics.filter(topic => topic.trim() !== '');
-      const filteredLearningPoints = courseInfo.learningPoints.filter(point => point.trim() !== '');
+      const filteredKeyTopics = (courseInfo.keyTopics || []).filter(topic => (topic || '').trim() !== '');
+      const filteredLearningPoints = (courseInfo.learningPoints || []).filter(point => (point || '').trim() !== '');
       
       // Change from 'keyTopics' to 'key_topics' to match backend expectations
       formData.append('key_topics', JSON.stringify(filteredKeyTopics));
@@ -570,10 +638,38 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       let resourceFileCounter = 0;
       const resourceFiles = [];
       
-      // Process chapters data for API
-      const chaptersData = chapters.map(chapter => ({
-        name: chapter.name,
-        lessons: chapter.lessons.map(lesson => {
+      // Process chapters honoring chapterCount by padding placeholders
+      const desiredCount = Math.max(1, parseInt(courseInfo.chapterCount || 1));
+      const chaptersData = Array.from({ length: desiredCount }, (_, i) => {
+        const chapter = chapters[i];
+        const name = (chapter?.name || '').trim() || `Chapter ${i + 1}`;
+        // Keep lessons that actually have content even if title is missing
+        const rawLessons = (chapter?.lessons || []);
+
+        const hasMeaningfulContent = (l) => {
+          const hasTitle = (l.title || '').trim() !== '';
+          const hasVideo = (l.videoUrl || '').trim() !== '';
+          const hasAbout = (l.aboutLesson || '').trim() !== '';
+          const hasQuiz = Array.isArray(l.quizQuestions) && l.quizQuestions.length > 0;
+          const hasResources = (l.resources && (
+            (Array.isArray(l.resources.downloadable) && l.resources.downloadable.length > 0) ||
+            (Array.isArray(l.resources.internet) && l.resources.internet.length > 0)
+          ));
+          return hasTitle || hasVideo || hasAbout || hasQuiz || hasResources;
+        };
+
+        const lessonsSource = rawLessons.filter(hasMeaningfulContent);
+
+        const lessons = (lessonsSource.length > 0 ? lessonsSource : [{
+          title: 'Lesson 1',
+          type: 'video',
+          videoUrl: '',
+          description: '',
+          aboutLesson: '',
+          hasResources: false,
+          resources: { downloadable: [], internet: [] },
+          quizQuestions: []
+        }]).map((lesson, idx) => {
           // Process resources and handle file uploads
           let processedResources = { downloadable: [], internet: [] };
           
@@ -589,16 +685,11 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
               // If there's a file attached, track it for upload
               if (resource.file) {
                 const fileId = `resource_file_${resourceFileCounter++}`;
-                resourceFiles.push({
-                  id: fileId,
-                  file: resource.file
-                });
+                resourceFiles.push({ id: fileId, file: resource.file });
                 processedResource.fileId = fileId;
               }
-              
               return processedResource;
             });
-            
             // Handle internet resources (no file uploads)
             processedResources.internet = lesson.resources.internet.map(resource => ({
               name: resource.name,
@@ -607,8 +698,17 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
             }));
           }
           
+          // Title fallback: don't lose a reading/resources lesson just because admin forgot title
+          const fallbackTitle = () => {
+            const base = (lesson.type === 'reading' || lesson.type === 'instructions') ? 'Reading' :
+                         (lesson.type === 'resources') ? 'Resources' :
+                         (lesson.type === 'quiz') ? 'Quiz' : 'Lesson';
+            const snippet = (lesson.aboutLesson || '').replace(/[#*>_`\-]|\s+/g, ' ').trim().slice(0, 40);
+            return snippet ? `${base}: ${snippet}` : `${base} ${idx + 1}`;
+          };
+
           return {
-            title: lesson.title,
+            title: (lesson.title || '').trim() || fallbackTitle(),
             type: lesson.type,
             videoUrl: lesson.videoUrl,
             description: lesson.description,
@@ -616,10 +716,12 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
             resources: lesson.hasResources || lesson.type === 'resources' ? processedResources : { downloadable: [], internet: [] },
             quizQuestions: lesson.quizQuestions || []
           };
-        })
-      }));
-      
-      // Add chapters data
+        });
+
+        return { name, lessons };
+      });
+
+      // Always include chapters honoring the count
       formData.append('chapters', JSON.stringify(chaptersData));
       
       // Append all resource files with their unique IDs
@@ -634,17 +736,19 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       
       // Submit the form
       await createCourse(formData);
-      toast('Course created successfully', {
+  universalToast.show('Course created successfully', {
         icon: '🎉',
         style: {
           backgroundColor: '#10B981',
           color: 'white',
         }
       });
+      // Clear draft on success
+      try { localStorage.removeItem(STORAGE_KEY); } catch (_) { /* ignore */ }
       navigate('/admin-p/courses');
     } catch (error) {
       console.error('Error creating course:', error);
-      toast('Failed to create course. Please try again.', {
+  universalToast.show('Failed to create course. Please try again.', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',

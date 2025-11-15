@@ -3,21 +3,25 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import LessonVideo from './LessonVideo';
 import CourseProgress from './CourseProgress';
 import ResourcesPage from './templ/ResourcesPage';
 import QuizIntro from './templ/QuizIntro';
 import InstructionsPage from './templ/InstructionsPage';
 import Sidebar from './Sidebar';
-import axios from 'axios';
+import CourseLoadingSkeleton from './CourseLoadingSkeleton';
 import axiosInstance from '../../utils/axios';
-import { toast } from 'react-hot-toast';
+import courseCache from '../../utils/courseCache';
+import universalToast from '../../utils/universalToast';
 import { useAuth } from '../../context/AuthContext';
+import preprocessLatex from '../../utils/latexPreprocessor';
 
 // Update the function signature to accept the new props
 const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [course, setCourse] = useState(null);
-  const [learningPlans, setLearningPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeChapter, setActiveChapter] = useState(0);
@@ -28,192 +32,69 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [contentType, setContentType] = useState('video'); // 'video', 'resources', 'quiz', 'instructions'
   const [courseProgress, setCourseProgress] = useState(null);
+  // Keep a server-computed snapshot so UI counts match backend/certificate logic
+  const [serverProgress, setServerProgress] = useState(null); // { completed, total, percentage }
   const [savingProgress, setSavingProgress] = useState(false);
   const [internetResourcesOpen, setInternetResourcesOpen] = useState(false);
   const [downloadResourcesOpen, setDownloadResourcesOpen] = useState(false);
-  const [isAIGeneratedPlan, setIsAIGeneratedPlan] = useState(false);
-  const [lastCreatedPlanId, setLastCreatedPlanId] = useState(null);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [certificate, setCertificate] = useState(null);
+  // When subject-only URL matches multiple courses (e.g., Mathematics 1A vs 1B), show chooser
+  const [disambiguationOptions, setDisambiguationOptions] = useState(null); // array of brief course objects
+  const [issuingCert, setIssuingCert] = useState(false);
   const videoRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, validateAuth } = useAuth();
 
-  // Helper function to update AI learning plan progress
-  const updateAILearningPlanProgress = async (planId, lessonId, isCompleted) => {
-    try {
-      // Get current progress data
-      const currentPlan = await axiosInstance.get(`/learning/plans/${planId}/`);
-      const currentProgress = currentPlan.data.plan_data.progress || {};
-      
-      // Update the specific lesson progress
-      const updatedProgress = {
-        ...currentProgress,
-        [lessonId]: isCompleted
-      };
-      
-      // Calculate overall completion
-      const allLessons = course.chapters.reduce((acc, chapter) => {
-        return acc.concat(chapter.lessons.map(lesson => lesson.id));
-      }, []);
-      
-      const completedLessonsCount = allLessons.filter(lessonKey => updatedProgress[lessonKey]).length;
-      const totalLessonsCount = allLessons.length;
-      const isOverallCompleted = totalLessonsCount > 0 && completedLessonsCount === totalLessonsCount;
-      
-      // Send progress update to backend
-      await axiosInstance.patch(`/learning/update-progress/${planId}/`, {
-        plan_data: {
-          progress: updatedProgress
-        },
-        is_completed: isOverallCompleted
-      });
-      
-      console.log(`Updated AI learning plan progress: ${completedLessonsCount}/${totalLessonsCount} lessons completed`);
-      
-    } catch (error) {
-      console.error('Error updating AI learning plan progress:', error);
-      throw error;
-    }
-  };
-
-  // Helper to fetch a learning plan by ID
-  const fetchLearningPlanById = async (planId) => {
-    try {
-      setLoading(true);
-      console.log('🔍 Fetching learning plan with ID:', planId);
-      const response = await axiosInstance.get(`/learning/plans/${planId}/`);
-      const planData = response.data;
-      console.log('📦 Received plan data:', JSON.stringify(planData, null, 2));
-      
-      // Check if planData has the expected structure
-      if (!planData || !planData.plan_data) {
-        throw new Error('Learning plan data is missing or invalid');
-      }
-      
-      // Ensure days is an array (can be empty)
-      if (!Array.isArray(planData.plan_data.days)) {
-        throw new Error('Learning plan days data is invalid');
-      }
-      
-      // Load existing progress data if available
-      const existingProgress = planData.plan_data.progress || {};
-      
-      // Transform days into chapters with progress loading
-      const transformedPlan = {
-        id: planData.id,
-        title: planData.title,
-        description: planData.description || "AI-generated learning plan",
-        chapters: planData.plan_data.days.map((day, dayIndex) => {
-          // DEBUG: Log quiz questions for each day
-          console.log(`🧩 Day ${day.day} (${day.topic}) quiz questions:`, day.quizQuestions);
-          console.log(`🧩 Quiz questions length:`, day.quizQuestions ? day.quizQuestions.length : 0);
-          
-          // Create video lessons from day.videos
-          const videoLessons = (day.videos || []).map((video, videoIndex) => {
-            // Create unique lesson identifier for AI learning plans
-            const lessonKey = `day_${day.day}_video_${videoIndex}`;
-            const isCompleted = existingProgress[lessonKey] || false;
-            
-            return {
-              id: lessonKey,
-              title: video.title,
-              type: 'video',
-              videoUrl: video.video_id ? `https://www.youtube.com/embed/${video.video_id}` : 
-                (video.url && video.url.includes('youtube.com/watch?v=') ? 
-                  `https://www.youtube.com/embed/${video.url.split('v=')[1].split('&')[0]}` : 
-                  video.url || ''),
-              description: video.description || "",
-              completed: isCompleted,
-              isAIGenerated: true,
-              aiLearningPlanId: planData.id,
-              dayIndex: dayIndex,
-              videoIndex: videoIndex
-            };
+  // **HELPER FUNCTION: Update course with progress data**
+  const updateCourseWithProgress = (courseData, progressData) => {
+    const updatedCourse = { ...courseData };
+    
+    if (progressData.chapters) {
+      progressData.chapters.forEach(chapter => {
+        const chapterIndex = updatedCourse.chapters.findIndex(c => c.title === chapter.name);
+        if (chapterIndex !== -1) {
+          chapter.lessons.forEach(lessonProgress => {
+            const lessonIndex = updatedCourse.chapters[chapterIndex].lessons.findIndex(l => 
+              String(l.id) === String(lessonProgress.id)
+            );
+            if (lessonIndex !== -1) {
+              updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = !!lessonProgress.completed;
+            }
           });
-
-          // Create quiz lesson if quiz questions exist
-          const quizLessons = [];
-          if (day.quizQuestions && day.quizQuestions.length > 0) {
-            console.log(`✅ Creating quiz lesson for Day ${day.day}: ${day.topic}`);
-            const quizLessonKey = `day_${day.day}_quiz`;
-            const isQuizCompleted = existingProgress[quizLessonKey] || false;
-            
-            quizLessons.push({
-              id: quizLessonKey,
-              title: `${day.topic} - Knowledge Check`,
-              type: 'quiz',
-              description: `Test your understanding of ${day.topic} concepts`,
-              completed: isQuizCompleted,
-              isAIGenerated: true,
-              aiLearningPlanId: planData.id,
-              dayIndex: dayIndex,
-              quiz_questions: day.quizQuestions,
-              quizQuestions: day.quizQuestions
-            });
-          } else {
-            console.log(`❌ No quiz questions found for Day ${day.day}: ${day.topic}`);
-          }
-
-          console.log(`📊 Day ${day.day} final lessons:`, {
-            videoLessons: videoLessons.length,
-            quizLessons: quizLessons.length,
-            totalLessons: videoLessons.length + quizLessons.length
-          });
-
-          return {
-            title: `Day ${day.day}: ${day.topic}`,
-            lessons: [...videoLessons, ...quizLessons]
-          };
-        }),
-      };
-      setCourse(transformedPlan);
-      setIsAIGeneratedPlan(true);
-      if (transformedPlan.chapters.length > 0) {
-        setExpandedChapters({ 0: true });
-      }
-    } catch (error) {
-      console.error('Error fetching learning plan by ID:', error);
-      let errorMessage = 'Failed to load learning plan';
-      
-      if (error.response) {
-        if (error.response.status === 404) {
-          errorMessage = 'Learning plan not found. It may have been deleted or is unavailable.';
-          setContentType('notFound');
-        } else if (error.response.status === 500) {
-          errorMessage = 'Server error occurred while loading the learning plan. Please try again later.';
-        } else if (error.response.data && error.response.data.error) {
-          errorMessage = error.response.data.error;
         }
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      setError(errorMessage);
-      setCourse(null);
-    } finally {
-      setLoading(false);
+      });
     }
+    
+    return updatedCourse;
   };
 
-  // Helper to generate a new AI learning plan and fetch it immediately
-  const generateAndFetchLearningPlan = async (goal, days=null) => {
+  // **HELPER FUNCTION: Fetch progress in background for logged-in users**
+  const fetchProgressInBackground = async (courseId, courseData, cacheKey) => {
     try {
-      setLoading(true);
-      const response = await axiosInstance.post('/learning/generate-learning-plan/', { goal, days });
-      const newPlan = response.data;
-      if (newPlan && newPlan.id) {
-        setLastCreatedPlanId(newPlan.id);
-        // Immediately fetch the new plan by its ID
-        await fetchLearningPlanById(newPlan.id);
-      } else {
-        console.error('No plan ID returned after creation:', newPlan);
+      await validateAuth();
+      const progressResponse = await axiosInstance.get(`/courses/progress/${courseId}/`);
+      
+      // Silently update progress without loading state
+      setCourseProgress(progressResponse.data);
+      if (progressResponse?.data?.progress) {
+        setServerProgress(progressResponse.data.progress);
       }
+      
+      // Update course with fresh progress
+      const updatedCourse = updateCourseWithProgress(courseData, progressResponse.data);
+      setCourse(updatedCourse);
+      
+      // Update cache with fresh data
+      courseCache.set(cacheKey, {
+        course: updatedCourse,
+        progress: progressResponse.data
+      });
+      console.log('🔄 Background progress sync completed');
     } catch (error) {
-      console.error('Error creating new AI learning plan:', error);
-      setError(error.message || 'Failed to generate learning plan');
-      setCourse(null);
-    } finally {
-      setLoading(false);
+      console.error('⚠️ Background progress sync failed (non-critical):', error);
+      // Don't show error to user - cache is good enough
     }
   };
 
@@ -221,166 +102,154 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     // Extract URL path to determine course type and proper API endpoint
     const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
     
-    // Check if this is a direct learning plan route (/learning/:id)
-    const isDirectLearningPlanRoute = pathParts[0] === 'learning' && pathParts.length > 1;
-    const learningPlanId = isDirectLearningPlanRoute ? pathParts[1] : null;
-    
-    // Only treat as AI learning plan if it's a direct learning route or we have a lastCreatedPlanId
-    const isLearningPlanId = learningPlanId !== null || lastCreatedPlanId !== null;
-
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Check first if this is an AI-generated learning plan
-        if (isLearningPlanId) {
-          try {
-            // Use the last created plan ID if available, otherwise use the learningPlanId from URL
-            const planId = lastCreatedPlanId || learningPlanId;
-            console.log(`🔍 Fetching AI learning plan with ID: ${planId}`);
-            await fetchLearningPlanById(planId);
-            console.log("✅ Learning plan loaded successfully!");
-            return; // Exit early since we successfully loaded the plan
-          } catch (error) {
-            const errorMessage = error.response?.data?.detail || error.message || 'Failed to load AI learning plan';
-            console.error('❌ Error fetching AI learning plan:', errorMessage);
-            setError(errorMessage);
-            setContentType('notFound');
-          }        } else {
-          try {
-            // Fetch regular course data
-            await fetchRegularCourse(pathParts);
-          } catch (error) {
-            console.error('❌ Error fetching course data:', error);
-            setError(error.message || 'Failed to load course data');
-            setContentType('notFound'); 
+        
+        // **IMPROVED CACHING STRATEGY**
+        // 1. For guest users: Use cache freely (no progress to worry about)
+        // 2. For logged-in users: Use cache if fresh, but always sync progress in background
+        // IMPORTANT: Include auth state in cache key to prevent showing locked content after login
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+        const cachedData = courseCache.get(cacheKey);
+        const isCacheFresh = courseCache.isFresh(cacheKey);
+        
+        // Use cache if available (for both guest and logged-in users)
+        // Validate cache has proper structure before using
+        if (cachedData && cachedData.course && cachedData.course.chapters && Array.isArray(cachedData.course.chapters)) {
+          if (!isLoggedIn) {
+            // Guest users: Use cache and stop (no progress to fetch)
+            console.log('👻 Guest user - using cached course data');
+            setCourse(cachedData.course);
+            setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
+            setLoading(false);
+            return;
+          } else if (isCacheFresh) {
+            // Logged-in users with fresh cache: Use cache immediately for instant load
+            console.log('👤 Logged in user - using fresh cache for instant load');
+            setCourse(cachedData.course);
+            if (cachedData.progress) {
+              setCourseProgress(cachedData.progress);
+              if (cachedData.progress?.progress) {
+                setServerProgress(cachedData.progress.progress);
+              }
+              // Update course with cached progress
+              const updatedCourse = updateCourseWithProgress(cachedData.course, cachedData.progress);
+              setCourse(updatedCourse);
+            }
+            setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
+            setLoading(false);
+            
+            // Optionally fetch progress in background to ensure it's up-to-date
+            // This happens silently without blocking the UI
+            if (cachedData.course?.id) {
+              fetchProgressInBackground(cachedData.course.id, cachedData.course, cacheKey);
+            }
+            return;
+          } else {
+            // Logged-in users with stale cache: Use cache to show content quickly,
+            // but also fetch fresh data
+            console.log('� Logged in user - using stale cache while fetching fresh data');
+            setCourse(cachedData.course);
+            if (cachedData.progress) {
+              setCourseProgress(cachedData.progress);
+              if (cachedData.progress?.progress) {
+                setServerProgress(cachedData.progress.progress);
+              }
+              const updatedCourse = updateCourseWithProgress(cachedData.course, cachedData.progress);
+              setCourse(updatedCourse);
+            }
+            setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
+            setLoading(false);
+            // Continue to fetch fresh data below
           }
+        } else if (cachedData) {
+          // Cache exists but has invalid structure - clear it
+          console.warn('⚠️ Cached data has invalid structure, clearing cache');
+          courseCache.invalidate(cacheKey);
         }
+        
+        // Fetch fresh data from server
+        await fetchRegularCourse(pathParts);
+        
+      } catch (error) {
+        console.error('❌ Error fetching course data:', error);
+        setError(error.message || 'Failed to load course data');
+        setContentType('notFound');
       } finally {
         setLoading(false);
       }
     };
     
-    const fetchRegularCourse = async (pathParts = pathname ? pathname.split('/').filter(Boolean) : [], isLearningPlanIdParam = false) => {
+  const fetchRegularCourse = async (pathParts = pathname ? pathname.split('/').filter(Boolean) : []) => {
       try {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+    // axiosInstance already prefixes with '/api' via its baseURL
         
         // Extract proper course type and ID from URL path
         let apiUrl;
         let isSchoolCourse = false;
-        
-        // Check if it's a school course (e.g., /courses/10th/cbse/math/learning)
-        if (pathParts.includes('10th') || pathParts.includes('11th') || pathParts.includes('12th')) {
-          isSchoolCourse = true;
-          const classLevel = pathParts.find(part => ['10th', '11th', '12th'].includes(part));          const board = pathParts.find(part => ['cbse', 'state'].includes(part));
-          
-          // Handle state board case which has an additional parameter
-          if (board === 'state') {
-            const stateIndex = pathParts.indexOf('state');
-            if (stateIndex !== -1 && stateIndex + 1 < pathParts.length) {
-              const stateId = pathParts[stateIndex + 1];
-              const subjectId = pathParts[stateIndex + 2];
-                // Map state codes to full state names
-              const stateMap = {
-                // Southern States
-                'ts': 'Telangana',
-                'ap': 'Andhra Pradesh',
-                'ka': 'Karnataka',
-                'tn': 'Tamil Nadu',
-                'kl': 'Kerala',
-                
-                // Western States
-                'mh': 'Maharashtra',
-                'gj': 'Gujarat',
-                'rj': 'Rajasthan',
-                'ga': 'Goa',
-                
-                // Northern States
-                'dl': 'Delhi',
-                'pb': 'Punjab',
-                'hr': 'Haryana',
-                'hp': 'Himachal Pradesh',
-                'up': 'Uttar Pradesh',
-                'uk': 'Uttarakhand',
-                'jk': 'Jammu and Kashmir',
-                
-                // Eastern States
-                'wb': 'West Bengal',
-                'br': 'Bihar',
-                'or': 'Odisha',
-                'jh': 'Jharkhand',
-                
-                // Central States
-                'mp': 'Madhya Pradesh',
-                'cg': 'Chhattisgarh',
-                
-                // North Eastern States
-                'as': 'Assam',
-                'sk': 'Sikkim',
-                'nl': 'Nagaland',
-                'mn': 'Manipur',
-                'ml': 'Meghalaya',
-                'tr': 'Tripura',
-                'ar': 'Arunachal Pradesh',
-                'mz': 'Mizoram',
-                
-                // Union Territories
-                'ch': 'Chandigarh',
-                'an': 'Andaman and Nicobar Islands',
-                'dn': 'Dadra and Nagar Haveli and Daman and Diu',
-                'ld': 'Lakshadweep',
-                'py': 'Puducherry',
-                'la': 'Ladakh'
-              };                // Use the full state name if available, otherwise use the code
-              const stateCode = stateId.toLowerCase();
-              const stateParam = stateMap[stateCode] || stateId;
-              
-              console.log(`🗺️ State code mapping: "${stateCode}" → "${stateParam}"`);
-              
-              // Warn if state code is not found in the mapping
-              if (!stateMap[stateCode]) {
-                console.warn(`⚠️ Warning: State code "${stateCode}" not found in state mapping. Using raw value instead.`);
-              }
-              
-              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&state=${stateParam}&subject=${subjectId}`;
-              console.log(`🔍 Looking for state board course: class=${classLevel}, state=${stateParam}, subject=${subjectId}`);
-            }
-          } else {
-            const subjectIndex = pathParts.indexOf(board) + 1;
-            if (subjectIndex < pathParts.length) {
-              const subjectId = pathParts[subjectIndex];
-              // Convert subjectId to lowercase to ensure case-insensitive matching with database
-              apiUrl = `${API_BASE_URL}/courses/school/?class=${classLevel}&board=${board}&subject=${subjectId.toLowerCase()}`;
-              console.log(`📚 Fetching school course with: class=${classLevel}, board=${board}, subject=${subjectId.toLowerCase()}`);
+        let response;
+        // If a specific courseId is present in the query string, prefer fetching by ID
+  const searchParams = new URLSearchParams(location.search || '');
+  const selectedCourseId = searchParams.get('courseId');
+        const grades = ['6th','7th','8th','9th','10th','11th','12th'];
+        const hasGradeInPath = grades.some(g => pathParts.includes(g));
+
+        // Support the generic ID-based learning route: /courses/:courseId/learning for both school and engineering
+        if (!hasGradeInPath && courseId) {
+          try {
+            isSchoolCourse = true;
+            apiUrl = `/courses/school/${courseId}/`;
+            console.log('🔍 Fetching school course by ID:', courseId);
+            response = await axiosInstance.get(apiUrl);
+            console.log('✅ School course fetched successfully');
+          } catch (e) {
+            // Fallback to engineering by ID if not a school course
+            console.log('⚠️ Not a school course, trying engineering course by ID:', courseId);
+            isSchoolCourse = false;
+            apiUrl = `/courses/engineering/${courseId}/`;
+            try {
+              response = await axiosInstance.get(apiUrl);
+              console.log('✅ Engineering course fetched successfully');
+            } catch (engError) {
+              console.error('❌ Course not found in either school or engineering:', courseId);
+              throw new Error(`Course with ID "${courseId}" not found. It may have been deleted or you may not have access to it.`);
             }
           }
         } else {
-          // Engineering course
-          apiUrl = `${API_BASE_URL}/courses/engineering/${courseId}/`;
-        }
         
+        // Check if it's a school course (e.g., /courses/6th/cbse/math/learning)
+        if (hasGradeInPath) {
+          isSchoolCourse = true;
+          if (selectedCourseId) {
+            apiUrl = `/courses/school/${selectedCourseId}/`;
+            console.log('🔍 Fetching school course by query courseId:', selectedCourseId);
+          } else {
+            // Strict ID-only mode: do not attempt subject/state fallbacks
+            throw new Error('Missing courseId. Please start learning from the course page so we can lock to the correct course.');
+          }
+        } else {
+          // Engineering course by path structure
+          apiUrl = `/courses/engineering/${courseId}/`;
+        }
+
         if (!apiUrl) {
           throw new Error("Could not determine API URL from path");
         }
-          console.log("🔍 Fetching course from API URL:", apiUrl);
-        const response = await axiosInstance.get(apiUrl);
-        console.log("📝 API Response:", response.data);
-          let courseData;
-        if (isSchoolCourse) {
-          if (Array.isArray(response.data) && response.data.length > 0) {
-            // For school courses, we get a list, so take the first matching course
-            courseData = response.data[0];
-            console.log("🎯 Selected course from list:", courseData);
-            // Now fetch the complete course details
-            const detailResponse = await axiosInstance.get(`/courses/school/${courseData.id}/`);
-            console.log("📚 Complete course details:", detailResponse.data);
-            courseData = detailResponse.data;
-          } else {
-            // No courses found for the given criteria
-            throw new Error(`No courses found for the specified criteria. Please check if the course exists.`);
-          }
-        } else {
-          courseData = response.data;
+        console.log("🔍 Fetching course from API URL:", apiUrl);
+        response = await axiosInstance.get(apiUrl);
+        
+        // Validate response
+        if (!response || !response.data) {
+          console.error('❌ Empty response from API');
+          throw new Error('Server returned empty response. Please try again.');
         }
+        console.log("📝 API Response status:", response.status);
+        console.log("📝 API Response data:", response.data);
+        }
+        console.log("📝 Processing API Response:", response.data);
+        let courseData;
+        courseData = response.data;
           console.log("Fetched Course Data:", courseData);
         
         // Check if courseData is valid and has the expected structure
@@ -396,6 +265,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           chapters: isSchoolCourse 
             ? courseData.chapters.map((chapter) => ({
                 title: chapter.name,
+                isLocked: !!chapter.is_locked,
+                isPreview: !!chapter.is_preview,
                 lessons: chapter.lessons.map((lesson) => ({
                   id: lesson.id,
                   title: lesson.title,
@@ -405,6 +276,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                   aboutLesson: lesson.about_lesson || lesson.aboutLesson,
                   completed: lesson.completed || false,
                   isAIGenerated: false,
+                  isLocked: !!lesson.is_locked,
+                  isPreview: !!lesson.is_preview,
                   // Include quiz questions with both possible field names
                   quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
                   quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
@@ -414,6 +287,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               }))
             : courseData.sections.map((section) => ({
                 title: section.name,
+                isLocked: !!section.is_locked,
+                isPreview: !!section.is_preview,
                 lessons: section.lessons.map((lesson) => ({
                   id: lesson.id,
                   title: lesson.title,
@@ -423,26 +298,96 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                   aboutLesson: lesson.about_lesson || lesson.aboutLesson,
                   completed: lesson.completed || false,
                   isAIGenerated: false,
+                  isLocked: !!lesson.is_locked,
+                  isPreview: !!lesson.is_preview,
                   // Include quiz questions with both possible field names
                   quiz_questions: lesson.quiz_questions || lesson.quizQuestions || [],
                   quizQuestions: lesson.quiz_questions || lesson.quizQuestions || [],
-                  // Include resources
+                  // Include resources - they should now be properly grouped
                   resources: lesson.resources || { downloadable: [], internet: [] }
                 })),
-              })),
+              }))
         };
 
+        // Final validation before setting course
+        if (!transformedCourse || !transformedCourse.chapters || transformedCourse.chapters.length === 0) {
+          console.error('❌ Transformed course has no chapters:', transformedCourse);
+          throw new Error('Course has no content available. Please contact support.');
+        }
+        
+        console.log('✅ Course transformation complete. Chapters:', transformedCourse.chapters.length);
         setCourse(transformedCourse);
-        setIsAIGeneratedPlan(false);
+
+        // If we loaded a school course by filters and we have its exact ID but the URL
+        // lacks ?courseId, normalize the URL to an ID-locked variant to keep future
+        // API calls ID-based and avoid ambiguity on refresh.
+        if (isSchoolCourse && transformedCourse?.id) {
+          const params = new URLSearchParams(location.search || '');
+          if (!params.get('courseId')) {
+            params.set('courseId', transformedCourse.id);
+            navigate({ pathname, search: `?${params.toString()}` }, { replace: true });
+          }
+        }
         
         // Expand the first chapter by default
         if (transformedCourse.chapters.length > 0) {
           setExpandedChapters({ 0: true });
         }
         
-        // Also fetch AI-generated learning plans to display in sidebar
-        fetchAILearningPlans();
-      } catch (error) {        console.error('❌ Error fetching course data:', error);
+        // **OPTIMIZATION 3: Fetch progress once auth is definitely valid (fixes first-load 401)**
+        // We explicitly validate auth so the very first request after login has fresh tokens.
+        const canFetchProgress = transformedCourse.id && (await (async () => {
+          if (!isLoggedIn) return false;
+          try { await validateAuth(); return true; } catch { return false; }
+        })());
+
+        if (canFetchProgress) {
+          try {
+            const progressResponse = await axiosInstance.get(`/courses/progress/${transformedCourse.id}/`);
+            setCourseProgress(progressResponse.data);
+            if (progressResponse?.data?.progress) {
+              setServerProgress(progressResponse.data.progress);
+            }
+            
+            // Update course with progress and cache
+            const updatedCourse = updateCourseWithProgress(transformedCourse, progressResponse.data);
+            setCourse(updatedCourse);
+            
+            // **OPTIMIZATION 4: Cache the complete data**
+            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+            courseCache.set(cacheKey, {
+              course: updatedCourse,
+              progress: progressResponse.data
+            });
+            console.log('💾 Course data cached for faster future loads');
+          } catch (progressError) {
+            console.error('⚠️ Error fetching progress (non-critical):', progressError);
+            // Still cache course without progress
+            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+            courseCache.set(cacheKey, { course: transformedCourse });
+          }
+        } else {
+          // Cache course without progress for non-logged-in users
+          const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+          courseCache.set(cacheKey, { course: transformedCourse });
+        }
+        
+      } catch (error) {
+        console.error('❌ Error fetching course data:', error);
+        console.error('Error details:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          message: error.message,
+          pathname,
+          courseId: searchParams.get('courseId')
+        });
+        
+        // Clear potentially corrupted cache
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+        courseCache.invalidate(cacheKey);
+        console.log('🗑️ Cleared cache due to error');
+        
         const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';
         
         // Special handling for state board course errors
@@ -454,59 +399,38 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             const stateId = pathParts[stateIndex + 1];
             console.error(`⚠️ State board course error with state code: ${stateId}`);
             setError(`Unable to find courses for the specified state. Make sure state code "${stateId}" is correct.`);
-          } else {
-            setError('Unable to find state board courses. Invalid URL format.');
+            setCourse(null);
+            setContentType('notFound');
+            return;
           }
-        } else {
-          setError(errorMessage);
         }
         
+        // Don't overwrite specific error messages
+        setError(errorMessage);
         setCourse(null);
-        
-        // Check if error response indicates ID belongs to a learning plan
-        if (error.response?.data?.isLearningPlanId) {
-          setError('This learning plan is not available. It may have been deleted or you may not have permission to access it.');
-        } else if (isLearningPlanId) {
-          setError('Unable to load the learning plan. Please check if the ID is correct.');
-          setContentType('notFound');
-        }
-      }
-    };
-    
-    const fetchAILearningPlans = async () => {
-      try {
-        const response = await axiosInstance.get('/learning/plans/');
-        
-        // Check if response is valid
-        if (response.status === 200 && Array.isArray(response.data)) {
-          const plans = response.data;
-          console.log("Fetched AI Learning Plans:", plans);
-          setLearningPlans(plans);
-        } else {
-          console.warn("Unexpected learning plans response format:", response.data);
-          setLearningPlans([]);
-        }
-      } catch (error) {
-        console.error('Error fetching AI learning plans:', error);
-        const errorMessage = error.response?.data?.detail || error.message || 'Failed to load learning plans';
-        console.warn('AI Learning Plans Error:', errorMessage);
-        setLearningPlans([]);
+        setContentType('notFound');
       }
     };
 
     fetchData();
-  }, [courseId, pathname]);
+  }, [courseId, pathname, location.search]);
 
   // Add a useEffect to fetch user progress when course data is loaded
   useEffect(() => {
     // Only fetch progress if the user is logged in and we have a course
     const fetchUserProgress = async () => {
-      if (!isLoggedIn || !course || !course.id || isAIGeneratedPlan) return;
+      if (!course || !course.id) return;
+      // Ensure we really are authenticated before calling protected endpoints
+      if (!isLoggedIn) return;
+      try { await validateAuth(); } catch { return; }
       
       try {        // Call the backend API to get the user's progress for this course
         const response = await axiosInstance.get(`/courses/progress/${course.id}/`);
         
         setCourseProgress(response.data);
+        if (response?.data?.progress) {
+          setServerProgress(response.data.progress);
+        }
         
         // Update the course lessons with completion status from the API
         const updatedCourse = {...course};
@@ -517,11 +441,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             const chapterIndex = updatedCourse.chapters.findIndex(c => c.title === chapter.name);
             if (chapterIndex !== -1) {
               chapter.lessons.forEach(lessonProgress => {
+                // Prefer matching by stable lesson id to avoid title mismatches
                 const lessonIndex = updatedCourse.chapters[chapterIndex].lessons.findIndex(l => 
-                  l.title === lessonProgress.title
+                  String(l.id) === String(lessonProgress.id)
                 );
                 if (lessonIndex !== -1) {
-                  updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = lessonProgress.completed;
+                  updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = !!lessonProgress.completed;
                 }
               });
             }
@@ -534,10 +459,10 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             if (sectionIndex !== -1) {
               section.lessons.forEach(lessonProgress => {
                 const lessonIndex = updatedCourse.chapters[sectionIndex].lessons.findIndex(l => 
-                  l.title === lessonProgress.title
+                  String(l.id) === String(lessonProgress.id)
                 );
                 if (lessonIndex !== -1) {
-                  updatedCourse.chapters[sectionIndex].lessons[lessonIndex].completed = lessonProgress.completed;
+                  updatedCourse.chapters[sectionIndex].lessons[lessonIndex].completed = !!lessonProgress.completed;
                 }
               });
             }
@@ -545,18 +470,41 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         
         setCourse(updatedCourse);
+
+        // Also get engineering progress summary (percentage + certificate if any)
+        try {
+          const summary = await axiosInstance.get(`/courses/${course.id}/progress/`);
+          const pct = summary.data?.progress?.percentage ?? 0;
+          setProgressPercent(pct);
+          setCertificate(summary.data?.certificate || null);
+          if (summary?.data?.progress) {
+            setServerProgress(summary.data.progress);
+          }
+        } catch (e) {
+          // ignore if not engineering course or not logged in
+        }
         
       } catch (error) {
         console.error('Error fetching user progress:', error);
         // Don't show error toast if 401 Unauthorized (user not logged in)
         if (error.response?.status !== 401) {
-          toast.error('Failed to load your course progress');
+          universalToast.error('Failed to load your course progress');
         }
       }
     };
     
     fetchUserProgress();
-  }, [course?.id, isLoggedIn, isAIGeneratedPlan]);
+  }, [course?.id, isLoggedIn]);
+
+  const handleIssueCertificate = async () => {
+    if (!course?.id) return;
+    if (!isLoggedIn) {
+  universalToast.error('Please log in to claim your certificate');
+      return;
+    }
+    // Navigate to the certificate page; it will issue if eligible
+    navigate(`/courses/${course.id}/certificate`, { state: { courseTitle: course?.title } });
+  };
 
   // Handle chapter toggling
   const toggleChapter = (index) => {
@@ -576,67 +524,141 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     }));
     
     // Scroll to video on mobile
-    if (window.innerWidth < 1024) {
-      videoRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+    // Always provide feedback by scrolling content area into view
+    videoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   // Mark lesson as complete (with backend integration)
   const markLessonComplete = async () => {
     if (!course) return;
+    if (!isLoggedIn) {
+  universalToast.error('Please log in to track your progress');
+      return;
+    }
     
     try {
       const currentLesson = course.chapters[activeChapter].lessons[activeLesson];
       
-      if (isAIGeneratedPlan && currentLesson.aiLearningPlanId) {
-        // Handle AI learning plan progress
-        await updateAILearningPlanProgress(currentLesson.aiLearningPlanId, currentLesson.id, true);
-      } else if (currentLesson.id && !isAIGeneratedPlan) {
-        // Handle regular course progress
-        await axiosInstance.post(`/lessons/toggle-completion/${currentLesson.id}/`);
+      // Don't mark if already completed
+      if (currentLesson.completed) {
+        return;
       }
       
-      // Update local state
-      const updatedCourse = {...course};
+      // Optimistic UI update for instant tick
+      const updatedCourse = { ...course };
       updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
       setCourse(updatedCourse);
+
+      if (currentLesson.id) {
+        // Fire and then sync progress from server response
+  const response = await axiosInstance.post(`/lessons/toggle-completion/${currentLesson.id}/`);
+        const pct = response?.data?.progress?.percentage;
+        const completed = response?.data?.progress?.completed;
+        const total = response?.data?.progress?.total;
+        if (typeof pct === 'number' && !Number.isNaN(pct)) {
+          setProgressPercent(pct);
+        }
+        if (typeof completed === 'number' && typeof total === 'number') {
+          setServerProgress({ completed, total, percentage: pct });
+        }
+        
+        // **OPTIMIZATION: Update cache directly instead of invalidating**
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+        
+        // Update cache with new course state
+        courseCache.set(cacheKey, {
+          course: updatedCourse,
+          progress: {
+            progress: { completed, total, percentage: pct },
+            chapters: updatedCourse.chapters.map(ch => ({
+              name: ch.title,
+              lessons: ch.lessons.map(l => ({
+                id: l.id,
+                completed: l.completed
+              }))
+            }))
+          }
+        });
+        console.log('💾 Cache updated with new completion status');
+
+        // Notify other parts of the app (Learning Hub) so progress refreshes immediately
+        try {
+          const ev = new CustomEvent('learning:progress-updated', {
+            detail: {
+              courseId: course?.id,
+              lessonId: currentLesson.id,
+              percentage: pct,
+              completed,
+              total
+            }
+          });
+          window.dispatchEvent(ev);
+        } catch (_) {}
+      }
     } catch (error) {
       console.error('Error marking lesson as complete:', error);
-      // Still update local state even if API call fails
-      const updatedCourse = {...course};
-      updatedCourse.chapters[activeChapter].lessons[activeLesson].completed = true;
-      setCourse(updatedCourse);
+      // keep optimistic completion; user can toggle off if needed
+      universalToast.error('Failed to save progress. Please try again.');
     }
   };
 
   // Toggle lesson completion from sidebar
   const toggleLessonCompletion = async (chapterIndex, lessonIndex) => {
     if (!course) return;
+    if (!isLoggedIn) {
+  universalToast.error('Please log in to track your progress');
+      return;
+    }
+    
+    // Store the previous state for potential rollback
+    const prevCourse = course;
     
     try {
       const lesson = course.chapters[chapterIndex].lessons[lessonIndex];
       const newCompletionState = !lesson.completed;
-      
-      if (isAIGeneratedPlan && lesson.aiLearningPlanId) {
-        // Handle AI learning plan progress
-        await updateAILearningPlanProgress(lesson.aiLearningPlanId, lesson.id, newCompletionState);
-      } else if (lesson.id && !isAIGeneratedPlan) {
-        // Handle regular course progress
-        const response = await axiosInstance.post(`/lessons/toggle-completion/${lesson.id}/`);
-        console.log('Lesson completion toggled:', response.data);
-      }
-      
-      // Update local state
-      const updatedCourse = {...course};
-      updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = newCompletionState;
+
+      // Optimistic UI update for instant feedback
+      const updatedCourse = { ...course };
+      updatedCourse.chapters = course.chapters.map((ch, idx) =>
+        idx !== chapterIndex ? ch : { ...ch, lessons: ch.lessons.map((l, li) => li !== lessonIndex ? l : { ...l, completed: newCompletionState }) }
+      );
       setCourse(updatedCourse);
+
+      if (lesson.id) {
+        const response = await axiosInstance.post(`/lessons/toggle-completion/${lesson.id}/`);
+        // Sync server-computed progress to ensure certificate eligibility reflects correctly
+        const pct = response?.data?.progress?.percentage;
+        const completed = response?.data?.progress?.completed;
+        const total = response?.data?.progress?.total;
+        if (typeof pct === 'number' && !Number.isNaN(pct)) {
+          setProgressPercent(pct);
+        }
+        if (typeof completed === 'number' && typeof total === 'number') {
+          setServerProgress({ completed, total, percentage: pct });
+        }
+        
+        // **OPTIMIZATION: Update cache directly with new state**
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+        courseCache.set(cacheKey, {
+          course: updatedCourse,
+          progress: {
+            progress: { completed, total, percentage: pct },
+            chapters: updatedCourse.chapters.map(ch => ({
+              name: ch.title,
+              lessons: ch.lessons.map(l => ({
+                id: l.id,
+                completed: l.completed
+              }))
+            }))
+          }
+        });
+        console.log('💾 Cache updated with new completion status');
+      }
     } catch (error) {
       console.error('Error toggling lesson completion:', error);
-      // Still update local state even if API call fails
-      const updatedCourse = {...course};
-      updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = 
-        !updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed;
-      setCourse(updatedCourse);
+      // Revert optimistic update on error
+      setCourse(prevCourse);
+      universalToast.error('Failed to update lesson progress. Please try again.');
     }
   };
 
@@ -717,6 +739,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     console.log('❓ Quiz questions:', lesson.quiz_questions);
     console.log('📚 About lesson:', lesson.aboutLesson);
     console.log('📂 Resources:', lesson.resources);
+    // Gate access for locked lessons when user is not logged in
+    if (!isLoggedIn && lesson.isLocked) {
+      // Soft nudge; prevent navigation
+      universalToast.info('Login to unlock this lesson');
+      return;
+    }
     
     // Only update state if we're actually changing lessons to prevent re-renders
     if (activeChapter !== chapterIndex || activeLesson !== lessonIndex) {
@@ -732,30 +760,54 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   useEffect(() => {
     const currentLesson = getCurrentLesson();
     console.log('🎯 Current lesson for content type detection:', currentLesson);
-    if (currentLesson && currentLesson.type) {
+    if (!currentLesson) return;
+
+    // Prefer explicit type when present
+    if (currentLesson.type) {
       console.log('🎮 Setting content type based on lesson type:', currentLesson.type);
-      // Map lesson types to content types
       switch (currentLesson.type) {
         case 'quiz':
           setContentType('quiz');
-          break;
+          return;
         case 'reading':
         case 'instructions':
           setContentType('instructions');
-          break;
+          return;
         case 'resources':
           setContentType('resources');
-          break;
+          return;
         case 'video':
         default:
-          setContentType('video');
+          // Fall through to heuristics in case videoUrl is missing
           break;
       }
-    } else {
-      console.log('🎮 Defaulting to video content type - no lesson type specified');
-      // Default to video if no lesson type is specified
-      setContentType('video');
     }
+
+    // Heuristic fallback when type is missing or unreliable
+    const hasVideo = Boolean(currentLesson.videoUrl && String(currentLesson.videoUrl).trim());
+    const about = currentLesson.aboutLesson && String(currentLesson.aboutLesson).trim();
+    const hasAbout = Boolean(about);
+    const qlen = (currentLesson.quiz_questions || currentLesson.quizQuestions || []).length;
+    const hasQuiz = qlen > 0;
+    const res = currentLesson.resources || { downloadable: [], internet: [] };
+    const hasResources = (Array.isArray(res.downloadable) && res.downloadable.length > 0) ||
+                         (Array.isArray(res.internet) && res.internet.length > 0);
+
+    if (hasQuiz) {
+      setContentType('quiz');
+      return;
+    }
+    if (hasResources) {
+      setContentType('resources');
+      return;
+    }
+    if (hasAbout && !hasVideo) {
+      // Treat as reading/instructions when text exists but no video
+      setContentType('instructions');
+      return;
+    }
+    // Default: video
+    setContentType('video');
   }, [activeChapter, activeLesson, course]);
 
   // Add effect to notify parent when sidebar visibility changes
@@ -767,12 +819,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
   // Loading and error states
   if (loading) {
-    return (
-      <div className="flex flex-col justify-center items-center h-96 space-y-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-        <p className="text-gray-600">Loading your learning content...</p>
-      </div>
-    );
+    return <CourseLoadingSkeleton />;
   }
 
   if (error) {
@@ -830,6 +877,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const totalLessons = course.chapters.reduce(
     (acc, chapter) => acc + chapter.lessons.length, 0
   );
+  // Display values: prefer server-computed to match certificate logic
+  const displayCompleted = serverProgress?.completed ?? completedLessons;
+  const displayTotal = serverProgress?.total ?? totalLessons;
+  const displayPercent = typeof serverProgress?.percentage === 'number'
+    ? serverProgress.percentage
+    : (progressPercent || Math.round((displayCompleted / Math.max(1, displayTotal)) * 100));
   
   // Content rendering section in the return statement
   const renderContent = () => {
@@ -846,21 +899,18 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           <h2 className="text-xl font-bold text-gray-800 mb-2">Content Not Found</h2>
           <p className="text-gray-600 mb-6">{error || "The content you're looking for could not be found. It may have been deleted or is unavailable."}</p>
           <div className="flex justify-center space-x-4">
-            {isLearningPlanId ? (
-              <button
-                onClick={() => navigate('/chat')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Create a New Learning Plan
-              </button>
-            ) : (
-              <button
-                onClick={() => navigate('/courses')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Browse Courses
-              </button>
-            )}
+            <button
+              onClick={() => navigate('/learning-hub')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Go to Learning Hub
+            </button>
+            <button
+              onClick={() => navigate('/courses')}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
+            >
+              Browse Courses
+            </button>
             <button
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
@@ -872,22 +922,47 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       );
     }
 
-    // Add a special header for AI-generated learning plans
-    const aiLearningPlanHeader = isAIGeneratedPlan && (
-      <div className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 p-4 rounded-lg border border-indigo-100">
-        <div className="flex items-center">
-          <div className="bg-white p-3 rounded-full mr-4 border border-indigo-200">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
+    // Disambiguation UI when multiple courses match subject-only URL (e.g., 1A vs 1B)
+    if (contentType === 'disambiguate' && Array.isArray(disambiguationOptions)) {
+      const chooseCourse = (id) => {
+        // Navigate to same path with explicit courseId so we fetch exact course by UUID
+        navigate(`${pathname}?courseId=${encodeURIComponent(id)}`);
+      };
+      return (
+        <div className="p-6 md:p-8">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Select the exact course</h2>
+          <p className="text-gray-600 mb-6">We found multiple courses for this subject. Please choose one to continue.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {disambiguationOptions.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => chooseCourse(opt.id)}
+                className="flex items-start gap-3 p-4 border rounded-lg hover:shadow transition bg-white text-left"
+                aria-label={`Choose ${opt.title}`}
+              >
+                {opt.thumbnail ? (
+                  <img src={opt.thumbnail} alt="thumbnail" className="w-16 h-16 rounded object-cover" />
+                ) : (
+                  <div className="w-16 h-16 rounded bg-gray-100 flex items-center justify-center text-gray-400">📘</div>
+                )}
+                <div>
+                  <div className="font-semibold text-gray-900 line-clamp-2">{opt.title}</div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {(opt.class_level || '').toString()} • {(opt.board || '').toString()}
+                    {opt.board?.toLowerCase() === 'state' && opt.state ? ` • ${opt.state}` : ''}
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-indigo-900">AI-Generated Learning Plan</h2>
-            <p className="text-gray-600">This personalized learning journey was created based on your interests and learning goals.</p>
+          <div className="mt-6">
+            <button onClick={() => navigate('/courses')} className="text-sm text-gray-600 hover:text-gray-800 underline">Back to Courses</button>
           </div>
         </div>
-      </div>
-    );    switch (contentType) {
+      );
+    }
+
+    switch (contentType) {
       case 'resources':
         return <ResourcesPage lessonResources={currentLesson?.resources} />; 
 
@@ -918,14 +993,13 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       default:
         return (
           <>
-            {aiLearningPlanHeader}
-            
             {/* Video Container */}
             <div className="mb-8">
               <div ref={videoRef} className="mb-6">
                 <LessonVideo 
                   videoUrl={currentLesson?.videoUrl} 
                   title={currentLesson?.title}
+                  locked={!isLoggedIn && (currentLesson?.isLocked === true)}
                 />
               </div>
                 {/* Content Tabs */}
@@ -959,7 +1033,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                       // Use actual lesson content if available with proper markdown components
                       <div>
                         <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
+                          remarkPlugins={[remarkGfm, remarkMath]}
+                          rehypePlugins={[rehypeKatex]}
                           components={{
                             ul: ({node, ...props}) => <ul className="list-disc pl-5 my-4 space-y-2" {...props} />,
                             ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-4 space-y-2" {...props} />,
@@ -1018,7 +1093,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                             a: ({node, ...props}) => <a className="text-blue-600 hover:text-blue-800 underline" {...props} />,                            hr: ({node, ...props}) => <hr className="my-6 border-gray-300" {...props} />,
                           }}
                         >
-                          {currentLesson.aboutLesson}
+                          {preprocessLatex(currentLesson.aboutLesson)}
                         </ReactMarkdown>
                       </div>
                     ) : currentLesson?.description ? (
@@ -1027,22 +1102,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                         <h3 className="text-lg font-semibold mb-4">About This Lesson</h3>
                         <p className="text-gray-700 mb-4">{currentLesson.description}</p>
                         
-                        {isAIGeneratedPlan ? (
-                          <div className="mt-6 p-4 border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-md">
-                            <h4 className="font-semibold text-indigo-800 flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                              </svg>
-                              Learning Tips
-                            </h4>
-                            <ul className="list-disc pl-5 space-y-2 mt-2 text-gray-700">
-                              <li>Take notes on key concepts as you watch</li>
-                              <li>Try to implement what you learn right away</li>
-                              <li>Revisit challenging sections multiple times</li>
-                              <li>Continue to the next video once you understand the material</li>
-                            </ul>
-                          </div>
-                        ) : (
                           <div className="mt-4">
                             <h4 className="font-medium mb-2">What you'll learn:</h4>
                             <ul className="list-disc pl-5 space-y-2 text-gray-700">
@@ -1052,7 +1111,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                               <li>Key takeaways for your learning journey</li>
                             </ul>
                           </div>
-                        )}
                       </div>                    ) : (                      // Simple message when no content is provided
                       <div>
                         <h3 className="text-lg font-semibold mb-4">About This Lesson</h3>
@@ -1117,35 +1175,20 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
   // In the return statement, remove the footer and adjust the layout:
   return (
-    <div className="min-h-screen flex">
-      {/* Main Content Area - Adjust width to fill available space */}
+    <div className="min-h-screen flex bg-white">
+      {/* Main Content Area - Professional Layout */}
       <div className="flex-1 flex flex-col">
-        {/* Content Container - Fixed right margin to match sidebar exactly */}
+        {/* Content Container - Clean spacing */}
         <div className={`transition-all duration-300 ${sidebarVisible ? 'mr-[400px]' : ''}`}>
-          <div className="p-5 w-full">
+          <div className="p-6 w-full">
             {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-              </div>
+              <CourseLoadingSkeleton />
             ) : error ? (
               <div className="text-center p-6 bg-red-50 rounded-lg border border-red-200">
                 <p className="text-red-600">{error}</p>
               </div>
             ) : course ? (
               <>
-                {/* Video content navigation */}
-                {contentType === 'video' && course.chapters && course.chapters[activeChapter] && (
-                  <div className="mb-6">
-                    <nav className="flex items-center text-sm text-gray-600">
-                      <span>Course</span>
-                      <span className="mx-2">•</span>
-                      <span>{course.chapters[activeChapter].title}</span>
-                      <span className="mx-2">•</span>
-                      <span>{currentLesson?.title || 'Loading...'}</span>
-                    </nav>
-                  </div>
-                )}
-
                 {/* Dynamic Content */}
                 {renderContent()}
               </>
@@ -1158,23 +1201,23 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         </div>
       </div>
 
-      {/* Always visible sidebar toggle button positioned at the top of sidebar */}
+      {/* Sidebar toggle button - positioned correctly */}
       <button
         onClick={() => setSidebarVisible(!sidebarVisible)}
-        className={`fixed top-17 transition-all duration-300 ${
+        className={`fixed transition-all duration-300 ${
           sidebarVisible ? 'right-[400px]' : 'right-0'
-        } transform bg-white p-3 shadow-md rounded-l-lg z-40 hover:bg-gray-50`}
+        } top-32 bg-white p-3 shadow-lg rounded-l-lg z-40 hover:bg-gray-50 border border-r-0 border-gray-200`}
         aria-label={sidebarVisible ? "Close sidebar" : "Open sidebar"}
       >
         {sidebarVisible ? 
-          <FaChevronRight className="w-5 h-5 text-gray-600" /> : 
-          <FaChevronLeft className="w-5 h-5 text-gray-600" />
+          <FaChevronRight className="w-4 h-4 text-gray-600" /> : 
+          <FaChevronLeft className="w-4 h-4 text-gray-600" />
         }
       </button>
 
-      {/* Sidebar - Keep fixed width */}
+      {/* Sidebar - Professional design */}
       <div 
-        className={`fixed top-0 right-0 h-screen w-[400px] bg-white shadow-lg border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 ${
+        className={`fixed top-14 right-0 h-[calc(100vh-3.5rem)] w-[400px] bg-white shadow-xl border-l border-gray-200 transform transition-transform duration-300 ease-in-out z-30 ${
           sidebarVisible ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -1187,14 +1230,17 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           activeChapter={activeChapter}
           activeLesson={activeLesson}
           handleLessonClick={handleLessonClick}
-          completedLessons={completedLessons}
-          totalLessons={totalLessons}
+          completedLessons={displayCompleted}
+          totalLessons={displayTotal}
           toggleChapter={toggleChapter}
           toggleSidebar={() => setSidebarVisible(!sidebarVisible)}
           toggleLessonCompletion={toggleLessonCompletion}
-          learningPlans={learningPlans}
-          isAIGeneratedPlan={isAIGeneratedPlan}
           navigate={navigate}
+          isLoggedIn={isLoggedIn}
+          progressPercent={displayPercent}
+          certificate={certificate}
+          issuingCert={issuingCert}
+          onIssueCertificate={handleIssueCertificate}
         />
       </div>
     </div>

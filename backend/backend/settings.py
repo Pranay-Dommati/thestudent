@@ -11,23 +11,165 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 import os
+import socket
 from datetime import timedelta
+try:
+    # Ensure we can extend allowed CORS headers with Authorization cleanly
+    from corsheaders.defaults import default_headers as CORS_DEFAULT_HEADERS
+except Exception:
+    CORS_DEFAULT_HEADERS = tuple()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env files
+# Priority: backend/.env takes precedence over root .env for local development.
+# Additionally load root .env.development if present to support local workflows
+# without requiring a manual copy to .env.
+try:
+    from dotenv import load_dotenv
+    root_env = BASE_DIR.parent / '.env'
+    root_env_development = BASE_DIR.parent / '.env.development'
+    backend_env = BASE_DIR / '.env'
+    backend_env_local = BASE_DIR / '.env.local'
+    
+    # Load root .env first without override (docker-compose compatibility)
+    if root_env.exists():
+        load_dotenv(dotenv_path=root_env, override=False)
+    # Load root .env.development (if present) without override to provide sane dev defaults
+    if root_env_development.exists():
+        load_dotenv(dotenv_path=root_env_development, override=False)
+    
+    # Load backend/.env with override=True so it takes precedence for local dev
+    if backend_env.exists():
+        load_dotenv(dotenv_path=backend_env, override=True)
+    
+    # Load backend/.env.local last to override everything (local dev only, not in prod)
+    if backend_env_local.exists():
+        load_dotenv(dotenv_path=backend_env_local, override=True)
+except ImportError:
+    # python-dotenv not installed, environment variables should be set manually
+    pass
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-8#ohv607$047eflb!2%1f%)zlh!swx$02=la-1*amg(z&uw-ex'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-8#ohv607$047eflb!2%1f%)zlh!swx$02=la-1*amg(z&uw-ex')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = []
+# Security Settings - Auto-configured based on DEBUG mode
+if DEBUG:
+    # Development settings - Allow HTTP connections and less strict security
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_HTTPONLY = False
+    CSRF_COOKIE_HTTPONLY = False
+    # Allow overriding via environment if needed for testing
+    if os.environ.get('SESSION_COOKIE_SECURE'):
+        SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() in ('1', 'true', 'yes')
+    if os.environ.get('CSRF_COOKIE_SECURE'):
+        CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'false').lower() in ('1', 'true', 'yes')
+else:
+    # Production Security Settings - Enforce HTTPS and strict security
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'true').lower() in ('1', 'true', 'yes')
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() in ('1', 'true', 'yes')
+    CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'true').lower() in ('1', 'true', 'yes')
+    # The following headers are generally safe defaults for production
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))  # 1 year by default
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'true').lower() in ('1','true','yes')
+    SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'true').lower() in ('1','true','yes')
+    # Respect reverse proxy (e.g., Nginx) X-Forwarded-Proto header
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+    # Additional security headers
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Cookie SameSite settings - Auto-configured based on DEBUG mode
+if DEBUG:
+    # Development: Use 'Lax' for easier local testing
+    SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
+    CSRF_COOKIE_SAMESITE = os.environ.get('CSRF_COOKIE_SAMESITE', 'Lax')
+else:
+    # Production: Use 'None' when serving frontend from a different domain over HTTPS
+    SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'None')
+    CSRF_COOKIE_SAMESITE = os.environ.get('CSRF_COOKIE_SAMESITE', 'None')
+
+# Clickjacking and Referrer-Policy
+X_FRAME_OPTIONS = os.environ.get('X_FRAME_OPTIONS', 'SAMEORIGIN')
+SECURE_REFERRER_POLICY = os.environ.get('SECURE_REFERRER_POLICY', 'strict-origin-when-cross-origin')
+
+# Robust ALLOWED_HOSTS parsing from environment
+# - Set ALLOWED_HOSTS="*" to allow all (not recommended for production)
+# - Otherwise provide a comma-separated list, e.g. "localhost,127.0.0.1,easylearnova.com,www.easylearnova.com"
+_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
+if DEBUG:
+    print(f"[DEBUG] ALLOWED_HOSTS env value: {repr(_hosts_env)}")
+if _hosts_env.strip() == '*':
+    ALLOWED_HOSTS = ['*']
+else:
+    _hosts_list = [h.strip() for h in _hosts_env.split(',') if h.strip()]
+    # Sensible defaults for development when env not set
+    ALLOWED_HOSTS = _hosts_list or ['localhost', '127.0.0.1', '0.0.0.0']
+if DEBUG:
+    print(f"[DEBUG] Final ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+# Cross-Origin-Opener-Policy (COOP)
+# - In development, disabling COOP avoids blocking window.postMessage (used by OAuth/HMR, etc.).
+# - In production, use 'same-origin-allow-popups' to preserve popup/OAuth flows while keeping isolation for same-origin.
+# - Allow override via env: SECURE_CROSS_ORIGIN_OPENER_POLICY. Use value 'none' to disable (set to None).
+_COOP_ENV = os.environ.get('SECURE_CROSS_ORIGIN_OPENER_POLICY')
+if _COOP_ENV is not None:
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = (None if _COOP_ENV.strip().lower() == 'none' else _COOP_ENV)
+else:
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = (None if DEBUG else 'same-origin-allow-popups')
+
+# Cache Configuration - Required for Rate Limiting
+# Use database cache for persistent caching across server restarts
+# This is better than LocMemCache for development
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'django_cache_table',
+        'TIMEOUT': 2592000,  # 30 days (for monthly tracking)
+        'OPTIONS': {
+            'MAX_ENTRIES': 10000,
+        }
+    }
+}
+
+# OLD: LocMemCache (loses data on server restart/reload)
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+#         'LOCATION': 'unique-snowflake',
+#         'TIMEOUT': 86400,  # 24 hours
+#         'OPTIONS': {
+#             'MAX_ENTRIES': 10000,
+#             'CULL_FREQUENCY': 3,
+#         }
+#     }
+# }
+
+# For production, use Redis:
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django_redis.cache.RedisCache',
+#         'LOCATION': os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/1'),
+#         'OPTIONS': {
+#             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+#         },
+#         'TIMEOUT': 86400,  # 24 hours
+#     }
+# }
 
 
 # Application definition
@@ -43,18 +185,45 @@ INSTALLED_APPS = [
     'chatbotcourse',
     'corsheaders',  # Add this
     'courses',
+    'feedback',  # Add feedback app
+    'newsletter',  # Add newsletter app
     'rest_framework',
+    'social_django',  # Add social-auth-app-django
+    'tracking',  # Custom analytics/tracking app
 ]
+
+# Optional: Cloudinary for persistent media storage
+# Enabled automatically when CLOUDINARY_URL is provided, or USE_CLOUDINARY=true
+USE_CLOUDINARY = os.environ.get('USE_CLOUDINARY', '').lower() in ('1', 'true', 'yes') or bool(os.environ.get('CLOUDINARY_URL'))
+if USE_CLOUDINARY:
+    # Fail-safe: if credentials are missing, fall back to filesystem in dev to avoid runtime 400s
+    _has_url = bool(os.environ.get('CLOUDINARY_URL'))
+    _has_parts = all(os.environ.get(k) for k in ('CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'))
+    if not (_has_url or _has_parts):
+        if os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes'):
+            print("[WARN] USE_CLOUDINARY=true but no Cloudinary credentials found (.env or env vars). Falling back to FileSystemStorage.")
+        USE_CLOUDINARY = False
+if USE_CLOUDINARY:
+    # Only add when configured to avoid import errors in minimal local setups
+    INSTALLED_APPS += [
+        'cloudinary',
+        'cloudinary_storage',
+    ]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # Add this at the top
+    'backend.middleware.db_connection.DatabaseConnectionMiddleware',  # Handle MySQL reconnections
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Efficient static files in production/Hostinger
+    'backend.security_middleware.SecurityHeadersMiddleware',  # Custom security headers
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'social_django.middleware.SocialAuthExceptionMiddleware',  # Add social auth middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'backend.middleware.certificate_frame.CertificateFrameMiddleware',  # Custom middleware for certificate PDFs
 ]
 
 ROOT_URLCONF = 'backend.urls'
@@ -81,12 +250,64 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Environment-driven database configuration.
+# Use MySQL when DB_ENGINE=mysql (or DB_HOST is defined), otherwise fall back to SQLite.
+DB_ENGINE = os.getenv('DB_ENGINE', '').lower()
+DB_HOST = os.getenv('DB_HOST')
+DB_PORT = os.getenv('DB_PORT', '3306')
+DB_NAME = os.getenv('DB_NAME', 'studentshub_db')
+DB_USER = os.getenv('DB_USER', 'studentshub_user')
+DB_PASSWORD = os.getenv('DB_PASSWORD', '')
+DB_SSL_REQUIRE = os.getenv('DB_SSL_REQUIRE', 'false').lower() in ('1', 'true', 'yes')
+# CRITICAL: For remote MySQL (Hostinger) + Backend (Render) setup
+# Use shorter CONN_MAX_AGE (60s) to avoid stale connections in distributed environment
+# Hostinger MySQL may close idle connections, so we reconnect more frequently
+DB_CONN_MAX_AGE = int(os.getenv('DB_CONN_MAX_AGE', '60'))  # 60 seconds for remote DB (was 300)
+
+if DB_ENGINE in ('mysql', 'mariadb') or DB_HOST:
+    # Optionally force IPv4 for MySQL host to avoid IPv6 access denials on some providers
+    DB_FORCE_IPV4 = os.getenv('DB_FORCE_IPV4', 'false').lower() in ('1','true','yes')
+    _resolved_host = DB_HOST
+    if DB_HOST and DB_FORCE_IPV4:
+        try:
+            # getaddrinfo with AF_INET to pick IPv4 address
+            infos = socket.getaddrinfo(DB_HOST, int(DB_PORT), family=socket.AF_INET, type=socket.SOCK_STREAM)
+            if infos:
+                _resolved_host = infos[0][4][0]
+        except Exception:
+            # Fallback to original host if resolution fails
+            _resolved_host = DB_HOST
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': DB_NAME,
+            'USER': DB_USER,
+            'PASSWORD': DB_PASSWORD,
+            'HOST': _resolved_host or 'localhost',
+            'PORT': DB_PORT,
+            'CONN_MAX_AGE': DB_CONN_MAX_AGE,
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                # Critical timeouts for remote MySQL (Hostinger) to avoid "Server has gone away"
+                'connect_timeout': 28,   # Increased from 10 to handle network latency
+                'read_timeout': 60,      # Increased from 30 for long queries (AI generation)
+                'write_timeout': 60,     # Increased from 30 for large data writes
+                # Auto-reconnect on connection loss (MySQLdb specific)
+                'autocommit': True,      # Prevent hanging transactions
+                **({'ssl': {'ssl_mode': 'REQUIRED'}} if DB_SSL_REQUIRE else {}),
+            },
+            'CONN_HEALTH_CHECKS': True,  # Django 4.1+ - CRITICAL for remote DB
+            'AUTOCOMMIT': True,  # Prevent transaction deadlocks
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -123,50 +344,219 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]  # Where to look for static files
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')    # Where collectstatic will put files
 
-# Media files (uploads)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# Only include local static dir if it exists to avoid warnings in development
+STATICFILES_DIRS = []
+_backend_static = os.path.join(BASE_DIR, 'static')
+if os.path.isdir(_backend_static):
+    STATICFILES_DIRS.append(_backend_static)
 
-# For development only
+# Use WhiteNoise for static files in production (works well on Hostinger Passenger)
+if not DEBUG:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+    # Cache-busting and long max-age are handled by Manifest storage
+    WHITENOISE_MAX_AGE = int(os.environ.get('WHITENOISE_MAX_AGE', 60 * 60 * 24 * 365))
+
+# Media files (uploads) and persistent storage
+# Default to filesystem; switch to Cloudinary when configured
+MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
+MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, 'media'))
+
+if USE_CLOUDINARY:
+    # Use Cloudinary for media storage
+    # django-cloudinary-storage supports Django 4/5 via STORAGES
+    _existing_storages = globals().get('STORAGES')
+    _existing_static = None
+    if isinstance(_existing_storages, dict):
+        _existing_static = _existing_storages.get('staticfiles')
+
+    # Always set Cloudinary as the default storage
+    STORAGES = {
+        "default": {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"},
+        # Ensure 'staticfiles' storage is defined to satisfy Django system check
+        "staticfiles": _existing_static or {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+    # Optional prefixes to keep uploads organized
+    CLOUDINARY_STORAGE = {
+        'PREFIX': os.environ.get('CLOUDINARY_MEDIA_PREFIX', 'easylearnova'),
+        'RESOURCE_TYPE': 'image',
+    }
+    # Allow credentials via individual env vars if CLOUDINARY_URL is not set
+    try:
+        import cloudinary
+        if not os.environ.get('CLOUDINARY_URL'):
+            cloudinary.config(
+                cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME') or None,
+                api_key=os.environ.get('CLOUDINARY_API_KEY') or None,
+                api_secret=os.environ.get('CLOUDINARY_API_SECRET') or None,
+                secure=True,
+            )
+    except Exception:
+        # If cloudinary is not installed or config fails, rely on CLOUDINARY_URL env if provided
+        pass
+    # MEDIA_URL is not used by Cloudinary storage for URL generation;
+    # keeping it defined is harmless and preserves local dev behavior.
+
+# ProLearning topic rate limits (read by backend.ai.rate_limiter)
+# Daily limits are disabled by default (ENFORCE_DAILY_LIMIT=false).
+# Keep the daily setting for backwards compatibility but it's not enforced.
 if DEBUG:
-    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+    MAX_TOPICS_PER_DAY = int(os.environ.get('MAX_TOPICS_PER_DAY', '1000'))
+else:
+    MAX_TOPICS_PER_DAY = int(os.environ.get('MAX_TOPICS_PER_DAY', '16'))
+
+# Per-request limit: maximum topics per single request (default 4)
+MAX_TOPICS_PER_REQUEST = int(os.environ.get('MAX_TOPICS_PER_REQUEST', '4'))
+
+# Monthly cap: 15 topics per user per calendar month (resets on the 1st)
+# This is the PRIMARY limit enforced in production.
+# Override with MAX_TOPICS_PER_MONTH env var only for testing/dev if needed.
+MAX_TOPICS_PER_MONTH = int(os.environ.get('MAX_TOPICS_PER_MONTH', '15'))
+
+# Control whether to enforce daily limits at all. For production with monthly-only caps,
+# keep this disabled (default false).
+ENFORCE_DAILY_LIMIT = os.environ.get('ENFORCE_DAILY_LIMIT', 'false').lower() in ('1','true','yes')
+
+# Development bypass: Disable rate limiting entirely for faster iteration.
+# Set TOPIC_RATE_LIMIT_BYPASS_DEV=true in your .env ONLY when you need to bypass checks.
+# By default, rate limiting is ACTIVE even in DEBUG to test the 15/month cap properly.
+TOPIC_RATE_LIMIT_BYPASS_DEV = os.environ.get('TOPIC_RATE_LIMIT_BYPASS_DEV', 'false').lower() in ('1','true','yes')
 
 # Authentication settings
 AUTHENTICATION_BACKENDS = [
+    'social_core.backends.google.GoogleOAuth2',  # Add Google OAuth2 backend
     'django.contrib.auth.backends.ModelBackend',
     'authentication.backends.EmailBackend',
 ]
 
 # REST Framework settings
-REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
-    ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
-    ],
-}
+# DRF configuration
+if DEBUG:
+    REST_FRAMEWORK = {
+        'DEFAULT_PERMISSION_CLASSES': [
+            'rest_framework.permissions.AllowAny',
+        ],
+        'DEFAULT_AUTHENTICATION_CLASSES': [
+            'rest_framework_simplejwt.authentication.JWTAuthentication',
+            'rest_framework.authentication.SessionAuthentication',
+            'rest_framework.authentication.BasicAuthentication',
+        ],
+        # Enable throttling in development to exercise limits (can be tuned via env)
+        'DEFAULT_THROTTLE_CLASSES': [
+            'rest_framework.throttling.AnonRateThrottle',
+            'rest_framework.throttling.UserRateThrottle',
+        ],
+        'DEFAULT_THROTTLE_RATES': {
+            'anon': os.environ.get('DRF_THROTTLE_RATE_ANON', '120/min'),
+            'user': os.environ.get('DRF_THROTTLE_RATE_USER', '240/min'),
+        },
+    }
+else:
+    # In production, avoid BasicAuth and rely on JWT (and Session if explicitly needed)
+    REST_FRAMEWORK = {
+        'DEFAULT_PERMISSION_CLASSES': [
+            'rest_framework.permissions.AllowAny',  # Keep explicit per-view control; adjust if needed
+        ],
+        'DEFAULT_AUTHENTICATION_CLASSES': [
+            'rest_framework_simplejwt.authentication.JWTAuthentication',
+            # 'rest_framework.authentication.SessionAuthentication',  # enable only if CSRF is correctly handled
+        ],
+        'DEFAULT_RENDERER_CLASSES': [
+            'rest_framework.renderers.JSONRenderer',
+        ],
+        # Global throttling for abuse resistance; tune via env
+        'DEFAULT_THROTTLE_CLASSES': [
+            'rest_framework.throttling.AnonRateThrottle',
+            'rest_framework.throttling.UserRateThrottle',
+        ],
+        'DEFAULT_THROTTLE_RATES': {
+            'anon': os.environ.get('DRF_THROTTLE_RATE_ANON', '60/min'),
+            'user': os.environ.get('DRF_THROTTLE_RATE_USER', '120/min'),
+        },
+    }
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # For development only
-CORS_ALLOW_CREDENTIALS = True
+if DEBUG:
+    # Development mode - allow all origins for easy testing
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
+    # Explicitly allow Authorization header (wildcard can be unreliable in browsers for preflight)
+    CORS_ALLOW_HEADERS = list(CORS_DEFAULT_HEADERS) + [
+        'authorization',
+        'x-csrftoken',
+        'x-requested-with',
+    ]
+    CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+    # Explicitly list localhost origins as well
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+else:
+    # Production CORS settings - MUST be configured properly
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOW_HEADERS = ['content-type', 'authorization', 'x-csrftoken', 'x-requested-with']
+    CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+    # Read allowed origins from env and normalize variants (with/without www)
+    _raw_cors = os.environ.get('CORS_ALLOWED_ORIGINS', '')
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw_cors.split(',') if o.strip()]
+    def _expand_www_variants(origins):
+        expanded = set()
+        for origin in origins:
+            try:
+                parsed = urlparse(origin)
+                if not parsed.scheme or not parsed.netloc:
+                    continue
+                host = parsed.netloc
+                # Add original
+                expanded.add(origin)
+                # Add www variant
+                if host.startswith('www.'):
+                    no_www = host[4:]
+                    expanded.add(urlunparse((parsed.scheme, no_www, parsed.path or '', '', '', '')))
+                else:
+                    expanded.add(urlunparse((parsed.scheme, f"www.{host}", parsed.path or '', '', '', '')))
+            except Exception:
+                # If parsing fails, keep the raw string
+                expanded.add(origin)
+        return list(expanded)
+    if CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS = _expand_www_variants(CORS_ALLOWED_ORIGINS)
+    
+    # Ensure we have proper origins in production
+    if not CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGINS == ['']:
+        raise ValueError("CORS_ALLOWED_ORIGINS environment variable must be set in production")
 
-# For production, specify allowed origins:
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:5173",
-# ]
-
-# Add this setting if you're using CSRF protection
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-]
+# CSRF trusted origins
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+else:
+    _csrf_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_env.split(',') if o.strip()]
+    # Expand CSRF trusted origins with/without www variants to avoid subtle mismatches
+    if CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS = _expand_www_variants(CSRF_TRUSTED_ORIGINS)
+    if not CSRF_TRUSTED_ORIGINS:
+        raise ValueError("CSRF_TRUSTED_ORIGINS environment variable must be set in production")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -178,11 +568,179 @@ AUTH_USER_MODEL = 'authentication.User'
 
 # Configure Simple JWT
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.environ.get('JWT_ACCESS_MINUTES', '60'))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.environ.get('JWT_REFRESH_DAYS', '7'))),
 }
 
-# API Keys for third-party services
-# In production, these should be set as environment variables
-HUGGINGFACE_API_TOKEN = os.environ.get('HUGGINGFACE_API_TOKEN', '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')
-YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', 'AIzaSyBK8JXhEc4HLz5_Mbv0ta0JnriW1YSSqNY')
+# API Keys for third-party services (MUST come from env; no hardcoded fallbacks)
+YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', '')
+
+# Gemini API key for AI services (from env only)
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+
+# Google Programmable Search API for Resources
+GOOGLE_SEARCH_API_KEY = os.environ.get('GOOGLE_SEARCH_API_KEY', '')
+GOOGLE_SEARCH_ENGINE_ID = os.environ.get('GOOGLE_SEARCH_ENGINE_ID', 'b5d49b623e0054ad9')
+
+# Google OAuth2 Settings
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.environ.get('GOOGLE_OAUTH2_CLIENT_ID', '')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.environ.get('GOOGLE_OAUTH2_CLIENT_SECRET', '')
+
+# Upload limits (prevent very large uploads)
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('DATA_UPLOAD_MAX_MEMORY_SIZE', 10 * 1024 * 1024))  # 10MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('FILE_UPLOAD_MAX_MEMORY_SIZE', 10 * 1024 * 1024))  # 10MB
+
+# Basic logging (upgrade as needed for production)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': os.environ.get('DJANGO_LOG_LEVEL', 'INFO'),
+    },
+    'loggers': {
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'WARNING',  # Set to DEBUG to see all SQL queries
+            'propagate': False,
+        },
+        'backend.middleware.db_connection': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+# Social Auth Configuration
+SOCIAL_AUTH_URL_NAMESPACE = 'social'
+_FRONTEND_DOMAIN = os.environ.get('FRONTEND_DOMAIN', '')
+# Default OAuth redirect:
+# - In dev: http://localhost:5173/
+# - In prod: FRONTEND_DOMAIN if set, else localhost fallback
+SOCIAL_AUTH_LOGIN_REDIRECT_URL = os.environ.get(
+    'SOCIAL_AUTH_LOGIN_REDIRECT_URL',
+    (_FRONTEND_DOMAIN.rstrip('/') + '/') if (not DEBUG and _FRONTEND_DOMAIN) else 'http://localhost:5173/'
+)
+SOCIAL_AUTH_REDIRECT_IS_HTTPS = os.environ.get('SOCIAL_AUTH_REDIRECT_IS_HTTPS', 'true' if not DEBUG else 'false').lower() in ('1','true','yes')
+SOCIAL_AUTH_LOGIN_URL = os.environ.get('SOCIAL_AUTH_LOGIN_URL', '/auth/login/')
+
+# Google OAuth2 specific settings
+SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = [
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+]
+SOCIAL_AUTH_GOOGLE_OAUTH2_USE_DEPRECATED_API = False
+
+# Social Auth Pipeline - customize to work with our User model
+SOCIAL_AUTH_PIPELINE = (
+    'social_core.pipeline.social_auth.social_details',
+    'social_core.pipeline.social_auth.social_uid',
+    'social_core.pipeline.social_auth.auth_allowed',
+    'social_core.pipeline.social_auth.social_user',
+    'authentication.pipeline.associate_by_email',  # Associate with existing users by email
+    'authentication.pipeline.create_user',  # Custom pipeline function
+    'social_core.pipeline.social_auth.associate_user',
+    'social_core.pipeline.social_auth.load_extra_data',
+    'social_core.pipeline.user.user_details',
+)
+
+# Social Auth User Fields
+SOCIAL_AUTH_USER_FIELDS = ['email', 'full_name']
+
+# Social Auth Admin
+SOCIAL_AUTH_ADMIN_USER_SEARCH_FIELDS = ['email', 'full_name']
+
+# Disconnect redirect URL
+SOCIAL_AUTH_DISCONNECT_REDIRECT_URL = '/auth/login/'
+
+# Social Auth Protected User Fields
+SOCIAL_AUTH_PROTECTED_USER_FIELDS = ['email']
+
+# Social Auth User Model
+SOCIAL_AUTH_USER_MODEL = 'authentication.User'
+
+# Social Auth UID Length (for compatibility with your User model)
+SOCIAL_AUTH_UID_LENGTH = 255
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'django.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': os.environ.get('LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+        'ai': {  # Rate limiting logs
+            'handlers': ['console', 'file'],
+            'level': os.environ.get('LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+    },
+}
+
+# Rate Limiting Configuration is already set above in dev/prod conditional
+# (removed duplicate definition that was overriding the dev-friendly limits)
+
+# X-Frame-Options Configuration
+# Allow iframe embedding for certificate PDFs while maintaining security
+X_FRAME_OPTIONS = 'SAMEORIGIN'  # Allow framing from same origin (localhost:8000)
+
+# AWS SES Configuration (API-based, not SMTP - works on Render free tier)
+# Configure via environment variables
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
+AWS_REGION = os.environ.get('AWS_REGION', 'ap-south-1')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'info@easylearnova.com')
+
+# Legacy SMTP settings (kept for backward compatibility, but AWS SES API is preferred)
+SMTP_HOST = os.environ.get('SMTP_HOST', '')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SMTP_USE_SSL = os.environ.get('SMTP_USE_SSL', 'false').lower() in ('1', 'true', 'yes')
+SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() in ('1', 'true', 'yes')
+
+# Optional: Frontend domain for building links in emails
+FRONTEND_DOMAIN = os.environ.get('FRONTEND_DOMAIN', 'http://localhost:5173')

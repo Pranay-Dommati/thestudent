@@ -1,6 +1,40 @@
-@import "tailwindcss";
+/* App-specific styles (Tailwind is imported in src/index.css) */
 
-/* ...existing code... */
+/* Custom spinner animations for auth modal */
+@keyframes auth-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Ensure smooth rotation with hardware acceleration */
+.auth-spinner {
+  animation: auth-spin 1.5s linear infinite;
+  transform-origin: center center;
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.auth-button-spinner {
+  animation: auth-spin 1s linear infinite;
+  transform-origin: center center;
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Fallback for browsers that don't support custom animations */
+.auth-spinner-fallback {
+  animation: spin 1.5s linear infinite;
+}
+
+.auth-button-spinner-fallback {
+  animation: spin 1s linear infinite;
+}
 
 /* Custom Scrollbar Styles */
 .custom-scrollbar {

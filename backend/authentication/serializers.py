@@ -3,11 +3,14 @@ from django.contrib.auth.password_validation import validate_password
 from .models import User
 from django.contrib.auth import authenticate
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
+from .models import EmailOTP
+import re
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'full_name', 'agreed_to_terms')
+        fields = ('id', 'email', 'full_name', 'auth_method', 'agreed_to_terms', 'has_seen_onboarding')
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
@@ -62,3 +65,58 @@ class LoginSerializer(serializers.Serializer):
 
         attrs['user'] = user
         return attrs
+
+
+class OTPSignupSerializer(serializers.Serializer):
+    full_name = serializers.CharField(max_length=255)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    agreed_to_terms = serializers.BooleanField()
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        if User.objects.filter(email__iexact=value, is_active=True).exists():
+            raise serializers.ValidationError("An account with this email already exists.")
+        return value
+
+    def validate_full_name(self, value):
+        if len(value.strip()) < 2:
+            raise serializers.ValidationError("Please provide your full name.")
+        return value.strip()
+
+    def validate(self, attrs):
+        if not attrs.get('agreed_to_terms'):
+            raise serializers.ValidationError("You must agree to the Terms and Conditions.")
+        return attrs
+
+
+class OTPVerifySerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6)
+
+    def validate(self, attrs):
+        email = attrs['email'].strip().lower()
+        code = attrs['code'].strip()
+        if not re.fullmatch(r"\d{6}", code):
+            raise serializers.ValidationError("Invalid OTP code format.")
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found for this email.")
+        attrs['user'] = user
+        return attrs
+
+
+class OTPResendSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        try:
+            user = User.objects.get(email__iexact=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("No pending signup for this email.")
+        if user.is_active:
+            raise serializers.ValidationError("User is already verified.")
+        self.context['user'] = user
+        return value

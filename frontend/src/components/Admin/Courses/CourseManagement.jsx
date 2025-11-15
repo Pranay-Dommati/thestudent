@@ -1,37 +1,59 @@
 import React, { useState } from 'react';
 import CourseForm from './CourseForm';
 import CourseList from './CourseList';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import universalToast from '../../../utils/universalToast';
+import { deleteCourse } from '../../../services/courseApi';
 
 const CourseManagement = ({ isDarkMode }) => {
   const [view, setView] = useState('list'); // 'list' or 'add'
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, course: null });
   const navigate = useNavigate();
   
   const handleAddNew = () => {
-    navigate('/admin-p/add-course');
+    navigate('/admin-p/add-course?new=true');
   };
   
   const handleEditCourse = (courseId, courseType) => {
-    // For future implementation
-    toast(`Edit ${courseType} course with ID: ${courseId}`, {
-      icon: '📝',
-      style: {
-        backgroundColor: isDarkMode ? '#1e40af' : '#3b82f6',
-        color: 'white',
+    console.log(`Editing ${courseType} course with ID: ${courseId}`);
+    navigate(`/admin-p/edit-course/${courseId}`);
+  };
+  
+  const handleDeleteCourse = (courseId, courseType, courseName) => {
+    setDeleteModal({
+      isOpen: true,
+      course: {
+        id: courseId,
+        type: courseType,
+        name: courseName
       }
     });
   };
-  
-  const handleDeleteCourse = (courseId, courseType) => {
-    // For future implementation
-    toast(`Delete ${courseType} course with ID: ${courseId}`, {
-      icon: '🗑️',
-      style: {
-        backgroundColor: isDarkMode ? '#991b1b' : '#ef4444',
-        color: 'white',
+
+  const confirmDelete = async () => {
+    const { course } = deleteModal;
+    
+    try {
+      const response = await deleteCourse(course.id);
+      
+      if (response.success) {
+        toast.success(response.message || 'Course deleted successfully!');
+        // Refresh the course list
+        setRefreshTrigger(prev => prev + 1);
+        setDeleteModal({ isOpen: false, course: null });
+      } else {
+        throw new Error(response.error || 'Failed to delete course');
       }
-    });
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      toast.error(error.message || 'Failed to delete course');
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteModal({ isOpen: false, course: null });
   };
     return (
     <div className={`p-0 ${isDarkMode ? 'text-white' : ''}`}>
@@ -41,8 +63,19 @@ const CourseManagement = ({ isDarkMode }) => {
           onEdit={handleEditCourse}
           onDelete={handleDeleteCourse}
           isDarkMode={isDarkMode}
+          refreshTrigger={refreshTrigger}
         />
       </div>
+      
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={cancelDelete}
+        onConfirm={confirmDelete}
+        courseName={deleteModal.course?.name}
+        courseType={deleteModal.course?.type}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 };

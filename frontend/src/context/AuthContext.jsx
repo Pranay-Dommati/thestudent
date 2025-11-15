@@ -1,8 +1,12 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
+ import { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
+import customToast from '../utils/customToast';
 import axiosInstance from '../utils/axios';
+import storage from '../utils/storage';
+import { courseCache } from '../utils/courseCache';
 
 const AuthContext = createContext(null);
+const IS_DEV = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV;
 
 const TOKEN_REFRESH_INTERVAL = 1000 * 60 * 4; // 4 minutes
 
@@ -15,73 +19,102 @@ export const AuthProvider = ({ children }) => {
   // Function to refresh the access token
   const refreshAccessToken = async () => {
     try {
-      const refreshToken = localStorage.getItem('refreshToken');
+  const refreshToken = storage.getItem('refreshToken');
       if (!refreshToken) {
+        if (IS_DEV) console.error('No refresh token found');
+        handleAuthFailure();
         throw new Error('No refresh token');
       }
 
-      const response = await axiosInstance.post('/auth/token/refresh/', {
-        refresh: refreshToken
-      });
+      // Use bare axios (no interceptors) and avoid Authorization header on refresh
+      const refreshUrl = `${axiosInstance.defaults.baseURL}/auth/token/refresh/`;
+      const response = await axios.post(
+        refreshUrl,
+        { refresh: refreshToken },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
 
       if (response.data.access) {
-        localStorage.setItem('accessToken', response.data.access);
+        storage.setItem('accessToken', response.data.access);
+        if (response.data.refresh) {
+          storage.setItem('refreshToken', response.data.refresh);
+        }
         return true;
       }
       return false;
     } catch (error) {
-      console.error('Token refresh failed:', error);
-      return false;
+      if (IS_DEV) console.error('Token refresh failed:', error);
+      // Clear auth on explicit invalid refresh (400/401) and also 5xx to prevent loops
+      const status = error.response?.status;
+      if (status === 400 || status === 401 || (typeof status === 'number' && status >= 500)) {
+        handleAuthFailure();
+      }
+      throw error;
     }
   };
 
   // Function to validate current auth state
   const validateAuth = async () => {
-    const token = localStorage.getItem('accessToken');
+  const token = storage.getItem('accessToken');
+  const refreshToken = storage.getItem('refreshToken');
     const now = Date.now();
     
-    // Only check if we haven't checked in the last minute
-    if (now - lastChecked < 60000) {
-      return isLoggedIn;
+    // Only check if we haven't checked in the last minute and we're already logged in
+    if (now - lastChecked < 60000 && isLoggedIn) {
+      return true;
     }
 
-    if (!token) {
-      setIsLoggedIn(false);
-      setUser(null);
+    if (!token || !refreshToken) {
+      handleAuthFailure();
       return false;
     }
 
     try {
-      const response = await axiosInstance.get('/auth/profile/');
-      setUser(response.data);
-      setIsLoggedIn(true);
-      setLastChecked(now);
-      return true;
-    } catch (error) {
-      // If token is invalid, try to refresh it
-      const refreshed = await refreshAccessToken();
-      if (refreshed) {
-        // Retry the profile fetch with new token
-        try {
-          const retryResponse = await axiosInstance.get('/auth/profile/');
+      // First try with current access token using bare axios (avoid interceptor auto-refresh)
+      try {
+        const profileUrl = `${axiosInstance.defaults.baseURL}/auth/profile/`;
+        const response = await axios.get(profileUrl, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setUser(response.data);
+        setIsLoggedIn(true);
+        setLastChecked(now);
+        return true;
+      } catch (error) {
+        if (error.response?.status === 401) {
+          // Token expired, try to refresh explicitly
+          await refreshAccessToken();
+          // Retry with new token (again with bare axios to keep control)
+          const newToken = storage.getItem('accessToken');
+          const profileUrl = `${axiosInstance.defaults.baseURL}/auth/profile/`;
+          const retryResponse = await axios.get(profileUrl, {
+            headers: { 'Authorization': `Bearer ${newToken}` }
+          });
           setUser(retryResponse.data);
           setIsLoggedIn(true);
           setLastChecked(now);
           return true;
-        } catch (retryError) {
-          handleAuthFailure();
-          return false;
         }
-      } else {
+        throw error;
+      }
+    } catch (error) {
+      if (IS_DEV) console.error('Auth validation failed:', error);
+      const status = error.response?.status;
+      // Only log out on explicit auth failure. If network/timeout, keep tokens and try again later.
+      if (status === 401) {
         handleAuthFailure();
         return false;
       }
+      // Network or server error: don't clear tokens. Consider user still logged in if tokens exist.
+      setIsLoggedIn(true);
+      setLastChecked(now);
+      return true;
     }
   };
 
   const handleAuthFailure = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+  storage.clearAuthTokens();
+  // IndexedDB no longer used
     setUser(null);
     setIsLoggedIn(false);
     setLastChecked(0);
@@ -122,30 +155,30 @@ export const AuthProvider = ({ children }) => {
       const response = await axiosInstance.post('/auth/register/', registrationData);
       const { user, tokens } = response.data;
 
-      localStorage.setItem('accessToken', tokens.access);
-      localStorage.setItem('refreshToken', tokens.refresh);
+  storage.setItem('accessToken', tokens.access);
+  storage.setItem('refreshToken', tokens.refresh);
 
       setUser(user);
       setIsLoggedIn(true);
       setLastChecked(Date.now());
 
-      toast.success('Account created successfully!');
+      customToast.success('Account created successfully!');
       return true;
     } catch (error) {
-      console.error('Registration error:', error.response?.data);
+      if (IS_DEV) console.error('Registration error:', error.response?.data);
       
       const errorData = error.response?.data;
       if (errorData) {
         if (errorData.password) {
-          toast.error(errorData.password[0]);
+          customToast.error(errorData.password[0]);
         } else if (errorData.email) {
-          toast.error(errorData.email[0]);
+          customToast.error(errorData.email[0]);
         } else if (errorData.full_name) {
-          toast.error(errorData.full_name[0]);
+          customToast.error(errorData.full_name[0]);
         } else if (errorData.non_field_errors) {
-          toast.error(errorData.non_field_errors[0]);
+          customToast.error(errorData.non_field_errors[0]);
         } else {
-          toast.error('Registration failed. Please check your input.');
+          customToast.error('Registration failed. Please check your input.');
         }
       }
       return false;
@@ -161,48 +194,97 @@ export const AuthProvider = ({ children }) => {
       
       const { user, access, refresh } = response.data;
       
-      localStorage.setItem('accessToken', access);
-      localStorage.setItem('refreshToken', refresh);
+      if (!access || !refresh) {
+        throw new Error('Invalid response: missing tokens');
+      }
+      
+  storage.setItem('accessToken', access);
+  storage.setItem('refreshToken', refresh);
       
       setUser(user);
       setIsLoggedIn(true);
       setLastChecked(Date.now());
       
-      toast.success('Login successful!');
-      return true;
+      customToast.success('Login successful!', { id: 'auth-login' });
+      return { success: true };
     } catch (error) {
-      console.error('Login error:', error.response?.data);
+      if (IS_DEV) console.error('Login error:', error.response?.data);
       
-      if (error.response?.status === 400) {
+      if (error.response?.status === 404) {
+        // Email doesn't exist - suggest signup
+        const errorData = error.response.data;
+        if (errorData.suggest_signup) {
+          // Don't show toast here - let AuthForm handle it after navigation
+          return { success: false, suggestSignup: true };
+        }
+      } else if (error.response?.status === 400) {
         const errorData = error.response.data;
         if (errorData.email) {
-          toast.error(errorData.email[0]);
+          customToast.error(errorData.email[0], { id: 'auth-login' });
         } else if (errorData.password) {
-          toast.error(errorData.password[0]);
+          customToast.error(errorData.password[0], { id: 'auth-login' });
         } else if (errorData.non_field_errors) {
-          toast.error(errorData.non_field_errors[0]);
+          customToast.error(errorData.non_field_errors[0], { id: 'auth-login' });
         } else {
-          toast.error('Invalid email or password');
+          customToast.error('Invalid email or password', { id: 'auth-login' });
         }
       } else if (error.response?.status === 401) {
-        toast.error('Invalid email or password');
+        customToast.error('Invalid email or password', { id: 'auth-login' });
       } else if (error.response?.status === 500) {
-        toast.error('Server error. Please try again later.');
+        customToast.error('Server error. Please try again later.', { id: 'auth-login' });
       } else {
-        toast.error('Login failed. Please try again.');
+        customToast.error('Login failed. Please try again.', { id: 'auth-login' });
       }
-      return false;
+      return { success: false };
     }
   };
 
   const logout = () => {
     handleAuthFailure();
-    toast.success('Logged out successfully');
+    // Clear course cache when user logs out
+    courseCache.clearAll();
+    customToast.success('Logged out successfully', { id: 'auth-logout' });
+  };
+
+  // Google Sign-In function
+  const googleLogin = async (googleToken) => {
+    try {
+      const response = await axiosInstance.post('/auth/google/token/', {
+        id_token: googleToken
+      });
+      
+      const { user, access, refresh } = response.data;
+      
+  storage.setItem('accessToken', access);
+  storage.setItem('refreshToken', refresh);
+      
+      setUser(user);
+      setIsLoggedIn(true);
+      setLastChecked(Date.now());
+      
+      customToast.success('Login successful!', { id: 'auth-login' });
+      return true;
+    } catch (error) {
+      // Log richer details to help diagnose undefined cases (e.g., network/CORS)
+      const status = error.response?.status;
+      const data = error.response?.data;
+      const detail = data || error.message || 'Unknown error';
+      if (IS_DEV) console.error('Google login error:', { status, detail });
+      
+      if (error.response?.status === 400) {
+        customToast.error('Google authentication failed. Please try again.', { id: 'auth-login' });
+      } else if (error.response?.status === 500) {
+        customToast.error('Server error. Please try again later.', { id: 'auth-login' });
+      } else {
+        customToast.error('Google login failed. Please try again.', { id: 'auth-login' });
+      }
+      return false;
+    }
   };
 
   // Export isAuthenticated as a function to always check current state
   const isAuthenticated = () => {
-    return isLoggedIn && !!localStorage.getItem('accessToken');
+  return isLoggedIn && !!storage.getItem('accessToken');
   };
   return (
     <AuthContext.Provider value={{ 
@@ -212,6 +294,7 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated, // Export the function as well
       register,
       login,
+      googleLogin,
       logout,
       validateAuth // Export the validate function
     }}>

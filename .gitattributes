@@ -1,0 +1,23 @@
+# Default to auto text handling
+* text=auto
+
+# Do not normalize line endings inside virtual environments
+.venv/** -text
+**/.venv/** -text
+venv/** -text
+**/venv/** -text
+
+# Treat dumps and binaries as binary
+*.dump binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.7z binary
+
+# SQL files should use LF line endings (MySQL requires this)
+*.sql text eol=lf

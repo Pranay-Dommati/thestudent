@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { FaEnvelope, FaArrowLeft, FaCheck } from 'react-icons/fa';
 import { motion } from 'framer-motion';
-import { toast } from 'react-hot-toast';
+import universalToast from "../../utils/universalToast";
 import { Link, useNavigate } from 'react-router-dom';
 import AdminNav from './layout/AdminNav';
+import api from '../../utils/axios';
 
 const AdminForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -15,22 +16,20 @@ const AdminForgotPassword = () => {
     e.preventDefault();
     
     if (!email || !email.includes('@')) {
-      toast.error('Please enter a valid email address');
+  universalToast.error('Please enter a valid email address');
       return;
     }
     
     setIsLoading(true);
     
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      
-      // In a real application, this would call an API endpoint
-      // For now, we just show a success message
+      await api.post('/auth/admin-forgot-password/', { email });
       setEmailSent(true);
-      toast.success('Password reset link sent to your email');
+  universalToast.success('Password reset link sent to your email');
     } catch (error) {
-      toast.error('Something went wrong. Please try again later.');
+      console.error('Admin forgot password error:', error);
+      const msg = error?.response?.data?.error || 'Something went wrong. Please try again later.';
+  universalToast.error(msg);
     } finally {
       setIsLoading(false);
     }

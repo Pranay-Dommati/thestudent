@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCheck, FaSync } from 'react-icons/fa';
-import axiosInstance from '../../../utils/axios';
-
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000; // 2 seconds
+import proContentManager from '../../../services/ProContentManager.js';
+import api from '../../../utils/axios';
+// logger removed for production cleanliness
 
 const SavedPlaylists = () => {
   const [activeTab, setActiveTab] = useState('courses');
@@ -12,106 +11,95 @@ const SavedPlaylists = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  
+  const MAX_RETRIES = 3;
 
-  // Fetch user's learning plans with retry mechanism
-  const fetchUserLearningPlans = useCallback(async (retryAttempt = 0) => {
+  // Fetch Pro Learning courses from database for current user
+  const fetchStoredCourses = useCallback(async (currentRetry = 0) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axiosInstance.get('/learning/user-plans/');
+      setRetryCount(currentRetry);
       
-      // Handle the response format from backend API
-      if (response.data && Array.isArray(response.data.plans)) {
-        setLearningPlans(response.data.plans);
-      } else if (Array.isArray(response.data)) {
-        setLearningPlans(response.data);
-      } else {
-        throw new Error('Invalid data format received from server');
+      // Ensure user is logged in (axios will attach token if present)
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        setError('Please log in to view your courses');
+        setLearningPlans([]);
+        return;
       }
+
+      // Fetch courses from database API via axios client
+      const { data } = await api.get('/courses/pro-learning/');
+      setLearningPlans(Array.isArray(data) ? data : []);
+      setRetryCount(0); // Reset retry count on success
       
-      // Reset retry count on successful fetch
-      setRetryCount(0);
-    } catch (err) {
-      console.error('Error fetching learning plans:', err);
+  } catch (err) {
       
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to load learning plans';
       
-      if (retryAttempt < MAX_RETRIES) {
-        setError(`${errorMessage} - Retrying... (Attempt ${retryAttempt + 1}/${MAX_RETRIES})`);
+      // Retry logic
+      if (currentRetry < MAX_RETRIES) {
+        
         setTimeout(() => {
-          fetchUserLearningPlans(retryAttempt + 1);
-        }, RETRY_DELAY);
-        setRetryCount(retryAttempt + 1);
+          fetchStoredCourses(currentRetry + 1);
+        }, 1000 * (currentRetry + 1)); // Exponential backoff
       } else {
-        setError(`${errorMessage} - Please try again later.`);
+        const msg = err?.response?.data?.detail || err?.response?.data?.error || 'Failed to load courses. Please check your connection.';
+        setError(msg);
         setLearningPlans([]);
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [MAX_RETRIES]);
 
   // Initial fetch on component mount
   useEffect(() => {
-    let mounted = true;
-    
-    if (mounted) {
-      fetchUserLearningPlans();
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, [fetchUserLearningPlans]);
+    fetchStoredCourses();
+  }, [fetchStoredCourses]);
 
   // Manual retry handler
   const handleRetry = () => {
     setRetryCount(0);
-    fetchUserLearningPlans();
+    fetchStoredCourses(0);
   };
 
-  // Transform learning plans to course format for display
-  const courses = Array.isArray(learningPlans) ? learningPlans.map(plan => {
-    // Calculate actual progress based on completed lessons
-    let progressPercentage = 0;
+  // Helper function to generate course URL with first topic
+  const generateCourseUrl = (course) => {
+    const rawCourse = course.rawCourse;
     
-    if (plan.plan_data && plan.plan_data.days && plan.plan_data.progress) {
-      const progress = plan.plan_data.progress;
-      let totalLessons = 0;
-      let completedLessons = 0;
+    // Check if course has topics and get the first one
+    if (rawCourse && rawCourse.topics && rawCourse.topics.length > 0) {
+      // Sort topics by order and get the first one
+      const sortedTopics = rawCourse.topics.sort((a, b) => (a.order || 0) - (b.order || 0));
+      const firstTopic = sortedTopics[0];
+      const topicName = encodeURIComponent(firstTopic.topic_name);
       
-      // Count total lessons and completed lessons
-      plan.plan_data.days.forEach((day, dayIndex) => {
-        if (day.videos) {
-          day.videos.forEach((video, videoIndex) => {
-            totalLessons++;
-            const lessonKey = `day_${day.day}_video_${videoIndex}`;
-            if (progress[lessonKey]) {
-              completedLessons++;
-            }
-          });
-        }
-      });
-      
-      if (totalLessons > 0) {
-        progressPercentage = Math.round((completedLessons / totalLessons) * 100);
-      }
-    } else if (plan.is_completed) {
-      // Fallback to simple binary progress if no detailed progress data
-      progressPercentage = 100;
+      return `/pro-learning/${course.id}?topic=${topicName}&tab=reading`;
     }
     
+    // Fallback if no topics found
+    return `/pro-learning/${course.id}`;
+  };
+
+  // Transform database courses to display format
+  const courses = Array.isArray(learningPlans) ? learningPlans.map(course => {
+    // Use database fields directly
+    const topicsCount = course.topics_count || 0;
+    const progressPercentage = course.completion_percentage || 0;
+    
     return {
-      id: plan.id,
-      title: plan.title,
+      id: course.id,
+      title: course.course_name,
       instructor: 'AI Generated',
-      progress: progressPercentage,
+      progress: Math.round(progressPercentage),
       thumbnail: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop',
-      duration: `${plan.duration_days} days`,
-      difficulty: plan.difficulty_level,
-      category: plan.category,
-      totalVideos: plan.total_videos,
-      daysCount: plan.days_count
+      duration: `${topicsCount} topics`,
+      difficulty: 'Beginner',
+      category: 'Pro Learning',
+      totalVideos: topicsCount * 2, // Estimate based on topics
+      daysCount: Math.ceil(topicsCount / 2), // Estimate study days
+      rawCourse: course // Keep reference to original course data
     };
   }) : [];
 
@@ -188,7 +176,7 @@ const SavedPlaylists = () => {
             }`}
           >
             <span className="relative">
-              My Learning Plans
+              AI Created Courses
               {activeTab === 'courses' && (
                 <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-indigo-600 transform scale-x-100 transition-transform"></span>
               )}
@@ -203,7 +191,7 @@ const SavedPlaylists = () => {
             }`}
           >
             <span className="relative">
-              Completed Plans
+              Completed Courses
               {activeTab === 'favorites' && (
                 <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-indigo-600 transform scale-x-100 transition-transform"></span>
               )}
@@ -215,21 +203,29 @@ const SavedPlaylists = () => {
       <div className="p-4 sm:p-6">
         {activeTab === 'courses' ? (
           <>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-              <h2 className="text-xl font-bold text-gray-800">My Learning Plans</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">AI Created Courses</h2>
+                <p className="text-gray-600 mt-1">Personalized courses generated by artificial intelligence</p>
+              </div>
               <Link 
                 to="/chatbot" 
-                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors text-center"
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 text-center shadow-md hover:shadow-lg"
               >
-                Create New Plan
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Create New Course
+                </span>
               </Link>
             </div>
 
             {loading && (
-              <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
                 <div className="text-gray-600 text-center">
-                  <p className="font-medium">Loading learning plans...</p>
+                  <p className="font-medium">Loading AI created courses...</p>
                   {retryCount > 0 && (
                     <p className="text-sm text-gray-500">Retry attempt {retryCount}/{MAX_RETRIES}</p>
                   )}
@@ -246,7 +242,7 @@ const SavedPlaylists = () => {
                       Please check your internet connection and try again.
                     </p>
                   </div>
-                  {retryCount >= MAX_RETRIES && (
+                  {error && (
                     <button
                       onClick={handleRetry}
                       className="ml-4 inline-flex items-center px-3 py-2 border border-red-600 text-red-600 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
@@ -325,7 +321,7 @@ const SavedPlaylists = () => {
                             </div>
                           </div>
                           <Link 
-                            to={`/learning/${course.id}`}
+                            to={generateCourseUrl(course)}
                             className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg 
                             hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center"
                           >
@@ -391,7 +387,7 @@ const SavedPlaylists = () => {
               {courses.filter(course => course.progress === 100).map((course) => (
                 <div key={course.id} className="border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                   <div className="flex flex-col sm:flex-row h-full">
-                    <Link to={`/learning/${course.id}`} className="w-full sm:w-1/3 h-32 sm:h-auto">
+                    <Link to={`/learning-hub/pro-learning?courseId=${course.id}`} className="w-full sm:w-1/3 h-32 sm:h-auto">
                       <img
                         src={course.thumbnail}
                         alt={course.title}
@@ -399,7 +395,7 @@ const SavedPlaylists = () => {
                       />
                     </Link>
                     <div className="p-4 flex-1 flex flex-col">
-                      <Link to={`/learning/${course.id}`} className="hover:text-indigo-600">
+                      <Link to={`/learning-hub/pro-learning?courseId=${course.id}`} className="hover:text-indigo-600">
                         <h3 className="font-bold text-sm sm:text-base mb-1 line-clamp-2">{course.title}</h3>
                       </Link>
                       <div className="flex items-center flex-wrap gap-2 text-xs sm:text-sm text-gray-600 mb-2">
@@ -421,7 +417,7 @@ const SavedPlaylists = () => {
                           <span>{course.totalVideos} videos</span>
                         </div>
                         <Link 
-                          to={`/learning/${course.id}`}
+                          to={`/learning-hub/pro-learning?courseId=${course.id}`}
                           className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                         >
                           Review

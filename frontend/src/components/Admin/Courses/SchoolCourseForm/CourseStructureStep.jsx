@@ -22,7 +22,7 @@ const CourseStructureStep = ({
       <h2 className="text-xl font-semibold text-gray-800 border-b pb-2">Course Structure</h2>
       
       {chapters.map((chapter, chapterIndex) => (
-        <div key={`chapter-${chapterIndex}`} className="border border-gray-200 rounded-lg p-6 space-y-6">
+        <div key={chapter.id ? `chapter-${chapter.id}` : `chapter-${chapterIndex}`} className="border border-gray-200 rounded-lg p-6 space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Chapter {chapterIndex + 1}</h3>
           </div>
@@ -59,7 +59,7 @@ const CourseStructureStep = ({
             
             {chapter.lessons.map((lesson, lessonIndex) => (
               <LessonForm
-                key={`lesson-${chapterIndex}-${lessonIndex}`}
+                key={lesson.id ? `lesson-${chapter.id || chapterIndex}-${lesson.id}` : `lesson-${chapterIndex}-${lessonIndex}`}
                 chapterIndex={chapterIndex}
                 lessonIndex={lessonIndex}
                 lesson={lesson}

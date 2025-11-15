@@ -1,0 +1,54 @@
+{
+  "courses": [
+    {
+      "title": "Data Structures in Python",
+      "short_description": "Learn core data structures with hands-on coding",
+      "description": "This course covers arrays, linked lists, stacks, queues, trees, graphs and hashing with Python examples.",
+      "duration": "40",
+      "is_published": true,
+      "subject": "Computer Science",
+      "sources": "NPTEL; MIT OCW",
+      "proficiency": "beginner",
+      "project_based": true,
+      "learning_points": [
+        "Implement arrays, stacks, queues",
+        "Solve problems using trees and graphs"
+      ],
+      "requirements": [
+        "Basic Python",
+        "Loops and functions"
+      ],
+      "category": "Programming",
+      "sections": [
+        {
+          "name": "Arrays",
+          "order": 1,
+          "lessons": [
+            {
+              "title": "Introduction to Arrays",
+              "type": "video",
+              "video_url": "https://www.youtube.com/watch?v=3ZxZPeXG2Hc",
+              "description": "Concepts and operations on arrays",
+              "order": 1,
+              "resources": [
+                {
+                  "type": "internet",
+                  "title": "Python Lists",
+                  "url": "https://docs.python.org/3/tutorial/datastructures.html",
+                  "description": "Official Python docs on list"
+                }
+              ],
+              "quiz": [
+                {
+                  "question": "Which operation is O(1) on average for Python lists?",
+                  "options": ["append", "insert at index 0", "delete middle"],
+                  "correct_answer": "append"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

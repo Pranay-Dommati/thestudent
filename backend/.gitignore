@@ -1,0 +1,29 @@
+# Python cache directories
+authentication/__pycache__/
+authentication/migrations/__pycache__/
+backend/__pycache__/
+chatbotcourse/__pycache__/
+chatbotcourse/migrations/__pycache__/
+courses/__pycache__/
+courses/migrations/__pycache__/
+
+# General Python patterns
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+
+# Django specific
+*.log
+db.sqlite3
+local_settings.py
+
+# Python virtual environments (ignore local envs in backend)
+venv/
+.venv/
+env/
+
+# Local environment files (do not commit secrets)
+.env
+.env.local

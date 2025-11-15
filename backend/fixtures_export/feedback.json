@@ -1,0 +1,11 @@
+[
+{
+  "model": "feedback.feedback",
+  "pk": 1,
+  "fields": {
+    "name": "Test User",
+    "message": "This is a test feedback message.",
+    "submitted_at": "2025-09-18T06:32:48.756Z"
+  }
+}
+]

@@ -1,27 +1,96 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FaSearch, FaFilter, FaEllipsisV, FaUserGraduate } from 'react-icons/fa';
+import authService from '../../../services/authService';
 
 const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('all');
+  // Filters
+  const [statusFilter, setStatusFilter] = useState('all'); // all|active|inactive
+  const [roleFilter, setRoleFilter] = useState('all'); // all|admin|user
+  const [joinedFilter, setJoinedFilter] = useState('all'); // all|last7|last30|thismonth
+  const [sortBy, setSortBy] = useState('recent'); // recent|oldest|name
+  // Additional filter: enrollment count quick filter (client-side)
+  const [enrollmentFilter, setEnrollmentFilter] = useState('all'); // all|none|1plus|5plus
   const [currentPage, setCurrentPage] = useState(1);
+  const [users, setUsers] = useState([]);
+  const [stats, setStats] = useState({ total_users: 0, active_users: 0, new_this_month: 0, inactive_users: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Mock data - replace with actual API call
-  const users = [
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john@example.com',
-      role: 'student',
-      status: 'active',
-      enrolledCourses: 3,
-      joinDate: '2024-01-15'
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const params = new URLSearchParams({
+        q: searchQuery,
+        status: statusFilter,
+        role: roleFilter,
+        joined: joinedFilter,
+        order: sortBy,
+        page: String(currentPage),
+        page_size: '10',
+      });
+      const resp = await authService.makeAuthenticatedRequest(`/auth/users/?${params.toString()}`);
+      const data = resp.data || {};
+      const results = Array.isArray(data.results) ? data.results : [];
+      // Keep the order returned by backend; do not re-sort here
+      setUsers(results);
+      setStats(data.stats || { total_users: 0, active_users: 0, new_this_month: 0, inactive_users: 0 });
+    } catch (e) {
+      console.error('Fetch users error:', e);
+      const serverMsg = e?.response?.data?.error;
+      setError(serverMsg || e.message || 'Failed to fetch users');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const handleUserAction = (userId, action) => {
-    console.log(`${action} user ${userId}`);
-    // Implement user actions
+  useEffect(() => {
+    fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, statusFilter, roleFilter, joinedFilter, sortBy, currentPage]);
+
+  // Derive client-side filter for enrollment counts (backend may ignore this param)
+  const usersToRender = React.useMemo(() => {
+    if (!Array.isArray(users) || enrollmentFilter === 'all') return users;
+    return users.filter(u => {
+      const cnt = Number(u.enrolledCourses || u.enrolled_courses || 0);
+      if (enrollmentFilter === 'none') return cnt === 0;
+      if (enrollmentFilter === '1plus') return cnt >= 1;
+      if (enrollmentFilter === '5plus') return cnt >= 5;
+      return true;
+    });
+  }, [users, enrollmentFilter]);
+
+  const handleUserAction = async (userId, action) => {
+    try {
+      if (action === 'delete') {
+        const confirmed = window.confirm('Are you sure you want to delete this user? This cannot be undone.');
+        if (!confirmed) return;
+  await authService.makeAuthenticatedRequest(`/auth/users/${userId}/`, { method: 'DELETE' });
+        await fetchUsers();
+        return;
+      }
+      if (action === 'edit') {
+        const newName = window.prompt('Enter new full name (leave blank to keep):');
+        const newEmail = window.prompt('Enter new email (leave blank to keep):');
+        const makeAdmin = window.confirm('Make this user admin? Click OK for Yes, Cancel for No.');
+        const payload = {};
+        if (newName) payload.full_name = newName;
+        if (newEmail) payload.email = newEmail;
+        payload.is_superuser = makeAdmin;
+  const resp = await authService.makeAuthenticatedRequest(`/auth/users/${userId}/`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload)
+        });
+        // axios will throw on non-2xx; no manual ok/json checks needed
+        await fetchUsers();
+        return;
+      }
+    } catch (e) {
+      const serverMsg = e?.response?.data?.error;
+      alert(serverMsg || e.message || 'Operation failed');
+    }
   };
 
   return (
@@ -39,19 +108,19 @@ const AdminUsers = () => {
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-blue-600">1,234</div>
+          <div className="text-2xl font-bold text-blue-600">{stats.total_users}</div>
           <div className="text-sm text-gray-500">Total Users</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-green-600">892</div>
+          <div className="text-2xl font-bold text-green-600">{stats.active_users}</div>
           <div className="text-sm text-gray-500">Active Users</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-yellow-600">156</div>
+          <div className="text-2xl font-bold text-yellow-600">{stats.new_this_month}</div>
           <div className="text-sm text-gray-500">New This Month</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-red-600">45</div>
+          <div className="text-2xl font-bold text-red-600">{stats.inactive_users}</div>
           <div className="text-sm text-gray-500">Inactive Users</div>
         </div>
       </div>
@@ -68,16 +137,61 @@ const AdminUsers = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+        {/* Status filter */}
         <select
-          value={selectedFilter}
-          onChange={(e) => setSelectedFilter(e.target.value)}
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
           className="w-full sm:w-40 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         >
-          <option value="all">All Users</option>
+          <option value="all">All Statuses</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
-          <option value="student">Students</option>
-          <option value="instructor">Instructors</option>
+        </select>
+
+        {/* Role filter */}
+        <select
+          value={roleFilter}
+          onChange={(e) => { setRoleFilter(e.target.value); setCurrentPage(1); }}
+          className="w-full sm:w-40 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="all">All Roles</option>
+          <option value="admin">Admins</option>
+          <option value="user">Non-admins</option>
+        </select>
+
+        {/* Joined date filter */}
+        <select
+          value={joinedFilter}
+          onChange={(e) => { setJoinedFilter(e.target.value); setCurrentPage(1); }}
+          className="w-full sm:w-44 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="all">All Time</option>
+          <option value="last7">Last 7 days</option>
+          <option value="last30">Last 30 days</option>
+          <option value="thismonth">This month</option>
+        </select>
+
+        {/* Enrollment count (client-side) */}
+        <select
+          value={enrollmentFilter}
+          onChange={(e) => { setEnrollmentFilter(e.target.value); setCurrentPage(1); }}
+          className="w-full sm:w-44 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="all">All Enrollments</option>
+          <option value="none">No enrollments</option>
+          <option value="1plus">1+ enrollments</option>
+          <option value="5plus">5+ enrollments</option>
+        </select>
+
+        {/* Sort */}
+        <select
+          value={sortBy}
+          onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1); }}
+          className="w-full sm:w-44 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="recent">Recently added</option>
+          <option value="oldest">Oldest first</option>
+          <option value="name">Name A–Z</option>
         </select>
       </div>
 
@@ -105,7 +219,17 @@ const AdminUsers = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user) => (
+              {loading && (
+                <tr>
+                  <td className="px-6 py-6 text-center text-sm text-gray-500" colSpan={5}>Loading users…</td>
+                </tr>
+              )}
+              {!loading && users.length === 0 && (
+                <tr>
+                  <td className="px-6 py-6 text-center text-sm text-gray-500" colSpan={5}>{error || 'No users found'}</td>
+                </tr>
+              )}
+              {!loading && usersToRender.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -113,7 +237,14 @@ const AdminUsers = () => {
                         <FaUserGraduate className="h-10 w-10 text-gray-400" />
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                        <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                          <span>{user.name}</span>
+                          {user.is_superuser && (
+                            <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+                              Admin
+                            </span>
+                          )}
+                        </div>
                         <div className="text-sm text-gray-500">{user.email}</div>
                       </div>
                     </div>
@@ -128,7 +259,7 @@ const AdminUsers = () => {
                     {user.enrolledCourses}
                   </td>
                   <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(user.joinDate).toLocaleDateString()}
+                    {user.joinDate ? new Date(user.joinDate).toLocaleDateString() : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end items-center space-x-3">
@@ -156,7 +287,7 @@ const AdminUsers = () => {
       {/* Pagination */}
       <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
         <p className="text-sm text-gray-700">
-          Showing 1 to 10 of {users.length} results
+          Showing page {currentPage}
         </p>
         <div className="flex space-x-2">
           <button

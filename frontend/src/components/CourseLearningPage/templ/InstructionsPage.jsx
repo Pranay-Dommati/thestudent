@@ -2,15 +2,40 @@ import React from 'react';
 import { FaInfo, FaCheck, FaLaptopCode, FaDownload, FaTasks } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import rehypeRaw from 'rehype-raw';
+import 'katex/dist/katex.min.css';
+// Import our new enterprise-grade processor - no more regex preprocessing!
+import { processMarkdownSync } from '../../../utils/markdownProcessor';
 
 const InstructionsPage = ({ lessonContent }) => {
-  // If lesson content is provided, render it using ReactMarkdown
+  // If lesson content is provided, render it using our new unified processor
   if (lessonContent && lessonContent.aboutLesson) {
+    // Process markdown with the new AST-based pipeline
+    const processedContent = processMarkdownSync(lessonContent.aboutLesson, {
+      convertDelimiters: true, // Handle \(...\) and \[...\] 
+      autoLatex: true // Auto-wrap bare LaTeX environments
+    });
+    
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <div 
+          className="prose prose-lg max-w-none markdown-body"
+          dangerouslySetInnerHTML={{ __html: processedContent }}
+        />
+      </div>
+    );
+  }
+
+  // Fallback: if using ReactMarkdown for backward compatibility
+  if (lessonContent && lessonContent.aboutLesson && false) { // Disabled - using new processor above
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <div className="prose prose-lg max-w-none markdown-body">
           <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex, rehypeRaw]}
             components={{
               ul: ({node, ...props}) => <ul className="list-disc pl-5 my-4 space-y-2" {...props} />,
               ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-4 space-y-2" {...props} />,
@@ -40,6 +65,35 @@ const InstructionsPage = ({ lessonContent }) => {
               tr: ({node, ...props}) => <tr className="hover:bg-gray-50" {...props} />,
               th: ({node, ...props}) => <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 uppercase tracking-wider border border-gray-200" {...props} />,
               td: ({node, ...props}) => <td className="px-4 py-2 text-sm text-gray-500 border border-gray-200" {...props} />,
+              // Image rendering with proper styling and responsive behavior
+              // Supports both markdown syntax and HTML <img> tags with custom width/height
+              img: ({node, alt, src, title, width, height, style, ...props}) => {
+                // Build inline styles from attributes
+                const inlineStyle = {
+                  ...style,
+                  ...(width && { width: typeof width === 'number' ? `${width}px` : width }),
+                  ...(height && { height: typeof height === 'number' ? `${height}px` : height })
+                };
+
+                return (
+                  <figure className="my-6">
+                    <img 
+                      src={src} 
+                      alt={alt || 'Image'} 
+                      title={title}
+                      style={Object.keys(inlineStyle).length > 0 ? inlineStyle : undefined}
+                      className="max-w-full h-auto rounded-lg shadow-md mx-auto hover:shadow-xl transition-shadow duration-300"
+                      loading="lazy"
+                      {...props}
+                    />
+                    {(alt || title) && (
+                      <figcaption className="text-center text-sm text-gray-600 mt-2 italic">
+                        {alt || title}
+                      </figcaption>
+                    )}
+                  </figure>
+                );
+              },
               code: ({node, inline, className, children, ...props}) => {
                 if (inline) {
                   return <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>{children}</code>

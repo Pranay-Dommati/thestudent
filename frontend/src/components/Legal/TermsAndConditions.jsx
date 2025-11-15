@@ -103,7 +103,7 @@ const TermsAndConditions = () => {
                   <li>Is for personal, non-commercial use only</li>
                   <li>Cannot be reproduced or distributed without permission</li>
                   <li>Is provided "as is" without guarantees of accuracy</li>
-                  <li>Remains the intellectual property of Students Hub</li>
+                  <li>Remains the intellectual property of EasyLearnova</li>
                 </ul>
               </div>
             </details>            <details className="bg-white border rounded-lg group">
@@ -168,13 +168,10 @@ const TermsAndConditions = () => {
           <section className="mt-6 md:mt-8 bg-gray-50 p-4 md:p-5 rounded-lg text-center">
             <h2 className="text-base md:text-lg font-semibold text-gray-800 mb-2">Questions About These Terms?</h2>
             <p className="text-gray-700 mb-2 md:mb-3">
-              Contact us at <strong>support@studentshub.com</strong>
+              Contact us at <strong>easylearnova@gmail.com</strong>
             </p>
             <p className="text-xs md:text-sm text-gray-500">
-              Phone: +91 12345 67890
-            </p>
-            <p className="text-xs md:text-sm text-gray-500">
-              Address: Students Hub, Educational District, India
+              Address: Hyderabad, Telangana, India
             </p>
           </section>
 
@@ -182,7 +179,7 @@ const TermsAndConditions = () => {
           <div className="mt-6 md:mt-8 bg-blue-50 border-l-4 border-blue-500 p-3 md:p-4 rounded-r-lg">
             <h4 className="text-base md:text-lg font-semibold text-blue-900 mb-1 md:mb-2">Acceptance</h4>
             <p className="text-blue-800 text-xs md:text-sm">
-              By using Students Hub, you agree to these Terms and Conditions. If you don't agree, please don't use our service.
+              By using EasyLearnova, you agree to these Terms and Conditions. If you don't agree, please don't use our service.
             </p>
           </div>
         </motion.div>
