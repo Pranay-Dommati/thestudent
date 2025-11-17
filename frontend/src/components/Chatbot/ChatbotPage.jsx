@@ -971,7 +971,8 @@ const ChatbotPage = () => {
   useEffect(() => {
     const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isAuthenticated;
     
-    if (authed && user && !loading) {
+    const freemiumLoginInProgress = localStorage.getItem('freemiumLoginInProgress') === '1';
+    if (authed && user && !loading && freemiumLoginInProgress) {
       // Check if there's a pending course to save
       const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
       if (pendingCourse) {
@@ -992,6 +993,7 @@ const ChatbotPage = () => {
               
               // Clear the pending course
               localStorage.removeItem('pendingFreemiumCourse');
+              localStorage.removeItem('freemiumLoginInProgress');
               
               // Show success toast
               universalToast.success('🎉 Your course has been saved to your Learning Hub!', {
@@ -1006,6 +1008,7 @@ const ChatbotPage = () => {
               console.log('✅ Freemium course saved successfully!');
             } catch (error) {
               console.error('Failed to save freemium course:', error);
+              localStorage.removeItem('freemiumLoginInProgress');
               universalToast.error('Failed to save your course. Please try again.', {
                 duration: 4000
               });

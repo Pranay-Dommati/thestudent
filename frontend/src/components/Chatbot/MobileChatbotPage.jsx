@@ -301,8 +301,8 @@ const MobileChatbotPage = () => {
   // Freemium: Auto-save course when user logs in (Mobile)
   useEffect(() => {
     const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isLoggedIn;
-    
-    if (authed && user && !loading) {
+    const freemiumLoginInProgress = localStorage.getItem('freemiumLoginInProgress') === '1';
+    if (authed && user && !loading && freemiumLoginInProgress) {
       // Check if there's a pending course to save
       const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
       if (pendingCourse) {
@@ -321,8 +321,9 @@ const MobileChatbotPage = () => {
                 personalization: courseData.personalization || ''
               });
               
-              // Clear the pending course
+              // Clear the pending course and flag
               localStorage.removeItem('pendingFreemiumCourse');
+              localStorage.removeItem('freemiumLoginInProgress');
               
               // Show success toast
               universalToast.success('🎉 Your course has been saved to your Learning Hub!', {
@@ -337,6 +338,7 @@ const MobileChatbotPage = () => {
               console.log('✅ [Mobile] Freemium course saved successfully!');
             } catch (error) {
               console.error('[Mobile] Failed to save freemium course:', error);
+              localStorage.removeItem('freemiumLoginInProgress');
               universalToast.error('Failed to save your course. Please try again.', {
                 duration: 4000
               });

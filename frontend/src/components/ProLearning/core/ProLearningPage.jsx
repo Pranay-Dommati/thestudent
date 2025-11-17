@@ -253,7 +253,9 @@ const ProLearningPage = () => {
       autoSaveAttempted: autoSaveAttempted.current
     });
     
-    if (user && !loading && !autoSaveAttempted.current) {
+    // Only proceed if login was explicitly initiated from the freemium modal
+    const freemiumLoginInProgress = localStorage.getItem('freemiumLoginInProgress') === '1';
+    if (user && !loading && !autoSaveAttempted.current && freemiumLoginInProgress) {
       console.log('✅ User is authenticated and not loading');
       // Check if there's a pending course to save
       const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
@@ -287,6 +289,7 @@ const ProLearningPage = () => {
                 console.log('✅ Save successful! Cleaning up...');
                 // Clear the pending course
                 localStorage.removeItem('pendingFreemiumCourse');
+                localStorage.removeItem('freemiumLoginInProgress');
                 
                 // Close modal if open
                 setShowSaveCourseModal(false);
@@ -300,6 +303,7 @@ const ProLearningPage = () => {
                 console.log('✅ Freemium course auto-saved successfully!');
               }).catch((error) => {
                 console.error('❌ Failed to auto-save freemium course:', error);
+                localStorage.removeItem('freemiumLoginInProgress');
                 universalToast.error('Failed to save your course. Please try again.', {
                   duration: 4000
                 });
@@ -1990,12 +1994,18 @@ Sign in to unlock a personalized and enhanced learning experience.
               <Link
                 to={`/auth?mode=signup&returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                onClick={() => {
+                  try { localStorage.setItem('freemiumLoginInProgress', '1'); } catch {}
+                }}
               >
                 Save Course
               </Link>
               <Link
                 to={`/auth?mode=login&returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`}
                 className="w-full flex items-center justify-center px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors text-sm"
+                onClick={() => {
+                  try { localStorage.setItem('freemiumLoginInProgress', '1'); } catch {}
+                }}
               >
                 Already have an account?
               </Link>
@@ -2003,6 +2013,7 @@ Sign in to unlock a personalized and enhanced learning experience.
                 onClick={() => {
                   // Clear the pending course so modal can show for next course
                   localStorage.removeItem('pendingFreemiumCourse');
+                  try { localStorage.removeItem('freemiumLoginInProgress'); } catch {}
                   console.log('🧹 Cleared pendingFreemiumCourse - modal dismissed by user');
                   
                   setShowSaveCourseModal(false);
