@@ -2,6 +2,7 @@ import './App.css';
 import React, { Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useLocation, Navigate } from 'react-router-dom';
 import HomePage from './components/HomePage/HomePage';
+import ModalTest from './components/Debug/ModalTest'; // TEMP: Modal debug test
 import Courses from './components/Courses/Courses';
 import CoursesWrapper from './components/Courses/CoursesWrapper';
 import ChatbotWrapper from './components/Chatbot/ChatbotWrapper';
@@ -271,7 +272,9 @@ const App = () => {
         <Layout excludePaths={['/admin-p', '/chat', '/offline', '/pro-learning']}>
             <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            {/* TEMP DEBUG: Replace homepage with modal test */}
+            <Route path="/" element={<ModalTest />} />
+            <Route path="/home-original" element={<HomePage />} />
             {/* Offline fallback page */}
             <Route path="/offline" element={<OfflinePage />} />
             

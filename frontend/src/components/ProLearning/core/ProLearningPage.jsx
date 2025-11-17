@@ -537,73 +537,40 @@ const ProLearningPage = () => {
     });
 
     if (allTopicsGenerated && user === null && !loading) {
-      // Check if there's a pending freemium course
-      const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
-      console.log('🔍 [Modal Trigger] Checking pendingFreemiumCourse:', pendingCourse ? 'exists' : 'null');
+      console.log('✅ [Modal Trigger] All conditions met for anonymous user!');
       
-      if (pendingCourse) {
-        try {
-          const courseData = JSON.parse(pendingCourse);
-          console.log('🔍 [Modal Trigger] Parsed courseData:', {
-            storedCourseId: courseData.courseId,
-            currentCourseId: courseId,
-            match: courseData.courseId === courseId
-          });
-          
-          // Check if this is the course that was just created (match by courseId)
-          if (courseData.courseId === courseId) {
-            console.log('✅ [Modal Trigger] Course ID matches! Setting timeout to show modal...');
-            // Show modal after a short delay to let the UI settle
-            setTimeout(() => {
-              console.log('🎉 [Modal Trigger] Timeout complete - setting modal state NOW');
-              setPendingCourseToSave(courseData);
-              setShowSaveCourseModal(true);
-              console.log('🎉 Showing freemium save modal for course:', courseId);
-
-              // Also notify any open Chatbot pages (desktop & mobile) so they can show their own modal if needed
-              try {
-                window.dispatchEvent(
-                  new CustomEvent('show-freemium-save-modal', { detail: courseData })
-                );
-                console.log('📢 Dispatched show-freemium-save-modal event from ProLearningPage');
-              } catch (eventError) {
-                console.error('Failed to dispatch show-freemium-save-modal event:', eventError);
-              }
-            }, 2000); // 2 second delay after generation completes
-          } else {
-            console.log('❌ [Modal Trigger] Course ID mismatch - considering fallback...');
-            const now = Date.now();
-            const isRecent = courseData?.createdAt && (now - courseData.createdAt) < (10 * 60 * 1000);
-            const looksClientId = typeof courseId === 'string' && courseId.startsWith('course_');
-            if (isRecent && looksClientId) {
-              console.log('✅ [Fallback] Recent anonymous generation detected - showing modal anyway');
-              setTimeout(() => {
-                try {
-                  // Update localStorage to point to the current course so future checks match
-                  const updated = { ...courseData, courseId };
-                  localStorage.setItem('pendingFreemiumCourse', JSON.stringify(updated));
-                } catch {}
-                console.log('🎉 [Fallback] Timeout complete - setting modal state NOW');
-                setPendingCourseToSave(courseData);
-                setShowSaveCourseModal(true);
-                try {
-                  window.dispatchEvent(new CustomEvent('show-freemium-save-modal', { detail: courseData }));
-                } catch {}
-              }, 1500);
-            } else {
-              console.log('🚫 [Fallback] Conditions not met - modal will NOT show');
-            }
-          }
-        } catch (e) {
-          console.error('❌ [Modal Trigger] Failed to parse pending freemium course:', e);
-        }
-      } else {
-        console.log('❌ [Modal Trigger] No pendingFreemiumCourse in localStorage - modal will NOT show');
+      // Create course data for modal
+      const courseData = {
+        courseId: courseId,
+        courseTitle: courseTitle,
+        createdAt: Date.now()
+      };
+      
+      console.log('🎉 [Modal Trigger] Setting modal state NOW for course:', courseId);
+      setPendingCourseToSave(courseData);
+      setShowSaveCourseModal(true);
+      
+      // Store in localStorage so modal persists on refresh
+      try {
+        localStorage.setItem('pendingFreemiumCourse', JSON.stringify(courseData));
+        console.log('💾 Stored pendingFreemiumCourse in localStorage');
+      } catch (e) {
+        console.error('Failed to store pendingFreemiumCourse:', e);
+      }
+      
+      // Also notify any open Chatbot pages
+      try {
+        window.dispatchEvent(
+          new CustomEvent('show-freemium-save-modal', { detail: courseData })
+        );
+        console.log('📢 Dispatched show-freemium-save-modal event');
+      } catch (eventError) {
+        console.error('Failed to dispatch event:', eventError);
       }
     } else {
       console.log('❌ [Modal Trigger] Conditions not met - modal will NOT show');
     }
-  }, [allTopicsGenerated, user, loading, courseId]);
+  }, [allTopicsGenerated, user, loading, courseId, courseTitle]);
 
   // If we arrive with a UUID course (DB-saved), proactively clear any stale fresh-generation marker
   useEffect(() => {
@@ -1942,26 +1909,9 @@ const ProLearningPage = () => {
       />
       
             {/* Freemium: Save Course Modal */}
-      {(() => {
-        const shouldShow = showSaveCourseModal && pendingCourseToSave;
-
-        console.log('🔍 [Modal Render Check] Evaluating condition (portal-based):', {
-          showSaveCourseModal,
-          pendingCourseToSave: pendingCourseToSave ? 'exists' : 'null',
-          willRender: shouldShow
-        });
-
-        if (!shouldShow) {
-          return null;
-        }
-
-        const modalContent = (
-          <div className="freemium-modal modal-portal animate-fadeIn">
-            {(() => {
-              console.log('✅ [Modal Render] RENDERING MODAL NOW (portal)!');
-              return null;
-            })()}
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 sm:p-8 animate-scaleIn max-h-[90vh] overflow-y-auto relative z-[10001]">
+      {showSaveCourseModal && pendingCourseToSave && typeof document !== 'undefined' && createPortal(
+        <div className="freemium-modal modal-portal animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 sm:p-8 animate-scaleIn max-h-[90vh] overflow-y-auto relative z-[10001]">
               {/* Success Icon */}
               <div className="flex justify-center mb-6">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
@@ -2041,17 +1991,38 @@ const ProLearningPage = () => {
                 </button>
               </div>
             </div>
+      
+        </div>,
+        document.body
+      )}
+      
+      {/* Diagnostic Test Portal (always visible when ?modaltest=1) */}
+      {(() => {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return null;
+        const forceTest = /[?&]modaltest=1/.test(window.location.search);
+        if (!forceTest) return null;
+        const testEl = (
+          <div className="freemium-modal modal-portal test-overlay" style={{
+            background: 'rgba(255,0,0,0.35)',
+            backdropFilter: 'none',
+            WebkitBackdropFilter: 'none',
+            zIndex: 2147483647,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <div style={{ background: '#ffffff', padding: '18px 22px', borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.25)', maxWidth: 340 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Modal Visibility Test</h3>
+              <p style={{ fontSize: 13, lineHeight: 1.5, marginTop: 8 }}>
+                This red-tinted overlay is forced by <code>?modaltest=1</code>. If you see this on mobile, CSS stacking is OK and the freemium modal logic needs review. If you do NOT see it on mobile (but do on desktop), a mobile rendering/clipping bug is still active.
+              </p>
+              <p style={{ fontSize: 12, marginTop: 10, color: '#555' }}>Viewport: {typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : 'SSR'}</p>
+            </div>
           </div>
         );
-
-        if (typeof document === 'undefined') {
-          // SSR safety fallback
-          return modalContent;
-        }
-
-        return createPortal(modalContent, document.body);
+        return createPortal(testEl, document.body);
       })()}
-      
+
       </div>
     </>
   );
