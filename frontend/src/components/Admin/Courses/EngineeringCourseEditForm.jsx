@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { memo, useState, useEffect, useCallback } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
 import universalToast from '../../../utils/universalToast';
 import axiosInstance from '../../../utils/axios';
@@ -6,8 +6,12 @@ import { CheckIcon } from '@heroicons/react/24/solid';
 import BasicInfoStep from './EngineeringCourseForm/BasicInfoStep';
 import CourseStructureStep from './EngineeringCourseForm/CourseStructureStep';
 
-const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
-  const { isDarkMode } = useTheme();
+const EngineeringCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMode }) => {
+  const renderStart = performance.now();
+  console.log(`[PERF] EngineeringCourseEditForm RENDER START`);
+  
+  const theme = useTheme();
+  const effectiveDarkMode = typeof isDarkMode === 'boolean' ? isDarkMode : theme?.isDarkMode;
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 2;
   const [isLoading, setIsLoading] = useState(false);
@@ -128,8 +132,7 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
 
   useEffect(() => {
     if (course) {
-      // Console log to debug what's coming from the backend
-      console.log("Course data from backend:", course);
+      // Trimmed heavy console logging to avoid performance issues while typing
       
       // Ensure all required fields have default values
       const defaultValues = {
@@ -186,12 +189,7 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
       const validatedFormData = ensureRequiredArrays(initialFormData);
       setFormData(validatedFormData);
       
-      // Debug the formData after setting it
-      console.log("Initial formData state:", {
-        title: validatedFormData.title,
-        learningPoints: validatedFormData.learningPoints,
-        learning_outcomes: validatedFormData.learning_outcomes
-      });
+      // Avoid logging large form state to keep admin edit UI responsive
 
       if (course.thumbnail) {
         setThumbnailPreview(course.thumbnail);
@@ -232,7 +230,6 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
 
   // Handler functions for step 1 (Basic Info)
   const handleInputChange = (name, value) => {
-    console.log("Engineering handleInputChange called with", name, value);
     
     // Field mapping for camelCase to snake_case and vice versa
     const fieldMapping = {
@@ -282,12 +279,10 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
   const handleInputChangeEvent = (e) => {
     const { name, value, type, checked } = e.target;
     const fieldValue = type === 'checkbox' ? checked : value;
-    console.log("Engineering handleInputChangeEvent called with", name, fieldValue);
     handleInputChange(name, fieldValue);
   };
 
   const handleArrayInputChange = (name, index, value) => {
-    console.log("Engineering handleArrayInputChange called with", name, index, value);
     
     // Field mapping for camelCase to snake_case and vice versa
     const fieldMapping = {
@@ -329,7 +324,6 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
   };
 
   const addArrayItem = (name) => {
-    console.log("Engineering addArrayItem called for", name);
     
     // Field mapping for camelCase to snake_case and vice versa
     const fieldMapping = {
@@ -375,7 +369,6 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
   };
 
   const removeArrayItem = (name, index) => {
-    console.log("Engineering removeArrayItem called for", name, index);
     
     // Field mapping for camelCase to snake_case and vice versa
     const fieldMapping = {
@@ -447,13 +440,13 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
   };
 
   // Handler functions for step 2 (Course Structure)
-  const handleSectionNameChange = (sectionIndex, value) => {
+  const handleSectionNameChange = useCallback((sectionIndex, value) => {
     setSections(prev => prev.map((section, i) => 
       i === sectionIndex ? { ...section, name: value } : section
     ));
-  };
+  }, []);
 
-  const addLesson = (sectionIndex) => {
+  const addLesson = useCallback((sectionIndex) => {
     setSections(prev => prev.map((section, i) => 
       i === sectionIndex 
         ? {
@@ -477,9 +470,9 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
           }
         : section
     ));
-  };
+  }, []);
 
-  const removeLesson = (sectionIndex, lessonIndex) => {
+  const removeLesson = useCallback((sectionIndex, lessonIndex) => {
     setSections(prev => prev.map((section, i) => 
       i === sectionIndex 
         ? {
@@ -488,20 +481,32 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
           }
         : section
     ));
-  };
+  }, []);
 
-  const handleLessonChange = (sectionIndex, lessonIndex, field, value) => {
-    setSections(prev => prev.map((section, i) => 
-      i === sectionIndex 
-        ? {
-            ...section,
-            lessons: section.lessons.map((lesson, li) => 
-              li === lessonIndex ? { ...lesson, [field]: value } : lesson
-            )
-          }
-        : section
-    ));
-  };
+  const handleLessonChange = useCallback((sectionIndex, lessonIndex, field, value) => {
+    const startTime = performance.now();
+    console.log(`[PERF] handleLessonChange START: section=${sectionIndex}, lesson=${lessonIndex}, field=${field}`);
+    
+    setSections(prev => {
+      const cloneStart = performance.now();
+      const result = prev.map((section, i) => 
+        i === sectionIndex 
+          ? {
+              ...section,
+              lessons: section.lessons.map((lesson, li) => 
+                li === lessonIndex ? { ...lesson, [field]: value } : lesson
+              )
+            }
+          : section
+      );
+      const cloneTime = performance.now() - cloneStart;
+      console.log(`[PERF] State clone took: ${cloneTime.toFixed(2)}ms, sections: ${prev.length}`);
+      return result;
+    });
+    
+    const totalTime = performance.now() - startTime;
+    console.log(`[PERF] handleLessonChange TOTAL: ${totalTime.toFixed(2)}ms`);
+  }, []);
 
   const addResource = (sectionIndex, lessonIndex, resourceType) => {
     const newResource = resourceType === 'downloadable' 
@@ -675,18 +680,11 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
 
   // Navigation functions
   const nextStep = () => {
-    console.log('Next button clicked');
-    console.log('Current step:', currentStep);
-    console.log('Current form data:', formData);
-    
     const isValid = validateStep(currentStep);
-    console.log('Validation result:', isValid);
     
     if (isValid) {
       setCurrentStep(prev => Math.min(prev + 1, totalSteps));
-      console.log('Moving to next step');
     } else {
-      console.log('Validation failed, staying on current step');
   universalToast.error('Please fill in all required fields');
     }
   };
@@ -697,40 +695,30 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
 
   const validateStep = (step) => {
     const newErrors = {};
-    console.log('Validating step:', step);
-    console.log('Current formData:', formData);
 
     if (step === 1) {
       // Validate basic info
       if (!formData.title?.trim()) {
         newErrors.title = 'Title is required';
-        console.log('Title validation failed');
       }
       if (!formData.category) {
         newErrors.category = 'Category is required';
-        console.log('Category validation failed');
       }
       if (!formData.proficiency) {
         newErrors.proficiency = 'Proficiency level is required';
-        console.log('Proficiency validation failed');
       }
       if (!formData.sources?.trim()) {
         newErrors.sources = 'Sources are required';
-        console.log('Sources validation failed');
       }
       if (!formData.duration?.trim()) {
         newErrors.duration = 'Duration is required';
-        console.log('Duration validation failed');
       }
       if (!formData.description?.trim()) {
         newErrors.description = 'Description is required';
-        console.log('Description validation failed');
       }
       if (!formData.shortDescription?.trim()) {
         newErrors.shortDescription = 'Short description is required';
-        console.log('Short description validation failed');
       }
-      console.log('Validation errors:', newErrors);
     } else if (step === 2) {
       // Validate course structure
       sections.forEach((section, sectionIndex) => {
@@ -763,12 +751,12 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
     const token = localStorage.getItem('token');
 
     try {
-      console.log('Starting course update...');
+      // keep logs minimal to avoid performance impact
       const submitData = new FormData();
-      console.log('Course ID:', course.id);
+      
 
       // Add basic info
-      console.log('Processing form data:', formData);
+      
       
       // Map field names to their API counterparts
       const fieldMapping = {
@@ -864,8 +852,8 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
         });
       });
 
-      console.log('Sending request to update course:', course.id);
-      console.log('Submit data:', Object.fromEntries(submitData.entries()));
+      
+      
       
       const response = await axiosInstance.put(
         `/courses/${course.id}/update/`,
@@ -877,7 +865,7 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
           }
         }
       );
-      console.log('Response received:', response);
+      
 
       if (response.status === 200) {
   universalToast.success('Course updated successfully!');
@@ -919,17 +907,17 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
           <BasicInfoStep
             courseInfo={formData}
             setCourseInfo={(updates) => {
-              console.log("Setting course info with updates:", updates);
+              
               setFormData(prev => {
                 const newFormData = {...prev, ...updates};
-                console.log("Updated formData:", newFormData);
+                
                 return newFormData;
               });
             }}
             handleCourseInfoChange={(e) => {
               const { name, value, type, checked } = e.target;
               const fieldValue = type === 'checkbox' ? checked : value;
-              console.log("Handling course info change:", name, fieldValue);
+              
               handleInputChange(name, fieldValue);
             }}
             handleArrayFieldChange={handleArrayInputChange}
@@ -996,7 +984,10 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
     }
   };
 
-  console.log('Rendering EngineeringCourseEditForm');
+  const renderTime = performance.now() - renderStart;
+  console.log(`[PERF] EngineeringCourseEditForm RENDER END: ${renderTime.toFixed(2)}ms`);
+  console.log(`[PERF] Sections: ${sections.length}, Total lessons: ${sections.reduce((acc, s) => acc + s.lessons.length, 0)}`);
+  
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} p-4`}>
       <div className="max-w-4xl mx-auto py-8 px-4">
@@ -1104,7 +1095,7 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log('Update button clicked');
+                  
                   handleSubmit(e);
                 }}
                 disabled={isLoading}
@@ -1121,4 +1112,4 @@ const EngineeringCourseEditForm = ({ course, onSuccess, onCancel }) => {
   );
 };
 
-export default EngineeringCourseEditForm;
+export default memo(EngineeringCourseEditForm);

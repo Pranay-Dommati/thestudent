@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { FaPlus, FaTrash, FaUpload } from 'react-icons/fa';
 import universalToast from '../../../../utils/universalToast';
 
@@ -32,13 +32,7 @@ const BasicInfoStep = ({
   const [newCategory, setNewCategory] = useState('');
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   
-  // Debug effect to check courseInfo prop
-  useEffect(() => {
-    console.log("BasicInfoStep received courseInfo:", courseInfo);
-    if (!courseInfo?.learningPoints) {
-      console.warn("courseInfo.learningPoints is undefined or null");
-    }
-  }, [courseInfo]);
+  // Removed expensive debug logging to keep typing smooth
 
   const handleAddCategory = () => {
     if (newCategory.trim()) {
@@ -313,8 +307,6 @@ const BasicInfoStep = ({
           </button>
         </div>
         
-        {/* Add debug log and defensive check */}
-        {console.log("courseInfo in BasicInfoStep:", courseInfo)}
         {(courseInfo?.learningPoints || []).map((point, index) => (
           <div key={`learn-${index}`} className="flex items-center space-x-2">
             <input
@@ -399,4 +391,4 @@ const BasicInfoStep = ({
   );
 };
 
-export default BasicInfoStep;
+export default memo(BasicInfoStep);

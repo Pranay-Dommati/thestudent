@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import universalToast from '../../../utils/universalToast';
 import { getCourseById, updateCourse } from '../../../services/courseApi';
@@ -153,4 +153,4 @@ const EditCourse = ({ isDarkMode }) => {
   );
 };
 
-export default EditCourse;
+export default memo(EditCourse);
