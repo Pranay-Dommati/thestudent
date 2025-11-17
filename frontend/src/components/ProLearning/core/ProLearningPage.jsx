@@ -1949,12 +1949,12 @@ const ProLearningPage = () => {
         });
         return showSaveCourseModal && pendingCourseToSave;
       })() && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 overflow-y-auto">
+        <div className="freemium-modal modal-portal animate-fadeIn">
           {(() => {
             console.log('✅ [Modal Render] RENDERING MODAL NOW!');
             return null;
           })()}
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 animate-fade-in max-h-[90vh] overflow-y-auto my-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 sm:p-8 animate-scaleIn max-h-[90vh] overflow-y-auto relative z-[10001]">
             {/* Success Icon */}
             <div className="flex justify-center mb-6">
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
