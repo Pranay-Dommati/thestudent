@@ -118,7 +118,7 @@ const ProLearningMobile = ({
   };
 
   return (
-    <div className="lg:hidden h-screen bg-gray-50 flex flex-col relative overflow-hidden">
+    <div className="lg:hidden min-h-screen bg-gray-50 flex flex-col relative">
       {/* Enhanced Styles and Animations */}
       <style dangerouslySetInnerHTML={{__html: `
         .scrollbar-hide {
