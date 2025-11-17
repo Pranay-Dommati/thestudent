@@ -546,6 +546,7 @@
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
+  height: 100dvh;
   z-index: 10000 !important;
   display: flex !important;
   align-items: center !important;
