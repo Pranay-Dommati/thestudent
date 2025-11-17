@@ -6,6 +6,7 @@ import CourseHero from "./CourseHero/CourseHero";
 import logger from '../../utils/logger';
 import api from '../../utils/axios';
 import { courseCache } from '../../utils/courseCache';
+import prefetchBoardsAndStates from '../../utils/prefetchBoardsAndStates';
 
 const Courses = () => {
     const navigate = useNavigate();
@@ -146,7 +147,29 @@ const Courses = () => {
     };
 
     useEffect(() => {
-        checkCoursesAvailability();
+        // Optimistic render: show all levels instantly, then refine in background
+        setAvailableLevels(allEducationLevels);
+        setLoading(false);
+        // Defer the availability check to the next frame to avoid blocking paint
+        const t = requestIdleCallback ? requestIdleCallback(checkCoursesAvailability, { timeout: 1000 }) : setTimeout(checkCoursesAvailability, 0);
+        return () => {
+            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(t); } catch {}
+            else clearTimeout(t);
+        };
+    }, []);
+
+    useEffect(() => {
+        // Also prefetch board/state availability immediately when landing on /courses
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const run = () => prefetchBoardsAndStates(undefined, controller?.signal);
+        const handle = typeof requestIdleCallback !== 'undefined'
+            ? requestIdleCallback(run, { timeout: 1500 })
+            : setTimeout(run, 200);
+        return () => {
+            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {}
+            else clearTimeout(handle);
+            try { controller?.abort(); } catch {}
+        };
     }, []);
 
     const handleLevelSelect = (level) => {

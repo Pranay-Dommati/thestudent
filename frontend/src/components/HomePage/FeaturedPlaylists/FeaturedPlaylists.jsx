@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { getSchoolCourses, getEngineeringCourses } from '../../../services/courseApi';
+import React, { useState, useEffect, useRef } from 'react';
+import { getSchoolCourses } from '../../../services/courseApi';
 import { useNavigate, Link } from 'react-router-dom';
+import courseCache from '../../../utils/courseCache';
 
 const categories = [
   { id: 'all', name: 'All Courses' },
@@ -19,19 +20,46 @@ const FeaturedPlaylists = () => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const sectionRef = useRef(null);
+  const [isInView, setIsInView] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch real courses from database (both School and Engineering)
+  // Show cached courses immediately (stale-while-revalidate)
   useEffect(() => {
+    const cached = courseCache.get('home_featured_v2');
+    if (Array.isArray(cached) && cached.length) {
+      setCourses(cached);
+      setLoading(false);
+    }
+  }, []);
+
+  // Observe when the section enters viewport to defer heavy fetching
+  useEffect(() => {
+    const node = sectionRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px 0px', threshold: 0.01 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  // Fetch real courses from database (both School and Engineering) once visible
+  useEffect(() => {
+    if (!isInView) return;
     const fetchRealCourses = async () => {
       setLoading(true);
       setError(false);
       try {
-        // Fetch in parallel to reduce load time
-        const [schoolCourses, engineeringCourses] = await Promise.all([
-          getSchoolCourses('', '', ''),
-          getEngineeringCourses('all')
-        ]);
+        // Fetch a small page with minimal fields to keep initial payload tiny
+        const schoolCourses = await getSchoolCourses('', '', '', { limit: 16 });
         
   // Removed debug logs for production
         
@@ -112,30 +140,13 @@ const FeaturedPlaylists = () => {
           };
         });
 
-        // Transform engineering courses
-        const transformedEngineeringCourses = (engineeringCourses || []).map(course => {
-          return {
-            id: course.id,
-            title: course.title,
-            // Use provided duration or fallback
-            duration: course.duration ? `${course.duration}` : 'Self-paced',
-            category: 'engineering',
-            author: course.subject || 'EasyLearnova',
-            board: 'Engineering',
-            board_raw: 'engineering',
-            state: '',
-            subject: course.category || 'General',
-            class_level: 'engineering',
-            image: course.thumbnail || 'https://images.unsplash.com/photo-1529101091764-c3526daf38fe?ixlib=rb-4.0.3',
-            courseType: 'engineering'
-          };
-        });
-
-        // Combine both types for display
-        const allCourses = [...transformedEngineeringCourses, ...transformedSchoolCourses];
+        // Combine results; engineering is intentionally excluded on home grid for speed
+        const allCourses = [...transformedSchoolCourses];
   // Removed debug logs
         
         setCourses(allCourses);
+        // Cache for subsequent visits (15–30 min via courseCache TTL)
+        courseCache.set('home_featured_v2', allCourses);
       } catch (error) {
   // Set error state to show proper error message to users
         setError(true);
@@ -146,7 +157,7 @@ const FeaturedPlaylists = () => {
     };
 
     fetchRealCourses();
-  }, []);
+  }, [isInView]);
   
   // Function to handle course card click and navigate to course page
   const handleCourseClick = (course) => {
@@ -270,7 +281,7 @@ const FeaturedPlaylists = () => {
   const hasMoreCourses = allFilteredCourses.length > displayedCourses.length;
 
   return (
-    <section className="py-6 sm:py-8 lg:py-12 xl:pt-0 xl:pb-16 px-3 sm:px-4 bg-[#F9FAFB]">
+    <section ref={sectionRef} className="py-6 sm:py-8 lg:py-12 xl:pt-0 xl:pb-16 px-3 sm:px-4 bg-[#F9FAFB]">
       <div className="container mx-auto">
         {/* Header section - mobile vs desktop optimized */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4 sm:mb-6 lg:mb-10">
@@ -319,9 +330,23 @@ const FeaturedPlaylists = () => {
 
         {/* Course grid with enhanced mobile layout */}
         {loading ? (
-          <div className="flex justify-center items-center py-8 sm:py-12">
-            <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-2 sm:ml-3 text-gray-600 text-sm sm:text-base">Loading new courses...</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 py-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden animate-pulse">
+                <div className="relative pb-[56.25%] bg-gray-200" />
+                <div className="p-3 sm:p-4">
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                  <div className="h-3 bg-gray-200 rounded w-1/3 mb-4" />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-full bg-gray-200" />
+                      <div className="h-3 w-24 bg-gray-200 rounded" />
+                    </div>
+                    <div className="h-5 w-16 bg-gray-200 rounded-full" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <>
@@ -335,10 +360,13 @@ const FeaturedPlaylists = () => {
                   >
                     {/* Course thumbnail with aspect ratio lock */}
                     <div className="relative pb-[56.25%]">
-                      <img 
-                        src={course.image} 
+                      <img
+                        src={course.image}
                         alt={course.title}
                         className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        fetchpriority="low"
                       />
                     </div>
                     

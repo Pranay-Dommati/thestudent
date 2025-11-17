@@ -7,7 +7,7 @@ import BackButton from '../../components/BackButton';
 import MobileBoardSelector from '../../shared/MobileBoardSelector';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
-import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
+import { checkBoardAvailability, checkStateAvailability, getOptimisticBoardAvailability } from '../../../../utils/courseAvailability';
 import Footer from '../../../Footer/Footer';
 import SEO from '../../../SEO/SEO';
 
@@ -37,22 +37,28 @@ const SixthStandard = () => {
   const [availableStates, setAvailableStates] = useState([]);
   const [checkingStates, setCheckingStates] = useState(false);
 
-  // Check course availability for each board
+  // Optimistic board availability: show immediately, then refine in background
   useEffect(() => {
-    const checkAvailability = async () => {
-      setCheckingAvailability(true);
-      try {
-        const availableBoards = await checkBoardAvailability('6th');
-        setAvailableBoards(availableBoards);
-      } catch (error) {
-        logger.error('Error checking board availability:', error);
-        setAvailableBoards([]);
-      } finally {
-        setCheckingAvailability(false);
-      }
-    };
+    // Immediate optimistic boards (cached or both)
+    setAvailableBoards(getOptimisticBoardAvailability('6th'));
+    setCheckingAvailability(false);
 
-    checkAvailability();
+    // Background refinement without blocking UI
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const run = async () => {
+      try {
+        const fresh = await checkBoardAvailability('6th');
+        if (Array.isArray(fresh) && fresh.length) setAvailableBoards(fresh);
+      } catch {}
+    };
+    const handle = typeof requestIdleCallback !== 'undefined'
+      ? requestIdleCallback(run, { timeout: 1500 })
+      : setTimeout(run, 200);
+    return () => {
+      if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {}
+      else clearTimeout(handle);
+      try { controller?.abort(); } catch {}
+    };
   }, []);
 
   // Sync selected board with URL; also reset on /courses/6th

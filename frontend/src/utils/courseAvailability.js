@@ -3,6 +3,33 @@ import { stateBoards } from '../components/Courses/data/states';
 import logger from './logger';
 import courseCache from './courseCache';
 
+function defaultBoards() {
+  return [
+    { 
+      id: 'cbse', 
+      name: 'CBSE',
+      fullName: 'Central Board of Secondary Education',
+      available: true
+    },
+    { 
+      id: 'state', 
+      name: 'State Board',
+      fullName: 'State Board of Secondary and Higher Secondary Education',
+      available: true
+    }
+  ];
+}
+
+/**
+ * Synchronous, optimistic getter used by UIs to avoid spinners.
+ * Returns cached availability if present, otherwise defaults to showing both boards.
+ */
+export function getOptimisticBoardAvailability(classLevel) {
+  const cached = courseCache.getBoardAvailability(classLevel);
+  if (cached && Array.isArray(cached) && cached.length) return cached;
+  return defaultBoards();
+}
+
 /**
  * Check if courses are available for specific board and class combinations
  * @param {string} classLevel - The class level (e.g., '6th', '7th', etc.)
@@ -16,33 +43,20 @@ export const checkBoardAvailability = async (classLevel) => {
     return cached;
   }
 
-  const boardsToCheck = [
-    { 
-      id: 'cbse', 
-      name: 'CBSE',
-      fullName: 'Central Board of Secondary Education',
-      available: false
-    },
-    { 
-      id: 'state', 
-      name: 'State Board',
-      fullName: 'State Board of Secondary and Higher Secondary Education',
-      available: false
-    }
-  ];
+  const boardsToCheck = defaultBoards().map(b => ({ ...b, available: false }));
 
   const availableBoards = [];
 
   try {
-    // Check CBSE courses
-    const cbseData = await getSchoolCourses(classLevel, 'cbse');
+    // Check CBSE courses with tiny payload
+    const cbseData = await getSchoolCourses(classLevel, 'cbse', '', { limit: 1 });
     if (cbseData && cbseData.length > 0) {
       const cbseBoard = boardsToCheck.find(board => board.id === 'cbse');
       availableBoards.push({ ...cbseBoard, available: true });
     }
 
-    // Check State board courses - check for any state
-    const stateData = await getSchoolCourses(classLevel, 'state');
+    // Check State board presence with tiny payload
+    const stateData = await getSchoolCourses(classLevel, 'state', '', { limit: 1 });
     if (stateData && stateData.length > 0) {
       const stateBoard = boardsToCheck.find(board => board.id === 'state');
       availableBoards.push({ ...stateBoard, available: true });

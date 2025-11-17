@@ -15,6 +15,7 @@ import '../../styles/mobile-courses.css';
 import logger from '../../utils/logger';
 import api from '../../utils/axios';
 import { courseCache } from '../../utils/courseCache';
+import prefetchBoardsAndStates from '../../utils/prefetchBoardsAndStates';
 
 const MobileFirstCourses = () => {
     const navigate = useNavigate();
@@ -184,6 +185,17 @@ const MobileFirstCourses = () => {
 
     useEffect(() => {
         checkCoursesAvailability();
+        // Prefetch board/state availability on mobile entry as well
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const run = () => prefetchBoardsAndStates(undefined, controller?.signal);
+        const handle = typeof requestIdleCallback !== 'undefined'
+            ? requestIdleCallback(run, { timeout: 1500 })
+            : setTimeout(run, 200);
+        return () => {
+            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {}
+            else clearTimeout(handle);
+            try { controller?.abort(); } catch {}
+        };
     }, []);
 
     useEffect(() => {

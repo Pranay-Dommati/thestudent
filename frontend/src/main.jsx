@@ -32,3 +32,10 @@ createRoot(document.getElementById('root')).render(
 )
 
 // Note: IndexedDB is no longer used for Pro Learning; keeping storage in localStorage only.
+
+// Register Service Worker in production builds to enable SWR caching of course lists
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

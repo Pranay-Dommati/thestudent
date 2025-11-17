@@ -5,8 +5,29 @@ import TrustSection from "./TrustSection/TrustSection";
 // import Testimonials from "./Testimonials/Testimonials";
 import Footer from "../Footer/Footer";
 import SEO from "../SEO/SEO";
+import { useEffect } from "react";
+import prefetchCoursesAvailability from "../../utils/prefetchCoursesAvailability";
+import prefetchBoardsAndStates from "../../utils/prefetchBoardsAndStates";
 
 const HomePage = () => {
+    useEffect(() => {
+        // Kick off background prefetch for /courses availability without blocking paint
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const run = () => {
+            prefetchCoursesAvailability(controller?.signal);
+            // Also warm board/state availability early to avoid spinners on first class visit
+            prefetchBoardsAndStates(undefined, controller?.signal);
+        };
+        const handle = typeof requestIdleCallback !== 'undefined'
+            ? requestIdleCallback(run, { timeout: 1000 })
+            : setTimeout(run, 0);
+
+        return () => {
+            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {}
+            else clearTimeout(handle);
+            try { controller?.abort(); } catch {}
+        };
+    }, []);
     return (
         <>
             <SEO

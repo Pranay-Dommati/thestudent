@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses, getSchoolCourseById } from '../../../../services/courseApi';
-import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
+import { checkBoardAvailability, checkStateAvailability, getOptimisticBoardAvailability } from '../../../../utils/courseAvailability';
 import MobileBoardSelector from '../../shared/MobileBoardSelector';
 import Footer from '../../../Footer/Footer';
 import SEO from '../../../SEO/SEO';
@@ -37,22 +37,20 @@ const TenthStandard = () => {
   const [availableStates, setAvailableStates] = useState([]);
   const [checkingStates, setCheckingStates] = useState(false);
 
-  // Check course availability for each board
+  // Optimistic board availability
   useEffect(() => {
-    const checkAvailability = async () => {
-      setCheckingAvailability(true);
+    setAvailableBoards(getOptimisticBoardAvailability('10th'));
+    setCheckingAvailability(false);
+    const run = async () => {
       try {
-        const availableBoards = await checkBoardAvailability('10th');
-        setAvailableBoards(availableBoards);
-      } catch (error) {
-        logger.error('Error checking board availability:', error);
-        setAvailableBoards([]);
-      } finally {
-        setCheckingAvailability(false);
-      }
+        const fresh = await checkBoardAvailability('10th');
+        if (Array.isArray(fresh) && fresh.length) setAvailableBoards(fresh);
+      } catch {}
     };
-
-    checkAvailability();
+    const handle = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback(run, { timeout: 1500 }) : setTimeout(run, 200);
+    return () => {
+      if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {} else clearTimeout(handle);
+    };
   }, []);
 
   // Sync selected board with URL; also reset on base route

@@ -58,10 +58,10 @@ export const getCourses = async () => {
   }
 };
 
-export const getEngineeringCourses = async (category = 'all') => {
+export const getEngineeringCourses = async (category = 'all', extraParams = {}) => {
   try {
   logger.log('Fetching courses for category:', category);
-  const response = await axios.get(`/courses/engineering/`, { params: { category } });
+  const response = await axios.get(`/courses/engineering/`, { params: { category, ...extraParams } });
   logger.log('Course data received:', response.data);
     const list = response.data || [];
     // Warm per-course cache for details page fast load and refresh-resilience
@@ -108,11 +108,11 @@ export const getAllCourses = async (category = 'all') => {
   }
 };
 
-export const getSchoolCourses = async (classLevel, board, state = '') => {
+export const getSchoolCourses = async (classLevel, board, state = '', extraParams = {}) => {
   try {
   logger.log(`API call: getSchoolCourses(${classLevel}, ${board}, ${state})`);
     
-    const params = { class: classLevel, board };
+    const params = { class: classLevel, board, ...extraParams };
     if (board === 'state' && state) params.state = state;
     logger.log('Requesting school courses with params:', params);
       const listKey = `school:list:${(classLevel||'').toLowerCase()}:${(board||'').toLowerCase()}:${(state||'').toLowerCase()}`;
