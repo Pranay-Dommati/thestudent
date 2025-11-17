@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import LessonForm from './LessonForm';
 
@@ -79,4 +79,4 @@ const CourseStructureStep = ({
   );
 };
 
-export default CourseStructureStep;
+export default memo(CourseStructureStep);
