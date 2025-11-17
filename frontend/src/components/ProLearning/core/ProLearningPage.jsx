@@ -539,10 +539,14 @@ const ProLearningPage = () => {
     if (allTopicsGenerated && user === null && !loading) {
       console.log('✅ [Modal Trigger] All conditions met for anonymous user!');
       
-      // Create course data for modal
+      // Create course data for modal with all required fields
       const courseData = {
         courseId: courseId,
         courseTitle: courseTitle,
+        topics: topicsList.map(t => t.name || t), // Extract topic names
+        originalPrompt: courseTitle, // Use course title as fallback
+        learningContext: '',
+        personalization: '',
         createdAt: Date.now()
       };
       
@@ -570,7 +574,7 @@ const ProLearningPage = () => {
     } else {
       console.log('❌ [Modal Trigger] Conditions not met - modal will NOT show');
     }
-  }, [allTopicsGenerated, user, loading, courseId, courseTitle]);
+  }, [allTopicsGenerated, user, loading, courseId, courseTitle, topicsList]);
 
   // If we arrive with a UUID course (DB-saved), proactively clear any stale fresh-generation marker
   useEffect(() => {
