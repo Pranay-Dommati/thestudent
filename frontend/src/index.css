@@ -518,92 +518,99 @@
   .mobile-text-adjust h3 {
     @apply text-lg;
   }
-    }
-    100% {
-      opacity: 1 !important;
-      transform: scale(1) !important;
-      visibility: visible !important;
-    }
-  }
+}
 
-  /* Button Click Fix */
-  .btn-clickable {
-    cursor: pointer !important;
-    pointer-events: auto !important;
-    position: relative;
-    z-index: 10;
-  }
-  
-  /* Modal specific styling - highest priority */
-  .freemium-modal {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    z-index: 10000 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    background: rgba(0, 0, 0, 0.5) !important;
-    backdrop-filter: blur(4px) !important;
-    pointer-events: auto !important;
-  }
-
-  /* Ensure all buttons and links are clickable - but don't override modal z-index */
-  button:not(.modal-portal *), a:not(.modal-portal *), [role="button"]:not(.modal-portal *) {
-    cursor: pointer !important;
-    pointer-events: auto !important;
-    position: relative !important;
-    z-index: 5 !important;
-  }
-
-  /* Learning Hub specific fixes */
-  .learning-hub-container button,
-  .learning-hub-container a {
-    z-index: 20 !important;
-    position: relative !important;
-    pointer-events: auto !important;
-  }
-
-  /* Ensure all buttons and links in Learning Hub are clickable */
-  .btn-clickable,
-  a[href],
-  button {
-    pointer-events: auto !important;
-    cursor: pointer !important;
-    position: relative !important;
-    z-index: 10 !important;
-  }
-
-  /* Force interactive elements to be clickable */
-  [role="button"],
-  .clickable {
-    pointer-events: auto !important;
-    cursor: pointer !important;
-  }
-
-  /* Prevent overlay interference */
-  .modal-overlay {
-    pointer-events: auto !important;
-  }
-
-  /* Fix for Learning Hub specific buttons */
-  .learning-hub button,
-  .learning-hub a,
-  .learning-hub-page button,
-  .learning-hub-page a {
-    pointer-events: auto !important;
-    cursor: pointer !important;
-    z-index: 50 !important;
-    position: relative !important;
-  }
-
-  /* Override any pointer-events: none - but be more specific */
-  .pointer-events-auto {
-    pointer-events: auto !important;
+/* Fix: Place animation inside keyframes */
+@keyframes fadeInScale {
+  100% {
+    opacity: 1 !important;
+    transform: scale(1) !important;
+    visibility: visible !important;
   }
 }
+
+
+
+/* Button Click Fix */
+.btn-clickable {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 10;
+}
+
+/* Modal specific styling - highest priority */
+.freemium-modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 10000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(4px) !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure all buttons and links are clickable - but don't override modal z-index */
+button:not(.modal-portal *),
+a:not(.modal-portal *),
+[role="button"]:not(.modal-portal *) {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 5 !important;
+}
+
+/* Learning Hub specific fixes */
+.learning-hub-container button,
+.learning-hub-container a {
+  z-index: 20 !important;
+  position: relative !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure all buttons and links in Learning Hub are clickable */
+.btn-clickable,
+a[href],
+button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+/* Force interactive elements to be clickable */
+[role="button"],
+.clickable {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Prevent overlay interference */
+.modal-overlay {
+  pointer-events: auto !important;
+}
+
+/* Fix for Learning Hub specific buttons */
+.learning-hub button,
+.learning-hub a,
+.learning-hub-page button,
+.learning-hub-page a {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 50 !important;
+  position: relative !important;
+}
+
+/* Override any pointer-events: none - but be more specific */
+.pointer-events-auto {
+  pointer-events: auto !important;
+}
+
 
 /* Ensure no unexpected gaps around the app */
 html, body, #root {
