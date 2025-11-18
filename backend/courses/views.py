@@ -2741,9 +2741,25 @@ def update_course(request, course_id):
     Update a course (both school and engineering courses)
     """
     try:
+        # Check if user is authenticated and is admin
+        if not request.user or not request.user.is_authenticated:
+            return Response({
+                'error': 'Authentication required',
+                'detail': 'You must be logged in to update courses'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        if not request.user.is_staff and not request.user.is_superuser:
+            return Response({
+                'error': 'Permission denied',
+                'detail': 'Admin privileges required to update courses'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
         data = request.data
         if settings.DEBUG:
-            print("Received update data:", data)
+            print(f"[DEBUG] Update request from user: {request.user.email if hasattr(request.user, 'email') else request.user.username}")
+            print(f"[DEBUG] Course ID: {course_id}")
+            print(f"[DEBUG] Request data keys: {list(data.keys())}")
+            print(f"[DEBUG] Request FILES keys: {list(request.FILES.keys())}")
         
         # Try to find the course in SchoolCourse first
         school_course = None
@@ -2829,7 +2845,18 @@ def update_course(request, course_id):
             if 'thumbnail' in request.FILES:
                 school_course.thumbnail = request.FILES['thumbnail']
             
-            school_course.save()
+            # Save the school course - wrap in try-catch for DB errors
+            try:
+                school_course.save()
+                if settings.DEBUG:
+                    print(f"[DEBUG] School course {course_id} basic fields saved successfully")
+            except Exception as save_error:
+                print(f"[ERROR] Failed to save school course: {save_error}")
+                traceback.print_exc()
+                return Response({
+                    'error': f'Failed to save course changes: {str(save_error)}',
+                    'error_type': type(save_error).__name__,
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             # Nested update: chapters and lessons (optional)
             if 'chapters' in data:
@@ -2919,8 +2946,15 @@ def update_course(request, course_id):
                         lesson_obj.description = les.get('description', lesson_obj.description) or ''
                         lesson_obj.about_lesson = les.get('aboutLesson', les.get('about_lesson', lesson_obj.about_lesson)) or ''
                         lesson_obj.order = lesson_index
-                        lesson_obj.save()
-                        kept_lesson_ids.append(lesson_obj.id)
+                        
+                        try:
+                            lesson_obj.save()
+                            kept_lesson_ids.append(lesson_obj.id)
+                        except Exception as lesson_save_error:
+                            print(f"[ERROR] Failed to save lesson '{title}': {lesson_save_error}")
+                            traceback.print_exc()
+                            # Continue with other lessons instead of failing completely
+                            continue
 
                         # --- Handle lesson resources (downloadable and internet) ---
                         has_resources = les.get('hasResources', False)
@@ -3147,7 +3181,18 @@ def update_course(request, course_id):
             if 'thumbnail' in request.FILES:
                 engineering_course.thumbnail = request.FILES['thumbnail']
             
-            engineering_course.save()
+            # Save the engineering course - wrap in try-catch for DB errors
+            try:
+                engineering_course.save()
+                if settings.DEBUG:
+                    print(f"[DEBUG] Engineering course {course_id} basic fields saved successfully")
+            except Exception as save_error:
+                print(f"[ERROR] Failed to save engineering course: {save_error}")
+                traceback.print_exc()
+                return Response({
+                    'error': f'Failed to save course changes: {str(save_error)}',
+                    'error_type': type(save_error).__name__,
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             # Nested update: sections and lessons (optional)
             if 'sections' in data:
@@ -3236,8 +3281,15 @@ def update_course(request, course_id):
                         lesson_obj.description = les.get('description', lesson_obj.description) or ''
                         lesson_obj.about_lesson = les.get('aboutLesson', les.get('about_lesson', lesson_obj.about_lesson)) or ''
                         lesson_obj.order = lesson_index
-                        lesson_obj.save()
-                        kept_lesson_ids.append(lesson_obj.id)
+                        
+                        try:
+                            lesson_obj.save()
+                            kept_lesson_ids.append(lesson_obj.id)
+                        except Exception as lesson_save_error:
+                            print(f"[ERROR] Failed to save lesson '{title}': {lesson_save_error}")
+                            traceback.print_exc()
+                            # Continue with other lessons instead of failing completely
+                            continue
 
                         # --- Handle lesson resources (downloadable and internet) ---
                         has_resources = les.get('hasResources', False)
