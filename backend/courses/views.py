@@ -2835,18 +2835,39 @@ def update_course(request, course_id):
             if 'chapters' in data:
                 try:
                     chapters_payload = data.get('chapters', '[]')
+                    if settings.DEBUG:
+                        print(f"[DEBUG] Chapters payload type: {type(chapters_payload)}")
+                        print(f"[DEBUG] Chapters payload sample: {str(chapters_payload)[:200]}...")
+                    
                     if isinstance(chapters_payload, str):
                         chapters_data = json.loads(chapters_payload or '[]')
                     else:
                         chapters_data = chapters_payload or []
-                except Exception:
+                        
+                    if settings.DEBUG:
+                        print(f"[DEBUG] Parsed {len(chapters_data)} chapters")
+                except json.JSONDecodeError as je:
+                    print(f"[ERROR] JSON decode error in chapters: {je}")
+                    print(f"[ERROR] Chapters payload: {chapters_payload}")
+                    chapters_data = []
+                except Exception as e:
+                    print(f"[ERROR] Unexpected error parsing chapters: {e}")
+                    traceback.print_exc()
                     chapters_data = []
 
                 kept_chapter_ids = []
                 for chapter_index, ch in enumerate(chapters_data):
+                    # Skip if chapter is not a dict
+                    if not isinstance(ch, dict):
+                        if settings.DEBUG:
+                            print(f"[WARNING] Skipping non-dict chapter at index {chapter_index}: {type(ch)}")
+                        continue
+                        
                     ch_id = ch.get('id')
                     ch_name = ch.get('name', '').strip()
                     if not ch_name:
+                        if settings.DEBUG:
+                            print(f"[WARNING] Skipping chapter at index {chapter_index} with empty name")
                         continue
                     # Find existing chapter by id under this course
                     chapter_obj = None
@@ -2862,11 +2883,24 @@ def update_course(request, course_id):
 
                     # Update lessons in this chapter
                     lessons = ch.get('lessons', []) or []
+                    if not isinstance(lessons, list):
+                        if settings.DEBUG:
+                            print(f"[WARNING] Lessons is not a list for chapter {ch_name}, type: {type(lessons)}")
+                        lessons = []
+                    
                     kept_lesson_ids = []
                     for lesson_index, les in enumerate(lessons):
+                        # Skip if lesson is not a dict
+                        if not isinstance(les, dict):
+                            if settings.DEBUG:
+                                print(f"[WARNING] Skipping non-dict lesson at index {lesson_index} in chapter {ch_name}")
+                            continue
+                            
                         les_id = les.get('id')
                         title = (les.get('title') or '').strip()
                         if not title:
+                            if settings.DEBUG:
+                                print(f"[WARNING] Skipping lesson at index {lesson_index} with empty title in chapter {ch_name}")
                             continue
                         lesson_obj = None
                         if les_id:
@@ -3119,18 +3153,39 @@ def update_course(request, course_id):
             if 'sections' in data:
                 try:
                     sections_payload = data.get('sections', '[]')
+                    if settings.DEBUG:
+                        print(f"[DEBUG] Sections payload type: {type(sections_payload)}")
+                        print(f"[DEBUG] Sections payload sample: {str(sections_payload)[:200]}...")
+                    
                     if isinstance(sections_payload, str):
                         sections_data = json.loads(sections_payload or '[]')
                     else:
                         sections_data = sections_payload or []
-                except Exception:
+                        
+                    if settings.DEBUG:
+                        print(f"[DEBUG] Parsed {len(sections_data)} sections")
+                except json.JSONDecodeError as je:
+                    print(f"[ERROR] JSON decode error in sections: {je}")
+                    print(f"[ERROR] Sections payload: {sections_payload}")
+                    sections_data = []
+                except Exception as e:
+                    print(f"[ERROR] Unexpected error parsing sections: {e}")
+                    traceback.print_exc()
                     sections_data = []
 
                 kept_section_ids = []
                 for section_index, sec in enumerate(sections_data):
+                    # Skip if section is not a dict
+                    if not isinstance(sec, dict):
+                        if settings.DEBUG:
+                            print(f"[WARNING] Skipping non-dict section at index {section_index}: {type(sec)}")
+                        continue
+                        
                     sec_id = sec.get('id')
                     sec_name = sec.get('name', '').strip()
                     if not sec_name:
+                        if settings.DEBUG:
+                            print(f"[WARNING] Skipping section at index {section_index} with empty name")
                         continue
                     # Find existing section by id under this course
                     section_obj = None
@@ -3146,11 +3201,24 @@ def update_course(request, course_id):
 
                     # Update lessons in this section
                     lessons = sec.get('lessons', []) or []
+                    if not isinstance(lessons, list):
+                        if settings.DEBUG:
+                            print(f"[WARNING] Lessons is not a list for section {sec_name}, type: {type(lessons)}")
+                        lessons = []
+                    
                     kept_lesson_ids = []
                     for lesson_index, les in enumerate(lessons):
+                        # Skip if lesson is not a dict
+                        if not isinstance(les, dict):
+                            if settings.DEBUG:
+                                print(f"[WARNING] Skipping non-dict lesson at index {lesson_index} in section {sec_name}")
+                            continue
+                            
                         les_id = les.get('id')
                         title = (les.get('title') or '').strip()
                         if not title:
+                            if settings.DEBUG:
+                                print(f"[WARNING] Skipping lesson at index {lesson_index} with empty title in section {sec_name}")
                             continue
                         lesson_obj = None
                         if les_id:
@@ -3362,11 +3430,31 @@ def update_course(request, course_id):
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
-        print(f"Error in update_course: {str(e)}")
-        traceback.print_exc()
-        return Response({
-            'error': f'Failed to update course: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Enhanced error logging with more details
+        error_type = type(e).__name__
+        error_message = str(e)
+        error_trace = traceback.format_exc()
+        
+        # Log detailed error information
+        print(f"[ERROR] Exception Type: {error_type}")
+        print(f"[ERROR] Error Message: {error_message}")
+        print(f"[ERROR] Full Traceback:\n{error_trace}")
+        print(f"[ERROR] Course ID: {course_id}")
+        print(f"[ERROR] Request Data Keys: {list(data.keys()) if hasattr(data, 'keys') else 'N/A'}")
+        
+        # Return detailed error response for debugging
+        error_response = {
+            'error': f'Failed to update course: {error_message}',
+            'error_type': error_type,
+            'course_id': course_id,
+        }
+        
+        # Include traceback in debug mode
+        if settings.DEBUG:
+            error_response['traceback'] = error_trace
+            error_response['request_data_keys'] = list(data.keys()) if hasattr(data, 'keys') else []
+        
+        return Response(error_response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
