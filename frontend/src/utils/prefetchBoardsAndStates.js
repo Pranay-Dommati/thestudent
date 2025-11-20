@@ -1,12 +1,14 @@
 import api from './axios';
 import { courseCache } from './courseCache';
 import { checkStateAvailability } from './courseAvailability';
+import { getSchoolCourses } from '../services/courseApi';
 
 const CLASS_LEVELS = ['6th','7th','8th','9th','10th','11th','12th'];
 
 /**
  * Prefetch board availability (CBSE/State) for class levels using tiny payloads (limit=1).
  * If state board is present, prefetch full state availability sequentially to avoid bursts.
+ * Also implements "write-ahead" caching for course cards (CBSE) to ensure instant load.
  * @param {Array<string>} [levels] Optional class levels to target
  * @param {AbortSignal} [signal] Optional AbortSignal for cancellation
  */
@@ -34,7 +36,11 @@ export async function prefetchBoardsAndStates(levels = CLASS_LEVELS, signal) {
         const hasState = stateRes.status === 'fulfilled' && stateRes.value === true;
 
         const availableBoards = [];
-        if (hasCbse) availableBoards.push({ id: 'cbse', name: 'CBSE', fullName: 'Central Board of Secondary Education', available: true });
+        if (hasCbse) {
+          availableBoards.push({ id: 'cbse', name: 'CBSE', fullName: 'Central Board of Secondary Education', available: true });
+          // Write-ahead: Prefetch CBSE course cards so they load instantly on click
+          getSchoolCourses(classLevel, 'cbse').catch(() => {});
+        }
         if (hasState) availableBoards.push({ id: 'state', name: 'State Board', fullName: 'State Board of Secondary and Higher Secondary Education', available: true });
 
         if (availableBoards.length) {
@@ -42,6 +48,7 @@ export async function prefetchBoardsAndStates(levels = CLASS_LEVELS, signal) {
         }
 
         // If state exists and cache isn't fresh, prefetch states sequentially
+        // This implicitly prefetches state course cards via getSchoolCourses('state') inside checkStateAvailability
         if (hasState && !courseCache.isFresh(`state_availability_${classLevel}`)) {
           try {
             await checkStateAvailability(classLevel);

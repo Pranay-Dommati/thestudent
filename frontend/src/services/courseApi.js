@@ -163,6 +163,42 @@ export const getSchoolCourseById = async (courseId) => {
   }
 };
 
+/**
+ * Manually populate the cache for specific state lists from a bulk fetch.
+ * This enables "write-ahead" caching where fetching all state courses
+ * automatically makes specific state queries (e.g. "Telangana") instant.
+ */
+export const populateStateCacheFromList = (classLevel, allCourses) => {
+  try {
+    // Group courses by state
+    const coursesByState = {};
+    allCourses.forEach(course => {
+      if (course.state) {
+        // Normalize state name to handle potential inconsistencies if needed, 
+        // but usually database returns consistent names like "Telangana"
+        const stateName = course.state;
+        if (!coursesByState[stateName]) {
+          coursesByState[stateName] = [];
+        }
+        coursesByState[stateName].push(course);
+      }
+    });
+
+    // Set cache for each state
+    Object.entries(coursesByState).forEach(([stateName, courses]) => {
+      // Construct key exactly as getSchoolCourses does:
+      // `school:list:${classLevel}:${board}:${state}`
+      // board is 'state'
+      const listKey = `school:list:${(classLevel||'').toLowerCase()}:state:${(stateName||'').toLowerCase()}`;
+      
+      logger.log(`Populating write-ahead cache for ${listKey} with ${courses.length} items`);
+      cache.set(listKey, courses, 5 * 60_000); // 5 minutes TTL
+    });
+  } catch (e) {
+    logger.error('Error populating state cache:', e);
+  }
+};
+
 export const updateCourse = async (courseId, formData) => {
   try {
   logger.log("Updating course with ID:", courseId);

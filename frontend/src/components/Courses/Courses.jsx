@@ -90,10 +90,16 @@ const Courses = () => {
         setLoading(true);
 
         try {
-            const schoolLevels = allEducationLevels.filter(level => level.apiClass !== 'engineering');
+            // Define levels that are always available (skip API check)
+            const alwaysAvailableIds = ['10th', '11th'];
+            
+            // Filter levels that need checking (exclude engineering and always available ones)
+            const levelsToCheck = allEducationLevels.filter(level => 
+                level.apiClass !== 'engineering' && !alwaysAvailableIds.includes(level.id)
+            );
 
             // Fire all requests in parallel and keep payloads tiny using limit=1 when supported
-            const schoolPromises = schoolLevels.map(level =>
+            const schoolPromises = levelsToCheck.map(level =>
                 api.get('/courses/school/', { params: { class: level.apiClass, limit: 1 } })
                     .then(({ data }) => ({ level, data }))
                     .catch(error => ({ level, error }))
@@ -112,7 +118,8 @@ const Courses = () => {
                 engineeringPromise,
             ]);
 
-            const levelsWithCourses = [];
+            // Start with the always available levels
+            const levelsWithCourses = allEducationLevels.filter(level => alwaysAvailableIds.includes(level.id));
 
             results.forEach(result => {
                 if (!result || result.status !== 'fulfilled') return;
@@ -131,9 +138,10 @@ const Courses = () => {
                 }
             });
 
-            // If nothing detected, show empty list (which renders "No Courses Available")
-            // instead of falling back to showing all levels
-            const finalLevels = levelsWithCourses;
+            // Sort levels to match the original order in allEducationLevels
+            const finalLevels = allEducationLevels.filter(level => 
+                levelsWithCourses.some(l => l.id === level.id)
+            );
 
             // Cache and update state
             courseCache.setCourseAvailability(finalLevels);
@@ -148,12 +156,9 @@ const Courses = () => {
     };
 
     useEffect(() => {
-        // Defer the availability check to the next frame to avoid blocking paint
-        const t = requestIdleCallback ? requestIdleCallback(checkCoursesAvailability, { timeout: 1000 }) : setTimeout(checkCoursesAvailability, 0);
-        return () => {
-            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(t); } catch {}
-            else clearTimeout(t);
-        };
+        // Defer the availability check slightly to avoid blocking paint, but keep it fast
+        const t = setTimeout(checkCoursesAvailability, 0);
+        return () => clearTimeout(t);
     }, []);
 
     useEffect(() => {

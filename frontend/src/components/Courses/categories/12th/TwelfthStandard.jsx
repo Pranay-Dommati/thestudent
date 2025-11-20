@@ -37,20 +37,21 @@ const TwelfthStandard = () => {
   const [availableStates, setAvailableStates] = useState([]);
   const [checkingStates, setCheckingStates] = useState(false);
 
-  // Optimistic board availability
+  // Check board availability
   useEffect(() => {
-    setAvailableBoards(getOptimisticBoardAvailability('12th'));
-    setCheckingAvailability(false);
     const run = async () => {
       try {
         const fresh = await checkBoardAvailability('12th');
-        if (Array.isArray(fresh) && fresh.length) setAvailableBoards(fresh);
-      } catch {}
+        if (Array.isArray(fresh) && fresh.length) {
+          setAvailableBoards(fresh);
+        }
+      } catch (error) {
+        logger.error('Error checking board availability:', error);
+      } finally {
+        setCheckingAvailability(false);
+      }
     };
-    const handle = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback(run, { timeout: 1500 }) : setTimeout(run, 200);
-    return () => {
-      if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {} else clearTimeout(handle);
-    };
+    run();
   }, []);
 
   // Sync selected board with URL; also reset on base route

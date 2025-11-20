@@ -1,4 +1,4 @@
-import { getSchoolCourses } from '../services/courseApi';
+import { getSchoolCourses, populateStateCacheFromList } from '../services/courseApi';
 import { stateBoards } from '../components/Courses/data/states';
 import logger from './logger';
 import courseCache from './courseCache';
@@ -91,6 +91,11 @@ export const checkStateAvailability = async (classLevel) => {
 
     // Fetch all state-board courses for this class in ONE request
     const stateCourses = await getSchoolCourses(classLevel, 'state');
+
+    // Write-ahead: Populate cache for individual states so subsequent clicks are instant
+    if (stateCourses && stateCourses.length > 0) {
+      populateStateCacheFromList(classLevel, stateCourses);
+    }
 
     // Build a set of normalized state names present in the data
     const availableNames = new Set(

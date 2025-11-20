@@ -35,20 +35,21 @@ const NinthStandard = () => {
   const [availableBoards, setAvailableBoards] = useState([]);
   const [checkingAvailability, setCheckingAvailability] = useState(true);
 
-  // Optimistic board availability
+  // Check board availability
   useEffect(() => {
-    setAvailableBoards(getOptimisticBoardAvailability('9th'));
-    setCheckingAvailability(false);
     const run = async () => {
       try {
         const fresh = await checkBoardAvailability('9th');
-        if (Array.isArray(fresh) && fresh.length) setAvailableBoards(fresh);
-      } catch {}
+        if (Array.isArray(fresh) && fresh.length) {
+          setAvailableBoards(fresh);
+        }
+      } catch (error) {
+        logger.error('Error checking board availability:', error);
+      } finally {
+        setCheckingAvailability(false);
+      }
     };
-    const handle = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback(run, { timeout: 1500 }) : setTimeout(run, 200);
-    return () => {
-      if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {} else clearTimeout(handle);
-    };
+    run();
   }, []);
 
   // Sync selected board with URL; also reset on base route
