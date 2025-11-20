@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
@@ -199,15 +199,15 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         if (!hasGradeInPath && courseId) {
           try {
             isSchoolCourse = true;
-            apiUrl = `/courses/school/${courseId}/`;
-            console.log('🔍 Fetching school course by ID:', courseId);
+            apiUrl = `/courses/school/${courseId}/?structure_only=true`;
+            console.log('🔍 Fetching school course structure by ID:', courseId);
             response = await axiosInstance.get(apiUrl);
             console.log('✅ School course fetched successfully');
           } catch (e) {
             // Fallback to engineering by ID if not a school course
             console.log('⚠️ Not a school course, trying engineering course by ID:', courseId);
             isSchoolCourse = false;
-            apiUrl = `/courses/engineering/${courseId}/`;
+            apiUrl = `/courses/engineering/${courseId}/?structure_only=true`;
             try {
               response = await axiosInstance.get(apiUrl);
               console.log('✅ Engineering course fetched successfully');
@@ -222,15 +222,15 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         if (hasGradeInPath) {
           isSchoolCourse = true;
           if (selectedCourseId) {
-            apiUrl = `/courses/school/${selectedCourseId}/`;
-            console.log('🔍 Fetching school course by query courseId:', selectedCourseId);
+            apiUrl = `/courses/school/${selectedCourseId}/?structure_only=true`;
+            console.log('🔍 Fetching school course structure by query courseId:', selectedCourseId);
           } else {
             // Strict ID-only mode: do not attempt subject/state fallbacks
             throw new Error('Missing courseId. Please start learning from the course page so we can lock to the correct course.');
           }
         } else {
           // Engineering course by path structure
-          apiUrl = `/courses/engineering/${courseId}/`;
+          apiUrl = `/courses/engineering/${courseId}/?structure_only=true`;
         }
 
         if (!apiUrl) {
@@ -332,6 +332,29 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         // Expand the first chapter by default
         if (transformedCourse.chapters.length > 0) {
           setExpandedChapters({ 0: true });
+          
+          // Lazy load the first lesson immediately
+          if (transformedCourse.chapters[0].lessons.length > 0) {
+            const firstLesson = transformedCourse.chapters[0].lessons[0];
+            if (firstLesson.id) {
+               // We can't call fetchLessonDetails here easily because it depends on 'course' state which isn't set yet
+               // But we can fetch it and merge it into transformedCourse before setting state
+               try {
+                 const lessonRes = await axiosInstance.get(`/lessons/${firstLesson.id}/`);
+                 const details = lessonRes.data;
+                 transformedCourse.chapters[0].lessons[0] = {
+                   ...firstLesson,
+                   ...details,
+                   videoUrl: details.video_url,
+                   aboutLesson: details.about_lesson,
+                   quizQuestions: details.quiz_questions,
+                   resources: details.resources || { downloadable: [], internet: [] }
+                 };
+               } catch (err) {
+                 console.warn('Failed to pre-fetch first lesson details', err);
+               }
+            }
+          }
         }
         
         // **OPTIMIZATION 3: Fetch progress once auth is definitely valid (fixes first-load 401)**
@@ -730,20 +753,80 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       );
       return filteredLessons.length > 0 ? { ...chapter, lessons: filteredLessons } : null;
     }).filter(Boolean);
-  };  // Handle lesson click
+  };
+
+  // Fetch full details for a specific lesson (lazy loading)
+  const fetchLessonDetails = useCallback(async (lessonId, chapterIndex, lessonIndex) => {
+    if (!lessonId) return;
+    
+    try {
+      const response = await axiosInstance.get(`/lessons/${lessonId}/`);
+      const lessonDetails = response.data;
+      
+      // Update the course state with the full lesson details
+      setCourse(prevCourse => {
+        const newCourse = { ...prevCourse };
+        const chapter = newCourse.chapters[chapterIndex];
+        const lesson = chapter.lessons[lessonIndex];
+        
+        // Merge existing lesson data with new details
+        newCourse.chapters[chapterIndex].lessons[lessonIndex] = {
+          ...lesson,
+          ...lessonDetails,
+          // Ensure we map backend fields to frontend expected fields
+          videoUrl: lessonDetails.video_url,
+          aboutLesson: lessonDetails.about_lesson,
+          quizQuestions: lessonDetails.quiz_questions,
+          // Ensure resources are properly formatted
+          resources: lessonDetails.resources || { downloadable: [], internet: [] }
+        };
+        
+        return newCourse;
+      });
+      
+      // Update cache with the new details
+      const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+      const cachedData = courseCache.get(cacheKey);
+      if (cachedData && cachedData.course) {
+        const newCachedCourse = { ...cachedData.course };
+        if (newCachedCourse.chapters && newCachedCourse.chapters[chapterIndex]) {
+           const cachedLesson = newCachedCourse.chapters[chapterIndex].lessons[lessonIndex];
+           newCachedCourse.chapters[chapterIndex].lessons[lessonIndex] = {
+             ...cachedLesson,
+             ...lessonDetails,
+             videoUrl: lessonDetails.video_url,
+             aboutLesson: lessonDetails.about_lesson,
+             quizQuestions: lessonDetails.quiz_questions,
+             resources: lessonDetails.resources || { downloadable: [], internet: [] }
+           };
+           courseCache.set(cacheKey, { ...cachedData, course: newCachedCourse });
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error fetching lesson details:', error);
+      universalToast.error('Failed to load lesson content');
+    }
+  }, [pathname, location.search, isLoggedIn]);
+
+  // Handle lesson click
   const handleLessonClick = (chapterIndex, lessonIndex) => {
     const lesson = course.chapters[chapterIndex].lessons[lessonIndex]; 
     // Debug information
     console.log('🎯 Lesson clicked:', lesson);
-    console.log('📝 Lesson type:', lesson.type);
-    console.log('❓ Quiz questions:', lesson.quiz_questions);
-    console.log('📚 About lesson:', lesson.aboutLesson);
-    console.log('📂 Resources:', lesson.resources);
+    
     // Gate access for locked lessons when user is not logged in
     if (!isLoggedIn && lesson.isLocked) {
       // Soft nudge; prevent navigation
       universalToast.info('Login to unlock this lesson');
       return;
+    }
+    
+    // Lazy load lesson details if they are missing (aboutLesson is undefined in light serializer)
+    // We check for undefined specifically, as empty string '' means it was fetched but is empty
+    if (lesson.aboutLesson === undefined && lesson.id) {
+      console.log('📥 Lazy loading lesson details for:', lesson.id);
+      fetchLessonDetails(lesson.id, chapterIndex, lessonIndex);
     }
     
     // Only update state if we're actually changing lessons to prevent re-renders
@@ -816,6 +899,23 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       onSidebarToggle(sidebarVisible);
     }
   }, [sidebarVisible, onSidebarToggle]);
+
+  // Effect to lazy load lesson details when active lesson changes
+  useEffect(() => {
+    if (!course || !course.chapters) return;
+    
+    const chapter = course.chapters[activeChapter];
+    if (!chapter || !chapter.lessons) return;
+    
+    const lesson = chapter.lessons[activeLesson];
+    if (!lesson) return;
+    
+    // Check if we need to fetch details (aboutLesson is undefined in light serializer)
+    if (lesson.aboutLesson === undefined && lesson.id) {
+      console.log('🔄 Auto-fetching details for active lesson:', lesson.id);
+      fetchLessonDetails(lesson.id, activeChapter, activeLesson);
+    }
+  }, [activeChapter, activeLesson, course, fetchLessonDetails]);
 
   // Loading and error states
   if (loading) {

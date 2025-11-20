@@ -7,7 +7,10 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource, LearningActivity, UserStartedPredefinedCourse, Certification
-from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer, CertificationSerializer
+from .serializers import (
+    CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer, CertificationSerializer,
+    CourseStructureSerializer, EngineeringCourseStructureSerializer, LessonSerializer
+)
 from django.utils import timezone
 from django.conf import settings
 import uuid
@@ -493,6 +496,14 @@ def list_engineering_courses(request):
 def get_engineering_course_by_id(request, course_id):
     try:
         course = EngineeringCourse.objects.get(id=course_id)
+        
+        # Check if we only want the structure (lightweight)
+        structure_only = request.query_params.get('structure_only', 'false').lower() == 'true'
+        
+        if structure_only:
+            serializer = EngineeringCourseStructureSerializer(course, context={'request': request})
+            return Response(serializer.data)
+            
         # Include request in serializer context so lesson completion flags compute correctly
         serializer = EngineeringCourseWithSectionsSerializer(course, context={'request': request})
         data = serializer.data
@@ -534,8 +545,6 @@ def get_engineering_course_by_id(request, course_id):
                             ld['video_url'] = None
                             ld['resources'] = {'downloadable': [], 'internet': []}
                             ld['quiz_questions'] = []
-                        new_lessons.append(ld)
-                    sec['lessons'] = new_lessons
                 else:
                     # Sections beyond preview limit are fully locked
                     sec['is_preview'] = False
@@ -577,6 +586,14 @@ def get_engineering_course_by_id(request, course_id):
 def get_school_course_by_id(request, course_id):
     try:
         course = SchoolCourse.objects.get(id=course_id)
+        
+        # Check if we only want the structure (lightweight)
+        structure_only = request.query_params.get('structure_only', 'false').lower() == 'true'
+        
+        if structure_only:
+            serializer = CourseStructureSerializer(course, context={'request': request})
+            return Response(serializer.data)
+            
         serializer = CourseWithChaptersSerializer(course, context={'request': request})
         data = serializer.data
 
@@ -2395,7 +2412,8 @@ def delete_course_enrollment(request, enrollment_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
+@authentication_classes([])
 def check_course_enrollment(request, course_type, course_id):
     """
     Check if user is enrolled in a specific course
@@ -2412,11 +2430,8 @@ def check_course_enrollment(request, course_type, course_id):
         elif course_type == 'engineering':
             filter_params['engineering_course_id'] = course_id
         else:
-            return Response(
-                {'error': 'Invalid course_type'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+            return Response({'error': 'Invalid course_type'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             enrollment = UserStartedPredefinedCourse.objects.get(**filter_params)
             return Response({
@@ -2558,6 +2573,7 @@ def admin_enrollment_stats(request):
         import traceback
         traceback.print_exc()
         return Response({'error': f'Failed to compute enrollment stats: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 # ==================== LEARNING ACTIVITY TRACKING API ====================
 
 @api_view(['POST'])
@@ -3526,12 +3542,10 @@ def get_course_by_id(request, course_id):
                 # Also provide the keys expected by the admin edit form
                 'learning_outcomes': course.learning_points or [],
                 'requirements': course.requirements or [],
-                'course_content': getattr(course, 'course_content', []),
                 'sources': course.sources or '',
                 'certificate': 'Certificate of Completion' if getattr(course, 'certificate_given', False) else '',
                 'price': str(getattr(course, 'price', 0)),
-                # Include sections and lessons
-                'sections': []
+                'course_content': getattr(course, 'course_content', []),
             }
             
             # Get sections and lessons for engineering courses
@@ -3623,11 +3637,11 @@ def get_course_by_id(request, course_id):
         if not is_auth:
             # Read preview limits from environment with safe defaults
             try:
-                preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))
+                preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))  # K
             except Exception:
                 preview_limit = 2
             try:
-                preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))
+                preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))  # L
             except Exception:
                 preview_lessons = 3
 
@@ -3778,3 +3792,55 @@ def get_user_certificates(request):
             'success': False,
             'error': f'Failed to get user certificates: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+@authentication_classes([JWTAuthentication])
+def get_lesson_details(request, lesson_id):
+    """
+    Fetch full details for a specific lesson.
+    Used for lazy loading lesson content.
+    """
+    try:
+        lesson = Lesson.objects.get(id=lesson_id)
+        
+        # Check for preview restrictions if user is not authenticated
+        is_auth = request.user.is_authenticated if hasattr(request, 'user') else False
+        
+        if not is_auth:
+            # Determine if this lesson is locked
+            is_locked = True
+            
+            try:
+                preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))
+                preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))
+                
+                # Check if lesson belongs to a chapter (School) or section (Engineering)
+                if lesson.chapter:
+                    chapter_order = lesson.chapter.order
+                    lesson_order = lesson.order
+                    if chapter_order < preview_limit and lesson_order < preview_lessons:
+                        is_locked = False
+                elif lesson.section:
+                    section_order = lesson.section.order
+                    lesson_order = lesson.order
+                    if section_order < preview_limit and lesson_order < preview_lessons:
+                        is_locked = False
+            except Exception:
+                # Default to locked if logic fails
+                pass
+                
+            if is_locked:
+                return Response(
+                    {"error": "Login to unlock this lesson"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        serializer = LessonSerializer(lesson, context={'request': request})
+        return Response(serializer.data)
+        
+    except Lesson.DoesNotExist:
+        return Response(
+            {"error": "Lesson not found"}, 
+            status=status.HTTP_404_NOT_FOUND
+        )

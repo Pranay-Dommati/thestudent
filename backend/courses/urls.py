@@ -39,6 +39,7 @@ urlpatterns = [
     path('api/courses/<str:course_id>/progress/', views.get_course_progress, name='get-course-progress-by-path'),
     path('api/lessons/complete/<int:lesson_id>/', views.toggle_lesson_completion, name='toggle-lesson-completion'),
     path('api/lessons/toggle-completion/<int:lesson_id>/', views.toggle_lesson_completion, name='toggle-lesson-completion'),
+    path('api/lessons/<int:lesson_id>/', views.get_lesson_details, name='get-lesson-details'),
 
     # Quiz endpoints
     path('api/quiz/submit/<int:lesson_id>/', views.submit_quiz, name='submit-quiz'),
