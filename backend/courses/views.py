@@ -2478,7 +2478,7 @@ def admin_enrollment_stats(request):
     {
       "totals": { "total_courses": n, "total_enrollments": m },
       "courses": [
-        { "id": str, "title": str, "course_type": "school|engineering", "enrollments": int, "is_published": bool, "last_updated": ISO }, ...
+        { "id": str, "title": "...", "course_type": "school|engineering", "enrollments": int, "is_published": bool, "last_updated": ISO }, ...
       ]
     }
     """
@@ -2822,6 +2822,8 @@ def update_course(request, course_id):
                     chapters_data = []
 
                 kept_chapter_ids = []
+                lessons_to_update = []
+
                 for chapter_index, ch in enumerate(chapters_data):
                     ch_id = ch.get('id')
                     ch_name = ch.get('name', '').strip()
@@ -2834,9 +2836,10 @@ def update_course(request, course_id):
                     if not chapter_obj:
                         chapter_obj = school_course.chapters.create(name=ch_name, order=chapter_index)
                     else:
-                        chapter_obj.name = ch_name
-                        chapter_obj.order = chapter_index
-                        chapter_obj.save()
+                        if chapter_obj.name != ch_name or chapter_obj.order != chapter_index:
+                            chapter_obj.name = ch_name
+                            chapter_obj.order = chapter_index
+                            chapter_obj.save()
                     kept_chapter_ids.append(chapter_obj.id)
 
                     # Update lessons in this chapter
@@ -2847,24 +2850,53 @@ def update_course(request, course_id):
                         title = (les.get('title') or '').strip()
                         if not title:
                             continue
+                        
                         lesson_obj = None
                         if les_id:
                             lesson_obj = chapter_obj.lessons.filter(id=les_id).first()
+                        
+                        # Prepare fields
+                        new_type = les.get('type', 'video') or 'video'
+                        new_video_url = les.get('videoUrl', les.get('video_url', '')) or ''
+                        new_description = les.get('description', '') or ''
+                        new_about_lesson = les.get('aboutLesson', les.get('about_lesson', '')) or ''
+                        
                         if not lesson_obj:
+                            # Create new lesson with all fields set
                             lesson_obj = chapter_obj.lessons.create(
                                 title=title,
-                                type=les.get('type', 'video') or 'video',
-                                order=lesson_index
+                                type=new_type,
+                                order=lesson_index,
+                                video_url=new_video_url,
+                                description=new_description,
+                                about_lesson=new_about_lesson
                             )
-                        # Update fields
-                        lesson_obj.title = title
-                        lesson_obj.type = les.get('type', lesson_obj.type) or lesson_obj.type
-                        # Frontend sends camelCase videoUrl/aboutLesson
-                        lesson_obj.video_url = les.get('videoUrl', les.get('video_url', lesson_obj.video_url)) or ''
-                        lesson_obj.description = les.get('description', lesson_obj.description) or ''
-                        lesson_obj.about_lesson = les.get('aboutLesson', les.get('about_lesson', lesson_obj.about_lesson)) or ''
-                        lesson_obj.order = lesson_index
-                        lesson_obj.save()
+                        else:
+                            # Update existing lesson in memory
+                            has_changes = False
+                            if lesson_obj.title != title:
+                                lesson_obj.title = title
+                                has_changes = True
+                            if lesson_obj.type != new_type:
+                                lesson_obj.type = new_type
+                                has_changes = True
+                            if lesson_obj.video_url != new_video_url:
+                                lesson_obj.video_url = new_video_url
+                                has_changes = True
+                            if lesson_obj.description != new_description:
+                                lesson_obj.description = new_description
+                                has_changes = True
+                            if lesson_obj.about_lesson != new_about_lesson:
+                                lesson_obj.about_lesson = new_about_lesson
+                                has_changes = True
+                            if lesson_obj.order != lesson_index:
+                                lesson_obj.order = lesson_index
+                                has_changes = True
+                            
+                            if has_changes:
+                                lesson_obj.updated_at = timezone.now()
+                                lessons_to_update.append(lesson_obj)
+                        
                         kept_lesson_ids.append(lesson_obj.id)
 
                         # --- Handle lesson resources (downloadable and internet) ---
@@ -3009,6 +3041,10 @@ def update_course(request, course_id):
                 else:
                     # If none kept (empty payload), remove all chapters
                     school_course.chapters.all().delete()
+                
+                # Perform bulk update for modified lessons
+                if lessons_to_update:
+                    Lesson.objects.bulk_update(lessons_to_update, ['title', 'type', 'video_url', 'description', 'about_lesson', 'order', 'updated_at'])
             course = school_course
             
         # Update Engineering Course
@@ -3106,6 +3142,8 @@ def update_course(request, course_id):
                     sections_data = []
 
                 kept_section_ids = []
+                lessons_to_update = []
+
                 for section_index, sec in enumerate(sections_data):
                     sec_id = sec.get('id')
                     sec_name = sec.get('name', '').strip()
@@ -3118,9 +3156,10 @@ def update_course(request, course_id):
                     if not section_obj:
                         section_obj = engineering_course.sections.create(name=sec_name, order=section_index)
                     else:
-                        section_obj.name = sec_name
-                        section_obj.order = section_index
-                        section_obj.save()
+                        if section_obj.name != sec_name or section_obj.order != section_index:
+                            section_obj.name = sec_name
+                            section_obj.order = section_index
+                            section_obj.save()
                     kept_section_ids.append(section_obj.id)
 
                     # Update lessons in this section
@@ -3131,23 +3170,53 @@ def update_course(request, course_id):
                         title = (les.get('title') or '').strip()
                         if not title:
                             continue
+                        
                         lesson_obj = None
                         if les_id:
                             lesson_obj = section_obj.lessons.filter(id=les_id).first()
+                        
+                        # Prepare fields
+                        new_type = les.get('type', 'video') or 'video'
+                        new_video_url = les.get('videoUrl', les.get('video_url', '')) or ''
+                        new_description = les.get('description', '') or ''
+                        new_about_lesson = les.get('aboutLesson', les.get('about_lesson', '')) or ''
+                        
                         if not lesson_obj:
+                            # Create new lesson with all fields set
                             lesson_obj = section_obj.lessons.create(
                                 title=title,
-                                type=les.get('type', 'video') or 'video',
-                                order=lesson_index
+                                type=new_type,
+                                order=lesson_index,
+                                video_url=new_video_url,
+                                description=new_description,
+                                about_lesson=new_about_lesson
                             )
-                        # Update fields
-                        lesson_obj.title = title
-                        lesson_obj.type = les.get('type', lesson_obj.type) or lesson_obj.type
-                        lesson_obj.video_url = les.get('videoUrl', les.get('video_url', lesson_obj.video_url)) or ''
-                        lesson_obj.description = les.get('description', lesson_obj.description) or ''
-                        lesson_obj.about_lesson = les.get('aboutLesson', les.get('about_lesson', lesson_obj.about_lesson)) or ''
-                        lesson_obj.order = lesson_index
-                        lesson_obj.save()
+                        else:
+                            # Update existing lesson in memory
+                            has_changes = False
+                            if lesson_obj.title != title:
+                                lesson_obj.title = title
+                                has_changes = True
+                            if lesson_obj.type != new_type:
+                                lesson_obj.type = new_type
+                                has_changes = True
+                            if lesson_obj.video_url != new_video_url:
+                                lesson_obj.video_url = new_video_url
+                                has_changes = True
+                            if lesson_obj.description != new_description:
+                                lesson_obj.description = new_description
+                                has_changes = True
+                            if lesson_obj.about_lesson != new_about_lesson:
+                                lesson_obj.about_lesson = new_about_lesson
+                                has_changes = True
+                            if lesson_obj.order != lesson_index:
+                                lesson_obj.order = lesson_index
+                                has_changes = True
+                            
+                            if has_changes:
+                                lesson_obj.updated_at = timezone.now()
+                                lessons_to_update.append(lesson_obj)
+                        
                         kept_lesson_ids.append(lesson_obj.id)
 
                         # --- Handle lesson resources (downloadable and internet) ---
@@ -3290,6 +3359,10 @@ def update_course(request, course_id):
                     engineering_course.sections.exclude(id__in=kept_section_ids).delete()
                 else:
                     engineering_course.sections.all().delete()
+                
+                # Perform bulk update for modified lessons
+                if lessons_to_update:
+                    Lesson.objects.bulk_update(lessons_to_update, ['title', 'type', 'video_url', 'description', 'about_lesson', 'order', 'updated_at'])
             course = engineering_course
         
         # Return updated course data
@@ -3618,6 +3691,7 @@ def get_course_by_id(request, course_id):
                     if c_idx < preview_limit:
                         ch_copy['is_preview'] = True
                         ch_copy['is_locked'] = False
+                        
                         for l_idx, l in enumerate(lessons):
                             ld = dict(l)
                             if l_idx < preview_lessons:
@@ -3626,8 +3700,8 @@ def get_course_by_id(request, course_id):
                             else:
                                 ld['is_preview'] = False
                                 ld['is_locked'] = True
+                                # Scrub sensitive content
                                 ld['video_url'] = None
-                                ld['videoUrl'] = None
                                 ld['resources'] = {'downloadable': [], 'internet': []}
                                 ld['quiz_questions'] = []
                                 ld['quizQuestions'] = []
@@ -3642,7 +3716,6 @@ def get_course_by_id(request, course_id):
                             ld['is_preview'] = False
                             ld['is_locked'] = True
                             ld['video_url'] = None
-                            ld['videoUrl'] = None
                             ld['resources'] = {'downloadable': [], 'internet': []}
                             ld['quiz_questions'] = []
                             ld['quizQuestions'] = []
