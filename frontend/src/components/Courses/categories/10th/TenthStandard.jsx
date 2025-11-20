@@ -39,19 +39,17 @@ const TenthStandard = () => {
 
   // Check board availability
   useEffect(() => {
-    const run = async () => {
-      try {
-        const fresh = await checkBoardAvailability('10th');
-        if (Array.isArray(fresh) && fresh.length) {
-          setAvailableBoards(fresh);
-        }
-      } catch (error) {
-        logger.error('Error checking board availability:', error);
-      } finally {
-        setCheckingAvailability(false);
-      }
-    };
-    run();
+    // STRICT REQUIREMENT: Only show State Board.
+    // No API checks, no conditions, just this one board.
+    const forcedBoards = [{ 
+      id: 'state', 
+      name: 'State Board', 
+      fullName: 'State Board of Secondary and Higher Secondary Education', 
+      available: true 
+    }];
+    
+    setAvailableBoards(forcedBoards);
+    setCheckingAvailability(false);
   }, []);
 
   // Sync selected board with URL; also reset on base route
@@ -137,19 +135,16 @@ const TenthStandard = () => {
 
   const handleBoardSelect = async (boardId) => {
     if (boardId === 'state') {
-      // Show state UI immediately for snappy UX; load availability in background
+      // STRICT REQUIREMENT: Only show Telangana state.
+      // No API checks, no conditions, just this one state.
       setShowStateBoards(true);
-      setCheckingStates(true);
-      setAvailableStates([]);
-      try {
-        const states = await checkStateAvailability('10th');
-        setAvailableStates(states);
-      } catch (error) {
-        logger.error('Error checking state availability:', error);
-        setAvailableStates([]);
-      } finally {
-        setCheckingStates(false);
-      }
+      setAvailableStates([{
+        id: 'ts',
+        name: 'Telangana',
+        fullName: 'Telangana State Board of Secondary Education',
+        available: true
+      }]);
+      setCheckingStates(false);
     } else {
       // Navigate first; URL-derived effect will sync selectedBoard
       navigate(`/courses/10th/${boardId}`);

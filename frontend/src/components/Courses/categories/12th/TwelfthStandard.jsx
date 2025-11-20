@@ -39,6 +39,14 @@ const TwelfthStandard = () => {
 
   // Check board availability
   useEffect(() => {
+    // 1. Try optimistic cache first for instant render
+    const cached = getOptimisticBoardAvailability('12th');
+    if (cached) {
+      setAvailableBoards(cached);
+      setCheckingAvailability(false);
+    }
+
+    // 2. Then fetch fresh data in background (or foreground if no cache)
     const run = async () => {
       try {
         const fresh = await checkBoardAvailability('12th');

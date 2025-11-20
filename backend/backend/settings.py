@@ -539,7 +539,18 @@ else:
     
     # Ensure we have proper origins in production
     if not CORS_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGINS == ['']:
-        raise ValueError("CORS_ALLOWED_ORIGINS environment variable must be set in production")
+        # Fallback if env var is missing
+        CORS_ALLOWED_ORIGINS = [
+            "https://www.easylearnova.com",
+            "https://easylearnova.com",
+            "https://easylearnova-backend.onrender.com"
+        ]
+    else:
+        # Ensure these are always present
+        if "https://www.easylearnova.com" not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append("https://www.easylearnova.com")
+        if "https://easylearnova.com" not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append("https://easylearnova.com")
 
 # CSRF trusted origins
 if DEBUG:
@@ -555,8 +566,20 @@ else:
     # Expand CSRF trusted origins with/without www variants to avoid subtle mismatches
     if CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS = _expand_www_variants(CSRF_TRUSTED_ORIGINS)
+    
+    # Ensure these are always present
+    if "https://www.easylearnova.com" not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append("https://www.easylearnova.com")
+    if "https://easylearnova.com" not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append("https://easylearnova.com")
+        
     if not CSRF_TRUSTED_ORIGINS:
-        raise ValueError("CSRF_TRUSTED_ORIGINS environment variable must be set in production")
+        # Fallback if env var is missing
+        CSRF_TRUSTED_ORIGINS = [
+            "https://www.easylearnova.com",
+            "https://easylearnova.com",
+            "https://easylearnova-backend.onrender.com"
+        ]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

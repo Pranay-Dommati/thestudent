@@ -37,6 +37,14 @@ const NinthStandard = () => {
 
   // Check board availability
   useEffect(() => {
+    // 1. Try optimistic cache first for instant render
+    const cached = getOptimisticBoardAvailability('9th');
+    if (cached) {
+      setAvailableBoards(cached);
+      setCheckingAvailability(false);
+    }
+
+    // 2. Then fetch fresh data in background
     const run = async () => {
       try {
         const fresh = await checkBoardAvailability('9th');
@@ -46,7 +54,7 @@ const NinthStandard = () => {
       } catch (error) {
         logger.error('Error checking board availability:', error);
       } finally {
-        setCheckingAvailability(false);
+        if (!cached) setCheckingAvailability(false);
       }
     };
     run();

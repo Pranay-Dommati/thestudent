@@ -105,85 +105,14 @@ const MobileFirstCourses = () => {
 
     // Function to check if courses exist for a specific class level
     const checkCoursesAvailability = async () => {
-        // First check if we have cached availability data
-        const cachedAvailability = courseCache.getCourseAvailability();
-        if (cachedAvailability) {
-            console.log('📦 Using cached course availability data (Mobile)');
-            setAvailableLevels(cachedAvailability);
-            setLoading(false);
-            return;
-        }
-
-        console.log('🔄 Fetching fresh course availability data (Mobile)');
-        setLoading(true);
-
-        try {
-            // Define levels that are always available (skip API check)
-            const alwaysAvailableIds = ['10th', '11th'];
-            
-            // Filter levels that need checking (exclude engineering and always available ones)
-            const levelsToCheck = allEducationLevels.filter(level => 
-                level.apiClass !== 'engineering' && !alwaysAvailableIds.includes(level.id)
-            );
-
-            // Fire requests in parallel and keep payloads small
-            const schoolPromises = levelsToCheck.map(level =>
-                api.get('/courses/school/', { params: { class: level.apiClass, limit: 1 } })
-                    .then(({ data }) => ({ level, data }))
-                    .catch(error => ({ level, error }))
-            );
-
-            // Engineering (currently hidden, but keep logic resilient)
-            const engineeringLevel = allEducationLevels.find(l => l.apiClass === 'engineering');
-            const engineeringPromise = engineeringLevel
-                ? api.get('/courses/engineering/', { params: { limit: 1 } })
-                    .then(({ data }) => ({ level: engineeringLevel, data }))
-                    .catch(error => ({ level: engineeringLevel, error }))
-                : Promise.resolve(null);
-
-            const results = await Promise.allSettled([
-                ...schoolPromises,
-                engineeringPromise,
-            ]);
-
-            // Start with the always available levels
-            const levelsWithCourses = allEducationLevels.filter(level => alwaysAvailableIds.includes(level.id));
-
-            results.forEach(result => {
-                if (!result || result.status !== 'fulfilled') return;
-                const payload = result.value;
-                if (!payload || payload.error) {
-                    if (payload?.error) logger.error(`Error checking courses for ${payload.level?.apiClass}:`, payload.error);
-                    return;
-                }
-
-                const { level, data } = payload;
-                const count = Array.isArray(data) ? data.length : (data?.results?.length || 0);
-                if (count > 0) {
-                    levelsWithCourses.push(level);
-                    // Optionally cache tiny payload to warm level cache
-                    const items = Array.isArray(data) ? data : (data?.results || []);
-                    courseCache.setCoursesForLevel(level.apiClass, items);
-                }
-            });
-
-            // Sort levels to match the original order in allEducationLevels
-            const finalLevels = allEducationLevels.filter(level => 
-                levelsWithCourses.some(l => l.id === level.id)
-            );
-
-            // Cache only non-empty availability to avoid persisting a blank screen
-            if (finalLevels.length > 0) {
-                courseCache.setCourseAvailability(finalLevels);
-            }
-            setAvailableLevels(finalLevels);
-        } catch (error) {
-            logger.error('Error checking course availability:', error);
-            // Fallback: show all levels if API fails
-            setAvailableLevels(allEducationLevels);
-        } finally {
-            setLoading(false);
-        }
+        // STRICT REQUIREMENT: Only show 10th and 11th standard cards.
+        // No API checks, no conditions, just these two.
+        const forcedLevels = allEducationLevels.filter(level => 
+            level.id === '10th' || level.id === '11th'
+        );
+        
+        setAvailableLevels(forcedLevels);
+        setLoading(false);
     };
 
     const handleLevelSelect = (level) => {

@@ -40,8 +40,11 @@ const SixthStandard = () => {
   // Optimistic board availability: show immediately, then refine in background
   useEffect(() => {
     // Immediate optimistic boards (cached or both)
-    setAvailableBoards(getOptimisticBoardAvailability('6th'));
-    setCheckingAvailability(false);
+    const cached = getOptimisticBoardAvailability('6th');
+    if (cached) {
+      setAvailableBoards(cached);
+      setCheckingAvailability(false);
+    }
 
     // Background refinement without blocking UI
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -49,7 +52,9 @@ const SixthStandard = () => {
       try {
         const fresh = await checkBoardAvailability('6th');
         if (Array.isArray(fresh) && fresh.length) setAvailableBoards(fresh);
-      } catch {}
+      } catch {} finally {
+        if (!cached) setCheckingAvailability(false);
+      }
     };
     const handle = typeof requestIdleCallback !== 'undefined'
       ? requestIdleCallback(run, { timeout: 1500 })

@@ -57,13 +57,19 @@ const EighthStandard = () => {
 
   // Optimistic board availability
   useEffect(() => {
-    setAvailableBoards(getOptimisticBoardAvailability('8th'));
-    setCheckingAvailability(false);
+    const cached = getOptimisticBoardAvailability('8th');
+    if (cached) {
+      setAvailableBoards(cached);
+      setCheckingAvailability(false);
+    }
+
     const run = async () => {
       try {
         const fresh = await checkBoardAvailability('8th');
         if (Array.isArray(fresh) && fresh.length) setAvailableBoards(fresh);
-      } catch {}
+      } catch {} finally {
+        if (!cached) setCheckingAvailability(false);
+      }
     };
     const handle = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback(run, { timeout: 1500 }) : setTimeout(run, 200);
     return () => {

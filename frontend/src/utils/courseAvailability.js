@@ -22,12 +22,12 @@ function defaultBoards() {
 
 /**
  * Synchronous, optimistic getter used by UIs to avoid spinners.
- * Returns cached availability if present, otherwise defaults to showing both boards.
+ * Returns cached availability if present, otherwise returns null to force loading state.
  */
 export function getOptimisticBoardAvailability(classLevel) {
   const cached = courseCache.getBoardAvailability(classLevel);
   if (cached && Array.isArray(cached) && cached.length) return cached;
-  return defaultBoards();
+  return null;
 }
 
 /**
