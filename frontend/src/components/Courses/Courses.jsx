@@ -131,8 +131,9 @@ const Courses = () => {
                 }
             });
 
-            // If nothing detected (API shape unknown or blocked), fallback to showing all
-            const finalLevels = levelsWithCourses.length > 0 ? levelsWithCourses : allEducationLevels;
+            // If nothing detected, show empty list (which renders "No Courses Available")
+            // instead of falling back to showing all levels
+            const finalLevels = levelsWithCourses;
 
             // Cache and update state
             courseCache.setCourseAvailability(finalLevels);
@@ -147,9 +148,6 @@ const Courses = () => {
     };
 
     useEffect(() => {
-        // Optimistic render: show all levels instantly, then refine in background
-        setAvailableLevels(allEducationLevels);
-        setLoading(false);
         // Defer the availability check to the next frame to avoid blocking paint
         const t = requestIdleCallback ? requestIdleCallback(checkCoursesAvailability, { timeout: 1000 }) : setTimeout(checkCoursesAvailability, 0);
         return () => {

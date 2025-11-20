@@ -32,6 +32,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [contentType, setContentType] = useState('video');
   const [courseProgress, setCourseProgress] = useState(null);
   const [savingProgress, setSavingProgress] = useState(false);
+  const [progressLoading, setProgressLoading] = useState(true);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const videoRef = useRef(null);
   const listRef = useRef(null);
@@ -148,6 +149,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             setCourse(cachedData.course);
             if (cachedData.progress) {
               setCourseProgress(cachedData.progress);
+              setProgressLoading(false);
             }
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
@@ -159,6 +161,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             setCourse(cachedData.course);
             if (cachedData.progress) {
               setCourseProgress(cachedData.progress);
+              setProgressLoading(false);
             }
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
@@ -318,7 +321,16 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   // Progress tracking logic (reused from desktop)
   useEffect(() => {
     const fetchUserProgress = async () => {
-      if (!isLoggedIn || !course || !course.id) return;
+      if (!isLoggedIn) {
+        setProgressLoading(false);
+        return;
+      }
+      if (!course || !course.id) return;
+      
+      // Only show loading if we don't have progress data yet
+      if (!courseProgress) {
+        setProgressLoading(true);
+      }
       
       try {
         const response = await axiosInstance.get(`/courses/progress/${course.id}/`);
@@ -377,6 +389,8 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         
       } catch (error) {
         logger.error('❌ Error fetching user progress:', error);
+      } finally {
+        setProgressLoading(false);
       }
     };
 
@@ -955,18 +969,30 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             <div className="p-4 bg-gray-50 border-b border-gray-200">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-gray-700">Your Progress</span>
-                <span className="text-sm font-bold text-indigo-600">
-                  {Math.round((completedLessons / totalLessons) * 100)}%
-                </span>
+                {progressLoading ? (
+                  <div className="h-4 w-10 bg-gray-200 rounded animate-pulse"></div>
+                ) : (
+                  <span className="text-sm font-bold text-indigo-600">
+                    {Math.round((completedLessons / totalLessons) * 100)}%
+                  </span>
+                )}
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                <div
-                  className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(completedLessons / totalLessons) * 100}%` }}
-                ></div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mb-2 overflow-hidden">
+                {progressLoading ? (
+                  <div className="h-full w-full bg-indigo-100 animate-pulse"></div>
+                ) : (
+                  <div
+                    className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(completedLessons / totalLessons) * 100}%` }}
+                  ></div>
+                )}
               </div>
               <div className="flex justify-between text-xs text-gray-500">
-                <span>{completedLessons} of {totalLessons} lessons completed</span>
+                {progressLoading ? (
+                  <div className="h-3 w-32 bg-gray-200 rounded animate-pulse"></div>
+                ) : (
+                  <span>{completedLessons} of {totalLessons} lessons completed</span>
+                )}
                 <span>{course?.chapters?.length || 0} chapters</span>
               </div>
             </div>
@@ -1102,11 +1128,17 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                               {/* Completion toggle moved to the left of title */}
                               <div
                                 className={`mr-3 w-5 h-5 flex items-center justify-center rounded-full border-2 cursor-pointer select-none touch-manipulation active:scale-95 transition-all ${
-                                  lesson.completed ? 'bg-green-50 border-green-500' : 'bg-white border-gray-300 hover:border-gray-400'
+                                  progressLoading 
+                                    ? 'bg-gray-50 border-gray-200 cursor-wait' 
+                                    : lesson.completed 
+                                      ? 'bg-green-50 border-green-500' 
+                                      : 'bg-white border-gray-300 hover:border-gray-400'
                                 }`}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  toggleLessonCompletion(chapterIndex, lessonIndex);
+                                  if (!progressLoading) {
+                                    toggleLessonCompletion(chapterIndex, lessonIndex);
+                                  }
                                 }}
                                 role="checkbox"
                                 aria-checked={!!lesson.completed}
@@ -1115,11 +1147,17 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter' || e.key === ' ') {
                                     e.preventDefault();
-                                    toggleLessonCompletion(chapterIndex, lessonIndex);
+                                    if (!progressLoading) {
+                                      toggleLessonCompletion(chapterIndex, lessonIndex);
+                                    }
                                   }
                                 }}
                               >
-                                {lesson.completed && <FaCheck className="w-3 h-3 text-green-600" />}
+                                {progressLoading ? (
+                                  <div className="w-3 h-3 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                                ) : (
+                                  lesson.completed && <FaCheck className="w-3 h-3 text-green-600" />
+                                )}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <h4 className={`text-sm font-medium truncate ${
