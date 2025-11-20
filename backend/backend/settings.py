@@ -551,6 +551,12 @@ else:
             CORS_ALLOWED_ORIGINS.append("https://www.easylearnova.com")
         if "https://easylearnova.com" not in CORS_ALLOWED_ORIGINS:
             CORS_ALLOWED_ORIGINS.append("https://easylearnova.com")
+            
+    # Add regex whitelist as a backup for subdomains or slight variations
+    CORS_ORIGIN_REGEX_WHITELIST = [
+        r"^https://.*\.easylearnova\.com$",
+        r"^https://easylearnova-backend\.onrender\.com$",
+    ]
 
 # CSRF trusted origins
 if DEBUG:
