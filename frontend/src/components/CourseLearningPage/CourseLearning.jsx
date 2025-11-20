@@ -1312,17 +1312,19 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         </div>
       </div>
 
-      {/* Sidebar toggle button - positioned correctly */}
+      {/* Sidebar toggle button */}
       <button
         onClick={() => setSidebarVisible(!sidebarVisible)}
-        className={`fixed transition-all duration-300 ${
-          sidebarVisible ? 'right-[400px]' : 'right-0'
-        } top-32 bg-white p-3 shadow-lg rounded-l-lg z-40 hover:bg-gray-50 border border-r-0 border-gray-200`}
+        className={`fixed top-32 z-40 h-12 w-8 shadow-md rounded-l-lg flex items-center justify-center border border-r-0 transition-all duration-300 ease-in-out ${
+          sidebarVisible 
+            ? 'right-[400px] bg-white border-gray-200 hover:bg-gray-50' 
+            : 'right-0 bg-indigo-600 border-indigo-600 hover:bg-indigo-700'
+        }`}
         aria-label={sidebarVisible ? "Close sidebar" : "Open sidebar"}
       >
         {sidebarVisible ? 
           <FaChevronRight className="w-4 h-4 text-gray-600" /> : 
-          <FaChevronLeft className="w-4 h-4 text-gray-600" />
+          <FaChevronLeft className="w-4 h-4 text-white" />
         }
       </button>
 
