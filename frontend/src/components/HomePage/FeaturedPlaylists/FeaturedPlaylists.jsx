@@ -331,8 +331,11 @@ const FeaturedPlaylists = () => {
         {/* Course grid with enhanced mobile layout */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 py-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden animate-pulse">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div 
+                key={i} 
+                className={`bg-white rounded-xl shadow-sm overflow-hidden animate-pulse ${i >= 2 ? 'hidden sm:block' : ''}`}
+              >
                 <div className="relative pb-[56.25%] bg-gray-200" />
                 <div className="p-3 sm:p-4">
                   <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
