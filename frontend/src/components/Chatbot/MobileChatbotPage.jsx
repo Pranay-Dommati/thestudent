@@ -995,7 +995,18 @@ const MobileChatbotPage = () => {
             }
             
             // Store limited topics for confirmation and show confirmation dialog
-            setPendingTopics(availableTopics);
+            const normalizedTopics = availableTopics.map((t, idx) => {
+              let name;
+              if (typeof t === 'string') name = t;
+              else if (t && typeof t.name === 'string') name = t.name;
+              else name = String(t || '').trim();
+              
+              return { 
+                id: `topic-${Date.now()}-${idx}`,
+                name 
+              };
+            });
+            setPendingTopics(normalizedTopics);
             setOriginalPrompt(messageToSend);
             setShowTopicConfirmation(true);
             

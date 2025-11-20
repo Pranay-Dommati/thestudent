@@ -1557,10 +1557,16 @@ const ChatbotPage = () => {
             }
             
             // Store limited topics for confirmation and show confirmation dialog (normalize to { name })
-            const normalizedTopics = availableTopics.map(t => {
-              if (typeof t === 'string') return { name: t };
-              if (t && typeof t.name === 'string') return { name: t.name };
-              return { name: String(t || '').trim() };
+            const normalizedTopics = availableTopics.map((t, idx) => {
+              let name;
+              if (typeof t === 'string') name = t;
+              else if (t && typeof t.name === 'string') name = t.name;
+              else name = String(t || '').trim();
+              
+              return { 
+                id: `topic-${Date.now()}-${idx}`,
+                name 
+              };
             });
             setPendingTopics(normalizedTopics);
             setOriginalPrompt(messageToSend);
