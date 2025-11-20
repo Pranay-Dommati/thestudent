@@ -2901,68 +2901,81 @@ const ChatbotPage = () => {
 
       {/* Freemium: Save Course Modal */}
       {showSaveCourseModal && pendingCourseToSave && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 animate-fade-in max-h-[90vh] overflow-y-auto">
-            {/* Success Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
-                <IoCheckmarkCircle className="text-white" size={48} />
-              </div>
-            </div>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm sm:max-w-md overflow-hidden animate-scaleIn relative">
             
-            {/* Title */}
-            <h2 className="text-xl font-bold text-center text-gray-900 mb-2">
-              Your Learning Path Starts Here
-            </h2>
-            
-            {/* Message */}
-            <p className="text-center text-gray-600 text-sm mb-4">
-              Sign in to unlock a personalized and enhanced learning experience.
-            </p>
-            
-            {/* Benefits List */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 mb-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                <span className="text-sm text-gray-700">Seamless progress tracking</span>
+            <div className="p-6 sm:p-8">
+              {/* Success Icon */}
+              <div className="flex justify-center mb-5 sm:mb-6">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg ring-4 ring-green-50">
+                  <IoCheckmarkCircle className="text-white w-8 h-8 sm:w-10 sm:h-10" />
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                <span className="text-sm text-gray-700">One-click access from your Learning Hub</span>
+              
+              {/* Title */}
+              <h2 className="text-xl sm:text-2xl font-bold text-center text-gray-900 mb-2 leading-tight">
+                Your Learning Path Starts Here
+              </h2>
+              
+              {/* Message */}
+              <p className="text-center text-gray-600 text-sm sm:text-base mb-6 leading-relaxed">
+                Sign in to unlock a personalized and enhanced learning experience.
+              </p>
+              
+              {/* Benefits List */}
+              <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-3 border border-gray-100">
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <IoRocket className="text-blue-600 w-3 h-3" />
+                  </div>
+                  <span className="text-sm text-gray-700 font-medium">Seamless progress tracking</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <IoHome className="text-blue-600 w-3 h-3" />
+                  </div>
+                  <span className="text-sm text-gray-700 font-medium">One-click access from Learning Hub</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <FaGraduationCap className="text-blue-600 w-3 h-3" />
+                  </div>
+                  <span className="text-sm text-gray-700 font-medium">Premium curated academic content</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                <span className="text-sm text-gray-700">Premium academic content curated for you</span>
-              </div>
-            </div>
-            
-            {/* Action Buttons */}
-            <div className="space-y-2">
-              <Link
-                to="/auth?mode=signup"
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-              >
-                Save Course
-              </Link>
-              <Link
-                to="/auth?mode=login"
-                className="w-full flex items-center justify-center px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors text-sm"
-              >
-                Already have an account?
-              </Link>
-              <button
-                onClick={() => {
-                  // Clear the pending course so modal can show for next course
-                  localStorage.removeItem('pendingFreemiumCourse');
-                  console.log('🧹 Cleared pendingFreemiumCourse - modal dismissed by user');
+              
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <Link
+                  to="/auth?mode=signup"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                >
+                  Save Course
+                </Link>
+                
+                <div className="flex flex-col gap-2 text-center">
+                  <Link
+                    to="/auth?mode=login"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors py-1"
+                  >
+                    Already have an account? Log in
+                  </Link>
                   
-                  setShowSaveCourseModal(false);
-                  setPendingCourseToSave(null);
-                }}
-                className="w-full px-4 py-1.5 text-gray-400 hover:text-gray-600 text-xs font-medium transition-colors"
-              >
-                Continue without saving
-              </button>
+                  <button
+                    onClick={() => {
+                      // Clear the pending course so modal can show for next course
+                      localStorage.removeItem('pendingFreemiumCourse');
+                      console.log('🧹 Cleared pendingFreemiumCourse - modal dismissed by user');
+                      
+                      setShowSaveCourseModal(false);
+                      setPendingCourseToSave(null);
+                    }}
+                    className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors py-1"
+                  >
+                    Continue without saving
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

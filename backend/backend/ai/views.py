@@ -940,8 +940,9 @@ def chat(request):
         return Response({'error': 'AI service error'}, status=502)
 
 @api_view(["POST"])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
+# Allow anonymous users for freemium support
+@authentication_classes([])
+@permission_classes([AllowAny])
 @throttle_classes([AIChatThrottle])
 def tutor(request):
     """Reading-aware tutor endpoint.
