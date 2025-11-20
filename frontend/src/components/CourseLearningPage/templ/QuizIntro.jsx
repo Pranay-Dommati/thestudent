@@ -11,7 +11,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
  * where courseId is sourced from either route params or ?courseId= query param.
  */
 
-const QuizIntro = ({ quizData, lessonId, onStart }) => {
+const QuizIntro = ({ quizData, lessonId, onStart, isLoading }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -22,6 +22,54 @@ const QuizIntro = ({ quizData, lessonId, onStart }) => {
   console.log('Current path:', location.pathname);
   console.log('Quiz questions available:', 
     Array.isArray(quizData?.questions) && quizData.questions.length > 0);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-3xl mx-auto animate-pulse">
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+          {/* Header Section */}
+          <div className="px-8 py-10 bg-gray-50">
+            <div className="max-w-2xl">
+              <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
+              <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+            </div>
+          </div>
+
+          {/* Quiz Details Grid */}
+          <div className="grid grid-cols-2 gap-6 p-8 bg-white">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-start">
+                <div className="w-12 h-12 rounded-full bg-gray-200 mr-4"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-16"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Instructions Section */}
+          <div className="p-8 bg-gray-50 border-t border-gray-200">
+            <div className="h-6 bg-gray-200 rounded w-32 mb-6"></div>
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-start">
+                  <div className="w-6 h-6 rounded-full bg-gray-200 mr-3"></div>
+                  <div className="h-4 bg-gray-200 rounded w-full"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Start Button Section */}
+          <div className="p-8 bg-white border-t border-gray-200">
+            <div className="w-full h-14 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleStartQuiz = () => {
     // Derive courseId strictly from param or query string (canonical ID approach)

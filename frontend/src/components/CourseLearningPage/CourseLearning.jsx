@@ -971,6 +971,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   }
 
   const currentLesson = getCurrentLesson();
+  const isLessonLoading = currentLesson?.aboutLesson === undefined && !!currentLesson?.id;
+
   const completedLessons = course.chapters.reduce(
     (acc, chapter) => acc + chapter.lessons.filter(l => l.completed).length, 0
   );
@@ -1064,7 +1066,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
     switch (contentType) {
       case 'resources':
-        return <ResourcesPage lessonResources={currentLesson?.resources} />; 
+        return <ResourcesPage lessonResources={currentLesson?.resources} isLoading={isLessonLoading} />; 
 
       case 'quiz':
         // Render quiz content
@@ -1083,11 +1085,11 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             'You need 80% or higher to pass this quiz'
           ]
         };
-        return <QuizIntro quizData={quizData} lessonId={currentLesson?.id} />; 
+        return <QuizIntro quizData={quizData} lessonId={currentLesson?.id} isLoading={isLessonLoading} />; 
         
       case 'instructions':
       case 'reading':
-        return <InstructionsPage lessonContent={currentLesson} />;
+        return <InstructionsPage lessonContent={currentLesson} isLoading={isLessonLoading} />;
         
       case 'video':
       default:
@@ -1129,7 +1131,16 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               </div>
                 {/* Tab Content */}
               <div className="mb-8">                {activeTab === 'about' && (
-                  <div className="prose prose-lg max-w-none markdown-body">                    {currentLesson?.aboutLesson ? (
+                  <div className="prose prose-lg max-w-none markdown-body">                    {isLessonLoading ? (
+                      <div className="animate-pulse space-y-4 p-4">
+                        <div className="h-6 bg-gray-200 rounded w-1/3 mb-6"></div>
+                        <div className="h-4 bg-gray-200 rounded w-full"></div>
+                        <div className="h-4 bg-gray-200 rounded w-full"></div>
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-full mt-4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                      </div>
+                    ) : currentLesson?.aboutLesson ? (
                       // Use actual lesson content if available with proper markdown components
                       <div>
                         <ReactMarkdown
@@ -1223,7 +1234,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                 )}
                 
                 {activeTab === 'resources' && (
-                  <ResourcesPage lessonResources={currentLesson?.resources} />
+                  <ResourcesPage lessonResources={currentLesson?.resources} isLoading={isLessonLoading} />
                 )}
               </div>
               
