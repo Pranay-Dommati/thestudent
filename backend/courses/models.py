@@ -127,6 +127,10 @@ class Lesson(models.Model):
     description = models.TextField(blank=True)
     about_lesson = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=0)
+    # Soft delete flag (aligns with existing MySQL column)
+    is_deleted = models.BooleanField(default=False)
+    # Timestamp for last update (aligns with existing MySQL NOT NULL column)
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         ordering = ['order']
