@@ -5,7 +5,7 @@ import {
   FaFileAudio, FaFileArchive 
 } from 'react-icons/fa';
 
-const ResourcesPage = ({ lessonResources }) => {
+const ResourcesPage = ({ lessonResources, isLoading }) => {
   const [downloadableOpen, setDownloadableOpen] = useState(false);
   const [internetOpen, setInternetOpen] = useState(false);
   
@@ -14,6 +14,45 @@ const ResourcesPage = ({ lessonResources }) => {
 
   // Simple debug log to verify resources are received
   console.log('📋 ResourcesPage - Received resources:', lessonResources);
+
+  if (isLoading) {
+    return (
+      <div className="p-3 md:p-6 animate-pulse">
+        <div className="mb-4 md:mb-8">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+        </div>
+        <div className="space-y-4 md:space-y-6">
+          {[1, 2].map((i) => (
+            <div key={i} className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+              <div className="p-3 md:p-4 bg-gray-50 flex items-center justify-between">
+                <div className="flex items-center w-full">
+                  <div className="w-5 h-5 bg-gray-300 rounded mr-3"></div>
+                  <div className="h-6 bg-gray-300 rounded w-1/3"></div>
+                </div>
+              </div>
+              <div className="divide-y divide-gray-200">
+                {[1, 2].map((j) => (
+                  <div key={j} className="p-3 md:p-4 bg-white">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex items-start sm:items-center flex-1">
+                        <div className="w-10 h-10 bg-gray-200 rounded-lg mr-3"></div>
+                        <div className="flex-1">
+                          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                          <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                        </div>
+                      </div>
+                      <div className="w-full sm:w-24 h-8 bg-gray-200 rounded-lg"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // Helper function to detect file type from URL or filename
   const detectFileType = (url) => {

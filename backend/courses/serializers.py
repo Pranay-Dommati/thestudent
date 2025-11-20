@@ -579,3 +579,68 @@ class ProLearningShareLinkSerializer(serializers.ModelSerializer):
             base = request.build_absolute_uri('/')[:-1]
             return f"{base}{frontend_path}"
         return frontend_path
+
+class LessonLightSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for course structure fetching.
+    Excludes heavy content like about_lesson, resources, and quiz_questions.
+    """
+    completed = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Lesson
+        fields = [
+            'id', 'title', 'type', 'video_url', 'description', 
+            'order', 'completed'
+        ]
+    
+    def get_completed(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return UserLessonProgress.objects.filter(user=request.user, lesson=obj).exists()
+        return False
+
+class CourseChapterLightSerializer(serializers.ModelSerializer):
+    lessons = LessonLightSerializer(many=True, required=False)
+    
+    class Meta:
+        model = CourseChapter
+        fields = ['id', 'name', 'order', 'lessons']
+
+class CourseStructureSerializer(serializers.ModelSerializer):
+    """
+    Serializer for fetching course structure without heavy lesson content.
+    """
+    chapters = CourseChapterLightSerializer(many=True, required=False)
+    
+    class Meta:
+        model = SchoolCourse
+        fields = [
+            'id', 'title', 'class_level', 'board', 'state', 'subject',
+            'short_description', 'description', 'thumbnail', 'duration',
+            'sources', 'last_updated', 'key_topics', 'learning_points',
+            'is_published', 'chapters'
+        ]
+
+class CourseSectionLightSerializer(serializers.ModelSerializer):
+    lessons = LessonLightSerializer(many=True, required=False)
+    
+    class Meta:
+        model = CourseSection
+        fields = ['id', 'name', 'order', 'lessons']
+
+class EngineeringCourseStructureSerializer(serializers.ModelSerializer):
+    """
+    Serializer for fetching engineering course structure without heavy lesson content.
+    """
+    sections = CourseSectionLightSerializer(many=True, required=False)
+    
+    class Meta:
+        model = EngineeringCourse
+        fields = [
+            'id', 'title', 'short_description', 'description',
+            'thumbnail', 'duration', 'sources', 'proficiency', 
+            'certificate_given', 'project_based', 'learning_points', 
+            'requirements', 'category', 'last_updated', 'is_published', 
+            'sections'
+        ]

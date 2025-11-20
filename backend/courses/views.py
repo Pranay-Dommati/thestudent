@@ -7,7 +7,10 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource, LearningActivity, UserStartedPredefinedCourse, Certification
-from .serializers import CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer, CertificationSerializer
+from .serializers import (
+    CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer, CertificationSerializer,
+    CourseStructureSerializer, EngineeringCourseStructureSerializer, LessonSerializer
+)
 from django.utils import timezone
 from django.conf import settings
 import uuid
@@ -436,6 +439,87 @@ def create_course(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+def _apply_preview_gating(data, course_type, request):
+    """
+    Applies preview gating logic to course data (sections/chapters).
+    course_type: 'engineering' or 'school'
+    """
+    try:
+        preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))
+    except Exception:
+        preview_limit = 2
+    try:
+        preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))
+    except Exception:
+        preview_lessons = 3
+
+    is_auth = request.user.is_authenticated if hasattr(request, 'user') else False
+    
+    # Key for the list of containers (sections or chapters)
+    container_key = 'sections' if course_type == 'engineering' else 'chapters'
+    
+    if not is_auth:
+        containers = data.get(container_key) or []
+        gated_containers = []
+        
+        for c_idx, container in enumerate(containers):
+            # Convert to dict if it's not already
+            cont = dict(container)
+            lessons = cont.get('lessons') or []
+            new_lessons = []
+            
+            if c_idx < preview_limit:
+                cont['is_preview'] = True
+                cont['is_locked'] = False
+                
+                for l_idx, l in enumerate(lessons):
+                    ld = dict(l)
+                    if l_idx < preview_lessons:
+                        ld['is_preview'] = True
+                        ld['is_locked'] = False
+                    else:
+                        ld['is_preview'] = False
+                        ld['is_locked'] = True
+                        # Scrub sensitive content
+                        ld['video_url'] = None
+                        ld['resources'] = {'downloadable': [], 'internet': []}
+                        ld['quiz_questions'] = []
+                    new_lessons.append(ld)
+                cont['lessons'] = new_lessons
+            else:
+                cont['is_preview'] = False
+                cont['is_locked'] = True
+                scrubbed = []
+                for l in lessons:
+                    ld = dict(l)
+                    ld['is_preview'] = False
+                    ld['is_locked'] = True
+                    ld['video_url'] = None
+                    ld['resources'] = {'downloadable': [], 'internet': []}
+                    ld['quiz_questions'] = []
+                    scrubbed.append(ld)
+                cont['lessons'] = scrubbed
+            gated_containers.append(cont)
+            
+        data[container_key] = gated_containers
+        data['preview'] = {
+            'sections_unlocked': min(preview_limit, len(gated_containers)),
+            'lessons_per_section_unlocked': preview_lessons,
+            'message': 'Login to unlock all content, quizzes and resources'
+        }
+    else:
+        # Explicitly set flags for authenticated users
+        containers = data.get(container_key) or []
+        for cont in containers:
+            cont['is_preview'] = False
+            cont['is_locked'] = False
+            lessons = cont.get('lessons') or []
+            for l in lessons:
+                l['is_preview'] = False
+                l['is_locked'] = False
+                
+    return data
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 @authentication_classes([])
@@ -493,76 +577,21 @@ def list_engineering_courses(request):
 def get_engineering_course_by_id(request, course_id):
     try:
         course = EngineeringCourse.objects.get(id=course_id)
+        
+        # Check if we only want the structure (lightweight)
+        structure_only = request.query_params.get('structure_only', 'false').lower() == 'true'
+        
+        if structure_only:
+            serializer = EngineeringCourseStructureSerializer(course, context={'request': request})
+            data = serializer.data
+            data = _apply_preview_gating(data, 'engineering', request)
+            return Response(data)
+            
         # Include request in serializer context so lesson completion flags compute correctly
         serializer = EngineeringCourseWithSectionsSerializer(course, context={'request': request})
         data = serializer.data
 
-        # Preview gating for unauthenticated users
-        # Expose only first K sections, and within each of those,
-        # unlock only first L lessons (scrub the rest).
-        try:
-            preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))  # K
-        except Exception:
-            preview_limit = 2
-        try:
-            preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))  # L
-        except Exception:
-            preview_lessons = 3
-
-        is_auth = request.user.is_authenticated if hasattr(request, 'user') else False
-
-        if not is_auth:
-            sections = data.get('sections') or []
-            gated_sections = []
-            for s_idx, section in enumerate(sections):
-                sec = dict(section)
-                lessons = sec.get('lessons') or []
-                new_lessons = []
-                if s_idx < preview_limit:
-                    # First K sections: unlock only first L lessons
-                    sec['is_preview'] = True
-                    sec['is_locked'] = False
-                    for l_idx, l in enumerate(lessons):
-                        ld = dict(l)
-                        if l_idx < preview_lessons:
-                            ld['is_preview'] = True
-                            ld['is_locked'] = False
-                        else:
-                            # Scrub content for non-preview lessons in preview sections
-                            ld['is_preview'] = False
-                            ld['is_locked'] = True
-                            ld['video_url'] = None
-                            ld['resources'] = {'downloadable': [], 'internet': []}
-                            ld['quiz_questions'] = []
-                        new_lessons.append(ld)
-                    sec['lessons'] = new_lessons
-                else:
-                    # Sections beyond preview limit are fully locked
-                    sec['is_preview'] = False
-                    sec['is_locked'] = True
-                    scrubbed = []
-                    for l in lessons:
-                        ld = dict(l)
-                        ld['is_preview'] = False
-                        ld['is_locked'] = True
-                        ld['video_url'] = None
-                        ld['resources'] = {'downloadable': [], 'internet': []}
-                        ld['quiz_questions'] = []
-                        scrubbed.append(ld)
-                    sec['lessons'] = scrubbed
-                gated_sections.append(sec)
-
-            data['sections'] = gated_sections
-            data['preview'] = {
-                'sections_unlocked': min(preview_limit, len(gated_sections)),
-                'lessons_per_section_unlocked': preview_lessons,
-                'message': 'Login to unlock all content, quizzes and resources'
-            }
-        else:
-            # Provide explicit flags for UI convenience
-            for sec in data.get('sections') or []:
-                sec['is_preview'] = False
-                sec['is_locked'] = False
+        data = _apply_preview_gating(data, 'engineering', request)
 
         return Response(data)
     except EngineeringCourse.DoesNotExist:
@@ -577,69 +606,20 @@ def get_engineering_course_by_id(request, course_id):
 def get_school_course_by_id(request, course_id):
     try:
         course = SchoolCourse.objects.get(id=course_id)
+        
+        # Check if we only want the structure (lightweight)
+        structure_only = request.query_params.get('structure_only', 'false').lower() == 'true'
+        
+        if structure_only:
+            serializer = CourseStructureSerializer(course, context={'request': request})
+            data = serializer.data
+            data = _apply_preview_gating(data, 'school', request)
+            return Response(data)
+            
         serializer = CourseWithChaptersSerializer(course, context={'request': request})
         data = serializer.data
 
-        # Apply similar preview gating for school courses by chapters
-        try:
-            preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))
-        except Exception:
-            preview_limit = 2
-        try:
-            preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))
-        except Exception:
-            preview_lessons = 3
-
-        is_auth = request.user.is_authenticated if hasattr(request, 'user') else False
-
-        if not is_auth:
-            chapters = data.get('chapters') or []
-            gated_chapters = []
-            for c_idx, chapter in enumerate(chapters):
-                ch = dict(chapter)
-                lessons = ch.get('lessons') or []
-                new_lessons = []
-                if c_idx < preview_limit:
-                    ch['is_preview'] = True
-                    ch['is_locked'] = False
-                    for l_idx, l in enumerate(lessons):
-                        ld = dict(l)
-                        if l_idx < preview_lessons:
-                            ld['is_preview'] = True
-                            ld['is_locked'] = False
-                        else:
-                            ld['is_preview'] = False
-                            ld['is_locked'] = True
-                            ld['video_url'] = None
-                            ld['resources'] = {'downloadable': [], 'internet': []}
-                            ld['quiz_questions'] = []
-                        new_lessons.append(ld)
-                    ch['lessons'] = new_lessons
-                else:
-                    ch['is_preview'] = False
-                    ch['is_locked'] = True
-                    scrubbed = []
-                    for l in lessons:
-                        ld = dict(l)
-                        ld['is_preview'] = False
-                        ld['is_locked'] = True
-                        ld['video_url'] = None
-                        ld['resources'] = {'downloadable': [], 'internet': []}
-                        ld['quiz_questions'] = []
-                        scrubbed.append(ld)
-                    ch['lessons'] = scrubbed
-                gated_chapters.append(ch)
-
-            data['chapters'] = gated_chapters
-            data['preview'] = {
-                'sections_unlocked': min(preview_limit, len(gated_chapters)),
-                'lessons_per_section_unlocked': preview_lessons,
-                'message': 'Login to unlock all chapters and resources'
-            }
-        else:
-            for ch in data.get('chapters') or []:
-                ch['is_preview'] = False
-                ch['is_locked'] = False
+        data = _apply_preview_gating(data, 'school', request)
 
         return Response(data)
     except SchoolCourse.DoesNotExist:
@@ -2395,7 +2375,8 @@ def delete_course_enrollment(request, enrollment_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
+@authentication_classes([])
 def check_course_enrollment(request, course_type, course_id):
     """
     Check if user is enrolled in a specific course
@@ -2412,11 +2393,8 @@ def check_course_enrollment(request, course_type, course_id):
         elif course_type == 'engineering':
             filter_params['engineering_course_id'] = course_id
         else:
-            return Response(
-                {'error': 'Invalid course_type'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+            return Response({'error': 'Invalid course_type'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             enrollment = UserStartedPredefinedCourse.objects.get(**filter_params)
             return Response({
@@ -2558,6 +2536,7 @@ def admin_enrollment_stats(request):
         import traceback
         traceback.print_exc()
         return Response({'error': f'Failed to compute enrollment stats: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 # ==================== LEARNING ACTIVITY TRACKING API ====================
 
 @api_view(['POST'])
@@ -3526,12 +3505,10 @@ def get_course_by_id(request, course_id):
                 # Also provide the keys expected by the admin edit form
                 'learning_outcomes': course.learning_points or [],
                 'requirements': course.requirements or [],
-                'course_content': getattr(course, 'course_content', []),
                 'sources': course.sources or '',
                 'certificate': 'Certificate of Completion' if getattr(course, 'certificate_given', False) else '',
                 'price': str(getattr(course, 'price', 0)),
-                # Include sections and lessons
-                'sections': []
+                'course_content': getattr(course, 'course_content', []),
             }
             
             # Get sections and lessons for engineering courses
@@ -3623,11 +3600,11 @@ def get_course_by_id(request, course_id):
         if not is_auth:
             # Read preview limits from environment with safe defaults
             try:
-                preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))
+                preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))  # K
             except Exception:
                 preview_limit = 2
             try:
-                preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))
+                preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))  # L
             except Exception:
                 preview_lessons = 3
 
@@ -3778,3 +3755,55 @@ def get_user_certificates(request):
             'success': False,
             'error': f'Failed to get user certificates: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+@authentication_classes([JWTAuthentication])
+def get_lesson_details(request, lesson_id):
+    """
+    Fetch full details for a specific lesson.
+    Used for lazy loading lesson content.
+    """
+    try:
+        lesson = Lesson.objects.get(id=lesson_id)
+        
+        # Check for preview restrictions if user is not authenticated
+        is_auth = request.user.is_authenticated if hasattr(request, 'user') else False
+        
+        if not is_auth:
+            # Determine if this lesson is locked
+            is_locked = True
+            
+            try:
+                preview_limit = int(os.environ.get('PREVIEW_SECTIONS_LIMIT', '2'))
+                preview_lessons = int(os.environ.get('PREVIEW_LESSONS_PER_SECTION', '3'))
+                
+                # Check if lesson belongs to a chapter (School) or section (Engineering)
+                if lesson.chapter:
+                    chapter_order = lesson.chapter.order
+                    lesson_order = lesson.order
+                    if chapter_order < preview_limit and lesson_order < preview_lessons:
+                        is_locked = False
+                elif lesson.section:
+                    section_order = lesson.section.order
+                    lesson_order = lesson.order
+                    if section_order < preview_limit and lesson_order < preview_lessons:
+                        is_locked = False
+            except Exception:
+                # Default to locked if logic fails
+                pass
+                
+            if is_locked:
+                return Response(
+                    {"error": "Login to unlock this lesson"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        serializer = LessonSerializer(lesson, context={'request': request})
+        return Response(serializer.data)
+        
+    except Lesson.DoesNotExist:
+        return Response(
+            {"error": "Lesson not found"}, 
+            status=status.HTTP_404_NOT_FOUND
+        )

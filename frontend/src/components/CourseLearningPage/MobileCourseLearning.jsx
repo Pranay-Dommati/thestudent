@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import logger from '../../utils/logger';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight, FaList, FaTimes, FaPlay, FaCheck, FaBook, FaQuestionCircle, FaDownload, FaGlobe, FaArrowLeft, FaLock } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -33,9 +34,87 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [savingProgress, setSavingProgress] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const videoRef = useRef(null);
+  const listRef = useRef(null);
+  const chapterRefs = useRef([]);
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn } = useAuth();
+
+  // Fetch full details for a specific lesson (lazy loading)
+  const fetchLessonDetails = useCallback(async (lessonId, chapterIndex, lessonIndex) => {
+    if (!lessonId) return;
+    
+    try {
+      const response = await axiosInstance.get(`/lessons/${lessonId}/`);
+      const lessonDetails = response.data;
+      
+      // Update the course state with the full lesson details
+      setCourse(prevCourse => {
+        if (!prevCourse) return prevCourse;
+        const newCourse = { ...prevCourse };
+        
+        if (newCourse.chapters && newCourse.chapters[chapterIndex]) {
+          const chapter = newCourse.chapters[chapterIndex];
+          if (chapter.lessons && chapter.lessons[lessonIndex]) {
+            const lesson = chapter.lessons[lessonIndex];
+            
+            // Merge existing lesson data with new details
+            newCourse.chapters[chapterIndex].lessons[lessonIndex] = {
+              ...lesson,
+              ...lessonDetails,
+              // Ensure we map backend fields to frontend expected fields
+              videoUrl: lessonDetails.video_url,
+              aboutLesson: lessonDetails.about_lesson,
+              quizQuestions: lessonDetails.quiz_questions,
+              // Ensure resources are properly formatted
+              resources: lessonDetails.resources || { downloadable: [], internet: [] }
+            };
+          }
+        }
+        
+        return newCourse;
+      });
+      
+      // Update cache with the new details
+      const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+      const cachedData = courseCache.get(cacheKey);
+      if (cachedData && cachedData.course) {
+        const newCachedCourse = { ...cachedData.course };
+        if (newCachedCourse.chapters && newCachedCourse.chapters[chapterIndex]) {
+           const cachedLesson = newCachedCourse.chapters[chapterIndex].lessons[lessonIndex];
+           newCachedCourse.chapters[chapterIndex].lessons[lessonIndex] = {
+             ...cachedLesson,
+             ...lessonDetails,
+             videoUrl: lessonDetails.video_url,
+             aboutLesson: lessonDetails.about_lesson,
+             quizQuestions: lessonDetails.quiz_questions,
+             resources: lessonDetails.resources || { downloadable: [], internet: [] }
+           };
+           courseCache.set(cacheKey, { ...cachedData, course: newCachedCourse });
+        }
+      }
+      
+    } catch (error) {
+      logger.error('Error fetching lesson details:', error);
+      // Don't show toast for background fetches to avoid spamming user
+    }
+  }, [pathname, location.search, isLoggedIn]);
+
+  // Effect to lazy load lesson details when navigating between lessons
+  useEffect(() => {
+    if (!course || !course.chapters) return;
+    
+    const chapter = course.chapters[activeChapter];
+    if (!chapter || !chapter.lessons) return;
+    
+    const lesson = chapter.lessons[activeLesson];
+    if (!lesson) return;
+    
+    // Check if we need to fetch details (aboutLesson is undefined in light serializer)
+    if (lesson.aboutLesson === undefined && lesson.id) {
+      fetchLessonDetails(lesson.id, activeChapter, activeLesson);
+    }
+  }, [activeChapter, activeLesson, course, fetchLessonDetails]);
 
   // Reuse the same course fetching logic from the desktop version
   useEffect(() => {
@@ -115,19 +194,19 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           throw new Error('Missing courseId. Please use Start Learning from the course page to lock to the exact course.');
         }
         isSchoolCourse = true;
-        apiUrl = `/courses/school/${selectedCourseId}/`;
+        apiUrl = `/courses/school/${selectedCourseId}/?structure_only=true`;
       } else if (pathParts.includes('engineering')) {
-        apiUrl = `/courses/engineering/${courseId}/`;
+        apiUrl = `/courses/engineering/${courseId}/?structure_only=true`;
       } else {
         if (!courseId) throw new Error('Missing courseId in URL.');
         // Try school first, then engineering by ID
         try {
           isSchoolCourse = true;
-          apiUrl = `/courses/school/${courseId}/`;
+          apiUrl = `/courses/school/${courseId}/?structure_only=true`;
           await axiosInstance.get(apiUrl); // probe existence
         } catch {
           isSchoolCourse = false;
-          apiUrl = `/courses/engineering/${courseId}/`;
+          apiUrl = `/courses/engineering/${courseId}/?structure_only=true`;
         }
       }
 
@@ -189,6 +268,36 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         setExpandedChapters({ 0: true });
         setActiveChapter(0);
         setActiveLesson(0);
+        
+        // Lazy load the first lesson immediately
+        if (transformedCourse.chapters[0].lessons.length > 0) {
+          const firstLesson = transformedCourse.chapters[0].lessons[0];
+          if (firstLesson.id) {
+             try {
+               const lessonRes = await axiosInstance.get(`/lessons/${firstLesson.id}/`);
+               const details = lessonRes.data;
+               
+               // Update state with details
+               setCourse(prev => {
+                 if (!prev) return prev;
+                 const newC = { ...prev };
+                 if (newC.chapters[0] && newC.chapters[0].lessons[0]) {
+                   newC.chapters[0].lessons[0] = {
+                     ...newC.chapters[0].lessons[0],
+                     ...details,
+                     videoUrl: details.video_url,
+                     aboutLesson: details.about_lesson,
+                     quizQuestions: details.quiz_questions,
+                     resources: details.resources || { downloadable: [], internet: [] }
+                   };
+                 }
+                 return newC;
+               });
+             } catch (err) {
+               console.warn('Failed to pre-fetch first lesson details', err);
+             }
+          }
+        }
       }
 
       const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
@@ -215,46 +324,55 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         const response = await axiosInstance.get(`/courses/progress/${course.id}/`);
         setCourseProgress(response.data);
         
-        const updatedCourse = {...course};
-        
-        if (response.data.chapters) {
-          response.data.chapters.forEach(chapter => {
-            const chapterIndex = updatedCourse.chapters.findIndex(c => c.title === chapter.name);
-            if (chapterIndex !== -1) {
-              chapter.lessons.forEach(lessonProgress => {
-                const lessonIndex = updatedCourse.chapters[chapterIndex].lessons.findIndex(l => 
-                  l.title === lessonProgress.title
-                );
-                if (lessonIndex !== -1) {
-                  updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = lessonProgress.completed;
-                }
-              });
-            }
-          });
-        } else if (response.data.sections) {
-          response.data.sections.forEach(section => {
-            const sectionIndex = updatedCourse.chapters.findIndex(c => c.title === section.name);
-            if (sectionIndex !== -1) {
-              section.lessons.forEach(lessonProgress => {
-                const lessonIndex = updatedCourse.chapters[sectionIndex].lessons.findIndex(l => 
-                  l.title === lessonProgress.title
-                );
-                if (lessonIndex !== -1) {
-                  updatedCourse.chapters[sectionIndex].lessons[lessonIndex].completed = lessonProgress.completed;
-                }
-              });
-            }
-          });
-        }
-        
-        setCourse(updatedCourse);
+        setCourse(prevCourse => {
+          if (!prevCourse) return prevCourse;
+          const updatedCourse = {...prevCourse};
+          
+          if (response.data.chapters) {
+            response.data.chapters.forEach(chapter => {
+              const chapterIndex = updatedCourse.chapters.findIndex(c => c.title === chapter.name);
+              if (chapterIndex !== -1) {
+                chapter.lessons.forEach(lessonProgress => {
+                  const lessonIndex = updatedCourse.chapters[chapterIndex].lessons.findIndex(l => 
+                    l.title === lessonProgress.title
+                  );
+                  if (lessonIndex !== -1) {
+                    updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = lessonProgress.completed;
+                  }
+                });
+              }
+            });
+          } else if (response.data.sections) {
+            response.data.sections.forEach(section => {
+              const sectionIndex = updatedCourse.chapters.findIndex(c => c.title === section.name);
+              if (sectionIndex !== -1) {
+                section.lessons.forEach(lessonProgress => {
+                  const lessonIndex = updatedCourse.chapters[sectionIndex].lessons.findIndex(l => 
+                    l.title === lessonProgress.title
+                  );
+                  if (lessonIndex !== -1) {
+                    updatedCourse.chapters[sectionIndex].lessons[lessonIndex].completed = lessonProgress.completed;
+                  }
+                });
+              }
+            });
+          }
+          return updatedCourse;
+        });
         
         // Update cache with progress data
+        // We use the latest course state from the closure if available, but it might be slightly stale regarding lesson details.
+        // However, for progress sync, the critical part is the progress data.
         const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
-        courseCache.set(cacheKey, { 
-          course: updatedCourse,
-          progress: response.data 
-        });
+        // We can't easily get the *result* of the functional update above to put in cache.
+        // But we can update the progress part of the cache.
+        const cachedData = courseCache.get(cacheKey);
+        if (cachedData && cachedData.course) {
+             courseCache.set(cacheKey, { 
+              course: cachedData.course, // Keep existing cached course (which might have details)
+              progress: response.data 
+            });
+        }
         console.log('💾 Mobile: Updated cache with progress data');
         
       } catch (error) {
@@ -272,6 +390,11 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     if (lesson?.isLocked && !isLoggedIn) {
       universalToast.info('Log in to access this lesson');
       return;
+    }
+
+    // Lazy load lesson details if they are missing
+    if (lesson.aboutLesson === undefined && lesson.id) {
+      fetchLessonDetails(lesson.id, chapterIndex, lessonIndex);
     }
 
     setActiveChapter(chapterIndex);
@@ -324,10 +447,27 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   }, [course, activeChapter, activeLesson]);
 
   const toggleChapter = (chapterIndex) => {
+    const isExpanding = !expandedChapters[chapterIndex];
     setExpandedChapters(prev => ({
       ...prev,
       [chapterIndex]: !prev[chapterIndex]
     }));
+
+    if (isExpanding) {
+      // Use requestAnimationFrame to ensure DOM update is complete
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const container = listRef.current;
+          const target = chapterRefs.current[chapterIndex];
+          if (container && target) {
+            container.scrollTo({
+              top: target.offsetTop,
+              behavior: 'smooth'
+            });
+          }
+        }, 350);
+      });
+    }
   };
 
   const toggleLessonCompletion = async (chapterIndex, lessonIndex) => {
@@ -422,6 +562,9 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   // Get current lesson
   const currentLesson = course?.chapters[activeChapter]?.lessons[activeLesson];
   const currentChapter = course?.chapters[activeChapter];
+  
+  // Check if lesson details are loading
+  const isLessonLoading = currentLesson?.aboutLesson === undefined && !!currentLesson?.id;
 
   // Calculate progress
   const completedLessons = course ? course.chapters.reduce((total, chapter) => 
@@ -504,6 +647,29 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         
       case 'instructions':
       case 'reading':
+        if (isLessonLoading) {
+          return (
+            <div className="p-4">
+              <div className="animate-pulse space-y-4">
+                <div className="h-8 bg-gray-100 rounded w-3/4 mb-6"></div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-100 rounded w-full"></div>
+                  <div className="h-4 bg-gray-100 rounded w-full"></div>
+                  <div className="h-4 bg-gray-100 rounded w-5/6"></div>
+                </div>
+                <div className="space-y-2 pt-4">
+                  <div className="h-4 bg-gray-100 rounded w-full"></div>
+                  <div className="h-4 bg-gray-100 rounded w-4/5"></div>
+                </div>
+                <div className="space-y-2 pt-4">
+                  <div className="h-4 bg-gray-100 rounded w-full"></div>
+                  <div className="h-4 bg-gray-100 rounded w-11/12"></div>
+                  <div className="h-4 bg-gray-100 rounded w-3/4"></div>
+                </div>
+              </div>
+            </div>
+          );
+        }
         return <InstructionsPage lessonContent={currentLesson} />;
         
       case 'video':
@@ -549,7 +715,16 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               <div className="px-3">
                 {activeTab === 'about' && (
                   <div className="prose prose-sm max-w-none break-words overflow-wrap-anywhere">
-                    {currentLesson?.aboutLesson ? (
+                    {isLessonLoading ? (
+                      <div className="animate-pulse space-y-3 py-2">
+                        <div className="h-5 bg-gray-100 rounded w-1/3 mb-4"></div>
+                        <div className="h-3 bg-gray-100 rounded w-full"></div>
+                        <div className="h-3 bg-gray-100 rounded w-full"></div>
+                        <div className="h-3 bg-gray-100 rounded w-5/6"></div>
+                        <div className="h-3 bg-gray-100 rounded w-full mt-4"></div>
+                        <div className="h-3 bg-gray-100 rounded w-4/5"></div>
+                      </div>
+                    ) : currentLesson?.aboutLesson ? (
                       <div className="break-words">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm, remarkMath]}
@@ -799,14 +974,26 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             {/* Guest CTA */}
             {!isLoggedIn && (
               <div className="px-4 py-3 border-b border-gray-100">
-                <div className="p-3 rounded-lg border border-gray-200 bg-white text-center">
-                  <p className="text-sm text-gray-700 mb-2">Log in to access all lessons</p>
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <FaLock className="w-3.5 h-3.5 text-indigo-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-gray-900 leading-tight">
+                        Unlock full course
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-tight">
+                        Log in to track progress.
+                      </p>
+                    </div>
+                  </div>
                   <button
                     onClick={() => {
                       const returnTo = encodeURIComponent((location?.pathname || '') + (location?.search || ''));
                       navigate(`/auth?returnTo=${returnTo}`);
                     }}
-                    className="inline-flex items-center justify-center px-3 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
+                    className="w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
                     Log in
                   </button>
@@ -815,7 +1002,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             )}
 
             {/* Course chapters list */}
-            <div className="overflow-y-auto h-full pb-48">
+            <div className="overflow-y-auto h-full pb-48 relative" ref={listRef}>
               {course?.chapters?.length === 0 && (
                 <div className="p-6 text-center">
                   <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
@@ -827,7 +1014,11 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               )}
 
               {course?.chapters?.map((chapter, chapterIndex) => (
-                <div key={chapterIndex} className="border-b border-gray-100 last:border-b-0">
+                <div 
+                  key={chapterIndex} 
+                  className="border-b border-gray-100 last:border-b-0"
+                  ref={(el) => (chapterRefs.current[chapterIndex] = el)}
+                >
                   <button 
                     className="w-full p-4 flex justify-between items-center hover:bg-gray-50 transition-colors text-left group"
                     onClick={() => toggleChapter(chapterIndex)}
@@ -865,81 +1056,97 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                         </div>
                         <div className="text-xs text-gray-500">completed</div>
                       </div>
-                      <svg 
-                        className={`h-4 w-4 text-gray-400 transform transition-transform ${
-                          expandedChapters[chapterIndex] ? 'rotate-180' : ''
-                        }`}
-                        fill="none" 
-                        viewBox="0 0 24 24" 
-                        stroke="currentColor"
+                      <motion.div
+                        animate={{ rotate: expandedChapters[chapterIndex] ? 180 : 0 }}
+                        transition={{ duration: 0.2 }}
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
+                        <svg 
+                          className={`h-4 w-4 text-gray-400`}
+                          fill="none" 
+                          viewBox="0 0 24 24" 
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </motion.div>
                     </div>
                   </button>
                   
                   {/* Lessons */}
-                  {expandedChapters[chapterIndex] && (
-                    <div className="bg-gray-50">
-                      {chapter.lessons.map((lesson, lessonIndex) => (
-                        <button
-                          key={lessonIndex}
-                          className={`w-full p-3 pl-4 flex items-center justify-between hover:bg-gray-100 transition-colors text-left group ${
-                            activeChapter === chapterIndex && activeLesson === lessonIndex
-                              ? 'bg-indigo-50 border-r-4 border-indigo-500'
-                              : ''
-                          } ${lesson.isLocked && !isLoggedIn ? 'opacity-60 cursor-not-allowed' : ''}`}
-                          aria-disabled={lesson.isLocked && !isLoggedIn}
-                          onClick={() => handleLessonClick(chapterIndex, lessonIndex)}
-                        >
-                          <div className="flex items-center flex-1 min-w-0">
-                            {/* Completion toggle moved to the left of title */}
-                            <div
-                              className={`mr-3 w-5 h-5 flex items-center justify-center rounded-full border-2 cursor-pointer select-none touch-manipulation active:scale-95 transition-all ${
-                                lesson.completed ? 'bg-green-50 border-green-500' : 'bg-white border-gray-300 hover:border-gray-400'
-                              }`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleLessonCompletion(chapterIndex, lessonIndex);
-                              }}
-                              role="checkbox"
-                              aria-checked={!!lesson.completed}
-                              aria-label={`Mark \"${lesson.title}\" as ${lesson.completed ? 'incomplete' : 'complete'}`}
-                              tabIndex={0}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
+                  <AnimatePresence initial={false}>
+                    {expandedChapters[chapterIndex] && (
+                      <motion.div
+                        key="content"
+                        initial="collapsed"
+                        animate="open"
+                        exit="collapsed"
+                        variants={{
+                          open: { opacity: 1, height: "auto" },
+                          collapsed: { opacity: 0, height: 0 }
+                        }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="overflow-hidden bg-gray-50"
+                      >
+                        {chapter.lessons.map((lesson, lessonIndex) => (
+                          <button
+                            key={lessonIndex}
+                            className={`w-full p-3 pl-4 flex items-center justify-between hover:bg-gray-100 transition-colors text-left group ${
+                              activeChapter === chapterIndex && activeLesson === lessonIndex
+                                ? 'bg-indigo-50 border-r-4 border-indigo-500'
+                                : ''
+                            } ${lesson.isLocked && !isLoggedIn ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            aria-disabled={lesson.isLocked && !isLoggedIn}
+                            onClick={() => handleLessonClick(chapterIndex, lessonIndex)}
+                          >
+                            <div className="flex items-center flex-1 min-w-0">
+                              {/* Completion toggle moved to the left of title */}
+                              <div
+                                className={`mr-3 w-5 h-5 flex items-center justify-center rounded-full border-2 cursor-pointer select-none touch-manipulation active:scale-95 transition-all ${
+                                  lesson.completed ? 'bg-green-50 border-green-500' : 'bg-white border-gray-300 hover:border-gray-400'
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   toggleLessonCompletion(chapterIndex, lessonIndex);
-                                }
-                              }}
-                            >
-                              {lesson.completed && <FaCheck className="w-3 h-3 text-green-600" />}
+                                }}
+                                role="checkbox"
+                                aria-checked={!!lesson.completed}
+                                aria-label={`Mark \"${lesson.title}\" as ${lesson.completed ? 'incomplete' : 'complete'}`}
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    toggleLessonCompletion(chapterIndex, lessonIndex);
+                                  }
+                                }}
+                              >
+                                {lesson.completed && <FaCheck className="w-3 h-3 text-green-600" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className={`text-sm font-medium truncate ${
+                                  activeChapter === chapterIndex && activeLesson === lessonIndex
+                                    ? 'text-indigo-700'
+                                    : 'text-gray-900 group-hover:text-indigo-600'
+                                }`}>
+                                  {lesson.title}
+                                </h4>
+                                <p className="text-xs text-gray-500 capitalize">
+                                  {lesson.type || 'video'} lesson
+                                </p>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className={`text-sm font-medium truncate ${
-                                activeChapter === chapterIndex && activeLesson === lessonIndex
-                                  ? 'text-indigo-700'
-                                  : 'text-gray-900 group-hover:text-indigo-600'
-                              }`}>
-                                {lesson.title}
-                              </h4>
-                              <p className="text-xs text-gray-500 capitalize">
-                                {lesson.type || 'video'} lesson
-                              </p>
+                            <div className="flex items-center ml-2">
+                              {lesson.isLocked && (
+                                <FaLock className="w-3.5 h-3.5 text-gray-400 mr-2" title="Lesson locked" />
+                              )}
+                              {activeChapter === chapterIndex && activeLesson === lessonIndex && (
+                                <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
+                              )}
                             </div>
-                          </div>
-                          <div className="flex items-center ml-2">
-                            {lesson.isLocked && (
-                              <FaLock className="w-3.5 h-3.5 text-gray-400 mr-2" title="Lesson locked" />
-                            )}
-                            {activeChapter === chapterIndex && activeLesson === lessonIndex && (
-                              <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               ))}
             </div>
