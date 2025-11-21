@@ -93,6 +93,7 @@ class CourseChapter(models.Model):
     name = models.CharField(max_length=255)
     order = models.PositiveIntegerField(default=0)
     is_deleted = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         ordering = ['order']
@@ -106,6 +107,7 @@ class CourseSection(models.Model):
     name = models.CharField(max_length=255)
     order = models.PositiveIntegerField(default=0)
     is_deleted = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         ordering = ['order']
