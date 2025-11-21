@@ -132,6 +132,9 @@ const LessonForm = ({
               previewOptions={{
                 style: { padding: '20px', fontSize: '16px' }
               }}
+              textareaProps={{
+                className: 'custom-scrollbar'
+              }}
             />
             <div className="text-xs text-gray-500 italic">
               Tip: Use markdown syntax for formatting - **bold**, *italic*, ## headings, - list items, [links](url), etc.
@@ -206,6 +209,7 @@ const LessonForm = ({
             hideToolbar={false}
             enableScroll={true}
             textareaProps={{
+              className: 'custom-scrollbar',
               placeholder: "Paste your formatted content here or start typing...",
               onPaste: (e) => {
                 // Try to get rich text content

@@ -92,6 +92,7 @@ class CourseChapter(models.Model):
     school_course = models.ForeignKey(SchoolCourse, on_delete=models.CASCADE, related_name='chapters')
     name = models.CharField(max_length=255)
     order = models.PositiveIntegerField(default=0)
+    is_deleted = models.BooleanField(default=False)
     
     class Meta:
         ordering = ['order']
@@ -104,6 +105,7 @@ class CourseSection(models.Model):
     engineering_course = models.ForeignKey(EngineeringCourse, on_delete=models.CASCADE, related_name='sections')
     name = models.CharField(max_length=255)
     order = models.PositiveIntegerField(default=0)
+    is_deleted = models.BooleanField(default=False)
     
     class Meta:
         ordering = ['order']

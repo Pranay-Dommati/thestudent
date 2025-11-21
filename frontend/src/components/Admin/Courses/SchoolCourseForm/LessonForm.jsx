@@ -263,7 +263,7 @@ const LessonForm = ({
               onPaste={handlePasteToMarkdown}
               onBlur={() => startTransition(() => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', aboutRef.current ? aboutRef.current.value : ''))}
               rows={8}
-              className="w-full p-3 border border-gray-300 rounded-lg font-mono text-sm"
+              className="w-full p-3 border border-gray-300 rounded-lg font-mono text-sm custom-scrollbar"
               placeholder="Write about this lesson using Markdown..."
             />
             <div className="text-xs text-gray-500 italic">
@@ -346,7 +346,7 @@ const LessonForm = ({
             onInput={postToWorkerThrottled}
             onBlur={() => startTransition(() => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', aboutRef.current ? aboutRef.current.value : ''))}
             rows={15}
-            className="w-full p-3 border border-gray-300 rounded-lg font-mono text-sm"
+            className="w-full p-3 border border-gray-300 rounded-lg font-mono text-sm custom-scrollbar"
             placeholder="Paste your formatted content here or start typing..."
             onPaste={(e) => {
                 // Try to get rich text content
