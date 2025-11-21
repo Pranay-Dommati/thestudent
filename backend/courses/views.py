@@ -2825,7 +2825,7 @@ def update_course(request, course_id):
 
                 # Bulk update chapters
                 if chapters_to_update:
-                    from backend.courses.models import CourseChapter
+                    from .models import CourseChapter
                     CourseChapter.objects.bulk_update(chapters_to_update, ['name', 'order'])
                 
                 # Delete removed chapters
@@ -2842,7 +2842,11 @@ def update_course(request, course_id):
                 # Now process lessons for ALL chapters (both existing and new)
                 all_lessons_to_update = []
                 all_resources_to_create = []
+                all_resources_to_update = []
+                all_resources_to_delete_ids = []
                 all_quiz_questions_to_create = []
+                all_quiz_questions_to_update = []
+                all_quiz_questions_to_delete_ids = []
                 
                 # We need to track which lessons to keep to delete others
                 kept_lessons_map = defaultdict(set)
@@ -2901,44 +2905,78 @@ def update_course(request, course_id):
                                 about_lesson=about
                             )
                         
-                        # Process Resources
+                        # Process Resources (Diffing Strategy)
                         if l_id: 
-                             lesson.resources.all().delete() 
+                             # Fetch existing resources for this lesson (uses prefetch cache if available)
+                             existing_resources = {r.id: r for r in lesson.resources.all()}
+                        else:
+                             existing_resources = {}
                         
                         has_resources = l_data.get('hasResources', False)
                         resources_data = l_data.get('resources', {})
                         
+                        seen_resource_ids = set()
+
                         if has_resources and resources_data:
+                            # Helper to process resource list
+                            def process_resource_list(res_list, r_type):
+                                for res in res_list:
+                                    if not isinstance(res, dict): continue
+                                    
+                                    r_id = res.get('id')
+                                    r_title = res.get('title') or res.get('name', '')
+                                    r_desc = res.get('description', '')
+                                    r_url = res.get('url') or res.get('link', '')
+                                    
+                                    if r_id and r_id in existing_resources:
+                                        # Update existing
+                                        existing_res = existing_resources[r_id]
+                                        seen_resource_ids.add(r_id)
+                                        
+                                        if (existing_res.title != r_title or 
+                                            existing_res.description != r_desc or 
+                                            existing_res.url != r_url or
+                                            existing_res.type != r_type):
+                                            existing_res.title = r_title
+                                            existing_res.description = r_desc
+                                            existing_res.url = r_url
+                                            existing_res.type = r_type
+                                            all_resources_to_update.append(existing_res)
+                                    else:
+                                        # Create new
+                                        all_resources_to_create.append(LessonResource(
+                                            lesson=lesson,
+                                            type=r_type,
+                                            title=r_title,
+                                            description=r_desc,
+                                            url=r_url
+                                        ))
+
                             # Downloadable
                             d_res = parse_json(resources_data.get('downloadable'))
-                            for res in d_res:
-                                if isinstance(res, dict):
-                                    all_resources_to_create.append(LessonResource(
-                                        lesson=lesson,
-                                        type='downloadable',
-                                        title=res.get('title') or res.get('name', ''),
-                                        description=res.get('description', ''),
-                                        url=res.get('url') or res.get('link', '')
-                                    ))
+                            process_resource_list(d_res, 'downloadable')
                             
                             # Internet
                             i_res = parse_json(resources_data.get('internet'))
-                            for res in i_res:
-                                if isinstance(res, dict):
-                                    all_resources_to_create.append(LessonResource(
-                                        lesson=lesson,
-                                        type='internet',
-                                        title=res.get('title') or res.get('name', ''),
-                                        description=res.get('description', ''),
-                                        url=res.get('url') or res.get('link', '')
-                                    ))
+                            process_resource_list(i_res, 'internet')
 
-                        # Process Quiz Questions
+                        # Mark unseen resources for deletion
                         if l_id:
-                            lesson.quiz_questions.all().delete()
+                            for r_id in existing_resources:
+                                if r_id not in seen_resource_ids:
+                                    all_resources_to_delete_ids.append(r_id)
+
+                        # Process Quiz Questions (Diffing Strategy)
+                        if l_id:
+                            existing_quizzes = {q.id: q for q in lesson.quiz_questions.all()}
+                        else:
+                            existing_quizzes = {}
                             
                         quiz_list = parse_json(l_data.get('quizQuestions') or l_data.get('quiz_questions'))
+                        seen_quiz_ids = set()
+
                         for q in quiz_list:
+                            q_id = q.get('id')
                             q_text = (q.get('question') or '').strip()
                             opts = parse_json(q.get('options'))
                             if not q_text or not opts: continue
@@ -2951,12 +2989,35 @@ def update_course(request, course_id):
                             except: pass
                             if not ca_text and isinstance(ca, str) and ca in opts: ca_text = ca
                             
-                            all_quiz_questions_to_create.append(QuizQuestion(
-                                lesson=lesson,
-                                question=q_text,
-                                options=opts,
-                                correct_answer=ca_text or (opts[0] if opts else '')
-                            ))
+                            final_ca = ca_text or (opts[0] if opts else '')
+
+                            if q_id and q_id in existing_quizzes:
+                                # Update existing
+                                existing_q = existing_quizzes[q_id]
+                                seen_quiz_ids.add(q_id)
+                                
+                                # Check for changes (simple equality check for lists/strings)
+                                if (existing_q.question != q_text or 
+                                    existing_q.options != opts or 
+                                    existing_q.correct_answer != final_ca):
+                                    existing_q.question = q_text
+                                    existing_q.options = opts
+                                    existing_q.correct_answer = final_ca
+                                    all_quiz_questions_to_update.append(existing_q)
+                            else:
+                                # Create new
+                                all_quiz_questions_to_create.append(QuizQuestion(
+                                    lesson=lesson,
+                                    question=q_text,
+                                    options=opts,
+                                    correct_answer=final_ca
+                                ))
+                        
+                        # Mark unseen quizzes for deletion
+                        if l_id:
+                            for q_id in existing_quizzes:
+                                if q_id not in seen_quiz_ids:
+                                    all_quiz_questions_to_delete_ids.append(q_id)
 
                     # Delete removed lessons for this chapter
                     if ch_id:
@@ -2973,9 +3034,21 @@ def update_course(request, course_id):
                 
                 if all_resources_to_create:
                     LessonResource.objects.bulk_create(all_resources_to_create)
+                
+                if all_resources_to_update:
+                    LessonResource.objects.bulk_update(all_resources_to_update, ['title', 'description', 'url', 'type'])
+                
+                if all_resources_to_delete_ids:
+                    LessonResource.objects.filter(id__in=all_resources_to_delete_ids).delete()
                     
                 if all_quiz_questions_to_create:
                     QuizQuestion.objects.bulk_create(all_quiz_questions_to_create)
+                
+                if all_quiz_questions_to_update:
+                    QuizQuestion.objects.bulk_update(all_quiz_questions_to_update, ['question', 'options', 'correct_answer'])
+
+                if all_quiz_questions_to_delete_ids:
+                    QuizQuestion.objects.filter(id__in=all_quiz_questions_to_delete_ids).delete()
 
             course = school_course
 
@@ -3045,7 +3118,7 @@ def update_course(request, course_id):
 
                 # Bulk update sections
                 if sections_to_update:
-                    from backend.courses.models import CourseSection
+                    from .models import CourseSection
                     CourseSection.objects.bulk_update(sections_to_update, ['name', 'order'])
                 
                 # Delete removed sections
@@ -3062,7 +3135,11 @@ def update_course(request, course_id):
                 # Now process lessons for ALL sections (both existing and new)
                 all_lessons_to_update = []
                 all_resources_to_create = []
+                all_resources_to_update = []
+                all_resources_to_delete_ids = []
                 all_quiz_questions_to_create = []
+                all_quiz_questions_to_update = []
+                all_quiz_questions_to_delete_ids = []
                 
                 # We need to track which lessons to keep to delete others
                 kept_lessons_map = defaultdict(set)
@@ -3121,44 +3198,78 @@ def update_course(request, course_id):
                                 about_lesson=about
                             )
                         
-                        # Process Resources
+                        # Process Resources (Diffing Strategy)
                         if l_id: 
-                             lesson.resources.all().delete() 
+                             # Fetch existing resources for this lesson (uses prefetch cache if available)
+                             existing_resources = {r.id: r for r in lesson.resources.all()}
+                        else:
+                             existing_resources = {}
                         
                         has_resources = l_data.get('hasResources', False)
                         resources_data = l_data.get('resources', {})
                         
+                        seen_resource_ids = set()
+
                         if has_resources and resources_data:
+                            # Helper to process resource list
+                            def process_resource_list(res_list, r_type):
+                                for res in res_list:
+                                    if not isinstance(res, dict): continue
+                                    
+                                    r_id = res.get('id')
+                                    r_title = res.get('title') or res.get('name', '')
+                                    r_desc = res.get('description', '')
+                                    r_url = res.get('url') or res.get('link', '')
+                                    
+                                    if r_id and r_id in existing_resources:
+                                        # Update existing
+                                        existing_res = existing_resources[r_id]
+                                        seen_resource_ids.add(r_id)
+                                        
+                                        if (existing_res.title != r_title or 
+                                            existing_res.description != r_desc or 
+                                            existing_res.url != r_url or
+                                            existing_res.type != r_type):
+                                            existing_res.title = r_title
+                                            existing_res.description = r_desc
+                                            existing_res.url = r_url
+                                            existing_res.type = r_type
+                                            all_resources_to_update.append(existing_res)
+                                    else:
+                                        # Create new
+                                        all_resources_to_create.append(LessonResource(
+                                            lesson=lesson,
+                                            type=r_type,
+                                            title=r_title,
+                                            description=r_desc,
+                                            url=r_url
+                                        ))
+
                             # Downloadable
                             d_res = parse_json(resources_data.get('downloadable'))
-                            for res in d_res:
-                                if isinstance(res, dict):
-                                    all_resources_to_create.append(LessonResource(
-                                        lesson=lesson,
-                                        type='downloadable',
-                                        title=res.get('title') or res.get('name', ''),
-                                        description=res.get('description', ''),
-                                        url=res.get('url') or res.get('link', '')
-                                    ))
+                            process_resource_list(d_res, 'downloadable')
                             
                             # Internet
                             i_res = parse_json(resources_data.get('internet'))
-                            for res in i_res:
-                                if isinstance(res, dict):
-                                    all_resources_to_create.append(LessonResource(
-                                        lesson=lesson,
-                                        type='internet',
-                                        title=res.get('title') or res.get('name', ''),
-                                        description=res.get('description', ''),
-                                        url=res.get('url') or res.get('link', '')
-                                    ))
+                            process_resource_list(i_res, 'internet')
 
-                        # Process Quiz Questions
+                        # Mark unseen resources for deletion
                         if l_id:
-                            lesson.quiz_questions.all().delete()
+                            for r_id in existing_resources:
+                                if r_id not in seen_resource_ids:
+                                    all_resources_to_delete_ids.append(r_id)
+
+                        # Process Quiz Questions (Diffing Strategy)
+                        if l_id:
+                            existing_quizzes = {q.id: q for q in lesson.quiz_questions.all()}
+                        else:
+                            existing_quizzes = {}
                             
                         quiz_list = parse_json(l_data.get('quizQuestions') or l_data.get('quiz_questions'))
+                        seen_quiz_ids = set()
+
                         for q in quiz_list:
+                            q_id = q.get('id')
                             q_text = (q.get('question') or '').strip()
                             opts = parse_json(q.get('options'))
                             if not q_text or not opts: continue
@@ -3171,12 +3282,35 @@ def update_course(request, course_id):
                             except: pass
                             if not ca_text and isinstance(ca, str) and ca in opts: ca_text = ca
                             
-                            all_quiz_questions_to_create.append(QuizQuestion(
-                                lesson=lesson,
-                                question=q_text,
-                                options=opts,
-                                correct_answer=ca_text or (opts[0] if opts else '')
-                            ))
+                            final_ca = ca_text or (opts[0] if opts else '')
+
+                            if q_id and q_id in existing_quizzes:
+                                # Update existing
+                                existing_q = existing_quizzes[q_id]
+                                seen_quiz_ids.add(q_id)
+                                
+                                # Check for changes (simple equality check for lists/strings)
+                                if (existing_q.question != q_text or 
+                                    existing_q.options != opts or 
+                                    existing_q.correct_answer != final_ca):
+                                    existing_q.question = q_text
+                                    existing_q.options = opts
+                                    existing_q.correct_answer = final_ca
+                                    all_quiz_questions_to_update.append(existing_q)
+                            else:
+                                # Create new
+                                all_quiz_questions_to_create.append(QuizQuestion(
+                                    lesson=lesson,
+                                    question=q_text,
+                                    options=opts,
+                                    correct_answer=final_ca
+                                ))
+                        
+                        # Mark unseen quizzes for deletion
+                        if l_id:
+                            for q_id in existing_quizzes:
+                                if q_id not in seen_quiz_ids:
+                                    all_quiz_questions_to_delete_ids.append(q_id)
 
                     # Delete removed lessons for this section
                     if sec_id:
@@ -3193,9 +3327,21 @@ def update_course(request, course_id):
                 
                 if all_resources_to_create:
                     LessonResource.objects.bulk_create(all_resources_to_create)
+                
+                if all_resources_to_update:
+                    LessonResource.objects.bulk_update(all_resources_to_update, ['title', 'description', 'url', 'type'])
+                
+                if all_resources_to_delete_ids:
+                    LessonResource.objects.filter(id__in=all_resources_to_delete_ids).delete()
                     
                 if all_quiz_questions_to_create:
                     QuizQuestion.objects.bulk_create(all_quiz_questions_to_create)
+                
+                if all_quiz_questions_to_update:
+                    QuizQuestion.objects.bulk_update(all_quiz_questions_to_update, ['question', 'options', 'correct_answer'])
+
+                if all_quiz_questions_to_delete_ids:
+                    QuizQuestion.objects.filter(id__in=all_quiz_questions_to_delete_ids).delete()
 
             course = engineering_course
         
