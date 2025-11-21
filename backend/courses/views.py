@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource, LearningActivity, UserStartedPredefinedCourse, Certification
+from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource, LearningActivity, UserStartedPredefinedCourse, Certification, QuizQuestion
 from .serializers import (
     CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer, CertificationSerializer,
     CourseStructureSerializer, EngineeringCourseStructureSerializer, LessonSerializer
@@ -38,6 +38,7 @@ from django.db.models import Count
 from django.db.models import Q
 from django.core.files.storage import default_storage
 from django.urls import reverse
+from collections import defaultdict
 
 # Module-level helper: build robust thumbnail URL with file-existence check and placeholder fallback
 def _build_thumbnail_url(obj_with_thumbnail, request):
@@ -484,6 +485,7 @@ def _apply_preview_gating(data, course_type, request):
                         ld['video_url'] = None
                         ld['resources'] = {'downloadable': [], 'internet': []}
                         ld['quiz_questions'] = []
+                        ld['quizQuestions'] = []
                     new_lessons.append(ld)
                 cont['lessons'] = new_lessons
             else:
@@ -497,6 +499,7 @@ def _apply_preview_gating(data, course_type, request):
                     ld['video_url'] = None
                     ld['resources'] = {'downloadable': [], 'internet': []}
                     ld['quiz_questions'] = []
+                    ld['quizQuestions'] = []
                     scrubbed.append(ld)
                 cont['lessons'] = scrubbed
             gated_containers.append(cont)
@@ -1920,6 +1923,8 @@ def is_topic_relevant(title, description, topic):
     
     # Check for topic variations
     variations = topic_variations.get(topic_lower, [topic_lower])
+   
+
     for variation in variations:
         if variation in content:
             return True
@@ -2717,7 +2722,7 @@ def delete_course(request, course_id):
 @permission_classes([IsAdminUser])
 def update_course(request, course_id):
     """
-    Update a course (both school and engineering courses)
+    Update a course (both school and engineering courses) - Optimized for performance
     """
     try:
         data = request.data
@@ -2727,642 +2732,471 @@ def update_course(request, course_id):
         # Try to find the course in SchoolCourse first
         school_course = None
         engineering_course = None
+        course_type = None
         
         try:
-            school_course = get_object_or_404(SchoolCourse, id=course_id)
+            school_course = SchoolCourse.objects.prefetch_related(
+                'chapters', 
+                'chapters__lessons',
+                'chapters__lessons__resources',
+                'chapters__lessons__quiz_questions'
+            ).get(id=course_id)
             course_type = 'school'
-        except Http404:
+        except SchoolCourse.DoesNotExist:
             try:
-                engineering_course = get_object_or_404(EngineeringCourse, id=course_id)
+                engineering_course = EngineeringCourse.objects.prefetch_related(
+                    'sections',
+                    'sections__lessons',
+                    'sections__lessons__resources',
+                    'sections__lessons__quiz_questions'
+                ).get(id=course_id)
                 course_type = 'engineering'
-            except Http404:
+            except EngineeringCourse.DoesNotExist:
                 return Response({
                     'error': 'Course not found'
                 }, status=status.HTTP_404_NOT_FOUND)
         
+        # Helper to parse JSON safely
+        def parse_json(value, default=None):
+            if default is None: default = []
+            if isinstance(value, str):
+                if not value.strip(): return default
+                try: return json.loads(value)
+                except: return default
+            return value if value is not None else default
+
         # Update School Course
         if school_course:
             # Update basic fields
-            if 'title' in data:
-                school_course.title = data.get('title')
-            if 'class_level' in data:
-                school_course.class_level = data.get('class_level')
-            if 'board' in data:
-                school_course.board = data.get('board')
-            if 'state' in data:
-                school_course.state = data.get('state', '')
-            if 'subject' in data:
-                school_course.subject = data.get('subject')
-            if 'sources' in data:
-                school_course.sources = data.get('sources', '')
-            if 'duration' in data:
-                school_course.duration = data.get('duration', '')
-            if 'description' in data:
-                school_course.description = data.get('description')
+            if 'title' in data: school_course.title = data.get('title')
+            if 'class_level' in data: school_course.class_level = data.get('class_level')
+            if 'board' in data: school_course.board = data.get('board')
+            if 'state' in data: school_course.state = data.get('state', '')
+            if 'subject' in data: school_course.subject = data.get('subject')
+            if 'sources' in data: school_course.sources = data.get('sources', '')
+            if 'duration' in data: school_course.duration = data.get('duration', '')
+            if 'description' in data: school_course.description = data.get('description')
             if 'short_description' in data or 'shortDescription' in data:
                 school_course.short_description = data.get('short_description', data.get('shortDescription', ''))
+            
             if 'is_published' in data:
-                # Handle string to boolean conversion for FormData
-                is_published_value = data.get('is_published', False)
-                if isinstance(is_published_value, str):
-                    school_course.is_published = is_published_value.lower() in ('true', '1', 'yes', 'on')
-                else:
-                    school_course.is_published = bool(is_published_value)
+                val = data.get('is_published', False)
+                school_course.is_published = (val.lower() in ('true', '1', 'yes', 'on')) if isinstance(val, str) else bool(val)
                 
             # Handle key_topics and learning_points
-            if 'key_topics' in data:
-                try:
-                    key_topics_data = data.get('key_topics', '[]')
-                    if not key_topics_data.strip():
-                        key_topics_data = '[]'
-                    school_course.key_topics = json.loads(key_topics_data)
-                except (json.JSONDecodeError, AttributeError):
-                    school_course.key_topics = []
-            elif 'keyTopics' in data:
-                try:
-                    key_topics_data = data.get('keyTopics', '[]')
-                    if not key_topics_data.strip():
-                        key_topics_data = '[]'
-                    school_course.key_topics = json.loads(key_topics_data)
-                except (json.JSONDecodeError, AttributeError):
-                    school_course.key_topics = []
-                    
-            if 'learning_points' in data:
-                try:
-                    learning_points_data = data.get('learning_points', '[]')
-                    if not learning_points_data.strip():
-                        learning_points_data = '[]'
-                    school_course.learning_points = json.loads(learning_points_data)
-                except (json.JSONDecodeError, AttributeError):
-                    school_course.learning_points = []
-            elif 'learningPoints' in data:
-                try:
-                    learning_points_data = data.get('learningPoints', '[]')
-                    if not learning_points_data.strip():
-                        learning_points_data = '[]'
-                    school_course.learning_points = json.loads(learning_points_data)
-                except (json.JSONDecodeError, AttributeError):
-                    school_course.learning_points = []
+            if 'key_topics' in data or 'keyTopics' in data:
+                school_course.key_topics = parse_json(data.get('key_topics', data.get('keyTopics')))
+            if 'learning_points' in data or 'learningPoints' in data:
+                school_course.learning_points = parse_json(data.get('learning_points', data.get('learningPoints')))
             
-            # Handle thumbnail update
             if 'thumbnail' in request.FILES:
                 school_course.thumbnail = request.FILES['thumbnail']
             
             school_course.save()
 
-            # Nested update: chapters and lessons (optional)
+            # Nested update: chapters and lessons
             if 'chapters' in data:
-                try:
-                    chapters_payload = data.get('chapters', '[]')
-                    if isinstance(chapters_payload, str):
-                        chapters_data = json.loads(chapters_payload or '[]')
+                chapters_data = parse_json(data.get('chapters'))
+                
+                # Pre-fetch existing chapters
+                existing_chapters = {c.id: c for c in school_course.chapters.all()}
+                existing_chapter_ids = set(existing_chapters.keys())
+                
+                kept_chapter_ids = set()
+                chapters_to_create = []
+                chapters_to_update = []
+                
+                # Process chapters
+                for idx, ch_data in enumerate(chapters_data):
+                    ch_id = ch_data.get('id')
+                    ch_name = ch_data.get('name', '').strip()
+                    if not ch_name: continue
+                    
+                    if ch_id and ch_id in existing_chapters:
+                        chapter = existing_chapters[ch_id]
+                        kept_chapter_ids.add(ch_id)
+                        if chapter.name != ch_name or chapter.order != idx:
+                            chapter.name = ch_name
+                            chapter.order = idx
+                            chapters_to_update.append(chapter)
                     else:
-                        chapters_data = chapters_payload or []
-                except Exception:
-                    chapters_data = []
+                        # New chapter
+                        chapters_to_create.append((idx, ch_data))
 
-                kept_chapter_ids = []
-                lessons_to_update = []
+                # Bulk update chapters
+                if chapters_to_update:
+                    from backend.courses.models import CourseChapter
+                    CourseChapter.objects.bulk_update(chapters_to_update, ['name', 'order'])
+                
+                # Delete removed chapters
+                chapters_to_delete = existing_chapter_ids - kept_chapter_ids
+                if chapters_to_delete:
+                    school_course.chapters.filter(id__in=chapters_to_delete).delete()
+                
+                # Create new chapters and process their lessons
+                created_chapters_map = {} 
+                for idx, ch_data in chapters_to_create:
+                    ch = school_course.chapters.create(name=ch_data.get('name'), order=idx)
+                    created_chapters_map[idx] = ch
 
-                for chapter_index, ch in enumerate(chapters_data):
-                    ch_id = ch.get('id')
-                    ch_name = ch.get('name', '').strip()
-                    if not ch_name:
-                        continue
-                    # Find existing chapter by id under this course
-                    chapter_obj = None
-                    if ch_id:
-                        chapter_obj = school_course.chapters.filter(id=ch_id).first()
-                    if not chapter_obj:
-                        chapter_obj = school_course.chapters.create(name=ch_name, order=chapter_index)
+                # Now process lessons for ALL chapters (both existing and new)
+                all_lessons_to_update = []
+                all_resources_to_create = []
+                all_quiz_questions_to_create = []
+                
+                # We need to track which lessons to keep to delete others
+                kept_lessons_map = defaultdict(set)
+                
+                for idx, ch_data in enumerate(chapters_data):
+                    ch_id = ch_data.get('id')
+                    
+                    # Get the chapter object
+                    if ch_id and ch_id in existing_chapters:
+                        chapter = existing_chapters[ch_id]
+                    elif idx in created_chapters_map:
+                        chapter = created_chapters_map[idx]
                     else:
-                        if chapter_obj.name != ch_name or chapter_obj.order != chapter_index:
-                            chapter_obj.name = ch_name
-                            chapter_obj.order = chapter_index
-                            chapter_obj.save()
-                    kept_chapter_ids.append(chapter_obj.id)
-
-                    # Update lessons in this chapter
-                    lessons = ch.get('lessons', []) or []
-                    kept_lesson_ids = []
-                    for lesson_index, les in enumerate(lessons):
-                        les_id = les.get('id')
-                        title = (les.get('title') or '').strip()
-                        if not title:
-                            continue
+                        continue 
                         
-                        lesson_obj = None
-                        if les_id:
-                            lesson_obj = chapter_obj.lessons.filter(id=les_id).first()
+                    # Get existing lessons for this chapter if it's an existing one
+                    existing_lessons = {l.id: l for l in chapter.lessons.all()} if ch_id else {}
+                    
+                    lessons_data = ch_data.get('lessons', []) or []
+                    
+                    for l_idx, l_data in enumerate(lessons_data):
+                        l_id = l_data.get('id')
+                        title = (l_data.get('title') or '').strip()
+                        if not title: continue
                         
                         # Prepare fields
-                        new_type = les.get('type', 'video') or 'video'
-                        new_video_url = les.get('videoUrl', les.get('video_url', '')) or ''
-                        new_description = les.get('description', '') or ''
-                        new_about_lesson = les.get('aboutLesson', les.get('about_lesson', '')) or ''
+                        l_type = l_data.get('type', 'video') or 'video'
+                        video_url = l_data.get('videoUrl', l_data.get('video_url', '')) or ''
+                        desc = l_data.get('description', '') or ''
+                        about = l_data.get('aboutLesson', l_data.get('about_lesson', '')) or ''
                         
-                        if not lesson_obj:
-                            # Create new lesson with all fields set
-                            lesson_obj = chapter_obj.lessons.create(
-                                title=title,
-                                type=new_type,
-                                order=lesson_index,
-                                video_url=new_video_url,
-                                description=new_description,
-                                about_lesson=new_about_lesson
-                            )
-                        else:
-                            # Update existing lesson in memory
-                            has_changes = False
-                            if lesson_obj.title != title:
-                                lesson_obj.title = title
-                                has_changes = True
-                            if lesson_obj.type != new_type:
-                                lesson_obj.type = new_type
-                                has_changes = True
-                            if lesson_obj.video_url != new_video_url:
-                                lesson_obj.video_url = new_video_url
-                                has_changes = True
-                            if lesson_obj.description != new_description:
-                                lesson_obj.description = new_description
-                                has_changes = True
-                            if lesson_obj.about_lesson != new_about_lesson:
-                                lesson_obj.about_lesson = new_about_lesson
-                                has_changes = True
-                            if lesson_obj.order != lesson_index:
-                                lesson_obj.order = lesson_index
-                                has_changes = True
+                        lesson = None
+                        if l_id and l_id in existing_lessons:
+                            lesson = existing_lessons[l_id]
+                            kept_lessons_map[chapter.id].add(l_id)
                             
-                            if has_changes:
-                                lesson_obj.updated_at = timezone.now()
-                                lessons_to_update.append(lesson_obj)
+                            # Check for changes
+                            if (lesson.title != title or lesson.type != l_type or 
+                                lesson.video_url != video_url or lesson.description != desc or 
+                                lesson.about_lesson != about or lesson.order != l_idx):
+                                lesson.title = title
+                                lesson.type = l_type
+                                lesson.video_url = video_url
+                                lesson.description = desc
+                                lesson.about_lesson = about
+                                lesson.order = l_idx
+                                lesson.updated_at = timezone.now()
+                                all_lessons_to_update.append(lesson)
+                        else:
+                            lesson = chapter.lessons.create(
+                                title=title,
+                                type=l_type,
+                                order=l_idx,
+                                video_url=video_url,
+                                description=desc,
+                                about_lesson=about
+                            )
                         
-                        kept_lesson_ids.append(lesson_obj.id)
-
-                        # --- Handle lesson resources (downloadable and internet) ---
-                        has_resources = les.get('hasResources', False)
-                        resources_data = les.get('resources', {})
+                        # Process Resources
+                        if l_id: 
+                             lesson.resources.all().delete() 
                         
-                        if settings.DEBUG:
-                            print(f"[DEBUG] School Lesson '{lesson_obj.title}' - hasResources: {has_resources}")
-                            print(f"[DEBUG] School Lesson '{lesson_obj.title}' - resources_data: {resources_data}")
+                        has_resources = l_data.get('hasResources', False)
+                        resources_data = l_data.get('resources', {})
                         
                         if has_resources and resources_data:
-                            # Clear existing resources for this lesson
-                            lesson_obj.resources.all().delete()
-                            
-                            # Add downloadable resources
-                            downloadable_resources = resources_data.get('downloadable', [])
-                            if isinstance(downloadable_resources, str):
-                                try:
-                                    downloadable_resources = json.loads(downloadable_resources)
-                                except:
-                                    downloadable_resources = []
-                            
-                            if settings.DEBUG:
-                                print(f"[DEBUG] Downloadable resources: {downloadable_resources}")
-                            
-                            for res in downloadable_resources:
+                            # Downloadable
+                            d_res = parse_json(resources_data.get('downloadable'))
+                            for res in d_res:
                                 if isinstance(res, dict):
-                                    # Handle both 'title'/'url' and 'name'/'link' field names
-                                    resource_title = res.get('title') or res.get('name', '')
-                                    resource_url = res.get('url') or res.get('link', '')
-                                    
-                                    LessonResource.objects.create(
-                                        lesson=lesson_obj,
+                                    all_resources_to_create.append(LessonResource(
+                                        lesson=lesson,
                                         type='downloadable',
-                                        title=resource_title,
+                                        title=res.get('title') or res.get('name', ''),
                                         description=res.get('description', ''),
-                                        url=resource_url,
-                                    )
-                                    if settings.DEBUG:
-                                        print(f"[DEBUG] Created downloadable resource: {resource_title}")
+                                        url=res.get('url') or res.get('link', '')
+                                    ))
                             
-                            # Add internet resources
-                            internet_resources = resources_data.get('internet', [])
-                            if isinstance(internet_resources, str):
-                                try:
-                                    internet_resources = json.loads(internet_resources)
-                                except:
-                                    internet_resources = []
-                            
-                            if settings.DEBUG:
-                                print(f"[DEBUG] Internet resources: {internet_resources}")
-                            
-                            for res in internet_resources:
+                            # Internet
+                            i_res = parse_json(resources_data.get('internet'))
+                            for res in i_res:
                                 if isinstance(res, dict):
-                                    # Handle both 'title'/'url' and 'name'/'link' field names
-                                    resource_title = res.get('title') or res.get('name', '')
-                                    resource_url = res.get('url') or res.get('link', '')
-                                    
-                                    LessonResource.objects.create(
-                                        lesson=lesson_obj,
+                                    all_resources_to_create.append(LessonResource(
+                                        lesson=lesson,
                                         type='internet',
-                                        title=resource_title,
+                                        title=res.get('title') or res.get('name', ''),
                                         description=res.get('description', ''),
-                                        url=resource_url,
-                                    )
-                                    if settings.DEBUG:
-                                        print(f"[DEBUG] Created internet resource: {resource_title}")
-                        elif not has_resources:
-                            # If hasResources is explicitly false, clear all resources
-                            lesson_obj.resources.all().delete()
+                                        url=res.get('url') or res.get('link', '')
+                                    ))
 
-                        # --- Nested: quiz questions update for SchoolCourse lessons ---
-                        has_quiz_key = ('quizQuestions' in les) or ('quiz_questions' in les)
-                        quiz_list = (les.get('quizQuestions') or les.get('quiz_questions') or [])
-                        if isinstance(quiz_list, str):
-                            try:
-                                import json as _json
-                                quiz_list = _json.loads(quiz_list) or []
-                            except Exception:
-                                quiz_list = []
-                        kept_question_ids = []
-                        for q in (quiz_list or []):
-                            q_id = q.get('id')
-                            question_text = (q.get('question') or '').strip()
-                            options = q.get('options') or []
-                            if isinstance(options, str):
-                                try:
-                                    import json as _json
-                                    options = _json.loads(options) or []
-                                except Exception:
-                                    options = []
-                            # Determine correct answer text
+                        # Process Quiz Questions
+                        if l_id:
+                            lesson.quiz_questions.all().delete()
+                            
+                        quiz_list = parse_json(l_data.get('quizQuestions') or l_data.get('quiz_questions'))
+                        for q in quiz_list:
+                            q_text = (q.get('question') or '').strip()
+                            opts = parse_json(q.get('options'))
+                            if not q_text or not opts: continue
+                            
                             ca = q.get('correctAnswer', q.get('correct_answer', ''))
-                            correct_answer_text = ''
-                            # Support index (int or numeric string)
+                            ca_text = ''
                             try:
                                 idx = int(ca)
-                                if 0 <= idx < len(options):
-                                    correct_answer_text = options[idx]
-                            except Exception:
-                                pass
-                            if not correct_answer_text and isinstance(ca, str) and ca in options:
-                                correct_answer_text = ca
-                            if not question_text or not options:
-                                # Skip invalid question payloads
-                                continue
-                            if q_id:
-                                qq = lesson_obj.quiz_questions.filter(id=q_id).first()
-                                if qq:
-                                    qq.question = question_text
-                                    qq.options = options
-                                    if correct_answer_text:
-                                        qq.correct_answer = correct_answer_text
-                                    qq.save()
-                                    kept_question_ids.append(qq.id)
-                                    continue
-                            # Create new
-                            qq = lesson_obj.quiz_questions.create(
-                                question=question_text,
-                                options=options,
-                                correct_answer=correct_answer_text or (options[0] if options else '')
-                            )
-                            kept_question_ids.append(qq.id)
+                                if 0 <= idx < len(opts): ca_text = opts[idx]
+                            except: pass
+                            if not ca_text and isinstance(ca, str) and ca in opts: ca_text = ca
+                            
+                            all_quiz_questions_to_create.append(QuizQuestion(
+                                lesson=lesson,
+                                question=q_text,
+                                options=opts,
+                                correct_answer=ca_text or (opts[0] if opts else '')
+                            ))
 
-                        # Delete removed quiz questions for this lesson
-                        if has_quiz_key:
-                            if kept_question_ids:
-                                lesson_obj.quiz_questions.exclude(id__in=kept_question_ids).delete()
-                            else:
-                                lesson_obj.quiz_questions.all().delete()
+                    # Delete removed lessons for this chapter
+                    if ch_id:
+                        kept = kept_lessons_map[ch_id]
+                        existing_ids = set(existing_lessons.keys())
+                        to_delete = existing_ids - kept
+                        if to_delete:
+                            chapter.lessons.filter(id__in=to_delete).delete()
 
-                    # Delete lessons not in payload for this chapter
-                    if kept_lesson_ids:
-                        chapter_obj.lessons.exclude(id__in=kept_lesson_ids).delete()
-                    else:
-                        # If no lessons kept, remove all lessons in this chapter
-                        chapter_obj.lessons.all().delete()
-
-                # Delete chapters not in payload
-                if kept_chapter_ids:
-                    school_course.chapters.exclude(id__in=kept_chapter_ids).delete()
-                else:
-                    # If none kept (empty payload), remove all chapters
-                    school_course.chapters.all().delete()
+                # Execute Bulk Operations
+                if all_lessons_to_update:
+                    Lesson.objects.bulk_update(all_lessons_to_update, 
+                        ['title', 'type', 'video_url', 'description', 'about_lesson', 'order', 'updated_at'])
                 
-                # Perform bulk update for modified lessons
-                if lessons_to_update:
-                    Lesson.objects.bulk_update(lessons_to_update, ['title', 'type', 'video_url', 'description', 'about_lesson', 'order', 'updated_at'])
+                if all_resources_to_create:
+                    LessonResource.objects.bulk_create(all_resources_to_create)
+                    
+                if all_quiz_questions_to_create:
+                    QuizQuestion.objects.bulk_create(all_quiz_questions_to_create)
+
             course = school_course
-            
+
         # Update Engineering Course
-        else:
+        elif engineering_course:
             # Update basic fields
-            if 'title' in data:
-                engineering_course.title = data.get('title')
-            if 'category' in data:
-                engineering_course.category = data.get('category')
-            if 'proficiency_level' in data:
-                # Map proficiency_level to proficiency field in model
-                engineering_course.proficiency = data.get('proficiency_level')
-            if 'sources' in data:
-                engineering_course.sources = data.get('sources', '')
-            if 'duration' in data:
-                engineering_course.duration = data.get('duration', '')
-            if 'description' in data:
-                engineering_course.description = data.get('description')
+            if 'title' in data: engineering_course.title = data.get('title')
+            if 'description' in data: engineering_course.description = data.get('description')
             if 'short_description' in data or 'shortDescription' in data:
                 engineering_course.short_description = data.get('short_description', data.get('shortDescription', ''))
+            if 'duration' in data: engineering_course.duration = data.get('duration', '')
+            if 'sources' in data: engineering_course.sources = data.get('sources', '')
+            if 'proficiency' in data: engineering_course.proficiency = data.get('proficiency', 'beginner')
+            if 'category' in data: engineering_course.category = data.get('category', '')
+            
+            if 'certificate_given' in data:
+                val = data.get('certificate_given', False)
+                engineering_course.certificate_given = (val.lower() in ('true', '1', 'yes', 'on')) if isinstance(val, str) else bool(val)
+            
+            if 'project_based' in data:
+                val = data.get('project_based', False)
+                engineering_course.project_based = (val.lower() in ('true', '1', 'yes', 'on')) if isinstance(val, str) else bool(val)
+
             if 'is_published' in data:
-                # Handle string to boolean conversion for FormData
-                is_published_value = data.get('is_published', False)
-                if isinstance(is_published_value, str):
-                    engineering_course.is_published = is_published_value.lower() in ('true', '1', 'yes', 'on')
-                else:
-                    engineering_course.is_published = bool(is_published_value)
-            if 'certificate' in data:
-                # Map certificate to certificate_given boolean field
-                certificate_value = data.get('certificate', '')
-                engineering_course.certificate_given = bool(certificate_value and certificate_value != 'No Certificate')
+                val = data.get('is_published', False)
+                engineering_course.is_published = (val.lower() in ('true', '1', 'yes', 'on')) if isinstance(val, str) else bool(val)
                 
-            # Handle learning outcomes/objectives (map to learning_points in model)
-            if 'learning_objectives' in data or 'learningObjectives' in data or 'learning_outcomes' in data or 'learningOutcomes' in data:
-                try:
-                    objectives_data = (
-                        data.get('learning_objectives')
-                        or data.get('learningObjectives')
-                        or data.get('learning_outcomes')
-                        or data.get('learningOutcomes')
-                        or '[]'
-                    )
-                    if isinstance(objectives_data, str):
-                        if not objectives_data.strip():
-                            objectives_data = '[]'
-                        engineering_course.learning_points = json.loads(objectives_data)
-                    else:
-                        # Already a list
-                        engineering_course.learning_points = list(objectives_data)
-                except (json.JSONDecodeError, AttributeError, TypeError):
-                    engineering_course.learning_points = []
+            if 'learning_points' in data or 'learningPoints' in data:
+                engineering_course.learning_points = parse_json(data.get('learning_points', data.get('learningPoints')))
             
-            # Handle prerequisites/requirements (map to requirements in model)
-            if 'prerequisites' in data or 'requirements' in data:
-                try:
-                    # Accept both 'prerequisites' and 'requirements' field names
-                    prereq_data = data.get('requirements') or data.get('prerequisites') or '[]'
-                    if settings.DEBUG:
-                        print(f"[DEBUG] Requirements update - Raw data: {prereq_data}")
-                        print(f"[DEBUG] Requirements update - Type: {type(prereq_data)}")
-                    
-                    if isinstance(prereq_data, str):
-                        if not prereq_data.strip():
-                            prereq_data = '[]'
-                        engineering_course.requirements = json.loads(prereq_data)
-                    else:
-                        # Already a list
-                        engineering_course.requirements = list(prereq_data)
-                    
-                    if settings.DEBUG:
-                        print(f"[DEBUG] Requirements update - Parsed: {engineering_course.requirements}")
-                except (json.JSONDecodeError, AttributeError, TypeError) as e:
-                    if settings.DEBUG:
-                        print(f"[DEBUG] Requirements update - Error: {e}")
-                    engineering_course.requirements = []
-                    
-            # Handle course_content (note: this field may not exist in model, so we'll skip errors)
-            # Note: course_content is not in the current model, so we'll just ignore it for now
-            
-            # Handle thumbnail update
+            if 'requirements' in data:
+                engineering_course.requirements = parse_json(data.get('requirements'))
+
             if 'thumbnail' in request.FILES:
                 engineering_course.thumbnail = request.FILES['thumbnail']
             
             engineering_course.save()
 
-            # Nested update: sections and lessons (optional)
+            # Nested update: sections and lessons
             if 'sections' in data:
-                try:
-                    sections_payload = data.get('sections', '[]')
-                    if isinstance(sections_payload, str):
-                        sections_data = json.loads(sections_payload or '[]')
+                sections_data = parse_json(data.get('sections'))
+                
+                # Pre-fetch existing sections
+                existing_sections = {s.id: s for s in engineering_course.sections.all()}
+                existing_section_ids = set(existing_sections.keys())
+                
+                kept_section_ids = set()
+                sections_to_create = []
+                sections_to_update = []
+                
+                # Process sections
+                for idx, sec_data in enumerate(sections_data):
+                    sec_id = sec_data.get('id')
+                    sec_name = sec_data.get('name', '').strip()
+                    if not sec_name: continue
+                    
+                    if sec_id and sec_id in existing_sections:
+                        section = existing_sections[sec_id]
+                        kept_section_ids.add(sec_id)
+                        if section.name != sec_name or section.order != idx:
+                            section.name = sec_name
+                            section.order = idx
+                            sections_to_update.append(section)
                     else:
-                        sections_data = sections_payload or []
-                except Exception:
-                    sections_data = []
+                        # New section
+                        sections_to_create.append((idx, sec_data))
 
-                kept_section_ids = []
-                lessons_to_update = []
+                # Bulk update sections
+                if sections_to_update:
+                    from backend.courses.models import CourseSection
+                    CourseSection.objects.bulk_update(sections_to_update, ['name', 'order'])
+                
+                # Delete removed sections
+                sections_to_delete = existing_section_ids - kept_section_ids
+                if sections_to_delete:
+                    engineering_course.sections.filter(id__in=sections_to_delete).delete()
+                
+                # Create new sections and process their lessons
+                created_sections_map = {} 
+                for idx, sec_data in sections_to_create:
+                    sec = engineering_course.sections.create(name=sec_data.get('name'), order=idx)
+                    created_sections_map[idx] = sec
 
-                for section_index, sec in enumerate(sections_data):
-                    sec_id = sec.get('id')
-                    sec_name = sec.get('name', '').strip()
-                    if not sec_name:
-                        continue
-                    # Find existing section by id under this course
-                    section_obj = None
-                    if sec_id:
-                        section_obj = engineering_course.sections.filter(id=sec_id).first()
-                    if not section_obj:
-                        section_obj = engineering_course.sections.create(name=sec_name, order=section_index)
+                # Now process lessons for ALL sections (both existing and new)
+                all_lessons_to_update = []
+                all_resources_to_create = []
+                all_quiz_questions_to_create = []
+                
+                # We need to track which lessons to keep to delete others
+                kept_lessons_map = defaultdict(set)
+                
+                for idx, sec_data in enumerate(sections_data):
+                    sec_id = sec_data.get('id')
+                    
+                    # Get the section object
+                    if sec_id and sec_id in existing_sections:
+                        section = existing_sections[sec_id]
+                    elif idx in created_sections_map:
+                        section = created_sections_map[idx]
                     else:
-                        if section_obj.name != sec_name or section_obj.order != section_index:
-                            section_obj.name = sec_name
-                            section_obj.order = section_index
-                            section_obj.save()
-                    kept_section_ids.append(section_obj.id)
-
-                    # Update lessons in this section
-                    lessons = sec.get('lessons', []) or []
-                    kept_lesson_ids = []
-                    for lesson_index, les in enumerate(lessons):
-                        les_id = les.get('id')
-                        title = (les.get('title') or '').strip()
-                        if not title:
-                            continue
+                        continue 
                         
-                        lesson_obj = None
-                        if les_id:
-                            lesson_obj = section_obj.lessons.filter(id=les_id).first()
+                    # Get existing lessons for this section if it's an existing one
+                    existing_lessons = {l.id: l for l in section.lessons.all()} if sec_id else {}
+                    
+                    lessons_data = sec_data.get('lessons', []) or []
+                    
+                    for l_idx, l_data in enumerate(lessons_data):
+                        l_id = l_data.get('id')
+                        title = (l_data.get('title') or '').strip()
+                        if not title: continue
                         
                         # Prepare fields
-                        new_type = les.get('type', 'video') or 'video'
-                        new_video_url = les.get('videoUrl', les.get('video_url', '')) or ''
-                        new_description = les.get('description', '') or ''
-                        new_about_lesson = les.get('aboutLesson', les.get('about_lesson', '')) or ''
+                        l_type = l_data.get('type', 'video') or 'video'
+                        video_url = l_data.get('videoUrl', l_data.get('video_url', '')) or ''
+                        desc = l_data.get('description', '') or ''
+                        about = l_data.get('aboutLesson', l_data.get('about_lesson', '')) or ''
                         
-                        if not lesson_obj:
-                            # Create new lesson with all fields set
-                            lesson_obj = section_obj.lessons.create(
-                                title=title,
-                                type=new_type,
-                                order=lesson_index,
-                                video_url=new_video_url,
-                                description=new_description,
-                                about_lesson=new_about_lesson
-                            )
-                        else:
-                            # Update existing lesson in memory
-                            has_changes = False
-                            if lesson_obj.title != title:
-                                lesson_obj.title = title
-                                has_changes = True
-                            if lesson_obj.type != new_type:
-                                lesson_obj.type = new_type
-                                has_changes = True
-                            if lesson_obj.video_url != new_video_url:
-                                lesson_obj.video_url = new_video_url
-                                has_changes = True
-                            if lesson_obj.description != new_description:
-                                lesson_obj.description = new_description
-                                has_changes = True
-                            if lesson_obj.about_lesson != new_about_lesson:
-                                lesson_obj.about_lesson = new_about_lesson
-                                has_changes = True
-                            if lesson_obj.order != lesson_index:
-                                lesson_obj.order = lesson_index
-                                has_changes = True
+                        lesson = None
+                        if l_id and l_id in existing_lessons:
+                            lesson = existing_lessons[l_id]
+                            kept_lessons_map[section.id].add(l_id)
                             
-                            if has_changes:
-                                lesson_obj.updated_at = timezone.now()
-                                lessons_to_update.append(lesson_obj)
+                            # Check for changes
+                            if (lesson.title != title or lesson.type != l_type or 
+                                lesson.video_url != video_url or lesson.description != desc or 
+                                lesson.about_lesson != about or lesson.order != l_idx):
+                                lesson.title = title
+                                lesson.type = l_type
+                                lesson.video_url = video_url
+                                lesson.description = desc
+                                lesson.about_lesson = about
+                                lesson.order = l_idx
+                                lesson.updated_at = timezone.now()
+                                all_lessons_to_update.append(lesson)
+                        else:
+                            lesson = section.lessons.create(
+                                title=title,
+                                type=l_type,
+                                order=l_idx,
+                                video_url=video_url,
+                                description=desc,
+                                about_lesson=about
+                            )
                         
-                        kept_lesson_ids.append(lesson_obj.id)
-
-                        # --- Handle lesson resources (downloadable and internet) ---
-                        has_resources = les.get('hasResources', False)
-                        resources_data = les.get('resources', {})
+                        # Process Resources
+                        if l_id: 
+                             lesson.resources.all().delete() 
                         
-                        if settings.DEBUG:
-                            print(f"[DEBUG] Lesson '{lesson_obj.title}' - hasResources: {has_resources}")
-                            print(f"[DEBUG] Lesson '{lesson_obj.title}' - resources_data: {resources_data}")
+                        has_resources = l_data.get('hasResources', False)
+                        resources_data = l_data.get('resources', {})
                         
                         if has_resources and resources_data:
-                            # Clear existing resources for this lesson
-                            lesson_obj.resources.all().delete()
-                            
-                            # Add downloadable resources
-                            downloadable_resources = resources_data.get('downloadable', [])
-                            if isinstance(downloadable_resources, str):
-                                try:
-                                    downloadable_resources = json.loads(downloadable_resources)
-                                except:
-                                    downloadable_resources = []
-                            
-                            if settings.DEBUG:
-                                print(f"[DEBUG] Downloadable resources: {downloadable_resources}")
-                            
-                            for res in downloadable_resources:
+                            # Downloadable
+                            d_res = parse_json(resources_data.get('downloadable'))
+                            for res in d_res:
                                 if isinstance(res, dict):
-                                    # Handle both 'title'/'url' and 'name'/'link' field names
-                                    resource_title = res.get('title') or res.get('name', '')
-                                    resource_url = res.get('url') or res.get('link', '')
-                                    
-                                    LessonResource.objects.create(
-                                        lesson=lesson_obj,
+                                    all_resources_to_create.append(LessonResource(
+                                        lesson=lesson,
                                         type='downloadable',
-                                        title=resource_title,
+                                        title=res.get('title') or res.get('name', ''),
                                         description=res.get('description', ''),
-                                        url=resource_url,
-                                    )
-                                    if settings.DEBUG:
-                                        print(f"[DEBUG] Created downloadable resource: {resource_title}")
+                                        url=res.get('url') or res.get('link', '')
+                                    ))
                             
-                            # Add internet resources
-                            internet_resources = resources_data.get('internet', [])
-                            if isinstance(internet_resources, str):
-                                try:
-                                    internet_resources = json.loads(internet_resources)
-                                except:
-                                    internet_resources = []
-                            
-                            if settings.DEBUG:
-                                print(f"[DEBUG] Internet resources: {internet_resources}")
-                            
-                            for res in internet_resources:
+                            # Internet
+                            i_res = parse_json(resources_data.get('internet'))
+                            for res in i_res:
                                 if isinstance(res, dict):
-                                    # Handle both 'title'/'url' and 'name'/'link' field names
-                                    resource_title = res.get('title') or res.get('name', '')
-                                    resource_url = res.get('url') or res.get('link', '')
-                                    
-                                    LessonResource.objects.create(
-                                        lesson=lesson_obj,
+                                    all_resources_to_create.append(LessonResource(
+                                        lesson=lesson,
                                         type='internet',
-                                        title=resource_title,
+                                        title=res.get('title') or res.get('name', ''),
                                         description=res.get('description', ''),
-                                        url=resource_url,
-                                    )
-                                    if settings.DEBUG:
-                                        print(f"[DEBUG] Created internet resource: {resource_title}")
-                        elif not has_resources:
-                            # If hasResources is explicitly false, clear all resources
-                            lesson_obj.resources.all().delete()
+                                        url=res.get('url') or res.get('link', '')
+                                    ))
 
-                        # --- Nested: quiz questions update for EngineeringCourse lessons ---
-                        has_quiz_key = ('quizQuestions' in les) or ('quiz_questions' in les)
-                        quiz_list = (les.get('quizQuestions') or les.get('quiz_questions') or [])
-                        if isinstance(quiz_list, str):
-                            try:
-                                import json as _json
-                                quiz_list = _json.loads(quiz_list) or []
-                            except Exception:
-                                quiz_list = []
-                        kept_question_ids = []
-                        for q in (quiz_list or []):
-                            q_id = q.get('id')
-                            question_text = (q.get('question') or '').strip()
-                            options = q.get('options') or []
-                            if isinstance(options, str):
-                                try:
-                                    import json as _json
-                                    options = _json.loads(options) or []
-                                except Exception:
-                                    options = []
-                            # Determine correct answer text
+                        # Process Quiz Questions
+                        if l_id:
+                            lesson.quiz_questions.all().delete()
+                            
+                        quiz_list = parse_json(l_data.get('quizQuestions') or l_data.get('quiz_questions'))
+                        for q in quiz_list:
+                            q_text = (q.get('question') or '').strip()
+                            opts = parse_json(q.get('options'))
+                            if not q_text or not opts: continue
+                            
                             ca = q.get('correctAnswer', q.get('correct_answer', ''))
-                            correct_answer_text = ''
-                            # Support index (int or numeric string)
+                            ca_text = ''
                             try:
                                 idx = int(ca)
-                                if 0 <= idx < len(options):
-                                    correct_answer_text = options[idx]
-                            except Exception:
-                                pass
-                            if not correct_answer_text and isinstance(ca, str) and ca in options:
-                                correct_answer_text = ca
-                            if not question_text or not options:
-                                # Skip invalid question payloads
-                                continue
-                            if q_id:
-                                qq = lesson_obj.quiz_questions.filter(id=q_id).first()
-                                if qq:
-                                    qq.question = question_text
-                                    qq.options = options
-                                    if correct_answer_text:
-                                        qq.correct_answer = correct_answer_text
-                                    qq.save()
-                                    kept_question_ids.append(qq.id)
-                                    continue
-                            # Create new
-                            qq = lesson_obj.quiz_questions.create(
-                                question=question_text,
-                                options=options,
-                                correct_answer=correct_answer_text or (options[0] if options else '')
-                            )
-                            kept_question_ids.append(qq.id)
+                                if 0 <= idx < len(opts): ca_text = opts[idx]
+                            except: pass
+                            if not ca_text and isinstance(ca, str) and ca in opts: ca_text = ca
+                            
+                            all_quiz_questions_to_create.append(QuizQuestion(
+                                lesson=lesson,
+                                question=q_text,
+                                options=opts,
+                                correct_answer=ca_text or (opts[0] if opts else '')
+                            ))
 
-                        # Delete removed quiz questions for this lesson
-                        if has_quiz_key:
-                            if kept_question_ids:
-                                lesson_obj.quiz_questions.exclude(id__in=kept_question_ids).delete()
-                            else:
-                                lesson_obj.quiz_questions.all().delete()
+                    # Delete removed lessons for this section
+                    if sec_id:
+                        kept = kept_lessons_map[sec_id]
+                        existing_ids = set(existing_lessons.keys())
+                        to_delete = existing_ids - kept
+                        if to_delete:
+                            section.lessons.filter(id__in=to_delete).delete()
 
-                    # Delete lessons not in payload for this section
-                    if kept_lesson_ids:
-                        section_obj.lessons.exclude(id__in=kept_lesson_ids).delete()
-                    else:
-                        section_obj.lessons.all().delete()
-
-                # Delete sections not in payload
-                if kept_section_ids:
-                    engineering_course.sections.exclude(id__in=kept_section_ids).delete()
-                else:
-                    engineering_course.sections.all().delete()
+                # Execute Bulk Operations
+                if all_lessons_to_update:
+                    Lesson.objects.bulk_update(all_lessons_to_update, 
+                        ['title', 'type', 'video_url', 'description', 'about_lesson', 'order', 'updated_at'])
                 
-                # Perform bulk update for modified lessons
-                if lessons_to_update:
-                    Lesson.objects.bulk_update(lessons_to_update, ['title', 'type', 'video_url', 'description', 'about_lesson', 'order', 'updated_at'])
+                if all_resources_to_create:
+                    LessonResource.objects.bulk_create(all_resources_to_create)
+                    
+                if all_quiz_questions_to_create:
+                    QuizQuestion.objects.bulk_create(all_quiz_questions_to_create)
+
             course = engineering_course
         
         # Return updated course data
@@ -3396,7 +3230,6 @@ def update_course(request, course_id):
             course_data.update({
                 'category': course.category,
                 'proficiency_level': getattr(course, 'proficiency', 'beginner'),
-                # Provide both legacy and new field names for compatibility
                 'learning_objectives': course.learning_points or [],
                 'learning_outcomes': course.learning_points or [],
                 'prerequisites': course.requirements or [],
@@ -3688,6 +3521,7 @@ def get_course_by_id(request, course_id):
                     ch_copy = dict(ch)
                     lessons = ch_copy.get('lessons') or []
                     new_lessons = []
+                    
                     if c_idx < preview_limit:
                         ch_copy['is_preview'] = True
                         ch_copy['is_locked'] = False
