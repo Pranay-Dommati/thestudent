@@ -41,12 +41,14 @@ const EditCourse = ({ isDarkMode }) => {
       if (response.success) {
         universalToast.success(response.message || 'Course updated successfully!');
         navigate('/admin-p/courses');
+        return true;
       } else {
         throw new Error(response.error || 'Failed to update course');
       }
     } catch (error) {
       console.error('Error updating course:', error);
       universalToast.error(error.message || 'Failed to update course');
+      return false;
     } finally {
       setUpdating(false);
     }

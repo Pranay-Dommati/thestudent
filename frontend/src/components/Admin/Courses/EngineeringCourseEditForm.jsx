@@ -1,14 +1,15 @@
-import React, { memo, useState, useEffect, useCallback } from 'react';
+import React, { memo, useState, useEffect, useCallback, useMemo } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
 import universalToast from '../../../utils/universalToast';
 import axiosInstance from '../../../utils/axios';
 import { CheckIcon } from '@heroicons/react/24/solid';
 import BasicInfoStep from './EngineeringCourseForm/BasicInfoStep';
 import CourseStructureStep from './EngineeringCourseForm/CourseStructureStep';
+import useAutoSave from '../../../hooks/useAutoSave';
 
 const EngineeringCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMode }) => {
   const renderStart = performance.now();
-  console.log(`[PERF] EngineeringCourseEditForm RENDER START`);
+  // console.log(`[PERF] EngineeringCourseEditForm RENDER START`);
   
   const theme = useTheme();
   const effectiveDarkMode = typeof isDarkMode === 'boolean' ? isDarkMode : theme?.isDarkMode;
@@ -47,6 +48,28 @@ const EngineeringCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isD
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState(null);
   const [errors, setErrors] = useState({});
+
+  // Auto-save integration
+  const autoSaveKey = course?.id ? `autoSave_eng_${course.id}` : null;
+  
+  const dataToSave = useMemo(() => ({
+    formData,
+    sections,
+    currentStep
+  }), [formData, sections, currentStep]);
+
+  const handleRestore = useCallback((savedData) => {
+    if (savedData.formData) setFormData(savedData.formData);
+    if (savedData.sections) setSections(savedData.sections);
+    if (savedData.currentStep) setCurrentStep(savedData.currentStep);
+  }, []);
+
+  const { clearSavedData } = useAutoSave(
+    autoSaveKey, 
+    dataToSave, 
+    handleRestore, 
+    !!course?.id // Only save if we have a course ID
+  );
 
   // Normalize a single quiz question shape
   const normalizeQuestion = (q, fallbackIndex = 0) => {
@@ -868,7 +891,8 @@ const EngineeringCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isD
       
 
       if (response.status === 200) {
-  universalToast.success('Course updated successfully!');
+        universalToast.success('Course updated successfully!');
+        clearSavedData(); // Clear auto-saved data on success
         if (typeof onSuccess === 'function') {
           onSuccess();
         }
@@ -1072,7 +1096,12 @@ const EngineeringCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isD
           <div className="flex space-x-4">
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => {
+                if (window.confirm('Are you sure you want to discard your changes?')) {
+                  clearSavedData();
+                  onCancel();
+                }
+              }}
               className={`px-6 py-2 rounded-lg font-medium transition-colors ${
                 isDarkMode
                   ? 'bg-gray-700 text-white hover:bg-gray-600'

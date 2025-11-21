@@ -1,8 +1,9 @@
-import React, { memo, useState, useCallback, useEffect, startTransition, useReducer } from 'react';
+import React, { memo, useState, useCallback, useEffect, startTransition, useReducer, useMemo } from 'react';
 import { chaptersReducer } from './SchoolCourseForm/chaptersReducer';
 import { FaSave, FaTimes, FaSpinner, FaImage, FaPlus, FaTrash, FaUpload, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
 import universalToast from '../../../utils/universalToast';
 import { toAbsoluteMedia } from '../../../utils/apiOrigin';
+import useAutoSave from '../../../hooks/useAutoSave';
 
 // Import the step components from creation form
 import BasicInfoStep from './SchoolCourseForm/BasicInfoStep';
@@ -138,6 +139,28 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
     course.thumbnail ? toAbsoluteMedia(course.thumbnail) : null
   );
   const [errors, setErrors] = useState({});
+
+  // Auto-save integration
+  const autoSaveKey = course?.id ? `autoSave_school_${course.id}` : null;
+  
+  const dataToSave = useMemo(() => ({
+    formData,
+    chapters,
+    currentStep
+  }), [formData, chapters, currentStep]);
+
+  const handleRestore = useCallback((savedData) => {
+    if (savedData.formData) setFormData(savedData.formData);
+    if (savedData.chapters) dispatch({ type: 'INIT_CHAPTERS', payload: savedData.chapters });
+    if (savedData.currentStep) setCurrentStep(savedData.currentStep);
+  }, []);
+
+  const { clearSavedData } = useAutoSave(
+    autoSaveKey, 
+    dataToSave, 
+    handleRestore, 
+    !!course?.id // Only save if we have a course ID
+  );
 
   // Handler functions for step 1 (Basic Info)
   const handleInputChange = (name, value) => {
@@ -449,7 +472,10 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
       submitFormData.append('thumbnail', thumbnailFile);
     }
 
-    await onSubmit(submitFormData);
+    const success = await onSubmit(submitFormData);
+    if (success) {
+      clearSavedData(); // Clear auto-saved data on success
+    }
   };
 
   const renderStepContent = () => {
@@ -605,7 +631,12 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
           <div className="flex gap-4">
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => {
+                if (window.confirm('Are you sure you want to discard your changes?')) {
+                  clearSavedData();
+                  onCancel();
+                }
+              }}
               disabled={isUpdating}
               className={`px-6 py-2 rounded-lg font-medium transition-colors ${
                 isDarkMode
