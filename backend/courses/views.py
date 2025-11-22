@@ -579,7 +579,13 @@ def list_engineering_courses(request):
 @authentication_classes([JWTAuthentication])
 def get_engineering_course_by_id(request, course_id):
     try:
-        course = EngineeringCourse.objects.get(id=course_id)
+        # Optimize query with prefetch_related to avoid N+1 queries for nested data
+        course = EngineeringCourse.objects.prefetch_related(
+            'sections',
+            'sections__lessons',
+            'sections__lessons__resources',
+            'sections__lessons__quiz_questions'
+        ).get(id=course_id)
         
         # Check if we only want the structure (lightweight)
         structure_only = request.query_params.get('structure_only', 'false').lower() == 'true'
@@ -591,7 +597,16 @@ def get_engineering_course_by_id(request, course_id):
             return Response(data)
             
         # Include request in serializer context so lesson completion flags compute correctly
-        serializer = EngineeringCourseWithSectionsSerializer(course, context={'request': request})
+        context = {'request': request}
+        if request.user.is_authenticated:
+            # Pre-fetch completed lesson IDs to avoid N+1 queries in serializer
+            completed_ids = set(UserLessonProgress.objects.filter(
+                user=request.user,
+                lesson__section__engineering_course=course
+            ).values_list('lesson_id', flat=True))
+            context['completed_lesson_ids'] = completed_ids
+
+        serializer = EngineeringCourseWithSectionsSerializer(course, context=context)
         data = serializer.data
 
         data = _apply_preview_gating(data, 'engineering', request)
@@ -608,7 +623,13 @@ def get_engineering_course_by_id(request, course_id):
 @authentication_classes([JWTAuthentication])
 def get_school_course_by_id(request, course_id):
     try:
-        course = SchoolCourse.objects.get(id=course_id)
+        # Optimize query with prefetch_related to avoid N+1 queries for nested data
+        course = SchoolCourse.objects.prefetch_related(
+            'chapters',
+            'chapters__lessons',
+            'chapters__lessons__resources',
+            'chapters__lessons__quiz_questions'
+        ).get(id=course_id)
         
         # Check if we only want the structure (lightweight)
         structure_only = request.query_params.get('structure_only', 'false').lower() == 'true'
@@ -619,7 +640,16 @@ def get_school_course_by_id(request, course_id):
             data = _apply_preview_gating(data, 'school', request)
             return Response(data)
             
-        serializer = CourseWithChaptersSerializer(course, context={'request': request})
+        context = {'request': request}
+        if request.user.is_authenticated:
+            # Pre-fetch completed lesson IDs to avoid N+1 queries in serializer
+            completed_ids = set(UserLessonProgress.objects.filter(
+                user=request.user,
+                lesson__chapter__school_course=course
+            ).values_list('lesson_id', flat=True))
+            context['completed_lesson_ids'] = completed_ids
+
+        serializer = CourseWithChaptersSerializer(course, context=context)
         data = serializer.data
 
         data = _apply_preview_gating(data, 'school', request)
@@ -1026,12 +1056,12 @@ def get_course_progress(request, course_id):
         # Determine if it's a school course or engineering course
         try:
             # Try to find a school course first
-            course = SchoolCourse.objects.get(id=course_id)
+            course = SchoolCourse.objects.prefetch_related('chapters', 'chapters__lessons').get(id=course_id)
             is_school_course = True
         except SchoolCourse.DoesNotExist:
             # If not found, try engineering course
             try:
-                course = EngineeringCourse.objects.get(id=course_id)
+                course = EngineeringCourse.objects.prefetch_related('sections', 'sections__lessons').get(id=course_id)
                 is_school_course = False
             except EngineeringCourse.DoesNotExist:
                 return Response(
@@ -1041,19 +1071,22 @@ def get_course_progress(request, course_id):
         
         # Get lesson completion status
         if is_school_course:
+            # Pre-fetch all completed lesson IDs for this course
+            all_completed_ids = set(UserLessonProgress.objects.filter(
+                user=user, 
+                lesson__chapter__school_course=course
+            ).values_list('lesson_id', flat=True))
+
             # For school course
             lessons_by_chapter = []
             for chapter in course.chapters.all():
                 chapter_lessons = chapter.lessons.all()
                 total_lessons += chapter_lessons.count()
                 
-                # Get completed lessons in this chapter
-                completed_lesson_ids = UserLessonProgress.objects.filter(
-                    user=user, 
-                    lesson__chapter=chapter
-                ).values_list('lesson_id', flat=True)
+                # Get completed lessons in this chapter from pre-fetched set
+                chapter_completed_ids = [l.id for l in chapter_lessons if l.id in all_completed_ids]
                 
-                chapter_completed = len(completed_lesson_ids)
+                chapter_completed = len(chapter_completed_ids)
                 completed_lessons += chapter_completed
                 
                 # Build chapter data with lessons
@@ -1066,7 +1099,7 @@ def get_course_progress(request, course_id):
                         {
                             'id': lesson.id,
                             'title': lesson.title,
-                            'completed': lesson.id in completed_lesson_ids
+                            'completed': lesson.id in all_completed_ids
                         }
                         for lesson in chapter_lessons
                     ]
@@ -1087,19 +1120,22 @@ def get_course_progress(request, course_id):
                 'chapters': lessons_by_chapter
             }
         else:
+            # Pre-fetch all completed lesson IDs for this course
+            all_completed_ids = set(UserLessonProgress.objects.filter(
+                user=user, 
+                lesson__section__engineering_course=course
+            ).values_list('lesson_id', flat=True))
+
             # For engineering course
             lessons_by_section = []
             for section in course.sections.all():
                 section_lessons = section.lessons.all()
                 total_lessons += section_lessons.count()
                 
-                # Get completed lessons in this section
-                completed_lesson_ids = UserLessonProgress.objects.filter(
-                    user=user, 
-                    lesson__section=section
-                ).values_list('lesson_id', flat=True)
+                # Get completed lessons in this section from pre-fetched set
+                section_completed_ids = [l.id for l in section_lessons if l.id in all_completed_ids]
                 
-                section_completed = len(completed_lesson_ids)
+                section_completed = len(section_completed_ids)
                 completed_lessons += section_completed
                 
                 # Build section data with lessons
@@ -1112,7 +1148,7 @@ def get_course_progress(request, course_id):
                         {
                             'id': lesson.id,
                             'title': lesson.title,
-                            'completed': lesson.id in completed_lesson_ids
+                            'completed': lesson.id in all_completed_ids
                         }
                         for lesson in section_lessons
                     ]

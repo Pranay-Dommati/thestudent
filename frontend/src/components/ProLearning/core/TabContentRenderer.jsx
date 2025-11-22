@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -37,6 +37,68 @@ import {
 } from '../utils/ReadingUtils.js';
 import TextSelectionPopup from '../TutorChat/TextSelectionPopup.jsx';
 
+// Hook for smooth text streaming animation
+const useSmoothStreaming = (targetText, isComplete, isProgressive) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const targetRef = useRef(targetText || '');
+  const currentLengthRef = useRef(0);
+  
+  // Update refs when props change
+  useEffect(() => {
+    targetRef.current = targetText || '';
+    
+    // If not progressive (e.g. reload), or already complete on mount (and we haven't started animating), show immediately
+    // We check currentLengthRef.current === 0 to ensure we only skip animation on initial load, not mid-stream
+    if ((!isProgressive || isComplete) && currentLengthRef.current === 0) {
+        currentLengthRef.current = (targetText || '').length;
+        setDisplayedText(targetText || '');
+    }
+  }, [targetText, isComplete, isProgressive]);
+
+  useEffect(() => {
+    let animationFrameId;
+    
+    const animate = () => {
+      const targetLen = targetRef.current.length;
+      const currentLen = currentLengthRef.current;
+      
+      if (currentLen < targetLen) {
+        // Calculate step size
+        const diff = targetLen - currentLen;
+        
+        // Adaptive speed:
+        // - Small diff: slow, smooth typing (2-3 chars/frame)
+        // - Medium diff: faster (5-10 chars/frame)
+        // - Huge diff: catch up quickly (20+ chars/frame)
+        let step = 2; 
+        if (diff > 50) step = 5;
+        if (diff > 200) step = 15;
+        if (diff > 1000) step = 50;
+        
+        const nextLen = Math.min(targetLen, currentLen + step);
+        currentLengthRef.current = nextLen;
+        setDisplayedText(targetRef.current.slice(0, nextLen));
+        
+        animationFrameId = requestAnimationFrame(animate);
+      } else if (currentLen > targetLen) {
+        // Text shrank (reset), update immediately
+        currentLengthRef.current = targetLen;
+        setDisplayedText(targetRef.current);
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        // Idle, check again next frame (or could stop and restart on prop change)
+        // Keeping loop running is simpler for now
+        animationFrameId = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []); // Run continuously
+
+  return displayedText;
+};
+
 /**
  * TabContentRenderer - Renders all tab content for ProLearningPage
  * 
@@ -68,7 +130,8 @@ const TabContentRenderer = ({
   loadScenario,
   getCurrentTopic,
   setActiveTab,
-  onTextSelection // New prop for handling text selection
+  onTextSelection, // New prop for handling text selection
+  isProgressiveGenerating // New prop for animation control
 }) => {
   // Create ref for reading content container
   const readingContentRef = useRef(null);
@@ -173,7 +236,14 @@ const TabContentRenderer = ({
               const useSanitized = (sanitizedReadingTopicName === currentTopicName) && (typeof sanitizedReading === 'string') && sanitizedReading.trim().length > 0;
               // Else fallback to raw content reading if content belongs to current topic
               const useRaw = (!useSanitized) && (contentTopicName === currentTopicName) && (typeof content?.reading === 'string') && content.reading.trim().length > 0;
-              const displayReading = useSanitized ? sanitizedReading : (useRaw ? content.reading : '');
+              const rawReading = useSanitized ? sanitizedReading : (useRaw ? content.reading : '');
+              
+              // Check if reading is marked as complete in metadata
+              const isReadingComplete = !!content?.metadata?.readingComplete;
+              
+              // Apply smooth streaming
+              const displayReading = useSmoothStreaming(rawReading, isReadingComplete, isProgressiveGenerating);
+
               if (!displayReading || displayReading.trim().length === 0) {
                 return (
                   <div className="text-gray-500">Content not available</div>

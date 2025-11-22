@@ -419,3 +419,111 @@ def call_intent_classifier(user_query: str, max_retries: int = 3):
                     break  # Try next model
 
     raise Exception("All intent classifier attempts failed")
+
+def call_gemini_api_stream(prompt):
+    """
+    Call Gemini API with streaming enabled.
+    Yields chunks of text.
+    """
+    if not settings.GEMINI_API_KEY:
+        raise Exception("Gemini API key not configured")
+
+    model_urls = [
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse',
+    ]
+    
+    # Ensure prompt is a clean string
+    if not isinstance(prompt, str):
+        try:
+            prompt = str(prompt)
+        except Exception:
+            prompt = ''
+
+    headers = {'Content-Type': 'application/json; charset=utf-8'}
+    data = {
+        'contents': [{
+            'parts': [{'text': prompt}]
+        }],
+        'generationConfig': {
+            'temperature': 0.3,
+            'topK': 20,
+            'topP': 0.8,
+            'maxOutputTokens': 4096,
+            'stopSequences': []
+        }
+    }
+
+    last_error = None
+    for model_url in model_urls:
+        has_yielded = False  # Track if we have sent data to the client
+        try:
+            model_name = 'gemini-2.5-flash' if '2.5-flash' in model_url else 'gemini-2.0-flash'
+            print(f"⚡ Streaming from {model_name}...")
+
+            response = requests.post(
+                f"{model_url}&key={settings.GEMINI_API_KEY}",
+                headers=headers,
+                json=data,
+                stream=True,
+                timeout=120  # Increased timeout for streaming
+            )
+
+            if response.status_code != 200:
+                print(f"❌ {model_name} error {response.status_code}: {response.text}")
+                last_error = Exception(f"{model_name} returned {response.status_code}")
+                continue
+
+            finish_reason_received = False
+            
+            for line in response.iter_lines():
+                if line:
+                    decoded_line = line.decode('utf-8')
+                    if decoded_line.startswith('data: '):
+                        json_str = decoded_line[6:] # Skip 'data: '
+                        try:
+                            chunk_data = json.loads(json_str)
+                            candidates = chunk_data.get('candidates', [])
+                            if candidates:
+                                parts = candidates[0].get('content', {}).get('parts', [])
+                                if parts:
+                                    text_chunk = parts[0].get('text', '')
+                                    if text_chunk:
+                                        yield text_chunk
+                                        has_yielded = True
+                                
+                                # Check for finishReason to ensure stream completed normally
+                                finish_reason = candidates[0].get('finishReason')
+                                if finish_reason:
+                                    if finish_reason == 'STOP':
+                                        finish_reason_received = True
+                                    elif finish_reason == 'MAX_TOKENS':
+                                        print(f"⚠️ Stream stopped with MAX_TOKENS. Content might be truncated.")
+                                        finish_reason_received = True # Accept it, but log warning
+                                    else:
+                                        # SAFETY, RECITATION, OTHER
+                                        print(f"❌ Stream stopped with reason: {finish_reason}")
+                                        # Don't set finish_reason_received = True, so it raises Exception and retries
+                                    
+                        except json.JSONDecodeError:
+                            pass
+            
+            if not finish_reason_received:
+                raise Exception("Stream ended unexpectedly without valid finishReason")
+                
+            return # Success
+            
+        except Exception as e:
+            print(f"❌ Error streaming from {model_name}: {str(e)}")
+            last_error = e
+            
+            # If we have already sent data to the client, we CANNOT retry transparently
+            # because the client has already received the beginning of the stream.
+            # Retrying would cause duplicate content (e.g. "Hello... Hello World").
+            if has_yielded:
+                print(f"⚠️ Cannot retry after yielding data. Aborting stream to prevent duplication.")
+                raise e
+                
+            continue
+
+    raise last_error or Exception("All Gemini API streaming attempts failed")

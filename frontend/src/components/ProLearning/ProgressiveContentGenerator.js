@@ -49,6 +49,7 @@ export class ProgressiveContentGenerator {
     this.topics = topicsList || [];
     this.callbacks = {
       onProgress: callbacks.onProgress || (() => {}),
+      onContentUpdate: callbacks.onContentUpdate || (() => {}),
       onTabComplete: callbacks.onTabComplete || (() => {}),
       onTopicComplete: callbacks.onTopicComplete || (() => {}),
       onAllComplete: callbacks.onAllComplete || (() => {}),
@@ -208,7 +209,7 @@ export class ProgressiveContentGenerator {
   async generateTabContent(topic, tab) {
     const topicName = topic.name || topic;
     
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       let timeoutId;
       let resolved = false;
 
@@ -218,93 +219,101 @@ export class ProgressiveContentGenerator {
           resolved = true;
           reject(new Error(`Timeout generating ${tab.name} for ${topicName}`));
         }
-      }, 45000); // 45 second timeout
+      }, 90000); // Increased to 90s for long streams
 
       // Create content setter that captures the generated content
+      // We use this to capture the FINAL state if the generator doesn't return it
+      let lastCapturedContent = {};
+      
       const setContent = (newContent) => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeoutId);
-          
           let content;
           if (typeof newContent === 'function') {
-            // If it's a function, call it with empty object
-            content = newContent({});
+            content = newContent(lastCapturedContent || {});
           } else {
             content = newContent;
           }
+          lastCapturedContent = content;
           
-          // Extract the specific tab content
-          let tabContent;
-          switch (tab.id) {
-            case 'reading':
-              tabContent = content.reading || '';
-              break;
-            case 'summary':
-              tabContent = content.summary || '';
-              break;
-            case 'videos':
-              tabContent = content.videos || [];
-              break;
-            case 'quiz':
-              tabContent = content.quiz || [];
-              break;
-            case 'resources':
-              // For resources, preserve both the array AND metadata
-              console.log('🔍 [PROG GEN] Raw content passed to extraction:', {
-                hasContent: !!content,
-                contentKeys: content ? Object.keys(content) : [],
-                hasResources: 'resources' in (content || {}),
-                hasResourcesMetadata: 'resourcesMetadata' in (content || {}),
-                resourcesType: typeof content?.resources,
-                resourcesMetadataType: typeof content?.resourcesMetadata,
-                resourcesMetadataValue: content?.resourcesMetadata
+          // Notify listener of content update (for streaming)
+          if (this.callbacks.onContentUpdate) {
+              this.callbacks.onContentUpdate({
+                  topic: topicName,
+                  tabType: tab.id,
+                  content: lastCapturedContent
               });
-              tabContent = {
-                resources: content.resources || [],
-                resourcesMetadata: content.resourcesMetadata || null
-              };
-              console.log('🔍 [PROG GEN] Extracted resources content:', {
-                resourcesCount: tabContent.resources?.length || 0,
-                hasMetadata: !!tabContent.resourcesMetadata,
-                metadataKeys: tabContent.resourcesMetadata ? Object.keys(tabContent.resourcesMetadata) : [],
-                generatedAt: tabContent.resourcesMetadata?.generatedAt
-              });
-              break;
-            default:
-              tabContent = content;
           }
-          
-          resolve(tabContent);
-        }
       };
 
       // Generate content based on tab type
       try {
+        let result;
         switch (tab.id) {
           case 'reading':
-            tab.generator(topicName, setContent);
+            result = await tab.generator(topicName, setContent);
             break;
           case 'summary':
             // For summary, we need existing reading content
             const existingContent = this.getExistingTopicContent(topicName);
             const readingContent = existingContent?.reading || '';
-            tab.generator(setContent, topicName, readingContent);
+            result = await tab.generator(setContent, topicName, readingContent);
             break;
           case 'videos':
-            tab.generator(setContent, topicName);
+            result = await tab.generator(setContent, topicName);
             break;
           case 'quiz':
             // For quiz, we need existing reading content
             const existingContentForQuiz = this.getExistingTopicContent(topicName);
             const readingContentForQuiz = existingContentForQuiz?.reading || '';
-            tab.generator(setContent, topicName, readingContentForQuiz);
+            result = await tab.generator(setContent, topicName, readingContentForQuiz);
             break;
           case 'resources':
-            tab.generator(setContent, topicName);
+            result = await tab.generator(setContent, topicName);
             break;
           default:
-            reject(new Error(`Unknown tab type: ${tab.id}`));
+            throw new Error(`Unknown tab type: ${tab.id}`);
+        }
+        
+        if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutId);
+            
+            // If generator returned a value, use it (Reading/Summary now do)
+            if (result) {
+                resolve(result);
+                return;
+            }
+            
+            // Fallback to last captured content from setContent
+            if (lastCapturedContent) {
+                let tabContent;
+                switch (tab.id) {
+                    case 'reading': tabContent = lastCapturedContent.reading || ''; break;
+                    case 'summary': tabContent = lastCapturedContent.summary || ''; break;
+                    case 'videos': tabContent = lastCapturedContent.videos || []; break;
+                    case 'quiz': tabContent = lastCapturedContent.quiz || []; break;
+                    case 'resources': 
+                        // For resources, preserve both the array AND metadata
+                        console.log('🔍 [PROG GEN] Raw content passed to extraction:', {
+                            hasContent: !!lastCapturedContent,
+                            contentKeys: lastCapturedContent ? Object.keys(lastCapturedContent) : [],
+                            hasResources: 'resources' in (lastCapturedContent || {}),
+                            hasResourcesMetadata: 'resourcesMetadata' in (lastCapturedContent || {}),
+                            resourcesType: typeof lastCapturedContent?.resources,
+                            resourcesMetadataType: typeof lastCapturedContent?.resourcesMetadata,
+                            resourcesMetadataValue: lastCapturedContent?.resourcesMetadata
+                        });
+                        tabContent = {
+                            resources: lastCapturedContent.resources || [],
+                            resourcesMetadata: lastCapturedContent.resourcesMetadata || null
+                        };
+                        break;
+                    default: tabContent = lastCapturedContent;
+                }
+                resolve(tabContent);
+            } else {
+                // If neither returned nor captured, resolve with empty/default
+                resolve(tab.id === 'videos' || tab.id === 'quiz' || tab.id === 'resources' ? [] : '');
+            }
         }
       } catch (error) {
         if (!resolved) {

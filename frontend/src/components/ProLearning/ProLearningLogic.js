@@ -66,14 +66,10 @@ export async function generateProContent({ topic, setIsLoading, setLoadingProgre
         // Merge the new content with existing content
         localContent = { ...localContent, ...updater };
       }
-      // Reduced logging frequency
-      // console.log('🔧 ProLearningLogic: Local content updated:', {
-      //   hasReading: !!localContent.reading,
-      //   hasSummary: !!localContent.summary,
-      //   hasQuiz: localContent.quiz && localContent.quiz.length > 0,
-      //   hasVideos: localContent.videos && localContent.videos.length > 0,
-      //   hasResources: localContent.resources && localContent.resources.length > 0
-      // });
+      
+      // CRITICAL: Update the UI in real-time for streaming content
+      // This ensures the user sees the typing effect
+      setContent(localContent);
     };
     
     await generateReadingContent(topic, localSetContent);

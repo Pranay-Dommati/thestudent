@@ -164,18 +164,18 @@ const ProLearningPage = () => {
   // UI state
   const [sidebarVisible, setSidebarVisible] = useState(false);
   // Video modal state
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [isVideoModalOpen, setIsVideoModal] = useState(false);
   const [currentVideo, setCurrentVideo] = useState(null);
 
   // Video modal handlers
   const openVideoModal = (video) => {
     setCurrentVideo(video);
-    setIsVideoModalOpen(true);
+    setIsVideoModal(true);
   };
 
   const closeVideoModal = () => {
     // Clear current video to stop playback when closing
-    setIsVideoModalOpen(false);
+    setIsVideoModal(false);
     setCurrentVideo(null);
   };
 
@@ -185,6 +185,9 @@ const ProLearningPage = () => {
   const topicParam = searchParams.get("topic"); // Get topic from URL if provided
   const activeTabParam = searchParams.get("tab") || "reading"; // Get active tab from URL
   const [selectedTopic, setSelectedTopic] = useState(null);
+  const selectedTopicRef = useRef(selectedTopic);
+  useEffect(() => { selectedTopicRef.current = selectedTopic; }, [selectedTopic]);
+
   const [topicsList, setTopicsList] = useState([]);
   const [sectionGenerating, setSectionGenerating] = useState(false);
   const [generatingTopics, setGeneratingTopics] = useState([]);
@@ -1422,6 +1425,7 @@ const ProLearningPage = () => {
       setCourseGenerationStatus,
       useProgressiveGeneration,
       selectedTopic,
+      selectedTopicRef,
       setSelectedTopic,
       initializeProgressiveGeneration,
       courseTitle,
@@ -1669,6 +1673,7 @@ const ProLearningPage = () => {
         setAvailableTabsForTopics,
         loadProgressiveTopicContent,
         selectedTopic,
+        selectedTopicRef,
         setSelectedTopic,
         setIsProgressiveGenerating,
         startProgressiveGeneration,
@@ -1680,7 +1685,11 @@ const ProLearningPage = () => {
         setIsBatchGenerating,
         setBatchGenerationProgress,
         setBatchGenerationStatus,
-        loadTopicContent
+        loadTopicContent,
+        setContent,
+        setContentTopicName,
+        setReadingRenderReady,
+        setSanitizedReadingTopicName
       });
     };
 
@@ -1761,8 +1770,6 @@ const ProLearningPage = () => {
       });
     }
   }, [content, selectedTopic, activeTab]);
-
-  // ...existing code...
 
   // Safety: when progressive generation marks a tab ready for the selected topic, hydrate content if empty
   useEffect(() => {
@@ -2067,4 +2074,4 @@ const ProLearningPage = () => {
   );
 };
 
-export default ProLearningPage; 
+export default ProLearningPage;

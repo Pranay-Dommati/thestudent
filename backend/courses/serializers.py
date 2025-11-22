@@ -93,6 +93,11 @@ class LessonSerializer(serializers.ModelSerializer):
     def get_completed(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
+            # Check for pre-fetched IDs first to avoid N+1 queries
+            completed_ids = self.context.get('completed_lesson_ids')
+            if completed_ids is not None:
+                return obj.id in completed_ids
+                
             return UserLessonProgress.objects.filter(user=request.user, lesson=obj).exists()
         return False
 
@@ -597,6 +602,11 @@ class LessonLightSerializer(serializers.ModelSerializer):
     def get_completed(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
+            # Check for pre-fetched IDs first to avoid N+1 queries
+            completed_ids = self.context.get('completed_lesson_ids')
+            if completed_ids is not None:
+                return obj.id in completed_ids
+                
             return UserLessonProgress.objects.filter(user=request.user, lesson=obj).exists()
         return False
 
