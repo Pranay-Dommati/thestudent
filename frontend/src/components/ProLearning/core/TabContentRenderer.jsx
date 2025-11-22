@@ -42,6 +42,7 @@ const useSmoothStreaming = (targetText, isComplete, isProgressive) => {
   const [displayedText, setDisplayedText] = useState('');
   const targetRef = useRef(targetText || '');
   const currentLengthRef = useRef(0);
+  const [cursorVisible, setCursorVisible] = useState(true);
   
   // Update refs when props change
   useEffect(() => {
@@ -69,11 +70,11 @@ const useSmoothStreaming = (targetText, isComplete, isProgressive) => {
         // Adaptive speed:
         // - Small diff: slow, smooth typing (2-3 chars/frame)
         // - Medium diff: faster (5-10 chars/frame)
-        // - Huge diff: catch up quickly (20+ chars/frame)
+        // - Huge diff: catch up quickly but still animated (15-20 chars/frame)
         let step = 2; 
         if (diff > 50) step = 5;
-        if (diff > 200) step = 15;
-        if (diff > 1000) step = 50;
+        if (diff > 200) step = 10; // Reduced from 15
+        if (diff > 1000) step = 20; // Reduced from 50 to prevent "instant" appearance
         
         const nextLen = Math.min(targetLen, currentLen + step);
         currentLengthRef.current = nextLen;
@@ -96,7 +97,49 @@ const useSmoothStreaming = (targetText, isComplete, isProgressive) => {
     return () => cancelAnimationFrame(animationFrameId);
   }, []); // Run continuously
 
-  return displayedText;
+  // Blinking cursor effect
+  useEffect(() => {
+    if (!isProgressive || isComplete) return;
+    
+    const interval = setInterval(() => {
+      setCursorVisible(v => !v);
+    }, 500);
+    
+    return () => clearInterval(interval);
+  }, [isProgressive, isComplete]);
+
+  // If complete, just return text
+  if (!isProgressive || isComplete) {
+      return displayedText;
+  }
+
+  // Append cursor token if generating
+  return displayedText + (cursorVisible ? ' |CURSOR|' : '');
+};
+
+// Helper to render children with cursor replacement
+const renderChildrenWithCursor = (children) => {
+  return React.Children.map(children, child => {
+    if (typeof child === 'string') {
+      if (child.includes('|CURSOR|')) {
+        const parts = child.split('|CURSOR|');
+        return (
+          <>
+            {parts[0]}
+            <span className="inline-block w-2.5 h-2.5 bg-blue-600 rounded-full ml-1 animate-pulse align-baseline" style={{ animationDuration: '1s' }} />
+            {parts[1]}
+          </>
+        );
+      }
+      return child;
+    }
+    if (React.isValidElement(child) && child.props.children) {
+      return React.cloneElement(child, {
+        children: renderChildrenWithCursor(child.props.children)
+      });
+    }
+    return child;
+  });
 };
 
 /**
@@ -179,6 +222,23 @@ const TabContentRenderer = ({
     }
   };
 
+  // Calculate reading content for animation hook (must be top-level to adhere to Rules of Hooks)
+  const effectiveTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
+  
+  // Prefer sanitized reading if it belongs to current topic
+  const useSanitized = (sanitizedReadingTopicName === effectiveTopicName) && (typeof sanitizedReading === 'string') && sanitizedReading.trim().length > 0;
+  
+  // Else fallback to raw content reading if content belongs to current topic
+  const useRaw = (!useSanitized) && (contentTopicName === effectiveTopicName) && (typeof content?.reading === 'string') && content.reading.trim().length > 0;
+  
+  const rawReading = useSanitized ? sanitizedReading : (useRaw ? content.reading : '');
+  
+  // Check if reading is marked as complete in metadata
+  const isReadingComplete = !!content?.metadata?.readingComplete || !!content?.metadata?.readingGenerated;
+  
+  // Apply smooth streaming - called unconditionally at top level
+  const displayReading = useSmoothStreaming(rawReading, isReadingComplete, isProgressiveGenerating);
+
   switch (activeTab) {
     case "reading":
       // BLOCK CHECK: If topic is blocked, don't show empty content panels
@@ -231,19 +291,6 @@ const TabContentRenderer = ({
               }
             `}</style>
             {(() => {
-              const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
-              // Prefer sanitized reading if it belongs to current topic
-              const useSanitized = (sanitizedReadingTopicName === currentTopicName) && (typeof sanitizedReading === 'string') && sanitizedReading.trim().length > 0;
-              // Else fallback to raw content reading if content belongs to current topic
-              const useRaw = (!useSanitized) && (contentTopicName === currentTopicName) && (typeof content?.reading === 'string') && content.reading.trim().length > 0;
-              const rawReading = useSanitized ? sanitizedReading : (useRaw ? content.reading : '');
-              
-              // Check if reading is marked as complete in metadata
-              const isReadingComplete = !!content?.metadata?.readingComplete;
-              
-              // Apply smooth streaming
-              const displayReading = useSmoothStreaming(rawReading, isReadingComplete, isProgressiveGenerating);
-
               if (!displayReading || displayReading.trim().length === 0) {
                 return (
                   <div className="text-gray-500">Content not available</div>
@@ -257,19 +304,19 @@ const TabContentRenderer = ({
                 components={{
                   h1: ({children}) => (
                     <h1 className="text-3xl font-bold mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      {children}
+                      {renderChildrenWithCursor(children)}
                     </h1>
                   ),
                   h2: ({children}) => (
                     <h2 className="text-2xl font-semibold text-gray-800 mb-4 mt-8 flex items-center">
                       <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-3"></div>
-                      {children}
+                      {renderChildrenWithCursor(children)}
                     </h2>
                   ),
                   h3: ({children}) => (
                     <h3 className="text-xl font-medium text-gray-700 mb-3 mt-6 flex items-center">
                       <FaLightbulb className="text-yellow-500 mr-2" />
-                      {children}
+                      {renderChildrenWithCursor(children)}
                     </h3>
                   ),
                   p: ({children}) => {
@@ -288,14 +335,14 @@ const TabContentRenderer = ({
                     if (hasCodeBlock) {
                       return (
                         <div className="text-gray-700 leading-relaxed mb-4 text-base">
-                          {children}
+                          {renderChildrenWithCursor(children)}
                         </div>
                       );
                     }
                     
                     return (
                       <p className="text-gray-700 leading-relaxed mb-4 text-base">
-                        {children}
+                        {renderChildrenWithCursor(children)}
                       </p>
                     );
                   },
@@ -444,14 +491,14 @@ const TabContentRenderer = ({
                   li: ({children}) => (
                     <li className="flex items-start text-gray-700">
                       <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mt-2.5 mr-3 flex-shrink-0"></div>
-                      <span>{children}</span>
+                      <span>{renderChildrenWithCursor(children)}</span>
                     </li>
                   ),
                   blockquote: ({children}) => (
                     <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-6 py-4 my-6 rounded-r-lg">
                       <div className="flex items-start">
                         <FaLightbulb className="text-blue-500 mt-1 mr-3 flex-shrink-0" />
-                        <div className="text-blue-800 italic">{children}</div>
+                        <div className="text-blue-800 italic">{renderChildrenWithCursor(children)}</div>
                       </div>
                     </blockquote>
                   )
