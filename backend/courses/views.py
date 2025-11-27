@@ -39,6 +39,14 @@ from django.db.models import Q
 from django.core.files.storage import default_storage
 from django.urls import reverse
 from collections import defaultdict
+from typing import Any, Dict
+
+# Consistent error response helper for frontend to display specific messages
+def _error_response(message: str, code: str = "unexpected_error", details: Dict[str, Any] | None = None, http_status: int = status.HTTP_400_BAD_REQUEST):
+    payload = {"error": message, "code": code}
+    if details:
+        payload["details"] = details
+    return Response(payload, status=http_status)
 
 # Module-level helper: build robust thumbnail URL with file-existence check and placeholder fallback
 def _build_thumbnail_url(obj_with_thumbnail, request):
@@ -427,17 +435,21 @@ def create_course(request):
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         else:
-            return Response(
-                {'error': 'Invalid course data - missing required fields'}, 
-                status=status.HTTP_400_BAD_REQUEST
+            return _error_response(
+                'Invalid course data - missing required fields',
+                code='invalid_course_data',
+                details={'received_keys': list(data.keys())} if settings.DEBUG else None,
+                http_status=status.HTTP_400_BAD_REQUEST,
             )
             
     except Exception as e:
         if settings.DEBUG:
             print(traceback.format_exc())
-        return Response(
-            {'error': str(e)}, 
-            status=status.HTTP_400_BAD_REQUEST
+        return _error_response(
+            'Failed to create course',
+            code='course_create_failed',
+            details={'exception': str(e)},
+            http_status=status.HTTP_400_BAD_REQUEST,
         )
 
 def _apply_preview_gating(data, course_type, request):
@@ -1767,9 +1779,7 @@ def get_resources(request):
         exclude_youtube = data.get('excludeYoutube', True)
         
         if not topic:
-            return Response({
-                'error': 'Topic is required'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return _error_response('Topic is required', code='topic_required', http_status=status.HTTP_400_BAD_REQUEST)
 
         # Google Programmable Search API credentials (from settings or env)
         from django.conf import settings as dj_settings
@@ -1939,10 +1949,7 @@ def get_resources(request):
         print(f"❌ Error in get_resources: {e}")
         import traceback
         traceback.print_exc()
-        return Response({
-            'error': str(e),
-            'resources': []
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return _error_response('Failed to fetch resources', code='resources_fetch_failed', details={'exception': str(e)}, http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def normalize_url(url):
