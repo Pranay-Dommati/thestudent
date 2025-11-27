@@ -3,6 +3,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom slow pulse animation for decorative elements */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+/* Custom slow bounce animation for decorative elements */
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10%);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 3s ease-in-out infinite;
+}
+
 /* Mobile scroll optimization */
 @layer base {
   /* Improve touch scrolling on mobile */

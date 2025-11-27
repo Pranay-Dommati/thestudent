@@ -18,10 +18,10 @@ const MobileHero = () => {
     <section className="bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0">
-        <div className="absolute top-10 left-4 w-16 h-16 bg-white/10 rounded-full animate-pulse"></div>
-        <div className="absolute top-32 right-8 w-8 h-8 bg-yellow-300/20 rounded-full animate-bounce delay-300"></div>
-        <div className="absolute bottom-20 left-8 w-12 h-12 bg-pink-300/20 rounded-full animate-pulse delay-500"></div>
-        <div className="absolute top-1/2 right-4 w-6 h-6 bg-blue-300/30 rounded-full animate-bounce delay-700"></div>
+        <div className="absolute top-10 left-4 w-16 h-16 bg-white/10 rounded-full animate-pulse-slow"></div>
+        <div className="absolute top-32 right-8 w-8 h-8 bg-yellow-300/20 rounded-full animate-bounce-slow" style={{animationDelay: '0.3s'}}></div>
+        <div className="absolute bottom-20 left-8 w-12 h-12 bg-pink-300/20 rounded-full animate-pulse-slow" style={{animationDelay: '0.5s'}}></div>
+        <div className="absolute top-1/2 right-4 w-6 h-6 bg-blue-300/30 rounded-full animate-bounce-slow" style={{animationDelay: '0.7s'}}></div>
       </div>
 
       <div className="relative z-10 px-4 py-12">
