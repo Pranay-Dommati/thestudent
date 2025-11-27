@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { IoShareSocial } from 'react-icons/io5';
 import universalToast from '../../utils/universalToast';
 import apiAxios from '../../utils/axios';
@@ -23,6 +23,13 @@ const ShareCourseButton = ({
   onShared,
   preventDefault = true,
 }) => {
+  // Track in-flight requests to prevent duplicate share generation
+  const inFlightRef = useRef(false);
+  const [isSharing, setIsSharing] = useState(false);
+
+  // Simple per-course cache to avoid re-hitting API repeatedly
+  const cacheRef = useRef({});
+
   const handleClick = async (e) => {
     if (preventDefault && e) {
       e.preventDefault();
@@ -34,11 +41,27 @@ const ShareCourseButton = ({
       return;
     }
 
+    // Guard: prevent rapid multi-clicks and concurrent requests
+    if (inFlightRef.current) {
+      universalToast.info('Generating share link… please wait', { duration: 1500 });
+      return;
+    }
+
     try {
-      // Create or fetch an active share link for this course
-      const { data } = await apiAxios.post(`/courses/pro-learning/${courseId}/share/`);
-      const shareId = data?.id || (typeof data?.web_url === 'string' ? data.web_url.split('/').pop() : null);
-      const shareUrl = shareId ? `${window.location.origin}/pro-learning/share/${shareId}` : null;
+      inFlightRef.current = true;
+      setIsSharing(true);
+
+      // If we already have a link for this course in this session, reuse it
+      let shareUrl;
+      if (cacheRef.current[courseId]) {
+        shareUrl = cacheRef.current[courseId];
+      } else {
+        // Create or fetch an active share link for this course
+        const { data } = await apiAxios.post(`/courses/pro-learning/${courseId}/share/`);
+        const shareId = data?.id || (typeof data?.web_url === 'string' ? data.web_url.split('/').pop() : null);
+        shareUrl = shareId ? `${window.location.origin}/pro-learning/share/${shareId}` : null;
+        if (shareUrl) cacheRef.current[courseId] = shareUrl;
+      }
 
       if (!shareUrl) {
         throw new Error('Share URL not available');
@@ -69,16 +92,29 @@ const ShareCourseButton = ({
       console.error('Failed to create share link:', err);
       universalToast.error('Could not create a shareable link. Please try again.', { duration: 2500 });
     }
+    finally {
+      inFlightRef.current = false;
+      setIsSharing(false);
+    }
   };
 
   return (
     <button
       onClick={handleClick}
-      className={className || 'p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all duration-200 flex-shrink-0'}
+      disabled={isSharing}
+      className={
+        (className || 'p-1.5 rounded-lg transition-all duration-200 flex-shrink-0') +
+        (isSharing ? ' cursor-not-allowed bg-indigo-50 text-indigo-500' : ' text-gray-400 hover:text-indigo-600 hover:bg-indigo-50')
+      }
       title={title}
       aria-label={title}
     >
-      <IoShareSocial size={16} />
+      {isSharing ? (
+        // Minimal inline spinner for both desktop and mobile
+        <span className="inline-block h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" aria-hidden="true"></span>
+      ) : (
+        <IoShareSocial size={16} />
+      )}
     </button>
   );
 };
