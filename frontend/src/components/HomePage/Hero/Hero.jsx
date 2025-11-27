@@ -7,20 +7,20 @@ const Hero = () => {
       {/* Mobile version - modern and visually appealing */}
       <div className="block lg:hidden">
         {/* Mobile/Tablet background elements - responsive sizing */}
-        <div className="absolute top-10 right-4 w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-pink-400/20 to-purple-400/20 blur-xl animate-pulse"></div>
-        <div className="absolute top-32 left-4 w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-cyan-400/20 to-blue-400/20 blur-lg animate-pulse delay-1000"></div>
-        <div className="absolute bottom-20 right-8 w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-yellow-400/20 to-orange-400/20 blur-xl animate-pulse delay-2000"></div>
+        <div className="absolute top-10 right-4 w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-pink-400/20 to-purple-400/20 blur-xl animate-pulse-slow"></div>
+        <div className="absolute top-32 left-4 w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-cyan-400/20 to-blue-400/20 blur-lg animate-pulse-slow" style={{animationDelay: '1s'}}></div>
+        <div className="absolute bottom-20 right-8 w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-yellow-400/20 to-orange-400/20 blur-xl animate-pulse-slow" style={{animationDelay: '2s'}}></div>
         
         {/* Mobile/Tablet floating geometric shapes */}
-        <div className="absolute top-24 left-8 w-3 h-3 md:w-4 md:h-4 bg-white/30 rounded rotate-45 animate-bounce"></div>
-        <div className="absolute top-40 right-12 w-2 h-6 sm:h-8 bg-white/20 rounded-full animate-pulse delay-500"></div>
+        <div className="absolute top-24 left-8 w-3 h-3 md:w-4 md:h-4 bg-white/30 rounded rotate-45 animate-bounce-slow"></div>
+        <div className="absolute top-40 right-12 w-2 h-6 sm:h-8 bg-white/20 rounded-full animate-pulse-slow" style={{animationDelay: '0.5s'}}></div>
         <div className="absolute bottom-32 left-6 w-3 h-3 sm:w-4 sm:h-4 border-2 border-white/30 rounded-full animate-spin" style={{animationDuration: '8s'}}></div>
         
         <div className="container mx-auto px-4 sm:px-6 md:px-8 relative z-20 min-h-[70vh] flex flex-col justify-center">
           <div className="text-center max-w-sm sm:max-w-md md:max-w-lg mx-auto">
             {/* Mobile/Tablet AI badge - more prominent */}
             <div className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-4 sm:mb-6 shadow-lg">
-              <div className="animate-pulse mr-2 h-2 w-2 sm:h-3 sm:w-3 rounded-full bg-gradient-to-r from-green-400 to-emerald-400 shadow-md"></div>
+              <div className="animate-pulse-slow mr-2 h-2 w-2 sm:h-3 sm:w-3 rounded-full bg-gradient-to-r from-green-400 to-emerald-400 shadow-md"></div>
               <span className="text-white text-xs sm:text-sm font-bold tracking-wide">AI-POWERED LEARNING</span>
             </div>
             
@@ -115,7 +115,7 @@ const Hero = () => {
           <div className="max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto text-center">
             {/* AI badge - optimized for tablet */}
             <div className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-white border border-gray-200 mb-4 md:mb-6 lg:mb-8 shadow-lg">
-              <span className="animate-pulse mr-2 h-2 w-2 md:h-3 md:w-3 rounded-full bg-green-400 shadow-sm"></span>
+              <span className="animate-pulse-slow mr-2 h-2 w-2 md:h-3 md:w-3 rounded-full bg-green-400 shadow-sm"></span>
               <span className="text-black text-xs md:text-sm font-semibold">AI-Powered Learning</span>
             </div>
             

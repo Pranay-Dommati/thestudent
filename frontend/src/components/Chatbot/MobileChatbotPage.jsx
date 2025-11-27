@@ -91,6 +91,7 @@ const MobileChatbotPage = () => {
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const topicConfirmationRef = useRef(null);
   const initialQueryProcessed = useRef(false);
   const autoSendProcessed = useRef(false); // Additional flag to prevent duplicate auto-sends
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -649,6 +650,16 @@ const MobileChatbotPage = () => {
       }
     }
   }, [usageStats, showTopicConfirmation]);
+
+  // Auto-scroll to topic confirmation dialog when it appears
+  useEffect(() => {
+    if (showTopicConfirmation && topicConfirmationRef.current) {
+      // Small delay to ensure the DOM has updated
+      setTimeout(() => {
+        topicConfirmationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [showTopicConfirmation]);
 
   // Close navigation menu when scrolling
   useEffect(() => {
@@ -2013,7 +2024,7 @@ const MobileChatbotPage = () => {
 
           {/* Mobile Course Configuration Dialog - Minimal design to match desktop */}
           {showTopicConfirmation && (
-            <div className="w-full mb-6 px-3">
+            <div ref={topicConfirmationRef} className="w-full mb-6 px-3">
               <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">

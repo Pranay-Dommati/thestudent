@@ -5,9 +5,12 @@ import { useAuth } from '../../context/AuthContext';
 import apiAxios from '../../utils/axios';
 import '../Chatbot/welcomeCardFix.css';
 
+const VISITOR_KEY = 'easylearnova_has_visited';
+
 const OnboardingModal = () => {
   const [showModal, setShowModal] = useState(false);
   const [hasMarkedSeen, setHasMarkedSeen] = useState(false);
+  const [isFirstTimeVisitor, setIsFirstTimeVisitor] = useState(false);
   // Be defensive: if AuthProvider hasn't mounted yet, use optional chaining
   const auth = useAuth();
   const user = auth?.user;
@@ -15,9 +18,24 @@ const OnboardingModal = () => {
   const validateAuth = auth?.validateAuth || (() => Promise.resolve());
   const navigate = useNavigate();
 
+  // Check for first-time visitors (not logged in and never visited before)
+  useEffect(() => {
+    const hasVisitedBefore = localStorage.getItem(VISITOR_KEY);
+    
+    // If user is not logged in and hasn't visited before, show the modal
+    if (!isLoggedIn && !hasVisitedBefore) {
+      setIsFirstTimeVisitor(true);
+      // Small delay for smooth page load
+      setTimeout(() => {
+        setShowModal(true);
+      }, 1000);
+    }
+  }, [isLoggedIn]);
+
+  // Check for logged-in users who haven't seen onboarding
   useEffect(() => {
     // Only check when user is logged in
-  if (isLoggedIn && user) {
+    if (isLoggedIn && user) {
       // Check if user has seen onboarding from the user object
       // Also check our local flag to prevent re-showing after marking as seen
       if (!user.has_seen_onboarding && !hasMarkedSeen) {
@@ -31,16 +49,24 @@ const OnboardingModal = () => {
 
   const handleClose = async () => {
     setShowModal(false);
-  setHasMarkedSeen(true); // Immediately set local flag
+    setHasMarkedSeen(true); // Immediately set local flag
     
-    // Mark onboarding as seen via API
-    try {
-      // Only try to mark when we have auth context
-      await apiAxios.post('/auth/onboarding/mark-seen/');
-      // Re-validate auth to update user object with latest data
-      try { await validateAuth(); } catch {}
-    } catch (error) {
-      console.error('Failed to mark onboarding as seen:', error);
+    // Mark as visited in localStorage for non-logged-in users
+    if (isFirstTimeVisitor) {
+      localStorage.setItem(VISITOR_KEY, 'true');
+      setIsFirstTimeVisitor(false);
+      return; // Don't call API for non-logged-in users
+    }
+    
+    // Mark onboarding as seen via API (only for logged-in users)
+    if (isLoggedIn) {
+      try {
+        await apiAxios.post('/auth/onboarding/mark-seen/');
+        // Re-validate auth to update user object with latest data
+        try { await validateAuth(); } catch {}
+      } catch (error) {
+        console.error('Failed to mark onboarding as seen:', error);
+      }
     }
   };
 
@@ -56,8 +82,8 @@ const OnboardingModal = () => {
     }
   };
 
-  // If auth context is not ready or modal not needed, render nothing
-  if (!showModal || !auth) return null;
+  // If modal not needed, render nothing
+  if (!showModal) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 welcome-message-modal" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">

@@ -530,6 +530,7 @@ const ChatbotPage = () => {
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const topicConfirmationRef = useRef(null); // Ref for auto-scrolling to topic confirmation
   const initialQueryProcessed = useRef(false);
   const autoSendProcessed = useRef(false); // Additional flag to prevent duplicate auto-sends
   const { width } = useWindowSize();
@@ -739,6 +740,19 @@ const ChatbotPage = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  // Auto-scroll to topic confirmation dialog when it appears
+  useEffect(() => {
+    if (showTopicConfirmation && topicConfirmationRef.current) {
+      // Small delay to ensure the DOM is updated
+      setTimeout(() => {
+        topicConfirmationRef.current?.scrollIntoView({ 
+          behavior: "smooth", 
+          block: "center" 
+        });
+      }, 100);
+    }
+  }, [showTopicConfirmation]);
 
   // Handle initial query from URL parameter
   useEffect(() => {
@@ -2733,7 +2747,7 @@ const ChatbotPage = () => {
 
               {/* Course Topics Configuration Dialog */}
               {showTopicConfirmation && (
-                <div className="w-full max-w-4xl mx-auto px-4 mb-6">
+                <div ref={topicConfirmationRef} className="w-full max-w-4xl mx-auto px-4 mb-6">
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
