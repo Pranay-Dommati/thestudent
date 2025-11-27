@@ -52,6 +52,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   // Track the currently loaded course ID to prevent re-fetching on URL changes
   const loadedCourseIdRef = useRef(null);
   const loadedCourseKeyRef = useRef(null);
+  // Track if a course fetch is currently in progress to prevent duplicate parallel fetches
+  const courseFetchInProgressRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn, validateAuth } = useAuth();
@@ -133,9 +135,13 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     console.log('[FETCH-EFFECT]', {
       currentCourseKey,
       loadedKey: loadedCourseKeyRef.current,
+      fetchInProgress: courseFetchInProgressRef.current,
       courseIdProp: courseId,
       queryCourseId,
-      resolvedCourseId
+      resolvedCourseId,
+      pathname,
+      search: location.search,
+      keysMatch: loadedCourseKeyRef.current === currentCourseKey
     });
 
     // Skip if we already have course data loaded for this key
@@ -153,6 +159,16 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       loadedCourseKeyRef.current = currentCourseKey;
       return;
     }
+    
+    // CRITICAL: Skip if a fetch is already in progress for this course
+    // This prevents React 18 Strict Mode double-mount from causing parallel fetches
+    if (courseFetchInProgressRef.current === resolvedCourseId) {
+      console.log('⏭️ Skipping fetch - already fetching course:', resolvedCourseId);
+      return;
+    }
+    
+    // Mark fetch as in progress IMMEDIATELY (synchronously) before any async work
+    courseFetchInProgressRef.current = resolvedCourseId;
     
     // Reset tracking refs when courseId changes
     fetchedLessonsRef.current = new Set();
@@ -178,20 +194,32 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         if (cachedData && cachedData.course && cachedData.course.chapters && Array.isArray(cachedData.course.chapters)) {
           if (!isLoggedIn) {
             // Guest users: Use cache and stop (no progress to fetch)
-            console.log('👻 Guest user - using cached course data');
+            const keyToSet = buildCourseKey(cachedData.course.id, pathname);
+            console.log('👻 Guest user - using cached course data', {
+              courseId: cachedData.course.id,
+              settingKey: keyToSet,
+              firstLessonAbout: cachedData.course.chapters?.[0]?.lessons?.[0]?.aboutLesson?.substring(0, 50)
+            });
             setCourse(cachedData.course);
             loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
-            loadedCourseKeyRef.current = buildCourseKey(cachedData.course.id, pathname);
+            loadedCourseKeyRef.current = keyToSet;
+            courseFetchInProgressRef.current = null; // Fetch complete
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
             return;
           } else if (isCacheFresh) {
             // Logged-in users with fresh cache: Use cache immediately for instant load
             // PREVIEW MODE: Ignore cached progress completely - just show content fast
-            console.log('👤 Logged in user - using fresh cache for instant load (Preview Mode)');
+            const keyToSet = buildCourseKey(cachedData.course.id, pathname);
+            console.log('👤 Logged in user - using fresh cache for instant load (Preview Mode)', {
+              courseId: cachedData.course.id,
+              settingKey: keyToSet,
+              firstLessonAbout: cachedData.course.chapters?.[0]?.lessons?.[0]?.aboutLesson?.substring(0, 50)
+            });
             setCourse(cachedData.course);
             loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
-            loadedCourseKeyRef.current = buildCourseKey(cachedData.course.id, pathname);
+            loadedCourseKeyRef.current = keyToSet;
+            courseFetchInProgressRef.current = null; // Fetch complete
             // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
@@ -203,6 +231,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             setCourse(cachedData.course);
             loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
             loadedCourseKeyRef.current = buildCourseKey(cachedData.course.id, pathname);
+            courseFetchInProgressRef.current = null; // Fetch complete
             // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
@@ -366,10 +395,18 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         // Don't wait for progress or first lesson details - show content fast!
         setCourse(transformedCourse);
         loadedCourseIdRef.current = transformedCourse.id; // Mark as loaded
+        
+        // CRITICAL: Set the key ref BEFORE navigate() to prevent race condition
+        // We need to use the FINAL URL (with courseId param if it will be added)
+        const willNormalize = isSchoolCourse && transformedCourse?.id && !new URLSearchParams(location.search || '').get('courseId');
         loadedCourseKeyRef.current = buildCourseKey(transformedCourse.id, pathname);
+        courseFetchInProgressRef.current = null; // Fetch complete - clear in-progress flag
+        
         console.log('[STRUCTURE-ONLY->SET]', {
           firstLessonId: transformedCourse.chapters?.[0]?.lessons?.[0]?.id,
-          firstAbout: transformedCourse.chapters?.[0]?.lessons?.[0]?.aboutLesson
+          firstAbout: transformedCourse.chapters?.[0]?.lessons?.[0]?.aboutLesson,
+          willNormalize,
+          setLoadedKey: loadedCourseKeyRef.current
         });
         setExpandedChapters({ 0: true });
         setLoading(false); // <-- CRITICAL: Stop loading spinner now!
@@ -377,17 +414,16 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         // If we loaded a school course by filters and we have its exact ID but the URL
         // lacks ?courseId, normalize the URL to an ID-locked variant to keep future
         // API calls ID-based and avoid ambiguity on refresh.
-        if (isSchoolCourse && transformedCourse?.id) {
+        if (willNormalize) {
           const params = new URLSearchParams(location.search || '');
-          if (!params.get('courseId')) {
-            params.set('courseId', transformedCourse.id);
-            console.log('[NAVIGATE-NORMALIZE]', {
-              addingCourseId: transformedCourse.id,
-              pathname,
-              prevSearch: location.search
-            });
-            navigate({ pathname, search: `?${params.toString()}` }, { replace: true });
-          }
+          params.set('courseId', transformedCourse.id);
+          console.log('[NAVIGATE-NORMALIZE]', {
+            addingCourseId: transformedCourse.id,
+            pathname,
+            prevSearch: location.search,
+            keyAlreadySet: loadedCourseKeyRef.current
+          });
+          navigate({ pathname, search: `?${params.toString()}` }, { replace: true });
         }
         
         // Cache course without progress for non-logged-in users
@@ -404,6 +440,9 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           pathname,
           courseId: searchParams.get('courseId')
         });
+        
+        // Clear fetch in progress flag on error
+        courseFetchInProgressRef.current = null;
         
         // Clear potentially corrupted cache
         const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));

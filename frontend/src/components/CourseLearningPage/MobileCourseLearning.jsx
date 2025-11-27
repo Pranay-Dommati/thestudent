@@ -46,6 +46,8 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   // Track the currently loaded course ID to prevent re-fetching on URL changes
   const loadedCourseIdRef = useRef(null);
   const loadedCourseKeyRef = useRef(null);
+  // Track if a course fetch is currently in progress to prevent duplicate parallel fetches
+  const courseFetchInProgressRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn } = useAuth();
@@ -191,6 +193,16 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       return;
     }
     
+    // CRITICAL: Skip if a fetch is already in progress for this course
+    // This prevents React 18 Strict Mode double-mount from causing parallel fetches
+    if (courseFetchInProgressRef.current === resolvedCourseId) {
+      logger.log('⏭️ Skipping fetch - already fetching course:', resolvedCourseId);
+      return;
+    }
+    
+    // Mark fetch as in progress IMMEDIATELY (synchronously) before any async work
+    courseFetchInProgressRef.current = resolvedCourseId;
+    
     // Reset tracking refs when courseId changes
     fetchedLessonsRef.current = new Set();
     progressFetchedRef.current = null;
@@ -218,6 +230,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             setCourse(cachedData.course);
             loadedCourseIdRef.current = cachedData.course.id;
             loadedCourseKeyRef.current = buildCourseKey(cachedData.course.id, pathname);
+            courseFetchInProgressRef.current = null; // Fetch complete
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
             return;
@@ -228,6 +241,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             setCourse(cachedData.course);
             loadedCourseIdRef.current = cachedData.course.id;
             loadedCourseKeyRef.current = buildCourseKey(cachedData.course.id, pathname);
+            courseFetchInProgressRef.current = null; // Fetch complete
             // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
@@ -239,6 +253,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             setCourse(cachedData.course);
             loadedCourseIdRef.current = cachedData.course.id;
             loadedCourseKeyRef.current = buildCourseKey(cachedData.course.id, pathname);
+            courseFetchInProgressRef.current = null; // Fetch complete
             // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
@@ -254,6 +269,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         await fetchRegularCourse(pathParts);
       } catch (error) {
         logger.error('❌ Error fetching course data:', error);
+        courseFetchInProgressRef.current = null; // Clear on error
         setError(error.message || 'Failed to load course data');
         setContentType('notFound');
       } finally {
@@ -346,6 +362,7 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         setCourse(transformedCourse);
         loadedCourseIdRef.current = transformedCourse.id; // Mark as loaded
         loadedCourseKeyRef.current = buildCourseKey(transformedCourse.id, pathname);
+        courseFetchInProgressRef.current = null; // Fetch complete
       if (transformedCourse.chapters.length > 0) {
         setExpandedChapters({ 0: true });
         setActiveChapter(0);
