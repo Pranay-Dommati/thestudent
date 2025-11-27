@@ -745,23 +745,25 @@ const ProLearningPage = () => {
     }
   }, [topicsList]); // Run when topics change
   
-  // Load completed topics from backend API
+  // Load completed topics from backend API (only when authenticated)
   useEffect(() => {
     const loadCompletedTopicsFromBackend = async () => {
+      // Do not call backend while auth is loading or user is logged out
+      if (loading || !user) return;
       if (topicsList.length === 0) return;
-      
+
       try {
         const axiosInstance = (await import('../../../utils/axios')).default;
         const courseId = getCourseId();
-        
+
         if (!courseId) return;
-        
+
         // Fetch course progress from backend
-  const response = await axiosInstance.get(`/courses/${courseId}/progress/`);
-        
+        const response = await axiosInstance.get(`/courses/${courseId}/progress/`);
+
         if (response.data) {
           const completedLessonIds = [];
-          
+
           // Extract completed lesson IDs from chapters or sections
           if (response.data.chapters) {
             // School course structure
@@ -782,24 +784,27 @@ const ProLearningPage = () => {
               });
             });
           }
-          
+
           // Update state with backend data
           setCompletedTopics(completedLessonIds);
-          
+
           // Also update localStorage
           const storageKey = courseId ? `proLearning_completedTopics_${courseId}` : 'proLearning_completedTopics';
           localStorage.setItem(storageKey, JSON.stringify(completedLessonIds));
-          
+
           console.log('✅ Loaded completed topics from backend:', completedLessonIds.length);
         }
       } catch (error) {
-        console.warn('Failed to load completed topics from backend:', error);
+        // Avoid noisy 401s when session is missing/expired; just stay silent
+        if (error?.response?.status !== 401) {
+          console.warn('Failed to load completed topics from backend:', error);
+        }
         // Fall back to localStorage data (already loaded in initial state)
       }
     };
-    
+
     loadCompletedTopicsFromBackend();
-  }, [topicsList]); // Run when topics are loaded
+  }, [topicsList, user, loading, courseId]); // Only run when authenticated and topics are loaded
   
   // Flag to prevent storage loading during direct URL generation
   const [isDirectUrlGeneration, setIsDirectUrlGeneration] = useState(false);
