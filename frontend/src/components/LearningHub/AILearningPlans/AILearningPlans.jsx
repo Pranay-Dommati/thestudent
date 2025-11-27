@@ -375,7 +375,7 @@ const AILearningPlans = () => {
             className="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
             style={{ pointerEvents: 'auto' }}
           >
-            <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between">
               {/* Left: Course Info */}
               <div className="flex items-center flex-1 min-w-0 mr-4">
                 <div className="bg-blue-100 p-2 rounded-lg mr-3 flex-shrink-0">
@@ -383,7 +383,7 @@ const AILearningPlans = () => {
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-gray-900 truncate" style={{ userSelect: 'text', cursor: 'text' }}>
+                  <h3 className="text-[14px] sm:text-sm md:text-base font-medium text-gray-900 line-clamp-2" style={{ userSelect: 'text', cursor: 'text', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                     {formatCourseName(course)}
                   </h3>
                   <div className="text-xs text-gray-500 mt-0.5" style={{ userSelect: 'text', cursor: 'text' }}>
@@ -395,7 +395,7 @@ const AILearningPlans = () => {
               </div>
 
               {/* Right: Progress & Actions */}
-              <div className="flex items-center space-x-4 flex-shrink-0 relative z-10" style={{ pointerEvents: 'auto' }}>
+              <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 flex-shrink-0 relative z-10" style={{ pointerEvents: 'auto' }}>
                 {/* Progress */}
                 <div className="text-xs text-gray-500 font-medium" style={{ userSelect: 'text', cursor: 'text' }}>
                   {Math.round(course.completion_percentage || 0)}%
@@ -408,11 +408,11 @@ const AILearningPlans = () => {
                     e.stopPropagation();
                     handleStartCourse(course.id, formatCourseName(course));
                   }}
-                  className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-colors flex items-center relative z-10"
+                  className="px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-600 text-white rounded text-[11px] sm:text-xs font-medium hover:bg-blue-700 transition-colors flex items-center relative z-10"
                   style={{ cursor: 'pointer', pointerEvents: 'auto', position: 'relative' }}
                   type="button"
                 >
-                  <FaPlay className="mr-1 text-[10px]" />
+                  <FaPlay className="mr-1 text-[9px] sm:text-[10px]" />
                   Start
                 </button>
                 
@@ -421,7 +421,7 @@ const AILearningPlans = () => {
                   <ShareCourseButton
                     courseId={course.id}
                     courseTitle={formatCourseName(course)}
-                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors relative z-10"
+                    className="p-1.5 sm:p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors relative z-10"
                     title="Share course"
                     preventDefault
                   />
@@ -435,15 +435,15 @@ const AILearningPlans = () => {
                     handleDeleteClick(course);
                   }}
                   disabled={deleteLoading === course.id}
-                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded transition-colors relative z-10"
+                  className="p-1.5 sm:p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded transition-colors relative z-10"
                   title="Delete"
                   style={{ cursor: 'pointer', pointerEvents: 'auto', position: 'relative' }}
                   type="button"
                 >
                   {deleteLoading === course.id ? (
-                    <FaSpinner className="text-sm animate-spin" />
+                    <FaSpinner className="text-xs sm:text-sm animate-spin" />
                   ) : (
-                    <FaTrash className="text-sm" />
+                    <FaTrash className="text-xs sm:text-sm" />
                   )}
                 </button>
               </div>
