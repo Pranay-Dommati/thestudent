@@ -2252,8 +2252,6 @@ const ChatbotPage = () => {
                 <div className="w-full">
                   <Link 
                     to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
                     onClick={() => {
                       // Set session flag for back button navigation

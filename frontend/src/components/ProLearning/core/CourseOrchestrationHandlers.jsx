@@ -202,7 +202,11 @@ export const handleProLearningStart = async (dependencies) => {
     setLoadScenario,
     setShowSkeletons,
     clearTopicFromBothStorages,
-    loadTopicContent
+    loadTopicContent,
+    // User info for background generation notifications (for logged-in users)
+    user,
+    isLoggedIn,
+    userId
   } = dependencies;
 
   if (topicsList.length === 0) {
@@ -252,6 +256,9 @@ export const handleProLearningStart = async (dependencies) => {
           setSelectedTopic(topicsList[0]);
         } catch {}
       }
+      
+      // Initialize with user info for background notification support
+      // Generation will continue even when user switches tabs/navigates away
       await initializeProgressiveGeneration(courseTitle, topicsList, {
         onProgress: (progress) => {
           setProgressiveGenerationProgress(progress);
@@ -436,7 +443,12 @@ export const handleProLearningStart = async (dependencies) => {
           console.error('❌ Progressive generation error:', err);
           setIsProgressiveGenerating(false);
         }
-}, { courseId: getCourseId() });
+}, { 
+  courseId: getCourseId(),
+  // Pass user info for background notification support (logged-in users only)
+  isLoggedIn: isLoggedIn || false,
+  userId: userId || null
+});
 
       setIsProgressiveGenerating(true);
       // Do not block the UI with the generic loader; tabs should appear as they become ready
@@ -522,7 +534,11 @@ export const handleContentGeneration = async (dependencies) => {
     setContent,
     setContentTopicName,
     setReadingRenderReady,
-    setSanitizedReadingTopicName
+    setSanitizedReadingTopicName,
+    // User info for background generation notifications (for logged-in users)
+    user,
+    isLoggedIn,
+    userId
   } = dependencies;
 
   try {
@@ -723,7 +739,12 @@ export const handleContentGeneration = async (dependencies) => {
           console.error('❌ Progressive generation error:', error);
           setIsProgressiveGenerating(false);
         }
-      }, { courseId: batchCourseId });
+      }, { 
+        courseId: batchCourseId,
+        // Pass user info for background notification support (logged-in users only)
+        isLoggedIn: isLoggedIn || false,
+        userId: userId || null
+      });
 
       // Start progressive generation
       setIsProgressiveGenerating(true);

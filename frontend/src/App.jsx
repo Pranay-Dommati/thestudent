@@ -46,6 +46,7 @@ import OfflineRouterHandler from './components/Common/OfflineRouterHandler.jsx';
 import OfflinePage from './components/Common/OfflinePage.jsx';
 const CertificatePreview = React.lazy(() => import('./components/Certificates/CertificatePreview'));
 import OnboardingModal from './components/Onboarding/OnboardingModal';
+import GlobalBackgroundGenerationCard from './components/ProLearning/GlobalBackgroundGenerationCard';
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -267,6 +268,8 @@ const App = () => {
           <OfflineRouterHandler />
           {/* Global Onboarding Modal - shows for new users on first login */}
           <OnboardingModal />
+          {/* Global Background Generation Card - shows on non-ProLearning pages when generating */}
+          <GlobalBackgroundGenerationCard />
           
         <Layout excludePaths={['/admin-p', '/chat', '/offline', '/pro-learning']}>
             <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>

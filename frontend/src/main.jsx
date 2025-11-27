@@ -21,6 +21,17 @@ import App from './App.jsx'
 // Initialize tracking early so session_id is available globally and PostHog is set up
 try { tracking.init(); } catch {}
 
+// Initialize pending course notification service
+// This will check for any completed courses that were generated in background
+// and show notifications when user returns to the site
+import { initializeNotificationService } from './services/PendingCourseNotificationService.js';
+try { 
+  // Slight delay to ensure DOM and other services are ready
+  setTimeout(() => initializeNotificationService(), 1000);
+} catch (e) { 
+  console.warn('Failed to initialize notification service:', e); 
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <HelmetProvider>

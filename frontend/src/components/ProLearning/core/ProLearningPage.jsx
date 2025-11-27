@@ -150,6 +150,8 @@ import { createContentLoadingEffect } from './ContentLoadingEffect.jsx';
 import { createTopicsInitializationEffect } from './TopicsInitializationEffect.jsx';
 // Tutor Chat (Reading Assistant)
 import TutorChat from '../TutorChat/TutorChat.jsx';
+// Global background generation state (for cross-page card)
+import { updateGenerationProgress, markGenerationComplete, clearGenerationState } from '../GlobalBackgroundGenerationCard.jsx';
 
 
 const ProLearningPage = () => {
@@ -472,6 +474,38 @@ const ProLearningPage = () => {
   const [availableTabsForTopics, setAvailableTabsForTopics] = useState({});
   const [useProgressiveGeneration, setUseProgressiveGeneration] = useState(true); // Feature flag
   const [loadScenario, setLoadScenario] = useState(null); // 'first-time' or 'reload'
+
+  // Update global generation state for cross-page card visibility
+  useEffect(() => {
+    if (isProgressiveGenerating && progressiveGenerationProgress) {
+      const progress = progressiveGenerationProgress;
+      // Handle direct progress format { topic, tabName, overallProgress, ... }
+      if (progress.topic || progress.overallProgress !== undefined) {
+        updateGenerationProgress({
+          courseId: courseId || null,
+          courseTitle: courseTitle || 'Your Course',
+          currentTopic: progress.topic || null,
+          currentStep: progress.tabName || null,
+          progress: progress.overallProgress || 0,
+          totalTopics: progress.totalTopics || topicsList.length,
+          completedTopics: progress.completedTopics || 0,
+          isComplete: false,
+          isGenerating: true
+        });
+      }
+    } else if (!isProgressiveGenerating && allTopicsGenerated) {
+      // Generation complete - mark as complete in global state
+      markGenerationComplete(courseId, courseTitle);
+    } else if (!isProgressiveGenerating) {
+      // Not generating - clear state after a delay to prevent flicker
+      const timer = setTimeout(() => {
+        if (!isProgressiveGenerating) {
+          clearGenerationState();
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isProgressiveGenerating, progressiveGenerationProgress, allTopicsGenerated, courseId, courseTitle, topicsList.length]);
   
   // Freemium: Save course modal state
   const [showSaveCourseModal, setShowSaveCourseModal] = useState(false);
@@ -1458,7 +1492,11 @@ const ProLearningPage = () => {
       setShowSkeletons,
       clearTopicFromBothStorages,
       loadTopicContent,
-      content
+      content,
+      // Pass user info for background generation notifications
+      user,
+      isLoggedIn: !!user,
+      userId: user?.id || null
     });
   };
 
@@ -1694,7 +1732,11 @@ const ProLearningPage = () => {
         setContent,
         setContentTopicName,
         setReadingRenderReady,
-        setSanitizedReadingTopicName
+        setSanitizedReadingTopicName,
+        // Pass user info for background generation notifications
+        user,
+        isLoggedIn: !!user,
+        userId: user?.id || null
       });
     };
 
