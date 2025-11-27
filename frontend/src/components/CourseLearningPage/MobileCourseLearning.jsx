@@ -32,11 +32,15 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [contentType, setContentType] = useState('video');
   const [courseProgress, setCourseProgress] = useState(null);
   const [savingProgress, setSavingProgress] = useState(false);
-  const [progressLoading, setProgressLoading] = useState(true);
+  const [progressLoading, setProgressLoading] = useState(false); // Default to false since we lazy load
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const videoRef = useRef(null);
   const listRef = useRef(null);
   const chapterRefs = useRef([]);
+  // Track which lessons have been fetched to avoid duplicate API calls
+  const fetchedLessonsRef = useRef(new Set());
+  // Track if progress has been fetched for this course to avoid duplicate calls
+  const progressFetchedRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn } = useAuth();
@@ -44,6 +48,14 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   // Fetch full details for a specific lesson (lazy loading)
   const fetchLessonDetails = useCallback(async (lessonId, chapterIndex, lessonIndex) => {
     if (!lessonId) return;
+    
+    // Prevent duplicate fetches for the same lesson
+    const lessonKey = `${lessonId}`;
+    if (fetchedLessonsRef.current.has(lessonKey)) {
+      logger.log('⏭️ Skipping duplicate fetch for lesson:', lessonId);
+      return;
+    }
+    fetchedLessonsRef.current.add(lessonKey);
     
     try {
       const response = await axiosInstance.get(`/lessons/${lessonId}/`);
@@ -119,6 +131,10 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
   // Reuse the same course fetching logic from the desktop version
   useEffect(() => {
+    // Reset tracking refs when courseId changes
+    fetchedLessonsRef.current = new Set();
+    progressFetchedRef.current = null;
+    
     const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
     
     const fetchData = async () => {
@@ -145,27 +161,22 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             return;
           } else if (isCacheFresh) {
             // Logged-in users with fresh cache: Use cache immediately for instant load
-            logger.log('📱 Logged in user - using fresh cache for instant load');
+            // PREVIEW MODE: Ignore cached progress completely - just show content fast
+            logger.log('📱 Logged in user - using fresh cache for instant load (Preview Mode)');
             setCourse(cachedData.course);
-            if (cachedData.progress) {
-              setCourseProgress(cachedData.progress);
-              setProgressLoading(false);
-            }
+            // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
             return;
           } else {
-            // Logged-in users with stale cache: Use cache to show content quickly,
-            // but also fetch fresh data
-            logger.log('📱 Logged in user - using stale cache while fetching fresh data');
+            // Logged-in users with stale cache: Use cache to show content quickly
+            // PREVIEW MODE: Ignore cached progress completely - just show content fast
+            logger.log('📱 Logged in user - using stale cache for instant load (Preview Mode)');
             setCourse(cachedData.course);
-            if (cachedData.progress) {
-              setCourseProgress(cachedData.progress);
-              setProgressLoading(false);
-            }
+            // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
-            // Continue to fetch fresh data below
+            return; // Don't fetch fresh data - use cache as-is for speed
           }
         } else if (cachedData) {
           // Cache exists but has invalid structure - clear it
@@ -271,38 +282,12 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         setExpandedChapters({ 0: true });
         setActiveChapter(0);
         setActiveLesson(0);
-        
-        // Lazy load the first lesson immediately
-        if (transformedCourse.chapters[0].lessons.length > 0) {
-          const firstLesson = transformedCourse.chapters[0].lessons[0];
-          if (firstLesson.id) {
-             try {
-               const lessonRes = await axiosInstance.get(`/lessons/${firstLesson.id}/`);
-               const details = lessonRes.data;
-               
-               // Update state with details
-               setCourse(prev => {
-                 if (!prev) return prev;
-                 const newC = { ...prev };
-                 if (newC.chapters[0] && newC.chapters[0].lessons[0]) {
-                   newC.chapters[0].lessons[0] = {
-                     ...newC.chapters[0].lessons[0],
-                     ...details,
-                     videoUrl: details.video_url,
-                     aboutLesson: details.about_lesson,
-                     quizQuestions: details.quiz_questions,
-                     resources: details.resources || { downloadable: [], internet: [] }
-                   };
-                 }
-                 return newC;
-               });
-             } catch (err) {
-               console.warn('Failed to pre-fetch first lesson details', err);
-             }
-          }
-        }
       }
-
+      
+      // **OPTIMIZATION: Set loading to false IMMEDIATELY**
+      // Don't wait for first lesson details - show content fast!
+      setLoading(false);
+      
       const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
       courseCache.set(cacheKey, { course: transformedCourse });
       logger.log('💾 Mobile: Course data cached for faster future loads');
@@ -326,6 +311,14 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         return;
       }
       if (!course || !course.id) return;
+      
+      // Prevent duplicate progress fetches for the same course
+      if (progressFetchedRef.current === course.id) {
+        logger.log('⏭️ Mobile: Skipping duplicate progress fetch for course:', course.id);
+        setProgressLoading(false);
+        return;
+      }
+      progressFetchedRef.current = course.id;
       
       // Only show loading if we don't have progress data yet
       if (!courseProgress) {
@@ -394,7 +387,8 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       }
     };
 
-    fetchUserProgress();
+    // TEMPORARILY DISABLED FOR PERFORMANCE - PREVIEW MODE STYLE LOADING
+    // fetchUserProgress();
   }, [isLoggedIn, course?.id, pathname]);
 
   // Navigation helpers

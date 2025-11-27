@@ -578,41 +578,80 @@ def list_engineering_courses(request):
 @permission_classes([AllowAny])
 @authentication_classes([JWTAuthentication])
 def get_engineering_course_by_id(request, course_id):
+    import time as _time
+    _start_total = _time.time()
+    
+    print(f"\n{'='*60}")
+    print(f"🚀 [ENGINEERING COURSE API] Request started")
+    print(f"   Course ID: {course_id}")
+    print(f"   User: {request.user if request.user.is_authenticated else 'Anonymous'}")
+    print(f"   Query params: {dict(request.query_params)}")
+    print(f"{'='*60}")
+    
     try:
         # Optimize query with prefetch_related to avoid N+1 queries for nested data
+        _start_db = _time.time()
         course = EngineeringCourse.objects.prefetch_related(
             'sections',
             'sections__lessons',
             'sections__lessons__resources',
             'sections__lessons__quiz_questions'
         ).get(id=course_id)
+        _db_time = (_time.time() - _start_db) * 1000
+        print(f"⏱️  [DB Query] Fetched course with prefetch: {_db_time:.2f}ms")
         
         # Check if we only want the structure (lightweight)
         structure_only = request.query_params.get('structure_only', 'false').lower() == 'true'
+        print(f"📋 [Mode] structure_only={structure_only}")
         
         if structure_only:
-            serializer = EngineeringCourseStructureSerializer(course, context={'request': request})
+            _start_serial = _time.time()
+            serializer = EngineeringCourseStructureSerializer(course, context={'request': request, 'skip_progress': True})
             data = serializer.data
+            _serial_time = (_time.time() - _start_serial) * 1000
+            print(f"⏱️  [Serializer] Structure serialization: {_serial_time:.2f}ms")
+            
+            _start_gate = _time.time()
             data = _apply_preview_gating(data, 'engineering', request)
+            _gate_time = (_time.time() - _start_gate) * 1000
+            print(f"⏱️  [Gating] Preview gating applied: {_gate_time:.2f}ms")
+            
+            _total_time = (_time.time() - _start_total) * 1000
+            print(f"✅ [TOTAL] Engineering course (structure_only) completed in {_total_time:.2f}ms")
+            print(f"{'='*60}\n")
             return Response(data)
             
         # Include request in serializer context so lesson completion flags compute correctly
         context = {'request': request}
         if request.user.is_authenticated:
             # Pre-fetch completed lesson IDs to avoid N+1 queries in serializer
+            _start_progress = _time.time()
             completed_ids = set(UserLessonProgress.objects.filter(
                 user=request.user,
                 lesson__section__engineering_course=course
             ).values_list('lesson_id', flat=True))
             context['completed_lesson_ids'] = completed_ids
+            _progress_time = (_time.time() - _start_progress) * 1000
+            print(f"⏱️  [Progress Query] Fetched {len(completed_ids)} completed lessons: {_progress_time:.2f}ms")
 
+        _start_serial = _time.time()
         serializer = EngineeringCourseWithSectionsSerializer(course, context=context)
         data = serializer.data
+        _serial_time = (_time.time() - _start_serial) * 1000
+        print(f"⏱️  [Serializer] Full course serialization: {_serial_time:.2f}ms")
 
+        _start_gate = _time.time()
         data = _apply_preview_gating(data, 'engineering', request)
+        _gate_time = (_time.time() - _start_gate) * 1000
+        print(f"⏱️  [Gating] Preview gating applied: {_gate_time:.2f}ms")
 
+        _total_time = (_time.time() - _start_total) * 1000
+        print(f"✅ [TOTAL] Engineering course (full) completed in {_total_time:.2f}ms")
+        print(f"{'='*60}\n")
         return Response(data)
     except EngineeringCourse.DoesNotExist:
+        _total_time = (_time.time() - _start_total) * 1000
+        print(f"❌ [ERROR] Course not found after {_total_time:.2f}ms")
         return Response(
             {"error": "Course not found"}, 
             status=status.HTTP_404_NOT_FOUND
@@ -622,40 +661,79 @@ def get_engineering_course_by_id(request, course_id):
 @permission_classes([AllowAny])
 @authentication_classes([JWTAuthentication])
 def get_school_course_by_id(request, course_id):
+    import time as _time
+    _start_total = _time.time()
+    
+    print(f"\n{'='*60}")
+    print(f"🏫 [SCHOOL COURSE API] Request started")
+    print(f"   Course ID: {course_id}")
+    print(f"   User: {request.user if request.user.is_authenticated else 'Anonymous'}")
+    print(f"   Query params: {dict(request.query_params)}")
+    print(f"{'='*60}")
+    
     try:
         # Optimize query with prefetch_related to avoid N+1 queries for nested data
+        _start_db = _time.time()
         course = SchoolCourse.objects.prefetch_related(
             'chapters',
             'chapters__lessons',
             'chapters__lessons__resources',
             'chapters__lessons__quiz_questions'
         ).get(id=course_id)
+        _db_time = (_time.time() - _start_db) * 1000
+        print(f"⏱️  [DB Query] Fetched course with prefetch: {_db_time:.2f}ms")
         
         # Check if we only want the structure (lightweight)
         structure_only = request.query_params.get('structure_only', 'false').lower() == 'true'
+        print(f"📋 [Mode] structure_only={structure_only}")
         
         if structure_only:
-            serializer = CourseStructureSerializer(course, context={'request': request})
+            _start_serial = _time.time()
+            serializer = CourseStructureSerializer(course, context={'request': request, 'skip_progress': True})
             data = serializer.data
+            _serial_time = (_time.time() - _start_serial) * 1000
+            print(f"⏱️  [Serializer] Structure serialization: {_serial_time:.2f}ms")
+            
+            _start_gate = _time.time()
             data = _apply_preview_gating(data, 'school', request)
+            _gate_time = (_time.time() - _start_gate) * 1000
+            print(f"⏱️  [Gating] Preview gating applied: {_gate_time:.2f}ms")
+            
+            _total_time = (_time.time() - _start_total) * 1000
+            print(f"✅ [TOTAL] School course (structure_only) completed in {_total_time:.2f}ms")
+            print(f"{'='*60}\n")
             return Response(data)
             
         context = {'request': request}
         if request.user.is_authenticated:
             # Pre-fetch completed lesson IDs to avoid N+1 queries in serializer
+            _start_progress = _time.time()
             completed_ids = set(UserLessonProgress.objects.filter(
                 user=request.user,
                 lesson__chapter__school_course=course
             ).values_list('lesson_id', flat=True))
             context['completed_lesson_ids'] = completed_ids
+            _progress_time = (_time.time() - _start_progress) * 1000
+            print(f"⏱️  [Progress Query] Fetched {len(completed_ids)} completed lessons: {_progress_time:.2f}ms")
 
+        _start_serial = _time.time()
         serializer = CourseWithChaptersSerializer(course, context=context)
         data = serializer.data
+        _serial_time = (_time.time() - _start_serial) * 1000
+        print(f"⏱️  [Serializer] Full course serialization: {_serial_time:.2f}ms")
 
+        _start_gate = _time.time()
         data = _apply_preview_gating(data, 'school', request)
+        _gate_time = (_time.time() - _start_gate) * 1000
+        print(f"⏱️  [Gating] Preview gating applied: {_gate_time:.2f}ms")
 
+        _total_time = (_time.time() - _start_total) * 1000
+        print(f"✅ [TOTAL] School course (full) completed in {_total_time:.2f}ms")
+        print(f"{'='*60}\n")
         return Response(data)
     except SchoolCourse.DoesNotExist:
+        _total_time = (_time.time() - _start_total) * 1000
+        print(f"❌ [ERROR] Course not found after {_total_time:.2f}ms")
         return Response(
             {"error": "Course not found"}, 
             status=status.HTTP_404_NOT_FOUND
@@ -1048,22 +1126,38 @@ def get_course_progress(request, course_id):
     """
     Get the progress of a specific course for the current user
     """
+    import time as _time
+    _start_total = _time.time()
+    
+    print(f"\n{'='*60}")
+    print(f"📊 [PROGRESS API] Request started")
+    print(f"   Course ID: {course_id}")
+    print(f"   User: {request.user}")
+    print(f"{'='*60}")
+    
     try:
         user = request.user
         total_lessons = 0
         completed_lessons = 0
         
         # Determine if it's a school course or engineering course
+        _start_db = _time.time()
         try:
             # Try to find a school course first
             course = SchoolCourse.objects.prefetch_related('chapters', 'chapters__lessons').get(id=course_id)
             is_school_course = True
+            _db_time = (_time.time() - _start_db) * 1000
+            print(f"⏱️  [DB Query] Found school course: {_db_time:.2f}ms")
         except SchoolCourse.DoesNotExist:
             # If not found, try engineering course
             try:
                 course = EngineeringCourse.objects.prefetch_related('sections', 'sections__lessons').get(id=course_id)
                 is_school_course = False
+                _db_time = (_time.time() - _start_db) * 1000
+                print(f"⏱️  [DB Query] Found engineering course: {_db_time:.2f}ms")
             except EngineeringCourse.DoesNotExist:
+                _db_time = (_time.time() - _start_db) * 1000
+                print(f"❌ [ERROR] Course not found after {_db_time:.2f}ms")
                 return Response(
                     {"error": "Course not found"}, 
                     status=status.HTTP_404_NOT_FOUND
@@ -1168,11 +1262,17 @@ def get_course_progress(request, course_id):
                 },
                 'sections': lessons_by_section        }
         
+        _total_time = (_time.time() - _start_total) * 1000
+        print(f"✅ [TOTAL] Progress API completed in {_total_time:.2f}ms")
+        print(f"   Completed: {completed_lessons}/{total_lessons} lessons")
+        print(f"{'='*60}\n")
         return Response(response_data)
     
     except Exception as e:
         import traceback
         traceback.print_exc()
+        _total_time = (_time.time() - _start_total) * 1000
+        print(f"❌ [ERROR] Progress API failed after {_total_time:.2f}ms: {str(e)}")
         return Response(
             {"error": str(e)},
             status=status.HTTP_400_BAD_REQUEST
@@ -3853,8 +3953,20 @@ def get_lesson_details(request, lesson_id):
     Fetch full details for a specific lesson.
     Used for lazy loading lesson content.
     """
+    import time as _time
+    _start_total = _time.time()
+    
+    print(f"\n{'='*60}")
+    print(f"📖 [LESSON DETAILS API] Request started")
+    print(f"   Lesson ID: {lesson_id}")
+    print(f"   User: {request.user if request.user.is_authenticated else 'Anonymous'}")
+    print(f"{'='*60}")
+    
     try:
+        _start_db = _time.time()
         lesson = Lesson.objects.get(id=lesson_id)
+        _db_time = (_time.time() - _start_db) * 1000
+        print(f"⏱️  [DB Query] Fetched lesson: {_db_time:.2f}ms")
         
         # Check for preview restrictions if user is not authenticated
         is_auth = request.user.is_authenticated if hasattr(request, 'user') else False
@@ -3883,15 +3995,27 @@ def get_lesson_details(request, lesson_id):
                 pass
                 
             if is_locked:
+                _total_time = (_time.time() - _start_total) * 1000
+                print(f"🔒 [LOCKED] Lesson locked for guest after {_total_time:.2f}ms")
                 return Response(
                     {"error": "Login to unlock this lesson"}, 
                     status=status.HTTP_403_FORBIDDEN
                 )
 
+        _start_serial = _time.time()
         serializer = LessonSerializer(lesson, context={'request': request})
-        return Response(serializer.data)
+        data = serializer.data
+        _serial_time = (_time.time() - _start_serial) * 1000
+        print(f"⏱️  [Serializer] Lesson serialization: {_serial_time:.2f}ms")
+        
+        _total_time = (_time.time() - _start_total) * 1000
+        print(f"✅ [TOTAL] Lesson details completed in {_total_time:.2f}ms")
+        print(f"{'='*60}\n")
+        return Response(data)
         
     except Lesson.DoesNotExist:
+        _total_time = (_time.time() - _start_total) * 1000
+        print(f"❌ [ERROR] Lesson not found after {_total_time:.2f}ms")
         return Response(
             {"error": "Lesson not found"}, 
             status=status.HTTP_404_NOT_FOUND

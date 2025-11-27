@@ -600,6 +600,9 @@ class LessonLightSerializer(serializers.ModelSerializer):
         ]
     
     def get_completed(self, obj):
+        if self.context.get('skip_progress'):
+            return False
+            
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             # Check for pre-fetched IDs first to avoid N+1 queries

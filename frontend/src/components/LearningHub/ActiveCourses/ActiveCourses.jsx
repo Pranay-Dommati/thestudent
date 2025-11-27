@@ -50,8 +50,9 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
 
             // Build course learning URL using course ID for both School and Engineering
             // We standardize navigation to the generic ID-based learning route: /courses/:courseId/learning
+            // Include courseId as query param to avoid late URL rewrite and cache key mismatch
             const courseId = course.id;
-            const courseLearningUrl = `/courses/${courseId}/learning`;
+            const courseLearningUrl = `/courses/${courseId}/learning?courseId=${courseId}`;
 
             // Use the thumbnail URL directly from the API (backend should handle absolute URLs)
             const imageUrl = course.thumbnail || "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80";

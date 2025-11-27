@@ -43,6 +43,10 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [disambiguationOptions, setDisambiguationOptions] = useState(null); // array of brief course objects
   const [issuingCert, setIssuingCert] = useState(false);
   const videoRef = useRef(null);
+  // Track which lessons have been fetched to avoid duplicate API calls
+  const fetchedLessonsRef = useRef(new Set());
+  // Track if progress has been fetched for this course to avoid duplicate calls
+  const progressFetchedRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn, validateAuth } = useAuth();
@@ -71,15 +75,30 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   };
 
   // **HELPER FUNCTION: Fetch progress in background for logged-in users**
-  const fetchProgressInBackground = async (courseId, courseData, cacheKey) => {
+  const fetchProgressInBackground = async (courseIdToFetch, courseData, cacheKey) => {
+    // Prevent duplicate progress fetches for the same course
+    if (progressFetchedRef.current === courseIdToFetch) {
+      console.log('⏭️ Skipping duplicate progress fetch for course:', courseIdToFetch);
+      return;
+    }
+    progressFetchedRef.current = courseIdToFetch;
+    
     try {
       await validateAuth();
-      const progressResponse = await axiosInstance.get(`/courses/progress/${courseId}/`);
+      const progressResponse = await axiosInstance.get(`/courses/progress/${courseIdToFetch}/`);
       
       // Silently update progress without loading state
       setCourseProgress(progressResponse.data);
       if (progressResponse?.data?.progress) {
         setServerProgress(progressResponse.data.progress);
+        // Also update percentage for UI
+        const pct = progressResponse.data.progress.percentage ?? 0;
+        setProgressPercent(pct);
+      }
+      
+      // Check for certificate in response
+      if (progressResponse.data?.certificate) {
+        setCertificate(progressResponse.data.certificate);
       }
       
       // Update course with fresh progress
@@ -94,11 +113,17 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       console.log('🔄 Background progress sync completed');
     } catch (error) {
       console.error('⚠️ Background progress sync failed (non-critical):', error);
+      // Reset the ref so it can be retried
+      progressFetchedRef.current = null;
       // Don't show error to user - cache is good enough
     }
   };
 
   useEffect(() => {
+    // Reset tracking refs when courseId changes
+    fetchedLessonsRef.current = new Set();
+    progressFetchedRef.current = null;
+    
     // Extract URL path to determine course type and proper API endpoint
     const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
     
@@ -126,42 +151,22 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             return;
           } else if (isCacheFresh) {
             // Logged-in users with fresh cache: Use cache immediately for instant load
-            console.log('👤 Logged in user - using fresh cache for instant load');
+            // PREVIEW MODE: Ignore cached progress completely - just show content fast
+            console.log('👤 Logged in user - using fresh cache for instant load (Preview Mode)');
             setCourse(cachedData.course);
-            if (cachedData.progress) {
-              setCourseProgress(cachedData.progress);
-              if (cachedData.progress?.progress) {
-                setServerProgress(cachedData.progress.progress);
-              }
-              // Update course with cached progress
-              const updatedCourse = updateCourseWithProgress(cachedData.course, cachedData.progress);
-              setCourse(updatedCourse);
-            }
+            // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
-            
-            // Optionally fetch progress in background to ensure it's up-to-date
-            // This happens silently without blocking the UI
-            if (cachedData.course?.id) {
-              fetchProgressInBackground(cachedData.course.id, cachedData.course, cacheKey);
-            }
             return;
           } else {
-            // Logged-in users with stale cache: Use cache to show content quickly,
-            // but also fetch fresh data
-            console.log('� Logged in user - using stale cache while fetching fresh data');
+            // Logged-in users with stale cache: Use cache to show content quickly
+            // PREVIEW MODE: Ignore cached progress completely - just show content fast
+            console.log('👤 Logged in user - using stale cache for instant load (Preview Mode)');
             setCourse(cachedData.course);
-            if (cachedData.progress) {
-              setCourseProgress(cachedData.progress);
-              if (cachedData.progress?.progress) {
-                setServerProgress(cachedData.progress.progress);
-              }
-              const updatedCourse = updateCourseWithProgress(cachedData.course, cachedData.progress);
-              setCourse(updatedCourse);
-            }
+            // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
-            // Continue to fetch fresh data below
+            return; // Don't fetch fresh data - use cache as-is for speed
           }
         } else if (cachedData) {
           // Cache exists but has invalid structure - clear it
@@ -316,7 +321,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         
         console.log('✅ Course transformation complete. Chapters:', transformedCourse.chapters.length);
+        
+        // **OPTIMIZATION: Set course and stop loading IMMEDIATELY**
+        // Don't wait for progress or first lesson details - show content fast!
         setCourse(transformedCourse);
+        setExpandedChapters({ 0: true });
+        setLoading(false); // <-- CRITICAL: Stop loading spinner now!
 
         // If we loaded a school course by filters and we have its exact ID but the URL
         // lacks ?courseId, normalize the URL to an ID-locked variant to keep future
@@ -329,71 +339,9 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           }
         }
         
-        // Expand the first chapter by default
-        if (transformedCourse.chapters.length > 0) {
-          setExpandedChapters({ 0: true });
-          
-          // Lazy load the first lesson immediately
-          if (transformedCourse.chapters[0].lessons.length > 0) {
-            const firstLesson = transformedCourse.chapters[0].lessons[0];
-            if (firstLesson.id) {
-               // We can't call fetchLessonDetails here easily because it depends on 'course' state which isn't set yet
-               // But we can fetch it and merge it into transformedCourse before setting state
-               try {
-                 const lessonRes = await axiosInstance.get(`/lessons/${firstLesson.id}/`);
-                 const details = lessonRes.data;
-                 transformedCourse.chapters[0].lessons[0] = {
-                   ...firstLesson,
-                   ...details,
-                   videoUrl: details.video_url,
-                   aboutLesson: details.about_lesson,
-                   quizQuestions: details.quiz_questions,
-                   resources: details.resources || { downloadable: [], internet: [] }
-                 };
-               } catch (err) {
-                 console.warn('Failed to pre-fetch first lesson details', err);
-               }
-            }
-          }
-        }
-        
-        // **OPTIMIZATION 3: Fetch progress once auth is definitely valid (fixes first-load 401)**
-        // We explicitly validate auth so the very first request after login has fresh tokens.
-        const canFetchProgress = transformedCourse.id && (await (async () => {
-          if (!isLoggedIn) return false;
-          try { await validateAuth(); return true; } catch { return false; }
-        })());
-
-        if (canFetchProgress) {
-          try {
-            const progressResponse = await axiosInstance.get(`/courses/progress/${transformedCourse.id}/`);
-            setCourseProgress(progressResponse.data);
-            if (progressResponse?.data?.progress) {
-              setServerProgress(progressResponse.data.progress);
-            }
-            
-            // Update course with progress and cache
-            const updatedCourse = updateCourseWithProgress(transformedCourse, progressResponse.data);
-            setCourse(updatedCourse);
-            
-            // **OPTIMIZATION 4: Cache the complete data**
-            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
-            courseCache.set(cacheKey, {
-              course: updatedCourse,
-              progress: progressResponse.data
-            });
-            console.log('💾 Course data cached for faster future loads');
-          } catch (progressError) {
-            console.error('⚠️ Error fetching progress (non-critical):', progressError);
-            // Still cache course without progress
-            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
-            courseCache.set(cacheKey, { course: transformedCourse });
-          }
-        } else {
-          // Cache course without progress for non-logged-in users
-          const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
-          courseCache.set(cacheKey, { course: transformedCourse });
-        }
+        // Cache course without progress for non-logged-in users
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+        courseCache.set(cacheKey, { course: transformedCourse });
         
       } catch (error) {
         console.error('❌ Error fetching course data:', error);
@@ -438,86 +386,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     fetchData();
   }, [courseId, pathname, location.search]);
 
-  // Add a useEffect to fetch user progress when course data is loaded
-  useEffect(() => {
-    // Only fetch progress if the user is logged in and we have a course
-    const fetchUserProgress = async () => {
-      if (!course || !course.id) return;
-      // Ensure we really are authenticated before calling protected endpoints
-      if (!isLoggedIn) return;
-      try { await validateAuth(); } catch { return; }
-      
-      try {        // Call the backend API to get the user's progress for this course
-        const response = await axiosInstance.get(`/courses/progress/${course.id}/`);
-        
-        setCourseProgress(response.data);
-        if (response?.data?.progress) {
-          setServerProgress(response.data.progress);
-        }
-        
-        // Update the course lessons with completion status from the API
-        const updatedCourse = {...course};
-        
-        // Check if it's a school course with chapters
-        if (response.data.chapters) {
-          response.data.chapters.forEach(chapter => {
-            const chapterIndex = updatedCourse.chapters.findIndex(c => c.title === chapter.name);
-            if (chapterIndex !== -1) {
-              chapter.lessons.forEach(lessonProgress => {
-                // Prefer matching by stable lesson id to avoid title mismatches
-                const lessonIndex = updatedCourse.chapters[chapterIndex].lessons.findIndex(l => 
-                  String(l.id) === String(lessonProgress.id)
-                );
-                if (lessonIndex !== -1) {
-                  updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = !!lessonProgress.completed;
-                }
-              });
-            }
-          });
-        } 
-        // Check if it's an engineering course with sections
-        else if (response.data.sections) {
-          response.data.sections.forEach(section => {
-            const sectionIndex = updatedCourse.chapters.findIndex(c => c.title === section.name);
-            if (sectionIndex !== -1) {
-              section.lessons.forEach(lessonProgress => {
-                const lessonIndex = updatedCourse.chapters[sectionIndex].lessons.findIndex(l => 
-                  String(l.id) === String(lessonProgress.id)
-                );
-                if (lessonIndex !== -1) {
-                  updatedCourse.chapters[sectionIndex].lessons[lessonIndex].completed = !!lessonProgress.completed;
-                }
-              });
-            }
-          });
-        }
-        
-        setCourse(updatedCourse);
-
-        // Also get engineering progress summary (percentage + certificate if any)
-        try {
-          const summary = await axiosInstance.get(`/courses/${course.id}/progress/`);
-          const pct = summary.data?.progress?.percentage ?? 0;
-          setProgressPercent(pct);
-          setCertificate(summary.data?.certificate || null);
-          if (summary?.data?.progress) {
-            setServerProgress(summary.data.progress);
-          }
-        } catch (e) {
-          // ignore if not engineering course or not logged in
-        }
-        
-      } catch (error) {
-        console.error('Error fetching user progress:', error);
-        // Don't show error toast if 401 Unauthorized (user not logged in)
-        if (error.response?.status !== 401) {
-          universalToast.error('Failed to load your course progress');
-        }
-      }
-    };
-    
-    fetchUserProgress();
-  }, [course?.id, isLoggedIn]);
+  // Progress fetching is now handled by fetchProgressInBackground called from the cache logic
+  // This eliminates duplicate API calls. The fetchProgressInBackground function:
+  // 1. Validates auth once
+  // 2. Fetches progress once
+  // 3. Updates course state with completion status
+  // 4. Updates cache
 
   const handleIssueCertificate = async () => {
     if (!course?.id) return;
@@ -758,6 +632,14 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   // Fetch full details for a specific lesson (lazy loading)
   const fetchLessonDetails = useCallback(async (lessonId, chapterIndex, lessonIndex) => {
     if (!lessonId) return;
+    
+    // Prevent duplicate fetches for the same lesson
+    const lessonKey = `${lessonId}`;
+    if (fetchedLessonsRef.current.has(lessonKey)) {
+      console.log('⏭️ Skipping duplicate fetch for lesson:', lessonId);
+      return;
+    }
+    fetchedLessonsRef.current.add(lessonKey);
     
     try {
       const response = await axiosInstance.get(`/lessons/${lessonId}/`);
