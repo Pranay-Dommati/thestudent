@@ -19,6 +19,8 @@ import universalToast from '../../utils/universalToast';
 import { useAuth } from '../../context/AuthContext';
 import preprocessLatex from '../../utils/latexPreprocessor';
 
+const buildCourseKey = (id, path) => (id ? `course:${id}` : `path:${path || ''}`);
+
 // Update the function signature to accept the new props
 const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [course, setCourse] = useState(null);
@@ -47,6 +49,9 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const fetchedLessonsRef = useRef(new Set());
   // Track if progress has been fetched for this course to avoid duplicate calls
   const progressFetchedRef = useRef(null);
+  // Track the currently loaded course ID to prevent re-fetching on URL changes
+  const loadedCourseIdRef = useRef(null);
+  const loadedCourseKeyRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn, validateAuth } = useAuth();
@@ -120,6 +125,35 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   };
 
   useEffect(() => {
+    const localSearchParams = new URLSearchParams(location.search || '');
+    const queryCourseId = localSearchParams.get('courseId');
+    const resolvedCourseId = courseId || queryCourseId || loadedCourseIdRef.current;
+    const currentCourseKey = buildCourseKey(resolvedCourseId, pathname);
+
+    console.log('[FETCH-EFFECT]', {
+      currentCourseKey,
+      loadedKey: loadedCourseKeyRef.current,
+      courseIdProp: courseId,
+      queryCourseId,
+      resolvedCourseId
+    });
+
+    // Skip if we already have course data loaded for this key
+    // IMPORTANT: Don't check `course` state here - it's stale in this closure!
+    // Trust the ref which is updated synchronously when course is set.
+    if (loadedCourseKeyRef.current === currentCourseKey) {
+      console.log('⏭️ Skipping fetch - course already loaded for key:', currentCourseKey);
+      return;
+    }
+    
+    // Also skip if the course ID matches what we already loaded (handles URL param additions)
+    if (loadedCourseIdRef.current && loadedCourseIdRef.current === resolvedCourseId) {
+      console.log('⏭️ Skipping fetch - course ID already loaded:', resolvedCourseId);
+      // Update the key ref to prevent future checks
+      loadedCourseKeyRef.current = currentCourseKey;
+      return;
+    }
+    
     // Reset tracking refs when courseId changes
     fetchedLessonsRef.current = new Set();
     progressFetchedRef.current = null;
@@ -146,6 +180,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             // Guest users: Use cache and stop (no progress to fetch)
             console.log('👻 Guest user - using cached course data');
             setCourse(cachedData.course);
+            loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
+            loadedCourseKeyRef.current = buildCourseKey(cachedData.course.id, pathname);
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
             return;
@@ -154,6 +190,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             // PREVIEW MODE: Ignore cached progress completely - just show content fast
             console.log('👤 Logged in user - using fresh cache for instant load (Preview Mode)');
             setCourse(cachedData.course);
+            loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
+            loadedCourseKeyRef.current = buildCourseKey(cachedData.course.id, pathname);
             // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
@@ -163,6 +201,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             // PREVIEW MODE: Ignore cached progress completely - just show content fast
             console.log('👤 Logged in user - using stale cache for instant load (Preview Mode)');
             setCourse(cachedData.course);
+            loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
+            loadedCourseKeyRef.current = buildCourseKey(cachedData.course.id, pathname);
             // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
@@ -325,6 +365,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         // **OPTIMIZATION: Set course and stop loading IMMEDIATELY**
         // Don't wait for progress or first lesson details - show content fast!
         setCourse(transformedCourse);
+        loadedCourseIdRef.current = transformedCourse.id; // Mark as loaded
+        loadedCourseKeyRef.current = buildCourseKey(transformedCourse.id, pathname);
+        console.log('[STRUCTURE-ONLY->SET]', {
+          firstLessonId: transformedCourse.chapters?.[0]?.lessons?.[0]?.id,
+          firstAbout: transformedCourse.chapters?.[0]?.lessons?.[0]?.aboutLesson
+        });
         setExpandedChapters({ 0: true });
         setLoading(false); // <-- CRITICAL: Stop loading spinner now!
 
@@ -335,6 +381,11 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           const params = new URLSearchParams(location.search || '');
           if (!params.get('courseId')) {
             params.set('courseId', transformedCourse.id);
+            console.log('[NAVIGATE-NORMALIZE]', {
+              addingCourseId: transformedCourse.id,
+              pathname,
+              prevSearch: location.search
+            });
             navigate({ pathname, search: `?${params.toString()}` }, { replace: true });
           }
         }
@@ -640,6 +691,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       return;
     }
     fetchedLessonsRef.current.add(lessonKey);
+    console.log('[DETAILS-FETCH]', { lessonId, chapterIndex, lessonIndex });
     
     try {
       const response = await axiosInstance.get(`/lessons/${lessonId}/`);
@@ -649,11 +701,11 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       setCourse(prevCourse => {
         const newCourse = { ...prevCourse };
         const chapter = newCourse.chapters[chapterIndex];
-        const lesson = chapter.lessons[lessonIndex];
+        const lessonBefore = chapter.lessons[lessonIndex];
         
         // Merge existing lesson data with new details
         newCourse.chapters[chapterIndex].lessons[lessonIndex] = {
-          ...lesson,
+          ...lessonBefore,
           ...lessonDetails,
           // Ensure we map backend fields to frontend expected fields
           videoUrl: lessonDetails.video_url,
@@ -662,6 +714,14 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           // Ensure resources are properly formatted
           resources: lessonDetails.resources || { downloadable: [], internet: [] }
         };
+        const after = newCourse.chapters[chapterIndex].lessons[lessonIndex].aboutLesson;
+        console.log('[DETAILS-SET]', {
+          lessonId,
+          hadBefore: lessonBefore?.aboutLesson !== undefined,
+          beforeSample: typeof lessonBefore?.aboutLesson === 'string' ? lessonBefore.aboutLesson.slice(0, 80) : lessonBefore?.aboutLesson,
+          afterHas: after !== undefined,
+          afterSample: typeof after === 'string' ? after.slice(0, 80) : after
+        });
         
         return newCourse;
       });
@@ -752,6 +812,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const hasVideo = Boolean(currentLesson.videoUrl && String(currentLesson.videoUrl).trim());
     const about = currentLesson.aboutLesson && String(currentLesson.aboutLesson).trim();
     const hasAbout = Boolean(about);
+    console.log('[CONTENT-TYPE-META]', { hasVideo, hasAbout, type: currentLesson.type });
     const qlen = (currentLesson.quiz_questions || currentLesson.quizQuestions || []).length;
     const hasQuiz = qlen > 0;
     const res = currentLesson.resources || { downloadable: [], internet: [] };
@@ -783,6 +844,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   }, [sidebarVisible, onSidebarToggle]);
 
   // Effect to lazy load lesson details when active lesson changes
+  // NOTE: We intentionally exclude `course` from dependencies to prevent re-triggers
+  // when course state updates. Instead, we check course existence inside the effect.
   useEffect(() => {
     if (!course || !course.chapters) return;
     
@@ -792,12 +855,53 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const lesson = chapter.lessons[activeLesson];
     if (!lesson) return;
     
+    // Check if already fetched to prevent triggering duplicate fetches
+    const lessonKey = `${lesson.id}`;
+    if (fetchedLessonsRef.current.has(lessonKey)) {
+      console.log('⏭️ Skipping auto-fetch - already fetched:', lesson.id);
+      return;
+    }
+    console.log('[AUTO-FETCH-CHECK]', {
+      activeChapter,
+      activeLesson,
+      lessonId: lesson.id,
+      aboutUndefined: lesson.aboutLesson === undefined,
+      dedupHas: fetchedLessonsRef.current.has(lessonKey)
+    });
+    
     // Check if we need to fetch details (aboutLesson is undefined in light serializer)
     if (lesson.aboutLesson === undefined && lesson.id) {
       console.log('🔄 Auto-fetching details for active lesson:', lesson.id);
       fetchLessonDetails(lesson.id, activeChapter, activeLesson);
     }
-  }, [activeChapter, activeLesson, course, fetchLessonDetails]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChapter, activeLesson]);
+
+  // Effect to fetch first lesson details when course initially loads
+  // This handles the case where activeChapter and activeLesson are already 0 when course arrives
+  useEffect(() => {
+    // Only run when course first becomes available and loading is complete
+    if (loading || !course || !course.chapters) return;
+    
+    const chapter = course.chapters[activeChapter];
+    if (!chapter || !chapter.lessons) return;
+    
+    const lesson = chapter.lessons[activeLesson];
+    if (!lesson) return;
+    
+    // Check if already fetched
+    const lessonKey = `${lesson.id}`;
+    if (fetchedLessonsRef.current.has(lessonKey)) {
+      return;
+    }
+    
+    // Fetch first lesson details if needed
+    if (lesson.aboutLesson === undefined && lesson.id) {
+      console.log('🚀 Initial load - fetching first lesson details:', lesson.id);
+      fetchLessonDetails(lesson.id, activeChapter, activeLesson);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, course?.id]); // Triggers when loading completes AND course is available
 
   // Loading and error states
   if (loading) {
