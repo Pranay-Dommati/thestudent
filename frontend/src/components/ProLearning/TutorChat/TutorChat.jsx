@@ -136,6 +136,8 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
   // Intentionally no-op here to prevent double scrolling.
   useEffect(() => {}, [open]);
 
+  const [copySuccess, setCopySuccess] = React.useState({});
+  
   const CodeBlock = ({ inline, className, children, ...props }) => {
     const isInline = !!inline;
     const text = String(children || '').replace(/\n$/, '');
@@ -144,26 +146,53 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
     }
 
     const match = /language-(\w+)/.exec(className || '');
-    const lang = match ? match[1] : undefined;
+    const lang = match ? match[1] : 'code';
+    const blockId = text.slice(0, 50);
 
     const onCopy = async () => {
       try {
         await navigator.clipboard.writeText(text);
+        setCopySuccess(prev => ({ ...prev, [blockId]: true }));
+        setTimeout(() => {
+          setCopySuccess(prev => ({ ...prev, [blockId]: false }));
+        }, 2000);
       } catch (_) {}
     };
 
     return (
-      <div className="relative group my-3">
+      <div className="relative my-3">
+        {/* Header bar with language and copy button - always visible */}
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border border-gray-200 border-b-0 rounded-t-xl">
+          <span className="text-xs text-gray-600 font-medium">{lang}</span>
+          <button
+            onClick={onCopy}
+            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+            aria-label="Copy code"
+          >
+            {copySuccess[blockId] ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span className="text-green-600">Copied!</span>
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy code
+              </>
+            )}
+          </button>
+        </div>
         <SyntaxHighlighter
-          language={lang}
+          language={lang === 'code' ? undefined : lang}
           style={vs}
           customStyle={{
             margin: 0,
-            borderRadius: '0.75rem',
+            borderRadius: '0 0 0.75rem 0.75rem',
             fontSize: '0.875rem',
             padding: '1rem',
-            backgroundColor: '#F9FAFB', // bg-gray-50
-            border: '1px solid #E5E7EB', // border-gray-200
+            backgroundColor: '#F9FAFB',
+            border: '1px solid #E5E7EB',
+            borderTop: 'none',
             overflowX: 'auto',
             overscrollBehaviorX: 'contain',
           }}
@@ -172,14 +201,6 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
         >
           {text}
         </SyntaxHighlighter>
-        <button
-          onClick={onCopy}
-          className="absolute top-2 right-2 hidden group-hover:inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm transition-colors"
-          aria-label="Copy code"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-          Copy code
-        </button>
       </div>
     );
   };
