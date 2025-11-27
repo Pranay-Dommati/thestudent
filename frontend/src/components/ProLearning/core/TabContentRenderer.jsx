@@ -394,10 +394,10 @@ const TabContentRenderer = ({
                     const blockId = codeString;
                     return (
                       <div className="relative my-6 w-full max-w-full">
-                        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl w-full">
-                          <span className="text-xs text-gray-500 font-mono">{lang || "code"}</span>
+                        <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border border-gray-200 border-b-0 rounded-t-xl w-full">
+                          <span className="text-xs text-gray-600 font-medium">{lang || "code"}</span>
                           <button
-                            className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-100 bg-white ml-2 flex items-center gap-1 cursor-pointer"
+                            className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white ml-2 flex items-center gap-1 cursor-pointer hover:bg-gray-50 transition-colors"
                             onClick={() => handleCopyCode(codeString, blockId)}
                             type="button"
                           >
@@ -406,17 +406,20 @@ const TabContentRenderer = ({
                                 <FaCheck className="inline-block text-green-600" /> Copied!
                               </>
                             ) : (
-                              <>Copy</>
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                Copy code
+                              </>
                             )}
                           </button>
                         </div>
                         <SyntaxHighlighter
                           style={{
                             'code[class*="language-"]': {
-                              color: '#f8f8f2',
+                              color: '#24292e',
                               background: 'none',
                               fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
-                              fontSize: '1rem',
+                              fontSize: '0.875rem',
                               lineHeight: '1.5',
                               whiteSpace: 'pre',
                               wordSpacing: 'normal',
@@ -426,57 +429,59 @@ const TabContentRenderer = ({
                               hyphens: 'none'
                             },
                             'pre[class*="language-"]': {
-                              color: '#f8f8f2',
-                              background: '#23272f',
+                              color: '#24292e',
+                              background: '#f8f9fa',
                               overflow: 'auto'
                             },
-                            comment: { color: '#6272a4', fontStyle: 'italic' },
-                            prolog: { color: '#6272a4' },
-                            doctype: { color: '#6272a4' },
-                            cdata: { color: '#6272a4' },
-                            punctuation: { color: '#f8f8f2' },
-                            property: { color: '#50fa7b' },
-                            tag: { color: '#ff79c6' },
-                            constant: { color: '#bd93f9' },
-                            symbol: { color: '#bd93f9' },
-                            deleted: { color: '#ff5555' },
-                            boolean: { color: '#bd93f9' },
-                            number: { color: '#bd93f9' },
-                            selector: { color: '#50fa7b' },
-                            'attr-name': { color: '#50fa7b' },
-                            string: { color: '#f1fa8c' },
-                            char: { color: '#f1fa8c' },
-                            builtin: { color: '#8be9fd' },
-                            inserted: { color: '#50fa7b' },
-                            operator: { color: '#ff79c6' },
-                            entity: { color: '#f8f8f2', cursor: 'help' },
-                            url: { color: '#f8f8f2' },
-                            variable: { color: '#f8f8f2' },
-                            atrule: { color: '#8be9fd' },
-                            'attr-value': { color: '#f1fa8c' },
-                            function: { color: '#50fa7b' },
-                            'class-name': { color: '#8be9fd' },
-                            keyword: { color: '#ff79c6' },
-                            regex: { color: '#f1fa8c' },
-                            important: { color: '#ff5555', fontWeight: 'bold' }
+                            comment: { color: '#6a737d', fontStyle: 'italic' },
+                            prolog: { color: '#6a737d' },
+                            doctype: { color: '#6a737d' },
+                            cdata: { color: '#6a737d' },
+                            punctuation: { color: '#24292e' },
+                            property: { color: '#22863a' },
+                            tag: { color: '#22863a' },
+                            constant: { color: '#005cc5' },
+                            symbol: { color: '#e36209' },
+                            deleted: { color: '#b31d28' },
+                            boolean: { color: '#005cc5' },
+                            number: { color: '#005cc5' },
+                            selector: { color: '#22863a' },
+                            'attr-name': { color: '#6f42c1' },
+                            string: { color: '#032f62' },
+                            char: { color: '#032f62' },
+                            builtin: { color: '#005cc5' },
+                            inserted: { color: '#22863a' },
+                            operator: { color: '#d73a49' },
+                            entity: { color: '#24292e', cursor: 'help' },
+                            url: { color: '#24292e' },
+                            variable: { color: '#e36209' },
+                            atrule: { color: '#d73a49' },
+                            'attr-value': { color: '#032f62' },
+                            function: { color: '#6f42c1' },
+                            'class-name': { color: '#6f42c1' },
+                            keyword: { color: '#d73a49' },
+                            regex: { color: '#032f62' },
+                            important: { color: '#d73a49', fontWeight: 'bold' }
                           }}
                           language={lang}
                           customStyle={{
                             borderRadius: "0 0 0.75rem 0.75rem",
-                            fontSize: "1rem",
+                            fontSize: "0.875rem",
                             margin: 0,
                             padding: "1rem",
-                            background: "#23272f",
-                            border: "1px solid #222c37",
-                            color: "#f8f8f2",
-                            lineHeight: "1.4",
+                            background: "#f8f9fa",
+                            border: "1px solid #e5e7eb",
+                            borderTop: "none",
+                            color: "#24292e",
+                            lineHeight: "1.5",
                             display: 'block',
-                            width: '100%'
+                            width: '100%',
+                            overflowX: 'auto'
                           }}
                           codeTagProps={{
                             style: { 
                               fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
-                              color: '#f8f8f2'
+                              color: '#24292e'
                             },
                             className: 'custom-syntax-highlight'
                           }}
@@ -681,11 +686,106 @@ const TabContentRenderer = ({
                     );
                   }
                   
-                  // default: keep summary code blocks minimal
+                  // Nice styled code block with header and copy button (matching Sia chat style)
+                  const blockId = `summary-${codeString.slice(0, 50)}`;
                   return (
-                    <pre className="my-4 p-4 rounded-lg bg-gray-900 text-gray-100 overflow-auto text-sm leading-6 whitespace-pre font-mono">
-                      <code>{codeString}</code>
-                    </pre>
+                    <div className="relative my-6 w-full max-w-full">
+                      <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border border-gray-200 border-b-0 rounded-t-xl w-full">
+                        <span className="text-xs text-gray-600 font-medium">{lang || "code"}</span>
+                        <button
+                          className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white ml-2 flex items-center gap-1 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={() => handleCopyCode(codeString, blockId)}
+                          type="button"
+                        >
+                          {copySuccessMap[blockId] ? (
+                            <>
+                              <FaCheck className="inline-block text-green-600" /> Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                              Copy code
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <SyntaxHighlighter
+                        language={lang || 'text'}
+                        style={{
+                          'code[class*="language-"]': {
+                            color: '#24292e',
+                            background: 'none',
+                            fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                            fontSize: '0.875rem',
+                            lineHeight: '1.5',
+                            whiteSpace: 'pre',
+                            wordSpacing: 'normal',
+                            wordBreak: 'normal',
+                            wordWrap: 'normal',
+                            tabSize: 4,
+                            hyphens: 'none'
+                          },
+                          'pre[class*="language-"]': {
+                            color: '#24292e',
+                            background: '#f8f9fa',
+                            overflow: 'auto'
+                          },
+                          comment: { color: '#6a737d', fontStyle: 'italic' },
+                          prolog: { color: '#6a737d' },
+                          doctype: { color: '#6a737d' },
+                          cdata: { color: '#6a737d' },
+                          punctuation: { color: '#24292e' },
+                          property: { color: '#22863a' },
+                          tag: { color: '#22863a' },
+                          constant: { color: '#005cc5' },
+                          symbol: { color: '#e36209' },
+                          deleted: { color: '#b31d28' },
+                          boolean: { color: '#005cc5' },
+                          number: { color: '#005cc5' },
+                          selector: { color: '#22863a' },
+                          'attr-name': { color: '#6f42c1' },
+                          string: { color: '#032f62' },
+                          char: { color: '#032f62' },
+                          builtin: { color: '#005cc5' },
+                          inserted: { color: '#22863a' },
+                          operator: { color: '#d73a49' },
+                          entity: { color: '#24292e', cursor: 'help' },
+                          url: { color: '#24292e' },
+                          variable: { color: '#e36209' },
+                          atrule: { color: '#d73a49' },
+                          'attr-value': { color: '#032f62' },
+                          function: { color: '#6f42c1' },
+                          'class-name': { color: '#6f42c1' },
+                          keyword: { color: '#d73a49' },
+                          regex: { color: '#032f62' },
+                          important: { color: '#d73a49', fontWeight: 'bold' }
+                        }}
+                        customStyle={{
+                          borderRadius: "0 0 0.75rem 0.75rem",
+                          fontSize: "0.875rem",
+                          margin: 0,
+                          padding: "1rem",
+                          background: "#f8f9fa",
+                          border: "1px solid #e5e7eb",
+                          borderTop: "none",
+                          color: "#24292e",
+                          lineHeight: "1.5",
+                          display: 'block',
+                          width: '100%',
+                          overflowX: 'auto'
+                        }}
+                        codeTagProps={{
+                          style: { 
+                            fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                            color: '#24292e'
+                          },
+                          className: 'custom-syntax-highlight'
+                        }}
+                        showLineNumbers={false}
+                      >
+                        {codeString}
+                      </SyntaxHighlighter>
+                    </div>
                   );
                 }
               }}
