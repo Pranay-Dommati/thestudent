@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 // logger removed for production cleanliness
 import { Link } from 'react-router-dom';
@@ -18,16 +18,29 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
   const [removingCourseId, setRemovingCourseId] = useState(null);
   const [confirmState, setConfirmState] = useState({ visible: false, enrollmentId: null, courseTitle: '' });
   const { isLoggedIn } = useAuth();
+  
+  // Refs to prevent duplicate API calls
+  const lastFetchTimeRef = useRef(0);
+  const isFetchingRef = useRef(false);
+  const FETCH_COOLDOWN = 2000; // 2 seconds cooldown
 
-  useEffect(() => {
-    const fetchEnrolledCourses = async () => {
-      if (!isLoggedIn) {
-        setLoading(false);
-        return;
-      }
+  const fetchEnrolledCourses = useCallback(async (force = false) => {
+    if (!isLoggedIn) {
+      setLoading(false);
+      return;
+    }
+    
+    const now = Date.now();
+    // Prevent duplicate calls within cooldown period
+    if (!force && (isFetchingRef.current || (now - lastFetchTimeRef.current < FETCH_COOLDOWN))) {
+      return;
+    }
+    
+    isFetchingRef.current = true;
+    lastFetchTimeRef.current = now;
 
-      try {
-        const response = await axios.get(`/courses/enrolled/`);
+    try {
+      const response = await axios.get(`/courses/enrolled/`);
 
   
 
@@ -98,33 +111,30 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
         }
       } finally {
         setLoading(false);
+        isFetchingRef.current = false;
       }
-    };
+  }, [isLoggedIn]);
 
-    fetchEnrolledCourses();
+  useEffect(() => {
+    fetchEnrolledCourses(true); // Force on initial mount
 
-    // Refresh helpers so progress updates reflect without full reload
-    const onFocus = () => fetchEnrolledCourses();
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') fetchEnrolledCourses();
-    };
+  }, [fetchEnrolledCourses]);
+
+  // Listen only for explicit learning activity events (not focus/visibility - parent handles that)
+  useEffect(() => {
     // When learning activity (time-on-task) is sent, progress may have changed server-side
     const onLearningActivity = () => fetchEnrolledCourses();
     // Generic progress event if emitted elsewhere in app
     const onProgressEvent = () => fetchEnrolledCourses();
 
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('learning:activity-updated', onLearningActivity);
     window.addEventListener('learning:progress-updated', onProgressEvent);
 
     return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('learning:activity-updated', onLearningActivity);
       window.removeEventListener('learning:progress-updated', onProgressEvent);
     };
-  }, [isLoggedIn]);
+  }, [fetchEnrolledCourses]);
 
   const handleSortChange = () => {
     

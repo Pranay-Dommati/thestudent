@@ -1,4 +1,4 @@
- import { createContext, useContext, useState, useEffect } from 'react';
+ import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import customToast from '../utils/customToast';
 import axiosInstance from '../utils/axios';
@@ -15,6 +15,10 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [lastChecked, setLastChecked] = useState(0);
+  
+  // Ref to prevent duplicate auth validation calls
+  const isValidatingRef = useRef(false);
+  const lastValidationTimeRef = useRef(0);
 
   // Function to refresh the access token
   const refreshAccessToken = async () => {
@@ -54,10 +58,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Function to validate current auth state
-  const validateAuth = async () => {
+  const validateAuth = useCallback(async () => {
+    const now = Date.now();
+    
+    // Prevent duplicate calls - if already validating or validated within last 2 seconds
+    if (isValidatingRef.current || (now - lastValidationTimeRef.current < 2000)) {
+      if (IS_DEV) console.log('Skipping duplicate auth validation');
+      return isLoggedIn;
+    }
+    
   const token = storage.getItem('accessToken');
   const refreshToken = storage.getItem('refreshToken');
-    const now = Date.now();
     
     // Only check if we haven't checked in the last minute and we're already logged in
     if (now - lastChecked < 60000 && isLoggedIn) {
@@ -68,6 +79,10 @@ export const AuthProvider = ({ children }) => {
       handleAuthFailure();
       return false;
     }
+
+    // Mark as validating
+    isValidatingRef.current = true;
+    lastValidationTimeRef.current = now;
 
     try {
       // First try with current access token using bare axios (avoid interceptor auto-refresh)
@@ -109,8 +124,11 @@ export const AuthProvider = ({ children }) => {
       setIsLoggedIn(true);
       setLastChecked(now);
       return true;
+    } finally {
+      // Always reset the validating flag
+      isValidatingRef.current = false;
     }
-  };
+  }, [isLoggedIn, lastChecked]);
 
   const handleAuthFailure = () => {
   storage.clearAuthTokens();
@@ -148,7 +166,7 @@ export const AuthProvider = ({ children }) => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', validateAuth);
     };
-  }, []);
+  }, [validateAuth]);
 
   const register = async (registrationData) => {
     try {

@@ -2608,17 +2608,22 @@ const ChatbotPage = () => {
             <span className="text-sm font-medium">Back</span>
           </Link>
         </div>
-        {/* Minimal mobile header (hidden at md+) */}
+        {/* Minimal mobile header (hidden at md+) - with safe area padding for notched devices */}
         {!isSidebarOpen && (
-          <div className="md:hidden flex items-center justify-between px-4 py-4 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
+          <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white/95 backdrop-blur-sm" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-600 hover:text-gray-800 transition-colors"
             >
               <IoMenu size={20} />
             </button>
-            <h1 className="text-base font-semibold text-gray-900">Course Creator</h1>
-            <div className="w-10"></div>
+            <div className="flex flex-col items-center">
+              <span className="text-base font-semibold text-gray-900">EasyLearnova</span>
+              <span className="text-xs text-gray-500">Course Creator</span>
+            </div>
+            <Link to="/" className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-600 hover:text-gray-800 transition-colors">
+              <IoChevronBack size={20} />
+            </Link>
           </div>
         )}
 

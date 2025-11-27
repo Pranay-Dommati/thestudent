@@ -1634,7 +1634,7 @@ const MobileChatbotPage = () => {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       {/* Mobile Header with Navigation - Always visible on mobile and tablet */}
-      <div className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+      <div className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center justify-between px-3 md:px-4 py-2 md:py-3">
           {/* Left: Menu button */}
           <button

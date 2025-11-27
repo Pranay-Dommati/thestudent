@@ -26,6 +26,8 @@ const AILearningPlans = () => {
   const CACHE_KEY = 'ai_pro_courses_cache_v1';
   const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
   const isFetchingRef = useRef(null); // holds in-flight promise
+  const lastFetchTimeRef = useRef(0);
+  const FETCH_COOLDOWN = 2000; // 2 seconds cooldown between fetches
 
   const readCache = () => {
     try {
@@ -53,38 +55,39 @@ const AILearningPlans = () => {
     refreshCourses();
   }, [refreshCourses]);
 
-  // Lightweight realtime refresh: listen to custom events and storage changes (no polling)
+  // Listen only for explicit events (not focus/visibility - parent LearningHubPage handles that)
   useEffect(() => {
-    // Force refresh when these events indicate backend changes or page becomes active
+    // Force refresh when these events indicate backend changes
     const onSaved = () => refreshCourses(true);
     const onStorage = (e) => {
       if (e && typeof e.key === 'string' && (e.key.startsWith('proLearning_') || e.key === 'coursesSavedToHub')) {
         refreshCourses(true);
       }
     };
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') refreshCourses(true);
-    };
-    const onFocus = () => refreshCourses(true);
-  const onLearningActivity = () => refreshCourses(true); // progress may change after activity updates
-  const onLearningProgress = () => refreshCourses(true); // explicit lesson/topic progress event
+    const onLearningActivity = () => refreshCourses(true); // progress may change after activity updates
+    const onLearningProgress = () => refreshCourses(true); // explicit lesson/topic progress event
+    
     window.addEventListener('prolearning:course-saved', onSaved);
     window.addEventListener('storage', onStorage);
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('focus', onFocus);
-  window.addEventListener('learning:activity-updated', onLearningActivity);
-  window.addEventListener('learning:progress-updated', onLearningProgress);
+    window.addEventListener('learning:activity-updated', onLearningActivity);
+    window.addEventListener('learning:progress-updated', onLearningProgress);
+    
     return () => {
       window.removeEventListener('prolearning:course-saved', onSaved);
       window.removeEventListener('storage', onStorage);
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('focus', onFocus);
       window.removeEventListener('learning:activity-updated', onLearningActivity);
       window.removeEventListener('learning:progress-updated', onLearningProgress);
     };
   }, [refreshCourses]);
 
   const fetchProCourses = async (force = false) => {
+    const now = Date.now();
+    
+    // Prevent duplicate calls within cooldown period (unless forced)
+    if (!force && (now - lastFetchTimeRef.current < FETCH_COOLDOWN)) {
+      return;
+    }
+    
     // Always attempt to show cached data instantly (stale-while-revalidate)
     let hadCache = false;
     try {
@@ -94,11 +97,13 @@ const AILearningPlans = () => {
         setLoading(false);
         hadCache = true;
         // If cache is fresh and not forced, skip network
-        if (!force && (Date.now() - cached.ts) < CACHE_TTL) {
+        if (!force && (now - cached.ts) < CACHE_TTL) {
           return cached.data;
         }
       }
     } catch (_) {}
+    
+    lastFetchTimeRef.current = now;
 
     // Deduplicate in-flight requests
     if (isFetchingRef.current && !force) {
