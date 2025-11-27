@@ -18,6 +18,7 @@ const Sidebar = ({
   toggleLessonCompletion, // Add this prop for handling lesson completion toggle
   navigate, // For navigation
   isLoggedIn = false,
+  progressLoading = false, // NEW: Show loading state for checkboxes
   progressPercent = 0,
   certificate = null,
   issuingCert = false,
@@ -282,6 +283,13 @@ const Sidebar = ({
                         }`}
                       >
                         {/* Clickable completion indicator - larger touch target for mobile */}
+                        {progressLoading ? (
+                          /* Skeleton loading state for checkbox */
+                          <div 
+                            className="w-6 h-6 md:w-5 md:h-5 flex-shrink-0 rounded-full mr-3 mt-0.5 bg-gray-200 animate-pulse"
+                            aria-label="Loading completion status"
+                          />
+                        ) : (
                         <div 
                           className={`w-6 h-6 md:w-5 md:h-5 flex-shrink-0 rounded-full border-2 flex items-center justify-center mr-3 mt-0.5 cursor-pointer touch-manipulation
                             ${lesson.completed ? 'bg-green-100 border-green-500' : 'bg-white border-gray-300 hover:border-gray-400'}
@@ -310,6 +318,7 @@ const Sidebar = ({
                             </svg>
                           )}
                         </div>
+                        )}
                         
                         {/* Lesson title and duration - clicking this navigates to lesson */}
                         <div 

@@ -120,6 +120,65 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     }
   }, [pathname, location.search, isLoggedIn]);
 
+  // **HELPER FUNCTION: Update course with progress data**
+  const updateCourseWithProgress = (courseData, progressData) => {
+    const updatedCourse = { ...courseData };
+    
+    if (progressData.chapters) {
+      progressData.chapters.forEach(chapter => {
+        const chapterIndex = updatedCourse.chapters.findIndex(c => c.title === chapter.name);
+        if (chapterIndex !== -1) {
+          chapter.lessons.forEach(lessonProgress => {
+            const lessonIndex = updatedCourse.chapters[chapterIndex].lessons.findIndex(l => 
+              String(l.id) === String(lessonProgress.id)
+            );
+            if (lessonIndex !== -1) {
+              updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = !!lessonProgress.completed;
+            }
+          });
+        }
+      });
+    }
+    
+    return updatedCourse;
+  };
+
+  // **HELPER FUNCTION: Fetch progress in background for logged-in users**
+  const fetchProgressInBackground = async (courseIdToFetch, courseData, cacheKey) => {
+    // Prevent duplicate progress fetches for the same course
+    if (progressFetchedRef.current === courseIdToFetch) {
+      logger.log('⏭️ Skipping duplicate progress fetch for course:', courseIdToFetch);
+      return;
+    }
+    progressFetchedRef.current = courseIdToFetch;
+    setProgressLoading(true); // Show loading state for checkboxes
+    
+    try {
+      const progressResponse = await axiosInstance.get(`/courses/progress/${courseIdToFetch}/`);
+      
+      // Silently update progress without loading state
+      setCourseProgress(progressResponse.data);
+      
+      // Update course with fresh progress
+      const updatedCourse = updateCourseWithProgress(courseData, progressResponse.data);
+      setCourse(updatedCourse);
+      
+      // Update cache with fresh data
+      courseCache.set(cacheKey, {
+        course: updatedCourse,
+        progress: progressResponse.data
+      });
+      logger.log('🔄 Background progress sync completed');
+    } catch (error) {
+      logger.error('⚠️ Background progress sync failed (non-critical):', error);
+      // Reset the ref so it can be retried
+      progressFetchedRef.current = null;
+      // Don't show error to user - cache is good enough
+    } finally {
+      setProgressLoading(false); // Hide loading state for checkboxes
+    }
+  };
+
   // Effect to lazy load lesson details when navigating between lessons
   // NOTE: We intentionally exclude `course` from dependencies to prevent re-triggers
   // when course state updates. Instead, we check course existence inside the effect.
@@ -363,6 +422,12 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         loadedCourseIdRef.current = transformedCourse.id; // Mark as loaded
         loadedCourseKeyRef.current = buildCourseKey(transformedCourse.id, pathname);
         courseFetchInProgressRef.current = null; // Fetch complete
+        
+        // For logged-in users, show skeleton for checkboxes until progress loads
+        if (isLoggedIn) {
+          setProgressLoading(true);
+        }
+        
       if (transformedCourse.chapters.length > 0) {
         setExpandedChapters({ 0: true });
         setActiveChapter(0);
@@ -376,6 +441,14 @@ const MobileCourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
       courseCache.set(cacheKey, { course: transformedCourse });
       logger.log('💾 Mobile: Course data cached for faster future loads');
+      
+      // Fetch progress in background for logged-in users AFTER showing content
+      if (isLoggedIn && transformedCourse?.id) {
+        // Small delay to ensure UI has rendered first
+        setTimeout(() => {
+          fetchProgressInBackground(transformedCourse.id, transformedCourse, cacheKey);
+        }, 100);
+      }
     } catch (error) {
       logger.error('❌ Error fetching course data:', error);
       const errorMessage = error.response?.data?.detail || error.message || 'Failed to load course content';

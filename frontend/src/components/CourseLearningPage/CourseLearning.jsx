@@ -40,6 +40,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [internetResourcesOpen, setInternetResourcesOpen] = useState(false);
   const [downloadResourcesOpen, setDownloadResourcesOpen] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0);
+  const [progressLoading, setProgressLoading] = useState(false); // NEW: Track when progress is being fetched
   const [certificate, setCertificate] = useState(null);
   // When subject-only URL matches multiple courses (e.g., Mathematics 1A vs 1B), show chooser
   const [disambiguationOptions, setDisambiguationOptions] = useState(null); // array of brief course objects
@@ -89,6 +90,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       return;
     }
     progressFetchedRef.current = courseIdToFetch;
+    setProgressLoading(true); // Show loading state for checkboxes
     
     try {
       await validateAuth();
@@ -123,6 +125,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       // Reset the ref so it can be retried
       progressFetchedRef.current = null;
       // Don't show error to user - cache is good enough
+    } finally {
+      setProgressLoading(false); // Hide loading state for checkboxes
     }
   };
 
@@ -132,29 +136,15 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const resolvedCourseId = courseId || queryCourseId || loadedCourseIdRef.current;
     const currentCourseKey = buildCourseKey(resolvedCourseId, pathname);
 
-    console.log('[FETCH-EFFECT]', {
-      currentCourseKey,
-      loadedKey: loadedCourseKeyRef.current,
-      fetchInProgress: courseFetchInProgressRef.current,
-      courseIdProp: courseId,
-      queryCourseId,
-      resolvedCourseId,
-      pathname,
-      search: location.search,
-      keysMatch: loadedCourseKeyRef.current === currentCourseKey
-    });
-
     // Skip if we already have course data loaded for this key
     // IMPORTANT: Don't check `course` state here - it's stale in this closure!
     // Trust the ref which is updated synchronously when course is set.
     if (loadedCourseKeyRef.current === currentCourseKey) {
-      console.log('⏭️ Skipping fetch - course already loaded for key:', currentCourseKey);
       return;
     }
     
     // Also skip if the course ID matches what we already loaded (handles URL param additions)
     if (loadedCourseIdRef.current && loadedCourseIdRef.current === resolvedCourseId) {
-      console.log('⏭️ Skipping fetch - course ID already loaded:', resolvedCourseId);
       // Update the key ref to prevent future checks
       loadedCourseKeyRef.current = currentCourseKey;
       return;
@@ -163,7 +153,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     // CRITICAL: Skip if a fetch is already in progress for this course
     // This prevents React 18 Strict Mode double-mount from causing parallel fetches
     if (courseFetchInProgressRef.current === resolvedCourseId) {
-      console.log('⏭️ Skipping fetch - already fetching course:', resolvedCourseId);
       return;
     }
     
@@ -195,11 +184,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           if (!isLoggedIn) {
             // Guest users: Use cache and stop (no progress to fetch)
             const keyToSet = buildCourseKey(cachedData.course.id, pathname);
-            console.log('👻 Guest user - using cached course data', {
-              courseId: cachedData.course.id,
-              settingKey: keyToSet,
-              firstLessonAbout: cachedData.course.chapters?.[0]?.lessons?.[0]?.aboutLesson?.substring(0, 50)
-            });
             setCourse(cachedData.course);
             loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
             loadedCourseKeyRef.current = keyToSet;
@@ -211,35 +195,38 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             // Logged-in users with fresh cache: Use cache immediately for instant load
             // PREVIEW MODE: Ignore cached progress completely - just show content fast
             const keyToSet = buildCourseKey(cachedData.course.id, pathname);
-            console.log('👤 Logged in user - using fresh cache for instant load (Preview Mode)', {
-              courseId: cachedData.course.id,
-              settingKey: keyToSet,
-              firstLessonAbout: cachedData.course.chapters?.[0]?.lessons?.[0]?.aboutLesson?.substring(0, 50)
-            });
             setCourse(cachedData.course);
             loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
             loadedCourseKeyRef.current = keyToSet;
             courseFetchInProgressRef.current = null; // Fetch complete
+            // Show loading skeleton for checkboxes
+            setProgressLoading(true);
             // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
+            // Fetch progress in background
+            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + ':auth');
+            setTimeout(() => fetchProgressInBackground(cachedData.course.id, cachedData.course, cacheKey), 100);
             return;
           } else {
             // Logged-in users with stale cache: Use cache to show content quickly
             // PREVIEW MODE: Ignore cached progress completely - just show content fast
-            console.log('👤 Logged in user - using stale cache for instant load (Preview Mode)');
             setCourse(cachedData.course);
             loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
             loadedCourseKeyRef.current = buildCourseKey(cachedData.course.id, pathname);
             courseFetchInProgressRef.current = null; // Fetch complete
+            // Show loading skeleton for checkboxes
+            setProgressLoading(true);
             // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
+            // Fetch progress in background
+            const staleCacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + ':auth');
+            setTimeout(() => fetchProgressInBackground(cachedData.course.id, cachedData.course, staleCacheKey), 100);
             return; // Don't fetch fresh data - use cache as-is for speed
           }
         } else if (cachedData) {
           // Cache exists but has invalid structure - clear it
-          console.warn('⚠️ Cached data has invalid structure, clearing cache');
           courseCache.invalidate(cacheKey);
         }
         
@@ -396,18 +383,17 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         setCourse(transformedCourse);
         loadedCourseIdRef.current = transformedCourse.id; // Mark as loaded
         
+        // For logged-in users, show skeleton for checkboxes until progress loads
+        if (isLoggedIn) {
+          setProgressLoading(true);
+        }
+        
         // CRITICAL: Set the key ref BEFORE navigate() to prevent race condition
         // We need to use the FINAL URL (with courseId param if it will be added)
         const willNormalize = isSchoolCourse && transformedCourse?.id && !new URLSearchParams(location.search || '').get('courseId');
         loadedCourseKeyRef.current = buildCourseKey(transformedCourse.id, pathname);
         courseFetchInProgressRef.current = null; // Fetch complete - clear in-progress flag
         
-        console.log('[STRUCTURE-ONLY->SET]', {
-          firstLessonId: transformedCourse.chapters?.[0]?.lessons?.[0]?.id,
-          firstAbout: transformedCourse.chapters?.[0]?.lessons?.[0]?.aboutLesson,
-          willNormalize,
-          setLoadedKey: loadedCourseKeyRef.current
-        });
         setExpandedChapters({ 0: true });
         setLoading(false); // <-- CRITICAL: Stop loading spinner now!
 
@@ -417,18 +403,20 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         if (willNormalize) {
           const params = new URLSearchParams(location.search || '');
           params.set('courseId', transformedCourse.id);
-          console.log('[NAVIGATE-NORMALIZE]', {
-            addingCourseId: transformedCourse.id,
-            pathname,
-            prevSearch: location.search,
-            keyAlreadySet: loadedCourseKeyRef.current
-          });
           navigate({ pathname, search: `?${params.toString()}` }, { replace: true });
         }
         
         // Cache course without progress for non-logged-in users
         const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
         courseCache.set(cacheKey, { course: transformedCourse });
+        
+        // Fetch progress in background for logged-in users AFTER showing content
+        if (isLoggedIn && transformedCourse?.id) {
+          // Small delay to ensure UI has rendered first
+          setTimeout(() => {
+            fetchProgressInBackground(transformedCourse.id, transformedCourse, cacheKey);
+          }, 100);
+        }
         
       } catch (error) {
         console.error('❌ Error fetching course data:', error);
@@ -730,7 +718,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       return;
     }
     fetchedLessonsRef.current.add(lessonKey);
-    console.log('[DETAILS-FETCH]', { lessonId, chapterIndex, lessonIndex });
     
     try {
       const response = await axiosInstance.get(`/lessons/${lessonId}/`);
@@ -753,14 +740,6 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           // Ensure resources are properly formatted
           resources: lessonDetails.resources || { downloadable: [], internet: [] }
         };
-        const after = newCourse.chapters[chapterIndex].lessons[lessonIndex].aboutLesson;
-        console.log('[DETAILS-SET]', {
-          lessonId,
-          hadBefore: lessonBefore?.aboutLesson !== undefined,
-          beforeSample: typeof lessonBefore?.aboutLesson === 'string' ? lessonBefore.aboutLesson.slice(0, 80) : lessonBefore?.aboutLesson,
-          afterHas: after !== undefined,
-          afterSample: typeof after === 'string' ? after.slice(0, 80) : after
-        });
         
         return newCourse;
       });
@@ -1375,6 +1354,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           toggleLessonCompletion={toggleLessonCompletion}
           navigate={navigate}
           isLoggedIn={isLoggedIn}
+          progressLoading={progressLoading && isLoggedIn}
           progressPercent={displayPercent}
           certificate={certificate}
           issuingCert={issuingCert}
