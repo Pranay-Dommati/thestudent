@@ -118,7 +118,7 @@ const ProLearningMobile = ({
   };
 
   return (
-    <div className="lg:hidden min-h-screen bg-gray-50 flex flex-col relative">
+    <div className="lg:hidden min-h-screen bg-gray-50 flex flex-col relative overflow-x-hidden">
       {/* Enhanced Styles and Animations */}
       <style dangerouslySetInnerHTML={{__html: `
         .scrollbar-hide {
@@ -145,9 +145,9 @@ const ProLearningMobile = ({
       
       
 
-      {/* Enhanced Main Content Area - Scrollable container */}
-  <main ref={mainRef} className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-white">
-        {/* Header now scrolls with content (not sticky) */}
+      {/* Enhanced Main Content Area */}
+  <main ref={mainRef} className="flex-1 bg-gradient-to-b from-gray-50 to-white">
+        {/* Header scrolls with content (not sticky) */}
         <header className="bg-white/98 backdrop-blur-xl shadow-sm border-b border-gray-200 px-4 py-3">
           <div className="flex items-center gap-3">
             {/* Integrated Back Button */}
@@ -217,8 +217,9 @@ const ProLearningMobile = ({
             </div>
           </div>
         </header>
-        {/* Sticky Tab Navigation inside scrollable area */}
-  <nav className="bg-white border-b border-gray-200 px-1 py-2 sticky top-0 z-20 shadow-sm">
+        
+        {/* Sticky Tab Navigation - Fixed to viewport when scrolling */}
+        <nav className="bg-white border-b border-gray-200 px-1 py-2 sticky top-0 z-30 shadow-sm flex-shrink-0">
           <div className="grid grid-cols-5 gap-0.5">
             {tabs && tabs.length > 0 ? tabs.map((tab, index) => {
               const isActive = currentSection === tab.id;
@@ -285,6 +286,8 @@ const ProLearningMobile = ({
             )}
           </div>
         </nav>
+        
+        {/* Content Area */}
         <div className="p-4 pb-8">
           {/* Loading State for Content Transitions */}
           {isLoading ? (

@@ -155,8 +155,9 @@ const OnboardingModal = () => {
               Just type your idea — we'll handle the rest.
             </p>
             
-            {/* Example prompts */}
-            <div className="flex flex-wrap gap-2 justify-center mb-6">
+            {/* Example prompts - Desktop: two options, Mobile: single "Try" prompt */}
+            {/* Desktop version */}
+            <div className="hidden sm:flex flex-wrap gap-2 justify-center mb-6">
               {["Learn Trigonometry", "Python Basics"].map((sample) => (
                 <button
                   key={sample}
@@ -170,12 +171,24 @@ const OnboardingModal = () => {
               ))}
             </div>
             
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            {/* Mobile version - Single engaging "Try" prompt */}
+            <div className="sm:hidden flex justify-center mb-6">
+              <button
+                onClick={() => handleStartCreating("Learn Python")}
+                className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-200 hover:border-indigo-300 rounded-full text-sm text-indigo-600 hover:text-indigo-700 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]"
+              >
+                <span className="text-indigo-400 group-hover:text-indigo-500">Try:</span>
+                <span className="font-medium">"Learn Python"</span>
+                <span className="text-indigo-400 group-hover:translate-x-0.5 transition-transform">→</span>
+              </button>
+            </div>
+            
+            {/* Action Buttons - Always side by side */}
+            <div className="flex flex-row gap-3">
               {/* Cancel Button */}
               <button
                 onClick={handleClose}
-                className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-200 hover:shadow-md active:scale-[0.98]"
+                className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-200 hover:shadow-md active:scale-[0.98] text-sm sm:text-base"
               >
                 Maybe Later
               </button>
@@ -183,13 +196,14 @@ const OnboardingModal = () => {
               {/* Start Creating Button */}
               <button
                 onClick={() => handleStartCreating()}
-                className="flex-1 group relative px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] overflow-hidden"
+                className="flex-1 group relative px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] overflow-hidden text-sm sm:text-base"
               >
                 {/* Shine effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-                <span className="relative flex items-center justify-center gap-2">
+                <span className="relative flex items-center justify-center gap-1.5 sm:gap-2">
                   <IoRocket className="w-4 h-4" />
-                  Start Creating
+                  <span className="hidden sm:inline">Start Creating</span>
+                  <span className="sm:hidden">Start</span>
                 </span>
               </button>
             </div>
