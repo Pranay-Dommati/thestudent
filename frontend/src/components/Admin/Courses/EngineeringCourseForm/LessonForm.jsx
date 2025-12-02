@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { FaTrash, FaVideo, FaFileAlt, FaQuestionCircle, FaBook } from 'react-icons/fa';
 import ResourcesInput from './ResourcesInput';
 import QuizQuestions from './QuizQuestions';
@@ -26,6 +26,12 @@ const LessonForm = ({
   handleQuizQuestionChange,
   errors
 }) => {
+  const lessonRenderStart = performance.now();
+  console.log(`[PERF] LessonForm ${sectionIndex}-${lessonIndex} RENDER START`);
+  
+  const renderTime = performance.now() - lessonRenderStart;
+  console.log(`[PERF] LessonForm ${sectionIndex}-${lessonIndex} RENDER: ${renderTime.toFixed(2)}ms`);
+  
   return (
     <div className="border border-gray-200 rounded-lg p-4 space-y-4">
       <div className="flex justify-between items-center">
@@ -82,7 +88,13 @@ const LessonForm = ({
         <input
           type="text"
           value={lesson.title}
-          onChange={(e) => handleLessonChange(sectionIndex, lessonIndex, 'title', e.target.value)}
+          onChange={(e) => {
+            const inputStart = performance.now();
+            console.log(`[PERF] Lesson Title INPUT onChange fired`);
+            handleLessonChange(sectionIndex, lessonIndex, 'title', e.target.value);
+            const inputTime = performance.now() - inputStart;
+            console.log(`[PERF] Lesson Title onChange handler: ${inputTime.toFixed(2)}ms`);
+          }}
           className={`w-full p-2 border ${errors[`section${sectionIndex}lesson${lessonIndex}`] ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
           placeholder="e.g., Introduction to Next.js"
         />
@@ -119,6 +131,9 @@ const LessonForm = ({
               style={{ fontSize: '16px' }}
               previewOptions={{
                 style: { padding: '20px', fontSize: '16px' }
+              }}
+              textareaProps={{
+                className: 'custom-scrollbar'
               }}
             />
             <div className="text-xs text-gray-500 italic">
@@ -194,6 +209,7 @@ const LessonForm = ({
             hideToolbar={false}
             enableScroll={true}
             textareaProps={{
+              className: 'custom-scrollbar',
               placeholder: "Paste your formatted content here or start typing...",
               onPaste: (e) => {
                 // Try to get rich text content
@@ -475,4 +491,4 @@ const LessonForm = ({
   );
 };
 
-export default LessonForm;
+export default memo(LessonForm);

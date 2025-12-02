@@ -1,6 +1,6 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.conf import settings
-from .ai_service import call_gemini_api
+from .ai_service import call_gemini_api, call_gemini_api_stream
 from .sanitization import sanitize_ai_content
 import json
 
@@ -12,6 +12,7 @@ def handle_summary(request):
         topic = body.get('topic', '')
         reading_content = body.get('reading_content', '')
         category = body.get('category', 'academic')  # Default to 'academic' for aggressive sanitization
+        stream_requested = bool(body.get('stream', False))
         
         if reading_content and len(reading_content) > 100:
             prompt = f"""
@@ -119,6 +120,36 @@ Create a well-structured summary specifically focused on "{topic}" that includes
 
 Generate only the markdown summary content focused on "{topic}". Be comprehensive yet concise.
 """
+        if stream_requested:
+            def event_stream():
+                full_content = ""
+                try:
+                    for chunk in call_gemini_api_stream(prompt):
+                        full_content += chunk
+                        yield json.dumps({
+                            'type': 'chunk',
+                            'text': chunk
+                        }) + "\n"
+                except Exception as e:
+                    yield json.dumps({
+                        'type': 'error',
+                        'error': str(e)
+                    }) + "\n"
+                    return
+
+                # Sanitization
+                sanitized_content, changes = sanitize_ai_content(full_content, category)
+                yield json.dumps({
+                    'type': 'complete',
+                    'full_text': sanitized_content,
+                    'sanitization_changes': changes
+                }) + "\n"
+
+            response = StreamingHttpResponse(event_stream(), content_type='application/x-ndjson')
+            response['X-Accel-Buffering'] = 'no'
+            response['Cache-Control'] = 'no-cache'
+            return response
+
         try:
             # Use ai_service with dual key support
             result = call_gemini_api(prompt)
@@ -166,4 +197,4 @@ Generate only the markdown summary content focused on "{topic}". Be comprehensiv
         except Exception as api_error:
             return JsonResponse({'error': f'AI service error: {str(api_error)}'}, status=500)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500) 
+        return JsonResponse({'error': str(e)}, status=500)

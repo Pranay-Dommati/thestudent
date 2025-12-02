@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useImperativeHandle, forwa
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { IoHelpCircle, IoSend, IoSparkles, IoChevronDown } from 'react-icons/io5';
 import { askTutor } from '../services';
 
@@ -25,13 +25,13 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [selectedContext, setSelectedContext] = useState('');
-  const messagesEndRef = useRef(null);
+  const mobileMessagesEndRef = useRef(null);
+  const desktopMessagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
   const [messages, setMessages] = useState(() => [
     { role: 'assistant', content: initialGreeting }
   ]);
-  const [expanded, setExpanded] = useState(() => new Set());
 
   // Expose method to parent component for text selection
   useImperativeHandle(ref, () => ({
@@ -75,6 +75,18 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
 
   const canChat = useMemo(() => typeof readingContent === 'string' && readingContent.trim().length > 0, [readingContent]);
 
+  // Lock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileOpen]);
+
   // Check if user is near the bottom of the page to show/hide floating button
   useEffect(() => {
     const handleScroll = () => {
@@ -96,14 +108,26 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
   }, []);
 
   useEffect(() => {
-    if (open && messagesEndRef.current) {
-      // Scroll within the messages container, not the whole page
-      const messagesContainer = messagesEndRef.current.closest('.overflow-y-auto');
-      if (messagesContainer) {
-        messagesContainer.scrollTo({ 
-          top: messagesContainer.scrollHeight,
-          behavior: 'smooth'
-        });
+    if (open) {
+      // Scroll desktop
+      if (desktopMessagesEndRef.current) {
+        const container = desktopMessagesEndRef.current.closest('.overflow-y-auto');
+        if (container) {
+          container.scrollTo({ 
+            top: container.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      }
+      // Scroll mobile
+      if (mobileMessagesEndRef.current) {
+        const container = mobileMessagesEndRef.current.closest('.overflow-y-auto');
+        if (container) {
+          container.scrollTo({ 
+            top: container.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
       }
     }
   }, [messages, open]);
@@ -112,64 +136,71 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
   // Intentionally no-op here to prevent double scrolling.
   useEffect(() => {}, [open]);
 
-  const isLongMessage = (content, role) => {
-    if (!content) return false;
-    const len = content.length;
-    const lines = (content.match(/\n/g) || []).length;
-    const hasCode = content.includes('```');
-    if (lines > 3 || hasCode) return true;
-    const threshold = role === 'assistant' ? 200 : 100;
-    return len > threshold;
-  };
-
-  const toggleExpand = (idx) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx); else next.add(idx);
-      return next;
-    });
-  };
-
+  const [copySuccess, setCopySuccess] = React.useState({});
+  
   const CodeBlock = ({ inline, className, children, ...props }) => {
     const isInline = !!inline;
     const text = String(children || '').replace(/\n$/, '');
     if (isInline) {
-      return <code className="bg-gray-800 text-green-300 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>{children}</code>;
+      return <code className="bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-200" {...props}>{children}</code>;
     }
 
     const match = /language-(\w+)/.exec(className || '');
-    const lang = match ? match[1] : undefined;
+    const lang = match ? match[1] : 'code';
+    const blockId = text.slice(0, 50);
 
     const onCopy = async () => {
       try {
         await navigator.clipboard.writeText(text);
+        setCopySuccess(prev => ({ ...prev, [blockId]: true }));
+        setTimeout(() => {
+          setCopySuccess(prev => ({ ...prev, [blockId]: false }));
+        }, 2000);
       } catch (_) {}
     };
 
     return (
-      <div className="relative group my-3">
+      <div className="relative my-3">
+        {/* Header bar with language and copy button - always visible */}
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border border-gray-200 border-b-0 rounded-t-xl">
+          <span className="text-xs text-gray-600 font-medium">{lang}</span>
+          <button
+            onClick={onCopy}
+            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+            aria-label="Copy code"
+          >
+            {copySuccess[blockId] ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span className="text-green-600">Copied!</span>
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy code
+              </>
+            )}
+          </button>
+        </div>
         <SyntaxHighlighter
-          language={lang}
-          style={oneDark}
-          wrapLongLines
+          language={lang === 'code' ? undefined : lang}
+          style={vs}
           customStyle={{
             margin: 0,
-            borderRadius: '0.5rem',
+            borderRadius: '0 0 0.75rem 0.75rem',
             fontSize: '0.875rem',
             padding: '1rem',
+            backgroundColor: '#F9FAFB',
+            border: '1px solid #E5E7EB',
+            borderTop: 'none',
+            overflowX: 'auto',
+            overscrollBehaviorX: 'contain',
           }}
           PreTag="div"
           {...props}
         >
           {text}
         </SyntaxHighlighter>
-        <button
-          onClick={onCopy}
-          className="absolute top-2 right-2 hidden group-hover:inline-flex text-xs px-2 py-1 rounded bg-gray-700/90 text-gray-100 hover:bg-gray-600"
-          aria-label="Copy code"
-        >
-          Copy
-        </button>
       </div>
     );
   };
@@ -344,11 +375,9 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
           </div>
 
           {/* Mobile Messages - Same structure as desktop */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 bg-gray-50 min-h-0">
+          <div className="flex-1 overflow-y-auto px-5 py-4 bg-gray-50 min-h-0 overscroll-y-contain">
             <div className="space-y-4">
               {messages.map((m, i) => {
-                const long = isLongMessage(m.content, m.role);
-                const isExpanded = expanded.has(i);
                 const isUser = m.role === 'user';
                 
                 return (
@@ -369,7 +398,7 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
                             : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
                         }`}
                       >
-                        <div className={`${long && !isExpanded ? 'max-h-48 overflow-hidden' : ''}`}>
+                        <div>
                           {isUser ? (
                             <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                               {m.content}
@@ -379,6 +408,7 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{ 
+                                  pre: ({children}) => <>{children}</>,
                                   code: CodeBlock,
                                   p: ({node, ...props}) => <p className="text-sm leading-relaxed my-2" {...props} />,
                                   ul: ({node, ...props}) => <ul className="list-disc pl-4 my-2 space-y-1" {...props} />,
@@ -392,20 +422,7 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
                             </div>
                           )}
                         </div>
-                        {long && !isExpanded && (
-                          <div className={`pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${
-                            isUser ? 'from-blue-600' : 'from-white'
-                          } to-transparent rounded-b-2xl`} />
-                        )}
                       </div>
-                      {long && (
-                        <button
-                          onClick={() => toggleExpand(i)}
-                          className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                        >
-                          {isExpanded ? 'Show less' : 'Show more'}
-                        </button>
-                      )}
                     </div>
                   </div>
                 );
@@ -434,7 +451,7 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
                 </div>
               )}
               
-              <div ref={messagesEndRef} />
+              <div ref={mobileMessagesEndRef} />
             </div>
           </div>
 
@@ -511,8 +528,6 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
             <div className="flex-1 overflow-y-auto px-5 py-4 bg-gray-50 min-h-0">
               <div className="space-y-4">
                 {messages.map((m, i) => {
-                  const long = isLongMessage(m.content, m.role);
-                  const isExpanded = expanded.has(i);
                   const isUser = m.role === 'user';
                   
                   return (
@@ -533,7 +548,7 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
                               : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
                           }`}
                         >
-                          <div className={`${long && !isExpanded ? 'max-h-48 overflow-hidden' : ''}`}>
+                          <div>
                             {isUser ? (
                               <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                                 {m.content}
@@ -543,6 +558,7 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
                                 <ReactMarkdown
                                   remarkPlugins={[remarkGfm]}
                                   components={{ 
+                                    pre: ({children}) => <>{children}</>,
                                     code: CodeBlock,
                                     p: ({node, ...props}) => <p className="text-sm leading-relaxed my-2" {...props} />,
                                     ul: ({node, ...props}) => <ul className="list-disc pl-4 my-2 space-y-1" {...props} />,
@@ -556,20 +572,7 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
                               </div>
                             )}
                           </div>
-                          {long && !isExpanded && (
-                            <div className={`pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t ${
-                              isUser ? 'from-blue-600' : 'from-white'
-                            } to-transparent rounded-b-2xl`} />
-                          )}
                         </div>
-                        {long && (
-                          <button
-                            onClick={() => toggleExpand(i)}
-                            className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                          >
-                            {isExpanded ? 'Show less' : 'Show more'}
-                          </button>
-                        )}
                       </div>
                     </div>
                   );
@@ -599,7 +602,7 @@ const TutorChat = forwardRef(({ readingContent, topicName, courseId, sidebarVisi
                   </div>
                 )}
                 
-                <div ref={messagesEndRef} />
+                <div ref={desktopMessagesEndRef} />
               </div>
             </div>
 

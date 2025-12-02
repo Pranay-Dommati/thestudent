@@ -58,6 +58,9 @@ const CourseCard = ({ course }) => {
                     src={thumbnail || categoryImages[category] || categoryImages['default']}
                     alt={title}
                     className="w-full aspect-video object-cover"
+                    loading="lazy"
+                    decoding="async"
+                    fetchpriority="low"
                     onError={(e) => {
                         e.target.onerror = null;
                         e.target.src = categoryImages['default'];

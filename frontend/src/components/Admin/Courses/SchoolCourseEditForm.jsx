@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { memo, useState, useCallback, useEffect, startTransition, useReducer, useMemo } from 'react';
+import { chaptersReducer } from './SchoolCourseForm/chaptersReducer';
 import { FaSave, FaTimes, FaSpinner, FaImage, FaPlus, FaTrash, FaUpload, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
 import universalToast from '../../../utils/universalToast';
 import { toAbsoluteMedia } from '../../../utils/apiOrigin';
+import useAutoSave from '../../../hooks/useAutoSave';
 
 // Import the step components from creation form
 import BasicInfoStep from './SchoolCourseForm/BasicInfoStep';
@@ -10,6 +12,8 @@ import CourseStructureStep from './SchoolCourseForm/CourseStructureStep';
 const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMode }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 2;
+  // Defer mounting of heavy structure step to avoid long pointer frames
+  const [structureReady, setStructureReady] = useState(false);
   
   // Initialize form data with course structure
   const [formData, setFormData] = useState({
@@ -32,8 +36,8 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
     chapterCount: course.chapters ? course.chapters.length : 1
   });
 
-  // Initialize chapters from course data
-  const [chapters, setChapters] = useState(() => {
+  // Initialize chapters from course data using reducer (normalized updates)
+  const initialChapters = (() => {
     if (course.chapters && course.chapters.length > 0) {
       return course.chapters.map(chapter => ({
         id: chapter.id,
@@ -127,7 +131,8 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
         }]
       }];
     }
-  });
+  })();
+  const [chapters, dispatch] = useReducer(chaptersReducer, initialChapters);
 
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState(
@@ -135,9 +140,31 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
   );
   const [errors, setErrors] = useState({});
 
+  // Auto-save integration
+  const autoSaveKey = course?.id ? `autoSave_school_${course.id}` : null;
+  
+  const dataToSave = useMemo(() => ({
+    formData,
+    chapters,
+    currentStep
+  }), [formData, chapters, currentStep]);
+
+  const handleRestore = useCallback((savedData) => {
+    if (savedData.formData) setFormData(savedData.formData);
+    if (savedData.chapters) dispatch({ type: 'INIT_CHAPTERS', payload: savedData.chapters });
+    if (savedData.currentStep) setCurrentStep(savedData.currentStep);
+  }, []);
+
+  const { clearSavedData } = useAutoSave(
+    autoSaveKey, 
+    dataToSave, 
+    handleRestore, 
+    !!course?.id // Only save if we have a course ID
+  );
+
   // Handler functions for step 1 (Basic Info)
   const handleInputChange = (name, value) => {
-    console.log("handleInputChange called with", name, value);
+    
     
     setFormData(prev => ({
       ...prev,
@@ -166,38 +193,15 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
     const count = Math.max(1, parseInt(e.target.value) || 1);
     // Update the visible count in basic info
     setFormData(prev => ({ ...prev, chapterCount: count }));
-    // Grow or shrink the chapters array to match the count
-    setChapters(prev => {
-      if (count > prev.length) {
-        const toAdd = count - prev.length;
-        const newChapters = Array.from({ length: toAdd }, () => ({
-          id: null,
-          name: '',
-          lessons: [
-            {
-              id: null,
-              title: '',
-              type: 'video',
-              videoUrl: '',
-              aboutLesson: '',
-              hasResources: false,
-              resources: { downloadable: [], internet: [] },
-              quizQuestions: []
-            }
-          ]
-        }));
-        return [...prev, ...newChapters];
-      }
-      // Do NOT truncate on decrease; preserve data and just render fewer.
-      return prev;
-    });
+    // Ensure at least `count` chapters exist; do NOT shrink on decrease
+    dispatch({ type: 'ENSURE_CHAPTER_COUNT', payload: { count } });
   };
 
   // Event handler to work with standard React input events
   const handleInputChangeEvent = (e) => {
     const { name, value, type, checked } = e.target;
     const fieldValue = type === 'checkbox' ? checked : value;
-    console.log("handleInputChangeEvent called with", name, fieldValue);
+    
     handleInputChange(name, fieldValue);
   };
 
@@ -299,233 +303,59 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
 
   // Handler functions for step 2 (Course Structure)
   const handleChapterNameChange = (chapterIndex, value) => {
-    setChapters(prev => prev.map((chapter, i) => 
-      i === chapterIndex ? { ...chapter, name: value } : chapter
-    ));
+    dispatch({ type: 'SET_CHAPTER_NAME', payload: { chapterIndex, name: value } });
   };
 
   const addLesson = (chapterIndex) => {
-    setChapters(prev => prev.map((chapter, i) => 
-      i === chapterIndex 
-        ? {
-            ...chapter,
-            lessons: [
-              ...chapter.lessons,
-              {
-                id: null,
-                title: '',
-                type: 'video',
-                videoUrl: '',
-                aboutLesson: '',
-                hasResources: false,
-                resources: {
-                  downloadable: [],
-                  internet: []
-                },
-                quizQuestions: []
-              }
-            ]
-          }
-        : chapter
-    ));
+    dispatch({ type: 'ADD_LESSON', payload: { chapterIndex } });
   };
 
   const removeLesson = (chapterIndex, lessonIndex) => {
     // Prevent removing from hidden chapters (preserve data when chapterCount is reduced)
     if (chapterIndex >= (formData.chapterCount || chapters.length)) return;
-    setChapters(prev => prev.map((chapter, i) => 
-      i === chapterIndex 
-        ? {
-            ...chapter,
-            lessons: chapter.lessons.filter((_, li) => li !== lessonIndex)
-          }
-        : chapter
-    ));
+    dispatch({ type: 'REMOVE_LESSON', payload: { chapterIndex, lessonIndex } });
   };
 
   const handleLessonChange = (chapterIndex, lessonIndex, field, value) => {
-    setChapters(prev => prev.map((chapter, i) => 
-      i === chapterIndex 
-        ? {
-            ...chapter,
-            lessons: chapter.lessons.map((lesson, li) => 
-              li === lessonIndex ? { ...lesson, [field]: value } : lesson
-            )
-          }
-        : chapter
-    ));
+    dispatch({ type: 'UPDATE_LESSON_FIELD', payload: { chapterIndex, lessonIndex, field, value } });
   };
 
   const addResource = (chapterIndex, lessonIndex, resourceType) => {
-    const newResource = resourceType === 'downloadable' 
-      ? { id: null, title: '', description: '', file: null }
-      : { id: null, title: '', description: '', url: '' };
-
-    setChapters(prev => prev.map((chapter, i) => 
-      i === chapterIndex 
-        ? {
-            ...chapter,
-            lessons: chapter.lessons.map((lesson, li) => 
-              li === lessonIndex 
-                ? {
-                    ...lesson,
-                    resources: {
-                      ...lesson.resources,
-                      [resourceType]: [...lesson.resources[resourceType], newResource]
-                    }
-                  }
-                : lesson
-            )
-          }
-        : chapter
-    ));
+    dispatch({ type: 'ADD_RESOURCE', payload: { chapterIndex, lessonIndex, resourceType } });
   };
 
   const removeResource = (chapterIndex, lessonIndex, resourceType, resourceIndex) => {
-    setChapters(prev => prev.map((chapter, i) => 
-      i === chapterIndex 
-        ? {
-            ...chapter,
-            lessons: chapter.lessons.map((lesson, li) => 
-              li === lessonIndex 
-                ? {
-                    ...lesson,
-                    resources: {
-                      ...lesson.resources,
-                      [resourceType]: lesson.resources[resourceType].filter((_, ri) => ri !== resourceIndex)
-                    }
-                  }
-                : lesson
-            )
-          }
-        : chapter
-    ));
+    dispatch({ type: 'REMOVE_RESOURCE', payload: { chapterIndex, lessonIndex, resourceType, resourceIndex } });
   };
 
   const handleResourceChange = (chapterIndex, lessonIndex, resourceType, resourceIndex, field, value) => {
-    setChapters(prev => prev.map((chapter, i) => 
-      i === chapterIndex 
-        ? {
-            ...chapter,
-            lessons: chapter.lessons.map((lesson, li) => 
-              li === lessonIndex 
-                ? {
-                    ...lesson,
-                    resources: {
-                      ...lesson.resources,
-                      [resourceType]: lesson.resources[resourceType].map((resource, ri) => 
-                        ri === resourceIndex ? { ...resource, [field]: value } : resource
-                      )
-                    }
-                  }
-                : lesson
-            )
-          }
-        : chapter
-    ));
+    dispatch({ type: 'UPDATE_RESOURCE', payload: { chapterIndex, lessonIndex, resourceType, resourceIndex, field, value } });
   };
 
   const handleFileChange = (chapterIndex, lessonIndex, resourceIndex, file) => {
-    setChapters(prev => prev.map((chapter, i) => 
-      i === chapterIndex 
-        ? {
-            ...chapter,
-            lessons: chapter.lessons.map((lesson, li) => 
-              li === lessonIndex 
-                ? {
-                    ...lesson,
-                    resources: {
-                      ...lesson.resources,
-                      downloadable: lesson.resources.downloadable.map((resource, ri) => 
-                        ri === resourceIndex ? { ...resource, file } : resource
-                      )
-                    }
-                  }
-                : lesson
-            )
-          }
-        : chapter
-    ));
+    dispatch({ type: 'UPDATE_RESOURCE', payload: { chapterIndex, lessonIndex, resourceType: 'downloadable', resourceIndex, field: 'file', value: file } });
   };
 
   const addQuizQuestion = (chapterIndex, lessonIndex) => {
-    setChapters(prev => prev.map((chapter, i) => 
-      i === chapterIndex 
-        ? {
-            ...chapter,
-            lessons: chapter.lessons.map((lesson, li) => 
-              li === lessonIndex 
-                ? {
-                    ...lesson,
-                    quizQuestions: [
-                      ...lesson.quizQuestions,
-                      {
-                        id: null,
-                        question: '',
-                        options: ['', '', '', ''],
-                        correctAnswer: ''
-                      }
-                    ]
-                  }
-                : lesson
-            )
-          }
-        : chapter
-    ));
+    dispatch({ type: 'ADD_QUIZ_QUESTION', payload: { chapterIndex, lessonIndex } });
   };
 
   const removeQuizQuestion = (chapterIndex, lessonIndex, questionIndex) => {
-    setChapters(prev => prev.map((chapter, i) => 
-      i === chapterIndex 
-        ? {
-            ...chapter,
-            lessons: chapter.lessons.map((lesson, li) => 
-              li === lessonIndex 
-                ? {
-                    ...lesson,
-                    quizQuestions: lesson.quizQuestions.filter((_, qi) => qi !== questionIndex)
-                  }
-                : lesson
-            )
-          }
-        : chapter
-    ));
+    dispatch({ type: 'REMOVE_QUIZ_QUESTION', payload: { chapterIndex, lessonIndex, questionIndex } });
   };
 
   const handleQuizQuestionChange = (chapterIndex, lessonIndex, questionIndex, field, value) => {
-    setChapters(prev => prev.map((chapter, i) => 
-      i === chapterIndex 
-        ? {
-            ...chapter,
-            lessons: chapter.lessons.map((lesson, li) => 
-              li === lessonIndex 
-                ? {
-                    ...lesson,
-                    quizQuestions: lesson.quizQuestions.map((question, qi) => 
-                      qi === questionIndex ? { ...question, [field]: value } : question
-                    )
-                  }
-                : lesson
-            )
-          }
-        : chapter
-    ));
+    dispatch({ type: 'UPDATE_QUIZ_QUESTION', payload: { chapterIndex, lessonIndex, questionIndex, field, value } });
   };
 
   // Navigation functions
   const nextStep = () => {
-    console.log("Current step before:", currentStep, "totalSteps:", totalSteps);
     if (validateStep(currentStep)) {
-      // Use setTimeout to ensure state update is processed correctly
-      setTimeout(() => {
-        setCurrentStep(prev => {
-          const next = Math.min(prev + 1, totalSteps);
-          console.log("Setting current step from", prev, "to", next);
-          return next;
-        });
-      }, 0);
+      startTransition(() => {
+        setCurrentStep(prev => Math.min(prev + 1, totalSteps));
+      });
     } else {
-      console.log("Validation failed for step", currentStep);
+      // keep current step when invalid
     }
   };
 
@@ -534,12 +364,12 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
   };
 
   const validateStep = (step) => {
-    console.log("Validating step:", step);
+    
     const newErrors = {};
 
     if (step === 1) {
       // Validate basic info
-      console.log("Form data for validation:", formData);
+      
       if (!formData.title.trim()) newErrors.title = 'Title is required';
       if (!formData.class_level) newErrors.class_level = 'Class level is required';
       if (!formData.board) newErrors.board = 'Board is required';
@@ -570,7 +400,7 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
 
     setErrors(newErrors);
     const isValid = Object.keys(newErrors).length === 0;
-    console.log("Validation result for step", step, ":", isValid, "errors:", Object.keys(newErrors));
+    
     return isValid;
   };
 
@@ -642,7 +472,10 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
       submitFormData.append('thumbnail', thumbnailFile);
     }
 
-    await onSubmit(submitFormData);
+    const success = await onSubmit(submitFormData);
+    if (success) {
+      clearSavedData(); // Clear auto-saved data on success
+    }
   };
 
   const renderStepContent = () => {
@@ -667,6 +500,13 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
       case 2:
         // Render only the number of chapters requested, but keep the full state unmodified
         const chaptersToRender = chapters.slice(0, formData.chapterCount || chapters.length);
+        if (!structureReady) {
+          return (
+            <div className="p-6 border border-gray-200 rounded-lg text-sm text-gray-600">
+              Preparing course structure…
+            </div>
+          );
+        }
         return (
           <CourseStructureStep
             chapters={chaptersToRender}
@@ -688,6 +528,26 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
         return null;
     }
   };
+
+  // When switching to step 2, defer heavy render until idle to end the click frame quickly
+  useEffect(() => {
+    if (currentStep === 2) {
+      setStructureReady(false);
+      const enable = () => setStructureReady(true);
+      try {
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+          window.requestIdleCallback(enable, { timeout: 250 });
+        } else {
+          setTimeout(enable, 0);
+        }
+      } catch {
+        setTimeout(enable, 0);
+      }
+    } else {
+      // Not on structure step; no need to defer
+      setStructureReady(false);
+    }
+  }, [currentStep]);
 
   return (
     <div className={`p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg`}>
@@ -771,7 +631,12 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
           <div className="flex gap-4">
             <button
               type="button"
-              onClick={onCancel}
+              onClick={() => {
+                if (window.confirm('Are you sure you want to discard your changes?')) {
+                  clearSavedData();
+                  onCancel();
+                }
+              }}
               disabled={isUpdating}
               className={`px-6 py-2 rounded-lg font-medium transition-colors ${
                 isDarkMode
@@ -822,4 +687,4 @@ const SchoolCourseEditForm = ({ course, onSubmit, onCancel, isUpdating, isDarkMo
   );
 };
 
-export default SchoolCourseEditForm;
+export default memo(SchoolCourseEditForm);

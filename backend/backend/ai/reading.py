@@ -1,8 +1,8 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.conf import settings
 import json
 import re
-from .ai_service import call_gemini_api, call_gemini_flash_api, NetworkError
+from .ai_service import call_gemini_api, call_gemini_flash_api, call_gemini_api_stream, NetworkError
 from datetime import datetime
 from .sanitization import sanitize_ai_content
 
@@ -849,6 +849,7 @@ def handle_reading(request):
         personalization = body.get('personalization')
         topic_context = None
         debug_requested = bool(body.get('debug'))
+        stream_requested = bool(body.get('stream', False))
 
         print(f"\n{'='*60}")
         print("🚀 STARTING AI PROMPT SELECTION PROCESS")
@@ -856,6 +857,7 @@ def handle_reading(request):
         print(f"📥 RAW REQUEST BODY: {body}")
         print(f"📥 Input Topic EXTRACTED: '{topic}' (type: {type(topic)})")
         print(f"📥 Topic length: {len(topic)} characters")
+        print(f"📥 Stream Requested: {stream_requested}")
         print("🤖 Method: AI-Powered Classification (Primary) + Keyword Fallback (Backup)")
         # Debug: log personalization received (topic_context is intentionally ignored)
         try:
@@ -888,6 +890,52 @@ def handle_reading(request):
             print(f"❌ WARNING: Topic '{topic}' NOT FOUND in generated prompt!")
         print(f"📤 Sending prompt to Gemini API with category: {category.upper()}, topic: '{topic}'...")
         print(f"{'='*60}")
+
+        if stream_requested:
+            def event_stream():
+                print(f"🌊 Starting stream for topic: {topic}")
+                # Send metadata first
+                yield json.dumps({
+                    'type': 'meta',
+                    'category': category,
+                    'topic': topic,
+                    'prompt_info': {
+                        'category': category,
+                        'prompt_id': f"{category.upper()}_PROMPT_V2024" if category != 'general' else 'GENERAL_FALLBACK_V2024',
+                    }
+                }) + "\n"
+                
+                full_content = ""
+                try:
+                    for chunk in call_gemini_api_stream(prompt):
+                        full_content += chunk
+                        yield json.dumps({
+                            'type': 'chunk',
+                            'text': chunk
+                        }) + "\n"
+                except Exception as e:
+                    print(f"❌ Error during streaming: {e}")
+                    yield json.dumps({
+                        'type': 'error',
+                        'error': str(e)
+                    }) + "\n"
+                    return
+
+                print(f"🌊 Stream complete. Full content length: {len(full_content)}")
+                
+                # Perform sanitization on the full content
+                sanitized_content, changes = sanitize_ai_content(full_content, category)
+                
+                yield json.dumps({
+                    'type': 'complete',
+                    'full_text': sanitized_content,
+                    'sanitization_changes': changes
+                }) + "\n"
+
+            response = StreamingHttpResponse(event_stream(), content_type='application/x-ndjson')
+            response['X-Accel-Buffering'] = 'no'
+            response['Cache-Control'] = 'no-cache'
+            return response
 
         # ========================================
         # 🚨 CRITICAL DEBUG: FULL PROMPT TO GEMINI
@@ -1410,4 +1458,4 @@ def test_single_topic(topic):
     print(f"🎯 FINAL RESULT: '{topic}' → '{category.upper()}'")
     print(f"{'='*60}\n")
     
-    return category 
+    return category

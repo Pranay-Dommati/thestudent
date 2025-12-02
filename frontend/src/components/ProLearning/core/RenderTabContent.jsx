@@ -361,6 +361,7 @@ export const renderTabContent = (dependencies) => {
       loadScenario={loadScenario}
       getCurrentTopic={getCurrentTopic}
       setActiveTab={setActiveTab}
+      isProgressiveGenerating={isProgressiveGenerating}
     />
   );
 };

@@ -29,7 +29,8 @@ const StandaloneQuizPage = () => {
       const courseId = params.courseId || searchParams.get('courseId');
       let defaultReturnPath;
       if (courseId) {
-        defaultReturnPath = `/courses/${courseId}/learning`;
+        // Include courseId as query param for cache consistency
+        defaultReturnPath = `/courses/${courseId}/learning?courseId=${courseId}`;
       } else {
         // Fallback: remove /quiz segment (legacy) if courseId missing
         defaultReturnPath = currentPath.replace('/quiz', '');

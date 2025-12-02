@@ -30,11 +30,21 @@ class TrackingService {
   const phKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY || import.meta.env.VITE_POSTHOG_KEY;
   const phHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST || import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com';
 
+    // Route-aware analytics gating: avoid client-side analytics overhead on admin pages
+    let isAdminRoute = false;
+    try {
+      const path = window?.location?.pathname || '';
+      isAdminRoute = path.startsWith('/admin-p');
+    } catch {}
+
     if (phKey) {
-      const disableRecording = import.meta.env.VITE_POSTHOG_DISABLE_SESSION_RECORDING === 'true';
+      const disableRecordingEnv = import.meta.env.VITE_POSTHOG_DISABLE_SESSION_RECORDING === 'true';
+      // Disable session recording and autocapture on admin route to prevent long frames
+      const disableRecording = disableRecordingEnv || isAdminRoute;
+      const enableAutocapture = (import.meta.env.VITE_POSTHOG_AUTOCAPTURE !== 'false') && !isAdminRoute;
       posthog.init(phKey, {
         api_host: phHost,
-        autocapture: import.meta.env.VITE_POSTHOG_AUTOCAPTURE !== 'false',
+        autocapture: enableAutocapture,
         capture_pageview: true,
         capture_pageleave: true,
         disable_session_recording: disableRecording,
@@ -51,6 +61,8 @@ class TrackingService {
         // fallback: set as person property only
         try { posthog.identify(undefined, { session_id: this.sessionId }); } catch {}
       }
+      // If we are on admin route, opt-out of capturing to further reduce overhead
+      try { if (isAdminRoute && typeof posthog.opt_out_capturing === 'function') posthog.opt_out_capturing(); } catch {}
       this.initialized = true;
       logger.log('[Tracking] PostHog initialized');
     } else {
@@ -99,9 +111,11 @@ class TrackingService {
       client_ts,
     };
 
-    // Send to PostHog if available
+    // Send to PostHog if available and not opted-out on admin route
     try {
-      if (posthog) {
+      let isAdminRoute = false;
+      try { isAdminRoute = (window?.location?.pathname || '').startsWith('/admin-p'); } catch {}
+      if (posthog && !isAdminRoute) {
         posthog.capture(eventType, { ...props, session_id: event.session_id, feature, success, error_code, latency_ms });
       }
     } catch (e) {}

@@ -530,6 +530,7 @@ const ChatbotPage = () => {
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const topicConfirmationRef = useRef(null); // Ref for auto-scrolling to topic confirmation
   const initialQueryProcessed = useRef(false);
   const autoSendProcessed = useRef(false); // Additional flag to prevent duplicate auto-sends
   const { width } = useWindowSize();
@@ -739,6 +740,19 @@ const ChatbotPage = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  // Auto-scroll to topic confirmation dialog when it appears
+  useEffect(() => {
+    if (showTopicConfirmation && topicConfirmationRef.current) {
+      // Small delay to ensure the DOM is updated
+      setTimeout(() => {
+        topicConfirmationRef.current?.scrollIntoView({ 
+          behavior: "smooth", 
+          block: "center" 
+        });
+      }, 100);
+    }
+  }, [showTopicConfirmation]);
 
   // Handle initial query from URL parameter
   useEffect(() => {
@@ -971,7 +985,8 @@ const ChatbotPage = () => {
   useEffect(() => {
     const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isAuthenticated;
     
-    if (authed && user && !loading) {
+    const freemiumLoginInProgress = localStorage.getItem('freemiumLoginInProgress') === '1';
+    if (authed && user && !loading && freemiumLoginInProgress) {
       // Check if there's a pending course to save
       const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
       if (pendingCourse) {
@@ -992,6 +1007,7 @@ const ChatbotPage = () => {
               
               // Clear the pending course
               localStorage.removeItem('pendingFreemiumCourse');
+              localStorage.removeItem('freemiumLoginInProgress');
               
               // Show success toast
               universalToast.success('🎉 Your course has been saved to your Learning Hub!', {
@@ -1006,6 +1022,7 @@ const ChatbotPage = () => {
               console.log('✅ Freemium course saved successfully!');
             } catch (error) {
               console.error('Failed to save freemium course:', error);
+              localStorage.removeItem('freemiumLoginInProgress');
               universalToast.error('Failed to save your course. Please try again.', {
                 duration: 4000
               });
@@ -1554,10 +1571,16 @@ const ChatbotPage = () => {
             }
             
             // Store limited topics for confirmation and show confirmation dialog (normalize to { name })
-            const normalizedTopics = availableTopics.map(t => {
-              if (typeof t === 'string') return { name: t };
-              if (t && typeof t.name === 'string') return { name: t.name };
-              return { name: String(t || '').trim() };
+            const normalizedTopics = availableTopics.map((t, idx) => {
+              let name;
+              if (typeof t === 'string') name = t;
+              else if (t && typeof t.name === 'string') name = t.name;
+              else name = String(t || '').trim();
+              
+              return { 
+                id: `topic-${Date.now()}-${idx}`,
+                name 
+              };
             });
             setPendingTopics(normalizedTopics);
             setOriginalPrompt(messageToSend);
@@ -2229,8 +2252,6 @@ const ChatbotPage = () => {
                 <div className="w-full">
                   <Link 
                     to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
                     onClick={() => {
                       // Set session flag for back button navigation
@@ -2599,17 +2620,22 @@ const ChatbotPage = () => {
             <span className="text-sm font-medium">Back</span>
           </Link>
         </div>
-        {/* Minimal mobile header (hidden at md+) */}
+        {/* Minimal mobile header (hidden at md+) - with safe area padding for notched devices */}
         {!isSidebarOpen && (
-          <div className="md:hidden flex items-center justify-between px-4 py-4 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
+          <div className="md:hidden flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white/95 backdrop-blur-sm" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-600 hover:text-gray-800 transition-colors"
             >
               <IoMenu size={20} />
             </button>
-            <h1 className="text-base font-semibold text-gray-900">Course Creator</h1>
-            <div className="w-10"></div>
+            <div className="flex flex-col items-center">
+              <span className="text-base font-semibold text-gray-900">EasyLearnova</span>
+              <span className="text-xs text-gray-500">Course Creator</span>
+            </div>
+            <Link to="/" className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-600 hover:text-gray-800 transition-colors">
+              <IoChevronBack size={20} />
+            </Link>
           </div>
         )}
 
@@ -2719,7 +2745,7 @@ const ChatbotPage = () => {
 
               {/* Course Topics Configuration Dialog */}
               {showTopicConfirmation && (
-                <div className="w-full max-w-4xl mx-auto px-4 mb-6">
+                <div ref={topicConfirmationRef} className="w-full max-w-4xl mx-auto px-4 mb-6">
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
@@ -2898,68 +2924,81 @@ const ChatbotPage = () => {
 
       {/* Freemium: Save Course Modal */}
       {showSaveCourseModal && pendingCourseToSave && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 animate-fade-in max-h-[90vh] overflow-y-auto">
-            {/* Success Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
-                <IoCheckmarkCircle className="text-white" size={48} />
-              </div>
-            </div>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm sm:max-w-md overflow-hidden animate-scaleIn relative">
             
-            {/* Title */}
-            <h2 className="text-xl font-bold text-center text-gray-900 mb-2">
-              Your Learning Path Starts Here
-            </h2>
-            
-            {/* Message */}
-            <p className="text-center text-gray-600 text-sm mb-4">
-              Sign in to unlock a personalized and enhanced learning experience.
-            </p>
-            
-            {/* Benefits List */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 mb-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                <span className="text-sm text-gray-700">Seamless progress tracking</span>
+            <div className="p-6 sm:p-8">
+              {/* Success Icon */}
+              <div className="flex justify-center mb-5 sm:mb-6">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg ring-4 ring-green-50">
+                  <IoCheckmarkCircle className="text-white w-8 h-8 sm:w-10 sm:h-10" />
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                <span className="text-sm text-gray-700">One-click access from your Learning Hub</span>
+              
+              {/* Title */}
+              <h2 className="text-xl sm:text-2xl font-bold text-center text-gray-900 mb-2 leading-tight">
+                Your Learning Path Starts Here
+              </h2>
+              
+              {/* Message */}
+              <p className="text-center text-gray-600 text-sm sm:text-base mb-6 leading-relaxed">
+                Sign in to unlock a personalized and enhanced learning experience.
+              </p>
+              
+              {/* Benefits List */}
+              <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-3 border border-gray-100">
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <IoRocket className="text-blue-600 w-3 h-3" />
+                  </div>
+                  <span className="text-sm text-gray-700 font-medium">Seamless progress tracking</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <IoHome className="text-blue-600 w-3 h-3" />
+                  </div>
+                  <span className="text-sm text-gray-700 font-medium">One-click access from Learning Hub</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <FaGraduationCap className="text-blue-600 w-3 h-3" />
+                  </div>
+                  <span className="text-sm text-gray-700 font-medium">Premium curated academic content</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                <span className="text-sm text-gray-700">Premium academic content curated for you</span>
-              </div>
-            </div>
-            
-            {/* Action Buttons */}
-            <div className="space-y-2">
-              <Link
-                to="/auth?mode=signup"
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-              >
-                Save Course
-              </Link>
-              <Link
-                to="/auth?mode=login"
-                className="w-full flex items-center justify-center px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors text-sm"
-              >
-                Already have an account?
-              </Link>
-              <button
-                onClick={() => {
-                  // Clear the pending course so modal can show for next course
-                  localStorage.removeItem('pendingFreemiumCourse');
-                  console.log('🧹 Cleared pendingFreemiumCourse - modal dismissed by user');
+              
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <Link
+                  to="/auth?mode=signup"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                >
+                  Save Course
+                </Link>
+                
+                <div className="flex flex-col gap-2 text-center">
+                  <Link
+                    to="/auth?mode=login"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors py-1"
+                  >
+                    Already have an account? Log in
+                  </Link>
                   
-                  setShowSaveCourseModal(false);
-                  setPendingCourseToSave(null);
-                }}
-                className="w-full px-4 py-1.5 text-gray-400 hover:text-gray-600 text-xs font-medium transition-colors"
-              >
-                Continue without saving
-              </button>
+                  <button
+                    onClick={() => {
+                      // Clear the pending course so modal can show for next course
+                      localStorage.removeItem('pendingFreemiumCourse');
+                      console.log('🧹 Cleared pendingFreemiumCourse - modal dismissed by user');
+                      
+                      setShowSaveCourseModal(false);
+                      setPendingCourseToSave(null);
+                    }}
+                    className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors py-1"
+                  >
+                    Continue without saving
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

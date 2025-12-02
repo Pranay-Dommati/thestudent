@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import ReactMarkdown from 'react-markdown';
@@ -19,6 +19,8 @@ import universalToast from '../../utils/universalToast';
 import { useAuth } from '../../context/AuthContext';
 import preprocessLatex from '../../utils/latexPreprocessor';
 
+const buildCourseKey = (id, path) => (id ? `course:${id}` : `path:${path || ''}`);
+
 // Update the function signature to accept the new props
 const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [course, setCourse] = useState(null);
@@ -38,11 +40,21 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   const [internetResourcesOpen, setInternetResourcesOpen] = useState(false);
   const [downloadResourcesOpen, setDownloadResourcesOpen] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0);
+  const [progressLoading, setProgressLoading] = useState(false); // NEW: Track when progress is being fetched
   const [certificate, setCertificate] = useState(null);
   // When subject-only URL matches multiple courses (e.g., Mathematics 1A vs 1B), show chooser
   const [disambiguationOptions, setDisambiguationOptions] = useState(null); // array of brief course objects
   const [issuingCert, setIssuingCert] = useState(false);
   const videoRef = useRef(null);
+  // Track which lessons have been fetched to avoid duplicate API calls
+  const fetchedLessonsRef = useRef(new Set());
+  // Track if progress has been fetched for this course to avoid duplicate calls
+  const progressFetchedRef = useRef(null);
+  // Track the currently loaded course ID to prevent re-fetching on URL changes
+  const loadedCourseIdRef = useRef(null);
+  const loadedCourseKeyRef = useRef(null);
+  // Track if a course fetch is currently in progress to prevent duplicate parallel fetches
+  const courseFetchInProgressRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoggedIn, validateAuth } = useAuth();
@@ -71,15 +83,31 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   };
 
   // **HELPER FUNCTION: Fetch progress in background for logged-in users**
-  const fetchProgressInBackground = async (courseId, courseData, cacheKey) => {
+  const fetchProgressInBackground = async (courseIdToFetch, courseData, cacheKey) => {
+    // Prevent duplicate progress fetches for the same course
+    if (progressFetchedRef.current === courseIdToFetch) {
+      console.log('⏭️ Skipping duplicate progress fetch for course:', courseIdToFetch);
+      return;
+    }
+    progressFetchedRef.current = courseIdToFetch;
+    setProgressLoading(true); // Show loading state for checkboxes
+    
     try {
       await validateAuth();
-      const progressResponse = await axiosInstance.get(`/courses/progress/${courseId}/`);
+      const progressResponse = await axiosInstance.get(`/courses/progress/${courseIdToFetch}/`);
       
       // Silently update progress without loading state
       setCourseProgress(progressResponse.data);
       if (progressResponse?.data?.progress) {
         setServerProgress(progressResponse.data.progress);
+        // Also update percentage for UI
+        const pct = progressResponse.data.progress.percentage ?? 0;
+        setProgressPercent(pct);
+      }
+      
+      // Check for certificate in response
+      if (progressResponse.data?.certificate) {
+        setCertificate(progressResponse.data.certificate);
       }
       
       // Update course with fresh progress
@@ -94,11 +122,47 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       console.log('🔄 Background progress sync completed');
     } catch (error) {
       console.error('⚠️ Background progress sync failed (non-critical):', error);
+      // Reset the ref so it can be retried
+      progressFetchedRef.current = null;
       // Don't show error to user - cache is good enough
+    } finally {
+      setProgressLoading(false); // Hide loading state for checkboxes
     }
   };
 
   useEffect(() => {
+    const localSearchParams = new URLSearchParams(location.search || '');
+    const queryCourseId = localSearchParams.get('courseId');
+    const resolvedCourseId = courseId || queryCourseId || loadedCourseIdRef.current;
+    const currentCourseKey = buildCourseKey(resolvedCourseId, pathname);
+
+    // Skip if we already have course data loaded for this key
+    // IMPORTANT: Don't check `course` state here - it's stale in this closure!
+    // Trust the ref which is updated synchronously when course is set.
+    if (loadedCourseKeyRef.current === currentCourseKey) {
+      return;
+    }
+    
+    // Also skip if the course ID matches what we already loaded (handles URL param additions)
+    if (loadedCourseIdRef.current && loadedCourseIdRef.current === resolvedCourseId) {
+      // Update the key ref to prevent future checks
+      loadedCourseKeyRef.current = currentCourseKey;
+      return;
+    }
+    
+    // CRITICAL: Skip if a fetch is already in progress for this course
+    // This prevents React 18 Strict Mode double-mount from causing parallel fetches
+    if (courseFetchInProgressRef.current === resolvedCourseId) {
+      return;
+    }
+    
+    // Mark fetch as in progress IMMEDIATELY (synchronously) before any async work
+    courseFetchInProgressRef.current = resolvedCourseId;
+    
+    // Reset tracking refs when courseId changes
+    fetchedLessonsRef.current = new Set();
+    progressFetchedRef.current = null;
+    
     // Extract URL path to determine course type and proper API endpoint
     const pathParts = pathname ? pathname.split('/').filter(Boolean) : [];
     
@@ -119,53 +183,50 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         if (cachedData && cachedData.course && cachedData.course.chapters && Array.isArray(cachedData.course.chapters)) {
           if (!isLoggedIn) {
             // Guest users: Use cache and stop (no progress to fetch)
-            console.log('👻 Guest user - using cached course data');
+            const keyToSet = buildCourseKey(cachedData.course.id, pathname);
             setCourse(cachedData.course);
+            loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
+            loadedCourseKeyRef.current = keyToSet;
+            courseFetchInProgressRef.current = null; // Fetch complete
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
             return;
           } else if (isCacheFresh) {
             // Logged-in users with fresh cache: Use cache immediately for instant load
-            console.log('👤 Logged in user - using fresh cache for instant load');
+            // PREVIEW MODE: Ignore cached progress completely - just show content fast
+            const keyToSet = buildCourseKey(cachedData.course.id, pathname);
             setCourse(cachedData.course);
-            if (cachedData.progress) {
-              setCourseProgress(cachedData.progress);
-              if (cachedData.progress?.progress) {
-                setServerProgress(cachedData.progress.progress);
-              }
-              // Update course with cached progress
-              const updatedCourse = updateCourseWithProgress(cachedData.course, cachedData.progress);
-              setCourse(updatedCourse);
-            }
+            loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
+            loadedCourseKeyRef.current = keyToSet;
+            courseFetchInProgressRef.current = null; // Fetch complete
+            // Show loading skeleton for checkboxes
+            setProgressLoading(true);
+            // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
-            
-            // Optionally fetch progress in background to ensure it's up-to-date
-            // This happens silently without blocking the UI
-            if (cachedData.course?.id) {
-              fetchProgressInBackground(cachedData.course.id, cachedData.course, cacheKey);
-            }
+            // Fetch progress in background
+            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + ':auth');
+            setTimeout(() => fetchProgressInBackground(cachedData.course.id, cachedData.course, cacheKey), 100);
             return;
           } else {
-            // Logged-in users with stale cache: Use cache to show content quickly,
-            // but also fetch fresh data
-            console.log('� Logged in user - using stale cache while fetching fresh data');
+            // Logged-in users with stale cache: Use cache to show content quickly
+            // PREVIEW MODE: Ignore cached progress completely - just show content fast
             setCourse(cachedData.course);
-            if (cachedData.progress) {
-              setCourseProgress(cachedData.progress);
-              if (cachedData.progress?.progress) {
-                setServerProgress(cachedData.progress.progress);
-              }
-              const updatedCourse = updateCourseWithProgress(cachedData.course, cachedData.progress);
-              setCourse(updatedCourse);
-            }
+            loadedCourseIdRef.current = cachedData.course.id; // Mark as loaded
+            loadedCourseKeyRef.current = buildCourseKey(cachedData.course.id, pathname);
+            courseFetchInProgressRef.current = null; // Fetch complete
+            // Show loading skeleton for checkboxes
+            setProgressLoading(true);
+            // DO NOT apply cached progress - show content immediately without ticks
             setExpandedChapters(cachedData.course.chapters && cachedData.course.chapters.length > 0 ? { 0: true } : {});
             setLoading(false);
-            // Continue to fetch fresh data below
+            // Fetch progress in background
+            const staleCacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + ':auth');
+            setTimeout(() => fetchProgressInBackground(cachedData.course.id, cachedData.course, staleCacheKey), 100);
+            return; // Don't fetch fresh data - use cache as-is for speed
           }
         } else if (cachedData) {
           // Cache exists but has invalid structure - clear it
-          console.warn('⚠️ Cached data has invalid structure, clearing cache');
           courseCache.invalidate(cacheKey);
         }
         
@@ -199,15 +260,15 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         if (!hasGradeInPath && courseId) {
           try {
             isSchoolCourse = true;
-            apiUrl = `/courses/school/${courseId}/`;
-            console.log('🔍 Fetching school course by ID:', courseId);
+            apiUrl = `/courses/school/${courseId}/?structure_only=true`;
+            console.log('🔍 Fetching school course structure by ID:', courseId);
             response = await axiosInstance.get(apiUrl);
             console.log('✅ School course fetched successfully');
           } catch (e) {
             // Fallback to engineering by ID if not a school course
             console.log('⚠️ Not a school course, trying engineering course by ID:', courseId);
             isSchoolCourse = false;
-            apiUrl = `/courses/engineering/${courseId}/`;
+            apiUrl = `/courses/engineering/${courseId}/?structure_only=true`;
             try {
               response = await axiosInstance.get(apiUrl);
               console.log('✅ Engineering course fetched successfully');
@@ -222,15 +283,15 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         if (hasGradeInPath) {
           isSchoolCourse = true;
           if (selectedCourseId) {
-            apiUrl = `/courses/school/${selectedCourseId}/`;
-            console.log('🔍 Fetching school course by query courseId:', selectedCourseId);
+            apiUrl = `/courses/school/${selectedCourseId}/?structure_only=true`;
+            console.log('🔍 Fetching school course structure by query courseId:', selectedCourseId);
           } else {
             // Strict ID-only mode: do not attempt subject/state fallbacks
             throw new Error('Missing courseId. Please start learning from the course page so we can lock to the correct course.');
           }
         } else {
           // Engineering course by path structure
-          apiUrl = `/courses/engineering/${courseId}/`;
+          apiUrl = `/courses/engineering/${courseId}/?structure_only=true`;
         }
 
         if (!apiUrl) {
@@ -316,60 +377,45 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         }
         
         console.log('✅ Course transformation complete. Chapters:', transformedCourse.chapters.length);
+        
+        // **OPTIMIZATION: Set course and stop loading IMMEDIATELY**
+        // Don't wait for progress or first lesson details - show content fast!
         setCourse(transformedCourse);
+        loadedCourseIdRef.current = transformedCourse.id; // Mark as loaded
+        
+        // For logged-in users, show skeleton for checkboxes until progress loads
+        if (isLoggedIn) {
+          setProgressLoading(true);
+        }
+        
+        // CRITICAL: Set the key ref BEFORE navigate() to prevent race condition
+        // We need to use the FINAL URL (with courseId param if it will be added)
+        const willNormalize = isSchoolCourse && transformedCourse?.id && !new URLSearchParams(location.search || '').get('courseId');
+        loadedCourseKeyRef.current = buildCourseKey(transformedCourse.id, pathname);
+        courseFetchInProgressRef.current = null; // Fetch complete - clear in-progress flag
+        
+        setExpandedChapters({ 0: true });
+        setLoading(false); // <-- CRITICAL: Stop loading spinner now!
 
         // If we loaded a school course by filters and we have its exact ID but the URL
         // lacks ?courseId, normalize the URL to an ID-locked variant to keep future
         // API calls ID-based and avoid ambiguity on refresh.
-        if (isSchoolCourse && transformedCourse?.id) {
+        if (willNormalize) {
           const params = new URLSearchParams(location.search || '');
-          if (!params.get('courseId')) {
-            params.set('courseId', transformedCourse.id);
-            navigate({ pathname, search: `?${params.toString()}` }, { replace: true });
-          }
+          params.set('courseId', transformedCourse.id);
+          navigate({ pathname, search: `?${params.toString()}` }, { replace: true });
         }
         
-        // Expand the first chapter by default
-        if (transformedCourse.chapters.length > 0) {
-          setExpandedChapters({ 0: true });
-        }
+        // Cache course without progress for non-logged-in users
+        const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+        courseCache.set(cacheKey, { course: transformedCourse });
         
-        // **OPTIMIZATION 3: Fetch progress once auth is definitely valid (fixes first-load 401)**
-        // We explicitly validate auth so the very first request after login has fresh tokens.
-        const canFetchProgress = transformedCourse.id && (await (async () => {
-          if (!isLoggedIn) return false;
-          try { await validateAuth(); return true; } catch { return false; }
-        })());
-
-        if (canFetchProgress) {
-          try {
-            const progressResponse = await axiosInstance.get(`/courses/progress/${transformedCourse.id}/`);
-            setCourseProgress(progressResponse.data);
-            if (progressResponse?.data?.progress) {
-              setServerProgress(progressResponse.data.progress);
-            }
-            
-            // Update course with progress and cache
-            const updatedCourse = updateCourseWithProgress(transformedCourse, progressResponse.data);
-            setCourse(updatedCourse);
-            
-            // **OPTIMIZATION 4: Cache the complete data**
-            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
-            courseCache.set(cacheKey, {
-              course: updatedCourse,
-              progress: progressResponse.data
-            });
-            console.log('💾 Course data cached for faster future loads');
-          } catch (progressError) {
-            console.error('⚠️ Error fetching progress (non-critical):', progressError);
-            // Still cache course without progress
-            const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
-            courseCache.set(cacheKey, { course: transformedCourse });
-          }
-        } else {
-          // Cache course without progress for non-logged-in users
-          const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
-          courseCache.set(cacheKey, { course: transformedCourse });
+        // Fetch progress in background for logged-in users AFTER showing content
+        if (isLoggedIn && transformedCourse?.id) {
+          // Small delay to ensure UI has rendered first
+          setTimeout(() => {
+            fetchProgressInBackground(transformedCourse.id, transformedCourse, cacheKey);
+          }, 100);
         }
         
       } catch (error) {
@@ -382,6 +428,9 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           pathname,
           courseId: searchParams.get('courseId')
         });
+        
+        // Clear fetch in progress flag on error
+        courseFetchInProgressRef.current = null;
         
         // Clear potentially corrupted cache
         const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
@@ -415,86 +464,12 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     fetchData();
   }, [courseId, pathname, location.search]);
 
-  // Add a useEffect to fetch user progress when course data is loaded
-  useEffect(() => {
-    // Only fetch progress if the user is logged in and we have a course
-    const fetchUserProgress = async () => {
-      if (!course || !course.id) return;
-      // Ensure we really are authenticated before calling protected endpoints
-      if (!isLoggedIn) return;
-      try { await validateAuth(); } catch { return; }
-      
-      try {        // Call the backend API to get the user's progress for this course
-        const response = await axiosInstance.get(`/courses/progress/${course.id}/`);
-        
-        setCourseProgress(response.data);
-        if (response?.data?.progress) {
-          setServerProgress(response.data.progress);
-        }
-        
-        // Update the course lessons with completion status from the API
-        const updatedCourse = {...course};
-        
-        // Check if it's a school course with chapters
-        if (response.data.chapters) {
-          response.data.chapters.forEach(chapter => {
-            const chapterIndex = updatedCourse.chapters.findIndex(c => c.title === chapter.name);
-            if (chapterIndex !== -1) {
-              chapter.lessons.forEach(lessonProgress => {
-                // Prefer matching by stable lesson id to avoid title mismatches
-                const lessonIndex = updatedCourse.chapters[chapterIndex].lessons.findIndex(l => 
-                  String(l.id) === String(lessonProgress.id)
-                );
-                if (lessonIndex !== -1) {
-                  updatedCourse.chapters[chapterIndex].lessons[lessonIndex].completed = !!lessonProgress.completed;
-                }
-              });
-            }
-          });
-        } 
-        // Check if it's an engineering course with sections
-        else if (response.data.sections) {
-          response.data.sections.forEach(section => {
-            const sectionIndex = updatedCourse.chapters.findIndex(c => c.title === section.name);
-            if (sectionIndex !== -1) {
-              section.lessons.forEach(lessonProgress => {
-                const lessonIndex = updatedCourse.chapters[sectionIndex].lessons.findIndex(l => 
-                  String(l.id) === String(lessonProgress.id)
-                );
-                if (lessonIndex !== -1) {
-                  updatedCourse.chapters[sectionIndex].lessons[lessonIndex].completed = !!lessonProgress.completed;
-                }
-              });
-            }
-          });
-        }
-        
-        setCourse(updatedCourse);
-
-        // Also get engineering progress summary (percentage + certificate if any)
-        try {
-          const summary = await axiosInstance.get(`/courses/${course.id}/progress/`);
-          const pct = summary.data?.progress?.percentage ?? 0;
-          setProgressPercent(pct);
-          setCertificate(summary.data?.certificate || null);
-          if (summary?.data?.progress) {
-            setServerProgress(summary.data.progress);
-          }
-        } catch (e) {
-          // ignore if not engineering course or not logged in
-        }
-        
-      } catch (error) {
-        console.error('Error fetching user progress:', error);
-        // Don't show error toast if 401 Unauthorized (user not logged in)
-        if (error.response?.status !== 401) {
-          universalToast.error('Failed to load your course progress');
-        }
-      }
-    };
-    
-    fetchUserProgress();
-  }, [course?.id, isLoggedIn]);
+  // Progress fetching is now handled by fetchProgressInBackground called from the cache logic
+  // This eliminates duplicate API calls. The fetchProgressInBackground function:
+  // 1. Validates auth once
+  // 2. Fetches progress once
+  // 3. Updates course state with completion status
+  // 4. Updates cache
 
   const handleIssueCertificate = async () => {
     if (!course?.id) return;
@@ -730,20 +705,88 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       );
       return filteredLessons.length > 0 ? { ...chapter, lessons: filteredLessons } : null;
     }).filter(Boolean);
-  };  // Handle lesson click
+  };
+
+  // Fetch full details for a specific lesson (lazy loading)
+  const fetchLessonDetails = useCallback(async (lessonId, chapterIndex, lessonIndex) => {
+    if (!lessonId) return;
+    
+    // Prevent duplicate fetches for the same lesson
+    const lessonKey = `${lessonId}`;
+    if (fetchedLessonsRef.current.has(lessonKey)) {
+      console.log('⏭️ Skipping duplicate fetch for lesson:', lessonId);
+      return;
+    }
+    fetchedLessonsRef.current.add(lessonKey);
+    
+    try {
+      const response = await axiosInstance.get(`/lessons/${lessonId}/`);
+      const lessonDetails = response.data;
+      
+      // Update the course state with the full lesson details
+      setCourse(prevCourse => {
+        const newCourse = { ...prevCourse };
+        const chapter = newCourse.chapters[chapterIndex];
+        const lessonBefore = chapter.lessons[lessonIndex];
+        
+        // Merge existing lesson data with new details
+        newCourse.chapters[chapterIndex].lessons[lessonIndex] = {
+          ...lessonBefore,
+          ...lessonDetails,
+          // Ensure we map backend fields to frontend expected fields
+          videoUrl: lessonDetails.video_url,
+          aboutLesson: lessonDetails.about_lesson,
+          quizQuestions: lessonDetails.quiz_questions,
+          // Ensure resources are properly formatted
+          resources: lessonDetails.resources || { downloadable: [], internet: [] }
+        };
+        
+        return newCourse;
+      });
+      
+      // Update cache with the new details
+      const cacheKey = courseCache.generateKey((pathname || '') + (location.search || '') + (isLoggedIn ? ':auth' : ':guest'));
+      const cachedData = courseCache.get(cacheKey);
+      if (cachedData && cachedData.course) {
+        const newCachedCourse = { ...cachedData.course };
+        if (newCachedCourse.chapters && newCachedCourse.chapters[chapterIndex]) {
+           const cachedLesson = newCachedCourse.chapters[chapterIndex].lessons[lessonIndex];
+           newCachedCourse.chapters[chapterIndex].lessons[lessonIndex] = {
+             ...cachedLesson,
+             ...lessonDetails,
+             videoUrl: lessonDetails.video_url,
+             aboutLesson: lessonDetails.about_lesson,
+             quizQuestions: lessonDetails.quiz_questions,
+             resources: lessonDetails.resources || { downloadable: [], internet: [] }
+           };
+           courseCache.set(cacheKey, { ...cachedData, course: newCachedCourse });
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error fetching lesson details:', error);
+      universalToast.error('Failed to load lesson content');
+    }
+  }, [pathname, location.search, isLoggedIn]);
+
+  // Handle lesson click
   const handleLessonClick = (chapterIndex, lessonIndex) => {
     const lesson = course.chapters[chapterIndex].lessons[lessonIndex]; 
     // Debug information
     console.log('🎯 Lesson clicked:', lesson);
-    console.log('📝 Lesson type:', lesson.type);
-    console.log('❓ Quiz questions:', lesson.quiz_questions);
-    console.log('📚 About lesson:', lesson.aboutLesson);
-    console.log('📂 Resources:', lesson.resources);
+    
     // Gate access for locked lessons when user is not logged in
     if (!isLoggedIn && lesson.isLocked) {
       // Soft nudge; prevent navigation
       universalToast.info('Login to unlock this lesson');
       return;
+    }
+    
+    // Lazy load lesson details if they are missing (aboutLesson is undefined in light serializer)
+    // We check for undefined specifically, as empty string '' means it was fetched but is empty
+    if (lesson.aboutLesson === undefined && lesson.id) {
+      console.log('📥 Lazy loading lesson details for:', lesson.id);
+      fetchLessonDetails(lesson.id, chapterIndex, lessonIndex);
     }
     
     // Only update state if we're actually changing lessons to prevent re-renders
@@ -787,6 +830,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const hasVideo = Boolean(currentLesson.videoUrl && String(currentLesson.videoUrl).trim());
     const about = currentLesson.aboutLesson && String(currentLesson.aboutLesson).trim();
     const hasAbout = Boolean(about);
+    console.log('[CONTENT-TYPE-META]', { hasVideo, hasAbout, type: currentLesson.type });
     const qlen = (currentLesson.quiz_questions || currentLesson.quizQuestions || []).length;
     const hasQuiz = qlen > 0;
     const res = currentLesson.resources || { downloadable: [], internet: [] };
@@ -816,6 +860,66 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
       onSidebarToggle(sidebarVisible);
     }
   }, [sidebarVisible, onSidebarToggle]);
+
+  // Effect to lazy load lesson details when active lesson changes
+  // NOTE: We intentionally exclude `course` from dependencies to prevent re-triggers
+  // when course state updates. Instead, we check course existence inside the effect.
+  useEffect(() => {
+    if (!course || !course.chapters) return;
+    
+    const chapter = course.chapters[activeChapter];
+    if (!chapter || !chapter.lessons) return;
+    
+    const lesson = chapter.lessons[activeLesson];
+    if (!lesson) return;
+    
+    // Check if already fetched to prevent triggering duplicate fetches
+    const lessonKey = `${lesson.id}`;
+    if (fetchedLessonsRef.current.has(lessonKey)) {
+      console.log('⏭️ Skipping auto-fetch - already fetched:', lesson.id);
+      return;
+    }
+    console.log('[AUTO-FETCH-CHECK]', {
+      activeChapter,
+      activeLesson,
+      lessonId: lesson.id,
+      aboutUndefined: lesson.aboutLesson === undefined,
+      dedupHas: fetchedLessonsRef.current.has(lessonKey)
+    });
+    
+    // Check if we need to fetch details (aboutLesson is undefined in light serializer)
+    if (lesson.aboutLesson === undefined && lesson.id) {
+      console.log('🔄 Auto-fetching details for active lesson:', lesson.id);
+      fetchLessonDetails(lesson.id, activeChapter, activeLesson);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChapter, activeLesson]);
+
+  // Effect to fetch first lesson details when course initially loads
+  // This handles the case where activeChapter and activeLesson are already 0 when course arrives
+  useEffect(() => {
+    // Only run when course first becomes available and loading is complete
+    if (loading || !course || !course.chapters) return;
+    
+    const chapter = course.chapters[activeChapter];
+    if (!chapter || !chapter.lessons) return;
+    
+    const lesson = chapter.lessons[activeLesson];
+    if (!lesson) return;
+    
+    // Check if already fetched
+    const lessonKey = `${lesson.id}`;
+    if (fetchedLessonsRef.current.has(lessonKey)) {
+      return;
+    }
+    
+    // Fetch first lesson details if needed
+    if (lesson.aboutLesson === undefined && lesson.id) {
+      console.log('🚀 Initial load - fetching first lesson details:', lesson.id);
+      fetchLessonDetails(lesson.id, activeChapter, activeLesson);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, course?.id]); // Triggers when loading completes AND course is available
 
   // Loading and error states
   if (loading) {
@@ -871,6 +975,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
   }
 
   const currentLesson = getCurrentLesson();
+  const isLessonLoading = currentLesson?.aboutLesson === undefined && !!currentLesson?.id;
+
   const completedLessons = course.chapters.reduce(
     (acc, chapter) => acc + chapter.lessons.filter(l => l.completed).length, 0
   );
@@ -964,7 +1070,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
     switch (contentType) {
       case 'resources':
-        return <ResourcesPage lessonResources={currentLesson?.resources} />; 
+        return <ResourcesPage lessonResources={currentLesson?.resources} isLoading={isLessonLoading} />; 
 
       case 'quiz':
         // Render quiz content
@@ -983,11 +1089,11 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             'You need 80% or higher to pass this quiz'
           ]
         };
-        return <QuizIntro quizData={quizData} lessonId={currentLesson?.id} />; 
+        return <QuizIntro quizData={quizData} lessonId={currentLesson?.id} isLoading={isLessonLoading} />; 
         
       case 'instructions':
       case 'reading':
-        return <InstructionsPage lessonContent={currentLesson} />;
+        return <InstructionsPage lessonContent={currentLesson} isLoading={isLessonLoading} />;
         
       case 'video':
       default:
@@ -1029,7 +1135,16 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
               </div>
                 {/* Tab Content */}
               <div className="mb-8">                {activeTab === 'about' && (
-                  <div className="prose prose-lg max-w-none markdown-body">                    {currentLesson?.aboutLesson ? (
+                  <div className="prose prose-lg max-w-none markdown-body">                    {isLessonLoading ? (
+                      <div className="animate-pulse space-y-4 p-4">
+                        <div className="h-6 bg-gray-200 rounded w-1/3 mb-6"></div>
+                        <div className="h-4 bg-gray-200 rounded w-full"></div>
+                        <div className="h-4 bg-gray-200 rounded w-full"></div>
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-full mt-4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                      </div>
+                    ) : currentLesson?.aboutLesson ? (
                       // Use actual lesson content if available with proper markdown components
                       <div>
                         <ReactMarkdown
@@ -1123,7 +1238,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                 )}
                 
                 {activeTab === 'resources' && (
-                  <ResourcesPage lessonResources={currentLesson?.resources} />
+                  <ResourcesPage lessonResources={currentLesson?.resources} isLoading={isLessonLoading} />
                 )}
               </div>
               
@@ -1201,17 +1316,19 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
         </div>
       </div>
 
-      {/* Sidebar toggle button - positioned correctly */}
+      {/* Sidebar toggle button */}
       <button
         onClick={() => setSidebarVisible(!sidebarVisible)}
-        className={`fixed transition-all duration-300 ${
-          sidebarVisible ? 'right-[400px]' : 'right-0'
-        } top-32 bg-white p-3 shadow-lg rounded-l-lg z-40 hover:bg-gray-50 border border-r-0 border-gray-200`}
+        className={`fixed top-32 z-40 h-12 w-8 shadow-md rounded-l-lg flex items-center justify-center border border-r-0 transition-all duration-300 ease-in-out ${
+          sidebarVisible 
+            ? 'right-[400px] bg-white border-gray-200 hover:bg-gray-50' 
+            : 'right-0 bg-indigo-600 border-indigo-600 hover:bg-indigo-700'
+        }`}
         aria-label={sidebarVisible ? "Close sidebar" : "Open sidebar"}
       >
         {sidebarVisible ? 
           <FaChevronRight className="w-4 h-4 text-gray-600" /> : 
-          <FaChevronLeft className="w-4 h-4 text-gray-600" />
+          <FaChevronLeft className="w-4 h-4 text-white" />
         }
       </button>
 
@@ -1237,6 +1354,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
           toggleLessonCompletion={toggleLessonCompletion}
           navigate={navigate}
           isLoggedIn={isLoggedIn}
+          progressLoading={progressLoading && isLoggedIn}
           progressPercent={displayPercent}
           certificate={certificate}
           issuingCert={issuingCert}

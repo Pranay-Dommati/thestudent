@@ -15,6 +15,7 @@ import '../../styles/mobile-courses.css';
 import logger from '../../utils/logger';
 import api from '../../utils/axios';
 import { courseCache } from '../../utils/courseCache';
+import prefetchBoardsAndStates from '../../utils/prefetchBoardsAndStates';
 
 const MobileFirstCourses = () => {
     const navigate = useNavigate();
@@ -104,77 +105,14 @@ const MobileFirstCourses = () => {
 
     // Function to check if courses exist for a specific class level
     const checkCoursesAvailability = async () => {
-        // First check if we have cached availability data
-        const cachedAvailability = courseCache.getCourseAvailability();
-        if (cachedAvailability) {
-            console.log('📦 Using cached course availability data (Mobile)');
-            setAvailableLevels(cachedAvailability);
-            setLoading(false);
-            return;
-        }
-
-        console.log('🔄 Fetching fresh course availability data (Mobile)');
-        setLoading(true);
-
-        try {
-            const schoolLevels = allEducationLevels.filter(level => level.apiClass !== 'engineering');
-
-            // Fire requests in parallel and keep payloads small
-            const schoolPromises = schoolLevels.map(level =>
-                api.get('/courses/school/', { params: { class: level.apiClass, limit: 1 } })
-                    .then(({ data }) => ({ level, data }))
-                    .catch(error => ({ level, error }))
-            );
-
-            // Engineering (currently hidden, but keep logic resilient)
-            const engineeringLevel = allEducationLevels.find(l => l.apiClass === 'engineering');
-            const engineeringPromise = engineeringLevel
-                ? api.get('/courses/engineering/', { params: { limit: 1 } })
-                    .then(({ data }) => ({ level: engineeringLevel, data }))
-                    .catch(error => ({ level: engineeringLevel, error }))
-                : Promise.resolve(null);
-
-            const results = await Promise.allSettled([
-                ...schoolPromises,
-                engineeringPromise,
-            ]);
-
-            const levelsWithCourses = [];
-
-            results.forEach(result => {
-                if (!result || result.status !== 'fulfilled') return;
-                const payload = result.value;
-                if (!payload || payload.error) {
-                    if (payload?.error) logger.error(`Error checking courses for ${payload.level?.apiClass}:`, payload.error);
-                    return;
-                }
-
-                const { level, data } = payload;
-                const count = Array.isArray(data) ? data.length : (data?.results?.length || 0);
-                if (count > 0) {
-                    levelsWithCourses.push(level);
-                    // Optionally cache tiny payload to warm level cache
-                    const items = Array.isArray(data) ? data : (data?.results || []);
-                    courseCache.setCoursesForLevel(level.apiClass, items);
-                }
-            });
-
-            // Mobile previously showed an empty state when nothing detected.
-            // Align with desktop: fall back to showing all levels so the page is never blank.
-            const finalLevels = levelsWithCourses.length > 0 ? levelsWithCourses : allEducationLevels;
-
-            // Cache only non-empty availability to avoid persisting a blank screen
-            if (levelsWithCourses.length > 0) {
-                courseCache.setCourseAvailability(levelsWithCourses);
-            }
-            setAvailableLevels(finalLevels);
-        } catch (error) {
-            logger.error('Error checking course availability:', error);
-            // Fallback: show all levels if API fails
-            setAvailableLevels(allEducationLevels);
-        } finally {
-            setLoading(false);
-        }
+        // STRICT REQUIREMENT: Only show 10th and 11th standard cards.
+        // No API checks, no conditions, just these two.
+        const forcedLevels = allEducationLevels.filter(level => 
+            level.id === '10th' || level.id === '11th'
+        );
+        
+        setAvailableLevels(forcedLevels);
+        setLoading(false);
     };
 
     const handleLevelSelect = (level) => {
@@ -183,7 +121,20 @@ const MobileFirstCourses = () => {
     };
 
     useEffect(() => {
-        checkCoursesAvailability();
+        // Defer the availability check slightly to avoid blocking paint, but keep it fast
+        const t = setTimeout(checkCoursesAvailability, 0);
+        // Prefetch board/state availability on mobile entry as well
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const run = () => prefetchBoardsAndStates(undefined, controller?.signal);
+        const handle = typeof requestIdleCallback !== 'undefined'
+            ? requestIdleCallback(run, { timeout: 1500 })
+            : setTimeout(run, 200);
+        return () => {
+            clearTimeout(t);
+            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {}
+            else clearTimeout(handle);
+            try { controller?.abort(); } catch {}
+        };
     }, []);
 
     useEffect(() => {

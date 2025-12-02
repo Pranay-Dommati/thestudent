@@ -6,6 +6,7 @@ import CourseHero from "./CourseHero/CourseHero";
 import logger from '../../utils/logger';
 import api from '../../utils/axios';
 import { courseCache } from '../../utils/courseCache';
+import prefetchBoardsAndStates from '../../utils/prefetchBoardsAndStates';
 
 const Courses = () => {
     const navigate = useNavigate();
@@ -76,77 +77,34 @@ const Courses = () => {
 
     // Function to check if courses exist for a specific class level
     const checkCoursesAvailability = async () => {
-        // First check if we have cached availability data
-        const cachedAvailability = courseCache.getCourseAvailability();
-        if (cachedAvailability) {
-            console.log('📦 Using cached course availability data');
-            setAvailableLevels(cachedAvailability);
-            setLoading(false);
-            return;
-        }
-
-        console.log('🔄 Fetching fresh course availability data (parallel)');
-        setLoading(true);
-
-        try {
-            const schoolLevels = allEducationLevels.filter(level => level.apiClass !== 'engineering');
-
-            // Fire all requests in parallel and keep payloads tiny using limit=1 when supported
-            const schoolPromises = schoolLevels.map(level =>
-                api.get('/courses/school/', { params: { class: level.apiClass, limit: 1 } })
-                    .then(({ data }) => ({ level, data }))
-                    .catch(error => ({ level, error }))
-            );
-
-            // Engineering (if/when enabled)
-            const engineeringLevel = allEducationLevels.find(l => l.apiClass === 'engineering');
-            const engineeringPromise = engineeringLevel
-                ? api.get('/courses/engineering/', { params: { limit: 1 } })
-                    .then(({ data }) => ({ level: engineeringLevel, data }))
-                    .catch(error => ({ level: engineeringLevel, error }))
-                : Promise.resolve(null);
-
-            const results = await Promise.allSettled([
-                ...schoolPromises,
-                engineeringPromise,
-            ]);
-
-            const levelsWithCourses = [];
-
-            results.forEach(result => {
-                if (!result || result.status !== 'fulfilled') return;
-                const payload = result.value;
-                if (!payload || payload.error) {
-                    if (payload?.error) logger.error(`Error checking courses for ${payload.level?.apiClass}:`, payload.error);
-                    return;
-                }
-
-                const { level, data } = payload;
-                if (Array.isArray(data) ? data.length > 0 : (data?.results?.length || 0) > 0) {
-                    levelsWithCourses.push(level);
-                    // Optionally cache the tiny payload to warm level cache
-                    const items = Array.isArray(data) ? data : (data?.results || []);
-                    courseCache.setCoursesForLevel(level.apiClass, items);
-                }
-            });
-
-            // If nothing detected (API shape unknown or blocked), fallback to showing all
-            const finalLevels = levelsWithCourses.length > 0 ? levelsWithCourses : allEducationLevels;
-
-            // Cache and update state
-            courseCache.setCourseAvailability(finalLevels);
-            setAvailableLevels(finalLevels);
-        } catch (error) {
-            logger.error('Error checking course availability:', error);
-            // Fallback: show all levels if API fails
-            setAvailableLevels(allEducationLevels);
-        } finally {
-            setLoading(false);
-        }
+        // STRICT REQUIREMENT: Only show 10th and 11th standard cards.
+        // No API checks, no conditions, just these two.
+        const forcedLevels = allEducationLevels.filter(level => 
+            level.id === '10th' || level.id === '11th'
+        );
+        
+        setAvailableLevels(forcedLevels);
+        setLoading(false);
     };
 
     useEffect(() => {
-        checkCoursesAvailability();
+        // Defer the availability check slightly to avoid blocking paint, but keep it fast
+        const t = setTimeout(checkCoursesAvailability, 0);
+        return () => clearTimeout(t);
+    }, []);
+
+    useEffect(() => {
+        // Also prefetch board/state availability immediately when landing on /courses
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const run = () => prefetchBoardsAndStates(undefined, controller?.signal);
+        const handle = typeof requestIdleCallback !== 'undefined'
+            ? requestIdleCallback(run, { timeout: 1500 })
+            : setTimeout(run, 200);
+        return () => {
+            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {}
+            else clearTimeout(handle);
+            try { controller?.abort(); } catch {}
+        };
     }, []);
 
     const handleLevelSelect = (level) => {

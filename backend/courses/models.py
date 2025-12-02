@@ -92,6 +92,8 @@ class CourseChapter(models.Model):
     school_course = models.ForeignKey(SchoolCourse, on_delete=models.CASCADE, related_name='chapters')
     name = models.CharField(max_length=255)
     order = models.PositiveIntegerField(default=0)
+    is_deleted = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         ordering = ['order']
@@ -104,6 +106,8 @@ class CourseSection(models.Model):
     engineering_course = models.ForeignKey(EngineeringCourse, on_delete=models.CASCADE, related_name='sections')
     name = models.CharField(max_length=255)
     order = models.PositiveIntegerField(default=0)
+    is_deleted = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         ordering = ['order']
@@ -127,6 +131,10 @@ class Lesson(models.Model):
     description = models.TextField(blank=True)
     about_lesson = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=0)
+    # Soft delete flag (aligns with existing MySQL column)
+    is_deleted = models.BooleanField(default=False)
+    # Timestamp for last update (aligns with existing MySQL NOT NULL column)
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         ordering = ['order']

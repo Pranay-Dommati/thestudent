@@ -56,13 +56,46 @@ export async function askTutor({ readingContent, message, topic, courseId, histo
   };
 
   try {
+    console.log('🤖 [Tutor] Starting request:', { 
+      topic, 
+      courseId, 
+      messageLength: message.length,
+      readingLength: reading.length,
+      historyCount: compactHistory.length 
+    });
+    
     const axiosAi = (await import('../../../utils/axiosAi')).default;
+    console.log('🤖 [Tutor] axiosAi imported, sending POST to /tutor/');
+    console.log('🤖 [Tutor] Payload:', {
+      topic: payload.topic,
+      course_id: payload.course_id,
+      message: payload.message?.substring(0, 100),
+      reading_content_length: payload.reading_content?.length,
+      history_length: payload.history?.length
+    });
+    
     const { data } = await axiosAi.post('/tutor/', payload);
+    console.log('🤖 [Tutor] Response received:', { dataKeys: Object.keys(data || {}) });
+    
     const text = extractTextFromAIResponse(data);
     if (!text) throw new Error('Empty tutor response');
+    
+    console.log('🤖 [Tutor] Success, response length:', text.length);
     return text;
   } catch (err) {
     // Graceful auth-less shared view handling is already in axiosAi; surface a friendly message
+    console.error('🤖 [Tutor] Request failed:', {
+      message: err?.message,
+      status: err?.response?.status,
+      statusText: err?.response?.statusText,
+      code: err?.code,
+      config: err?.config ? {
+        url: err.config.url,
+        method: err.config.method,
+        baseURL: err.config.baseURL
+      } : null
+    });
+    
     logger.warn('Tutor request failed:', err?.message || err);
     const status = err?.response?.status;
     const serverError = err?.response?.data?.error;

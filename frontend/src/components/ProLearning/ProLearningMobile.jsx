@@ -41,8 +41,26 @@ const ProLearningMobile = ({
   const [isSelectingTopic, setIsSelectingTopic] = useState(false);
   const [showTopicsSidebar, setShowTopicsSidebar] = useState(false);
   
+  // Track if user has scrolled past the header for sticky nav behavior
+  const [isNavSticky, setIsNavSticky] = useState(false);
+  const navRef = useRef(null);
+  const headerRef = useRef(null);
+  
   // Ref for the scrollable main area so we can control scroll position on tab change
   const mainRef = useRef(null);
+
+  // Handle scroll to toggle sticky nav
+  useEffect(() => {
+    const handleScroll = () => {
+      if (headerRef.current) {
+        const headerBottom = headerRef.current.getBoundingClientRect().bottom;
+        setIsNavSticky(headerBottom <= 0);
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const scrollMainToTop = (smooth = true) => {
     if (mainRef.current) {
@@ -118,7 +136,7 @@ const ProLearningMobile = ({
   };
 
   return (
-    <div className="lg:hidden h-screen bg-gray-50 flex flex-col relative overflow-hidden">
+    <div className="lg:hidden min-h-screen bg-gray-50 relative">
       {/* Enhanced Styles and Animations */}
       <style dangerouslySetInnerHTML={{__html: `
         .scrollbar-hide {
@@ -145,10 +163,10 @@ const ProLearningMobile = ({
       
       
 
-      {/* Enhanced Main Content Area - Scrollable container */}
-  <main ref={mainRef} className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-white">
-        {/* Header now scrolls with content (not sticky) */}
-        <header className="bg-white/98 backdrop-blur-xl shadow-sm border-b border-gray-200 px-4 py-3">
+      {/* Enhanced Main Content Area */}
+  <main ref={mainRef} className="bg-gradient-to-b from-gray-50 to-white">
+        {/* Header scrolls with content (not sticky) */}
+        <header ref={headerRef} className="bg-white/98 backdrop-blur-xl shadow-sm border-b border-gray-200 px-4 py-3">
           <div className="flex items-center gap-3">
             {/* Integrated Back Button */}
             <button
@@ -217,8 +235,16 @@ const ProLearningMobile = ({
             </div>
           </div>
         </header>
-        {/* Sticky Tab Navigation inside scrollable area */}
-  <nav className="bg-white border-b border-gray-200 px-1 py-2 sticky top-0 z-20 shadow-sm">
+        
+        {/* Tab Navigation - Sticky when scrolled past header */}
+        <nav 
+          ref={navRef}
+          className={`bg-white border-b border-gray-200 px-1 py-2 z-40 shadow-sm lg:hidden transition-all duration-200 ${
+            isNavSticky 
+              ? 'fixed top-0 left-0 right-0' 
+              : ''
+          }`}
+        >
           <div className="grid grid-cols-5 gap-0.5">
             {tabs && tabs.length > 0 ? tabs.map((tab, index) => {
               const isActive = currentSection === tab.id;
@@ -285,6 +311,11 @@ const ProLearningMobile = ({
             )}
           </div>
         </nav>
+        
+        {/* Spacer to prevent content jump when nav becomes fixed */}
+        {isNavSticky && <div className="h-14 lg:hidden" />}
+        
+        {/* Content Area */}
         <div className="p-4 pb-8">
           {/* Loading State for Content Transitions */}
           {isLoading ? (
@@ -304,9 +335,7 @@ const ProLearningMobile = ({
             </div>
           )}
         </div>
-      </main>
-
-      {/* Ultra Minimal Professional Sidebar - Slides from Right */}
+      </main>      {/* Ultra Minimal Professional Sidebar - Slides from Right */}
       <div className={`fixed inset-y-0 right-0 z-50 w-72 max-w-[85vw] bg-white/95 backdrop-blur-xl border-l border-gray-200/50 transform transition-all duration-300 ease-out ${
         showTopicsSidebar ? 'translate-x-0' : 'translate-x-full'
       }`}>

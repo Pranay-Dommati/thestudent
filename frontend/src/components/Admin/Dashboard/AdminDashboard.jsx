@@ -134,7 +134,7 @@ const AdminDashboard = () => {
             isDarkMode={isDarkMode}
           />
           
-          <main className={`transition-all duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'} min-h-screen ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
+          <main className={`transition-all duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50'} h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
             <div className="p-6 lg:p-8">
               <div className="max-w-7xl mx-auto">
                 <div className="mb-6 flex justify-end items-center">

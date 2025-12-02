@@ -1,6 +1,8 @@
 // Summary Content Generation Service
 // Handles generating concise summaries and key points from reading content
 
+import storage from '../../../utils/storage';
+
 /**
  * Generate summary content based on user input and reading material
  * @param {function} setContent - React setContent function
@@ -12,47 +14,134 @@ export async function generateSummaryContent(setContent, topic = '', readingCont
   // Reading content available and preview
   
   try {
-    let summary;
     let metadata = {
       generatedAt: new Date().toISOString(),
-      topic: topic
+      topic: topic,
+      type: readingContent && readingContent.length > 100 ? 'content-based' : 'topic-based'
     };
 
-    // Prioritize reading content for actual summaries
-    if (readingContent && readingContent.length > 100) {
-      // Generate content-based summary from actual reading material
-      // Generating content-based summary from reading material
-      summary = await generateAISummary(readingContent, topic);
-      metadata.type = 'content-based';
-      metadata.sourceLength = readingContent.length;
-      metadata.topic = topic;
-    } else if (topic && topic.length > 0) {
-      // Generate topic-based summary only when no reading content
-      // Generating topic-based summary
-      summary = await generateTopicBasedSummary(topic, readingContent);
-      metadata.type = 'topic-based';
-      metadata.hasReadingContent = false;
-    } else {
-      // Use fallback summary
-      // Using fallback summary
-      throw new Error('No summary content available');
+    if (readingContent) {
+        metadata.sourceLength = readingContent.length;
     }
 
-    if (summary) {
-      metadata.summaryLength = summary.length;
-      if (readingContent) {
-        metadata.compressionRatio = Math.round((summary.length / readingContent.length) * 100) + '%';
-      }
-    }
+    const token = storage.getItem('accessToken');
+    const baseURL = (import.meta.env.VITE_AI_BASE_URL || '/ai');
 
-    // Summary content generated successfully
-    // Summary metadata logged
-
-    // Call setContent with the generated summary
-    setContent({
-      summary: summary,
-      summaryMetadata: metadata
+    const response = await fetch(`${baseURL}/summary/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : undefined
+        },
+        body: JSON.stringify({
+            topic,
+            reading_content: readingContent,
+            stream: true
+        })
     });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullText = '';
+    let completeReceived = false;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+            // Flush any remaining text in decoder
+            buffer += decoder.decode();
+            if (buffer.trim()) {
+                // Process final buffer content
+                const lines = buffer.split('\n');
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const data = JSON.parse(line);
+                        if (data.type === 'chunk') {
+                            fullText += data.text;
+                            setContent({
+                                summary: fullText,
+                                summaryMetadata: metadata
+                            });
+                        } else if (data.type === 'complete') {
+                            completeReceived = true;
+                            fullText = data.full_text;
+                            if (data.sanitization_changes) {
+                                metadata.sanitization = data.sanitization_changes;
+                            }
+                            setContent({
+                                summary: fullText,
+                                summaryMetadata: metadata
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('Error parsing final stream line:', line, e);
+                    }
+                }
+            }
+            break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // Keep the last incomplete line
+
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+                const data = JSON.parse(line);
+                if (data.type === 'chunk') {
+                    fullText += data.text;
+                    setContent({
+                        summary: fullText,
+                        summaryMetadata: metadata
+                    });
+                } else if (data.type === 'complete') {
+                    completeReceived = true;
+                    // Final sanitized text
+                    fullText = data.full_text;
+                    if (data.sanitization_changes) {
+                        metadata.sanitization = data.sanitization_changes;
+                    }
+                    setContent({
+                        summary: fullText,
+                        summaryMetadata: metadata
+                    });
+                } else if (data.type === 'error') {
+                    console.error('Stream error:', data.error);
+                    throw new Error(data.error);
+                }
+            } catch (e) {
+                console.warn('Error parsing stream line:', line, e);
+            }
+        }
+    }
+
+    if (!completeReceived) {
+        throw new Error('Stream ended unexpectedly without completion signal');
+    }
+
+    if (fullText) {
+      metadata.summaryLength = fullText.length;
+      if (readingContent) {
+        metadata.compressionRatio = Math.round((fullText.length / readingContent.length) * 100) + '%';
+      }
+      metadata.estimatedReadTime = estimateReadingTime(fullText);
+      
+      // Final update
+      setContent({
+        summary: fullText,
+        summaryMetadata: metadata
+      });
+      
+      return fullText;
+    }
     
   } catch (error) {
     console.error('🚨 Summary generation failed:', error);
@@ -60,64 +149,6 @@ export async function generateSummaryContent(setContent, topic = '', readingCont
     // Throw error instead of using fallback
     throw new Error('Summary generation failed');
   }
-}
-
-// Generate topic-based summary with optional reading content context
-async function generateTopicBasedSummary(topic, readingContent = '') {
-  try {
-    const axiosAi = (await import('../../../utils/axiosAi')).default;
-    const { data: result } = await axiosAi.post('/summary/', { topic, reading_content: readingContent });
-    return result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  } catch (error) {
-    throw new Error('Summary generation failed');
-  }
-}
-
-// Generate AI-powered summary from reading content
-async function generateAISummary(readingContent, topic = '') {
-  // Calling AI summary API for topic
-  // Sending reading content
-  
-  try {
-    const axiosAi = (await import('../../../utils/axiosAi')).default;
-    const { data: result } = await axiosAi.post('/summary/', { topic, reading_content: readingContent });
-    // AI Summary API result
-    
-    const summaryText = result?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    // Generated summary
-    
-    return summaryText;
-  } catch (error) {
-    console.error(`🚨 AI Summary generation error:`, error);
-    throw new Error('Summary generation failed');
-  }
-}
-
-// Extract key topics from reading content for smart summary generation
-function extractKeyTopics(content) {
-  if (!content || typeof content !== 'string') return [];
-  
-  // Look for markdown headers
-  const headers = content.match(/#{1,6}\s+(.+)/g) || [];
-  const topics = headers
-    .map(header => header.replace(/#{1,6}\s+/, '').trim())
-    .filter(topic => topic.length > 0)
-    .slice(0, 10); // Limit to prevent overloading
-  
-  return topics;
-}
-
-// Create topic-specific summary points
-function createTopicSummary(topics) {
-  if (!topics || topics.length === 0) return '';
-  
-  let summary = '### 🎯 Topic Overview\n\n';
-  
-  topics.forEach((topic, index) => {
-    summary += `${index + 1}. **${topic}**: Key concepts and practical applications\n`;
-  });
-  
-  return summary + '\n';
 }
 
 // Generate reading time estimate for summary

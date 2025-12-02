@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -37,6 +37,111 @@ import {
 } from '../utils/ReadingUtils.js';
 import TextSelectionPopup from '../TutorChat/TextSelectionPopup.jsx';
 
+// Hook for smooth text streaming animation
+const useSmoothStreaming = (targetText, isComplete, isProgressive) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const targetRef = useRef(targetText || '');
+  const currentLengthRef = useRef(0);
+  const [cursorVisible, setCursorVisible] = useState(true);
+  
+  // Update refs when props change
+  useEffect(() => {
+    targetRef.current = targetText || '';
+    
+    // If not progressive (e.g. reload), or already complete on mount (and we haven't started animating), show immediately
+    // We check currentLengthRef.current === 0 to ensure we only skip animation on initial load, not mid-stream
+    if ((!isProgressive || isComplete) && currentLengthRef.current === 0) {
+        currentLengthRef.current = (targetText || '').length;
+        setDisplayedText(targetText || '');
+    }
+  }, [targetText, isComplete, isProgressive]);
+
+  useEffect(() => {
+    let animationFrameId;
+    
+    const animate = () => {
+      const targetLen = targetRef.current.length;
+      const currentLen = currentLengthRef.current;
+      
+      if (currentLen < targetLen) {
+        // Calculate step size
+        const diff = targetLen - currentLen;
+        
+        // Adaptive speed:
+        // - Small diff: slow, smooth typing (2-3 chars/frame)
+        // - Medium diff: faster (5-10 chars/frame)
+        // - Huge diff: catch up quickly but still animated (15-20 chars/frame)
+        let step = 2; 
+        if (diff > 50) step = 5;
+        if (diff > 200) step = 10; // Reduced from 15
+        if (diff > 1000) step = 20; // Reduced from 50 to prevent "instant" appearance
+        
+        const nextLen = Math.min(targetLen, currentLen + step);
+        currentLengthRef.current = nextLen;
+        setDisplayedText(targetRef.current.slice(0, nextLen));
+        
+        animationFrameId = requestAnimationFrame(animate);
+      } else if (currentLen > targetLen) {
+        // Text shrank (reset), update immediately
+        currentLengthRef.current = targetLen;
+        setDisplayedText(targetRef.current);
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        // Idle, check again next frame (or could stop and restart on prop change)
+        // Keeping loop running is simpler for now
+        animationFrameId = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []); // Run continuously
+
+  // Blinking cursor effect
+  useEffect(() => {
+    if (!isProgressive || isComplete) return;
+    
+    const interval = setInterval(() => {
+      setCursorVisible(v => !v);
+    }, 500);
+    
+    return () => clearInterval(interval);
+  }, [isProgressive, isComplete]);
+
+  // If complete, just return text
+  if (!isProgressive || isComplete) {
+      return displayedText;
+  }
+
+  // Append cursor token if generating
+  return displayedText + (cursorVisible ? ' |CURSOR|' : '');
+};
+
+// Helper to render children with cursor replacement
+const renderChildrenWithCursor = (children) => {
+  return React.Children.map(children, child => {
+    if (typeof child === 'string') {
+      if (child.includes('|CURSOR|')) {
+        const parts = child.split('|CURSOR|');
+        return (
+          <>
+            {parts[0]}
+            <span className="inline-block w-2.5 h-2.5 bg-blue-600 rounded-full ml-1 animate-pulse align-baseline" style={{ animationDuration: '1s' }} />
+            {parts[1]}
+          </>
+        );
+      }
+      return child;
+    }
+    if (React.isValidElement(child) && child.props.children) {
+      return React.cloneElement(child, {
+        children: renderChildrenWithCursor(child.props.children)
+      });
+    }
+    return child;
+  });
+};
+
 /**
  * TabContentRenderer - Renders all tab content for ProLearningPage
  * 
@@ -68,7 +173,8 @@ const TabContentRenderer = ({
   loadScenario,
   getCurrentTopic,
   setActiveTab,
-  onTextSelection // New prop for handling text selection
+  onTextSelection, // New prop for handling text selection
+  isProgressiveGenerating // New prop for animation control
 }) => {
   // Create ref for reading content container
   const readingContentRef = useRef(null);
@@ -115,6 +221,23 @@ const TabContentRenderer = ({
       // Don't clear the browser selection - let it persist
     }
   };
+
+  // Calculate reading content for animation hook (must be top-level to adhere to Rules of Hooks)
+  const effectiveTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
+  
+  // Prefer sanitized reading if it belongs to current topic
+  const useSanitized = (sanitizedReadingTopicName === effectiveTopicName) && (typeof sanitizedReading === 'string') && sanitizedReading.trim().length > 0;
+  
+  // Else fallback to raw content reading if content belongs to current topic
+  const useRaw = (!useSanitized) && (contentTopicName === effectiveTopicName) && (typeof content?.reading === 'string') && content.reading.trim().length > 0;
+  
+  const rawReading = useSanitized ? sanitizedReading : (useRaw ? content.reading : '');
+  
+  // Check if reading is marked as complete in metadata
+  const isReadingComplete = !!content?.metadata?.readingComplete || !!content?.metadata?.readingGenerated;
+  
+  // Apply smooth streaming - called unconditionally at top level
+  const displayReading = useSmoothStreaming(rawReading, isReadingComplete, isProgressiveGenerating);
 
   switch (activeTab) {
     case "reading":
@@ -168,12 +291,6 @@ const TabContentRenderer = ({
               }
             `}</style>
             {(() => {
-              const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
-              // Prefer sanitized reading if it belongs to current topic
-              const useSanitized = (sanitizedReadingTopicName === currentTopicName) && (typeof sanitizedReading === 'string') && sanitizedReading.trim().length > 0;
-              // Else fallback to raw content reading if content belongs to current topic
-              const useRaw = (!useSanitized) && (contentTopicName === currentTopicName) && (typeof content?.reading === 'string') && content.reading.trim().length > 0;
-              const displayReading = useSanitized ? sanitizedReading : (useRaw ? content.reading : '');
               if (!displayReading || displayReading.trim().length === 0) {
                 return (
                   <div className="text-gray-500">Content not available</div>
@@ -187,19 +304,19 @@ const TabContentRenderer = ({
                 components={{
                   h1: ({children}) => (
                     <h1 className="text-3xl font-bold mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      {children}
+                      {renderChildrenWithCursor(children)}
                     </h1>
                   ),
                   h2: ({children}) => (
                     <h2 className="text-2xl font-semibold text-gray-800 mb-4 mt-8 flex items-center">
                       <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-3"></div>
-                      {children}
+                      {renderChildrenWithCursor(children)}
                     </h2>
                   ),
                   h3: ({children}) => (
                     <h3 className="text-xl font-medium text-gray-700 mb-3 mt-6 flex items-center">
                       <FaLightbulb className="text-yellow-500 mr-2" />
-                      {children}
+                      {renderChildrenWithCursor(children)}
                     </h3>
                   ),
                   p: ({children}) => {
@@ -218,14 +335,14 @@ const TabContentRenderer = ({
                     if (hasCodeBlock) {
                       return (
                         <div className="text-gray-700 leading-relaxed mb-4 text-base">
-                          {children}
+                          {renderChildrenWithCursor(children)}
                         </div>
                       );
                     }
                     
                     return (
                       <p className="text-gray-700 leading-relaxed mb-4 text-base">
-                        {children}
+                        {renderChildrenWithCursor(children)}
                       </p>
                     );
                   },
@@ -277,10 +394,10 @@ const TabContentRenderer = ({
                     const blockId = codeString;
                     return (
                       <div className="relative my-6 w-full max-w-full">
-                        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl w-full">
-                          <span className="text-xs text-gray-500 font-mono">{lang || "code"}</span>
+                        <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border border-gray-200 border-b-0 rounded-t-xl w-full">
+                          <span className="text-xs text-gray-600 font-medium">{lang || "code"}</span>
                           <button
-                            className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-100 bg-white ml-2 flex items-center gap-1 cursor-pointer"
+                            className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white ml-2 flex items-center gap-1 cursor-pointer hover:bg-gray-50 transition-colors"
                             onClick={() => handleCopyCode(codeString, blockId)}
                             type="button"
                           >
@@ -289,17 +406,20 @@ const TabContentRenderer = ({
                                 <FaCheck className="inline-block text-green-600" /> Copied!
                               </>
                             ) : (
-                              <>Copy</>
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                Copy code
+                              </>
                             )}
                           </button>
                         </div>
                         <SyntaxHighlighter
                           style={{
                             'code[class*="language-"]': {
-                              color: '#f8f8f2',
+                              color: '#24292e',
                               background: 'none',
                               fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
-                              fontSize: '1rem',
+                              fontSize: '0.875rem',
                               lineHeight: '1.5',
                               whiteSpace: 'pre',
                               wordSpacing: 'normal',
@@ -309,57 +429,59 @@ const TabContentRenderer = ({
                               hyphens: 'none'
                             },
                             'pre[class*="language-"]': {
-                              color: '#f8f8f2',
-                              background: '#23272f',
+                              color: '#24292e',
+                              background: '#f8f9fa',
                               overflow: 'auto'
                             },
-                            comment: { color: '#6272a4', fontStyle: 'italic' },
-                            prolog: { color: '#6272a4' },
-                            doctype: { color: '#6272a4' },
-                            cdata: { color: '#6272a4' },
-                            punctuation: { color: '#f8f8f2' },
-                            property: { color: '#50fa7b' },
-                            tag: { color: '#ff79c6' },
-                            constant: { color: '#bd93f9' },
-                            symbol: { color: '#bd93f9' },
-                            deleted: { color: '#ff5555' },
-                            boolean: { color: '#bd93f9' },
-                            number: { color: '#bd93f9' },
-                            selector: { color: '#50fa7b' },
-                            'attr-name': { color: '#50fa7b' },
-                            string: { color: '#f1fa8c' },
-                            char: { color: '#f1fa8c' },
-                            builtin: { color: '#8be9fd' },
-                            inserted: { color: '#50fa7b' },
-                            operator: { color: '#ff79c6' },
-                            entity: { color: '#f8f8f2', cursor: 'help' },
-                            url: { color: '#f8f8f2' },
-                            variable: { color: '#f8f8f2' },
-                            atrule: { color: '#8be9fd' },
-                            'attr-value': { color: '#f1fa8c' },
-                            function: { color: '#50fa7b' },
-                            'class-name': { color: '#8be9fd' },
-                            keyword: { color: '#ff79c6' },
-                            regex: { color: '#f1fa8c' },
-                            important: { color: '#ff5555', fontWeight: 'bold' }
+                            comment: { color: '#6a737d', fontStyle: 'italic' },
+                            prolog: { color: '#6a737d' },
+                            doctype: { color: '#6a737d' },
+                            cdata: { color: '#6a737d' },
+                            punctuation: { color: '#24292e' },
+                            property: { color: '#22863a' },
+                            tag: { color: '#22863a' },
+                            constant: { color: '#005cc5' },
+                            symbol: { color: '#e36209' },
+                            deleted: { color: '#b31d28' },
+                            boolean: { color: '#005cc5' },
+                            number: { color: '#005cc5' },
+                            selector: { color: '#22863a' },
+                            'attr-name': { color: '#6f42c1' },
+                            string: { color: '#032f62' },
+                            char: { color: '#032f62' },
+                            builtin: { color: '#005cc5' },
+                            inserted: { color: '#22863a' },
+                            operator: { color: '#d73a49' },
+                            entity: { color: '#24292e', cursor: 'help' },
+                            url: { color: '#24292e' },
+                            variable: { color: '#e36209' },
+                            atrule: { color: '#d73a49' },
+                            'attr-value': { color: '#032f62' },
+                            function: { color: '#6f42c1' },
+                            'class-name': { color: '#6f42c1' },
+                            keyword: { color: '#d73a49' },
+                            regex: { color: '#032f62' },
+                            important: { color: '#d73a49', fontWeight: 'bold' }
                           }}
                           language={lang}
                           customStyle={{
                             borderRadius: "0 0 0.75rem 0.75rem",
-                            fontSize: "1rem",
+                            fontSize: "0.875rem",
                             margin: 0,
                             padding: "1rem",
-                            background: "#23272f",
-                            border: "1px solid #222c37",
-                            color: "#f8f8f2",
-                            lineHeight: "1.4",
+                            background: "#f8f9fa",
+                            border: "1px solid #e5e7eb",
+                            borderTop: "none",
+                            color: "#24292e",
+                            lineHeight: "1.5",
                             display: 'block',
-                            width: '100%'
+                            width: '100%',
+                            overflowX: 'auto'
                           }}
                           codeTagProps={{
                             style: { 
                               fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
-                              color: '#f8f8f2'
+                              color: '#24292e'
                             },
                             className: 'custom-syntax-highlight'
                           }}
@@ -374,14 +496,14 @@ const TabContentRenderer = ({
                   li: ({children}) => (
                     <li className="flex items-start text-gray-700">
                       <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mt-2.5 mr-3 flex-shrink-0"></div>
-                      <span>{children}</span>
+                      <span>{renderChildrenWithCursor(children)}</span>
                     </li>
                   ),
                   blockquote: ({children}) => (
                     <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-6 py-4 my-6 rounded-r-lg">
                       <div className="flex items-start">
                         <FaLightbulb className="text-blue-500 mt-1 mr-3 flex-shrink-0" />
-                        <div className="text-blue-800 italic">{children}</div>
+                        <div className="text-blue-800 italic">{renderChildrenWithCursor(children)}</div>
                       </div>
                     </blockquote>
                   )
@@ -564,11 +686,106 @@ const TabContentRenderer = ({
                     );
                   }
                   
-                  // default: keep summary code blocks minimal
+                  // Nice styled code block with header and copy button (matching Sia chat style)
+                  const blockId = `summary-${codeString.slice(0, 50)}`;
                   return (
-                    <pre className="my-4 p-4 rounded-lg bg-gray-900 text-gray-100 overflow-auto text-sm leading-6 whitespace-pre font-mono">
-                      <code>{codeString}</code>
-                    </pre>
+                    <div className="relative my-6 w-full max-w-full">
+                      <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border border-gray-200 border-b-0 rounded-t-xl w-full">
+                        <span className="text-xs text-gray-600 font-medium">{lang || "code"}</span>
+                        <button
+                          className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white ml-2 flex items-center gap-1 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={() => handleCopyCode(codeString, blockId)}
+                          type="button"
+                        >
+                          {copySuccessMap[blockId] ? (
+                            <>
+                              <FaCheck className="inline-block text-green-600" /> Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                              Copy code
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <SyntaxHighlighter
+                        language={lang || 'text'}
+                        style={{
+                          'code[class*="language-"]': {
+                            color: '#24292e',
+                            background: 'none',
+                            fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                            fontSize: '0.875rem',
+                            lineHeight: '1.5',
+                            whiteSpace: 'pre',
+                            wordSpacing: 'normal',
+                            wordBreak: 'normal',
+                            wordWrap: 'normal',
+                            tabSize: 4,
+                            hyphens: 'none'
+                          },
+                          'pre[class*="language-"]': {
+                            color: '#24292e',
+                            background: '#f8f9fa',
+                            overflow: 'auto'
+                          },
+                          comment: { color: '#6a737d', fontStyle: 'italic' },
+                          prolog: { color: '#6a737d' },
+                          doctype: { color: '#6a737d' },
+                          cdata: { color: '#6a737d' },
+                          punctuation: { color: '#24292e' },
+                          property: { color: '#22863a' },
+                          tag: { color: '#22863a' },
+                          constant: { color: '#005cc5' },
+                          symbol: { color: '#e36209' },
+                          deleted: { color: '#b31d28' },
+                          boolean: { color: '#005cc5' },
+                          number: { color: '#005cc5' },
+                          selector: { color: '#22863a' },
+                          'attr-name': { color: '#6f42c1' },
+                          string: { color: '#032f62' },
+                          char: { color: '#032f62' },
+                          builtin: { color: '#005cc5' },
+                          inserted: { color: '#22863a' },
+                          operator: { color: '#d73a49' },
+                          entity: { color: '#24292e', cursor: 'help' },
+                          url: { color: '#24292e' },
+                          variable: { color: '#e36209' },
+                          atrule: { color: '#d73a49' },
+                          'attr-value': { color: '#032f62' },
+                          function: { color: '#6f42c1' },
+                          'class-name': { color: '#6f42c1' },
+                          keyword: { color: '#d73a49' },
+                          regex: { color: '#032f62' },
+                          important: { color: '#d73a49', fontWeight: 'bold' }
+                        }}
+                        customStyle={{
+                          borderRadius: "0 0 0.75rem 0.75rem",
+                          fontSize: "0.875rem",
+                          margin: 0,
+                          padding: "1rem",
+                          background: "#f8f9fa",
+                          border: "1px solid #e5e7eb",
+                          borderTop: "none",
+                          color: "#24292e",
+                          lineHeight: "1.5",
+                          display: 'block',
+                          width: '100%',
+                          overflowX: 'auto'
+                        }}
+                        codeTagProps={{
+                          style: { 
+                            fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                            color: '#24292e'
+                          },
+                          className: 'custom-syntax-highlight'
+                        }}
+                        showLineNumbers={false}
+                      >
+                        {codeString}
+                      </SyntaxHighlighter>
+                    </div>
                   );
                 }
               }}

@@ -7,7 +7,7 @@ import BackButton from '../../components/BackButton';
 import MobileBoardSelector from '../../shared/MobileBoardSelector';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
-import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
+import { checkBoardAvailability, checkStateAvailability, getOptimisticBoardAvailability } from '../../../../utils/courseAvailability';
 import Footer from '../../../Footer/Footer';
 import SEO from '../../../SEO/SEO';
 
@@ -37,22 +37,29 @@ const TwelfthStandard = () => {
   const [availableStates, setAvailableStates] = useState([]);
   const [checkingStates, setCheckingStates] = useState(false);
 
-  // Check course availability for each board
+  // Check board availability
   useEffect(() => {
-    const checkAvailability = async () => {
-      setCheckingAvailability(true);
+    // 1. Try optimistic cache first for instant render
+    const cached = getOptimisticBoardAvailability('12th');
+    if (cached) {
+      setAvailableBoards(cached);
+      setCheckingAvailability(false);
+    }
+
+    // 2. Then fetch fresh data in background (or foreground if no cache)
+    const run = async () => {
       try {
-        const availableBoards = await checkBoardAvailability('12th');
-        setAvailableBoards(availableBoards);
+        const fresh = await checkBoardAvailability('12th');
+        if (Array.isArray(fresh) && fresh.length) {
+          setAvailableBoards(fresh);
+        }
       } catch (error) {
         logger.error('Error checking board availability:', error);
-        setAvailableBoards([]);
       } finally {
         setCheckingAvailability(false);
       }
     };
-
-    checkAvailability();
+    run();
   }, []);
 
   // Sync selected board with URL; also reset on base route

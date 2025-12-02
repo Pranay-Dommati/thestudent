@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import universalToast from '../../../../utils/universalToast';
@@ -6,6 +6,7 @@ import BasicInfoStep from './BasicInfoStep';
 import CourseStructureStep from './CourseStructureStep';
 import { createCourse } from '../../../../services/courseApi';
 import { sanitizeFileName } from '../../../../utils/fileHelpers';
+import { chaptersReducer } from './chaptersReducer';
 
 const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   const STORAGE_KEY = `draft_school_course_${classLevel || 'unknown'}`;
@@ -30,8 +31,8 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     chapterCount: 1
   });
 
-  // Course Structure (must be declared before effects that use it)
-  const [chapters, setChapters] = useState([
+  // Course Structure - normalized reducer for O(1) updates
+  const [chapters, dispatch] = useReducer(chaptersReducer, [
     {
       name: '',
       lessons: [
@@ -59,7 +60,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed.courseInfo) setCourseInfo(ci => ({ ...ci, ...parsed.courseInfo, thumbnail: null }));
-        if (parsed.chapters) setChapters(parsed.chapters);
+        if (parsed.chapters) dispatch({ type: 'INIT_CHAPTERS', payload: parsed.chapters });
       }
     } catch (_) { /* ignore */ }
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
@@ -85,7 +86,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
           learningPoints: ['', ''],
           chapterCount: 1
         });
-        setChapters([
+        dispatch({ type: 'INIT_CHAPTERS', payload: [
           {
             name: '',
             lessons: [
@@ -101,7 +102,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
               }
             ]
           }
-        ]);
+        ] });
         setThumbnailPreview(null);
         setActiveStep(1);
       }
@@ -109,7 +110,12 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   }, [STORAGE_KEY]);
 
   // Debounced autosave
-  const autosave = useMemo(() => (data) => {
+  const lastSaveRef = useRef(0);
+  const autosave = useMemo(() => (data, reason = 'auto') => {
+    // Throttle saves to avoid UI stalls (e.g. rapid lesson edits)
+    const now = performance.now();
+    const sinceLast = now - lastSaveRef.current;
+    if (reason === 'auto' && sinceLast < 1200) return; // skip frequent autosaves
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       try {
@@ -117,9 +123,22 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
           courseInfo: { ...data.courseInfo, thumbnail: null },
           chapters: data.chapters
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+        const serialized = JSON.stringify(sanitized);
+        // Defer heavy localStorage write to idle time if possible
+        const writeFn = () => {
+          localStorage.setItem(STORAGE_KEY, serialized);
+          lastSaveRef.current = performance.now();
+          if (window.__SCHOOL_DEBUG_PERF) {
+            console.log(`[PERF][School] autosave (${reason}) size=${serialized.length}B`);
+          }
+        };
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(writeFn, { timeout: 500 });
+        } else {
+          writeFn();
+        }
       } catch (e) { /* ignore */ }
-    }, 400);
+    }, 300);
   }, [STORAGE_KEY]);
 
   useEffect(() => {
@@ -226,224 +245,76 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
   const handleChapterCountChange = (e) => {
     const count = parseInt(e.target.value) || 0;
     setCourseInfo({...courseInfo, chapterCount: count});
-    
-    // Adjust chapters array to match count
-    if (count > chapters.length) {
-      // Add new chapters
-      setChapters([
-        ...chapters,
-        ...Array(count - chapters.length).fill().map(() => ({
-          name: '',
-          lessons: [
-            {
-              type: 'video',
-              title: '',
-              videoUrl: '',
-              description: '',
-              aboutLesson: '',
-              hasResources: false,
-              resources: {
-                downloadable: [],
-                internet: []
-              },
-              quizQuestions: []
-            }
-          ]
-        }))
-      ]);
-    } else if (count < chapters.length) {
-      // Remove excess chapters
-      setChapters(chapters.slice(0, count));
-    }
+    dispatch({ type: 'ADJUST_CHAPTER_COUNT', payload: { count } });
   };
   
   // Handle chapter name change
-  const handleChapterNameChange = (index, value) => {
-    setChapters(chapters.map((chapter, i) => 
-      i === index ? {...chapter, name: value} : chapter
-    ));
-  };
+  const handleChapterNameChange = useCallback((chapterIndex, name) => {
+    dispatch({ type: 'SET_CHAPTER_NAME', payload: { chapterIndex, name } });
+  }, []);
   
   // Add lesson to chapter
-  const addLesson = (chapterIndex) => {
-    setChapters(chapters.map((chapter, i) => 
-      i === chapterIndex ? {
-        ...chapter,
-        lessons: [
-          ...chapter.lessons,
-          {
-            type: 'video',
-            title: '',
-            videoUrl: '',
-            description: '',
-            aboutLesson: '',
-            hasResources: false,
-            resources: {
-              downloadable: [],
-              internet: []
-            },
-            quizQuestions: []
-          }
-        ]
-      } : chapter
-    ));
-  };
+  const addLesson = useCallback((chapterIndex) => {
+    dispatch({ type: 'ADD_LESSON', payload: { chapterIndex } });
+  }, []);
   
   // Remove lesson from chapter
-  const removeLesson = (chapterIndex, lessonIndex) => {
-    if (chapters[chapterIndex].lessons.length <= 1) {
-  universalToast.show('Each chapter must have at least one lesson', {
+  const removeLesson = useCallback((chapterIndex, lessonIndex) => {
+    const chapter = chapters[chapterIndex];
+    if (!chapter || (chapter.lessons?.length ?? 0) <= 1) {
+      universalToast.show('Each chapter must have at least one lesson', {
         icon: '❌',
-        style: {
-          backgroundColor: '#EF4444',
-          color: 'white',
-        }
+        style: { backgroundColor: '#EF4444', color: 'white' }
       });
       return;
     }
-    
-    setChapters(chapters.map((chapter, i) => 
-      i === chapterIndex ? {
-        ...chapter,
-        lessons: chapter.lessons.filter((_, j) => j !== lessonIndex)
-      } : chapter
-    ));
-  };
+    dispatch({ type: 'REMOVE_LESSON', payload: { chapterIndex, lessonIndex } });
+  }, [chapters]);
   
-  // Handle lesson data change
-  const handleLessonChange = (chapterIndex, lessonIndex, field, value) => {
-    setChapters(chapters.map((chapter, i) => 
-      i === chapterIndex ? {
-        ...chapter,
-        lessons: chapter.lessons.map((lesson, j) => 
-          j === lessonIndex ? {...lesson, [field]: value} : lesson
-        )
-      } : chapter
-    ));
-  };
+  // Handle lesson data change - O(1) targeted update
+  const handleLessonChange = useCallback((chapterIndex, lessonIndex, field, value) => {
+    dispatch({ type: 'UPDATE_LESSON_FIELD', payload: { chapterIndex, lessonIndex, field, value } });
+  }, []);
   
   // Add resource to lesson
-  const addResource = (chapterIndex, lessonIndex, resourceType) => {
-    setChapters(chapters.map((chapter, i) => 
-      i === chapterIndex ? {
-        ...chapter,
-        lessons: chapter.lessons.map((lesson, j) => 
-          j === lessonIndex ? {
-            ...lesson,
-            resources: {
-              ...lesson.resources,
-              [resourceType]: [
-                ...lesson.resources[resourceType],
-                { name: '', description: '', link: '' }
-              ]
-            }
-          } : lesson
-        )
-      } : chapter
-    ));
-  };
+  const addResource = useCallback((chapterIndex, lessonIndex, resourceType) => {
+    dispatch({ type: 'ADD_RESOURCE', payload: { chapterIndex, lessonIndex, resourceType } });
+  }, []);
   
   // Remove resource from lesson
-  const removeResource = (chapterIndex, lessonIndex, resourceType, resourceIndex) => {
-    setChapters(chapters.map((chapter, i) => 
-      i === chapterIndex ? {
-        ...chapter,
-        lessons: chapter.lessons.map((lesson, j) => 
-          j === lessonIndex ? {
-            ...lesson,
-            resources: {
-              ...lesson.resources,
-              [resourceType]: lesson.resources[resourceType].filter((_, k) => k !== resourceIndex)
-            }
-          } : lesson
-        )
-      } : chapter
-    ));
-  };
+  const removeResource = useCallback((chapterIndex, lessonIndex, resourceType, resourceIndex) => {
+    dispatch({ type: 'REMOVE_RESOURCE', payload: { chapterIndex, lessonIndex, resourceType, resourceIndex } });
+  }, []);
   
-  // Handle resource change
-  const handleResourceChange = (chapterIndex, lessonIndex, resourceType, resourceIndex, field, value) => {
-    setChapters(chapters.map((chapter, i) => 
-      i === chapterIndex ? {
-        ...chapter,
-        lessons: chapter.lessons.map((lesson, j) => 
-          j === lessonIndex ? {
-            ...lesson,
-            resources: {
-              ...lesson.resources,
-              [resourceType]: lesson.resources[resourceType].map((resource, k) => 
-                k === resourceIndex ? {...resource, [field]: value} : resource
-              )
-            }
-          } : lesson
-        )
-      } : chapter
-    ));
-  };
+  // Handle resource data change - O(1) targeted update
+  const handleResourceChange = useCallback((chapterIndex, lessonIndex, resourceType, resourceIndex, field, value) => {
+    dispatch({ type: 'UPDATE_RESOURCE', payload: { chapterIndex, lessonIndex, resourceType, resourceIndex, field, value } });
+  }, []);
   
-  // Add quiz question
-  const addQuizQuestion = (chapterIndex, lessonIndex) => {
-    setChapters(chapters.map((chapter, i) => 
-      i === chapterIndex ? {
-        ...chapter,
-        lessons: chapter.lessons.map((lesson, j) => 
-          j === lessonIndex ? {
-            ...lesson,
-            quizQuestions: [
-              ...lesson.quizQuestions,
-              { question: '', options: ['', '', '', ''], correctAnswer: 0 }
-            ]
-          } : lesson
-        )
-      } : chapter
-    ));
-  };
+  // Add quiz question to lesson
+  const addQuizQuestion = useCallback((chapterIndex, lessonIndex) => {
+    dispatch({ type: 'ADD_QUIZ_QUESTION', payload: { chapterIndex, lessonIndex } });
+  }, []);
   
-  // Remove quiz question
-  const removeQuizQuestion = (chapterIndex, lessonIndex, questionIndex) => {
-    setChapters(chapters.map((chapter, i) => 
-      i === chapterIndex ? {
-        ...chapter,
-        lessons: chapter.lessons.map((lesson, j) => 
-          j === lessonIndex ? {
-            ...lesson,
-            quizQuestions: lesson.quizQuestions.filter((_, k) => k !== questionIndex)
-          } : lesson
-        )
-      } : chapter
-    ));
-  };
+  // Remove quiz question from lesson
+  const removeQuizQuestion = useCallback((chapterIndex, lessonIndex, questionIndex) => {
+    dispatch({ type: 'REMOVE_QUIZ_QUESTION', payload: { chapterIndex, lessonIndex, questionIndex } });
+  }, []);
   
-  // Handle quiz question change
-  const handleQuizQuestionChange = (chapterIndex, lessonIndex, questionIndex, field, value, optionIndex = null) => {
-    setChapters(chapters.map((chapter, i) => 
-      i === chapterIndex ? {
-        ...chapter,
-        lessons: chapter.lessons.map((lesson, j) => 
-          j === lessonIndex ? {
-            ...lesson,
-            quizQuestions: lesson.quizQuestions.map((question, k) => 
-              k === questionIndex ? (
-                field === 'options' ? 
-                {
-                  ...question,
-                  options: question.options.map((option, l) => l === optionIndex ? value : option)
-                } : 
-                {...question, [field]: value}
-              ) : question
-            )
-          } : lesson
-        )
-      } : chapter
-    ));
-  };
-  // Handle file change for downloadable resources
-  const handleFileChange = (chapterIndex, lessonIndex, resourceIndex, file) => {
+  // Handle quiz question change - O(1) targeted update
+  const handleQuizQuestionChange = useCallback((chapterIndex, lessonIndex, questionIndex, field, value, optionIndex = null) => {
+    dispatch({ 
+      type: 'UPDATE_QUIZ_QUESTION', 
+      payload: { chapterIndex, lessonIndex, questionIndex, field, value, optionIndex } 
+    });
+  }, []);
+  // Handle file change for downloadable resources - O(1) targeted update
+  const handleFileChange = useCallback((chapterIndex, lessonIndex, resourceIndex, file) => {
     if (!file) return;
     
     // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-  universalToast.show('File size must be less than 10MB', {
+      universalToast.show('File size must be less than 10MB', {
         icon: '❌',
         style: {
           backgroundColor: '#EF4444',
@@ -457,7 +328,7 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
     const sanitizedFile = sanitizeFileName(file, 100);
     
     if (file.name !== sanitizedFile.name) {
-  universalToast.show('File name was too long and has been truncated', {
+      universalToast.show('File name was too long and has been truncated', {
         icon: 'ℹ️',
         style: {
           backgroundColor: '#3B82F6',
@@ -466,23 +337,18 @@ const SchoolCourseForm = ({ onSubmit, onCancel, classLevel }) => {
       });
     }
     
-    setChapters(chapters.map((chapter, i) => 
-      i === chapterIndex ? {
-        ...chapter,
-        lessons: chapter.lessons.map((lesson, j) => 
-          j === lessonIndex ? {
-            ...lesson,
-            resources: {
-              ...lesson.resources,
-              downloadable: lesson.resources.downloadable.map((resource, k) => 
-                k === resourceIndex ? {...resource, file: sanitizedFile} : resource
-              )
-            }
-          } : lesson
-        )
-      } : chapter
-    ));
-  };
+    dispatch({ 
+      type: 'UPDATE_RESOURCE', 
+      payload: { 
+        chapterIndex, 
+        lessonIndex, 
+        resourceType: 'downloadable', 
+        resourceIndex, 
+        field: 'file', 
+        value: sanitizedFile 
+      } 
+    });
+  }, []);
   
   const validateForm = () => {
     const newErrors = {};

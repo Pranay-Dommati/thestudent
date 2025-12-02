@@ -123,8 +123,9 @@ const CourseDetails = () => {
     if (isStarting) return; // guard against double-clicks
     // Guest users go straight to preview (no enrollment)
     if (!isLoggedIn) {
-  // ID-BASED NAVIGATION (engineering)
-  navigate(`/courses/${courseId}/learning`);
+      // ID-BASED NAVIGATION (engineering)
+      // Include courseId as query param to avoid late URL rewrite and improve cache hits
+      navigate(`/courses/${courseId}/learning?courseId=${courseId}`);
       return;
     }
 
@@ -151,8 +152,9 @@ const CourseDetails = () => {
         }
         
         // Navigate to the learning page
-  // Canonical ID-only learning route
-  navigate(`/courses/${courseId}/learning`);
+        // Canonical ID-only learning route
+        // Include courseId as query param to avoid late URL rewrite and improve cache hits
+        navigate(`/courses/${courseId}/learning?courseId=${courseId}`);
       }
     } catch (error) {
       console.error('Error enrolling in engineering course:', error);

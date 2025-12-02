@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import universalToast from '../../../utils/universalToast';
 import { getCourseById, updateCourse } from '../../../services/courseApi';
@@ -41,12 +41,14 @@ const EditCourse = ({ isDarkMode }) => {
       if (response.success) {
         universalToast.success(response.message || 'Course updated successfully!');
         navigate('/admin-p/courses');
+        return true;
       } else {
         throw new Error(response.error || 'Failed to update course');
       }
     } catch (error) {
       console.error('Error updating course:', error);
       universalToast.error(error.message || 'Failed to update course');
+      return false;
     } finally {
       setUpdating(false);
     }
@@ -153,4 +155,4 @@ const EditCourse = ({ isDarkMode }) => {
   );
 };
 
-export default EditCourse;
+export default memo(EditCourse);

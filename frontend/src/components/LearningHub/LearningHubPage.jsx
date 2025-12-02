@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Navbar from '../Navbar/Navbar';
 import Footer from '../Footer/Footer';
 import HeroSection from './HeroSection/HeroSection';
@@ -25,6 +25,11 @@ const LearningHubPage = () => {
     today: { hours: 0 }
   });
   
+  // Refs to prevent duplicate API calls
+  const lastRefreshTimeRef = useRef(0);
+  const isRefreshingRef = useRef(false);
+  const REFRESH_COOLDOWN = 30000; // 30 seconds cooldown between refreshes on tab switch
+  
   // Cleaned up development logs
   useEffect(() => {}, [learningStats]);
   
@@ -41,8 +46,18 @@ const LearningHubPage = () => {
     }
   }, [location.hash]);
   
-  const refreshHubData = useCallback(async () => {
+  const refreshHubData = useCallback(async (force = false) => {
     if (!isLoggedIn) return;
+    
+    const now = Date.now();
+    // Prevent duplicate calls within cooldown period
+    if (!force && (isRefreshingRef.current || (now - lastRefreshTimeRef.current < REFRESH_COOLDOWN))) {
+      return;
+    }
+    
+    isRefreshingRef.current = true;
+    lastRefreshTimeRef.current = now;
+    
     try {
       // Fetch enrolled courses count
       const coursesResponse = await axios.get('/courses/enrolled/');
@@ -57,11 +72,13 @@ const LearningHubPage = () => {
       }
     } catch (_) {
       // silent in production
+    } finally {
+      isRefreshingRef.current = false;
     }
   }, [isLoggedIn]);
 
   useEffect(() => {
-    refreshHubData();
+    refreshHubData(true); // Force on initial mount
   }, [refreshHubData]);
 
   // Lightweight realtime: listen for activity updates and pro-learning saves
@@ -134,21 +151,19 @@ const LearningHubPage = () => {
         refreshHubData();
       }
     };
+    // Only use visibilitychange (not focus) to avoid double-firing on Alt+Tab
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        refreshHubData();
+        refreshHubData(); // Cooldown will prevent excessive calls
       }
     };
-    const onFocus = () => {
-      // When tab/window gains focus, refresh once
-      refreshHubData();
-    };
+    
     window.addEventListener('learning:activity-updated', onActivity);
     window.addEventListener('prolearning:course-saved', onActivity);
     window.addEventListener('enrollment-changed', onEnrollmentChanged);
     window.addEventListener('storage', onStorage);
     document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('focus', onFocus);
+    // Removed focus listener - visibilitychange is sufficient and prevents double-firing
 
     return () => {
       window.removeEventListener('learning:activity-updated', onActivity);
@@ -156,7 +171,6 @@ const LearningHubPage = () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('enrollment-changed', onEnrollmentChanged);
       document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('focus', onFocus);
     };
   }, [refreshHubData]);
   

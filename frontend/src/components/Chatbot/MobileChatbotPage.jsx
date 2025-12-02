@@ -91,6 +91,7 @@ const MobileChatbotPage = () => {
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const topicConfirmationRef = useRef(null);
   const initialQueryProcessed = useRef(false);
   const autoSendProcessed = useRef(false); // Additional flag to prevent duplicate auto-sends
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -301,8 +302,8 @@ const MobileChatbotPage = () => {
   // Freemium: Auto-save course when user logs in (Mobile)
   useEffect(() => {
     const authed = typeof isAuthenticated === 'function' ? isAuthenticated() : !!isLoggedIn;
-    
-    if (authed && user && !loading) {
+    const freemiumLoginInProgress = localStorage.getItem('freemiumLoginInProgress') === '1';
+    if (authed && user && !loading && freemiumLoginInProgress) {
       // Check if there's a pending course to save
       const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
       if (pendingCourse) {
@@ -321,8 +322,9 @@ const MobileChatbotPage = () => {
                 personalization: courseData.personalization || ''
               });
               
-              // Clear the pending course
+              // Clear the pending course and flag
               localStorage.removeItem('pendingFreemiumCourse');
+              localStorage.removeItem('freemiumLoginInProgress');
               
               // Show success toast
               universalToast.success('🎉 Your course has been saved to your Learning Hub!', {
@@ -337,6 +339,7 @@ const MobileChatbotPage = () => {
               console.log('✅ [Mobile] Freemium course saved successfully!');
             } catch (error) {
               console.error('[Mobile] Failed to save freemium course:', error);
+              localStorage.removeItem('freemiumLoginInProgress');
               universalToast.error('Failed to save your course. Please try again.', {
                 duration: 4000
               });
@@ -647,6 +650,16 @@ const MobileChatbotPage = () => {
       }
     }
   }, [usageStats, showTopicConfirmation]);
+
+  // Auto-scroll to topic confirmation dialog when it appears
+  useEffect(() => {
+    if (showTopicConfirmation && topicConfirmationRef.current) {
+      // Small delay to ensure the DOM has updated
+      setTimeout(() => {
+        topicConfirmationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [showTopicConfirmation]);
 
   // Close navigation menu when scrolling
   useEffect(() => {
@@ -993,7 +1006,18 @@ const MobileChatbotPage = () => {
             }
             
             // Store limited topics for confirmation and show confirmation dialog
-            setPendingTopics(availableTopics);
+            const normalizedTopics = availableTopics.map((t, idx) => {
+              let name;
+              if (typeof t === 'string') name = t;
+              else if (t && typeof t.name === 'string') name = t.name;
+              else name = String(t || '').trim();
+              
+              return { 
+                id: `topic-${Date.now()}-${idx}`,
+                name 
+              };
+            });
+            setPendingTopics(normalizedTopics);
             setOriginalPrompt(messageToSend);
             setShowTopicConfirmation(true);
             
@@ -1525,8 +1549,6 @@ const MobileChatbotPage = () => {
               {message.type === "bot" && isProCard && (
                 <Link 
                   to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="inline-flex items-center justify-between w-full px-5 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 group"
                     onClick={() => {
                       // Set session flag for back button navigation
@@ -1621,7 +1643,7 @@ const MobileChatbotPage = () => {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       {/* Mobile Header with Navigation - Always visible on mobile and tablet */}
-      <div className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+      <div className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center justify-between px-3 md:px-4 py-2 md:py-3">
           {/* Left: Menu button */}
           <button
@@ -1761,7 +1783,7 @@ const MobileChatbotPage = () => {
                   return (
                     <div key={course.id} className="p-3 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition-all">
                       <div className="flex items-center justify-between gap-3">
-                        <Link to={href} target="_blank" rel="noopener noreferrer" onClick={() => { sessionStorage.setItem('cameFromChat', 'true'); closeCoursesDrawer(); }} className="flex items-center gap-3 min-w-0 flex-1">
+                        <Link to={href} onClick={() => { sessionStorage.setItem('cameFromChat', 'true'); closeCoursesDrawer(); }} className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="bg-indigo-50 rounded-lg p-2">
                             <IoBook className="w-4 h-4 text-indigo-600" />
                           </div>
@@ -1944,7 +1966,7 @@ const MobileChatbotPage = () => {
                   return (
                     <div key={course.id} className="p-3 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all">
                       <div className="flex items-center justify-between gap-3">
-                        <a href={href} target="_blank" rel="noopener noreferrer" onClick={() => sessionStorage.setItem('cameFromChat', 'true')} className="flex items-center gap-3 min-w-0 flex-1">
+                        <Link to={href} onClick={() => sessionStorage.setItem('cameFromChat', 'true')} className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="bg-indigo-50 rounded-lg p-2">
                             <IoBook className="w-4 h-4 text-indigo-600" />
                           </div>
@@ -1954,7 +1976,7 @@ const MobileChatbotPage = () => {
                               {new Date(course.created_at).toLocaleDateString()} • {new Date(course.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </div>
                           </div>
-                        </a>
+                        </Link>
                         <ShareCourseButton
                           courseId={course.id}
                           courseTitle={friendlyName}
@@ -2000,7 +2022,7 @@ const MobileChatbotPage = () => {
 
           {/* Mobile Course Configuration Dialog - Minimal design to match desktop */}
           {showTopicConfirmation && (
-            <div className="w-full mb-6 px-3">
+            <div ref={topicConfirmationRef} className="w-full mb-6 px-3">
               <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">

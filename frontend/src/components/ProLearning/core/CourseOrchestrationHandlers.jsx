@@ -175,6 +175,7 @@ export const handleProLearningStart = async (dependencies) => {
     setCourseGenerationStatus,
     useProgressiveGeneration,
     selectedTopic,
+    selectedTopicRef,
     setSelectedTopic,
     initializeProgressiveGeneration,
     courseTitle,
@@ -201,7 +202,11 @@ export const handleProLearningStart = async (dependencies) => {
     setLoadScenario,
     setShowSkeletons,
     clearTopicFromBothStorages,
-    loadTopicContent
+    loadTopicContent,
+    // User info for background generation notifications (for logged-in users)
+    user,
+    isLoggedIn,
+    userId
   } = dependencies;
 
   if (topicsList.length === 0) {
@@ -251,11 +256,47 @@ export const handleProLearningStart = async (dependencies) => {
           setSelectedTopic(topicsList[0]);
         } catch {}
       }
+      
+      // Initialize with user info for background notification support
+      // Generation will continue even when user switches tabs/navigates away
       await initializeProgressiveGeneration(courseTitle, topicsList, {
         onProgress: (progress) => {
           setProgressiveGenerationProgress(progress);
           setCourseGenerationProgress(progress.overallProgress || 0);
           setCourseGenerationStatus(`Generating ${progress.tabName} for ${progress.topic}...`);
+        },
+        onContentUpdate: (update) => {
+          // Use ref to get current selected topic to avoid stale closures
+          const currentSelected = selectedTopicRef?.current || selectedTopic;
+          const currentName = currentSelected?.name || currentSelected;
+
+          // Stream content updates to UI if this is the selected topic
+          if (currentName === update.topic) {
+             setContent(prev => ({ ...prev, ...update.content }));
+             // Ensure we are showing the right topic context
+             try { setContentTopicName(update.topic); } catch {}
+             
+             // If reading content is streaming in, ensure it's renderable
+             if (update.tabType === 'reading' && update.content?.reading) {
+                 // We don't sanitize every chunk to avoid perf hit, just set raw
+                 // The RenderTabContent handles raw content fallback
+                 setReadingRenderReady(true);
+                 setSanitizedReadingTopicName(update.topic);
+             }
+          }
+
+          // Unlock the tab early if it has content, so user can navigate to it
+          // This allows viewing the tab while it generates, WITHOUT triggering the next tab yet
+          if (update.content && update.tabType === 'reading' && update.content.reading?.length > 20) {
+             setAvailableTabsForTopics(prev => {
+                const topicTabs = prev[update.topic] || [];
+                if (!topicTabs.includes(update.tabType)) {
+                   console.log(`🔓 [ON CONTENT UPDATE] Early unlock for ${update.tabType} of ${update.topic}`);
+                   return { ...prev, [update.topic]: [...topicTabs, update.tabType] };
+                }
+                return prev;
+             });
+          }
         },
         onTabComplete: (tabInfo) => {
           console.log(`🎬 [ON TAB COMPLETE] Tab ${tabInfo.tabType} completed for ${tabInfo.topic}`);
@@ -275,8 +316,12 @@ export const handleProLearningStart = async (dependencies) => {
             return updated;
           });
 
+          // Use ref to get current selected topic
+          const currentSelected = selectedTopicRef?.current || selectedTopic;
+          const currentName = currentSelected?.name || currentSelected;
+
           // Immediately update content if this is the currently selected topic
-          if (selectedTopic?.name === tabInfo.topic) {
+          if (currentName === tabInfo.topic) {
             console.log(`📝 DEBUG: Tab ${tabInfo.tabName} completed for ${tabInfo.topic} - updating content immediately`);
             
             // Get the fresh content and update immediately
@@ -356,7 +401,7 @@ export const handleProLearningStart = async (dependencies) => {
               setIsLoading(false);
               setLoadingStep('');
             }
-          } else if (!selectedTopic && topicsList?.length > 0 && (topicsList[0].name === tabInfo.topic || (topicsList[0] === tabInfo.topic))) {
+          } else if (!currentSelected && topicsList?.length > 0 && (topicsList[0].name === tabInfo.topic || (topicsList[0] === tabInfo.topic))) {
             // If no selectedTopic yet, set it and hydrate
             setSelectedTopic(typeof topicsList[0] === 'string' ? { name: topicsList[0] } : topicsList[0]);
             loadProgressiveTopicContent(tabInfo.topic, { showLoader: false });
@@ -398,7 +443,12 @@ export const handleProLearningStart = async (dependencies) => {
           console.error('❌ Progressive generation error:', err);
           setIsProgressiveGenerating(false);
         }
-}, { courseId: getCourseId() });
+}, { 
+  courseId: getCourseId(),
+  // Pass user info for background notification support (logged-in users only)
+  isLoggedIn: isLoggedIn || false,
+  userId: userId || null
+});
 
       setIsProgressiveGenerating(true);
       // Do not block the UI with the generic loader; tabs should appear as they become ready
@@ -469,6 +519,7 @@ export const handleContentGeneration = async (dependencies) => {
     loadProgressiveTopicContent,
     setSelectedTopic,
     selectedTopic,
+    selectedTopicRef,
     setIsProgressiveGenerating,
     startProgressiveGeneration,
     setLoadScenario,
@@ -479,7 +530,15 @@ export const handleContentGeneration = async (dependencies) => {
     setIsBatchGenerating,
     setBatchGenerationProgress,
     setBatchGenerationStatus,
-    loadTopicContent
+    loadTopicContent,
+    setContent,
+    setContentTopicName,
+    setReadingRenderReady,
+    setSanitizedReadingTopicName,
+    // User info for background generation notifications (for logged-in users)
+    user,
+    isLoggedIn,
+    userId
   } = dependencies;
 
   try {
@@ -541,6 +600,40 @@ export const handleContentGeneration = async (dependencies) => {
       await initializeProgressiveGeneration(courseTitle, topics, {
         onProgress: (progress) => {
           setProgressiveGenerationProgress(progress);
+        },
+        onContentUpdate: (update) => {
+            // Use ref to get current selected topic
+            const currentSelected = selectedTopicRef?.current || selectedTopic;
+            const currentName = currentSelected?.name || currentSelected;
+
+            // Stream content updates if this is the selected topic
+            if (currentSelected && currentName === update.topic) {
+                if (setContent) {
+                    setContent(prev => ({ ...prev, ...update.content }));
+                    if (setContentTopicName) {
+                        try { setContentTopicName(update.topic); } catch {}
+                    }
+                    
+                    // Handle reading render readiness
+                    if (update.tabType === 'reading' && update.content?.reading && setReadingRenderReady) {
+                        setReadingRenderReady(true);
+                        if (setSanitizedReadingTopicName) setSanitizedReadingTopicName(update.topic);
+                    }
+                }
+            }
+
+            // Unlock the tab early if it has content, so user can navigate to it
+            // This allows viewing the tab while it generates, WITHOUT triggering the next tab yet
+            if (update.content && update.tabType === 'reading' && update.content.reading?.length > 20) {
+                setAvailableTabsForTopics(prev => {
+                    const topicTabs = prev[update.topic] || [];
+                    if (!topicTabs.includes(update.tabType)) {
+                        console.log(`🔓 [ON CONTENT UPDATE] Early unlock for ${update.tabType} of ${update.topic}`);
+                        return { ...prev, [update.topic]: [...topicTabs, update.tabType] };
+                    }
+                    return prev;
+                });
+            }
         },
         onTabComplete: (tabInfo) => {
           console.log(`✅ Tab completed: ${tabInfo.tabName} for ${tabInfo.topic}`);
@@ -608,8 +701,12 @@ export const handleContentGeneration = async (dependencies) => {
             }
           }
           
+          // Use ref to get current selected topic
+          const currentSelected = selectedTopicRef?.current || selectedTopic;
+          const currentName = currentSelected?.name || currentSelected;
+
           // If the current selected topic just got new content, refresh it
-          if (selectedTopic && (selectedTopic.name || selectedTopic) === tabInfo.topic) {
+          if (currentSelected && currentName === tabInfo.topic) {
             console.log('🔄 Refreshing content for current topic:', tabInfo.topic);
             loadProgressiveTopicContent(tabInfo.topic, { showLoader: false });
           }
@@ -642,7 +739,12 @@ export const handleContentGeneration = async (dependencies) => {
           console.error('❌ Progressive generation error:', error);
           setIsProgressiveGenerating(false);
         }
-      }, { courseId: batchCourseId });
+      }, { 
+        courseId: batchCourseId,
+        // Pass user info for background notification support (logged-in users only)
+        isLoggedIn: isLoggedIn || false,
+        userId: userId || null
+      });
 
       // Start progressive generation
       setIsProgressiveGenerating(true);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link, useSearchParams, useNavigate, useParams } from "react-router-dom";
 import universalToast from '../../../utils/universalToast';
 import { useAuth } from '../../../context/AuthContext';
@@ -149,6 +150,8 @@ import { createContentLoadingEffect } from './ContentLoadingEffect.jsx';
 import { createTopicsInitializationEffect } from './TopicsInitializationEffect.jsx';
 // Tutor Chat (Reading Assistant)
 import TutorChat from '../TutorChat/TutorChat.jsx';
+// Global background generation state (for cross-page card)
+import { updateGenerationProgress, markGenerationComplete, clearGenerationState } from '../GlobalBackgroundGenerationCard.jsx';
 
 
 const ProLearningPage = () => {
@@ -163,18 +166,18 @@ const ProLearningPage = () => {
   // UI state
   const [sidebarVisible, setSidebarVisible] = useState(false);
   // Video modal state
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [isVideoModalOpen, setIsVideoModal] = useState(false);
   const [currentVideo, setCurrentVideo] = useState(null);
 
   // Video modal handlers
   const openVideoModal = (video) => {
     setCurrentVideo(video);
-    setIsVideoModalOpen(true);
+    setIsVideoModal(true);
   };
 
   const closeVideoModal = () => {
     // Clear current video to stop playback when closing
-    setIsVideoModalOpen(false);
+    setIsVideoModal(false);
     setCurrentVideo(null);
   };
 
@@ -184,6 +187,9 @@ const ProLearningPage = () => {
   const topicParam = searchParams.get("topic"); // Get topic from URL if provided
   const activeTabParam = searchParams.get("tab") || "reading"; // Get active tab from URL
   const [selectedTopic, setSelectedTopic] = useState(null);
+  const selectedTopicRef = useRef(selectedTopic);
+  useEffect(() => { selectedTopicRef.current = selectedTopic; }, [selectedTopic]);
+
   const [topicsList, setTopicsList] = useState([]);
   const [sectionGenerating, setSectionGenerating] = useState(false);
   const [generatingTopics, setGeneratingTopics] = useState([]);
@@ -253,7 +259,9 @@ const ProLearningPage = () => {
       autoSaveAttempted: autoSaveAttempted.current
     });
     
-    if (user && !loading && !autoSaveAttempted.current) {
+    // Only proceed if login was explicitly initiated from the freemium modal
+    const freemiumLoginInProgress = localStorage.getItem('freemiumLoginInProgress') === '1';
+    if (user && !loading && !autoSaveAttempted.current && freemiumLoginInProgress) {
       console.log('✅ User is authenticated and not loading');
       // Check if there's a pending course to save
       const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
@@ -287,6 +295,7 @@ const ProLearningPage = () => {
                 console.log('✅ Save successful! Cleaning up...');
                 // Clear the pending course
                 localStorage.removeItem('pendingFreemiumCourse');
+                localStorage.removeItem('freemiumLoginInProgress');
                 
                 // Close modal if open
                 setShowSaveCourseModal(false);
@@ -300,6 +309,7 @@ const ProLearningPage = () => {
                 console.log('✅ Freemium course auto-saved successfully!');
               }).catch((error) => {
                 console.error('❌ Failed to auto-save freemium course:', error);
+                localStorage.removeItem('freemiumLoginInProgress');
                 universalToast.error('Failed to save your course. Please try again.', {
                   duration: 4000
                 });
@@ -464,6 +474,38 @@ const ProLearningPage = () => {
   const [availableTabsForTopics, setAvailableTabsForTopics] = useState({});
   const [useProgressiveGeneration, setUseProgressiveGeneration] = useState(true); // Feature flag
   const [loadScenario, setLoadScenario] = useState(null); // 'first-time' or 'reload'
+
+  // Update global generation state for cross-page card visibility
+  useEffect(() => {
+    if (isProgressiveGenerating && progressiveGenerationProgress) {
+      const progress = progressiveGenerationProgress;
+      // Handle direct progress format { topic, tabName, overallProgress, ... }
+      if (progress.topic || progress.overallProgress !== undefined) {
+        updateGenerationProgress({
+          courseId: courseId || null,
+          courseTitle: courseTitle || 'Your Course',
+          currentTopic: progress.topic || null,
+          currentStep: progress.tabName || null,
+          progress: progress.overallProgress || 0,
+          totalTopics: progress.totalTopics || topicsList.length,
+          completedTopics: progress.completedTopics || 0,
+          isComplete: false,
+          isGenerating: true
+        });
+      }
+    } else if (!isProgressiveGenerating && allTopicsGenerated) {
+      // Generation complete - mark as complete in global state
+      markGenerationComplete(courseId, courseTitle);
+    } else if (!isProgressiveGenerating) {
+      // Not generating - clear state after a delay to prevent flicker
+      const timer = setTimeout(() => {
+        if (!isProgressiveGenerating) {
+          clearGenerationState();
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isProgressiveGenerating, progressiveGenerationProgress, allTopicsGenerated, courseId, courseTitle, topicsList.length]);
   
   // Freemium: Save course modal state
   const [showSaveCourseModal, setShowSaveCourseModal] = useState(false);
@@ -532,73 +574,44 @@ const ProLearningPage = () => {
     });
 
     if (allTopicsGenerated && user === null && !loading) {
-      // Check if there's a pending freemium course
-      const pendingCourse = localStorage.getItem('pendingFreemiumCourse');
-      console.log('🔍 [Modal Trigger] Checking pendingFreemiumCourse:', pendingCourse ? 'exists' : 'null');
+      console.log('✅ [Modal Trigger] All conditions met for anonymous user!');
       
-      if (pendingCourse) {
-        try {
-          const courseData = JSON.parse(pendingCourse);
-          console.log('🔍 [Modal Trigger] Parsed courseData:', {
-            storedCourseId: courseData.courseId,
-            currentCourseId: courseId,
-            match: courseData.courseId === courseId
-          });
-          
-          // Check if this is the course that was just created (match by courseId)
-          if (courseData.courseId === courseId) {
-            console.log('✅ [Modal Trigger] Course ID matches! Setting timeout to show modal...');
-            // Show modal after a short delay to let the UI settle
-            setTimeout(() => {
-              console.log('🎉 [Modal Trigger] Timeout complete - setting modal state NOW');
-              setPendingCourseToSave(courseData);
-              setShowSaveCourseModal(true);
-              console.log('🎉 Showing freemium save modal for course:', courseId);
-
-              // Also notify any open Chatbot pages (desktop & mobile) so they can show their own modal if needed
-              try {
-                window.dispatchEvent(
-                  new CustomEvent('show-freemium-save-modal', { detail: courseData })
-                );
-                console.log('📢 Dispatched show-freemium-save-modal event from ProLearningPage');
-              } catch (eventError) {
-                console.error('Failed to dispatch show-freemium-save-modal event:', eventError);
-              }
-            }, 2000); // 2 second delay after generation completes
-          } else {
-            console.log('❌ [Modal Trigger] Course ID mismatch - considering fallback...');
-            const now = Date.now();
-            const isRecent = courseData?.createdAt && (now - courseData.createdAt) < (10 * 60 * 1000);
-            const looksClientId = typeof courseId === 'string' && courseId.startsWith('course_');
-            if (isRecent && looksClientId) {
-              console.log('✅ [Fallback] Recent anonymous generation detected - showing modal anyway');
-              setTimeout(() => {
-                try {
-                  // Update localStorage to point to the current course so future checks match
-                  const updated = { ...courseData, courseId };
-                  localStorage.setItem('pendingFreemiumCourse', JSON.stringify(updated));
-                } catch {}
-                console.log('🎉 [Fallback] Timeout complete - setting modal state NOW');
-                setPendingCourseToSave(courseData);
-                setShowSaveCourseModal(true);
-                try {
-                  window.dispatchEvent(new CustomEvent('show-freemium-save-modal', { detail: courseData }));
-                } catch {}
-              }, 1500);
-            } else {
-              console.log('🚫 [Fallback] Conditions not met - modal will NOT show');
-            }
-          }
-        } catch (e) {
-          console.error('❌ [Modal Trigger] Failed to parse pending freemium course:', e);
-        }
-      } else {
-        console.log('❌ [Modal Trigger] No pendingFreemiumCourse in localStorage - modal will NOT show');
+      // Create course data for modal with all required fields
+      const courseData = {
+        courseId: courseId,
+        courseTitle: courseTitle,
+        topics: topicsList.map(t => t.name || t), // Extract topic names
+        originalPrompt: courseTitle, // Use course title as fallback
+        learningContext: '',
+        personalization: '',
+        createdAt: Date.now()
+      };
+      
+      console.log('🎉 [Modal Trigger] Setting modal state NOW for course:', courseId);
+      setPendingCourseToSave(courseData);
+      setShowSaveCourseModal(true);
+      
+      // Store in localStorage so modal persists on refresh
+      try {
+        localStorage.setItem('pendingFreemiumCourse', JSON.stringify(courseData));
+        console.log('💾 Stored pendingFreemiumCourse in localStorage');
+      } catch (e) {
+        console.error('Failed to store pendingFreemiumCourse:', e);
+      }
+      
+      // Also notify any open Chatbot pages
+      try {
+        window.dispatchEvent(
+          new CustomEvent('show-freemium-save-modal', { detail: courseData })
+        );
+        console.log('📢 Dispatched show-freemium-save-modal event');
+      } catch (eventError) {
+        console.error('Failed to dispatch event:', eventError);
       }
     } else {
       console.log('❌ [Modal Trigger] Conditions not met - modal will NOT show');
     }
-  }, [allTopicsGenerated, user, loading, courseId]);
+  }, [allTopicsGenerated, user, loading, courseId, courseTitle, topicsList]);
 
   // If we arrive with a UUID course (DB-saved), proactively clear any stale fresh-generation marker
   useEffect(() => {
@@ -766,23 +779,25 @@ const ProLearningPage = () => {
     }
   }, [topicsList]); // Run when topics change
   
-  // Load completed topics from backend API
+  // Load completed topics from backend API (only when authenticated)
   useEffect(() => {
     const loadCompletedTopicsFromBackend = async () => {
+      // Do not call backend while auth is loading or user is logged out
+      if (loading || !user) return;
       if (topicsList.length === 0) return;
-      
+
       try {
         const axiosInstance = (await import('../../../utils/axios')).default;
         const courseId = getCourseId();
-        
+
         if (!courseId) return;
-        
+
         // Fetch course progress from backend
-  const response = await axiosInstance.get(`/courses/${courseId}/progress/`);
-        
+        const response = await axiosInstance.get(`/courses/${courseId}/progress/`);
+
         if (response.data) {
           const completedLessonIds = [];
-          
+
           // Extract completed lesson IDs from chapters or sections
           if (response.data.chapters) {
             // School course structure
@@ -803,24 +818,27 @@ const ProLearningPage = () => {
               });
             });
           }
-          
+
           // Update state with backend data
           setCompletedTopics(completedLessonIds);
-          
+
           // Also update localStorage
           const storageKey = courseId ? `proLearning_completedTopics_${courseId}` : 'proLearning_completedTopics';
           localStorage.setItem(storageKey, JSON.stringify(completedLessonIds));
-          
+
           console.log('✅ Loaded completed topics from backend:', completedLessonIds.length);
         }
       } catch (error) {
-        console.warn('Failed to load completed topics from backend:', error);
+        // Avoid noisy 401s when session is missing/expired; just stay silent
+        if (error?.response?.status !== 401) {
+          console.warn('Failed to load completed topics from backend:', error);
+        }
         // Fall back to localStorage data (already loaded in initial state)
       }
     };
-    
+
     loadCompletedTopicsFromBackend();
-  }, [topicsList]); // Run when topics are loaded
+  }, [topicsList, user, loading, courseId]); // Only run when authenticated and topics are loaded
   
   // Flag to prevent storage loading during direct URL generation
   const [isDirectUrlGeneration, setIsDirectUrlGeneration] = useState(false);
@@ -1297,6 +1315,29 @@ const ProLearningPage = () => {
 
   // Toggle topic completion status
   const toggleTopicCompletion = (topicId, event) => {
+    // Prevent completion for non-logged in users
+    if (!user) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      
+      // Create course data for modal
+      const courseData = {
+        courseId: courseId,
+        courseTitle: courseTitle,
+        topics: topicsList.map(t => t.name || t),
+        originalPrompt: courseTitle,
+        learningContext: '',
+        personalization: '',
+        createdAt: Date.now()
+      };
+      
+      setPendingCourseToSave(courseData);
+      setShowSaveCourseModal(true);
+      return;
+    }
+
     return ContentHandlers.toggleTopicCompletion(topicId, event, {
       setCompletedTopics,
       getCourseId
@@ -1423,6 +1464,7 @@ const ProLearningPage = () => {
       setCourseGenerationStatus,
       useProgressiveGeneration,
       selectedTopic,
+      selectedTopicRef,
       setSelectedTopic,
       initializeProgressiveGeneration,
       courseTitle,
@@ -1450,7 +1492,11 @@ const ProLearningPage = () => {
       setShowSkeletons,
       clearTopicFromBothStorages,
       loadTopicContent,
-      content
+      content,
+      // Pass user info for background generation notifications
+      user,
+      isLoggedIn: !!user,
+      userId: user?.id || null
     });
   };
 
@@ -1670,6 +1716,7 @@ const ProLearningPage = () => {
         setAvailableTabsForTopics,
         loadProgressiveTopicContent,
         selectedTopic,
+        selectedTopicRef,
         setSelectedTopic,
         setIsProgressiveGenerating,
         startProgressiveGeneration,
@@ -1681,7 +1728,15 @@ const ProLearningPage = () => {
         setIsBatchGenerating,
         setBatchGenerationProgress,
         setBatchGenerationStatus,
-        loadTopicContent
+        loadTopicContent,
+        setContent,
+        setContentTopicName,
+        setReadingRenderReady,
+        setSanitizedReadingTopicName,
+        // Pass user info for background generation notifications
+        user,
+        isLoggedIn: !!user,
+        userId: user?.id || null
       });
     };
 
@@ -1762,8 +1817,6 @@ const ProLearningPage = () => {
       });
     }
   }, [content, selectedTopic, activeTab]);
-
-  // ...existing code...
 
   // Safety: when progressive generation marks a tab ready for the selected topic, hydrate content if empty
   useEffect(() => {
@@ -1936,90 +1989,136 @@ const ProLearningPage = () => {
         onClose={closeVideoModal}
       />
       
-      {/* Freemium: Save Course Modal */}
-      {(() => {
-        console.log('🔍 [Modal Render Check] Evaluating condition:', {
-          showSaveCourseModal,
-          pendingCourseToSave: pendingCourseToSave ? 'exists' : 'null',
-          willRender: showSaveCourseModal && pendingCourseToSave
-        });
-        return showSaveCourseModal && pendingCourseToSave;
-      })() && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 overflow-y-auto">
-          {(() => {
-            console.log('✅ [Modal Render] RENDERING MODAL NOW!');
-            return null;
-          })()}
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 animate-fade-in max-h-[90vh] overflow-y-auto my-auto">
-            {/* Success Icon */}
-            <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
-                <IoCheckmarkCircle className="text-white" size={48} />
-              </div>
-            </div>
-            
-            {/* Title */}
-            <h2 className="text-xl font-bold text-center text-gray-900 mb-2">
-              Your Learning Path Starts Here
+            {/* Freemium: Save Course Modal */}
+      {showSaveCourseModal && pendingCourseToSave && typeof document !== 'undefined' && createPortal(
+        <div className="freemium-modal modal-portal animate-fadeIn fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm sm:max-w-md overflow-hidden animate-scaleIn relative z-[10001]">
+              
+              <div className="p-6 sm:p-8">
+                {/* Success Icon */}
+                <div className="flex justify-center mb-5 sm:mb-6">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg ring-4 ring-green-50">
+                    <IoCheckmarkCircle className="text-white w-8 h-8 sm:w-10 sm:h-10" />
+                  </div>
+                </div>
 
-            </h2>
-            
-            {/* Message */}
-            <p className="text-center text-gray-600 text-sm mb-4">
-Sign in to unlock a personalized and enhanced learning experience.
-            </p>
-            
-            {/* Benefits List */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 mb-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                <span className="text-sm text-gray-700">Seamless progress tracking</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                <span className="text-sm text-gray-700">One-click access from your Learning Hub</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                <span className="text-sm text-gray-700">Premium academic content curated for you</span>
-              </div>
-            </div>
-            
-            {/* Action Buttons */}
-            <div className="space-y-2">
-              <Link
-                to={`/auth?mode=signup&returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-              >
-                Save Course
-              </Link>
-              <Link
-                to={`/auth?mode=login&returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`}
-                className="w-full flex items-center justify-center px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors text-sm"
-              >
-                Already have an account?
-              </Link>
-              <button
-                onClick={() => {
-                  // Clear the pending course so modal can show for next course
-                  localStorage.removeItem('pendingFreemiumCourse');
-                  console.log('🧹 Cleared pendingFreemiumCourse - modal dismissed by user');
+                {/* Title */}
+                <h2 className="text-xl sm:text-2xl font-bold text-center text-gray-900 mb-2 leading-tight">
+                  Your Learning Path Starts Here
+                </h2>
+
+                {/* Message */}
+                <p className="text-center text-gray-600 text-sm sm:text-base mb-6 leading-relaxed">
+                  Sign in to unlock a personalized and enhanced learning experience.
+                </p>
+
+                {/* Benefits List */}
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-3 border border-gray-100">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <IoStatsChart className="text-blue-600 w-3 h-3" />
+                    </div>
+                    <span className="text-sm text-gray-700 font-medium">Seamless progress tracking</span>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <IoHome className="text-blue-600 w-3 h-3" />
+                    </div>
+                    <span className="text-sm text-gray-700 font-medium">One-click access from Learning Hub</span>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <IoSparkles className="text-blue-600 w-3 h-3" />
+                    </div>
+                    <span className="text-sm text-gray-700 font-medium">Premium curated academic content</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  <Link
+                    to={`/auth?mode=signup&returnTo=${encodeURIComponent(
+                      window.location.pathname + window.location.search
+                    )}`}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                    onClick={() => {
+                      try {
+                        localStorage.setItem('freemiumLoginInProgress', '1');
+                      } catch {}
+                    }}
+                  >
+                    Save Course
+                  </Link>
                   
-                  setShowSaveCourseModal(false);
-                  setPendingCourseToSave(null);
-                }}
-                className="w-full px-4 py-1.5 text-gray-400 hover:text-gray-600 text-xs font-medium transition-colors"
-              >
-                Continue without saving
-              </button>
-            </div>
+                  <div className="flex flex-col gap-2 text-center">
+                    <Link
+                      to={`/auth?mode=login&returnTo=${encodeURIComponent(
+                        window.location.pathname + window.location.search
+                      )}`}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors py-1"
+                      onClick={() => {
+                        try {
+                          localStorage.setItem('freemiumLoginInProgress', '1');
+                        } catch {}
+                      }}
+                    >
+                      Already have an account? Log in
+                    </Link>
+                    
+                    <button
+                      onClick={() => {
+                        // Clear the pending course so modal can show for next course
+                        localStorage.removeItem('pendingFreemiumCourse');
+                        try {
+                          localStorage.removeItem('freemiumLoginInProgress');
+                        } catch {}
+                        console.log('🧹 Cleared pendingFreemiumCourse - modal dismissed by user');
+
+                        setShowSaveCourseModal(false);
+                        setPendingCourseToSave(null);
+                      }}
+                      className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors py-1"
+                    >
+                      Continue without saving
+                    </button>
+                  </div>
+                </div>
+              </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       
+      {/* Diagnostic Test Portal (always visible when ?modaltest=1) */}
+      {(() => {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return null;
+        const forceTest = /[?&]modaltest=1/.test(window.location.search);
+        if (!forceTest) return null;
+        const testEl = (
+          <div className="freemium-modal modal-portal test-overlay" style={{
+            background: 'rgba(255,0,0,0.35)',
+            backdropFilter: 'none',
+            WebkitBackdropFilter: 'none',
+            zIndex: 2147483647,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <div style={{ background: '#ffffff', padding: '18px 22px', borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.25)', maxWidth: 340 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Modal Visibility Test</h3>
+              <p style={{ fontSize: 13, lineHeight: 1.5, marginTop: 8 }}>
+                This red-tinted overlay is forced by <code>?modaltest=1</code>. If you see this on mobile, CSS stacking is OK and the freemium modal logic needs review. If you do NOT see it on mobile (but do on desktop), a mobile rendering/clipping bug is still active.
+              </p>
+              <p style={{ fontSize: 12, marginTop: 10, color: '#555' }}>Viewport: {typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : 'SSR'}</p>
+            </div>
+          </div>
+        );
+        return createPortal(testEl, document.body);
+      })()}
+
       </div>
     </>
   );
 };
 
-export default ProLearningPage; 
+export default ProLearningPage;

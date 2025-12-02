@@ -17,6 +17,7 @@ import {
 } from '../ProgressiveContentGenerator';
 import { getSummaryContent, validateSummaryForTab } from '../utils/SummaryUtils';
 import universalToast from '../../../utils/universalToast';
+import { notifyCourseComplete } from '../../../services/PendingCourseNotificationService';
 
 /**
  * Load topic content from progressive generation data
@@ -978,11 +979,15 @@ export const autoSaveToBackend = async (dependencies) => {
       localStorage.setItem(`proLearning_courseReady_${currentCourseId}`, 'true');
 
       // Show a one-time notification that generation completed and was added to Learning Hub
+      // This handles both visible and background (tab hidden) scenarios
       try {
         const notifiedKey = `proLearning_savedNotified_${currentCourseId}`;
         const alreadyNotified = localStorage.getItem(notifiedKey) === 'true';
         if (!alreadyNotified) {
-          universalToast.success('🎉 Course generation completed and added to your Learning Hub');
+          // Use the notification service to handle both visible and background states
+          // For logged-in users, this will queue notification if tab is hidden
+          const topicsCount = Object.keys(courseData.topics || {}).length;
+          notifyCourseComplete(currentCourseId, smartCourseName, { topicsCount });
           localStorage.setItem(notifiedKey, 'true');
         }
       } catch (_) {

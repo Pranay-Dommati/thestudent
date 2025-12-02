@@ -1,14 +1,8 @@
-import React from 'react';
-import MDEditor from '@uiw/react-md-editor';
+import React, { memo, useState, useEffect, useRef, startTransition } from 'react';
 import { FaPlus, FaTrash, FaVideo, FaFileAlt, FaQuestionCircle, FaBook } from 'react-icons/fa';
 import ResourcesInput from './ResourcesInput';
 import QuizQuestions from './QuizQuestions';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-// Use new enterprise-grade processor instead of regex preprocessor
 import { processMarkdownSync } from '../../../../utils/markdownProcessor';
 
 const LessonForm = ({
@@ -26,6 +20,153 @@ const LessonForm = ({
   handleQuizQuestionChange,
   errors
 }) => {
+  // Uncontrolled text area with worker-based preview
+  const titleRef = useRef(null);
+  const aboutRef = useRef(null);
+  const workerRef = useRef(null);
+  const [renderedHtml, setRenderedHtml] = useState('');
+  const throttleTimerRef = useRef(null);
+  const lastInputValueRef = useRef(lesson.aboutLesson || '');
+  const lastRequestIdRef = useRef(0);
+
+  // Initialize worker once and wire message handler
+  useEffect(() => {
+    const enableWorker = typeof Worker !== 'undefined' && import.meta && import.meta.env && import.meta.env.VITE_MARKDOWN_WORKER === '1';
+    if (enableWorker) {
+      try {
+        workerRef.current = new Worker(new URL('../../../../workers/markdownWorker.js', import.meta.url), { type: 'module' });
+        workerRef.current.onmessage = (e) => {
+          const { html, requestId } = e.data || {};
+          if (requestId == null || requestId === lastRequestIdRef.current) {
+            if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+              window.requestIdleCallback(() => setRenderedHtml(html), { timeout: 200 });
+            } else {
+              setRenderedHtml(html);
+            }
+          }
+        };
+        const initial = lesson.aboutLesson || '';
+        lastInputValueRef.current = initial;
+        const rid = ++lastRequestIdRef.current;
+        workerRef.current.postMessage({ type: 'MARKDOWN', text: initial, requestId: rid });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[LessonForm] Failed to init markdown worker', err);
+        workerRef.current = null;
+      }
+    }
+    // Always compute initial preview on idle in main thread as a safe fallback
+    const initialHtml = processMarkdownSync(lesson.aboutLesson || '', { convertDelimiters: true, autoLatex: /\$/.test(lesson.aboutLesson || '') });
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      window.requestIdleCallback(() => setRenderedHtml(initialHtml), { timeout: 200 });
+    } else {
+      setRenderedHtml(initialHtml);
+    }
+    return () => {
+      try {
+        if (workerRef.current) workerRef.current.terminate();
+      } catch {}
+    };
+  }, [lesson.aboutLesson]);
+
+  // Throttle posting input to worker (200ms)
+  const postToWorkerThrottled = () => {
+    const value = aboutRef.current ? aboutRef.current.value : '';
+    lastInputValueRef.current = value;
+    if (throttleTimerRef.current) return;
+    throttleTimerRef.current = setTimeout(() => {
+      throttleTimerRef.current = null;
+      if (workerRef.current) {
+        const rid = ++lastRequestIdRef.current;
+        workerRef.current.postMessage({ type: 'MARKDOWN', text: lastInputValueRef.current, requestId: rid });
+      } else {
+        // Fallback: process in main thread during idle time
+        const compute = () => {
+          const html = processMarkdownSync(lastInputValueRef.current, { convertDelimiters: true, autoLatex: /\$/.test(lastInputValueRef.current) });
+          setRenderedHtml(html);
+        };
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+          window.requestIdleCallback(compute, { timeout: 200 });
+        } else {
+          compute();
+        }
+      }
+    }, 200);
+  };
+
+  // Paste handler: convert rich HTML to markdown and insert without React state
+  const handlePasteToMarkdown = (e) => {
+    const textarea = aboutRef.current;
+    if (!textarea) return;
+    const richText = e.clipboardData && e.clipboardData.getData('text/html');
+    if (!richText) return; // let default plain text paste flow
+    e.preventDefault();
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = richText;
+    // Minimal transforms (keep existing detailed logic as-is)
+    const headings = tempDiv.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    headings.forEach(h => {
+      const level = h.tagName[1];
+      const text = h.textContent.trim();
+      h.textContent = '\n' + '#'.repeat(parseInt(level)) + ' ' + text + '\n';
+    });
+    const tables = tempDiv.querySelectorAll('table');
+    tables.forEach(table => {
+      const rows = table.querySelectorAll('tr');
+      let markdownTable = '\n';
+      rows.forEach((row, rowIndex) => {
+        const cells = row.querySelectorAll('td, th');
+        const isHeader = rowIndex === 0;
+        cells.forEach((cell, cellIndex) => {
+          const cellText = cell.textContent.trim() || ' ';
+          markdownTable += '| ' + cellText + ' ';
+          if (cellIndex === cells.length - 1) markdownTable += '|';
+        });
+        markdownTable += '\n';
+        if (isHeader) {
+          cells.forEach(() => { markdownTable += '| --- '; });
+          markdownTable += '|\n';
+        }
+      });
+      table.outerHTML = markdownTable + '\n';
+    });
+    // Lists
+    const lists = tempDiv.querySelectorAll('ul, ol');
+    lists.forEach(list => {
+      const isOrdered = list.tagName.toLowerCase() === 'ol';
+      const processListItems = (items, level = 0) => {
+        items.forEach((item, index) => {
+          const nestedLists = item.querySelectorAll(':scope > ul, :scope > ol');
+          let clone = item.cloneNode(true);
+          nestedLists.forEach(nl => clone.removeChild(nl));
+          const itemText = clone.textContent.trim();
+          const indent = '  '.repeat(level);
+          item.textContent = `\n${indent}${isOrdered ? `${index + 1}. ` : '- '}${itemText}`;
+          nestedLists.forEach(nl => {
+            const nestedItems = nl.querySelectorAll(':scope > li');
+            processListItems(nestedItems, level + 1);
+          });
+        });
+      };
+      const items = list.querySelectorAll(':scope > li');
+      processListItems(items);
+    });
+    const markdown = tempDiv.textContent.replace(/\n{3,}/g, '\n\n');
+    // Insert at cursor
+    const start = textarea.selectionStart ?? textarea.value.length;
+    const end = textarea.selectionEnd ?? start;
+    const before = textarea.value.substring(0, start);
+    const after = textarea.value.substring(end);
+    const next = before + markdown + after;
+    textarea.value = next;
+    // Move cursor to end of inserted
+    const pos = before.length + markdown.length;
+    textarea.selectionStart = textarea.selectionEnd = pos;
+    // Kick worker
+    postToWorkerThrottled();
+  };
+
+  // No helper needed: title is uncontrolled, commits on blur
   return (
     <div className="border border-gray-200 rounded-lg p-4 space-y-4">
       <div className="flex justify-between items-center">
@@ -80,9 +221,10 @@ const LessonForm = ({
           Lesson Title <span className="text-red-500">*</span>
         </label>
         <input
+          ref={titleRef}
           type="text"
-          value={lesson.title}
-          onChange={(e) => handleLessonChange(chapterIndex, lessonIndex, 'title', e.target.value)}
+          defaultValue={lesson.title}
+          onBlur={(e) => startTransition(() => handleLessonChange(chapterIndex, lessonIndex, 'title', e.target.value))}
           className={`w-full p-2 border ${errors[`chapter${chapterIndex}lesson${lessonIndex}`] ? 'border-red-500' : 'border-gray-300'} rounded-lg`}
           placeholder="e.g., Understanding Linear Equations"
         />
@@ -112,19 +254,30 @@ const LessonForm = ({
           
           <div className="space-y-2">
             <label className="block text-gray-700">
-              About This Lesson <span className="text-xs text-gray-500">(Supports Markdown)</span>            </label>            <MDEditor
-              value={lesson.aboutLesson}              
-              onChange={(e) => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', e)}              
-              height={200}                preview="edit"
-              visibleDragbar={true}
-              style={{ fontSize: '16px' }}
-              previewOptions={{
-                style: { padding: '20px', fontSize: '16px' }
-              }}
+              About This Lesson <span className="text-xs text-gray-500">(Supports Markdown)</span>
+            </label>
+            <textarea
+              ref={aboutRef}
+              defaultValue={lesson.aboutLesson || ''}
+              onInput={postToWorkerThrottled}
+              onPaste={handlePasteToMarkdown}
+              onBlur={() => startTransition(() => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', aboutRef.current ? aboutRef.current.value : ''))}
+              rows={8}
+              className="w-full p-3 border border-gray-300 rounded-lg font-mono text-sm custom-scrollbar"
+              placeholder="Write about this lesson using Markdown..."
             />
             <div className="text-xs text-gray-500 italic">
               Tip: Use markdown syntax for formatting - **bold**, *italic*, ## headings, - list items, [links](url), etc.
             </div>
+            {/* Live preview below editor */}
+            {renderedHtml ? (
+              <div className="mt-2 border border-gray-200 rounded-md">
+                <div className="px-3 py-2 text-xs bg-gray-50 border-b text-gray-700">Preview</div>
+                <div className="p-3 prose prose-sm max-w-none">
+                  <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+                </div>
+              </div>
+            ) : null}
           </div>
           
           {/* Resources toggle */}
@@ -183,22 +336,21 @@ const LessonForm = ({
       
       {/* Reading specific fields */}
       {lesson.type === 'reading' && (
-        <div className="space-y-2" data-color-mode="dark">
+        <div className="space-y-2">
           <label className="block text-gray-700">
-            Content <span className="text-red-500">*</span>          </label>          <MDEditor            value={lesson.aboutLesson}
-            onChange={(e) => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', e)}              height={300}            preview="edit"
-            visibleDragbar={true}
-            hideToolbar={false}
-            style={{ fontSize: '16px' }}
-            previewOptions={{
-              style: { padding: '20px', fontSize: '16px' }
-            }}
-            enableScroll={true}
-            textareaProps={{
-              placeholder: "Paste your formatted content here or start typing...",
-              onPaste: (e) => {
+            Content <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            ref={aboutRef}
+            defaultValue={lesson.aboutLesson || ''}
+            onInput={postToWorkerThrottled}
+            onBlur={() => startTransition(() => handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', aboutRef.current ? aboutRef.current.value : ''))}
+            rows={15}
+            className="w-full p-3 border border-gray-300 rounded-lg font-mono text-sm custom-scrollbar"
+            placeholder="Paste your formatted content here or start typing..."
+            onPaste={(e) => {
                 // Try to get rich text content
-                const richText = e.clipboardData.getData('text/html');
+              const richText = e.clipboardData.getData('text/html');
                 
                 if (richText) {
                   e.preventDefault();
@@ -386,16 +538,23 @@ const LessonForm = ({
                   // Clean up excessive newlines
                   markdown = markdown.replace(/\n{3,}/g, '\n\n');
                   
-                  // Insert at cursor position
+                  // Insert into uncontrolled textarea and notify worker
                   const textarea = e.target;
-                  const start = textarea.selectionStart;
-                  const end = textarea.selectionEnd;
-                  const text = textarea.value;
-                  const newText = text.substring(0, start) + markdown + text.substring(end);
-                  handleLessonChange(chapterIndex, lessonIndex, 'aboutLesson', newText);
+                  try {
+                    const start = textarea.selectionStart ?? 0;
+                    const end = textarea.selectionEnd ?? start;
+                    const text = textarea.value || '';
+                    const newText = text.substring(0, start) + markdown + text.substring(end);
+                    textarea.value = newText;
+                    textarea.selectionStart = textarea.selectionEnd = (start + markdown.length);
+                    postToWorkerThrottled();
+                  } catch {
+                    textarea.value = (textarea.value || '') + markdown;
+                    postToWorkerThrottled();
+                  }
                 }
               }
-            }}
+            }
           />
           <div className="flex items-center bg-blue-50 text-blue-800 p-3 rounded-lg mt-2">
             <div className="mr-2">
@@ -413,15 +572,8 @@ const LessonForm = ({
           <div className="mt-4 border border-gray-200 rounded-md">
             <div className="px-3 py-2 text-sm bg-gray-50 border-b text-gray-700">Live Preview</div>
             <div className="p-4 prose prose-slate max-w-none">
-              {lesson.aboutLesson ? (
-                <div 
-                  dangerouslySetInnerHTML={{ 
-                    __html: processMarkdownSync(lesson.aboutLesson, {
-                      convertDelimiters: true,
-                      autoLatex: true
-                    })
-                  }}
-                />
+              {renderedHtml ? (
+                <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
               ) : (
                 <p className="text-gray-500 text-sm">Start typing to see a preview. Math supported with $inline$ and $$block$$ syntax.</p>
               )}
@@ -476,4 +628,4 @@ const LessonForm = ({
   );
 };
 
-export default LessonForm;
+export default memo(LessonForm);

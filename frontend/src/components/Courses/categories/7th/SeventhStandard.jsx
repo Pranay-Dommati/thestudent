@@ -7,7 +7,7 @@ import MobileBoardSelector from '../../shared/MobileBoardSelector';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
 import logger from '../../../../utils/logger';
-import { checkBoardAvailability, checkStateAvailability } from '../../../../utils/courseAvailability';
+import { checkBoardAvailability, checkStateAvailability, getOptimisticBoardAvailability } from '../../../../utils/courseAvailability';
 import Footer from '../../../Footer/Footer';
 import SEO from '../../../SEO/SEO';
 
@@ -37,22 +37,26 @@ const SeventhStandard = () => {
   const [availableStates, setAvailableStates] = useState([]);
   const [checkingStates, setCheckingStates] = useState(false);
 
-  // Check course availability for each board
+  // Optimistic board availability: show immediately, then refine in background
   useEffect(() => {
-    const checkAvailability = async () => {
-      setCheckingAvailability(true);
+    const cached = getOptimisticBoardAvailability('7th');
+    if (cached) {
+      setAvailableBoards(cached);
+      setCheckingAvailability(false);
+    }
+    
+    const run = async () => {
       try {
-        const availableBoards = await checkBoardAvailability('7th');
-        setAvailableBoards(availableBoards);
-      } catch (error) {
-        logger.error('Error checking board availability:', error);
-        setAvailableBoards([]);
-      } finally {
-        setCheckingAvailability(false);
+        const fresh = await checkBoardAvailability('7th');
+        if (Array.isArray(fresh) && fresh.length) setAvailableBoards(fresh);
+      } catch {} finally {
+        if (!cached) setCheckingAvailability(false);
       }
     };
-
-    checkAvailability();
+    const handle = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback(run, { timeout: 1500 }) : setTimeout(run, 200);
+    return () => {
+      if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {} else clearTimeout(handle);
+    };
   }, []);
 
   // Sync selected board with URL; also reset on base route

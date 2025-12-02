@@ -1,5 +1,6 @@
 // ProgressiveContentGenerator.js
 // Handles progressive generation of content - generating and displaying one tab at a time for each topic
+// Supports background generation that continues even when user switches tabs or navigates away
 
 import { 
   generateReadingContent,
@@ -10,11 +11,24 @@ import {
 } from './services/index.js';
 import contentStorageService from '../../services/ContentStorageService.js';
 import logger from '../../utils/logger';
+import backgroundGenerationService from '../../services/BackgroundGenerationService.js';
+import { notifyCourseComplete } from '../../services/PendingCourseNotificationService.js';
+// Global generation state for cross-page card
+import { updateGenerationProgress, markGenerationComplete, clearGenerationState } from './GlobalBackgroundGenerationCard.jsx';
+
+// Storage key for persisting generation state
+const GENERATION_STATE_KEY = 'progressiveGen_state';
 
 /**
  * Progressive content generator that generates content one tab at a time
  * Order: Reading -> Summary -> Videos -> Quiz -> Resources for each topic
  * Then moves to next topic and repeats the cycle
+ * 
+ * ENHANCED: Now supports background generation that continues when:
+ * - User switches to another tab
+ * - User navigates away from ProLearning page
+ * - User minimizes the browser
+ * - User switches apps on mobile
  */
 export class ProgressiveContentGenerator {
   constructor() {
@@ -25,6 +39,15 @@ export class ProgressiveContentGenerator {
     this.courseId = null;
     this.courseTitle = null;
     this.callbacks = {};
+    
+    // Background generation tracking
+    this.isBackgroundMode = false;
+    this.userId = null;
+    this.isLoggedIn = false;
+    
+    // Visibility tracking for background mode
+    this._boundVisibilityHandler = this._handleVisibilityChange.bind(this);
+    this._initVisibilityTracking();
     
     // Tab generation order
     this.tabOrder = [
@@ -37,7 +60,93 @@ export class ProgressiveContentGenerator {
   }
 
   /**
+   * Initialize visibility change tracking for background mode
+   */
+  _initVisibilityTracking() {
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this._boundVisibilityHandler);
+    }
+  }
+
+  /**
+   * Handle visibility changes - persist state when going to background
+   */
+  _handleVisibilityChange() {
+    if (this.isGenerating) {
+      if (document.hidden) {
+        // Page is now hidden - persist state for background continuation
+        logger.log('🔄 [ProgressiveGen] Page hidden - continuing in background mode');
+        this._persistGenerationState();
+        this.isBackgroundMode = true;
+      } else {
+        // Page is now visible
+        logger.log('👁️ [ProgressiveGen] Page visible - updating UI');
+        this.isBackgroundMode = false;
+      }
+    }
+  }
+
+  /**
+   * Persist current generation state for background/recovery
+   */
+  _persistGenerationState() {
+    try {
+      const state = {
+        courseId: this.courseId,
+        courseTitle: this.courseTitle,
+        topics: this.topics.map(t => typeof t === 'string' ? t : t.name),
+        currentTopic: this.currentTopic,
+        currentTab: this.currentTab,
+        isGenerating: this.isGenerating,
+        userId: this.userId,
+        isLoggedIn: this.isLoggedIn,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(GENERATION_STATE_KEY, JSON.stringify(state));
+      logger.log('💾 [ProgressiveGen] State persisted');
+    } catch (error) {
+      logger.error('❌ [ProgressiveGen] Failed to persist state:', error);
+    }
+  }
+
+  /**
+   * Restore generation state (for recovery after page reload)
+   */
+  _getPersistedState() {
+    try {
+      const stored = localStorage.getItem(GENERATION_STATE_KEY);
+      if (!stored) return null;
+      
+      const state = JSON.parse(stored);
+      
+      // Check if state is recent (within last 10 minutes)
+      const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+      if (state.timestamp < tenMinutesAgo) {
+        localStorage.removeItem(GENERATION_STATE_KEY);
+        return null;
+      }
+      
+      return state;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Clear persisted state
+   */
+  _clearPersistedState() {
+    try {
+      localStorage.removeItem(GENERATION_STATE_KEY);
+    } catch {}
+  }
+
+  /**
    * Initialize progressive generation for a course
+   * @param {string} courseTitle - Course title
+   * @param {Array} topicsList - List of topics
+   * @param {Object} callbacks - Callback functions
+   * @param {Object} options - Options including courseId, userId, isLoggedIn for background support
    */
   async initializeGeneration(courseTitle, topicsList, callbacks = {}, options = {}) {
     if (this.isGenerating) {
@@ -47,8 +156,14 @@ export class ProgressiveContentGenerator {
 
     this.courseTitle = courseTitle;
     this.topics = topicsList || [];
+    
+    // Store user info for background notifications (for logged-in users only)
+    this.userId = options.userId || null;
+    this.isLoggedIn = options.isLoggedIn || false;
+    
     this.callbacks = {
       onProgress: callbacks.onProgress || (() => {}),
+      onContentUpdate: callbacks.onContentUpdate || (() => {}),
       onTabComplete: callbacks.onTabComplete || (() => {}),
       onTopicComplete: callbacks.onTopicComplete || (() => {}),
       onAllComplete: callbacks.onAllComplete || (() => {}),
@@ -72,14 +187,40 @@ export class ProgressiveContentGenerator {
       }
     }
 
-  // Store topics
+    // Store topics
     contentStorageService.storeTopics(this.courseId, this.topics);
+    
+    // Register with background generation service for robust background support
+    backgroundGenerationService.startBackgroundGeneration({
+      courseId: this.courseId,
+      courseTitle: this.courseTitle,
+      topics: this.topics,
+      isLoggedIn: this.isLoggedIn,
+      userId: this.userId,
+      callbacks: {
+        onProgress: (progress) => {
+          // Forward to our callbacks if page is visible
+          if (!this.isBackgroundMode && this.callbacks.onProgress) {
+            this.callbacks.onProgress(progress);
+          }
+        },
+        onComplete: () => {
+          // Handled by our own onAllComplete
+        },
+        onError: (error) => {
+          if (this.callbacks.onError) {
+            this.callbacks.onError(error);
+          }
+        }
+      }
+    });
 
     return { success: true, courseId: this.courseId };
   }
 
   /**
    * Start progressive generation
+   * Generation will continue even if user switches tabs or navigates away
    */
   async startProgressiveGeneration() {
     if (this.isGenerating) {
@@ -96,9 +237,13 @@ export class ProgressiveContentGenerator {
     this.isGenerating = true;
     this.currentTopic = 0;
     this.currentTab = 0;
+    this.isBackgroundMode = false;
 
-    // Starting progressive content generation...
-    // Topics: this.topics.length, Tabs per topic: this.tabOrder.length
+    // Persist initial state
+    this._persistGenerationState();
+
+    logger.log('🚀 [ProgressiveGen] Starting generation with background support');
+    logger.log(`📚 Topics: ${this.topics.length}, Tabs per topic: ${this.tabOrder.length}`);
 
     try {
       await this.generateNextTabContent();
@@ -106,46 +251,93 @@ export class ProgressiveContentGenerator {
       logger.error('❌ Progressive generation failed:', error);
       this.callbacks.onError(error.message);
       this.isGenerating = false;
+      this._clearPersistedState();
+      backgroundGenerationService.markFailed(error.message);
     }
   }
 
   /**
    * Generate content for the next tab in sequence
+   * This method continues running even when the page is in the background
    */
   async generateNextTabContent() {
     if (!this.isGenerating || this.currentTopic >= this.topics.length) {
-      // All content generated
+      // All content generated - COMPLETION HANDLING
       this.isGenerating = false;
+      this._clearPersistedState();
+      
+      logger.log('🔥 [ProgressiveGen] All content generated - triggering completion');
+      
+      // Mark background generation as complete
+      await backgroundGenerationService.markComplete();
+      
+      // Mark global state as complete for cross-page card
+      markGenerationComplete(this.courseId, this.courseTitle);
+      
+      // If logged in user and page is hidden, queue notification for when they return
+      if (this.isLoggedIn && this.isBackgroundMode) {
+        logger.log('📬 [ProgressiveGen] User is logged in and page is hidden - queueing notification');
+        notifyCourseComplete(
+          this.courseId,
+          this.courseTitle,
+          { topicsCount: this.topics.length, userId: this.userId }
+        );
+      }
+      
+      // Call the onAllComplete callback
       logger.log('🔥 PROG GEN DEBUG: Calling onAllComplete callback!');
       this.callbacks.onAllComplete();
       logger.log('🔥 PROG GEN DEBUG: onAllComplete callback finished');
-      // All progressive content generation completed!
       return;
     }
 
     const topic = this.topics[this.currentTopic];
     const tab = this.tabOrder[this.currentTab];
     
-    // Generating tab.name for topic (progress info)
-
     // Calculate overall progress
     const totalTabs = this.topics.length * this.tabOrder.length;
     const completedTabs = this.currentTopic * this.tabOrder.length + this.currentTab;
     const progressPercentage = Math.round((completedTabs / totalTabs) * 100);
 
-    // Notify progress
-    this.callbacks.onProgress({
-      topic: topic.name || topic,
-      tabType: tab.id,
-      tabName: tab.name,
-      topicIndex: this.currentTopic,
-      tabIndex: this.currentTab,
-      totalTopics: this.topics.length,
-      totalTabs: this.tabOrder.length,
-      overallProgress: progressPercentage,
-      completedTabs,
-      totalTabs
+    // Update persisted state for recovery
+    this._persistGenerationState();
+    
+    // Update background service with progress
+    backgroundGenerationService.updateProgress({
+      completedTopics: this.currentTopic,
+      currentTab: this.currentTab,
+      progressPercentage,
     });
+
+    // Update global state for cross-page card (always update, not just foreground)
+    updateGenerationProgress({
+      courseId: this.courseId,
+      courseTitle: this.courseTitle,
+      currentTopic: topic.name || topic,
+      currentStep: tab.id,
+      progress: progressPercentage,
+      totalTopics: this.topics.length,
+      completedTopics: this.currentTopic,
+      isComplete: false,
+      isGenerating: true
+    });
+
+    // Notify progress (will be shown if page is visible)
+    if (!this.isBackgroundMode) {
+      this.callbacks.onProgress({
+        topic: topic.name || topic,
+        tabType: tab.id,
+        tabName: tab.name,
+        topicIndex: this.currentTopic,
+        tabIndex: this.currentTab,
+        totalTopics: this.topics.length,
+        totalTabs: this.tabOrder.length,
+        overallProgress: progressPercentage,
+        completedTopics: this.currentTopic,
+        completedTabs,
+        totalTabs
+      });
+    }
 
     try {
       // Generate content for current tab
@@ -154,15 +346,17 @@ export class ProgressiveContentGenerator {
       // Store the content for this specific tab
       await this.storeTabContent(topic, tab.id, generatedContent);
 
-      // Notify tab completion
-      this.callbacks.onTabComplete({
-        topic: topic.name || topic,
-        tabType: tab.id,
-        tabName: tab.name,
-        content: generatedContent,
-        topicIndex: this.currentTopic,
-        tabIndex: this.currentTab
-      });
+      // Notify tab completion (if page is visible)
+      if (!this.isBackgroundMode) {
+        this.callbacks.onTabComplete({
+          topic: topic.name || topic,
+          tabType: tab.id,
+          tabName: tab.name,
+          content: generatedContent,
+          topicIndex: this.currentTopic,
+          tabIndex: this.currentTab
+        });
+      }
 
       // Move to next tab/topic
       this.currentTab++;
@@ -172,21 +366,27 @@ export class ProgressiveContentGenerator {
         this.currentTab = 0;
         this.currentTopic++;
         
-        // Notify topic completion
-        this.callbacks.onTopicComplete({
-          topic: topic.name || topic,
-          topicIndex: this.currentTopic - 1,
-          totalTopics: this.topics.length
-        });
+        // Update persisted state with topic completion
+        this._persistGenerationState();
+        
+        // Notify topic completion (if page is visible)
+        if (!this.isBackgroundMode) {
+          this.callbacks.onTopicComplete({
+            topic: topic.name || topic,
+            topicIndex: this.currentTopic - 1,
+            totalTopics: this.topics.length
+          });
+        }
       }
 
-      // Generate next tab content
+      // Generate next tab content - continues even in background
+      // Using setTimeout ensures the call stack doesn't grow too deep
       setTimeout(() => {
         this.generateNextTabContent();
-      }, 1000); // Small delay between generations
+      }, this.isBackgroundMode ? 500 : 1000); // Faster in background mode
 
     } catch (error) {
-  logger.error(`❌ Failed to generate ${tab.name} for ${topic.name || topic}:`, error);
+      logger.error(`❌ Failed to generate ${tab.name} for ${topic.name || topic}:`, error);
       
       // Continue with next tab even if current one fails
       this.currentTab++;
@@ -195,10 +395,13 @@ export class ProgressiveContentGenerator {
         this.currentTopic++;
       }
       
-      // Continue generation despite error
+      // Persist state after error recovery
+      this._persistGenerationState();
+      
+      // Continue generation despite error - robust error recovery
       setTimeout(() => {
         this.generateNextTabContent();
-      }, 1000);
+      }, this.isBackgroundMode ? 500 : 1000);
     }
   }
 
@@ -208,103 +411,112 @@ export class ProgressiveContentGenerator {
   async generateTabContent(topic, tab) {
     const topicName = topic.name || topic;
     
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       let timeoutId;
       let resolved = false;
 
-      // Set timeout to prevent hanging
+      // Set timeout to prevent hanging - increased for background mode
+      const timeoutMs = this.isBackgroundMode ? 120000 : 90000; // 2 min in bg, 90s in fg
       timeoutId = setTimeout(() => {
         if (!resolved) {
           resolved = true;
           reject(new Error(`Timeout generating ${tab.name} for ${topicName}`));
         }
-      }, 45000); // 45 second timeout
+      }, timeoutMs);
 
       // Create content setter that captures the generated content
+      // We use this to capture the FINAL state if the generator doesn't return it
+      let lastCapturedContent = {};
+      
       const setContent = (newContent) => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeoutId);
-          
           let content;
           if (typeof newContent === 'function') {
-            // If it's a function, call it with empty object
-            content = newContent({});
+            content = newContent(lastCapturedContent || {});
           } else {
             content = newContent;
           }
+          lastCapturedContent = content;
           
-          // Extract the specific tab content
-          let tabContent;
-          switch (tab.id) {
-            case 'reading':
-              tabContent = content.reading || '';
-              break;
-            case 'summary':
-              tabContent = content.summary || '';
-              break;
-            case 'videos':
-              tabContent = content.videos || [];
-              break;
-            case 'quiz':
-              tabContent = content.quiz || [];
-              break;
-            case 'resources':
-              // For resources, preserve both the array AND metadata
-              console.log('🔍 [PROG GEN] Raw content passed to extraction:', {
-                hasContent: !!content,
-                contentKeys: content ? Object.keys(content) : [],
-                hasResources: 'resources' in (content || {}),
-                hasResourcesMetadata: 'resourcesMetadata' in (content || {}),
-                resourcesType: typeof content?.resources,
-                resourcesMetadataType: typeof content?.resourcesMetadata,
-                resourcesMetadataValue: content?.resourcesMetadata
+          // Notify listener of content update (for streaming)
+          if (this.callbacks.onContentUpdate) {
+              this.callbacks.onContentUpdate({
+                  topic: topicName,
+                  tabType: tab.id,
+                  content: lastCapturedContent
               });
-              tabContent = {
-                resources: content.resources || [],
-                resourcesMetadata: content.resourcesMetadata || null
-              };
-              console.log('🔍 [PROG GEN] Extracted resources content:', {
-                resourcesCount: tabContent.resources?.length || 0,
-                hasMetadata: !!tabContent.resourcesMetadata,
-                metadataKeys: tabContent.resourcesMetadata ? Object.keys(tabContent.resourcesMetadata) : [],
-                generatedAt: tabContent.resourcesMetadata?.generatedAt
-              });
-              break;
-            default:
-              tabContent = content;
           }
-          
-          resolve(tabContent);
-        }
       };
 
       // Generate content based on tab type
       try {
+        let result;
         switch (tab.id) {
           case 'reading':
-            tab.generator(topicName, setContent);
+            result = await tab.generator(topicName, setContent);
             break;
           case 'summary':
             // For summary, we need existing reading content
             const existingContent = this.getExistingTopicContent(topicName);
             const readingContent = existingContent?.reading || '';
-            tab.generator(setContent, topicName, readingContent);
+            result = await tab.generator(setContent, topicName, readingContent);
             break;
           case 'videos':
-            tab.generator(setContent, topicName);
+            result = await tab.generator(setContent, topicName);
             break;
           case 'quiz':
             // For quiz, we need existing reading content
             const existingContentForQuiz = this.getExistingTopicContent(topicName);
             const readingContentForQuiz = existingContentForQuiz?.reading || '';
-            tab.generator(setContent, topicName, readingContentForQuiz);
+            result = await tab.generator(setContent, topicName, readingContentForQuiz);
             break;
           case 'resources':
-            tab.generator(setContent, topicName);
+            result = await tab.generator(setContent, topicName);
             break;
           default:
-            reject(new Error(`Unknown tab type: ${tab.id}`));
+            throw new Error(`Unknown tab type: ${tab.id}`);
+        }
+        
+        if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutId);
+            
+            // If generator returned a value, use it (Reading/Summary now do)
+            if (result) {
+                resolve(result);
+                return;
+            }
+            
+            // Fallback to last captured content from setContent
+            if (lastCapturedContent) {
+                let tabContent;
+                switch (tab.id) {
+                    case 'reading': tabContent = lastCapturedContent.reading || ''; break;
+                    case 'summary': tabContent = lastCapturedContent.summary || ''; break;
+                    case 'videos': tabContent = lastCapturedContent.videos || []; break;
+                    case 'quiz': tabContent = lastCapturedContent.quiz || []; break;
+                    case 'resources': 
+                        // For resources, preserve both the array AND metadata
+                        console.log('🔍 [PROG GEN] Raw content passed to extraction:', {
+                            hasContent: !!lastCapturedContent,
+                            contentKeys: lastCapturedContent ? Object.keys(lastCapturedContent) : [],
+                            hasResources: 'resources' in (lastCapturedContent || {}),
+                            hasResourcesMetadata: 'resourcesMetadata' in (lastCapturedContent || {}),
+                            resourcesType: typeof lastCapturedContent?.resources,
+                            resourcesMetadataType: typeof lastCapturedContent?.resourcesMetadata,
+                            resourcesMetadataValue: lastCapturedContent?.resourcesMetadata
+                        });
+                        tabContent = {
+                            resources: lastCapturedContent.resources || [],
+                            resourcesMetadata: lastCapturedContent.resourcesMetadata || null
+                        };
+                        break;
+                    default: tabContent = lastCapturedContent;
+                }
+                resolve(tabContent);
+            } else {
+                // If neither returned nor captured, resolve with empty/default
+                resolve(tab.id === 'videos' || tab.id === 'quiz' || tab.id === 'resources' ? [] : '');
+            }
         }
       } catch (error) {
         if (!resolved) {
@@ -438,6 +650,8 @@ export class ProgressiveContentGenerator {
    */
   stopGeneration() {
     this.isGenerating = false;
+    // Clear global state when stopped
+    clearGenerationState();
     logger.log('🛑 Progressive generation stopped');
   }
 

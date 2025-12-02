@@ -7,7 +7,7 @@ import BackButton from '../../components/BackButton';
 import MobileBoardSelector from '../../shared/MobileBoardSelector';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
-import { checkBoardAvailability } from '../../../../utils/courseAvailability';
+import { checkBoardAvailability, getOptimisticBoardAvailability } from '../../../../utils/courseAvailability';
 import Footer from '../../../Footer/Footer';
 import SEO from '../../../SEO/SEO';
 
@@ -55,22 +55,26 @@ const EighthStandard = () => {
     }
   }, [navigate]);
 
-  // Check course availability for each board
+  // Optimistic board availability
   useEffect(() => {
-    const checkAvailability = async () => {
-      setCheckingAvailability(true);
+    const cached = getOptimisticBoardAvailability('8th');
+    if (cached) {
+      setAvailableBoards(cached);
+      setCheckingAvailability(false);
+    }
+
+    const run = async () => {
       try {
-        const availableBoards = await checkBoardAvailability('8th');
-        setAvailableBoards(availableBoards);
-      } catch (error) {
-        logger.error('Error checking board availability:', error);
-        setAvailableBoards([]);
-      } finally {
-        setCheckingAvailability(false);
+        const fresh = await checkBoardAvailability('8th');
+        if (Array.isArray(fresh) && fresh.length) setAvailableBoards(fresh);
+      } catch {} finally {
+        if (!cached) setCheckingAvailability(false);
       }
     };
-
-    checkAvailability();
+    const handle = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback(run, { timeout: 1500 }) : setTimeout(run, 200);
+    return () => {
+      if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {} else clearTimeout(handle);
+    };
   }, []);
 
   // Sync selected board with URL; also reset on base route

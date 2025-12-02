@@ -58,10 +58,10 @@ export const getCourses = async () => {
   }
 };
 
-export const getEngineeringCourses = async (category = 'all') => {
+export const getEngineeringCourses = async (category = 'all', extraParams = {}) => {
   try {
   logger.log('Fetching courses for category:', category);
-  const response = await axios.get(`/courses/engineering/`, { params: { category } });
+  const response = await axios.get(`/courses/engineering/`, { params: { category, ...extraParams } });
   logger.log('Course data received:', response.data);
     const list = response.data || [];
     // Warm per-course cache for details page fast load and refresh-resilience
@@ -108,11 +108,11 @@ export const getAllCourses = async (category = 'all') => {
   }
 };
 
-export const getSchoolCourses = async (classLevel, board, state = '') => {
+export const getSchoolCourses = async (classLevel, board, state = '', extraParams = {}) => {
   try {
   logger.log(`API call: getSchoolCourses(${classLevel}, ${board}, ${state})`);
     
-    const params = { class: classLevel, board };
+    const params = { class: classLevel, board, ...extraParams };
     if (board === 'state' && state) params.state = state;
     logger.log('Requesting school courses with params:', params);
       const listKey = `school:list:${(classLevel||'').toLowerCase()}:${(board||'').toLowerCase()}:${(state||'').toLowerCase()}`;
@@ -160,6 +160,42 @@ export const getSchoolCourseById = async (courseId) => {
   } catch (error) {
     logger.error('Error fetching school course by ID:', error);
     throw error;
+  }
+};
+
+/**
+ * Manually populate the cache for specific state lists from a bulk fetch.
+ * This enables "write-ahead" caching where fetching all state courses
+ * automatically makes specific state queries (e.g. "Telangana") instant.
+ */
+export const populateStateCacheFromList = (classLevel, allCourses) => {
+  try {
+    // Group courses by state
+    const coursesByState = {};
+    allCourses.forEach(course => {
+      if (course.state) {
+        // Normalize state name to handle potential inconsistencies if needed, 
+        // but usually database returns consistent names like "Telangana"
+        const stateName = course.state;
+        if (!coursesByState[stateName]) {
+          coursesByState[stateName] = [];
+        }
+        coursesByState[stateName].push(course);
+      }
+    });
+
+    // Set cache for each state
+    Object.entries(coursesByState).forEach(([stateName, courses]) => {
+      // Construct key exactly as getSchoolCourses does:
+      // `school:list:${classLevel}:${board}:${state}`
+      // board is 'state'
+      const listKey = `school:list:${(classLevel||'').toLowerCase()}:state:${(stateName||'').toLowerCase()}`;
+      
+      logger.log(`Populating write-ahead cache for ${listKey} with ${courses.length} items`);
+      cache.set(listKey, courses, 5 * 60_000); // 5 minutes TTL
+    });
+  } catch (e) {
+    logger.error('Error populating state cache:', e);
   }
 };
 
