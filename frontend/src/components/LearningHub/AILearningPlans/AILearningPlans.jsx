@@ -10,10 +10,44 @@ import ShareCourseButton from '../../Shared/ShareCourseButton.jsx';
 
 // Use axios baseURL and dev proxy
 
+// Simple session cache to speed up UI. Stored shape: { ts: number, data: Array }
+const CACHE_KEY = 'ai_pro_courses_cache_v1';
+const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+const readCache = () => {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.ts || !Array.isArray(parsed.data)) return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+};
+
+const writeCache = (data) => {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+  } catch (_) {}
+};
+
+// Read cache synchronously for initial state - INSTANT display
+const getInitialState = () => {
+  const cached = readCache();
+  if (cached && Array.isArray(cached.data)) {
+    return { courses: cached.data, loading: false, hasCachedData: true };
+  }
+  return { courses: [], loading: true, hasCachedData: false };
+};
+
 const AILearningPlans = () => {
   const navigate = useNavigate();
-  const [proCourses, setProCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Initialize from cache immediately for instant display
+  const initialState = getInitialState();
+  const [proCourses, setProCourses] = useState(initialState.courses);
+  const [loading, setLoading] = useState(initialState.loading);
   const [refreshing, setRefreshing] = useState(false); // background refresh without blocking UI
   const [error, setError] = useState(null);
   const [showMore, setShowMore] = useState(false);
@@ -22,37 +56,18 @@ const AILearningPlans = () => {
 
   const COURSES_TO_SHOW = 6;
 
-  // Simple session cache to speed up UI. Stored shape: { ts: number, data: Array }
-  const CACHE_KEY = 'ai_pro_courses_cache_v1';
-  const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
   const isFetchingRef = useRef(null); // holds in-flight promise
   const lastFetchTimeRef = useRef(0);
+  const hasCachedDataRef = useRef(initialState.hasCachedData);
   const FETCH_COOLDOWN = 2000; // 2 seconds cooldown between fetches
-
-  const readCache = () => {
-    try {
-      const raw = sessionStorage.getItem(CACHE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || !parsed.ts || !Array.isArray(parsed.data)) return null;
-      return parsed;
-    } catch (_) {
-      return null;
-    }
-  };
-
-  const writeCache = (data) => {
-    try {
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
-    } catch (_) {}
-  };
 
   const refreshCourses = useCallback((force = false) => {
     fetchProCourses(force);
   }, []);
 
   useEffect(() => {
-    refreshCourses();
+    // Background fetch - don't force if we have cache
+    refreshCourses(!hasCachedDataRef.current);
   }, [refreshCourses]);
 
   // Listen only for explicit events (not focus/visibility - parent LearningHubPage handles that)
@@ -64,18 +79,17 @@ const AILearningPlans = () => {
         refreshCourses(true);
       }
     };
-    const onLearningActivity = () => refreshCourses(true); // progress may change after activity updates
-    const onLearningProgress = () => refreshCourses(true); // explicit lesson/topic progress event
+    // Only refresh on explicit progress events, not general activity (reduces API calls)
+    const onLearningProgress = () => refreshCourses(); // Use cooldown (not force) for progress events
     
     window.addEventListener('prolearning:course-saved', onSaved);
     window.addEventListener('storage', onStorage);
-    window.addEventListener('learning:activity-updated', onLearningActivity);
     window.addEventListener('learning:progress-updated', onLearningProgress);
+    // Removed learning:activity-updated listener - too frequent for mobile performance
     
     return () => {
       window.removeEventListener('prolearning:course-saved', onSaved);
       window.removeEventListener('storage', onStorage);
-      window.removeEventListener('learning:activity-updated', onLearningActivity);
       window.removeEventListener('learning:progress-updated', onLearningProgress);
     };
   }, [refreshCourses]);
@@ -88,20 +102,13 @@ const AILearningPlans = () => {
       return;
     }
     
-    // Always attempt to show cached data instantly (stale-while-revalidate)
-    let hadCache = false;
-    try {
+    // Check cache freshness - if we already have cached data displayed, skip network if fresh
+    if (!force && hasCachedDataRef.current) {
       const cached = readCache();
-      if (cached && Array.isArray(cached.data) && cached.data.length > 0) {
-        setProCourses(cached.data);
-        setLoading(false);
-        hadCache = true;
-        // If cache is fresh and not forced, skip network
-        if (!force && (now - cached.ts) < CACHE_TTL) {
-          return cached.data;
-        }
+      if (cached && (now - cached.ts) < CACHE_TTL) {
+        return cached.data; // Cache is fresh, no need to fetch
       }
-    } catch (_) {}
+    }
     
     lastFetchTimeRef.current = now;
 
@@ -122,8 +129,8 @@ const AILearningPlans = () => {
       return;
     }
 
-    // Show full-page spinner only when no cache; otherwise do a quiet refresh
-    if (!hadCache) setLoading(true); else setRefreshing(true);
+    // Show full-page spinner only when no cached data; otherwise do a quiet background refresh
+    if (!hasCachedDataRef.current) setLoading(true); else setRefreshing(true);
     const p = (async () => {
       try {
         const response = await axios.get(`/courses/pro-learning/?compact=1`, {
@@ -136,6 +143,7 @@ const AILearningPlans = () => {
         const data = response.data.results || response.data || [];
         setProCourses(data);
         writeCache(data);
+        hasCachedDataRef.current = true; // Mark that we have data
         setError(null);
         return data;
       } catch (error) {
