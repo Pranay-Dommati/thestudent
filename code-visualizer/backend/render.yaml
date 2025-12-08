@@ -1,0 +1,24 @@
+# Render Blueprint for Code Visualizer Backend
+# This file configures the service for deployment on Render
+
+services:
+  - type: web
+    name: code-visualizer-backend
+    runtime: python
+    rootDir: code-visualizer/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+    healthCheckPath: /api/health
