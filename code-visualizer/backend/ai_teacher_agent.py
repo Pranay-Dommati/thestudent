@@ -44,8 +44,9 @@ logging.getLogger("livekit").setLevel(logging.WARNING)
 logging.getLogger("livekit.agents").setLevel(logging.INFO)
 logging.getLogger("root").setLevel(logging.WARNING)  # Silence transcription warnings
 
-# Backend API URL
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000")
+# Backend API URL - auto-detect PORT from Render environment
+_port = os.getenv("PORT", "5000")
+BACKEND_URL = os.getenv("BACKEND_URL", f"http://localhost:{_port}")
 
 # Global state - singleton tracking
 _current_context = {}
