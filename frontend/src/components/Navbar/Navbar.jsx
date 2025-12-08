@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaUserPlus, FaSignInAlt, FaChevronRight, FaHome } from 'react-icons/fa';
+import { HiOutlineCode, HiOutlineSparkles } from 'react-icons/hi';
+import { IoClose } from 'react-icons/io5';
 import { useAuth } from '../../context/AuthContext';
 import LogoutConfirmModal from '../common/LogoutConfirmModal';
 
@@ -12,6 +14,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
   // Generate breadcrumbs from current path
@@ -263,12 +266,12 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 >
                   Course Creator
                 </Link>
-                <Link 
-                  to="/code-visualizer" 
-                  className={`font-medium transition-colors ${textColor}`}
+                <button 
+                  onClick={() => setShowComingSoon(true)}
+                  className={`font-medium transition-colors ${textColor} hover:opacity-80`}
                 >
                   Code Visualizer
-                </Link>
+                </button>
               </div>
             </div>
           )}
@@ -522,6 +525,77 @@ const Navbar = ({ initialStyle = "transparent" }) => {
         onConfirm={confirmLogout}
         onCancel={cancelLogout}
       />
+
+      {/* Code Visualizer Coming Soon Modal */}
+      {showComingSoon && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowComingSoon(false)}
+          />
+          
+          {/* Modal */}
+          <div className="relative bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl p-8 max-w-md mx-4 shadow-2xl border border-purple-500/30 animate-in fade-in zoom-in duration-300">
+            {/* Close button */}
+            <button
+              onClick={() => setShowComingSoon(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+            >
+              <IoClose className="w-6 h-6" />
+            </button>
+
+            {/* Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30">
+                  <HiOutlineCode className="w-10 h-10 text-white" />
+                </div>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center animate-pulse">
+                  <HiOutlineSparkles className="w-4 h-4 text-white" />
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <h2 className="text-2xl font-bold text-white text-center mb-3">
+              Code Visualizer
+            </h2>
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <span className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-semibold rounded-full">
+                Coming Soon
+              </span>
+            </div>
+            <p className="text-gray-300 text-center mb-6 leading-relaxed">
+              We're building something amazing! Our AI-powered Code Visualizer will help you understand code execution step-by-step with interactive visualizations and voice explanations.
+            </p>
+
+            {/* Features preview */}
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-3 text-gray-300">
+                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                <span className="text-sm">Step-by-step code execution</span>
+              </div>
+              <div className="flex items-center gap-3 text-gray-300">
+                <div className="w-2 h-2 bg-pink-400 rounded-full"></div>
+                <span className="text-sm">AI voice explanations</span>
+              </div>
+              <div className="flex items-center gap-3 text-gray-300">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                <span className="text-sm">Interactive visualizations</span>
+              </div>
+            </div>
+
+            {/* Button */}
+            <button
+              onClick={() => setShowComingSoon(false)}
+              className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

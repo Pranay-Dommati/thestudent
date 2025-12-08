@@ -326,8 +326,8 @@ const App = () => {
             <Route path="/pro-learning" element={<Navigate to="/chat" replace />} />
             <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
             <Route path="/pro-learning/share/:shareId" element={<SharedProLearningPage />} />
-            {/* Code Visualizer - Python code visualization tool */}
-            <Route path="/code-visualizer" element={<CodeVisualizerPage />} />
+            {/* Code Visualizer - Coming Soon, redirect to home */}
+            <Route path="/code-visualizer" element={<Navigate to="/" replace />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
             {/* Canonical ID-based quiz route */}
