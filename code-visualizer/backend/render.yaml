@@ -6,11 +6,11 @@ services:
     name: code-visualizer-backend
     runtime: python
     rootDir: code-visualizer/backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    buildCommand: chmod +x start.sh && pip install -r requirements.txt
+    startCommand: ./start.sh
     envVars:
       - key: PYTHON_VERSION
-        value: "3.12.0"
+        value: "3.11.4"
       - key: GEMINI_API_KEY
         sync: false
       - key: LIVEKIT_URL
@@ -21,4 +21,6 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      - key: BACKEND_URL
+        value: "http://localhost:$PORT"
     healthCheckPath: /api/health
