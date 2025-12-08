@@ -47,6 +47,8 @@ import OfflinePage from './components/Common/OfflinePage.jsx';
 const CertificatePreview = React.lazy(() => import('./components/Certificates/CertificatePreview'));
 import OnboardingModal from './components/Onboarding/OnboardingModal';
 import GlobalBackgroundGenerationCard from './components/ProLearning/GlobalBackgroundGenerationCard';
+// Code Visualizer - Python code visualization tool
+const CodeVisualizerPage = React.lazy(() => import('./components/CodeVisualizer'));
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -84,7 +86,7 @@ const Layout = ({ children, excludePaths = [] }) => {
                      isLearningPage; // Exclude profile, certificate and learning pages for focused layout
 
   // Paths where we don't want mobile navigation (like auth, admin, chat, etc.)
-  const noMobileNavPaths = ['/auth', '/admin-p', '/not-found', '/chat', '/pro-learning'];
+  const noMobileNavPaths = ['/auth', '/admin-p', '/not-found', '/chat', '/pro-learning', '/code-visualizer'];
   const shouldShowMobileNav = !noMobileNavPaths.some(path => location.pathname.startsWith(path)) && !isCertificatePage && !isLearningPage;
 
   // Determine the navbar style based on the current route
@@ -271,7 +273,7 @@ const App = () => {
           {/* Global Background Generation Card - shows on non-ProLearning pages when generating */}
           <GlobalBackgroundGenerationCard />
           
-        <Layout excludePaths={['/admin-p', '/chat', '/offline', '/pro-learning']}>
+        <Layout excludePaths={['/admin-p', '/chat', '/offline', '/pro-learning', '/code-visualizer']}>
             <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
           <Routes>
             <Route path="/" element={<HomePage />} />
@@ -324,6 +326,8 @@ const App = () => {
             <Route path="/pro-learning" element={<Navigate to="/chat" replace />} />
             <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
             <Route path="/pro-learning/share/:shareId" element={<SharedProLearningPage />} />
+            {/* Code Visualizer - Python code visualization tool */}
+            <Route path="/code-visualizer" element={<CodeVisualizerPage />} />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
             {/* Canonical ID-based quiz route */}

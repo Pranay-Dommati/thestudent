@@ -31,6 +31,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
       if (segment === 'chat') name = 'Course Creator';
       if (segment === 'courses') name = 'Courses';
       if (segment === 'pro-learning') name = 'Pro Learning';
+      if (segment === 'code-visualizer') name = 'Code Visualizer';
       if (segment === 'auth') name = 'Authentication';
       if (segment.includes('th') || segment === 'engineering') {
         name = segment.charAt(0).toUpperCase() + segment.slice(1);
@@ -239,7 +240,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             </div>
           ) : (
             // Full navigation for desktop
-            <div className="flex items-center justify-center flex-1 max-w-[600px]">
+            <div className="flex items-center justify-center flex-1 max-w-[700px]">
               <div className="flex items-center space-x-8">
                 <Link to="/" className={`font-medium transition-colors ${textColor}`}>Home</Link>
                 <Link 
@@ -261,6 +262,12 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                   className={`font-medium transition-colors ${textColor}`}
                 >
                   Course Creator
+                </Link>
+                <Link 
+                  to="/code-visualizer" 
+                  className={`font-medium transition-colors ${textColor}`}
+                >
+                  Code Visualizer
                 </Link>
               </div>
             </div>
