@@ -3,7 +3,7 @@
  * This addresses common Google Sign-In issues
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import universalToast from '../utils/universalToast';
 
 // Enhanced Google Sign-In Hook
@@ -11,12 +11,17 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
   const [isGoogleReady, setIsGoogleReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  
+  // Ref to track if authentication is in progress (accessible from event handlers)
+  const authInProgressRef = useRef(false);
 
   useEffect(() => {
     // Handle Google authentication response
     const handleGoogleResponse = async (response) => {
       try {
         console.log('Google Sign-In response received');
+        // Mark auth as complete
+        authInProgressRef.current = false;
         
         if (!response.credential) {
           throw new Error('No credential received from Google');
@@ -130,17 +135,20 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
   // Trigger Google Sign-In
   const signInWithGoogle = () => {
     if (!isGoogleReady) {
-  universalToast.error('Google Sign-In not ready. Please refresh the page.');
+      universalToast.error('Google Sign-In not ready. Please refresh the page.');
       return;
     }
+
+    // Mark auth as in progress
+    authInProgressRef.current = true;
 
     try {
       // Use prompt method for better compatibility
       window.google.accounts.id.prompt((notification) => {
         try {
-          // If the Google prompt is displayed, inform caller to hide loading
+          // If the Google prompt is displayed, keep loading visible
           if ((notification.isDisplayed && notification.isDisplayed()) || (notification.isDisplayMoment && notification.isDisplayMoment())) {
-            onShown && onShown();
+            // Don't hide loading - keep it visible during auth
           }
         } catch {}
         if (notification.isNotDisplayed && notification.isNotDisplayed()) {
@@ -150,17 +158,20 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
           renderGoogleButtonAndClick();
         } else if (notification.isSkippedMoment && notification.isSkippedMoment()) {
           console.log('Google Sign-In prompt skipped');
+          authInProgressRef.current = false;
           universalToast.error('Google Sign-In was cancelled');
           try { onError && onError('Google Sign-In cancelled'); } catch {}
         } else if (notification.isDismissedMoment && notification.isDismissedMoment()) {
           console.log('Google Sign-In popup dismissed/closed by user');
+          authInProgressRef.current = false;
           // Reset loading state when user closes the popup
           try { onError && onError('Google Sign-In dismissed'); } catch {}
         }
       });
     } catch (error) {
+      authInProgressRef.current = false;
       console.error('Failed to show Google Sign-In:', error);
-  universalToast.error('Failed to start Google Sign-In');
+      universalToast.error('Failed to start Google Sign-In');
       try { onError && onError(error); } catch {}
     }
   };
@@ -168,6 +179,8 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
   // Fallback method: render invisible button and click it
   const renderGoogleButtonAndClick = () => {
     try {
+      authInProgressRef.current = true;
+      
       const tempContainer = document.createElement('div');
       tempContainer.style.position = 'absolute';
       tempContainer.style.top = '-9999px';
@@ -185,18 +198,53 @@ export const useGoogleAuth = (onSuccess, onError, onShown) => {
       setTimeout(() => {
         const button = tempContainer.querySelector('div[role="button"]');
         if (button) {
-          try { onShown && onShown(); } catch {}
           button.click();
+          
+          // Start monitoring for popup closure
+          // When popup opens, window loses focus. When closed without auth, focus returns.
+          let popupOpened = false;
+          
+          const handleBlur = () => {
+            popupOpened = true;
+          };
+          
+          const handleFocus = () => {
+            if (popupOpened && authInProgressRef.current) {
+              // Small delay to allow auth callback to fire first if successful
+              setTimeout(() => {
+                if (authInProgressRef.current) {
+                  console.log('Google popup closed without completing authentication');
+                  authInProgressRef.current = false;
+                  try { onError && onError('Google Sign-In dismissed'); } catch {}
+                }
+              }, 500);
+            }
+            // Cleanup listeners
+            window.removeEventListener('blur', handleBlur);
+            window.removeEventListener('focus', handleFocus);
+          };
+          
+          window.addEventListener('blur', handleBlur);
+          window.addEventListener('focus', handleFocus);
+          
+          // Safety cleanup after 60 seconds
+          setTimeout(() => {
+            window.removeEventListener('blur', handleBlur);
+            window.removeEventListener('focus', handleFocus);
+          }, 60000);
+          
         } else {
+          authInProgressRef.current = false;
           universalToast.error('Google Sign-In button could not be rendered');
           try { onError && onError('Google Sign-In button could not be rendered'); } catch {}
         }
-        // Clean up
+        // Clean up temp container
         document.body.removeChild(tempContainer);
       }, 100);
     } catch (error) {
+      authInProgressRef.current = false;
       console.error('Fallback Google Sign-In failed:', error);
-  universalToast.error('Google Sign-In is temporarily unavailable');
+      universalToast.error('Google Sign-In is temporarily unavailable');
       try { onError && onError(error); } catch {}
     }
   };

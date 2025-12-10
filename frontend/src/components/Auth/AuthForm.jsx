@@ -578,7 +578,6 @@ export default function AuthForm() {
                     onSuccess={handleGoogleSuccess}
                     onError={handleGoogleError}
                     onStart={() => setIsLoading(true)}
-                    onShown={() => setIsLoading(false)}
                     disabled={isLoading}
                   />
                 </motion.div>
@@ -1088,7 +1087,6 @@ export default function AuthForm() {
                         onSuccess={handleGoogleSuccess}
                         onError={handleGoogleError}
                         onStart={() => setIsLoading(true)}
-                        onShown={() => setIsLoading(false)}
                         disabled={isLoading}
                       />
                     </div>
