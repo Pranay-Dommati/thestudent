@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaUserPlus, FaSignInAlt, FaChevronRight, FaHome } from 'react-icons/fa';
 import { HiOutlineCode, HiOutlineSparkles } from 'react-icons/hi';
@@ -203,6 +204,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   };
 
   return (
+    <>
     <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${backgroundClass} ${isScrolled ? 'py-2' : 'py-4'}`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center">
@@ -543,77 +545,80 @@ const Navbar = ({ initialStyle = "transparent" }) => {
         onCancel={cancelLogout}
       />
 
-      {/* Code Visualizer Coming Soon Modal */}
-      {showComingSoon && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowComingSoon(false)}
-          />
-          
-          {/* Modal - White background to match site's other modals */}
-          <div className="relative bg-white rounded-2xl p-8 max-w-md mx-4 shadow-2xl border border-gray-100">
-            {/* Close button */}
-            <button
-              onClick={() => setShowComingSoon(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <IoClose className="w-6 h-6" />
-            </button>
-
-            {/* Icon - Purple gradient like other icons on site */}
-            <div className="flex justify-center mb-6">
-              <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <HiOutlineCode className="w-8 h-8 text-white" />
-                </div>
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
-                  <HiOutlineSparkles className="w-3 h-3 text-white" />
-                </div>
-              </div>
-            </div>
-
-            {/* Content */}
-            <h2 className="text-xl font-bold text-gray-900 text-center mb-3">
-              Code Visualizer
-            </h2>
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <span className="px-3 py-1 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold rounded-full">
-                Coming Soon
-              </span>
-            </div>
-            <p className="text-gray-600 text-center mb-6 leading-relaxed">
-              We're building something amazing! Our AI-powered Code Visualizer will help you understand code execution step-by-step with interactive visualizations and voice explanations.
-            </p>
-
-            {/* Features preview */}
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center gap-3 text-gray-600">
-                <div className="w-2 h-2 bg-violet-500 rounded-full"></div>
-                <span className="text-sm">Step-by-step code execution</span>
-              </div>
-              <div className="flex items-center gap-3 text-gray-600">
-                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                <span className="text-sm">AI voice explanations</span>
-              </div>
-              <div className="flex items-center gap-3 text-gray-600">
-                <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                <span className="text-sm">Interactive visualizations</span>
-              </div>
-            </div>
-
-            {/* Button */}
-            <button
-              onClick={() => setShowComingSoon(false)}
-              className="w-full py-3 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all"
-            >
-              Got it!
-            </button>
-          </div>
-        </div>
-      )}
     </nav>
+    
+    {/* Code Visualizer Coming Soon Modal - Rendered via Portal to body */}
+    {showComingSoon && ReactDOM.createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+        {/* Backdrop */}
+        <div 
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowComingSoon(false)}
+        />
+        
+        {/* Modal - White background to match site's other modals */}
+        <div className="relative bg-white rounded-2xl p-8 max-w-md mx-4 shadow-2xl border border-gray-100">
+          {/* Close button */}
+          <button
+            onClick={() => setShowComingSoon(false)}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <IoClose className="w-6 h-6" />
+          </button>
+
+          {/* Icon - Purple gradient like other icons on site */}
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <HiOutlineCode className="w-8 h-8 text-white" />
+              </div>
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
+                <HiOutlineSparkles className="w-3 h-3 text-white" />
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <h2 className="text-xl font-bold text-gray-900 text-center mb-3">
+            Code Visualizer
+          </h2>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <span className="px-3 py-1 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold rounded-full">
+              Coming Soon
+            </span>
+          </div>
+          <p className="text-gray-600 text-center mb-6 leading-relaxed">
+            We're building something amazing! Our AI-powered Code Visualizer will help you understand code execution step-by-step with interactive visualizations and voice explanations.
+          </p>
+
+          {/* Features preview */}
+          <div className="space-y-3 mb-6">
+            <div className="flex items-center gap-3 text-gray-600">
+              <div className="w-2 h-2 bg-violet-500 rounded-full"></div>
+              <span className="text-sm">Step-by-step code execution</span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-600">
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              <span className="text-sm">AI voice explanations</span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-600">
+              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+              <span className="text-sm">Interactive visualizations</span>
+            </div>
+          </div>
+
+          {/* Button */}
+          <button
+            onClick={() => setShowComingSoon(false)}
+            className="w-full py-3 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all"
+          >
+            Got it!
+          </button>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 };
 
