@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { 
-  FaHome, FaGraduationCap, FaBook, FaAward, FaUser, FaArrowLeft
+  FaHome, FaGraduationCap, FaBook, FaAward, FaCode, FaArrowLeft
 } from 'react-icons/fa';
+import { HiOutlineCode, HiOutlineSparkles } from 'react-icons/hi';
+import { IoClose } from 'react-icons/io5';
 
 const MobileBottomNavigation = () => {
   const { isLoggedIn } = useAuth();
@@ -14,6 +17,7 @@ const MobileBottomNavigation = () => {
   
   // State for controlling navigation visibility
   const [isVisible, setIsVisible] = useState(true);
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
   const scrollTimeoutRef = useRef(null);
   const lastToggleTime = useRef(0);
@@ -223,7 +227,7 @@ const MobileBottomNavigation = () => {
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { path: isLoggedIn ? '/profile' : '/auth?mode=login', icon: FaUser, label: isLoggedIn ? 'Profile' : 'Login', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Code', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -237,7 +241,7 @@ const MobileBottomNavigation = () => {
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { path: isLoggedIn ? '/profile' : '/auth?mode=login', icon: FaUser, label: isLoggedIn ? 'Profile' : 'Login', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Code', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -251,7 +255,7 @@ const MobileBottomNavigation = () => {
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { path: isLoggedIn ? '/profile' : '/auth?mode=login', icon: FaUser, label: isLoggedIn ? 'Profile' : 'Login', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Code', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -265,7 +269,7 @@ const MobileBottomNavigation = () => {
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { path: isLoggedIn ? '/profile' : '/auth?mode=login', icon: FaUser, label: isLoggedIn ? 'Profile' : 'Login', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Code', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -278,7 +282,7 @@ const MobileBottomNavigation = () => {
         { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
         { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
         ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-        { path: isLoggedIn ? '/profile' : '/auth?mode=login', icon: FaUser, label: isLoggedIn ? 'Profile' : 'Login', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+        { action: () => setShowComingSoon(true), icon: FaCode, label: 'Code', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
       ]
     };
   };
@@ -290,6 +294,7 @@ const MobileBottomNavigation = () => {
   }
 
   return (
+    <>
     <div 
       className={`fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 lg:hidden transition-transform duration-300 ease-in-out ${
         isVisible ? 'translate-y-0' : 'translate-y-full'
@@ -314,17 +319,15 @@ const MobileBottomNavigation = () => {
               <button
                 key={index}
                 onClick={item.action}
-                className={`flex flex-col items-center py-0.5 px-2 relative transition-all duration-300 rounded-lg hover:bg-gray-50 active:scale-95 ${
-                  item.label === 'Back' ? 'text-gray-600' : item.activeColor || 'text-gray-600'
-                }`}
+                className="flex flex-col items-center py-0.5 px-2 relative transition-all duration-300 rounded-lg hover:bg-gray-50 active:scale-95"
               >
                 {/* Icon container with enhanced animation */}
-                <div className="p-1.5 rounded-lg transition-all duration-300 hover:bg-gray-100">
+                <div className="p-1.5 rounded-lg transition-all duration-300 text-gray-500 hover:bg-gray-100">
                   <item.icon className="w-4 h-4 transition-transform duration-200 hover:scale-110" />
                 </div>
                 
                 {/* Label */}
-                <span className="text-xs font-medium mt-0.5">
+                <span className="text-xs font-medium mt-0.5 text-gray-500">
                   {item.label}
                 </span>
               </button>
@@ -361,6 +364,79 @@ const MobileBottomNavigation = () => {
         })}
       </div>
     </div>
+
+    {/* Code Visualizer Coming Soon Modal - Rendered via Portal to body */}
+    {showComingSoon && ReactDOM.createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+        {/* Backdrop */}
+        <div 
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowComingSoon(false)}
+        />
+        
+        {/* Modal */}
+        <div className="relative bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-2xl border border-gray-100">
+          {/* Close button */}
+          <button
+            onClick={() => setShowComingSoon(false)}
+            className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <IoClose className="w-5 h-5" />
+          </button>
+
+          {/* Icon */}
+          <div className="flex justify-center mb-4">
+            <div className="relative">
+              <div className="w-14 h-14 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <HiOutlineCode className="w-7 h-7 text-white" />
+              </div>
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
+                <HiOutlineSparkles className="w-2.5 h-2.5 text-white" />
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <h2 className="text-lg font-bold text-gray-900 text-center mb-2">
+            Code Visualizer
+          </h2>
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <span className="px-2.5 py-0.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-xs font-semibold rounded-full">
+              Coming Soon
+            </span>
+          </div>
+          <p className="text-gray-600 text-center text-sm mb-4 leading-relaxed">
+            AI-powered code visualization with step-by-step execution and voice explanations.
+          </p>
+
+          {/* Features preview */}
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center gap-2 text-gray-600">
+              <div className="w-1.5 h-1.5 bg-violet-500 rounded-full"></div>
+              <span className="text-xs">Step-by-step code execution</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-600">
+              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full"></div>
+              <span className="text-xs">AI voice explanations</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-600">
+              <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
+              <span className="text-xs">Interactive visualizations</span>
+            </div>
+          </div>
+
+          {/* Button */}
+          <button
+            onClick={() => setShowComingSoon(false)}
+            className="w-full py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all text-sm"
+          >
+            Got it!
+          </button>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 };
 
