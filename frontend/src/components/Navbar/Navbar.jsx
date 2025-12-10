@@ -81,13 +81,30 @@ const Navbar = ({ initialStyle = "transparent" }) => {
       if (event.key === 'Escape' && (isMobileMenuOpen || isAuthMenuOpen)) {
         closeAllMenus();
       }
+      if (event.key === 'Escape' && showComingSoon) {
+        setShowComingSoon(false);
+      }
     };
 
-    if (isMobileMenuOpen || isAuthMenuOpen) {
+    if (isMobileMenuOpen || isAuthMenuOpen || showComingSoon) {
       document.addEventListener('keydown', handleKeyDown);
       return () => document.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isMobileMenuOpen, isAuthMenuOpen]);  useEffect(() => {
+  }, [isMobileMenuOpen, isAuthMenuOpen, showComingSoon]);
+
+  // Prevent body scroll when Coming Soon modal is open
+  useEffect(() => {
+    if (showComingSoon) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showComingSoon]);
+
+  useEffect(() => {
     window.scrollTo(0, 0);
     setIsScrolled(window.scrollY > 10);
   }, []);
@@ -531,57 +548,57 @@ const Navbar = ({ initialStyle = "transparent" }) => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
           {/* Backdrop */}
           <div 
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowComingSoon(false)}
           />
           
-          {/* Modal */}
-          <div className="relative bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-2xl p-8 max-w-md mx-4 shadow-2xl border border-purple-500/30 animate-in fade-in zoom-in duration-300">
+          {/* Modal - White background to match site's other modals */}
+          <div className="relative bg-white rounded-2xl p-8 max-w-md mx-4 shadow-2xl border border-gray-100">
             {/* Close button */}
             <button
               onClick={() => setShowComingSoon(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <IoClose className="w-6 h-6" />
             </button>
 
-            {/* Icon */}
+            {/* Icon - Purple gradient like other icons on site */}
             <div className="flex justify-center mb-6">
               <div className="relative">
-                <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30">
-                  <HiOutlineCode className="w-10 h-10 text-white" />
+                <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <HiOutlineCode className="w-8 h-8 text-white" />
                 </div>
-                <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center animate-pulse">
-                  <HiOutlineSparkles className="w-4 h-4 text-white" />
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
+                  <HiOutlineSparkles className="w-3 h-3 text-white" />
                 </div>
               </div>
             </div>
 
             {/* Content */}
-            <h2 className="text-2xl font-bold text-white text-center mb-3">
+            <h2 className="text-xl font-bold text-gray-900 text-center mb-3">
               Code Visualizer
             </h2>
             <div className="flex items-center justify-center gap-2 mb-4">
-              <span className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-semibold rounded-full">
+              <span className="px-3 py-1 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold rounded-full">
                 Coming Soon
               </span>
             </div>
-            <p className="text-gray-300 text-center mb-6 leading-relaxed">
+            <p className="text-gray-600 text-center mb-6 leading-relaxed">
               We're building something amazing! Our AI-powered Code Visualizer will help you understand code execution step-by-step with interactive visualizations and voice explanations.
             </p>
 
             {/* Features preview */}
             <div className="space-y-3 mb-6">
-              <div className="flex items-center gap-3 text-gray-300">
-                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+              <div className="flex items-center gap-3 text-gray-600">
+                <div className="w-2 h-2 bg-violet-500 rounded-full"></div>
                 <span className="text-sm">Step-by-step code execution</span>
               </div>
-              <div className="flex items-center gap-3 text-gray-300">
-                <div className="w-2 h-2 bg-pink-400 rounded-full"></div>
+              <div className="flex items-center gap-3 text-gray-600">
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                 <span className="text-sm">AI voice explanations</span>
               </div>
-              <div className="flex items-center gap-3 text-gray-300">
-                <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+              <div className="flex items-center gap-3 text-gray-600">
+                <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
                 <span className="text-sm">Interactive visualizations</span>
               </div>
             </div>
@@ -589,7 +606,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             {/* Button */}
             <button
               onClick={() => setShowComingSoon(false)}
-              className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50"
+              className="w-full py-3 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all"
             >
               Got it!
             </button>
