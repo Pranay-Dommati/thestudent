@@ -185,7 +185,7 @@ const MobileBottomNavigation = () => {
         items: [
           { action: goBack, icon: FaArrowLeft, label: 'Back', isAction: true },
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-          { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
+          { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
         ]
       };
@@ -198,7 +198,7 @@ const MobileBottomNavigation = () => {
         items: [
           { action: goBack, icon: FaArrowLeft, label: 'Back', isAction: true },
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-          { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
+          { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
         ]
       };
@@ -212,7 +212,7 @@ const MobileBottomNavigation = () => {
         type: 'learning',
         items: [
           { action: goBack, icon: FaArrowLeft, label: 'Back', isAction: true },
-          { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
+          { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
         ]
       };
@@ -225,9 +225,9 @@ const MobileBottomNavigation = () => {
         items: [
           { path: '/', icon: FaHome, label: 'Home', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-          { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
+          { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Code', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -239,9 +239,9 @@ const MobileBottomNavigation = () => {
         items: [
           { path: '/', icon: FaHome, label: 'Home', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-          { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
+          { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Code', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -253,9 +253,9 @@ const MobileBottomNavigation = () => {
         items: [
           { path: '/', icon: FaHome, label: 'Home', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-          { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
+          { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Code', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -267,9 +267,9 @@ const MobileBottomNavigation = () => {
         items: [
           { path: '/', icon: FaHome, label: 'Home', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-          { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
+          { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Code', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -280,9 +280,9 @@ const MobileBottomNavigation = () => {
       items: [
         { path: '/', icon: FaHome, label: 'Home', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
         { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
-        { path: '/chat', icon: FaBook, label: 'Creator', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
+        { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
         ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-        { action: () => setShowComingSoon(true), icon: FaCode, label: 'Code', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+        { action: () => setShowComingSoon(true), icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
       ]
     };
   };
