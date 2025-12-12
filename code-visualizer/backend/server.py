@@ -31,8 +31,14 @@ from sandbox import validate_code
 try:
     from ai_narrator import get_narrator
     narrator = get_narrator()
+    if narrator and narrator.is_available:
+        print(f"✓ AI Narrator loaded successfully - model: {narrator.model}")
+    else:
+        print(f"⚠ AI Narrator loaded but NOT available - is_available: {narrator.is_available if narrator else 'None'}")
 except Exception as e:
     print(f"⚠ AI Narrator import failed: {e}")
+    import traceback
+    traceback.print_exc()
     narrator = None
 
 # Pydantic Models

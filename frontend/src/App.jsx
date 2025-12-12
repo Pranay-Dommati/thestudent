@@ -326,8 +326,12 @@ const App = () => {
             <Route path="/pro-learning" element={<Navigate to="/chat" replace />} />
             <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
             <Route path="/pro-learning/share/:shareId" element={<SharedProLearningPage />} />
-            {/* Code Visualizer - Coming Soon, redirect to home */}
-            <Route path="/code-visualizer" element={<Navigate to="/" replace />} />
+            {/* Code Visualizer - Available in dev, Coming Soon modal in production */}
+            <Route path="/code-visualizer" element={
+              import.meta.env.DEV 
+                ? <CodeVisualizerPage /> 
+                : <Navigate to="/" replace />
+            } />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
             <Route path="/courses/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
             {/* Canonical ID-based quiz route */}

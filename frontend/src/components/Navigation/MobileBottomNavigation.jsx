@@ -174,6 +174,15 @@ const MobileBottomNavigation = () => {
     navigate(-1);
   };
 
+  // Helper function for Code Visualizer action - navigate in dev, show modal in production
+  const handleCodeVisualizerClick = () => {
+    if (import.meta.env.DEV) {
+      navigate('/code-visualizer');
+    } else {
+      setShowComingSoon(true);
+    }
+  };
+
   // Get navigation configuration based on current route
   const getNavigationConfig = () => {
     const path = location.pathname;
@@ -227,7 +236,7 @@ const MobileBottomNavigation = () => {
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: handleCodeVisualizerClick, icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -241,7 +250,7 @@ const MobileBottomNavigation = () => {
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: handleCodeVisualizerClick, icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -255,7 +264,7 @@ const MobileBottomNavigation = () => {
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: handleCodeVisualizerClick, icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -269,7 +278,7 @@ const MobileBottomNavigation = () => {
           { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
           ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-          { action: () => setShowComingSoon(true), icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+          { action: handleCodeVisualizerClick, icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
         ]
       };
     }
@@ -282,7 +291,7 @@ const MobileBottomNavigation = () => {
         { path: '/courses', icon: FaGraduationCap, label: 'Courses', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
         { path: '/chat', icon: FaBook, label: 'Create', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' },
         ...(isLoggedIn ? [{ path: '/learning-hub', icon: FaAward, label: 'Hub', activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }] : []),
-        { action: () => setShowComingSoon(true), icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
+        { action: handleCodeVisualizerClick, icon: FaCode, label: 'Visualizer', isAction: true, activeColor: 'text-blue-600', bgColor: 'bg-blue-50', activeBg: 'bg-blue-600' }
       ]
     };
   };

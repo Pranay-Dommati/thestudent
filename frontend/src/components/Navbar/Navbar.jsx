@@ -286,7 +286,13 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                   Course Creator
                 </Link>
                 <button 
-                  onClick={() => setShowComingSoon(true)}
+                  onClick={() => {
+                    if (import.meta.env.DEV) {
+                      navigate('/code-visualizer');
+                    } else {
+                      setShowComingSoon(true);
+                    }
+                  }}
                   className={`font-medium transition-colors ${textColor} hover:opacity-80`}
                 >
                   Code Visualizer

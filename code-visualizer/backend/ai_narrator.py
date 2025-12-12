@@ -221,6 +221,7 @@ class AINarrator:
         """
         if not self.is_available or not self.model:
             # Fallback to basic narration
+            print(f"[AI Narrator] Fallback mode - is_available: {self.is_available}, model: {self.model is not None}")
             return self._generate_basic_narration(
                 step, line, code, event, variables, 
                 changed_vars, function_name, return_value
@@ -259,6 +260,8 @@ class AINarrator:
             prompt = "\n".join(context_parts)
             prompt += "\n\nGenerate a brief, friendly narration for this step:"
             
+            print(f"[AI Narrator] Step {step} - Generating AI narration for line {line}: {code.strip()[:50]}...")
+            
             # Call Gemini API
             response = self.model.generate_content(
                 prompt,
@@ -269,6 +272,7 @@ class AINarrator:
             )
             
             narration = response.text.strip()
+            print(f"[AI Narrator] Success - Got response: {narration[:80]}...")
             
             # Clean up any markdown or quotes that might slip through
             narration = narration.strip('"\'')
@@ -278,7 +282,9 @@ class AINarrator:
             return narration
             
         except Exception as e:
-            print(f"AI narration error: {e}")
+            print(f"[AI Narrator] ERROR: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             # Fallback to basic narration on error
             return self._generate_basic_narration(
                 step, line, code, event, variables,
