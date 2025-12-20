@@ -23,6 +23,7 @@ const AnimatedStepCard = ({
     const animationRef = useRef(null);
     const hasPlayedRef = useRef(false);
     const runIdRef = useRef(0);
+    const animationCompletedRef = useRef(false);
 
     const getVarValue = useCallback((varName) => {
         if (!varName) return undefined;
@@ -157,20 +158,19 @@ const AnimatedStepCard = ({
 
     const stepType = parseStepType();
 
-    // Auto-play animation when step becomes the active/latest step
-    // NOTE: In React 18 StrictMode (dev), effects run twice (mount → cleanup → mount).
-    // We must not permanently block autoplay in the first run, otherwise the completion
-    // callback never fires and the next step won't be revealed.
+    // Auto-play animation ONCE when step first appears as latest
+    // After animation completes, showReplay stays true forever (for this step instance)
     useEffect(() => {
+        // Only trigger on first time this step becomes latest
         if (!isLatest) return;
         if (hasPlayedRef.current) return;
 
         hasPlayedRef.current = true;
+        animationCompletedRef.current = false;
         runIdRef.current += 1;
         const myRunId = runIdRef.current;
 
         setAnimationPhase('playing');
-        setShowReplay(false);
 
         // Animation duration based on type
         const duration = stepType.type === 'array_access' ? 2500 : 
@@ -181,23 +181,21 @@ const AnimatedStepCard = ({
         animationRef.current = setTimeout(() => {
             // Guard against stale timers
             if (runIdRef.current !== myRunId) return;
+            animationCompletedRef.current = true;
             setAnimationPhase('complete');
             setShowReplay(true);
             onAnimationComplete?.();
         }, duration);
 
+        // Cleanup only clears timer, never resets showReplay/animationPhase after completion
         return () => {
-            // StrictMode dev runs this cleanup between the two mounts.
-            // Reset gating so the second mount schedules the timer again.
-            if (animationRef.current) {
+            if (animationRef.current && !animationCompletedRef.current) {
                 clearTimeout(animationRef.current);
                 animationRef.current = null;
+                // Only reset if we're in StrictMode's double-mount scenario
+                // (animation not yet completed means this is the first mount being cleaned up)
+                hasPlayedRef.current = false;
             }
-            hasPlayedRef.current = false;
-            // Don't force state changes on real unmount; but during StrictMode's simulated
-            // unmount this keeps things consistent.
-            setAnimationPhase('idle');
-            setShowReplay(false);
         };
     }, [isLatest, stepType.type, onAnimationComplete]);
 
@@ -215,9 +213,9 @@ const AnimatedStepCard = ({
         setAnimationPhase('playing');
         setShowReplay(false);
         
-        const duration = stepType.type === 'array_access' ? 2500 : 
-                        stepType.type === 'condition' ? 2000 : 
-                        stepType.type === 'for_loop' ? 2000 : 1500;
+        const duration = stepType.type === 'array_access' ? 4000 : 
+                        stepType.type === 'condition' ? 2500 : 
+                        stepType.type === 'for_loop' ? 2500 : 1800;
         
         animationRef.current = setTimeout(() => {
             setAnimationPhase('complete');
@@ -225,103 +223,214 @@ const AnimatedStepCard = ({
         }, duration);
     };
 
-    // Render array access animation
+    // Render array access animation - Cinematic version
     const renderArrayAccessAnimation = () => {
         const { targetVar, sourceArray, index, arrayValue, resultValue } = stepType;
         const isPlaying = animationPhase === 'playing';
+        const isComplete = animationPhase === 'complete';
+
+        // Animation timeline (in seconds):
+        // 0.0 - 0.3: Show array label
+        // 0.3 - 0.8: Reveal array elements one by one
+        // 0.8 - 1.2: Show index labels below elements
+        // 1.2 - 1.6: Highlight the accessed index with pointer
+        // 1.6 - 2.2: Arrow appears and value "lifts" from array
+        // 2.2 - 2.8: Value travels down
+        // 2.8 - 3.4: Value lands in target variable
+        // 3.4 - 4.0: Success checkmark
 
         return (
-            <div className="relative p-6 bg-slate-900/60 rounded-xl overflow-hidden">
-                {/* Source Array Visualization */}
-                <div className="mb-6">
-                    <div className="text-xs text-slate-400 mb-2 font-mono">{sourceArray}</div>
-                    <div className="flex gap-1 items-center">
-                        <span className="text-slate-500 mr-1">[</span>
-                        {arrayValue.map((val, idx) => (
-                            <motion.div
-                                key={idx}
-                                className={`relative flex flex-col items-center`}
-                                animate={isPlaying && idx === index ? {
-                                    scale: [1, 1.2, 1.2, 1],
-                                    y: [0, -8, -8, 0]
-                                } : {}}
-                                transition={{ duration: 0.6, delay: 0.3 }}
-                            >
-                                <motion.div
-                                    className={`w-12 h-12 flex items-center justify-center rounded-lg font-mono text-lg font-bold border-2 transition-all
-                                        ${idx === index 
-                                            ? 'bg-teal-500/30 border-teal-400 text-teal-300' 
-                                            : 'bg-slate-800 border-slate-600 text-slate-300'}`}
-                                    animate={isPlaying && idx === index ? {
-                                        borderColor: ['#475569', '#2dd4bf', '#2dd4bf', '#2dd4bf'],
-                                        backgroundColor: ['rgba(51,65,85,1)', 'rgba(45,212,191,0.3)', 'rgba(45,212,191,0.3)', 'rgba(45,212,191,0.3)']
-                                    } : {}}
-                                    transition={{ duration: 0.4, delay: 0.2 }}
-                                >
-                                    {val}
-                                </motion.div>
-                                <span className="text-xs text-slate-500 mt-1">[{idx}]</span>
-                            </motion.div>
-                        ))}
-                        <span className="text-slate-500 ml-1">]</span>
-                    </div>
-                </div>
+            <div className="relative p-6 bg-slate-900/60 rounded-xl overflow-hidden min-h-[280px]">
+                {/* Step 1: Array Label */}
+                <motion.div 
+                    className="flex items-center gap-2 mb-4"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3 }}
+                >
+                    <span className="text-sm font-mono text-purple-400 font-semibold">{sourceArray}</span>
+                    <span className="text-slate-500">=</span>
+                </motion.div>
 
-                {/* Animated Arrow */}
-                <AnimatePresence>
-                    {isPlaying && (
+                {/* Step 2: Array Elements Container */}
+                <div className="flex items-start gap-1 mb-2 ml-4">
+                    <motion.span 
+                        className="text-slate-400 text-xl font-mono"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.2 }}
+                    >
+                        [
+                    </motion.span>
+                    
+                    {arrayValue.map((val, idx) => (
                         <motion.div
-                            className="flex justify-center my-4"
+                            key={idx}
+                            className="flex flex-col items-center"
                             initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ delay: 0.8, duration: 0.4 }}
+                            transition={{ delay: 0.3 + idx * 0.1, duration: 0.3 }}
                         >
+                            {/* Element Box */}
                             <motion.div
-                                className="flex flex-col items-center"
-                                animate={{ y: [0, 5, 0] }}
-                                transition={{ repeat: 2, duration: 0.3 }}
+                                className={`w-14 h-14 flex items-center justify-center rounded-lg font-mono text-lg font-bold border-2 relative
+                                    ${idx === index && (isPlaying || isComplete)
+                                        ? 'bg-teal-500/30 border-teal-400 text-teal-200 shadow-lg shadow-teal-500/30' 
+                                        : 'bg-slate-800 border-slate-600 text-slate-300'}`}
+                                animate={isPlaying && idx === index ? {
+                                    scale: [1, 1.15, 1.15, 1.1],
+                                    boxShadow: [
+                                        '0 0 0 rgba(45,212,191,0)',
+                                        '0 0 20px rgba(45,212,191,0.5)',
+                                        '0 0 25px rgba(45,212,191,0.6)',
+                                        '0 0 15px rgba(45,212,191,0.4)'
+                                    ]
+                                } : {}}
+                                transition={{ delay: 1.2, duration: 0.5 }}
                             >
-                                <div className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center shadow-lg shadow-teal-500/50">
-                                    <span className="text-white font-bold">{resultValue !== undefined ? String(resultValue) : ''}</span>
-                                </div>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-teal-400 mt-1">
-                                    <path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
+                                {val}
+                                
+                                {/* Pointer indicator on selected index */}
+                                {idx === index && (isPlaying || isComplete) && (
+                                    <motion.div
+                                        className="absolute -top-8 left-1/2 transform -translate-x-1/2"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 1.2, duration: 0.3 }}
+                                    >
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-xs text-teal-400 font-mono font-bold whitespace-nowrap">
+                                                {sourceArray}[{index}]
+                                            </span>
+                                            <motion.svg 
+                                                width="16" height="16" 
+                                                viewBox="0 0 24 24" 
+                                                fill="none" 
+                                                className="text-teal-400"
+                                                animate={isPlaying ? { y: [0, 3, 0] } : {}}
+                                                transition={{ repeat: 3, duration: 0.3, delay: 1.4 }}
+                                            >
+                                                <path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                            </motion.svg>
+                                        </div>
+                                    </motion.div>
+                                )}
                             </motion.div>
+                            
+                            {/* Index Label */}
+                            <motion.span 
+                                className={`text-xs mt-1 font-mono ${idx === index ? 'text-teal-400 font-bold' : 'text-slate-500'}`}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.8 + idx * 0.05, duration: 0.2 }}
+                            >
+                                [{idx}]
+                            </motion.span>
                         </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* Target Variable */}
-                <motion.div
-                    className="flex items-center gap-3"
-                    initial={{ opacity: 0.5 }}
-                    animate={isPlaying ? { opacity: [0.5, 1] } : { opacity: 1 }}
-                    transition={{ delay: 1.2, duration: 0.3 }}
-                >
-                    <div className="text-xs text-slate-400 font-mono">{targetVar}</div>
-                    <span className="text-slate-500">=</span>
-                    <motion.div
-                        className="px-4 py-2 rounded-lg bg-teal-500/20 border border-teal-500/50 font-mono font-bold text-teal-300"
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={isPlaying || animationPhase === 'complete' ? { scale: 1, opacity: 1 } : {}}
-                        transition={{ delay: 1.4, duration: 0.3, type: 'spring' }}
+                    ))}
+                    
+                    <motion.span 
+                        className="text-slate-400 text-xl font-mono"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.3 + arrayValue.length * 0.1 }}
                     >
-                        {resultValue !== undefined ? String(resultValue) : ''}
+                        ]
+                    </motion.span>
+                </div>
+
+                {/* Step 3: Animated Value Transfer */}
+                <div className="relative h-20 my-4">
+                    <AnimatePresence>
+                        {(isPlaying || isComplete) && (
+                            <motion.div
+                                className="absolute left-1/2 transform -translate-x-1/2"
+                                initial={{ opacity: 0, y: 0 }}
+                                animate={{ 
+                                    opacity: [0, 1, 1, 1],
+                                    y: [0, 10, 40, 60]
+                                }}
+                                transition={{ 
+                                    delay: 1.8,
+                                    duration: 1.0,
+                                    times: [0, 0.2, 0.6, 1],
+                                    ease: "easeInOut"
+                                }}
+                            >
+                                <motion.div 
+                                    className="w-12 h-12 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-xl shadow-teal-500/50 font-mono font-bold text-white text-lg"
+                                    animate={isPlaying ? {
+                                        scale: [1, 1.1, 1],
+                                    } : {}}
+                                    transition={{ delay: 2.2, duration: 0.3 }}
+                                >
+                                    {resultValue !== undefined ? String(resultValue) : ''}
+                                </motion.div>
+                                
+                                {/* Trail effect */}
+                                <motion.div
+                                    className="absolute top-0 left-1/2 transform -translate-x-1/2 w-1 bg-gradient-to-b from-teal-400 to-transparent"
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 40, opacity: [0, 0.8, 0] }}
+                                    transition={{ delay: 1.9, duration: 0.8 }}
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Step 4: Target Variable Receiving Value */}
+                <motion.div
+                    className="flex items-center gap-3 ml-4"
+                    initial={{ opacity: 0.3 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 2.6, duration: 0.3 }}
+                >
+                    <span className="text-sm font-mono text-blue-400 font-semibold">{targetVar}</span>
+                    <span className="text-slate-500">=</span>
+                    
+                    <motion.div
+                        className="relative"
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={isPlaying || isComplete ? { scale: 1, opacity: 1 } : {}}
+                        transition={{ delay: 2.8, duration: 0.4, type: 'spring', stiffness: 300 }}
+                    >
+                        <motion.div
+                            className="px-5 py-3 rounded-xl bg-gradient-to-r from-teal-500/20 to-blue-500/20 border-2 border-teal-400 font-mono font-bold text-teal-300 text-lg"
+                            animate={isPlaying ? {
+                                boxShadow: [
+                                    '0 0 0 rgba(45,212,191,0)',
+                                    '0 0 30px rgba(45,212,191,0.6)',
+                                    '0 0 15px rgba(45,212,191,0.3)'
+                                ]
+                            } : {}}
+                            transition={{ delay: 3.0, duration: 0.5 }}
+                        >
+                            {resultValue !== undefined ? String(resultValue) : ''}
+                        </motion.div>
+                        
+                        {/* Sparkle effect on landing */}
+                        {(isPlaying || isComplete) && (
+                            <motion.div
+                                className="absolute -inset-2 rounded-xl border-2 border-teal-400"
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: [0, 1, 0], scale: [0.8, 1.1, 1.2] }}
+                                transition={{ delay: 2.9, duration: 0.5 }}
+                            />
+                        )}
                     </motion.div>
                 </motion.div>
 
                 {/* Completion indicator */}
-                {animationPhase === 'complete' && (
+                {isComplete && (
                     <motion.div
                         className="absolute top-3 right-3"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: 'spring', stiffness: 500 }}
+                        initial={{ scale: 0, rotate: -180 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ delay: 0.1, type: 'spring', stiffness: 500 }}
                     >
-                        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                        <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center shadow-lg shadow-green-500/50">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
                                 <polyline points="20,6 9,17 4,12" />
                             </svg>
                         </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import VisualExplanationPanelV2 from './VisualExplanationPanelV2';
 import AnimatedStepCard from './AnimatedStepCard';
+import EnterpriseVisualizer from './EnterpriseVisualizer';
 
 // API Base URL - can be updated for production
 const API_BASE_URL = import.meta.env.VITE_CODE_VISUALIZER_API_URL || 'http://localhost:5000/api';
@@ -19,6 +20,9 @@ const ImmersiveVisualizer = ({
     const [currentStepIndex, setCurrentStepIndex] = useState(-1);
     const [isStreaming, setIsStreaming] = useState(false); // Track if we're receiving streamed data
     const [leftPanelTab, setLeftPanelTab] = useState('code'); // 'code' or 'teacher'
+
+    // Visualization mode: 'timeline' (legacy) or 'enterprise' (PixiJS + GSAP)
+    const [visualizationMode, setVisualizationMode] = useState('enterprise');
 
     // Cinematic step reveal: queue incoming steps and animate one-by-one
     const [pendingSteps, setPendingSteps] = useState([]);
@@ -586,6 +590,42 @@ const ImmersiveVisualizer = ({
                     </h1>
                 </div>
 
+                {/* Visualization Mode Toggle */}
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">Mode:</span>
+                    <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1">
+                        <button
+                            onClick={() => setVisualizationMode('timeline')}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                                visualizationMode === 'timeline'
+                                    ? 'bg-slate-700 text-white shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-300'
+                            }`}
+                        >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="12" y1="2" x2="12" y2="22"/>
+                                <circle cx="12" cy="6" r="2"/>
+                                <circle cx="12" cy="12" r="2"/>
+                                <circle cx="12" cy="18" r="2"/>
+                            </svg>
+                            Timeline
+                        </button>
+                        <button
+                            onClick={() => setVisualizationMode('enterprise')}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                                visualizationMode === 'enterprise'
+                                    ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-300'
+                            }`}
+                        >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/>
+                            </svg>
+                            Enterprise
+                        </button>
+                    </div>
+                </div>
+
             </header>
 
             {/* Main Content Area */}
@@ -844,8 +884,20 @@ const ImmersiveVisualizer = ({
                         </div>
                     )}
 
-                    {/* Timeline Content */}
-                    {!isLoading && (
+                    {/* Enterprise Mode - PixiJS + GSAP Visualizer */}
+                    {!isLoading && visualizationMode === 'enterprise' && (
+                        <div className="h-full p-6">
+                            <EnterpriseVisualizer
+                                steps={steps}
+                                code={code}
+                                onStepChange={(index, step) => setCurrentStepIndex(index)}
+                                className="h-full"
+                            />
+                        </div>
+                    )}
+
+                    {/* Timeline Mode - Legacy Animated Cards */}
+                    {!isLoading && visualizationMode === 'timeline' && (
                         <div className="max-w-4xl mx-auto py-8 px-6">
                             {/* Start Marker */}
                             <div className="flex items-center gap-4 mb-8">
@@ -1079,8 +1131,6 @@ const ImmersiveVisualizer = ({
                     )}
                 </div>
             </div>
-
-            {/* Bottom Progress Bar */}
             <div className="flex-shrink-0 h-1 bg-slate-800">
                 <div
                     className={`h-full transition-all duration-300 ${isStreaming ? 'bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500 animate-pulse' : 'bg-gradient-to-r from-teal-500 via-blue-500 to-purple-500'}`}

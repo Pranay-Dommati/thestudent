@@ -1,20 +1,25 @@
 /**
- * Rendering Engine Module
- * =======================
+ * Animation Engine - Entry Point
+ * ==============================
  * 
- * This module provides the complete visualization engine with:
- * - CinematicDirector for continuous animations (NEW!)
- * - PixiJS for GPU-accelerated rendering
- * - GSAP for smooth animations
- * - LayoutManager for automatic positioning
- * - SceneProcessor for converting timeline steps to scenes
- * - SceneTypes for semantic visualization commands
+ * Enterprise-level code visualization engine using:
+ * - PixiJS for WebGL rendering (persistent objects)
+ * - GSAP for timeline-based animations (master clock)
+ * - Custom orchestration layer (semantic commands)
+ * 
+ * Architecture:
+ * - TimelineEngine: Master timeline orchestrator
+ * - PixiRenderer: WebGL canvas manager
+ * - VisualObjects: Persistent visual entities
  */
 
-// NEW: Cinematic Director - Object persistence + State transitions
-export { default as cinematicDirector } from './CinematicDirector';
+// NEW: Enterprise Animation Engine
+export { TimelineEngine, getTimelineEngine, createTimelineEngine } from './TimelineEngine';
+export { PixiRenderer, getPixiRenderer, createPixiRenderer } from './PixiRenderer';
+export * from './VisualObjects';
 
 // Legacy exports (still available for compatibility)
+export { default as cinematicDirector } from './CinematicDirector';
 export { default as renderingEngine } from './RenderingEngine';
 export { default as LayoutManager } from './LayoutManager';
 export { default as sceneProcessor } from './SceneProcessor';
