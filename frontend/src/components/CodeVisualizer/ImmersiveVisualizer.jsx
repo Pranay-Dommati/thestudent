@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import VisualExplanationPanelV2 from './VisualExplanationPanelV2';
+import AnimatedStepCard from './AnimatedStepCard';
 
 // API Base URL - can be updated for production
 const API_BASE_URL = import.meta.env.VITE_CODE_VISUALIZER_API_URL || 'http://localhost:5000/api';
@@ -18,6 +19,10 @@ const ImmersiveVisualizer = ({
     const [currentStepIndex, setCurrentStepIndex] = useState(-1);
     const [isStreaming, setIsStreaming] = useState(false); // Track if we're receiving streamed data
     const [leftPanelTab, setLeftPanelTab] = useState('code'); // 'code' or 'teacher'
+
+    // Cinematic step reveal: queue incoming steps and animate one-by-one
+    const [pendingSteps, setPendingSteps] = useState([]);
+    const [isStepAnimating, setIsStepAnimating] = useState(false);
 
     // AI Teacher state
     const [chatMessages, setChatMessages] = useState([]);
@@ -42,6 +47,8 @@ const ImmersiveVisualizer = ({
             prevStepsLengthRef.current = 0;
             setChatMessages([]);
             setTeacherContextSet(false);
+            setPendingSteps([]);
+            setIsStepAnimating(false);
             // Wait for steps to stream in
         }
     }, [isOpen, isLoading]);
@@ -92,16 +99,35 @@ const ImmersiveVisualizer = ({
             // New steps have arrived via streaming
             setIsStreaming(true);
 
-            // Add the new steps to visible steps
+            // Queue new steps; we will reveal them one-by-one (cinematic)
             const newSteps = steps.slice(prevStepsLengthRef.current);
-            setVisibleSteps(prev => [...prev, ...newSteps]);
-            setCurrentStepIndex(steps.length - 1);
+            setPendingSteps(prev => [...prev, ...newSteps]);
 
             prevStepsLengthRef.current = steps.length;
         }
     }, [steps, isOpen, isLoading]);
 
-    // Stop streaming mode when all steps are received
+    // Reveal next pending step when not animating
+    useEffect(() => {
+        if (!isOpen || isLoading) return;
+        if (isStepAnimating) return;
+        if (pendingSteps.length === 0) return;
+
+        setIsStepAnimating(true);
+        setVisibleSteps(prev => {
+            const next = pendingSteps[0];
+            const nextVisible = [...prev, next];
+            setCurrentStepIndex(nextVisible.length - 1);
+            return nextVisible;
+        });
+        setPendingSteps(prev => prev.slice(1));
+    }, [pendingSteps, isStepAnimating, isOpen, isLoading]);
+
+    const handleStepAnimationComplete = useCallback(() => {
+        setIsStepAnimating(false);
+    }, []);
+
+    // Stop streaming mode when all steps are received AND revealed
     useEffect(() => {
         if (isStreaming && steps.length > 0 && visibleSteps.length === steps.length) {
             // All steps have been received and shown
@@ -893,6 +919,22 @@ const ImmersiveVisualizer = ({
                                                             {highlightSyntax(step.code)}
                                                         </code>
                                                     </div>
+                                                </div>
+
+                                                {/* Cinematic Animation Visualization */}
+                                                <div className="px-5 py-4 border-b border-slate-700/50">
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-400">
+                                                            <polygon points="5,3 19,12 5,21" fill="currentColor" />
+                                                        </svg>
+                                                        <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider">Visual Animation</span>
+                                                    </div>
+                                                    <AnimatedStepCard
+                                                        step={step}
+                                                        stepIndex={idx}
+                                                        isLatest={isLatest}
+                                                        onAnimationComplete={isLatest ? handleStepAnimationComplete : undefined}
+                                                    />
                                                 </div>
 
                                                 {/* AI Explanation with Dry-Run */}
