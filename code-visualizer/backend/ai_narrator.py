@@ -29,106 +29,83 @@ if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
 # System prompt for the AI narrator
-NARRATOR_SYSTEM_PROMPT = """You are a coding tutor explaining Python code execution with DRY-RUN style breakdowns.
+NARRATOR_SYSTEM_PROMPT = """You are a coding tutor explaining Python code execution step by step.
 
-For each step, provide TWO things:
-1. A brief friendly explanation (1-2 sentences)
-2. A DRY-RUN breakdown showing the actual values and evaluation
+CRITICAL: Read the CODE LINE being executed carefully. Explain what THAT specific line does.
 
-FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
+For each step, provide:
+1. A brief, accurate explanation of what the line does (1-2 sentences)
+2. A DRY-RUN showing actual values being used
 
-For assignments:
-```
-[explanation sentence]
+IMPORTANT RULES:
+- Look at the actual code line and explain what IT does
+- Use the variable values provided in the context
+- For assignments like `x = expression`, explain we're assigning the RESULT to x
+- For conditions, show the comparison with actual values and the result (True/False)
+- For loops, show the current loop variable value
+- Keep explanations SHORT and focused
 
-DRY-RUN:
-variable_name = expression
-variable_name = [actual value]
-```
+FORMAT:
 
-For conditions (if/elif):
-```
-[explanation sentence]
-
-DRY-RUN:
-condition with variable names
-[substitute actual values]
-[result] → [True/False]
-so [if block executes / if block skipped]
-```
-
-For loops (for n in nums):
-```
-[explanation sentence]
-
-DRY-RUN:
-loop_var = next value from iterable
-loop_var = [actual value]
-```
-
-For return statements:
-```
-[explanation sentence]
-
-DRY-RUN:
-return variable_name
-return [actual value] ✓
-```
-
-EXAMPLES:
-
-For `max_val = nums[0]` with nums=[3,5,1,7]:
-"We're initializing max_val with the first element of our list, assuming it's the largest for now.
+For assignments (e.g., max_val = nums[0]):
+"[What this line does - assigning to the LEFT side variable]
 
 DRY-RUN:
 max_val = nums[0]
-max_val = 3"
+max_val = [actual value of nums[0]]"
 
-For `if n > max_val:` with n=5, max_val=3:
-"Checking if our current number is bigger than our tracked maximum.
+For conditions (if/elif):
+"[What we're checking]
+
+DRY-RUN:
+[condition with variable names]
+[condition with actual values]
+[True/False] → [what happens]"
+
+For loops (for n in items):
+"[Loop iteration description]
+
+DRY-RUN:
+n = [current value]"
+
+For return:
+"[What we're returning]
+
+DRY-RUN:
+return [expression]
+return [actual value] ✓"
+
+EXAMPLES:
+
+Line: `max_val = nums[0]` with nums=[4,6], max_val will be 4:
+"Initializing max_val with the first element of nums.
+
+DRY-RUN:
+max_val = nums[0]
+max_val = 4"
+
+Line: `if n > max_val:` with n=6, max_val=4:
+"Checking if current element is greater than our maximum.
 
 DRY-RUN:
 n > max_val
-5 > 3
-True → if block executes
-max_val will be updated!"
+6 > 4
+True → updating max_val"
 
-For `if n > max_val:` with n=2, max_val=3:
-"Checking if the current number beats our maximum.
-
-DRY-RUN:
-n > max_val
-2 > 3
-False → if block skipped
-max_val stays at 3"
-
-For `for n in nums:` with n becoming 5:
-"Moving to the next element in our list.
+Line: `for n in nums:` with n=4, nums=[4,6]:
+"Iterating through the list.
 
 DRY-RUN:
-n = next(nums)
-n = 5"
+n = 4 (first element)"
 
-For `max_val = n` with n=7:
-"Found a bigger number! Updating our maximum.
-
-DRY-RUN:
-max_val = n
-max_val = 7"
-
-For `return max_val` with max_val=7:
-"All done! Returning the largest value we found.
+Line: `return max_val` with max_val=6:
+"Returning the maximum value found.
 
 DRY-RUN:
 return max_val
-return 7 ✓"
+return 6 ✓"
 
-CRITICAL RULES:
-- Always include the DRY-RUN section with actual values
-- Show the symbolic form first, then the evaluated form
-- For conditions, ALWAYS show True/False result and what happens
-- Keep explanations brief but the dry-run detailed
-- Use the actual variable values from the context provided"""
+NEVER describe the wrong variable. The LEFT side of = is what's being assigned TO."""
 
 
 class AINarrator:
@@ -228,46 +205,41 @@ class AINarrator:
             )
         
         try:
-            # Build the context for Gemini
+            # Build the context for Gemini - be very explicit about the code line
+            code_line = code.strip()
+            
             context_parts = [
-                f"Step {step} of execution:",
-                f"Line {line}: {code.strip()}",
-                f"Event type: {event}",
+                f"CURRENT LINE TO EXPLAIN: {code_line}",
+                f"Step {step}, Line {line}",
             ]
             
             if function_name and function_name != '<module>':
                 context_parts.append(f"Inside function: {function_name}")
             
+            # Format variables clearly
             if variables:
-                context_parts.append(f"Current variables: {self._format_variables(variables)}")
-            
-            if changed_vars:
-                context_parts.append(f"Variables that changed: {self._format_changed_vars(changed_vars, variables)}")
+                var_list = []
+                for name, data in variables.items():
+                    if isinstance(data, dict) and 'value' in data:
+                        var_list.append(f"  {name} = {data['value']} ({data.get('type', 'unknown')})")
+                    else:
+                        var_list.append(f"  {name} = {data}")
+                context_parts.append("Current variable values:\n" + "\n".join(var_list))
             
             if event == 'return' and return_value is not None:
-                context_parts.append(f"Returning value: {return_value}")
-            
-            # Add surrounding code context
-            if full_source and 1 <= line <= len(full_source):
-                start = max(0, line - 3)
-                end = min(len(full_source), line + 2)
-                context_code = []
-                for i in range(start, end):
-                    marker = ">>>" if i == line - 1 else "   "
-                    context_code.append(f"{marker} {i+1}: {full_source[i]}")
-                context_parts.append(f"\nCode context:\n" + "\n".join(context_code))
+                context_parts.append(f"Return value: {return_value}")
             
             prompt = "\n".join(context_parts)
-            prompt += "\n\nGenerate a brief, friendly narration for this step:"
+            prompt += f"\n\nExplain what the line `{code_line}` does with these values. Include DRY-RUN:"
             
-            print(f"[AI Narrator] Step {step} - Generating AI narration for line {line}: {code.strip()[:50]}...")
+            print(f"[AI Narrator] Step {step} - Generating AI narration for line {line}: {code_line[:50]}...")
             
             # Call Gemini API
             response = self.model.generate_content(
                 prompt,
                 generation_config=genai.GenerationConfig(
-                    temperature=0.7,
-                    max_output_tokens=150,
+                    temperature=0.5,  # Lower temperature for more consistent output
+                    max_output_tokens=200,
                 )
             )
             
@@ -304,8 +276,17 @@ class AINarrator:
     ) -> str:
         """
         Generate a basic narration without AI (fallback).
+        Parses the actual code to describe what's happening.
         """
+        import re
         code = code.strip()
+        
+        # Helper to get variable value
+        def get_var_value(var_name):
+            if var_name in variables:
+                data = variables[var_name]
+                return data['value'] if isinstance(data, dict) else data
+            return None
         
         # Handle different event types
         if event == 'call':
@@ -319,38 +300,59 @@ class AINarrator:
         if event == 'exception':
             return f"An error occurred at this line"
         
-        # Generate based on code patterns
-        if '=' in code and '==' not in code and '!=' not in code and '<=' not in code and '>=' not in code:
-            if changed_vars:
-                var = changed_vars[0]
-                if var in variables:
-                    data = variables[var]
-                    val = data['value'] if isinstance(data, dict) else data
-                    return f"Setting {var} to {val}"
+        # Handle for loops - extract loop variable and show current value
+        for_match = re.match(r'for\s+(\w+)\s+in\s+(.+):', code)
+        if for_match:
+            loop_var = for_match.group(1)
+            iterable = for_match.group(2).strip()
+            val = get_var_value(loop_var)
+            if val is not None:
+                return f"Loop iteration: {loop_var} is now {val}"
+            return f"Starting loop: iterating {loop_var} through {iterable}"
         
-        if code.startswith('for '):
-            if changed_vars:
-                var = changed_vars[0]
-                if var in variables:
-                    data = variables[var]
-                    val = data['value'] if isinstance(data, dict) else data
-                    return f"Loop iteration: {var} is now {val}"
-            return "Starting a loop iteration"
+        # Handle return statements
+        return_match = re.match(r'return\s+(.+)', code)
+        if return_match:
+            return_expr = return_match.group(1).strip()
+            val = get_var_value(return_expr)
+            if val is not None:
+                return f"Returning {return_expr} which equals {val}"
+            return f"Returning {return_expr}"
+        
+        # Handle if/elif conditions
+        if_match = re.match(r'(if|elif)\s+(.+):', code)
+        if if_match:
+            keyword = if_match.group(1)
+            condition = if_match.group(2).strip()
+            return f"Checking condition: {condition}"
+            
+        # Handle else branch
+        if code.strip() == 'else:':
+            return "Entering else branch"
+        
+        # Handle assignments (but not ==, !=, <=, >=)
+        assign_match = re.match(r'^(\w+)\s*=\s*(.+)$', code)
+        if assign_match and '==' not in code and '!=' not in code and '<=' not in code and '>=' not in code:
+            var_name = assign_match.group(1)
+            expression = assign_match.group(2).strip()
+            val = get_var_value(var_name)
+            if val is not None:
+                return f"Setting {var_name} = {expression} → {val}"
+            return f"Assigning {expression} to {var_name}"
+        
+        # Handle augmented assignments (+=, -=, etc.)
+        aug_match = re.match(r'^(\w+)\s*([+\-*/])=\s*(.+)$', code)
+        if aug_match:
+            var_name = aug_match.group(1)
+            op = aug_match.group(2)
+            expression = aug_match.group(3).strip()
+            val = get_var_value(var_name)
+            if val is not None:
+                return f"Updating {var_name} {op}= {expression} → {var_name} is now {val}"
+            return f"Updating {var_name} {op}= {expression}"
         
         if code.startswith('while '):
             return "Checking the while loop condition"
-        
-        if code.startswith('if '):
-            return "Checking if condition"
-        
-        if code.startswith('elif '):
-            return "Checking alternative condition"
-        
-        if code.startswith('else:'):
-            return "Entering the else branch"
-        
-        if code.startswith('return '):
-            return "Returning a value from the function"
         
         if code.startswith('print('):
             return "Printing output to console"

@@ -292,37 +292,77 @@ class PythonTracer:
         changed = frame.changed_vars
         locals_data = frame.locals
         
-        # Basic explanations based on code patterns
-        if '=' in code and '==' not in code and '!=' not in code:
-            if changed:
-                var = changed[0]
-                if var in locals_data:
-                    val = locals_data[var]['value']
-                    return f"Assigning value {val} to variable '{var}'"
+        # Parse the code to understand what's happening
+        import re
         
-        if code.startswith('for '):
-            return "Starting a loop iteration"
+        # Handle for loops - extract loop variable and iterable
+        for_match = re.match(r'for\s+(\w+)\s+in\s+(.+):', code)
+        if for_match:
+            loop_var = for_match.group(1)
+            iterable = for_match.group(2).strip()
+            if loop_var in locals_data:
+                val = locals_data[loop_var]['value']
+                return f"Loop iteration: {loop_var} is now {val}"
+            return f"Starting loop: iterating {loop_var} through {iterable}"
+        
+        # Handle return statements
+        return_match = re.match(r'return\s+(.+)', code)
+        if return_match:
+            return_expr = return_match.group(1).strip()
+            # Try to evaluate the return value from locals
+            if return_expr in locals_data:
+                val = locals_data[return_expr]['value']
+                return f"Returning {return_expr} which is {val}"
+            return f"Returning {return_expr}"
+        
+        # Handle if/elif conditions
+        if_match = re.match(r'(if|elif)\s+(.+):', code)
+        if if_match:
+            keyword = if_match.group(1)
+            condition = if_match.group(2).strip()
+            # Try to describe the condition with actual values
+            desc = f"Checking condition: {condition}"
+            return desc
+            
+        # Handle else branch
+        if code.strip() == 'else:':
+            return "Entering else branch"
+        
+        # Handle assignments (single = but not ==, !=, <=, >=)
+        # Match pattern: variable = expression
+        assign_match = re.match(r'^(\w+)\s*=\s*(.+)$', code)
+        if assign_match and '==' not in code and '!=' not in code and '<=' not in code and '>=' not in code:
+            var_name = assign_match.group(1)
+            expression = assign_match.group(2).strip()
+            # Get the value of the assigned variable if available
+            if var_name in locals_data:
+                val = locals_data[var_name]['value']
+                # Make the explanation describe the assignment, not just the value
+                return f"Setting {var_name} = {expression} → {val}"
+            return f"Assigning {expression} to {var_name}"
+        
+        # Handle augmented assignments (+=, -=, etc.)
+        aug_match = re.match(r'^(\w+)\s*([+\-*/])=\s*(.+)$', code)
+        if aug_match:
+            var_name = aug_match.group(1)
+            op = aug_match.group(2)
+            expression = aug_match.group(3).strip()
+            if var_name in locals_data:
+                val = locals_data[var_name]['value']
+                return f"Updating {var_name} {op}= {expression} → {var_name} is now {val}"
+            return f"Updating {var_name} {op}= {expression}"
             
         if code.startswith('while '):
-            return "Checking loop condition"
-            
-        if code.startswith('if '):
-            return "Evaluating condition"
-            
-        if code.startswith('elif '):
-            return "Checking alternative condition"
-            
-        if code.startswith('else:'):
-            return "Executing else branch"
-            
-        if code.startswith('return '):
-            return f"Returning value from function"
+            return "Checking while loop condition"
             
         if code.startswith('print('):
             return "Printing output to console"
             
         if code.startswith('def '):
             return "Defining a function"
+        
+        if code.startswith('class '):
+            return "Defining a class"
             
         if frame.event == 'call':
             return f"Calling function '{frame.function_name}'"
