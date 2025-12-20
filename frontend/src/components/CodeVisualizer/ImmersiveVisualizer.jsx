@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import VisualExplanationPanelV2 from './VisualExplanationPanelV2';
-import AnimatedStepCard from './AnimatedStepCard';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
 
 // API Base URL - can be updated for production
@@ -111,7 +110,7 @@ const ImmersiveVisualizer = ({
         }
     }, [steps, isOpen, isLoading]);
 
-    // Reveal next pending step when not animating
+    // Reveal next pending step (streamed) without relying on card animations
     useEffect(() => {
         if (!isOpen || isLoading) return;
         if (isStepAnimating) return;
@@ -125,11 +124,10 @@ const ImmersiveVisualizer = ({
             return nextVisible;
         });
         setPendingSteps(prev => prev.slice(1));
+        // No AnimatedStepCard in Timeline anymore, so release immediately
+        const t = setTimeout(() => setIsStepAnimating(false), 0);
+        return () => clearTimeout(t);
     }, [pendingSteps, isStepAnimating, isOpen, isLoading]);
-
-    const handleStepAnimationComplete = useCallback(() => {
-        setIsStepAnimating(false);
-    }, []);
 
     // Stop streaming mode when all steps are received AND revealed
     useEffect(() => {
@@ -971,22 +969,6 @@ const ImmersiveVisualizer = ({
                                                             {highlightSyntax(step.code)}
                                                         </code>
                                                     </div>
-                                                </div>
-
-                                                {/* Cinematic Animation Visualization */}
-                                                <div className="px-5 py-4 border-b border-slate-700/50">
-                                                    <div className="flex items-center gap-2 mb-3">
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-400">
-                                                            <polygon points="5,3 19,12 5,21" fill="currentColor" />
-                                                        </svg>
-                                                        <span className="text-xs font-semibold text-purple-400 uppercase tracking-wider">Visual Animation</span>
-                                                    </div>
-                                                    <AnimatedStepCard
-                                                        step={step}
-                                                        stepIndex={idx}
-                                                        isLatest={isLatest}
-                                                        onAnimationComplete={isLatest ? handleStepAnimationComplete : undefined}
-                                                    />
                                                 </div>
 
                                                 {/* AI Explanation with Dry-Run */}
