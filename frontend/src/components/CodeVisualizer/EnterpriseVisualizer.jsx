@@ -176,6 +176,9 @@ const EnterpriseVisualizer = ({
         
         // Initialize timeline with steps
         engineRef.current?.initialize(steps, rendererRef.current);
+
+        // Seed pre-run snapshot (inputs like nums) so Start screen isn't empty
+        rendererRef.current?.seedInitialStateFromSteps(steps);
         
         console.log(`📊 Loaded ${steps.length} steps into timeline`);
     }, [steps, isReady]);

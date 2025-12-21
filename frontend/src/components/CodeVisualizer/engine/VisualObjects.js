@@ -113,8 +113,8 @@ export class ArrayVisual extends VisualObject {
         this.valueTexts = [];
         this.highlightedIndex = -1;
         
-        this.elementSize = 56;
-        this.gap = 8;
+        this.elementSize = 72;
+        this.gap = 10;
         
         this._createGraphics();
     }
@@ -122,16 +122,16 @@ export class ArrayVisual extends VisualObject {
     _createGraphics() {
         // Array name label
         this.nameLabel = createText(this.name, {
-            fontSize: 14,
+            fontSize: 18,
             fill: COLORS.variable,
             fontWeight: 'bold'
         });
-        this.nameLabel.y = -24;
+        this.nameLabel.y = -30;
         this.container.addChild(this.nameLabel);
 
         // Equals sign
         this.equalsSign = createText('=', {
-            fontSize: 14,
+            fontSize: 16,
             fill: COLORS.textMuted
         });
         this.equalsSign.x = this.nameLabel.width + 8;
@@ -140,11 +140,11 @@ export class ArrayVisual extends VisualObject {
 
         // Opening bracket
         this.openBracket = createText('[', {
-            fontSize: 20,
+            fontSize: 24,
             fill: COLORS.textMuted
         });
         this.openBracket.x = 0;
-        this.openBracket.y = (this.elementSize - 20) / 2;
+        this.openBracket.y = (this.elementSize - 24) / 2;
         this.container.addChild(this.openBracket);
 
         // Create element boxes
@@ -152,11 +152,11 @@ export class ArrayVisual extends VisualObject {
 
         // Closing bracket
         this.closeBracket = createText(']', {
-            fontSize: 20,
+            fontSize: 24,
             fill: COLORS.textMuted
         });
         this.closeBracket.x = 20 + this.values.length * (this.elementSize + this.gap);
-        this.closeBracket.y = (this.elementSize - 20) / 2;
+        this.closeBracket.y = (this.elementSize - 24) / 2;
         this.container.addChild(this.closeBracket);
     }
 
@@ -176,7 +176,7 @@ export class ArrayVisual extends VisualObject {
 
             // Value text
             const valueText = createText(value, {
-                fontSize: 18,
+                fontSize: 22,
                 fill: COLORS.text,
                 fontWeight: 'bold'
             });
@@ -188,7 +188,7 @@ export class ArrayVisual extends VisualObject {
 
             // Index label (hidden initially)
             const indexLabel = createText(`[${index}]`, {
-                fontSize: 11,
+                fontSize: 12,
                 fill: COLORS.textMuted
             });
             indexLabel.anchor.set(0.5, 0);
@@ -253,6 +253,17 @@ export class ArrayVisual extends VisualObject {
         };
     }
 
+    getVisualWidth() {
+        // Approximate total width including brackets and padding.
+        // open bracket starts at x=0, elements start at x=20.
+        return 20 + this.values.length * (this.elementSize + this.gap) + 32;
+    }
+
+    getVisualHeight() {
+        // Element row height + index labels spacing
+        return this.elementSize + 28;
+    }
+
     updateValues(newValues) {
         // Normalize input
         const next = Array.isArray(newValues) ? newValues : [];
@@ -304,22 +315,22 @@ export class VariableVisual extends VisualObject {
         super(stage);
         this.name = name;
         this.value = value;
-        this.boxWidth = 80;
-        this.boxHeight = 44;
+        this.boxWidth = 130;
+        this.boxHeight = 54;
         
         this._createGraphics();
     }
 
     _createGraphics() {
         this.nameLabel = createText(this.name, {
-            fontSize: 14,
+            fontSize: 18,
             fill: COLORS.variable,
             fontWeight: 'bold'
         });
         this.container.addChild(this.nameLabel);
 
         this.equalsSign = createText('=', {
-            fontSize: 14,
+            fontSize: 16,
             fill: COLORS.textMuted
         });
         this.equalsSign.x = this.nameLabel.width + 8;
@@ -334,7 +345,7 @@ export class VariableVisual extends VisualObject {
         this.container.addChild(this.valueBox);
 
         this.valueText = createText(this.value !== null ? String(this.value) : '?', {
-            fontSize: 16,
+            fontSize: 20,
             fill: this.value !== null ? COLORS.number : COLORS.textMuted,
             fontWeight: 'bold'
         });
@@ -410,6 +421,15 @@ export class VariableVisual extends VisualObject {
             duration: 0.2,
             ease: 'back.out(3)'
         }, startTime + 0.1);
+    }
+
+    getVisualWidth() {
+        // name + " = " + box + padding
+        return this.nameLabel.width + 8 + this.equalsSign.width + 20 + this.boxWidth;
+    }
+
+    getVisualHeight() {
+        return Math.max(this.boxHeight, 54);
     }
 }
 
@@ -505,7 +525,7 @@ export class ComparisonVisual extends VisualObject {
 
     _createGraphics() {
         this.bg = new PIXI.Graphics();
-        this.bg.alpha = 0;
+        this.bg.alpha = 1;  // Set to 1, container alpha controls visibility
         this.container.addChild(this.bg);
 
         this.leftText = createText('', {
@@ -609,7 +629,7 @@ export class LoopIndicator extends VisualObject {
     constructor(stage) {
         super(stage);
         this.iteration = 0;
-        this.size = 40;
+        this.size = 52;
         
         this._createGraphics();
     }
@@ -621,7 +641,7 @@ export class LoopIndicator extends VisualObject {
         this.container.addChild(this.circle);
 
         this.iterText = createText('1', {
-            fontSize: 16,
+            fontSize: 18,
             fill: 0xffffff,
             fontWeight: 'bold'
         });
@@ -629,7 +649,7 @@ export class LoopIndicator extends VisualObject {
         this.container.addChild(this.iterText);
 
         this.label = createText('iteration', {
-            fontSize: 10,
+            fontSize: 12,
             fill: COLORS.textMuted
         });
         this.label.anchor.set(0.5, 0);

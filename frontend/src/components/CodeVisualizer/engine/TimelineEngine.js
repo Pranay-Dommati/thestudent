@@ -156,6 +156,7 @@ export class TimelineEngine {
         
         // Parse the step type
         const stepType = this._parseStepType(step);
+        console.log(`🔎 Step ${stepIndex} type:`, stepType.type, 'code:', code, 'parsed:', stepType);
         
         switch (stepType.type) {
             case 'array_access':
@@ -185,7 +186,11 @@ export class TimelineEngine {
                 commands.push(
                     { type: 'HIGHLIGHT_CODE', line: stepLine, duration: 0.3 },
                     { type: 'SHOW_LOOP_INDICATOR', iteration: stepType.iteration, duration: 0.3 },
+                    // Create/update the loop variable with current value
+                    { type: 'CREATE_VARIABLE', name: stepType.loopVar, value: stepType.currentValue, duration: 0.3 },
                     { type: 'UPDATE_VARIABLE', name: stepType.loopVar, value: stepType.currentValue, duration: 0.4 },
+                    // Highlight the array element being accessed
+                    { type: 'HIGHLIGHT_INDEX', name: stepType.iterableName, index: Math.max(0, stepType.iteration - 1), duration: 0.4 },
                     { type: 'PULSE_LOOP', duration: 0.3 },
                     { type: 'COMPLETE_STEP', stepIndex, duration: 0.2 }
                 );
@@ -354,6 +359,8 @@ export class TimelineEngine {
      * Play next step only (for step-by-step mode)
      */
     playNextStep() {
+        console.log('▶️ playNextStep called, currentStep:', this.currentStepIndex, 'totalSteps:', this.stepMarkers.length);
+        
         // Cancel any existing step animation
         if (this.stepAnimation) {
             this.stepAnimation.kill();
@@ -363,12 +370,17 @@ export class TimelineEngine {
         const nextIndex = this.currentStepIndex + 1;
         if (nextIndex >= this.stepMarkers.length) {
             // Already at the end
+            console.log('⏹️ Already at end, no more steps');
+            this.isPlaying = false;
+            this._notifyStateChange();
             return;
         }
 
         const startMarker = this.stepMarkers[nextIndex];
         const endMarker = this.stepMarkers[nextIndex + 1];
         const endTime = endMarker ? endMarker.startTime : this.duration;
+
+        console.log(`📍 Playing step ${nextIndex}: time ${startMarker.startTime} -> ${endTime}`);
 
         // Jump to step start
         this.masterTimeline.pause();
@@ -378,17 +390,29 @@ export class TimelineEngine {
         this._notifyStateChange();
 
         // Animate to step end, then pause
-        const duration = (endTime - startMarker.startTime) / this.masterTimeline.timeScale();
+        const stepDuration = endTime - startMarker.startTime;
+        const animDuration = stepDuration / this.masterTimeline.timeScale();
+        
+        // Safety: ensure duration is positive and reasonable
+        if (animDuration <= 0 || !isFinite(animDuration)) {
+            console.warn('⚠️ Invalid animation duration, completing step immediately');
+            this.masterTimeline.seek(endTime);
+            this.currentTime = endTime;
+            this.isPlaying = false;
+            this._notifyStateChange();
+            return;
+        }
         
         this.stepAnimation = gsap.to(this.masterTimeline, {
             time: endTime,
-            duration: duration,
+            duration: animDuration,
             ease: 'none',
             onUpdate: () => {
                 this.currentTime = this.masterTimeline.time();
                 this._notifyStateChange();
             },
             onComplete: () => {
+                console.log(`✅ Step ${nextIndex} animation complete`);
                 this.isPlaying = false;
                 this.stepAnimation = null;
                 this._notifyStateChange();
@@ -460,10 +484,15 @@ export class TimelineEngine {
     }
 
     restart() {
+        console.log('🔄 TimelineEngine restart called');
+        
+        // Kill any pending step animation
         if (this.stepAnimation) {
             this.stepAnimation.kill();
             this.stepAnimation = null;
         }
+        
+        // Pause and reset timeline position
         this.masterTimeline.pause();
         this.masterTimeline.seek(0);
         this.currentStepIndex = -1;
@@ -475,7 +504,24 @@ export class TimelineEngine {
             this.renderer.reset();
         }
         
+        // Clear and rebuild the master timeline with the same steps
+        // This is necessary because the old animations reference destroyed objects
+        const savedSteps = this.steps;
+        const savedRenderer = this.renderer;
+        
+        this.clear();
+        
+        if (savedSteps.length > 0 && savedRenderer) {
+            this.initialize(savedSteps, savedRenderer);
+        }
+        
+        // Re-seed initial snapshot so inputs are visible before Start
+        if (this.renderer && savedSteps.length > 0) {
+            this.renderer.seedInitialStateFromSteps?.(savedSteps);
+        }
+        
         this._notifyStateChange();
+        console.log('✅ TimelineEngine restart complete, ready for playback');
     }
 
     /**

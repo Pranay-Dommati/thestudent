@@ -44,17 +44,145 @@ export class PixiRenderer {
             codeHighlight: null     // CodeHighlight
         };
         
-        // Layout positions
+        // Layout positions (computed responsively; these are fallbacks)
         this.layout = {
-            arrays: { x: 40, y: 80 },
-            variables: { x: 40, y: 200, spacing: 60 },
+            arrays: { x: 40, y: 80, rowSpacing: 130 },
+            variables: { x: 40, y: 200, spacing: 78 },
             comparison: { x: 400, y: 100 },
-            loopIndicator: { x: 700, y: 60 },
+            loopIndicator: { x: 400, y: 60 },
             return: { x: 300, y: 350 }
         };
         
         this.variableCount = 0;
         this.layers = null;
+    }
+
+    _computeLayout() {
+        const padX = 64;
+        const padY = 56;
+
+        // Center-top loop indicator
+        this.layout.loopIndicator.x = Math.round(this.width / 2);
+        this.layout.loopIndicator.y = 56;
+
+        // Secondary visuals (avoid edges)
+        this.layout.comparison.x = Math.round(this.width * 0.60);
+        this.layout.comparison.y = Math.round(this.height * 0.20);
+        this.layout.return.x = Math.round(this.width * 0.54);
+        this.layout.return.y = Math.round(this.height * 0.72);
+
+        // Fallback anchors; arrays/vars are centered via _layoutAll()
+        this.layout.arrays.x = padX;
+        this.layout.arrays.y = padY + 30;
+        this.layout.variables.x = padX;
+        this.layout.variables.y = padY + 220;
+    }
+
+    _layoutAll() {
+        if (!this.isInitialized || this.isDestroyed) return;
+
+        const arrays = Array.from(this.objects.arrays.values());
+        const vars = Array.from(this.objects.variables.values());
+
+        const maxArrayWidth = arrays.reduce((m, a) => Math.max(m, a?.getVisualWidth?.() || 0), 0);
+        const arraysHeight = arrays.length ? arrays.length * this.layout.arrays.rowSpacing : 0;
+
+        const maxVarWidth = vars.reduce((m, v) => Math.max(m, v?.getVisualWidth?.() || 0), 0);
+        const varsHeight = vars.length
+            ? ((vars.length - 1) * this.layout.variables.spacing + (vars[0]?.getVisualHeight?.() || 54))
+            : 0;
+
+        const gapBetween = arrays.length && vars.length ? 90 : 0;
+        const groupWidth = Math.max(maxArrayWidth, maxVarWidth, 460);
+        const groupHeight = Math.max(arraysHeight + gapBetween + varsHeight, 280);
+
+        const originX = Math.max(48, Math.round((this.width - groupWidth) / 2));
+        const originY = Math.max(48, Math.round((this.height - groupHeight) / 2));
+
+        arrays.forEach((arr, idx) => {
+            const y = originY + idx * this.layout.arrays.rowSpacing;
+            arr.setPosition(originX, y);
+        });
+
+        const varsBaseY = originY + (arrays.length ? arraysHeight + gapBetween : 0);
+        vars.forEach((v, idx) => {
+            const y = varsBaseY + idx * this.layout.variables.spacing;
+            v.setPosition(originX, y);
+        });
+
+        this.objects.comparison?.setPosition(this.layout.comparison.x, this.layout.comparison.y);
+        this.objects.loopIndicator?.setPosition(this.layout.loopIndicator.x, this.layout.loopIndicator.y);
+        this.objects.returnVisual?.setPosition(this.layout.return.x, this.layout.return.y);
+    }
+
+    _unwrapTracerValue(payload) {
+        // Backend tracer format: { value, type }
+        if (payload && typeof payload === 'object' && !Array.isArray(payload) && 'value' in payload) {
+            return payload.value;
+        }
+        return payload;
+    }
+
+    _normalizeVars(step) {
+        const raw = step?.variables || step?.locals || {};
+        const out = {};
+        for (const [k, v] of Object.entries(raw)) {
+            out[k] = this._unwrapTracerValue(v);
+        }
+        return out;
+    }
+
+    /**
+     * Seed a pre-run snapshot (inputs) so the canvas isn't empty before Start.
+     * Picks the earliest step that contains any variables.
+     */
+    seedInitialStateFromSteps(steps = []) {
+        if (!this.isInitialized || this.isDestroyed) return;
+        if (!Array.isArray(steps) || steps.length === 0) return;
+
+        const firstWithVars = steps.find(s => {
+            const vars = s?.variables || s?.locals;
+            return vars && Object.keys(vars).length > 0;
+        }) || steps[0];
+
+        this.seedInitialState(firstWithVars);
+    }
+
+    /**
+     * Seed initial visuals from a single step.
+     * Only shows ARRAYS (function inputs like nums).
+     * Scalar variables will appear when they are assigned during animation.
+     */
+    seedInitialState(step) {
+        if (!this.isInitialized || this.isDestroyed) return;
+
+        // Ensure persistent objects are hidden at rest
+        this.objects.comparison?.hide();
+        this.objects.loopIndicator?.hide();
+        this.objects.returnVisual?.hide();
+        
+        // Hide ALL existing scalar variables (they should only appear during animation)
+        this.objects.variables.forEach(v => {
+            v.hide();
+            v.container.alpha = 0;
+        });
+
+        const vars = this._normalizeVars(step);
+
+        // Show arrays ONLY (inputs like nums) - these are the function parameters
+        for (const [name, value] of Object.entries(vars)) {
+            if (Array.isArray(value)) {
+                const arrayVisual = this.getOrCreateArray(name, value);
+                arrayVisual.show();
+                arrayVisual.container.visible = true;
+                arrayVisual.container.alpha = 1;
+                arrayVisual.container.scale.set(1);
+            }
+        }
+
+        // DO NOT show scalar variables in initial state - they appear during animation
+
+        this._layoutAll();
     }
 
     /**
@@ -110,13 +238,26 @@ export class PixiRenderer {
                 }
             });
 
+            this._computeLayout();
+
             // Create persistent objects
             this._createPersistentObjects();
             
             this.isInitialized = true;
+            this._layoutAll();
             return this;
         } catch (err) {
             console.error('PixiRenderer initialization failed:', err);
+            try {
+                // Prevent Pixi ticker from rendering a half-initialized stage
+                this.app?.destroy(true, { children: true, texture: true });
+            } catch (e) {
+                console.warn('Error destroying PixiJS app after init failure:', e);
+            }
+            this.app = null;
+            this.stage = null;
+            this.layers = null;
+            this.isInitialized = false;
             throw err;
         }
     }
@@ -155,14 +296,18 @@ export class PixiRenderer {
             const arrayCount = this.objects.arrays.size;
             arrayVisual.setPosition(
                 this.layout.arrays.x,
-                this.layout.arrays.y + arrayCount * 100
+                this.layout.arrays.y + arrayCount * this.layout.arrays.rowSpacing
             );
+            // Hide until seeded/animated
+            arrayVisual.hide();
+            arrayVisual.container.alpha = 0;
             this.objects.arrays.set(name, arrayVisual);
             console.log(`✅ Created array visual: ${name} with ${values.length} elements`);
         } else if (Array.isArray(values) && values.length) {
             const existing = this.objects.arrays.get(name);
             existing.updateValues(values);
         }
+        this._layoutAll();
         return this.objects.arrays.get(name);
     }
 
@@ -178,6 +323,9 @@ export class PixiRenderer {
                 this.layout.variables.x,
                 this.layout.variables.y + this.variableCount * this.layout.variables.spacing
             );
+            // Hide until seeded/animated
+            varVisual.hide();
+            varVisual.container.alpha = 0;
             this.variableCount++;
             this.objects.variables.set(name, varVisual);
             console.log(`✅ Created variable visual: ${name} = ${value}`);
@@ -187,6 +335,7 @@ export class PixiRenderer {
             existing.value = value;
             existing.valueText.text = String(value);
         }
+        this._layoutAll();
         return this.objects.variables.get(name);
     }
 
@@ -267,6 +416,7 @@ export class PixiRenderer {
     _animateShowArray(command) {
         const { name, values, duration } = command;
         const array = this.getOrCreateArray(name, values);
+        array.show();
         
         const tl = gsap.timeline();
         array.container.alpha = 0;
@@ -323,22 +473,39 @@ export class PixiRenderer {
 
     _animateCreateVariable(command) {
         const { name, value = null, duration } = command;
+        const isNew = !this.objects.variables.has(name);
         const variable = this.getOrCreateVariable(name, value);
+        variable.show();
         
         const tl = gsap.timeline();
-        variable.container.alpha = 0;
-        variable.container.scale.set(0);
         
-        tl.to(variable.container, {
-            alpha: 1,
-            duration: duration * 0.3
-        });
-        tl.to(variable.container.scale, {
-            x: 1,
-            y: 1,
-            duration: duration * 0.7,
-            ease: 'back.out(2)'
-        }, '<');
+        // Only animate "pop in" if this is a new variable
+        if (isNew) {
+            variable.container.alpha = 0;
+            variable.container.scale.set(0);
+            
+            tl.to(variable.container, {
+                alpha: 1,
+                duration: duration * 0.3
+            });
+            tl.to(variable.container.scale, {
+                x: 1,
+                y: 1,
+                duration: duration * 0.7,
+                ease: 'back.out(2)'
+            }, '<');
+        } else {
+            // Variable exists, just ensure visible and update value
+            variable.container.alpha = 1;
+            variable.container.scale.set(1);
+            if (value !== null && value !== undefined) {
+                variable.value = value;
+                variable.valueText.text = String(value);
+            }
+            // Small pulse to indicate update
+            tl.to(variable.container.scale, { x: 1.05, y: 1.05, duration: 0.1 });
+            tl.to(variable.container.scale, { x: 1, y: 1, duration: 0.1, ease: 'back.out(2)' });
+        }
         
         return tl;
     }
@@ -347,6 +514,7 @@ export class PixiRenderer {
         const { target, value, duration } = command;
         const variable = this.objects.variables.get(target);
         if (!variable) return null;
+        variable.show();
         
         const tl = gsap.timeline();
         variable.animateAssignment(tl, value, 0);
@@ -355,12 +523,17 @@ export class PixiRenderer {
 
     _animateUpdateVariable(command) {
         const { name, value, duration } = command;
+        console.log('📝 Updating variable:', name, '=', value);
         let variable = this.objects.variables.get(name);
         
         // Create if doesn't exist (for loop variables)
         if (!variable) {
             variable = this.getOrCreateVariable(name, value);
         }
+        variable.show();
+        // Ensure visible for existing variables
+        variable.container.alpha = 1;
+        variable.container.scale.set(1);
         
         const tl = gsap.timeline();
         variable.animateUpdate(tl, value, 0);
@@ -393,7 +566,10 @@ export class PixiRenderer {
     _animateShowComparison(command) {
         const { left, operator, right, duration } = command;
         const comparison = this.objects.comparison;
+        console.log('⚖️ Showing comparison:', left, operator, right);
         comparison.show();
+        // Reset result text for new comparison
+        comparison.resultText.alpha = 0;
         
         const tl = gsap.timeline();
         comparison.animateComparison(tl, left, operator, right, 0);
@@ -420,7 +596,11 @@ export class PixiRenderer {
     _animateShowLoopIndicator(command) {
         const { iteration, duration } = command;
         const indicator = this.objects.loopIndicator;
+        console.log('🔁 Showing loop indicator, iteration:', iteration);
         indicator.show();
+        // Ensure visible and reset for animation
+        indicator.container.alpha = 1;
+        indicator.container.scale.set(1);
         
         const tl = gsap.timeline();
         indicator.animateIteration(tl, iteration, 0);
@@ -520,6 +700,8 @@ export class PixiRenderer {
         this.width = width;
         this.height = height;
         this.app.renderer?.resize(width, height);
+        this._computeLayout();
+        this._layoutAll();
     }
 
     /**
