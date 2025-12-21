@@ -183,6 +183,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'authentication',  # Make sure this is after django.contrib.admin
     'chatbotcourse',
+    'code_visualizer',  # Code execution visualizer
     'corsheaders',  # Add this
     'courses',
     'feedback',  # Add feedback app

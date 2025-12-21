@@ -29,6 +29,7 @@ urlpatterns = [
     path('api/feedback/', include('feedback.urls')),  # Add feedback app
     path('api/newsletter/', include('newsletter.urls')),  # Add newsletter app
     path('api/analytics/', include('tracking.urls')),  # Analytics/tracking endpoints
+    path('api/visualizer/', include('code_visualizer.urls')),  # Code visualizer API
 ] + (static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) if settings.DEBUG else [])
 
 urlpatterns += [

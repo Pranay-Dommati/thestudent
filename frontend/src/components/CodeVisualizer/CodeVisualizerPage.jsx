@@ -5,8 +5,12 @@ import InputModal from './InputModal';
 import ImmersiveVisualizer from './ImmersiveVisualizer';
 import './CodeVisualizer.css';
 
-// API Base URL - can be updated for production
-const API_BASE_URL = import.meta.env.VITE_CODE_VISUALIZER_API_URL || 'http://localhost:5000/api';
+// API Base URL - uses Django backend visualizer API
+// In development: http://localhost:8000/api/visualizer
+// In production: uses relative URL through VITE_API_BASE_URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL 
+    ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/visualizer`
+    : 'http://localhost:8000/api/visualizer';
 
 const exampleCode = `arr = [64, 34, 25, 12, 22, 11, 90]
 n = len(arr)
@@ -37,9 +41,9 @@ function CodeVisualizerPage() {
 
     // Detect inputs in the code
     const detectInputs = useCallback(async (codeToCheck) => {
-        console.log('detectInputs: Starting fetch to', `${API_BASE_URL}/detect-inputs`);
+        console.log('detectInputs: Starting fetch to', `${API_BASE_URL}/detect-inputs/`);
         try {
-            const response = await fetch(`${API_BASE_URL}/detect-inputs`, {
+            const response = await fetch(`${API_BASE_URL}/detect-inputs/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code: codeToCheck })
@@ -76,8 +80,8 @@ function CodeVisualizerPage() {
         setLoadingPhase(3); // Preparing
 
         try {
-            // Use the streaming endpoint
-            const response = await fetch(`${API_BASE_URL}/trace-stream`, {
+            // Use the trace endpoint (non-streaming for Django compatibility)
+            const response = await fetch(`${API_BASE_URL}/trace/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -155,6 +159,7 @@ function CodeVisualizerPage() {
                                 if (data.type === 'complete') {
                                     // All frames received
                                     setIsLoadingTrace(false);
+                                    setIsRunning(false);
                                 }
                             } catch (parseError) {
                                 console.error('Failed to parse SSE data:', parseError);

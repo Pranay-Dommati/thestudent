@@ -156,7 +156,13 @@ export class TimelineEngine {
         
         // Parse the step type
         const stepType = this._parseStepType(step);
-        console.log(`🔎 Step ${stepIndex} type:`, stepType.type, 'code:', code, 'parsed:', stepType);
+        console.log(`🔎 Step ${stepIndex}:`, {
+            type: stepType.type,
+            code: code,
+            lineNumber: step?.lineNumber,
+            locals: this._normalizeLocals(step),
+            parsed: stepType
+        });
         
         switch (stepType.type) {
             case 'array_access':
@@ -232,7 +238,10 @@ export class TimelineEngine {
     _parseStepType(step) {
         const code = step.code?.trim() || '';
         const locals = this._normalizeLocals(step);
-        const changedVarNames = Array.isArray(step?.changed_vars) ? step.changed_vars : [];
+        // Handle both camelCase (from frontend transform) and snake_case (from raw tracer)
+        const changedVarNames = Array.isArray(step?.changedVars) 
+            ? step.changedVars 
+            : (Array.isArray(step?.changed_vars) ? step.changed_vars : []);
         
         // Array access: target = array[index]
         const arrayAccessMatch = code.match(/(\w+)\s*=\s*(\w+)\[(\d+|\w+)\]/);
@@ -387,6 +396,11 @@ export class TimelineEngine {
         this.masterTimeline.seek(startMarker.startTime);
         this.currentStepIndex = nextIndex;
         this.isPlaying = true;
+        
+        // Notify step change for code highlighting
+        if (this.onStepChange) {
+            this.onStepChange(nextIndex, startMarker.step);
+        }
         this._notifyStateChange();
 
         // Animate to step end, then pause
@@ -498,6 +512,11 @@ export class TimelineEngine {
         this.currentStepIndex = -1;
         this.currentTime = 0;
         this.isPlaying = false;
+        
+        // Notify step change to reset code highlighting
+        if (this.onStepChange) {
+            this.onStepChange(-1, null);
+        }
         
         // Reset renderer visuals
         if (this.renderer) {

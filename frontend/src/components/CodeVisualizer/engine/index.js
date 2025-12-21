@@ -13,14 +13,10 @@
  * - VisualObjects: Persistent visual entities
  */
 
-// NEW: Enterprise Animation Engine
+// Enterprise Animation Engine
 export { TimelineEngine, getTimelineEngine, createTimelineEngine } from './TimelineEngine';
 export { PixiRenderer, getPixiRenderer, createPixiRenderer } from './PixiRenderer';
 export * from './VisualObjects';
 
-// Legacy exports (still available for compatibility)
-export { default as cinematicDirector } from './CinematicDirector';
-export { default as renderingEngine } from './RenderingEngine';
+// Layout utilities
 export { default as LayoutManager } from './LayoutManager';
-export { default as sceneProcessor } from './SceneProcessor';
-export { default as SceneType, SceneCommands } from './SceneTypes';
