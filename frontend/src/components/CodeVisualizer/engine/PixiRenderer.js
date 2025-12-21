@@ -1,10 +1,22 @@
 /**
  * PixiRenderer - WebGL Canvas Renderer
  * 
- * This class manages the PixiJS application and handles
- * all visual object creation and animation command execution.
+ * ZONE-BASED CHOREOGRAPHY ENGINE
  * 
- * React does NOT control this - it's a standalone rendering engine.
+ * Layout:
+ * ┌─────────────────────────────────────────────┐
+ * │ INPUT ZONE          (arrays, parameters)    │
+ * ├────────────┬────────────────────────────────┤
+ * │ STATE ZONE │ INTERACTION ZONE               │
+ * │ (variables)│ (temporary choreography)       │
+ * ├────────────┴────────────────────────────────┤
+ * │ OUTPUT ZONE         (return / result)       │
+ * └─────────────────────────────────────────────┘
+ * 
+ * Variables are PERSISTENT ACTORS:
+ * - Created once, have a HOME position
+ * - Move to INTERACTION zone for comparisons/assignments
+ * - Return HOME after interaction
  */
 
 import * as PIXI from 'pixi.js';
@@ -18,8 +30,7 @@ import {
     LoopIndicator,
     ReturnVisual,
     CodeHighlight,
-    PointerArrow,
-    StatePanel
+    PointerArrow
 } from './VisualObjects';
 
 // Register GSAP PixiJS plugin
@@ -36,34 +47,40 @@ export class PixiRenderer {
         this.isDestroyed = false;
         
         // Persistent visual objects registry
+        // These are the ACTORS that participate in choreography
         this.objects = {
-            arrays: new Map(),      // name -> ArrayVisual
-            variables: new Map(),   // name -> VariableVisual
-            bubbles: [],            // ValueBubble instances
-            comparison: null,       // ComparisonVisual
-            loopIndicator: null,    // LoopIndicator
-            returnVisual: null,     // ReturnVisual
+            arrays: new Map(),      // name -> ArrayVisual (INPUT zone)
+            variables: new Map(),   // name -> VariableVisual (STATE zone - these ARE the state display)
+            bubbles: [],            // ValueBubble instances (temporary)
+            comparison: null,       // ComparisonVisual (INTERACTION zone)
+            loopIndicator: null,    // LoopIndicator (INPUT zone, top-right)
+            returnVisual: null,     // ReturnVisual (OUTPUT zone)
             codeHighlight: null,    // CodeHighlight
-            pointerArrow: null,     // PointerArrow
-            statePanel: null        // StatePanel for settled variables
+            pointerArrow: null      // PointerArrow (for connections)
         };
         
-        // Layout positions - organized grid system
-        // LEFT: State panel (persistent variables)
-        // CENTER: Main visualization area (arrays, active variables)
-        // RIGHT: Code panel (handled by React)
-        this.layout = {
-            // Left column - State panel
-            statePanel: { x: 16, y: 60, width: 130, height: 350 },
-            
-            // Center column - Main content
-            arrays: { x: 180, y: 80, rowSpacing: 100 },
-            variables: { x: 180, y: 220, spacing: 60, maxPerRow: 2, colWidth: 130 },
-            
-            // Center - Floating elements (positioned relative to content)
-            loopIndicator: { x: 450, y: 50 },
-            comparison: { x: 420, y: 240 },
-            return: { x: 400, y: 360 }
+        // ============================================
+        // ZONE-BASED LAYOUT SYSTEM
+        // ============================================
+        // Zones are FIXED regions - visuals have HOME positions within zones
+        // Choreography TEMPORARILY moves visuals to INTERACTION zone
+        // After interaction, visuals return HOME
+        //
+        // ┌─────────────────────────────────────────────┐
+        // │ INPUT ZONE          (arrays, parameters)    │
+        // ├────────────┬────────────────────────────────┤
+        // │ STATE ZONE │ INTERACTION ZONE               │
+        // │ (variables)│ (temporary choreography)       │
+        // │            │                                │
+        // ├────────────┴────────────────────────────────┤
+        // │ OUTPUT ZONE         (return / result)       │
+        // └─────────────────────────────────────────────┘
+        
+        this.zones = {
+            input: { x: 0, y: 0, width: 0, height: 0 },
+            state: { x: 0, y: 0, width: 0, height: 0 },
+            interaction: { x: 0, y: 0, width: 0, height: 0 },
+            output: { x: 0, y: 0, width: 0, height: 0 }
         };
         
         this.variableCount = 0;
@@ -71,91 +88,385 @@ export class PixiRenderer {
     }
 
     _computeLayout() {
-        const padX = 16;
+        const padX = 20;
         const padY = 56;
         const canvasWidth = this.width;
         const canvasHeight = this.height;
         
-        // ========================================
-        // LEFT COLUMN: State Panel (fixed width)
-        // ========================================
-        this.layout.statePanel.x = padX;
-        this.layout.statePanel.y = padY;
-        this.layout.statePanel.width = 130;
-        this.layout.statePanel.height = Math.min(canvasHeight - 120, 380);
-
-        // ========================================
-        // CENTER COLUMN: Main Visualization Area
-        // ========================================
-        const contentStartX = this.layout.statePanel.x + this.layout.statePanel.width + 24;
-        const contentWidth = canvasWidth - contentStartX - 20;
-        const contentCenterX = contentStartX + contentWidth / 2;
+        // ============================================
+        // ZONE CALCULATIONS
+        // ============================================
+        const stateZoneWidth = 140;  // Left column for state
+        const outputZoneHeight = 60; // Bottom row for output
+        const inputZoneHeight = 80;  // Top row for input
         
-        // Arrays at top of content area
-        this.layout.arrays.x = contentStartX;
-        this.layout.arrays.y = padY + 24;
-        this.layout.arrays.rowSpacing = 100;
+        // INPUT ZONE: Top strip (arrays, parameters)
+        this.zones.input = {
+            x: padX,
+            y: padY,
+            width: canvasWidth - padX * 2,
+            height: inputZoneHeight
+        };
         
-        // Variables below arrays - can be multi-column
-        this.layout.variables.x = contentStartX;
-        this.layout.variables.y = padY + 140;
-        this.layout.variables.spacing = 56;
-        this.layout.variables.colWidth = 130;
-        this.layout.variables.maxPerRow = Math.max(2, Math.floor(contentWidth / 140));
-
-        // ========================================
-        // FLOATING ELEMENTS: Positioned in center-right
-        // ========================================
-        // Loop indicator - top right of content area
-        this.layout.loopIndicator.x = contentStartX + contentWidth - 80;
-        this.layout.loopIndicator.y = padY;
-
-        // Comparison - center-right, vertically centered
-        this.layout.comparison.x = contentStartX + contentWidth - 120;
-        this.layout.comparison.y = Math.round(canvasHeight * 0.38);
+        // STATE ZONE: Left column below input (variables)
+        this.zones.state = {
+            x: padX,
+            y: padY + inputZoneHeight + 10,
+            width: stateZoneWidth,
+            height: canvasHeight - padY - inputZoneHeight - outputZoneHeight - 30
+        };
         
-        // Return - bottom center of content
-        this.layout.return.x = contentCenterX - 40;
-        this.layout.return.y = Math.round(canvasHeight * 0.75);
+        // INTERACTION ZONE: Center-right area (choreography happens here)
+        this.zones.interaction = {
+            x: padX + stateZoneWidth + 20,
+            y: padY + inputZoneHeight + 10,
+            width: canvasWidth - padX * 2 - stateZoneWidth - 20,
+            height: canvasHeight - padY - inputZoneHeight - outputZoneHeight - 30
+        };
+        
+        // OUTPUT ZONE: Bottom strip (return values)
+        this.zones.output = {
+            x: padX,
+            y: canvasHeight - outputZoneHeight - 10,
+            width: canvasWidth - padX * 2,
+            height: outputZoneHeight
+        };
+        
+        // Store centers for choreography targets
+        this.zones.interaction.centerX = this.zones.interaction.x + this.zones.interaction.width / 2;
+        this.zones.interaction.centerY = this.zones.interaction.y + this.zones.interaction.height / 2;
     }
 
     _layoutAll() {
         if (!this.isInitialized || this.isDestroyed) return;
 
+        // Position visuals in their HOME positions within zones
+        this._layoutInputZone();
+        this._layoutStateZone();
+        this._layoutOutputZone();
+        this._layoutInteractionZone();
+    }
+    
+    /**
+     * Layout INPUT ZONE: Arrays and parameters
+     */
+    _layoutInputZone() {
         const arrays = Array.from(this.objects.arrays.values());
-        const vars = Array.from(this.objects.variables.values());
-
-        // Position state panel
-        this.objects.statePanel?.setPosition(this.layout.statePanel.x, this.layout.statePanel.y);
-
-        // Calculate content area
-        const contentX = this.layout.variables.x;
-        const arraysY = this.layout.arrays.y;
+        const zone = this.zones.input;
         
-        // Position arrays in a vertical stack
+        let currentX = zone.x;
         arrays.forEach((arr, idx) => {
-            const y = arraysY + idx * this.layout.arrays.rowSpacing;
-            arr.setPosition(contentX, y);
+            arr.setHomePosition(currentX, zone.y + 10);
+            arr.moveToHome();
+            currentX += arr.getVisualWidth() + 30;
         });
-
-        // Position active variables in a grid layout
-        const varsBaseY = this.layout.variables.y;
-        const colWidth = this.layout.variables.colWidth;
-        const rowHeight = this.layout.variables.spacing;
-        const maxPerRow = this.layout.variables.maxPerRow;
         
+        // Loop indicator in top-right of input zone
+        if (this.objects.loopIndicator) {
+            this.objects.loopIndicator.setPosition(
+                zone.x + zone.width - 50,
+                zone.y + 20
+            );
+        }
+    }
+    
+    /**
+     * Layout STATE ZONE: Variables (persistent actors, vertically stacked)
+     * These are the ONLY state display - no separate panel
+     */
+    _layoutStateZone() {
+        const vars = Array.from(this.objects.variables.values());
+        const zone = this.zones.state;
+        
+        // Variables stacked vertically in STATE zone
+        const startY = zone.y + 10;
         vars.forEach((v, idx) => {
-            const row = Math.floor(idx / maxPerRow);
-            const col = idx % maxPerRow;
-            const x = contentX + col * colWidth;
-            const y = varsBaseY + row * rowHeight;
-            v.setPosition(x, y);
+            const y = startY + idx * 45;
+            v.setHomePosition(zone.x + 5, y);
+            v.moveToHome();
         });
-
-        // Position floating elements
-        this.objects.loopIndicator?.setPosition(this.layout.loopIndicator.x, this.layout.loopIndicator.y);
-        this.objects.comparison?.setPosition(this.layout.comparison.x, this.layout.comparison.y);
-        this.objects.returnVisual?.setPosition(this.layout.return.x, this.layout.return.y);
+    }
+    
+    /**
+     * Layout INTERACTION ZONE: Comparison visual (center)
+     */
+    _layoutInteractionZone() {
+        const zone = this.zones.interaction;
+        
+        // Comparison visual lives in center of interaction zone
+        if (this.objects.comparison) {
+            this.objects.comparison.setPosition(zone.centerX - 60, zone.centerY - 20);
+        }
+    }
+    
+    /**
+     * Layout OUTPUT ZONE: Return visual
+     */
+    _layoutOutputZone() {
+        const zone = this.zones.output;
+        
+        if (this.objects.returnVisual) {
+            this.objects.returnVisual.setPosition(
+                zone.x + zone.width / 2 - 50,
+                zone.y + 10
+            );
+        }
+    }
+    
+    // ============================================
+    // CHOREOGRAPHY METHODS
+    // ============================================
+    // These methods animate visuals INTO the interaction zone,
+    // perform the interaction, then return them HOME.
+    
+    /**
+     * Get the interaction zone center point
+     */
+    getInteractionCenter() {
+        return {
+            x: this.zones.interaction.centerX,
+            y: this.zones.interaction.centerY
+        };
+    }
+    
+    /**
+     * Get a variable visual by name
+     */
+    getVariable(name) {
+        return this.objects.variables.get(name);
+    }
+    
+    /**
+     * Get an array visual by name
+     */
+    getArray(name) {
+        return this.objects.arrays.get(name);
+    }
+    
+    /**
+     * Choreograph a comparison: gather value representations, compare, show result
+     * 
+     * PROPER CHOREOGRAPHY:
+     * 1. Create value bubbles representing the two values
+     * 2. Animate them to interaction zone with proper spacing
+     * 3. Show operator between them
+     * 4. Show result (True ✓ / False ✗)
+     * 5. Clean up
+     * 
+     * Original variables STAY in place - we animate VALUE representations
+     */
+    choreographComparison(timeline, leftVar, rightVar, operator, leftVal, rightVal, result, startTime) {
+        const leftVisual = this.objects.variables.get(leftVar);
+        const rightVisual = this.objects.variables.get(rightVar);
+        const zone = this.zones.interaction;
+        
+        // Calculate positions in interaction zone (centered, with spacing)
+        const centerX = zone.centerX;
+        const centerY = zone.centerY;
+        const spacing = 60; // Space between values and operator
+        
+        // Create temporary value bubbles
+        let leftBubble = null;
+        let rightBubble = null;
+        let operatorText = null;
+        let resultText = null;
+        
+        // Step 1: Highlight source variables
+        if (leftVisual) {
+            timeline.to(leftVisual.container, {
+                pixi: { tint: 0x6366f1 },
+                duration: 0.2
+            }, startTime);
+        }
+        if (rightVisual) {
+            timeline.to(rightVisual.container, {
+                pixi: { tint: 0x6366f1 },
+                duration: 0.2
+            }, startTime);
+        }
+        
+        // Step 2: Create value bubbles at source positions and animate to center
+        timeline.call(() => {
+            // Left value bubble
+            leftBubble = this.createValueBubble(leftVal);
+            if (leftVisual) {
+                const pos = leftVisual.getPosition();
+                leftBubble.setPosition(pos.x + 80, pos.y + 15);
+            } else {
+                leftBubble.setPosition(zone.x, centerY);
+            }
+            leftBubble.show();
+            
+            // Right value bubble  
+            rightBubble = this.createValueBubble(rightVal);
+            if (rightVisual) {
+                const pos = rightVisual.getPosition();
+                rightBubble.setPosition(pos.x + 80, pos.y + 15);
+            } else {
+                rightBubble.setPosition(zone.x + zone.width, centerY);
+            }
+            rightBubble.show();
+            
+            // Animate bubbles to center positions
+            gsap.to(leftBubble.container, {
+                x: centerX - spacing,
+                y: centerY,
+                duration: 0.4,
+                ease: 'power2.out'
+            });
+            
+            gsap.to(rightBubble.container, {
+                x: centerX + spacing,
+                y: centerY,
+                duration: 0.4,
+                ease: 'power2.out'
+            });
+        }, null, startTime + 0.25);
+        
+        // Step 3: Show operator between values
+        timeline.call(() => {
+            operatorText = new PIXI.Text({
+                text: operator,
+                style: new PIXI.TextStyle({
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: 24,
+                    fill: 0xf59e0b,
+                    fontWeight: 'bold'
+                })
+            });
+            operatorText.anchor.set(0.5);
+            operatorText.x = centerX;
+            operatorText.y = centerY;
+            operatorText.alpha = 0;
+            this.layers.effects.addChild(operatorText);
+            
+            gsap.to(operatorText, {
+                alpha: 1,
+                duration: 0.2,
+                ease: 'power2.out'
+            });
+        }, null, startTime + 0.7);
+        
+        // Step 4: Show result
+        timeline.call(() => {
+            const resultColor = result ? 0x22c55e : 0xef4444;
+            const resultSymbol = result ? '→ True ✓' : '→ False ✗';
+            
+            resultText = new PIXI.Text({
+                text: resultSymbol,
+                style: new PIXI.TextStyle({
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: 16,
+                    fill: resultColor,
+                    fontWeight: 'bold'
+                })
+            });
+            resultText.anchor.set(0.5);
+            resultText.x = centerX;
+            resultText.y = centerY + 40;
+            resultText.alpha = 0;
+            resultText.scale.set(0.5);
+            this.layers.effects.addChild(resultText);
+            
+            gsap.to(resultText, {
+                alpha: 1,
+                duration: 0.2
+            });
+            gsap.to(resultText.scale, {
+                x: 1, y: 1,
+                duration: 0.3,
+                ease: 'back.out(2)'
+            });
+        }, null, startTime + 1.0);
+        
+        // Step 5: Remove highlights from variables
+        if (leftVisual) {
+            timeline.to(leftVisual.container, {
+                pixi: { tint: 0xffffff },
+                duration: 0.3
+            }, startTime + 1.3);
+        }
+        if (rightVisual) {
+            timeline.to(rightVisual.container, {
+                pixi: { tint: 0xffffff },
+                duration: 0.3
+            }, startTime + 1.3);
+        }
+        
+        // Step 6: Clean up - fade out everything
+        timeline.call(() => {
+            const fadeOut = [leftBubble?.container, rightBubble?.container, operatorText, resultText].filter(Boolean);
+            
+            gsap.to(fadeOut, {
+                alpha: 0,
+                duration: 0.3,
+                ease: 'power2.in',
+                onComplete: () => {
+                    leftBubble?.destroy();
+                    rightBubble?.destroy();
+                    operatorText?.destroy();
+                    resultText?.destroy();
+                }
+            });
+        }, null, startTime + 1.5);
+    }
+    
+    /**
+     * Choreograph an assignment: highlight source, transfer value to target
+     * Variables STAY in place - we animate a value bubble transfer
+     * 
+     * @param {Object} timeline - GSAP timeline
+     * @param {string} targetVar - Target variable name
+     * @param {string} sourceVar - Source variable name (or null if literal)
+     * @param {*} value - Value being assigned
+     * @param {number} startTime - Start time in timeline
+     */
+    choreographAssignment(timeline, targetVar, sourceVar, value, startTime) {
+        const targetVisual = this.objects.variables.get(targetVar);
+        const sourceVisual = sourceVar ? this.objects.variables.get(sourceVar) : null;
+        
+        if (sourceVisual && targetVisual) {
+            // Highlight source variable
+            timeline.to(sourceVisual.container, {
+                pixi: { tint: 0x6366f1 },
+                duration: 0.15
+            }, startTime);
+            
+            // Create value bubble at source position
+            timeline.call(() => {
+                const bubble = this.createValueBubble(value);
+                const sourcePos = sourceVisual.getPosition();
+                bubble.setPosition(sourcePos.x + 80, sourcePos.y + 15);
+                bubble.show();
+                
+                // Animate bubble to target
+                const targetPos = targetVisual.getPosition();
+                gsap.to(bubble.container, {
+                    x: targetPos.x + 80,
+                    y: targetPos.y + 15,
+                    duration: 0.4,
+                    ease: 'power2.inOut',
+                    onComplete: () => {
+                        // Update target value
+                        targetVisual.setValue(value, true);
+                        // Remove bubble
+                        bubble.hide();
+                        setTimeout(() => bubble.destroy(), 100);
+                    }
+                });
+            }, null, startTime + 0.2);
+            
+            // Remove highlight from source
+            timeline.to(sourceVisual.container, {
+                pixi: { tint: 0xffffff },
+                duration: 0.2
+            }, startTime + 0.7);
+        } else if (targetVisual) {
+            // Direct value assignment (no source visual)
+            timeline.call(() => {
+                targetVisual.setValue(value, true);
+            }, null, startTime + 0.2);
+        }
     }
 
     _unwrapTracerValue(payload) {
@@ -307,15 +618,11 @@ export class PixiRenderer {
 
     /**
      * Create objects that persist across the animation
+     * These are positioned within their respective ZONES
      */
     _createPersistentObjects() {
-        // State panel (left side)
-        this.objects.statePanel = new StatePanel(
-            this.layers.ui, 
-            this.layout.statePanel.width, 
-            this.layout.statePanel.height
-        );
-        this.objects.statePanel.setPosition(this.layout.statePanel.x, this.layout.statePanel.y);
+        // NOTE: No StatePanel - VariableVisuals ARE the state display
+        // They are persistent actors that live in STATE zone and move for choreography
         
         // Pointer arrow for showing connections
         this.objects.pointerArrow = new PointerArrow(this.layers.effects);
@@ -323,50 +630,88 @@ export class PixiRenderer {
         // Code highlight
         this.objects.codeHighlight = new CodeHighlight(this.layers.code);
         
-        // Comparison visual
+        // Comparison visual lives in INTERACTION ZONE (center)
         this.objects.comparison = new ComparisonVisual(this.layers.effects);
-        this.objects.comparison.setPosition(this.layout.comparison.x, this.layout.comparison.y);
+        this.objects.comparison.setPosition(
+            this.zones.interaction.centerX - 60, 
+            this.zones.interaction.centerY - 20
+        );
         this.objects.comparison.hide();
         
-        // Loop indicator
+        // Loop indicator lives in INPUT ZONE (top-right)
         this.objects.loopIndicator = new LoopIndicator(this.layers.ui);
-        this.objects.loopIndicator.setPosition(this.layout.loopIndicator.x, this.layout.loopIndicator.y);
+        this.objects.loopIndicator.setPosition(
+            this.zones.input.x + this.zones.input.width - 50,
+            this.zones.input.y + 20
+        );
         this.objects.loopIndicator.hide();
         
-        // Return visual
+        // Return visual lives in OUTPUT ZONE (bottom-center)
         this.objects.returnVisual = new ReturnVisual(this.layers.effects);
-        this.objects.returnVisual.setPosition(this.layout.return.x, this.layout.return.y);
+        this.objects.returnVisual.setPosition(
+            this.zones.output.x + this.zones.output.width / 2 - 50,
+            this.zones.output.y + 10
+        );
         this.objects.returnVisual.hide();
+        
+        // Draw zone label for STATE area
+        this._drawZoneLabel('State', this.zones.state.x, this.zones.state.y - 20);
+    }
+    
+    /**
+     * Draw a zone label
+     */
+    _drawZoneLabel(text, x, y) {
+        const label = new PIXI.Text({
+            text,
+            style: new PIXI.TextStyle({
+                fontFamily: 'JetBrains Mono, monospace',
+                fontSize: 12,
+                fill: 0x6b7280,
+                fontWeight: 'bold'
+            })
+        });
+        label.x = x;
+        label.y = y;
+        this.layers.ui.addChild(label);
     }
 
     /**
      * Get or create an array visual
+     * Arrays live in the INPUT ZONE with fixed home positions
      */
     getOrCreateArray(name, values = []) {
         console.log(`🎨 getOrCreateArray: ${name} =`, values, 'exists:', this.objects.arrays.has(name));
         
         if (!this.objects.arrays.has(name)) {
             const arrayVisual = new ArrayVisual(this.layers.arrays, name, values);
+            
+            // Calculate HOME position in INPUT zone
+            const zone = this.zones.input;
             const arrayCount = this.objects.arrays.size;
-            arrayVisual.setPosition(
-                this.layout.arrays.x,
-                this.layout.arrays.y + arrayCount * this.layout.arrays.rowSpacing
-            );
-            // Hide until seeded/animated
-            arrayVisual.hide();
+            const homeX = zone.x;
+            const homeY = zone.y + 10 + arrayCount * 70;  // Stack vertically if multiple arrays
+            
+            arrayVisual.setHomePosition(homeX, homeY);
+            arrayVisual.moveToHome();
+            
+            // Hidden until seeded/animated
             arrayVisual.container.alpha = 0;
+            arrayVisual.show();
+            
             this.objects.arrays.set(name, arrayVisual);
-            console.log(`✅ Created array visual: ${name} with ${values.length} elements`);
+            console.log(`✅ Created array visual: ${name} with ${values.length} elements at home (${homeX}, ${homeY})`);
         } else if (Array.isArray(values) && values.length) {
             const existing = this.objects.arrays.get(name);
             existing.updateValues(values);
         }
-        this._layoutAll();
         return this.objects.arrays.get(name);
     }
 
     /**
      * Get or create a variable visual
+     * Variables are PERSISTENT ACTORS in the STATE ZONE
+     * They move for choreography, then return home
      */
     getOrCreateVariable(name, value = null) {
         // Skip self and other internal variables
@@ -381,23 +726,34 @@ export class PixiRenderer {
         
         if (!this.objects.variables.has(name)) {
             const varVisual = new VariableVisual(this.layers.variables, name, displayValue);
-            varVisual.setPosition(
-                this.layout.variables.x,
-                this.layout.variables.y + this.variableCount * this.layout.variables.spacing
-            );
-            // Hide until seeded/animated
-            varVisual.hide();
+            
+            // Calculate HOME position in STATE zone
+            const zone = this.zones.state;
+            const homeX = zone.x + 5;
+            const homeY = zone.y + 10 + this.variableCount * 45;
+            
+            varVisual.setHomePosition(homeX, homeY);
+            varVisual.moveToHome();
+            
+            // Start visible but faded, will animate in
+            varVisual.show();
             varVisual.container.alpha = 0;
+            
+            // Fade in animation
+            gsap.to(varVisual.container, {
+                alpha: 1,
+                duration: 0.3,
+                ease: 'power2.out'
+            });
+            
             this.variableCount++;
             this.objects.variables.set(name, varVisual);
-            console.log(`✅ Created variable visual: ${name} = ${displayValue}`);
+            console.log(`✅ Created variable: ${name} at home (${homeX}, ${homeY})`);
         } else if (value !== null && value !== undefined) {
-            // Update existing variable display if a new value is provided
+            // Update existing variable
             const existing = this.objects.variables.get(name);
-            existing.value = value;
-            existing.valueText.text = String(value);
+            existing.setValue(value, true);
         }
-        this._layoutAll();
         return this.objects.variables.get(name);
     }
 
@@ -1042,22 +1398,24 @@ export class PixiRenderer {
     }
 
     /**
-     * Add/update variable in the state panel
+     * Update a variable's value (the VariableVisual IS the state display)
      */
     updateStatePanel(varName, value) {
-        console.log('🔄 PixiRenderer.updateStatePanel:', { varName, value, hasPanel: !!this.objects.statePanel });
-        if (this.objects.statePanel) {
-            this.objects.statePanel.setVariable(varName, value, true);
+        console.log('🔄 PixiRenderer.updateVariable:', { varName, value });
+        const variable = this.objects.variables.get(varName);
+        if (variable) {
+            variable.setValue(value, true);
         }
     }
 
     /**
-     * Clear the state panel
+     * Clear all variables (reset state)
      */
     clearStatePanel() {
-        if (this.objects.statePanel) {
-            this.objects.statePanel.clear();
-        }
+        // Variables are persistent actors - just reset their values
+        this.objects.variables.forEach((v, name) => {
+            v.setValue('?', false);
+        });
     }
 
     /**

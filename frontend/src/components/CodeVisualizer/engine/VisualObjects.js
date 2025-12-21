@@ -59,6 +59,11 @@ const createText = (text, options = {}) => {
 
 /**
  * Base Visual Object
+ * 
+ * CHOREOGRAPHY SYSTEM:
+ * - Every visual has a HOME position (where it lives in its zone)
+ * - Visuals can be MOVED to interaction zone for choreography
+ * - After interaction, visuals RETURN home
  */
 export class VisualObject {
     constructor(stage) {
@@ -68,12 +73,71 @@ export class VisualObject {
             this.stage.addChild(this.container);
         }
         this.isVisible = true;
+        
+        // HOME position - where this visual "lives"
+        this.homeX = 0;
+        this.homeY = 0;
+        this.isAtHome = true;
     }
 
     setPosition(x, y) {
         this.container.x = x;
         this.container.y = y;
         return this;
+    }
+    
+    /**
+     * Set the HOME position for this visual
+     * This is where the visual "lives" in its zone
+     */
+    setHomePosition(x, y) {
+        this.homeX = x;
+        this.homeY = y;
+        return this;
+    }
+    
+    /**
+     * Instantly move to home position
+     */
+    moveToHome() {
+        this.container.x = this.homeX;
+        this.container.y = this.homeY;
+        this.isAtHome = true;
+        return this;
+    }
+    
+    /**
+     * Animate movement to a target position (for choreography)
+     * @returns {Object} GSAP tween config
+     */
+    animateMoveTo(x, y, duration = 0.4) {
+        this.isAtHome = false;
+        return gsap.to(this.container, {
+            x, y,
+            duration,
+            ease: 'power2.out'
+        });
+    }
+    
+    /**
+     * Animate return to home position
+     * @returns {Object} GSAP tween config
+     */
+    animateMoveHome(duration = 0.3) {
+        this.isAtHome = true;
+        return gsap.to(this.container, {
+            x: this.homeX,
+            y: this.homeY,
+            duration,
+            ease: 'power2.inOut'
+        });
+    }
+    
+    /**
+     * Get current position
+     */
+    getPosition() {
+        return { x: this.container.x, y: this.container.y };
     }
 
     setAlpha(alpha) {
@@ -429,6 +493,27 @@ export class VariableVisual extends VisualObject {
             ease: 'back.out(3)'
         }, startTime + 0.1);
     }
+    
+    /**
+     * Set value instantly (with optional flash effect)
+     */
+    setValue(newValue, animate = true) {
+        this.value = newValue;
+        this.valueText.text = String(newValue);
+        this.valueText.style.fill = COLORS.number;
+        
+        if (animate) {
+            // Quick flash effect
+            gsap.fromTo(this.valueBox, 
+                { pixi: { tint: COLORS.accent } },
+                { pixi: { tint: 0xffffff }, duration: 0.3 }
+            );
+            gsap.fromTo(this.valueText.scale,
+                { x: 1.2, y: 1.2 },
+                { x: 1, y: 1, duration: 0.2, ease: 'back.out(2)' }
+            );
+        }
+    }
 
     getVisualWidth() {
         // name + " = " + box + padding
@@ -626,6 +711,44 @@ export class ComparisonVisual extends VisualObject {
             duration: 0.15,
             ease: 'back.out(2)'
         }, startTime + 0.15);
+    }
+    
+    /**
+     * Set comparison values instantly (for choreography)
+     */
+    setValues(left, operator, right) {
+        this.leftText.text = String(left);
+        this.operatorText.text = ` ${operator} `;
+        this.rightText.text = String(right);
+        
+        this.operatorText.x = this.leftText.x + this.leftText.width;
+        this.operatorText.y = this.boxPadding;
+        this.rightText.x = this.operatorText.x + this.operatorText.width;
+        this.rightText.y = this.boxPadding;
+        
+        const totalWidth = this.rightText.x + this.rightText.width + this.boxPadding;
+        const totalHeight = this.boxPadding * 2 + 20;
+        
+        this.bg.clear();
+        this.bg.roundRect(0, 0, totalWidth, totalHeight, 6);
+        this.bg.fill(COLORS.bgLight);
+        this.bg.stroke({ width: 2, color: COLORS.border });
+        
+        this.resultText.alpha = 0;
+        this.container.alpha = 1;
+        this.container.scale.set(1);
+    }
+    
+    /**
+     * Show result instantly (for choreography)
+     */
+    showResult(result) {
+        this.resultText.text = result ? '→ True ✓' : '→ False ✗';
+        this.resultText.style.fill = result ? COLORS.success : COLORS.error;
+        this.resultText.x = this.rightText.x + this.rightText.width + 10;
+        this.resultText.y = this.boxPadding;
+        
+        gsap.to(this.resultText, { alpha: 1, duration: 0.2 });
     }
 }
 

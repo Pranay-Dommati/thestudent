@@ -37,24 +37,28 @@ class BasePrimitive {
 
 /**
  * Assignment Primitive
- * Handles: x = value, x = expression
+ * Handles: x = value, x = expression, x = otherVar
  * 
- * ARCHITECTURE: PURE FUNCTION
+ * CHOREOGRAPHY MODEL:
+ * - If assigning from another variable: GATHER source, TRANSFER, RETURN
+ * - If assigning literal: Simple animation
+ * 
  * step.meta contains:
  * - targetVar: string
- * - expression: string  
+ * - expression: string (source expression)
+ * - sourceVar: string | null (if assigning from another variable)
  * - value: the resolved value
  */
 export class AssignmentPrimitive extends BasePrimitive {
     static getDuration() {
-        return 1.2;
+        return 1.4;
     }
 
     static animate(step, renderer, timeline, onComplete) {
-        const { targetVar, value, expression } = step.meta;
+        const { targetVar, value, expression, sourceVar } = step.meta;
         const lineNumber = step.line;
         
-        console.log('📝 AssignmentPrimitive [PURE]:', { targetVar, value, expression, lineNumber });
+        console.log('📝 AssignmentPrimitive [CHOREOGRAPHY]:', { targetVar, value, expression, sourceVar, lineNumber });
 
         const tl = gsap.timeline({
             onComplete: () => onComplete?.()
@@ -65,29 +69,33 @@ export class AssignmentPrimitive extends BasePrimitive {
             renderer.highlightLine(lineNumber);
         }, null, 0);
 
-        // 2. Create/get variable visual
+        // 2. Ensure target variable exists
         tl.call(() => {
-            renderer.getOrCreateVariable(targetVar, value);
-        }, null, 0.3);
+            renderer.getOrCreateVariable(targetVar, '?');
+        }, null, 0.15);
 
-        // 3. Show value bubble floating in
-        tl.call(() => {
-            renderer.showValueBubble(value, targetVar);
-        }, null, 0.5);
+        // 3. Use CHOREOGRAPHY for variable-to-variable assignment
+        if (sourceVar && renderer.getVariable(sourceVar)) {
+            renderer.choreographAssignment(tl, targetVar, sourceVar, value, 0.3);
+        } else {
+            // Simple literal assignment
+            tl.call(() => {
+                renderer.showValueBubble(value, targetVar);
+            }, null, 0.3);
 
-        // 4. Animate value assignment
-        tl.call(() => {
-            renderer.animateAssignment(targetVar, value);
-        }, null, 0.8);
+            tl.call(() => {
+                const variable = renderer.getVariable(targetVar);
+                variable?.setValue(value);
+            }, null, 0.6);
 
-        // 5. Update state panel
+            tl.call(() => {
+                renderer.clearValueBubble();
+            }, null, 0.9);
+        }
+
+        // 4. Update state panel
         tl.call(() => {
             renderer.updateStatePanel(targetVar, value);
-        }, null, 0.9);
-
-        // 6. Clean up
-        tl.call(() => {
-            renderer.clearValueBubble();
         }, null, 1.1);
 
         timeline.add(tl);
@@ -291,25 +299,30 @@ export class ForLoopPrimitive extends BasePrimitive {
  * Condition Primitive
  * Handles: if x > y, while x < n
  * 
- * ARCHITECTURE: PURE FUNCTION
+ * CHOREOGRAPHY MODEL:
+ * 1. GATHER: Move existing variable visuals to interaction zone
+ * 2. INTERACT: Show comparison with operator
+ * 3. RESOLVE: Show result, return variables home
+ * 
  * step.meta contains:
  * - left: actual value (e.g., 44)
  * - right: actual value (e.g., 44)
+ * - leftVar: variable name for left operand
+ * - rightVar: variable name for right operand
  * - operator: string (e.g., ">")
  * - result: boolean (pre-evaluated!)
- * - expression: string for display
  */
 export class ConditionPrimitive extends BasePrimitive {
     static getDuration() {
-        return 1.5;
+        return 1.8;  // Longer for choreography
     }
 
     static animate(step, renderer, timeline, onComplete) {
-        const { left, operator, right, result, expression } = step.meta;
+        const { left, operator, right, result, leftVar, rightVar, expression } = step.meta;
         const lineNumber = step.line;
         
-        console.log('🔀 ConditionPrimitive [PURE]:', {
-            left, operator, right, result, expression, lineNumber
+        console.log('🔀 ConditionPrimitive [CHOREOGRAPHY]:', {
+            leftVar, rightVar, left, operator, right, result, lineNumber
         });
 
         const tl = gsap.timeline({
@@ -321,20 +334,17 @@ export class ConditionPrimitive extends BasePrimitive {
             renderer.highlightLine(lineNumber);
         }, null, 0);
 
-        // 2. Show comparison visual
-        tl.call(() => {
-            renderer.showComparison(left, operator, right);
-        }, null, 0.3);
-
-        // 3. Animate evaluation
-        tl.call(() => {
-            renderer.animateConditionEvaluation(result);
-        }, null, 0.8);
-
-        // 4. Show branch taken
-        tl.call(() => {
-            renderer.showBranchTaken(result);
-        }, null, 1.2);
+        // 2. Use CHOREOGRAPHY: gather variables, show comparison, return them
+        renderer.choreographComparison(
+            tl,
+            leftVar,
+            rightVar,
+            operator,
+            left,
+            right,
+            result,
+            0.15  // Start time
+        );
 
         timeline.add(tl);
     }

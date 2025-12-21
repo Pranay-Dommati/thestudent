@@ -284,33 +284,31 @@ function detectStepType(step, loopCounters, variableHistory, knownArrays) {
     
     // ============================================
     // ASSIGNMENT: x = value or x = otherVar
-    // NOTE: Don't require changedVars - backend might not send it
+    // CHOREOGRAPHY: If expression is another variable, include sourceVar
     // ============================================
     const assignMatch = code.match(/^(\w+)\s*=\s*(.+)$/);
     if (assignMatch) {
         const [, targetVar, expression] = assignMatch;
         const exprTrimmed = expression.trim();
         
-        // Try to get the value from multiple sources:
-        // 1. If expression is a variable name, get that variable's value (e.g., "max_val = n" -> get n's value)
-        // 2. Check if targetVar is in variables (already assigned)
-        // 3. Otherwise try to parse as a literal
-        
+        // Determine if expression is a variable (for choreography)
+        let sourceVar = null;
         let value;
         
-        // First priority: if expression is a known variable, use its value
+        // Check if expression is a known variable name
         if (variables[exprTrimmed] !== undefined) {
+            sourceVar = exprTrimmed;  // For choreography!
             value = variables[exprTrimmed];
         }
-        // Second: check if target already has the value
+        // Check if target already has the value
         else if (variables[targetVar] !== undefined) {
             value = variables[targetVar];
         }
-        // Third: try parsing as number
+        // Try parsing as number
         else if (!isNaN(exprTrimmed)) {
             value = parseFloat(exprTrimmed);
         }
-        // Fourth: keep as string expression
+        // Keep as string expression
         else {
             value = exprTrimmed;
         }
@@ -318,10 +316,10 @@ function detectStepType(step, loopCounters, variableHistory, knownArrays) {
         console.log('📝 Assignment detected:', { 
             targetVar, 
             expression: exprTrimmed, 
+            sourceVar,
             value, 
             fromTarget: variables[targetVar], 
-            fromExpr: variables[exprTrimmed],
-            changedVars 
+            fromExpr: variables[exprTrimmed]
         });
         
         return {
@@ -329,6 +327,7 @@ function detectStepType(step, loopCounters, variableHistory, knownArrays) {
             meta: {
                 targetVar,
                 expression: exprTrimmed,
+                sourceVar,  // For choreography: move source toward target
                 value
             }
         };
@@ -344,10 +343,6 @@ function detectStepType(step, loopCounters, variableHistory, knownArrays) {
         }
     };
 }
-
-/**
- * Get arrays that need to be pre-created from normalized steps
- */
 export function extractArraysFromSteps(normalizedSteps) {
     const arrays = new Map();
     

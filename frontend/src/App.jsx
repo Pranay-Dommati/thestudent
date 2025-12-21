@@ -49,6 +49,8 @@ import OnboardingModal from './components/Onboarding/OnboardingModal';
 import GlobalBackgroundGenerationCard from './components/ProLearning/GlobalBackgroundGenerationCard';
 // Code Visualizer - Python code visualization tool
 const CodeVisualizerPage = React.lazy(() => import('./components/CodeVisualizer'));
+// Dev Sandbox - Test visual behaviors
+const DevSandbox = React.lazy(() => import('./components/CodeVisualizer/DevSandbox'));
 
 const CourseDetailsWrapper = () => {
   const { courseId } = useParams();
@@ -86,7 +88,7 @@ const Layout = ({ children, excludePaths = [] }) => {
                      isLearningPage; // Exclude profile, certificate and learning pages for focused layout
 
   // Paths where we don't want mobile navigation (like auth, admin, chat, etc.)
-  const noMobileNavPaths = ['/auth', '/admin-p', '/not-found', '/chat', '/pro-learning', '/code-visualizer'];
+  const noMobileNavPaths = ['/auth', '/admin-p', '/not-found', '/chat', '/pro-learning', '/code-visualizer', '/dev-sandbox'];
   const shouldShowMobileNav = !noMobileNavPaths.some(path => location.pathname.startsWith(path)) && !isCertificatePage && !isLearningPage;
 
   // Determine the navbar style based on the current route
@@ -273,7 +275,7 @@ const App = () => {
           {/* Global Background Generation Card - shows on non-ProLearning pages when generating */}
           <GlobalBackgroundGenerationCard />
           
-        <Layout excludePaths={['/admin-p', '/chat', '/offline', '/pro-learning', '/code-visualizer']}>
+        <Layout excludePaths={['/admin-p', '/chat', '/offline', '/pro-learning', '/code-visualizer', '/dev-sandbox']}>
             <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
           <Routes>
             <Route path="/" element={<HomePage />} />
@@ -330,6 +332,12 @@ const App = () => {
             <Route path="/code-visualizer" element={
               import.meta.env.DEV 
                 ? <CodeVisualizerPage /> 
+                : <Navigate to="/" replace />
+            } />
+            {/* Dev Sandbox - Test visual behaviors (dev only) */}
+            <Route path="/dev-sandbox" element={
+              import.meta.env.DEV 
+                ? <Suspense fallback={<div className="min-h-screen bg-slate-900" />}><DevSandbox /></Suspense>
                 : <Navigate to="/" replace />
             } />
             <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />
