@@ -7,19 +7,18 @@ Generates friendly, educational narrations for each step of code execution.
 import os
 from typing import Dict, List, Any, Optional
 
-# Try to import Google Gemini
+# Try to import Google Gemini (new package)
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
     genai = None
+    types = None
 
 # Get API key from Django settings or environment
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-
-if GEMINI_AVAILABLE and GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
 
 NARRATOR_SYSTEM_PROMPT = """You are a coding tutor explaining Python code execution step by step.
 
@@ -74,22 +73,19 @@ class AINarrator:
     """Generates AI-powered narrations for code execution steps."""
     
     def __init__(self):
-        self.model = None
+        self.client = None
         self.is_available = False
         
         if GEMINI_AVAILABLE and GEMINI_API_KEY:
             try:
-                self.model = genai.GenerativeModel(
-                    model_name='gemini-2.0-flash',
-                    system_instruction=NARRATOR_SYSTEM_PROMPT
-                )
+                self.client = genai.Client(api_key=GEMINI_API_KEY)
                 self.is_available = True
                 print("✓ AI Narrator initialized with Gemini 2.0 Flash")
             except Exception as e:
                 print(f"⚠ AI Narrator initialization failed: {e}")
                 self.is_available = False
         else:
-            print("⚠ GEMINI_API_KEY not found or google-generativeai not installed - AI narration disabled")
+            print("⚠ GEMINI_API_KEY not found or google-genai not installed - AI narration disabled")
     
     def _format_variables(self, variables: Dict[str, Any]) -> str:
         if not variables:
@@ -116,7 +112,7 @@ class AINarrator:
         return_value: Any = None,
         full_source: Optional[List[str]] = None
     ) -> str:
-        if not self.is_available or not self.model:
+        if not self.is_available or not self.client:
             return self._generate_basic_narration(
                 step, line, code, event, variables, 
                 changed_vars, function_name, return_value
@@ -147,9 +143,11 @@ class AINarrator:
             prompt = "\n".join(context_parts)
             prompt += f"\n\nExplain what the line `{code_line}` does with these values. Include DRY-RUN:"
             
-            response = self.model.generate_content(
-                prompt,
-                generation_config=genai.GenerationConfig(
+            response = self.client.models.generate_content(
+                model='gemini-2.0-flash-exp',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=NARRATOR_SYSTEM_PROMPT,
                     temperature=0.5,
                     max_output_tokens=200,
                 )
