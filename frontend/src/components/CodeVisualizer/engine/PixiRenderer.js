@@ -17,7 +17,9 @@ import {
     ComparisonVisual,
     LoopIndicator,
     ReturnVisual,
-    CodeHighlight
+    CodeHighlight,
+    PointerArrow,
+    StatePanel
 } from './VisualObjects';
 
 // Register GSAP PixiJS plugin
@@ -41,16 +43,27 @@ export class PixiRenderer {
             comparison: null,       // ComparisonVisual
             loopIndicator: null,    // LoopIndicator
             returnVisual: null,     // ReturnVisual
-            codeHighlight: null     // CodeHighlight
+            codeHighlight: null,    // CodeHighlight
+            pointerArrow: null,     // PointerArrow
+            statePanel: null        // StatePanel for settled variables
         };
         
-        // Layout positions (computed responsively; these are fallbacks)
+        // Layout positions - organized grid system
+        // LEFT: State panel (persistent variables)
+        // CENTER: Main visualization area (arrays, active variables)
+        // RIGHT: Code panel (handled by React)
         this.layout = {
-            arrays: { x: 40, y: 80, rowSpacing: 130 },
-            variables: { x: 40, y: 200, spacing: 78 },
-            comparison: { x: 400, y: 100 },
-            loopIndicator: { x: 400, y: 60 },
-            return: { x: 300, y: 350 }
+            // Left column - State panel
+            statePanel: { x: 16, y: 60, width: 130, height: 350 },
+            
+            // Center column - Main content
+            arrays: { x: 180, y: 80, rowSpacing: 100 },
+            variables: { x: 180, y: 220, spacing: 60, maxPerRow: 2, colWidth: 130 },
+            
+            // Center - Floating elements (positioned relative to content)
+            loopIndicator: { x: 450, y: 50 },
+            comparison: { x: 420, y: 240 },
+            return: { x: 400, y: 360 }
         };
         
         this.variableCount = 0;
@@ -58,24 +71,52 @@ export class PixiRenderer {
     }
 
     _computeLayout() {
-        const padX = 64;
+        const padX = 16;
         const padY = 56;
+        const canvasWidth = this.width;
+        const canvasHeight = this.height;
+        
+        // ========================================
+        // LEFT COLUMN: State Panel (fixed width)
+        // ========================================
+        this.layout.statePanel.x = padX;
+        this.layout.statePanel.y = padY;
+        this.layout.statePanel.width = 130;
+        this.layout.statePanel.height = Math.min(canvasHeight - 120, 380);
 
-        // Center-top loop indicator
-        this.layout.loopIndicator.x = Math.round(this.width / 2);
-        this.layout.loopIndicator.y = 56;
+        // ========================================
+        // CENTER COLUMN: Main Visualization Area
+        // ========================================
+        const contentStartX = this.layout.statePanel.x + this.layout.statePanel.width + 24;
+        const contentWidth = canvasWidth - contentStartX - 20;
+        const contentCenterX = contentStartX + contentWidth / 2;
+        
+        // Arrays at top of content area
+        this.layout.arrays.x = contentStartX;
+        this.layout.arrays.y = padY + 24;
+        this.layout.arrays.rowSpacing = 100;
+        
+        // Variables below arrays - can be multi-column
+        this.layout.variables.x = contentStartX;
+        this.layout.variables.y = padY + 140;
+        this.layout.variables.spacing = 56;
+        this.layout.variables.colWidth = 130;
+        this.layout.variables.maxPerRow = Math.max(2, Math.floor(contentWidth / 140));
 
-        // Secondary visuals (avoid edges)
-        this.layout.comparison.x = Math.round(this.width * 0.60);
-        this.layout.comparison.y = Math.round(this.height * 0.20);
-        this.layout.return.x = Math.round(this.width * 0.54);
-        this.layout.return.y = Math.round(this.height * 0.72);
+        // ========================================
+        // FLOATING ELEMENTS: Positioned in center-right
+        // ========================================
+        // Loop indicator - top right of content area
+        this.layout.loopIndicator.x = contentStartX + contentWidth - 80;
+        this.layout.loopIndicator.y = padY;
 
-        // Fallback anchors; arrays/vars are centered via _layoutAll()
-        this.layout.arrays.x = padX;
-        this.layout.arrays.y = padY + 30;
-        this.layout.variables.x = padX;
-        this.layout.variables.y = padY + 220;
+        // Comparison - center-right, vertically centered
+        this.layout.comparison.x = contentStartX + contentWidth - 120;
+        this.layout.comparison.y = Math.round(canvasHeight * 0.38);
+        
+        // Return - bottom center of content
+        this.layout.return.x = contentCenterX - 40;
+        this.layout.return.y = Math.round(canvasHeight * 0.75);
     }
 
     _layoutAll() {
@@ -84,34 +125,36 @@ export class PixiRenderer {
         const arrays = Array.from(this.objects.arrays.values());
         const vars = Array.from(this.objects.variables.values());
 
-        const maxArrayWidth = arrays.reduce((m, a) => Math.max(m, a?.getVisualWidth?.() || 0), 0);
-        const arraysHeight = arrays.length ? arrays.length * this.layout.arrays.rowSpacing : 0;
+        // Position state panel
+        this.objects.statePanel?.setPosition(this.layout.statePanel.x, this.layout.statePanel.y);
 
-        const maxVarWidth = vars.reduce((m, v) => Math.max(m, v?.getVisualWidth?.() || 0), 0);
-        const varsHeight = vars.length
-            ? ((vars.length - 1) * this.layout.variables.spacing + (vars[0]?.getVisualHeight?.() || 54))
-            : 0;
-
-        const gapBetween = arrays.length && vars.length ? 90 : 0;
-        const groupWidth = Math.max(maxArrayWidth, maxVarWidth, 460);
-        const groupHeight = Math.max(arraysHeight + gapBetween + varsHeight, 280);
-
-        const originX = Math.max(48, Math.round((this.width - groupWidth) / 2));
-        const originY = Math.max(48, Math.round((this.height - groupHeight) / 2));
-
+        // Calculate content area
+        const contentX = this.layout.variables.x;
+        const arraysY = this.layout.arrays.y;
+        
+        // Position arrays in a vertical stack
         arrays.forEach((arr, idx) => {
-            const y = originY + idx * this.layout.arrays.rowSpacing;
-            arr.setPosition(originX, y);
+            const y = arraysY + idx * this.layout.arrays.rowSpacing;
+            arr.setPosition(contentX, y);
         });
 
-        const varsBaseY = originY + (arrays.length ? arraysHeight + gapBetween : 0);
+        // Position active variables in a grid layout
+        const varsBaseY = this.layout.variables.y;
+        const colWidth = this.layout.variables.colWidth;
+        const rowHeight = this.layout.variables.spacing;
+        const maxPerRow = this.layout.variables.maxPerRow;
+        
         vars.forEach((v, idx) => {
-            const y = varsBaseY + idx * this.layout.variables.spacing;
-            v.setPosition(originX, y);
+            const row = Math.floor(idx / maxPerRow);
+            const col = idx % maxPerRow;
+            const x = contentX + col * colWidth;
+            const y = varsBaseY + row * rowHeight;
+            v.setPosition(x, y);
         });
 
-        this.objects.comparison?.setPosition(this.layout.comparison.x, this.layout.comparison.y);
+        // Position floating elements
         this.objects.loopIndicator?.setPosition(this.layout.loopIndicator.x, this.layout.loopIndicator.y);
+        this.objects.comparison?.setPosition(this.layout.comparison.x, this.layout.comparison.y);
         this.objects.returnVisual?.setPosition(this.layout.return.x, this.layout.return.y);
     }
 
@@ -266,6 +309,17 @@ export class PixiRenderer {
      * Create objects that persist across the animation
      */
     _createPersistentObjects() {
+        // State panel (left side)
+        this.objects.statePanel = new StatePanel(
+            this.layers.ui, 
+            this.layout.statePanel.width, 
+            this.layout.statePanel.height
+        );
+        this.objects.statePanel.setPosition(this.layout.statePanel.x, this.layout.statePanel.y);
+        
+        // Pointer arrow for showing connections
+        this.objects.pointerArrow = new PointerArrow(this.layers.effects);
+        
         // Code highlight
         this.objects.codeHighlight = new CodeHighlight(this.layers.code);
         
@@ -315,10 +369,18 @@ export class PixiRenderer {
      * Get or create a variable visual
      */
     getOrCreateVariable(name, value = null) {
+        // Skip self and other internal variables
+        if (name === 'self' || name.startsWith('_')) {
+            return null;
+        }
+        
         console.log(`🎨 getOrCreateVariable: ${name} =`, value, 'exists:', this.objects.variables.has(name));
         
+        // Display value - show actual value or '?' if undefined
+        const displayValue = (value !== null && value !== undefined) ? value : '?';
+        
         if (!this.objects.variables.has(name)) {
-            const varVisual = new VariableVisual(this.layers.variables, name, value);
+            const varVisual = new VariableVisual(this.layers.variables, name, displayValue);
             varVisual.setPosition(
                 this.layout.variables.x,
                 this.layout.variables.y + this.variableCount * this.layout.variables.spacing
@@ -328,9 +390,9 @@ export class PixiRenderer {
             varVisual.container.alpha = 0;
             this.variableCount++;
             this.objects.variables.set(name, varVisual);
-            console.log(`✅ Created variable visual: ${name} = ${value}`);
+            console.log(`✅ Created variable visual: ${name} = ${displayValue}`);
         } else if (value !== null && value !== undefined) {
-            // Update existing variable display if a new initial value is provided
+            // Update existing variable display if a new value is provided
             const existing = this.objects.variables.get(name);
             existing.value = value;
             existing.valueText.text = String(value);
@@ -689,6 +751,313 @@ export class PixiRenderer {
         this.objects.comparison?.hide();
         this.objects.loopIndicator?.hide();
         this.objects.returnVisual?.hide();
+        
+        // Reset pointer arrow
+        this.objects.pointerArrow?.reset();
+        
+        // Clear state panel
+        this.objects.statePanel?.clear();
+    }
+
+    // ==========================================
+    // NEW METHODS FOR VISUAL ENGINE PRIMITIVES
+    // ==========================================
+
+    /**
+     * Highlight a specific line of code
+     */
+    highlightLine(lineNumber) {
+        // This is handled by the React shell via events
+        // The renderer doesn't control the code editor
+        console.log(`📍 Highlight line: ${lineNumber}`);
+    }
+
+    /**
+     * Show value bubble floating toward a variable
+     */
+    showValueBubble(value, targetVarName) {
+        const bubble = this.createValueBubble(value);
+        const targetVar = this.objects.variables.get(targetVarName);
+        
+        // Position bubble above the variable
+        const targetPos = targetVar 
+            ? { x: targetVar.container.x + 60, y: targetVar.container.y - 40 }
+            : { x: this.width / 2, y: this.height / 2 - 50 };
+        
+        bubble.setPosition(targetPos.x, targetPos.y);
+        bubble.container.alpha = 0;
+        bubble.container.scale.set(0);
+        
+        gsap.to(bubble.container, {
+            alpha: 1,
+            duration: 0.2
+        });
+        gsap.to(bubble.container.scale, {
+            x: 1,
+            y: 1,
+            duration: 0.3,
+            ease: 'back.out(2)'
+        });
+        
+        // Store reference for clearing
+        this._currentBubble = bubble;
+    }
+
+    /**
+     * Clear the current value bubble
+     */
+    clearValueBubble() {
+        if (this._currentBubble) {
+            const bubble = this._currentBubble;
+            gsap.to(bubble.container, {
+                alpha: 0,
+                duration: 0.2,
+                onComplete: () => bubble.destroy()
+            });
+            this._currentBubble = null;
+        }
+    }
+
+    /**
+     * Animate value assignment to variable
+     */
+    animateAssignment(varName, value) {
+        const variable = this.objects.variables.get(varName);
+        if (!variable) return;
+        
+        variable.show();
+        variable.container.alpha = 1;
+        
+        const tl = gsap.timeline();
+        variable.animateAssignment(tl, value, 0);
+    }
+
+    /**
+     * Highlight array index
+     */
+    highlightArrayIndex(arrayName, index) {
+        const array = this.objects.arrays.get(arrayName);
+        if (!array) return;
+        
+        array.show();
+        const tl = gsap.timeline();
+        array.animateHighlightIndex(tl, index, 0);
+    }
+
+    /**
+     * Clear array highlight
+     */
+    clearArrayHighlight(arrayName) {
+        const array = this.objects.arrays.get(arrayName);
+        if (array) {
+            array.clearHighlight?.();
+        }
+    }
+
+    /**
+     * Animate extraction from array
+     */
+    animateExtraction(arrayName, index, targetVarName) {
+        const array = this.objects.arrays.get(arrayName);
+        const targetVar = this.objects.variables.get(targetVarName);
+        if (!array) return;
+        
+        const fromPos = array.getElementPosition(index);
+        const toPos = targetVar 
+            ? { x: targetVar.container.x + 60, y: targetVar.container.y }
+            : { x: 200, y: 280 };
+        
+        const value = array.values[index];
+        const bubble = this.createValueBubble(value);
+        
+        const tl = gsap.timeline();
+        bubble.animateTransfer(tl, fromPos, toPos, 0, 0.5);
+    }
+
+    /**
+     * Show loop indicator with iteration count
+     */
+    showLoopIndicator(iteration) {
+        if (this.objects.loopIndicator) {
+            this.objects.loopIndicator.show();
+            this.objects.loopIndicator.update(iteration);
+        }
+    }
+
+    /**
+     * Pulse the loop indicator
+     */
+    pulseLoopIndicator() {
+        if (this.objects.loopIndicator) {
+            this.objects.loopIndicator.pulse?.();
+        }
+    }
+
+    /**
+     * Show comparison visual
+     */
+    showComparison(left, operator, right) {
+        console.log('🔍 showComparison called:', { 
+            left, operator, right, 
+            hasComparison: !!this.objects.comparison,
+            comparisonPosition: this.objects.comparison ? {
+                x: this.objects.comparison.container?.x,
+                y: this.objects.comparison.container?.y
+            } : null
+        });
+        
+        if (this.objects.comparison) {
+            this.objects.comparison.show();
+            // Use the animateComparison method with a timeline
+            const tl = gsap.timeline();
+            this.objects.comparison.animateComparison(tl, left, operator, right, 0);
+        } else {
+            console.warn('⚠️ No comparison object exists!');
+        }
+    }
+
+    /**
+     * Animate condition evaluation result
+     */
+    animateConditionEvaluation(result) {
+        if (this.objects.comparison) {
+            const tl = gsap.timeline();
+            this.objects.comparison.animateResult(tl, result, 0);
+        }
+    }
+
+    /**
+     * Show branch taken indicator
+     */
+    showBranchTaken(result) {
+        if (this.objects.comparison) {
+            this.objects.comparison.showBranch?.(result);
+        }
+    }
+
+    /**
+     * Show return value visual
+     */
+    showReturnValue(value) {
+        if (this.objects.returnVisual) {
+            this.objects.returnVisual.show();
+            this.objects.returnVisual.setValue(value);
+        }
+    }
+
+    /**
+     * Animate return
+     */
+    animateReturn(value) {
+        if (this.objects.returnVisual) {
+            this.objects.returnVisual.animate?.();
+        }
+    }
+
+    /**
+     * Update variable instantly (no animation) - for state rebuilding
+     */
+    updateVariableInstantly(varName, value) {
+        let variable = this.objects.variables.get(varName);
+        if (!variable) {
+            variable = this.getOrCreateVariable(varName, value);
+        }
+        variable.show();
+        variable.container.alpha = 1;
+        variable.container.scale.set(1);
+        variable.value = value;
+        variable.valueText.text = String(value);
+    }
+
+    /**
+     * Animate pointer from variable label to array element
+     * Creates a visual connection showing which element is being accessed
+     */
+    animatePointerToArrayElement(arrayName, index, varName) {
+        const array = this.objects.arrays.get(arrayName);
+        if (!array || !this.objects.pointerArrow) return;
+        
+        const elementPos = array.getElementPosition(index);
+        
+        // Variable position (or use a starting point near the variable name)
+        const variable = this.objects.variables.get(varName);
+        let fromPos;
+        if (variable) {
+            fromPos = {
+                x: variable.container.x + 30,
+                y: variable.container.y + variable.boxHeight / 2
+            };
+        } else {
+            // Default position above the element
+            fromPos = {
+                x: elementPos.x,
+                y: elementPos.y - 80
+            };
+        }
+        
+        const tl = gsap.timeline();
+        this.objects.pointerArrow.animatePointer(tl, fromPos, elementPos, varName, 0);
+    }
+
+    /**
+     * Hide the pointer arrow
+     */
+    hidePointer() {
+        if (this.objects.pointerArrow) {
+            const tl = gsap.timeline();
+            this.objects.pointerArrow.fadeOut(tl, 0);
+        }
+    }
+
+    /**
+     * Animate value transfer from array element to variable with visual bubble
+     */
+    animateValueFromArray(arrayName, index, varName, value) {
+        const array = this.objects.arrays.get(arrayName);
+        const variable = this.objects.variables.get(varName);
+        
+        if (!array) return;
+        
+        const fromPos = array.getElementPosition(index);
+        const toPos = variable ? {
+            x: variable.container.x + variable.valueBox.x + variable.boxWidth / 2,
+            y: variable.container.y + variable.boxHeight / 2
+        } : {
+            x: fromPos.x,
+            y: fromPos.y + 100
+        };
+        
+        // Create value bubble for transfer animation
+        const bubble = this.createValueBubble(value);
+        const tl = gsap.timeline();
+        bubble.animateTransfer(tl, fromPos, toPos, 0, 0.5);
+        
+        // Update variable after bubble arrives
+        tl.call(() => {
+            if (variable) {
+                variable.value = value;
+                variable.valueText.text = String(value);
+            }
+        }, null, 0.5);
+    }
+
+    /**
+     * Add/update variable in the state panel
+     */
+    updateStatePanel(varName, value) {
+        console.log('🔄 PixiRenderer.updateStatePanel:', { varName, value, hasPanel: !!this.objects.statePanel });
+        if (this.objects.statePanel) {
+            this.objects.statePanel.setVariable(varName, value, true);
+        }
+    }
+
+    /**
+     * Clear the state panel
+     */
+    clearStatePanel() {
+        if (this.objects.statePanel) {
+            this.objects.statePanel.clear();
+        }
     }
 
     /**

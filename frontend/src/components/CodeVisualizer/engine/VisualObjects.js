@@ -102,6 +102,7 @@ export class VisualObject {
 
 /**
  * Array Visual - Represents an array in memory
+ * Clean, compact design with inline label
  */
 export class ArrayVisual extends VisualObject {
     constructor(stage, name, values = []) {
@@ -113,60 +114,63 @@ export class ArrayVisual extends VisualObject {
         this.valueTexts = [];
         this.highlightedIndex = -1;
         
-        this.elementSize = 72;
-        this.gap = 10;
+        this.elementSize = 50;  // Smaller, more compact
+        this.gap = 6;
         
         this._createGraphics();
     }
 
     _createGraphics() {
-        // Array name label
+        // Array name label (inline with array)
         this.nameLabel = createText(this.name, {
-            fontSize: 18,
+            fontSize: 15,
             fill: COLORS.variable,
             fontWeight: 'bold'
         });
-        this.nameLabel.y = -30;
+        this.nameLabel.y = (this.elementSize - 15) / 2;
         this.container.addChild(this.nameLabel);
 
         // Equals sign
         this.equalsSign = createText('=', {
-            fontSize: 16,
+            fontSize: 14,
             fill: COLORS.textMuted
         });
-        this.equalsSign.x = this.nameLabel.width + 8;
-        this.equalsSign.y = -24;
+        this.equalsSign.x = this.nameLabel.width + 6;
+        this.equalsSign.y = (this.elementSize - 14) / 2;
         this.container.addChild(this.equalsSign);
 
-        // Opening bracket
+        // Opening bracket - position after "name ="
+        const bracketStartX = this.equalsSign.x + 18;
+        
         this.openBracket = createText('[', {
-            fontSize: 24,
+            fontSize: 20,
             fill: COLORS.textMuted
         });
-        this.openBracket.x = 0;
-        this.openBracket.y = (this.elementSize - 24) / 2;
+        this.openBracket.x = bracketStartX;
+        this.openBracket.y = (this.elementSize - 20) / 2;
         this.container.addChild(this.openBracket);
 
-        // Create element boxes
+        // Create element boxes (starting after bracket)
+        this.elementsStartX = bracketStartX + 14;
         this._createElements();
 
         // Closing bracket
         this.closeBracket = createText(']', {
-            fontSize: 24,
+            fontSize: 20,
             fill: COLORS.textMuted
         });
-        this.closeBracket.x = 20 + this.values.length * (this.elementSize + this.gap);
-        this.closeBracket.y = (this.elementSize - 24) / 2;
+        this.closeBracket.x = this.elementsStartX + this.values.length * (this.elementSize + this.gap);
+        this.closeBracket.y = (this.elementSize - 20) / 2;
         this.container.addChild(this.closeBracket);
     }
 
     _createElements() {
         this.values.forEach((value, index) => {
-            const x = 20 + index * (this.elementSize + this.gap);
+            const x = this.elementsStartX + index * (this.elementSize + this.gap);
             
             // Element box
             const box = new PIXI.Graphics();
-            box.roundRect(0, 0, this.elementSize, this.elementSize, 8);
+            box.roundRect(0, 0, this.elementSize, this.elementSize, 6);
             box.fill(COLORS.bgLight);
             box.stroke({ width: 2, color: COLORS.border });
             box.x = x;
@@ -176,7 +180,7 @@ export class ArrayVisual extends VisualObject {
 
             // Value text
             const valueText = createText(value, {
-                fontSize: 22,
+                fontSize: 18,
                 fill: COLORS.text,
                 fontWeight: 'bold'
             });
@@ -188,12 +192,12 @@ export class ArrayVisual extends VisualObject {
 
             // Index label (hidden initially)
             const indexLabel = createText(`[${index}]`, {
-                fontSize: 12,
+                fontSize: 10,
                 fill: COLORS.textMuted
             });
             indexLabel.anchor.set(0.5, 0);
             indexLabel.x = x + this.elementSize / 2;
-            indexLabel.y = this.elementSize + 4;
+            indexLabel.y = this.elementSize + 2;
             indexLabel.alpha = 0;
             this.container.addChild(indexLabel);
             this.indexLabels.push(indexLabel);
@@ -254,14 +258,14 @@ export class ArrayVisual extends VisualObject {
     }
 
     getVisualWidth() {
-        // Approximate total width including brackets and padding.
-        // open bracket starts at x=0, elements start at x=20.
-        return 20 + this.values.length * (this.elementSize + this.gap) + 32;
+        // Total width from name to closing bracket
+        const elementsEnd = this.elementsStartX + this.values.length * (this.elementSize + this.gap);
+        return elementsEnd + 14; // closing bracket width
     }
 
     getVisualHeight() {
         // Element row height + index labels spacing
-        return this.elementSize + 28;
+        return this.elementSize + 20;
     }
 
     updateValues(newValues) {
@@ -302,56 +306,59 @@ export class ArrayVisual extends VisualObject {
 
         // Move closing bracket
         if (this.closeBracket) {
-            this.closeBracket.x = 20 + this.values.length * (this.elementSize + this.gap);
+            this.closeBracket.x = this.elementsStartX + this.values.length * (this.elementSize + this.gap);
         }
     }
 }
 
 /**
  * Variable Visual - Represents a variable in memory
+ * Compact design: "name = [value]"
  */
 export class VariableVisual extends VisualObject {
     constructor(stage, name, value = null) {
         super(stage);
         this.name = name;
         this.value = value;
-        this.boxWidth = 130;
-        this.boxHeight = 54;
+        this.boxWidth = 70;
+        this.boxHeight = 36;
         
         this._createGraphics();
     }
 
     _createGraphics() {
         this.nameLabel = createText(this.name, {
-            fontSize: 18,
+            fontSize: 15,
             fill: COLORS.variable,
             fontWeight: 'bold'
         });
+        this.nameLabel.y = 6;
         this.container.addChild(this.nameLabel);
 
         this.equalsSign = createText('=', {
-            fontSize: 16,
+            fontSize: 14,
             fill: COLORS.textMuted
         });
-        this.equalsSign.x = this.nameLabel.width + 8;
+        this.equalsSign.x = this.nameLabel.width + 6;
+        this.equalsSign.y = 6;
         this.container.addChild(this.equalsSign);
 
         this.valueBox = new PIXI.Graphics();
-        this.valueBox.roundRect(0, 0, this.boxWidth, this.boxHeight, 8);
+        this.valueBox.roundRect(0, 0, this.boxWidth, this.boxHeight, 6);
         this.valueBox.fill(COLORS.bgLight);
         this.valueBox.stroke({ width: 2, color: COLORS.border });
-        this.valueBox.x = this.equalsSign.x + 20;
-        this.valueBox.y = -12;
+        this.valueBox.x = this.equalsSign.x + 18;
+        this.valueBox.y = -3;
         this.container.addChild(this.valueBox);
 
         this.valueText = createText(this.value !== null ? String(this.value) : '?', {
-            fontSize: 20,
+            fontSize: 16,
             fill: this.value !== null ? COLORS.number : COLORS.textMuted,
             fontWeight: 'bold'
         });
         this.valueText.anchor.set(0.5);
         this.valueText.x = this.valueBox.x + this.boxWidth / 2;
-        this.valueText.y = this.boxHeight / 2 - 12;
+        this.valueText.y = this.boxHeight / 2 - 3;
         this.container.addChild(this.valueText);
 
         this.glowGraphics = new PIXI.Graphics();
@@ -518,7 +525,7 @@ export class ValueBubble extends VisualObject {
 export class ComparisonVisual extends VisualObject {
     constructor(stage) {
         super(stage);
-        this.boxPadding = 12;
+        this.boxPadding = 10;
         
         this._createGraphics();
     }
@@ -529,7 +536,7 @@ export class ComparisonVisual extends VisualObject {
         this.container.addChild(this.bg);
 
         this.leftText = createText('', {
-            fontSize: 18,
+            fontSize: 16,
             fill: COLORS.number,
             fontWeight: 'bold'
         });
@@ -538,21 +545,21 @@ export class ComparisonVisual extends VisualObject {
         this.container.addChild(this.leftText);
 
         this.operatorText = createText('', {
-            fontSize: 18,
+            fontSize: 16,
             fill: COLORS.keyword,
             fontWeight: 'bold'
         });
         this.container.addChild(this.operatorText);
 
         this.rightText = createText('', {
-            fontSize: 18,
+            fontSize: 16,
             fill: COLORS.number,
             fontWeight: 'bold'
         });
         this.container.addChild(this.rightText);
 
         this.resultText = createText('', {
-            fontSize: 16,
+            fontSize: 14,
             fill: COLORS.success,
             fontWeight: 'bold'
         });
@@ -629,7 +636,7 @@ export class LoopIndicator extends VisualObject {
     constructor(stage) {
         super(stage);
         this.iteration = 0;
-        this.size = 52;
+        this.size = 40;  // Smaller, more compact
         
         this._createGraphics();
     }
@@ -641,7 +648,7 @@ export class LoopIndicator extends VisualObject {
         this.container.addChild(this.circle);
 
         this.iterText = createText('1', {
-            fontSize: 18,
+            fontSize: 15,
             fill: 0xffffff,
             fontWeight: 'bold'
         });
@@ -649,11 +656,11 @@ export class LoopIndicator extends VisualObject {
         this.container.addChild(this.iterText);
 
         this.label = createText('iteration', {
-            fontSize: 12,
+            fontSize: 10,
             fill: COLORS.textMuted
         });
         this.label.anchor.set(0.5, 0);
-        this.label.y = this.size / 2 + 4;
+        this.label.y = this.size / 2 + 3;
         this.container.addChild(this.label);
     }
 
@@ -689,35 +696,35 @@ export class ReturnVisual extends VisualObject {
 
     _createGraphics() {
         this.returnLabel = createText('return', {
-            fontSize: 14,
+            fontSize: 13,
             fill: COLORS.keyword,
             fontWeight: 'bold'
         });
         this.container.addChild(this.returnLabel);
 
         this.valueBox = new PIXI.Graphics();
-        this.valueBox.roundRect(0, 0, 80, 40, 8);
+        this.valueBox.roundRect(0, 0, 60, 32, 6);
         this.valueBox.fill({ color: COLORS.success });
-        this.valueBox.x = this.returnLabel.width + 12;
-        this.valueBox.y = -10;
+        this.valueBox.x = this.returnLabel.width + 10;
+        this.valueBox.y = -8;
         this.container.addChild(this.valueBox);
 
         this.valueText = createText('', {
-            fontSize: 18,
+            fontSize: 16,
             fill: 0xffffff,
             fontWeight: 'bold'
         });
         this.valueText.anchor.set(0.5);
-        this.valueText.x = this.valueBox.x + 40;
-        this.valueText.y = 10;
+        this.valueText.x = this.valueBox.x + 30;
+        this.valueText.y = 8;
         this.container.addChild(this.valueText);
 
         this.checkmark = createText('✓', {
-            fontSize: 20,
+            fontSize: 16,
             fill: COLORS.success
         });
-        this.checkmark.x = this.valueBox.x + 90;
-        this.checkmark.y = 0;
+        this.checkmark.x = this.valueBox.x + 68;
+        this.checkmark.y = -2;
         this.checkmark.alpha = 0;
         this.container.addChild(this.checkmark);
     }
@@ -758,6 +765,26 @@ export class ReturnVisual extends VisualObject {
             duration: 0.2
         }, startTime + 0.5);
     }
+
+    /**
+     * Set the return value (without full animation)
+     */
+    setValue(value) {
+        console.log('🔙 ReturnVisual.setValue:', value);
+        this.valueText.text = String(value ?? '');
+    }
+
+    /**
+     * Simple animate method for use with primitives
+     */
+    animate() {
+        // Pulse animation on the value box
+        gsap.fromTo(this.valueBox.scale, 
+            { x: 1, y: 1 },
+            { x: 1.1, y: 1.1, duration: 0.2, yoyo: true, repeat: 1 }
+        );
+        gsap.to(this.checkmark, { alpha: 1, duration: 0.3 });
+    }
 }
 
 /**
@@ -792,5 +819,226 @@ export class CodeHighlight extends VisualObject {
         }, startTime);
 
         this.currentLine = lineNumber;
+    }
+}
+/**
+ * Pointer Arrow - Animated connection from variable to array element
+ */
+export class PointerArrow extends VisualObject {
+    constructor(stage) {
+        super(stage);
+        this.line = null;
+        this.arrowHead = null;
+        this.label = null;
+        
+        this._createGraphics();
+    }
+
+    _createGraphics() {
+        // Line/path
+        this.line = new PIXI.Graphics();
+        this.container.addChild(this.line);
+        
+        // Arrow head
+        this.arrowHead = new PIXI.Graphics();
+        this.container.addChild(this.arrowHead);
+        
+        // Label showing the variable name
+        this.label = createText('', {
+            fontSize: 14,
+            fill: COLORS.accent,
+            fontWeight: 'bold'
+        });
+        this.label.anchor.set(0.5);
+        this.container.addChild(this.label);
+        
+        this.container.alpha = 0;
+    }
+
+    /**
+     * Animate pointer from a position to target array element
+     */
+    animatePointer(timeline, fromPos, toPos, varName, startTime) {
+        this.label.text = varName;
+        
+        // Draw the curved line
+        const midX = (fromPos.x + toPos.x) / 2;
+        const midY = toPos.y - 50; // Arc above
+        
+        timeline.call(() => {
+            this.line.clear();
+            this.arrowHead.clear();
+            
+            // Draw line with animation effect
+            this.line.moveTo(fromPos.x, fromPos.y);
+            this.line.quadraticCurveTo(midX, midY, toPos.x, toPos.y - 10);
+            this.line.stroke({ width: 3, color: COLORS.accent, alpha: 0.8 });
+            
+            // Arrow head pointing down
+            this.arrowHead.moveTo(toPos.x, toPos.y);
+            this.arrowHead.lineTo(toPos.x - 8, toPos.y - 12);
+            this.arrowHead.lineTo(toPos.x + 8, toPos.y - 12);
+            this.arrowHead.closePath();
+            this.arrowHead.fill({ color: COLORS.accent });
+            
+            // Position label at start
+            this.label.x = fromPos.x;
+            this.label.y = fromPos.y - 20;
+        }, null, startTime);
+        
+        // Fade in
+        timeline.to(this.container, {
+            alpha: 1,
+            duration: 0.3,
+            ease: 'power2.out'
+        }, startTime);
+        
+        // Pulse effect
+        timeline.to(this.arrowHead, {
+            pixi: { scale: 1.3 },
+            duration: 0.15,
+            ease: 'power2.out'
+        }, startTime + 0.3);
+        
+        timeline.to(this.arrowHead, {
+            pixi: { scale: 1 },
+            duration: 0.15,
+            ease: 'power2.in'
+        }, startTime + 0.45);
+    }
+
+    /**
+     * Fade out the pointer
+     */
+    fadeOut(timeline, startTime) {
+        timeline.to(this.container, {
+            alpha: 0,
+            duration: 0.3,
+            ease: 'power2.in'
+        }, startTime);
+    }
+
+    reset() {
+        this.line.clear();
+        this.arrowHead.clear();
+        this.container.alpha = 0;
+    }
+}
+
+/**
+ * State Panel - Left-side panel showing settled variable states
+ */
+export class StatePanel extends VisualObject {
+    constructor(stage, width = 160, height = 400) {
+        super(stage);
+        this.panelWidth = width;
+        this.panelHeight = height;
+        this.variables = new Map(); // name -> {text, value, y}
+        this.nextY = 40;
+        this.rowHeight = 32;
+        
+        this._createGraphics();
+    }
+
+    _createGraphics() {
+        // Panel background
+        this.bg = new PIXI.Graphics();
+        this.bg.roundRect(0, 0, this.panelWidth, this.panelHeight, 12);
+        this.bg.fill({ color: COLORS.bg, alpha: 0.7 });
+        this.bg.stroke({ width: 1, color: COLORS.border, alpha: 0.5 });
+        this.container.addChild(this.bg);
+        
+        // Header
+        this.header = createText('State', {
+            fontSize: 14,
+            fill: COLORS.textMuted,
+            fontWeight: 'bold'
+        });
+        this.header.x = 12;
+        this.header.y = 12;
+        this.container.addChild(this.header);
+        
+        // Divider line
+        this.divider = new PIXI.Graphics();
+        this.divider.moveTo(10, 32);
+        this.divider.lineTo(this.panelWidth - 10, 32);
+        this.divider.stroke({ width: 1, color: COLORS.border, alpha: 0.5 });
+        this.container.addChild(this.divider);
+    }
+
+    /**
+     * Add or update a variable in the state panel
+     */
+    setVariable(name, value, animate = true) {
+        console.log('📊 StatePanel.setVariable:', { name, value, hasExisting: this.variables.has(name) });
+        
+        if (this.variables.has(name)) {
+            // Update existing
+            const entry = this.variables.get(name);
+            const oldValue = entry.valueText.text;
+            entry.valueText.text = String(value);
+            
+            if (animate && oldValue !== String(value)) {
+                // Flash effect on change
+                gsap.fromTo(entry.valueText, 
+                    { pixi: { tint: COLORS.accent } },
+                    { pixi: { tint: 0xffffff }, duration: 0.5 }
+                );
+            }
+        } else {
+            // Create new entry
+            const y = this.nextY;
+            
+            // Variable name
+            const nameText = createText(name + ':', {
+                fontSize: 13,
+                fill: COLORS.variable
+            });
+            nameText.x = 12;
+            nameText.y = y;
+            this.container.addChild(nameText);
+            
+            // Value
+            const valueText = createText(String(value), {
+                fontSize: 13,
+                fill: COLORS.number,
+                fontWeight: 'bold'
+            });
+            valueText.x = this.panelWidth - 12;
+            valueText.anchor.set(1, 0);
+            valueText.y = y;
+            this.container.addChild(valueText);
+            
+            this.variables.set(name, {
+                nameText,
+                valueText,
+                y
+            });
+            
+            this.nextY += this.rowHeight;
+            
+            if (animate) {
+                // Slide in animation
+                nameText.alpha = 0;
+                valueText.alpha = 0;
+                gsap.to([nameText, valueText], {
+                    alpha: 1,
+                    duration: 0.3,
+                    ease: 'power2.out'
+                });
+            }
+        }
+    }
+
+    /**
+     * Clear all variables from the panel
+     */
+    clear() {
+        this.variables.forEach(entry => {
+            entry.nameText.destroy();
+            entry.valueText.destroy();
+        });
+        this.variables.clear();
+        this.nextY = 40;
     }
 }

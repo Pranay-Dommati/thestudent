@@ -1,17 +1,17 @@
 /**
- * EnterpriseVisualizer - React Component
+ * EnterpriseVisualizer - React Component (DUMB UI SHELL)
  * 
- * This is the ONLY React component that touches the animation engine.
- * It provides:
- * - A container for the PixiJS canvas
- * - Playback controls (play/pause/seek/speed)
- * - Step indicator UI
+ * This component is a DUMB UI shell that:
+ * - Provides a container for the PixiJS canvas
+ * - Provides playback controls (Start/Next/Restart)
+ * - Displays step indicator UI
  * 
- * React does NOT control the animations - it only provides the UI shell.
+ * React does NOT control animations - it only listens to engine events.
+ * All animation logic lives in VisualEngine.
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { createTimelineEngine } from './engine/TimelineEngine';
+import { createVisualEngine } from './engine/VisualEngine';
 import { createPixiRenderer } from './engine/PixiRenderer';
 
 // Playback control icons as SVG
@@ -68,15 +68,16 @@ const EnterpriseVisualizer = ({
     const isInitializedRef = useRef(false);
     const isMountedRef = useRef(true);
     
-    // UI State only
+    // UI State only - driven by engine events
     const [uiState, setUiState] = useState({
         isPlaying: false,
+        isAnimating: false,
         currentStep: -1,
         totalSteps: 0,
-        progress: 0,
-        duration: 0,
-        speed: 1,
-        stepByStepMode: true
+        hasNext: false,
+        hasPrevious: false,
+        isAtEnd: false,
+        speed: 1
     });
     const [isReady, setIsReady] = useState(false);
     const [initError, setInitError] = useState(null);
@@ -95,7 +96,7 @@ const EnterpriseVisualizer = ({
                 const width = container.clientWidth || 800;
                 const height = container.clientHeight || 500;
                 
-                // Create renderer
+                // Create renderer first
                 rendererRef.current = createPixiRenderer();
                 await rendererRef.current.initialize(container, width, height);
                 
@@ -104,24 +105,25 @@ const EnterpriseVisualizer = ({
                     return;
                 }
                 
-                // Create timeline engine
-                engineRef.current = createTimelineEngine();
+                // Create visual engine
+                engineRef.current = createVisualEngine();
                 
-                // Wire up callbacks
+                // Wire up engine callbacks - React ONLY listens, never controls
                 engineRef.current.onStateChange = (state) => {
                     if (!isMountedRef.current) return;
-                    setUiState(prev => ({
-                        ...prev,
+                    setUiState({
                         isPlaying: state.isPlaying,
-                        currentStep: state.currentStepIndex,
+                        isAnimating: state.isAnimating,
+                        currentStep: state.currentStep,
                         totalSteps: state.totalSteps,
-                        progress: state.progress,
-                        duration: state.duration,
-                        stepByStepMode: state.stepByStepMode ?? true
-                    }));
+                        hasNext: state.hasNext,
+                        hasPrevious: state.hasPrevious,
+                        isAtEnd: state.isAtEnd,
+                        speed: state.speed
+                    });
                 };
                 
-                engineRef.current.onStepChange = (index, step) => {
+                engineRef.current.onStepStart = (index, step) => {
                     if (isMountedRef.current) {
                         onStepChange?.(index, step);
                     }
@@ -130,7 +132,7 @@ const EnterpriseVisualizer = ({
                 isInitializedRef.current = true;
                 if (isMountedRef.current) {
                     setIsReady(true);
-                    console.log('🎬 Enterprise Visualizer initialized');
+                    console.log('🎬 Enterprise Visualizer initialized (4-Layer Architecture)');
                 }
             } catch (err) {
                 console.error('Failed to initialize visualizer:', err);
@@ -142,16 +144,16 @@ const EnterpriseVisualizer = ({
         
         initializeEngine();
         
-        // Cleanup
+        // Cleanup - DESTROY everything
         return () => {
             isMountedRef.current = false;
             isInitializedRef.current = false;
             
             if (engineRef.current) {
                 try {
-                    engineRef.current.dispose();
+                    engineRef.current.destroy();
                 } catch (e) {
-                    console.warn('Error disposing engine:', e);
+                    console.warn('Error destroying engine:', e);
                 }
                 engineRef.current = null;
             }
@@ -171,16 +173,10 @@ const EnterpriseVisualizer = ({
     useEffect(() => {
         if (!isReady || !steps.length || !isMountedRef.current) return;
         
-        // Reset renderer state
-        rendererRef.current?.reset();
-        
-        // Initialize timeline with steps
+        // Initialize engine with steps (this handles reset internally)
         engineRef.current?.initialize(steps, rendererRef.current);
-
-        // Seed pre-run snapshot (inputs like nums) so Start screen isn't empty
-        rendererRef.current?.seedInitialStateFromSteps(steps);
         
-        console.log(`📊 Loaded ${steps.length} steps into timeline`);
+        console.log(`📊 Loaded ${steps.length} steps into VisualEngine`);
     }, [steps, isReady]);
 
     // Handle resize
@@ -201,58 +197,33 @@ const EnterpriseVisualizer = ({
         const observer = new ResizeObserver(handleResize);
         observer.observe(container);
         
-        return () => {
-            observer.disconnect();
-        };
+        return () => observer.disconnect();
     }, [isReady]);
 
-    // Playback controls - these just call engine methods
-    const handlePlay = useCallback(() => {
-        if (uiState.stepByStepMode) {
-            // In step-by-step mode, play button advances to next step
-            engineRef.current?.playNextStep();
-        } else if (uiState.isPlaying) {
-            engineRef.current?.pause();
-        } else {
-            engineRef.current?.play();
-        }
-    }, [uiState.isPlaying, uiState.stepByStepMode]);
+    // ==========================================
+    // UI CONTROLS - Just call engine methods
+    // React NEVER makes animation decisions
+    // ==========================================
 
-    const handleRestart = useCallback(() => {
-        engineRef.current?.restart();
+    const handleNextStep = useCallback(() => {
+        engineRef.current?.playNextStep();
     }, []);
 
     const handlePrevStep = useCallback(() => {
         engineRef.current?.playPreviousStep();
     }, []);
 
-    const handleNextStep = useCallback(() => {
-        engineRef.current?.playNextStep();
-    }, []);
-
-    const handleSeek = useCallback((e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const progress = x / rect.width;
-        const time = progress * uiState.duration;
-        engineRef.current?.seek(time);
-    }, [uiState.duration]);
-
-    const handleSpeedChange = useCallback((speed) => {
-        engineRef.current?.setSpeed(speed);
-        setUiState(prev => ({ ...prev, speed }));
+    const handleRestart = useCallback(() => {
+        engineRef.current?.restart();
     }, []);
 
     const handleStepClick = useCallback((index) => {
         engineRef.current?.goToStep(index);
-        // Don't auto-play, user must click next
     }, []);
 
-    const handleToggleMode = useCallback(() => {
-        const newMode = !uiState.stepByStepMode;
-        engineRef.current?.setStepByStepMode(newMode);
-        setUiState(prev => ({ ...prev, stepByStepMode: newMode }));
-    }, [uiState.stepByStepMode]);
+    const handleSpeedChange = useCallback((speed) => {
+        engineRef.current?.setSpeed(speed);
+    }, []);
 
     return (
         <div className={`flex flex-col bg-slate-900 rounded-xl overflow-hidden ${className}`}>
@@ -304,33 +275,33 @@ const EnterpriseVisualizer = ({
                     
                     <button
                         onClick={handlePrevStep}
-                        disabled={uiState.currentStep <= 0 && uiState.currentStep !== 0}
+                        disabled={!uiState.hasPrevious || uiState.isAnimating}
                         className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Previous Step"
                     >
                         <Icons.SkipBack />
                     </button>
                     
-                    {/* Main Action Button - Shows "Next" in step mode, Play/Pause otherwise */}
+                    {/* Main Action Button - Start/Next */}
                     <button
                         onClick={handleNextStep}
-                        disabled={uiState.isPlaying || uiState.currentStep >= uiState.totalSteps - 1}
+                        disabled={uiState.isAnimating || uiState.isAtEnd}
                         className={`group relative px-5 py-3 rounded-xl font-semibold text-white transition-all ${
-                            uiState.isPlaying 
-                                ? 'bg-amber-500 hover:bg-amber-400' 
-                                : uiState.currentStep >= uiState.totalSteps - 1
+                            uiState.isAnimating 
+                                ? 'bg-amber-500' 
+                                : uiState.isAtEnd
                                     ? 'bg-slate-600 cursor-not-allowed'
                                     : 'bg-teal-500 hover:bg-teal-400 hover:scale-105'
                         }`}
-                        title={uiState.currentStep >= uiState.totalSteps - 1 ? 'Complete' : 'Next Step'}
+                        title={uiState.isAtEnd ? 'Complete' : uiState.currentStep === -1 ? 'Start' : 'Next Step'}
                     >
                         <div className="flex items-center gap-2">
-                            {uiState.isPlaying ? (
+                            {uiState.isAnimating ? (
                                 <>
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                    <span>Running...</span>
+                                    <span>Animating...</span>
                                 </>
-                            ) : uiState.currentStep >= uiState.totalSteps - 1 ? (
+                            ) : uiState.isAtEnd ? (
                                 <>
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                         <polyline points="20,6 9,17 4,12"/>
@@ -354,13 +325,14 @@ const EnterpriseVisualizer = ({
 
                 {/* Progress Bar */}
                 <div className="flex-1 flex items-center gap-3">
-                    <div 
-                        className="flex-1 h-2 bg-slate-700 rounded-full cursor-pointer overflow-hidden"
-                        onClick={handleSeek}
-                    >
+                    <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
                         <div 
-                            className="h-full bg-gradient-to-r from-teal-500 to-cyan-400 rounded-full transition-all"
-                            style={{ width: `${uiState.progress * 100}%` }}
+                            className="h-full bg-gradient-to-r from-teal-500 to-cyan-400 rounded-full transition-all duration-300"
+                            style={{ 
+                                width: `${uiState.totalSteps > 0 
+                                    ? ((uiState.currentStep + 1) / uiState.totalSteps) * 100 
+                                    : 0}%` 
+                            }}
                         />
                     </div>
                 </div>
@@ -407,13 +379,14 @@ const EnterpriseVisualizer = ({
                             <button
                                 key={index}
                                 onClick={() => handleStepClick(index)}
+                                disabled={uiState.isAnimating}
                                 className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-mono transition-all ${
                                     isActive 
                                         ? 'bg-teal-500 text-white scale-105 shadow-lg shadow-teal-500/30' 
                                         : isCompleted
                                             ? 'bg-slate-700 text-slate-300'
                                             : 'bg-slate-800 text-slate-500 hover:bg-slate-700'
-                                }`}
+                                } ${uiState.isAnimating ? 'cursor-not-allowed' : ''}`}
                             >
                                 <div className="flex items-center gap-2">
                                     <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold ${
