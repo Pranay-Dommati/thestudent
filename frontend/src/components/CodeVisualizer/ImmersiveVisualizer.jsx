@@ -333,38 +333,44 @@ const ImmersiveVisualizer = ({
                     </h1>
                 </div>
 
-                {/* Visualization Mode Toggle */}
-                <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">Mode:</span>
-                    <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1">
+                {/* Visualization Mode Toggle - Segmented Control */}
+                <div className="flex items-center">
+                    <div className="relative flex items-center bg-slate-800/80 rounded-full p-1 border border-slate-700/50">
+                        {/* Sliding Background Indicator */}
+                        <div 
+                            className={`absolute h-[calc(100%-8px)] w-[calc(50%-4px)] bg-gradient-to-r rounded-full transition-all duration-300 ease-out shadow-lg ${
+                                visualizationMode === 'timeline'
+                                    ? 'left-1 from-slate-600 to-slate-500'
+                                    : 'left-[calc(50%+2px)] from-teal-500 to-cyan-500'
+                            }`}
+                        />
+                        
                         <button
                             onClick={() => setVisualizationMode('timeline')}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                            className={`relative z-10 px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-2 min-w-[110px] justify-center ${
                                 visualizationMode === 'timeline'
-                                    ? 'bg-slate-700 text-white shadow-sm'
-                                    : 'text-slate-400 hover:text-slate-300'
+                                    ? 'text-white'
+                                    : 'text-slate-400 hover:text-slate-200'
                             }`}
                         >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <line x1="12" y1="2" x2="12" y2="22"/>
-                                <circle cx="12" cy="6" r="2"/>
-                                <circle cx="12" cy="12" r="2"/>
-                                <circle cx="12" cy="18" r="2"/>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                <path d="M12 2v20M12 6h-2M12 10h2M12 14h-2M12 18h2"/>
                             </svg>
                             Timeline
                         </button>
+                        
                         <button
                             onClick={() => setVisualizationMode('enterprise')}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                            className={`relative z-10 px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-2 min-w-[120px] justify-center ${
                                 visualizationMode === 'enterprise'
-                                    ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-sm'
-                                    : 'text-slate-400 hover:text-slate-300'
+                                    ? 'text-white'
+                                    : 'text-slate-400 hover:text-slate-200'
                             }`}
                         >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/>
                             </svg>
-                            Enterprise
+                            Visualize
                         </button>
                     </div>
                 </div>
@@ -384,15 +390,6 @@ const ImmersiveVisualizer = ({
                         className={`absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-teal-500/50 transition-colors z-10 ${isResizing ? 'bg-teal-500' : 'bg-transparent'}`}
                         style={{ transform: 'translateX(-50%)' }}
                     />
-                    <div className="px-4 py-2 border-b border-slate-800 flex items-center justify-center">
-                        <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1">
-                            <button
-                                className="px-3 py-1.5 text-xs font-medium rounded-md transition-all bg-slate-700 text-white shadow-sm"
-                            >
-                                Source Code
-                            </button>
-                        </div>
-                    </div>
 
                     {/* Source Code Panel */}
                     <div className="flex-1 overflow-y-auto p-4 font-mono text-sm">
@@ -418,13 +415,13 @@ const ImmersiveVisualizer = ({
                                 <div
                                     key={idx}
                                     className={`flex transition-all duration-300 rounded-lg ${isCurrentLine
-                                        ? 'bg-teal-500/20 border-l-4 border-teal-400 -ml-1 pl-1'
+                                        ? 'bg-teal-500/20 border-l-4 border-teal-400'
                                         : wasExecuted
                                             ? 'bg-slate-800/30'
                                             : ''
                                         }`}
                                 >
-                                    <span className={`w-10 text-right pr-4 select-none ${isCurrentLine ? 'text-teal-400 font-bold' : 'text-slate-600'
+                                    <span className={`w-12 min-w-[3rem] text-right pr-4 select-none flex-shrink-0 ${isCurrentLine ? 'text-teal-400 font-bold' : 'text-slate-600'
                                         }`}>
                                         {lineNum}
                                     </span>
