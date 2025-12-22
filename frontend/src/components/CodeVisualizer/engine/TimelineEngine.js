@@ -238,10 +238,12 @@ export class TimelineEngine {
                         params: {
                             leftValue: stepType.left,
                             rightValue: stepType.right,
+                            leftVarName: stepType.leftVar,
+                            rightVarName: stepType.rightVar,
                             operator: stepType.operator,
                             result: stepType.result
                         },
-                        duration: 3.0
+                        duration: 5.0
                     },
                     { type: 'COMPLETE_STEP', stepIndex, duration: 0.2 }
                 );
@@ -477,6 +479,7 @@ export class TimelineEngine {
 
     /**
      * Play previous step (reverse to previous step)
+     * Since visuals are destroyed during playback, we restart and replay to target step
      */
     playPreviousStep() {
         if (this.stepAnimation) {
@@ -484,25 +487,84 @@ export class TimelineEngine {
             this.stepAnimation = null;
         }
 
-        const prevIndex = Math.max(0, this.currentStepIndex - 1);
-        if (prevIndex === this.currentStepIndex && this.currentStepIndex === 0) {
-            // Already at the beginning, just seek to start
-            this.masterTimeline.pause();
-            this.masterTimeline.seek(0);
-            this.currentStepIndex = -1;
-            this.currentTime = 0;
-            this.isPlaying = false;
-            this._notifyStateChange();
+        const targetStepIndex = this.currentStepIndex - 1;
+
+        // If we're at step 0 or before, go to initial state
+        if (targetStepIndex < 0) {
+            this.restart();
             return;
         }
 
-        // Go to start of previous step
-        const marker = this.stepMarkers[prevIndex];
+        console.log(`⏪ Going back to step ${targetStepIndex} from ${this.currentStepIndex}`);
+
+        // Save current state
+        const savedSteps = this.steps;
+        const savedRenderer = this.renderer;
+        const savedCallbacks = {
+            onStepChange: this.onStepChange,
+            onProgress: this.onProgress,
+            onComplete: this.onComplete,
+            onStateChange: this.onStateChange
+        };
+
+        // Kill current timeline
         this.masterTimeline.pause();
-        this.masterTimeline.seek(marker.startTime);
-        this.currentStepIndex = prevIndex - 1; // Will be incremented when step plays
+        this.masterTimeline.kill();
+
+        // Create a new master timeline
+        this.masterTimeline = gsap.timeline({
+            paused: true,
+            onUpdate: () => this._onUpdate(),
+            onComplete: () => this._onComplete()
+        });
+
+        // Reset renderer to clean state
+        if (this.renderer) {
+            this.renderer.reset();
+        }
+
+        // Clear timeline state
+        this.currentTime = 0;
+        this.duration = 0;
         this.isPlaying = false;
-        this.currentTime = marker.startTime;
+        this.currentStepIndex = -1;
+        this.steps = [];
+        this.stepMarkers = [];
+
+        // Restore callbacks
+        this.onStepChange = savedCallbacks.onStepChange;
+        this.onProgress = savedCallbacks.onProgress;
+        this.onComplete = savedCallbacks.onComplete;
+        this.onStateChange = savedCallbacks.onStateChange;
+
+        // Reinitialize with same steps
+        if (savedSteps.length > 0 && savedRenderer) {
+            this.initialize(savedSteps, savedRenderer);
+        }
+
+        // Re-seed initial state
+        if (this.renderer && savedSteps.length > 0) {
+            this.renderer.seedInitialStateFromSteps?.(savedSteps);
+        }
+
+        // Now seek to the END of the target step (so it appears complete)
+        if (targetStepIndex >= 0 && targetStepIndex < this.stepMarkers.length) {
+            const targetMarker = this.stepMarkers[targetStepIndex];
+            const nextMarker = this.stepMarkers[targetStepIndex + 1];
+            const endTime = nextMarker ? nextMarker.startTime - 0.05 : targetMarker.startTime + 1;
+
+            // Seek to end of target step
+            this.masterTimeline.seek(endTime);
+            this.currentStepIndex = targetStepIndex;
+            this.currentTime = endTime;
+
+            // Notify step change
+            if (this.onStepChange) {
+                this.onStepChange(targetStepIndex, targetMarker.step);
+            }
+        }
+
+        this.isPlaying = false;
         this._notifyStateChange();
     }
 

@@ -29,7 +29,10 @@ const COLORS = {
     value: 0x3b82f6,        // Blue - values
     bg: 0x1e293b,           // Dark slate - backgrounds
     text: 0xf8fafc,         // White - text
-    muted: 0x64748b         // Gray - muted text
+    muted: 0x64748b,        // Gray - muted text
+    keyword: 0xc084fc,      // Purple - keywords (if, for, etc.)
+    variable: 0x60a5fa,     // Light blue - variable names
+    accent: 0x14b8a6        // Teal - accent color
 };
 
 const TIMING = {
@@ -1644,6 +1647,8 @@ export function IF_ELSE_BRANCH(layer, params, onComplete) {
     const {
         leftValue = 10,
         rightValue = 5,
+        leftVarName = 'left',
+        rightVarName = 'right',
         operator = '>',
         result = true,
         position
@@ -1652,11 +1657,11 @@ export function IF_ELSE_BRANCH(layer, params, onComplete) {
     const { x, y } = position;
     const tl = gsap.timeline({ onComplete });
 
-    // Layout constants
-    const BOX_W = 44;
-    const BOX_H = 34;
-    const PATH_WIDTH = 80;
-    const PATH_HEIGHT = 50;
+    // Layout constants - LARGER for visibility
+    const BOX_W = 70;
+    const BOX_H = 50;
+    const PATH_WIDTH = 100;
+    const PATH_HEIGHT = 60;
 
     const container = new PIXI.Container();
     container.x = x;
@@ -1668,114 +1673,115 @@ export function IF_ELSE_BRANCH(layer, params, onComplete) {
     // PHASE 1: Condition expression "if left op right:"
     // ========================================
     const conditionContainer = new PIXI.Container();
-    conditionContainer.y = -30;
+    conditionContainer.y = -50;
     container.addChild(conditionContainer);
 
-    // "if" keyword
-    const ifText = createText('if', { fontSize: 18, fill: COLORS.muted });
+    // "if" keyword - LARGER
+    const ifText = createText('if', { fontSize: 24, fill: COLORS.keyword, fontWeight: 'bold' });
     ifText.anchor.set(0.5, 0.5);
-    ifText.x = -60;
+    ifText.x = -110;
     ifText.y = 0;
     conditionContainer.addChild(ifText);
 
-    // Left value box
-    const leftBox = createValueBox(leftValue, {
-        width: BOX_W,
-        height: BOX_H,
-        borderColor: COLORS.value
-    });
-    leftBox.x = -30 - BOX_W / 2;
-    leftBox.y = -BOX_H / 2;
-    leftBox.alpha = 0;
-    leftBox.scale.set(0.5);
-    conditionContainer.addChild(leftBox);
+    // Left value container (value + label)
+    const leftContainer = new PIXI.Container();
+    leftContainer.x = -50;
+    leftContainer.y = 0;
+    conditionContainer.addChild(leftContainer);
 
-    // Operator
-    const opText = createText(operator, { fontSize: 22, fill: COLORS.warning });
+    // Left value box - LARGER with better colors
+    const leftBg = new PIXI.Graphics();
+    leftBg.roundRect(-BOX_W / 2, -BOX_H / 2, BOX_W, BOX_H, 8);
+    leftBg.fill({ color: 0x1e293b });
+    leftBg.stroke({ width: 3, color: COLORS.primary });
+    leftContainer.addChild(leftBg);
+
+    const leftValueText = createText(String(leftValue), { fontSize: 26, fill: 0xffffff, fontWeight: 'bold' });
+    leftValueText.anchor.set(0.5, 0.5);
+    leftContainer.addChild(leftValueText);
+
+    // Left variable name BELOW the box
+    const leftLabel = createText(leftVarName, { fontSize: 14, fill: COLORS.variable });
+    leftLabel.anchor.set(0.5, 0);
+    leftLabel.y = BOX_H / 2 + 5;
+    leftContainer.addChild(leftLabel);
+
+    leftContainer.alpha = 0;
+    leftContainer.scale.set(0.5);
+
+    // Operator - LARGER and BRIGHTER
+    const opText = createText(operator, { fontSize: 32, fill: COLORS.warning, fontWeight: 'bold' });
     opText.anchor.set(0.5, 0.5);
-    opText.x = 0;
+    opText.x = 20;
     opText.y = 0;
     opText.alpha = 0;
     conditionContainer.addChild(opText);
 
-    // Right value box
-    const rightBox = createValueBox(rightValue, {
-        width: BOX_W,
-        height: BOX_H,
-        borderColor: COLORS.value
-    });
-    rightBox.x = 30 - BOX_W / 2;
-    rightBox.y = -BOX_H / 2;
-    rightBox.alpha = 0;
-    rightBox.scale.set(0.5);
-    conditionContainer.addChild(rightBox);
+    // Right value container (value + label)
+    const rightContainer = new PIXI.Container();
+    rightContainer.x = 90;
+    rightContainer.y = 0;
+    conditionContainer.addChild(rightContainer);
 
-    // Colon
-    const colonText = createText(':', { fontSize: 18, fill: COLORS.muted });
+    // Right value box - LARGER with better colors
+    const rightBg = new PIXI.Graphics();
+    rightBg.roundRect(-BOX_W / 2, -BOX_H / 2, BOX_W, BOX_H, 8);
+    rightBg.fill({ color: 0x1e293b });
+    rightBg.stroke({ width: 3, color: COLORS.accent });
+    rightContainer.addChild(rightBg);
+
+    const rightValueText = createText(String(rightValue), { fontSize: 26, fill: 0xffffff, fontWeight: 'bold' });
+    rightValueText.anchor.set(0.5, 0.5);
+    rightContainer.addChild(rightValueText);
+
+    // Right variable name BELOW the box
+    const rightLabel = createText(rightVarName, { fontSize: 14, fill: COLORS.variable });
+    rightLabel.anchor.set(0.5, 0);
+    rightLabel.y = BOX_H / 2 + 5;
+    rightContainer.addChild(rightLabel);
+
+    rightContainer.alpha = 0;
+    rightContainer.scale.set(0.5);
+
+    // Colon - LARGER
+    const colonText = createText(':', { fontSize: 26, fill: COLORS.muted });
     colonText.anchor.set(0.5, 0.5);
-    colonText.x = 65;
+    colonText.x = 140;
     colonText.y = 0;
     conditionContainer.addChild(colonText);
 
     // ========================================
-    // PHASE 2: Branch paths
+    // PHASE 2: Single Result Badge (only True OR False)
     // ========================================
-    const pathsContainer = new PIXI.Container();
-    pathsContainer.y = 20;
-    container.addChild(pathsContainer);
+    const resultContainer = new PIXI.Container();
+    resultContainer.y = 55;
+    resultContainer.x = 20; // Center below the comparison
+    container.addChild(resultContainer);
 
-    // True path (left)
-    const truePath = new PIXI.Graphics();
-    truePath.roundRect(-PATH_WIDTH - 10, 0, PATH_WIDTH, PATH_HEIGHT, 8);
-    truePath.fill({ color: COLORS.success, alpha: 0.15 });
-    truePath.stroke({ width: 2, color: COLORS.success, alpha: 0.5 });
-    truePath.alpha = 0;
-    pathsContainer.addChild(truePath);
+    // Result badge - show ONLY the correct result
+    const resultColor = result ? COLORS.success : COLORS.error;
+    const resultSymbol = result ? '✓' : '✗';
+    const resultLabel = result ? 'True' : 'False';
 
-    const trueLabel = createText('True ✓', { fontSize: 14, fill: COLORS.success });
-    trueLabel.anchor.set(0.5, 0.5);
-    trueLabel.x = -PATH_WIDTH / 2 - 10;
-    trueLabel.y = PATH_HEIGHT / 2;
-    trueLabel.alpha = 0;
-    pathsContainer.addChild(trueLabel);
+    // Result background
+    const resultBg = new PIXI.Graphics();
+    resultBg.roundRect(-60, -22, 120, 44, 10);
+    resultBg.fill({ color: resultColor, alpha: 0.2 });
+    resultBg.stroke({ width: 3, color: resultColor });
+    resultContainer.addChild(resultBg);
 
-    // False path (right)
-    const falsePath = new PIXI.Graphics();
-    falsePath.roundRect(10, 0, PATH_WIDTH, PATH_HEIGHT, 8);
-    falsePath.fill({ color: COLORS.error, alpha: 0.15 });
-    falsePath.stroke({ width: 2, color: COLORS.error, alpha: 0.5 });
-    falsePath.alpha = 0;
-    pathsContainer.addChild(falsePath);
+    // Result text with symbol
+    const resultText = createText(`${resultLabel} ${resultSymbol}`, {
+        fontSize: 22,
+        fill: resultColor,
+        fontWeight: 'bold'
+    });
+    resultText.anchor.set(0.5, 0.5);
+    resultContainer.addChild(resultText);
 
-    const falseLabel = createText('False ✗', { fontSize: 14, fill: COLORS.error });
-    falseLabel.anchor.set(0.5, 0.5);
-    falseLabel.x = PATH_WIDTH / 2 + 10;
-    falseLabel.y = PATH_HEIGHT / 2;
-    falseLabel.alpha = 0;
-    pathsContainer.addChild(falseLabel);
-
-    // Decision arrow (points to chosen path)
-    const arrow = new PIXI.Graphics();
-    arrow.moveTo(0, -5);
-    arrow.lineTo(-8, -15);
-    arrow.lineTo(8, -15);
-    arrow.closePath();
-    arrow.fill(result ? COLORS.success : COLORS.error);
-    arrow.x = result ? (-PATH_WIDTH / 2 - 10) : (PATH_WIDTH / 2 + 10);
-    arrow.y = 5;
-    arrow.alpha = 0;
-    arrow.scale.set(0.5);
-    pathsContainer.addChild(arrow);
-
-    // Glow ring around result
-    const resultGlow = new PIXI.Graphics();
-    resultGlow.circle(0, 0, 35);
-    resultGlow.fill({ color: result ? COLORS.success : COLORS.error, alpha: 0.2 });
-    resultGlow.x = 0;
-    resultGlow.y = -30;
-    resultGlow.alpha = 0;
-    resultGlow.scale.set(0.5);
-    container.addChild(resultGlow);
+    // Start invisible
+    resultContainer.alpha = 0;
+    resultContainer.scale.set(0.5);
 
     // ========================================
     // ANIMATION TIMELINE
@@ -1783,58 +1789,36 @@ export function IF_ELSE_BRANCH(layer, params, onComplete) {
     let t = 0;
 
     // --- STEP 1: Fade in container with "if" ---
-    tl.to(container, { alpha: 1, duration: 0.3, ease: 'power2.out' }, t);
-    t += 0.4;
+    tl.to(container, { alpha: 1, duration: 0.4, ease: 'power2.out' }, t);
+    t += 0.5;
 
     // --- STEP 2: Value boxes appear ---
-    tl.to([leftBox, rightBox], { alpha: 1, duration: 0.2, stagger: 0.1 }, t);
-    tl.to([leftBox.scale, rightBox.scale], { x: 1, y: 1, duration: 0.25, ease: 'back.out(1.5)', stagger: 0.1 }, t);
-    t += 0.4;
+    tl.to([leftContainer, rightContainer], { alpha: 1, duration: 0.3, stagger: 0.15 }, t);
+    tl.to([leftContainer.scale, rightContainer.scale], { x: 1, y: 1, duration: 0.35, ease: 'back.out(1.5)', stagger: 0.15 }, t);
+    t += 0.6;
 
     // --- STEP 3: Operator appears ---
-    tl.to(opText, { alpha: 1, duration: 0.2, ease: 'power2.out' }, t);
-    t += 0.3;
-
-    // --- STEP 4: Comparison "processing" - operator pulses ---
-    tl.to(opText.scale, { x: 1.3, y: 1.3, duration: 0.15, ease: 'power2.out' }, t);
-    tl.to(opText.scale, { x: 1, y: 1, duration: 0.2, ease: 'power2.inOut' }, t + 0.15);
-    t += 0.45;
-
-    // --- STEP 5: Both paths appear ---
-    tl.to([truePath, falsePath], { alpha: 1, duration: 0.25, stagger: 0.1 }, t);
-    tl.to([trueLabel, falseLabel], { alpha: 0.5, duration: 0.25, stagger: 0.1 }, t + 0.1);
-    t += 0.45;
-
-    // --- STEP 6: Result glow expands from center ---
-    tl.to(resultGlow, { alpha: 1, duration: 0.2 }, t);
-    tl.to(resultGlow.scale, { x: 1.2, y: 1.2, duration: 0.3, ease: 'power2.out' }, t);
-    t += 0.35;
-
-    // --- STEP 7: Chosen path brightens, other fades ---
-    const chosenPath = result ? truePath : falsePath;
-    const chosenLabel = result ? trueLabel : falseLabel;
-    const fadedPath = result ? falsePath : truePath;
-    const fadedLabel = result ? falseLabel : trueLabel;
-
-    tl.to(chosenPath, { alpha: 1, duration: 0.25 }, t);
-    tl.to(chosenLabel, { alpha: 1, duration: 0.25 }, t);
-    tl.to(fadedPath, { alpha: 0.2, duration: 0.25 }, t);
-    tl.to(fadedLabel, { alpha: 0.2, duration: 0.25 }, t);
-    t += 0.35;
-
-    // --- STEP 8: Arrow appears, points to chosen path ---
-    tl.to(arrow, { alpha: 1, duration: 0.2 }, t);
-    tl.to(arrow.scale, { x: 1, y: 1, duration: 0.25, ease: 'back.out(2)' }, t);
+    tl.to(opText, { alpha: 1, duration: 0.3, ease: 'power2.out' }, t);
     t += 0.4;
 
-    // --- STEP 9: Chosen path "opens" (scale effect) ---
-    tl.to(chosenPath.scale, { x: 1.05, y: 1.05, duration: 0.15, ease: 'power2.out' }, t);
-    tl.to(chosenPath.scale, { x: 1, y: 1, duration: 0.2, ease: 'power2.inOut' }, t + 0.15);
+    // --- STEP 4: Comparison "processing" - operator pulses ---
+    tl.to(opText.scale, { x: 1.4, y: 1.4, duration: 0.2, ease: 'power2.out' }, t);
+    tl.to(opText.scale, { x: 1, y: 1, duration: 0.25, ease: 'power2.inOut' }, t + 0.2);
+    t += 0.5;
+
+    // --- STEP 5: Result badge pops in ---
+    tl.to(resultContainer, { alpha: 1, duration: 0.3, ease: 'power2.out' }, t);
+    tl.to(resultContainer.scale, { x: 1, y: 1, duration: 0.4, ease: 'back.out(2)' }, t);
+    t += 0.5;
+
+    // --- STEP 7: Result badge pulses ---
+    tl.to(resultContainer.scale, { x: 1.1, y: 1.1, duration: 0.15, ease: 'power2.out' }, t);
+    tl.to(resultContainer.scale, { x: 1, y: 1, duration: 0.2, ease: 'power2.inOut' }, t + 0.15);
     t += 0.5;
 
     // --- Hold ---
-    tl.to({}, { duration: 0.3 }, t);
-    t += 0.3;
+    tl.to({}, { duration: 0.6 }, t);
+    t += 0.6;
 
     // --- Cleanup ---
     tl.to(container, { alpha: 0, duration: 0.3, ease: 'power2.in' }, t);
