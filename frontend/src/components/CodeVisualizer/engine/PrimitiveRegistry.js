@@ -275,14 +275,14 @@ export class ForLoopPrimitive extends BasePrimitive {
  */
 export class ConditionPrimitive extends BasePrimitive {
     static getDuration() {
-        return 1.8;  // Longer for choreography
+        return 5.5;  // Cinematic duration
     }
 
     static animate(step, renderer, timeline, onComplete) {
         const { left, operator, right, result, leftVar, rightVar, expression } = step.meta;
         const lineNumber = step.line;
 
-        console.log('🔀 ConditionPrimitive [CHOREOGRAPHY]:', {
+        console.log('🔀 ConditionPrimitive [CINEMATIC]:', {
             leftVar, rightVar, left, operator, right, result, lineNumber
         });
 
@@ -295,17 +295,24 @@ export class ConditionPrimitive extends BasePrimitive {
             renderer.highlightLine(lineNumber);
         }, null, 0);
 
-        // 2. Use CHOREOGRAPHY: gather variables, show comparison, return them
-        renderer.choreographComparison(
-            tl,
-            leftVar,
-            rightVar,
-            operator,
-            left,
-            right,
-            result,
-            0.15  // Start time
-        );
+        // 2. Play the cinematic IF_ELSE_BRANCH animation
+        tl.call(() => {
+            // Use the cinematic animation from BehaviorLibrary via PixiRenderer
+            renderer.playCinematicComparison({
+                left,
+                right,
+                leftVar,
+                rightVar,
+                operator,
+                result
+            }, () => {
+                console.log('✅ Cinematic comparison animation complete');
+            });
+        }, null, 0.15);
+
+        // 3. Wait for the cinematic animation to complete
+        // The behavior duration is set to 5.0s in BehaviorLibrary
+        tl.to({}, { duration: 5.0 }, 0.2);
 
         timeline.add(tl);
     }

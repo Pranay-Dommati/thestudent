@@ -271,160 +271,35 @@ export class PixiRenderer {
      * 
      * Original variables STAY in place - we animate VALUE representations
      */
-    choreographComparison(timeline, leftVar, rightVar, operator, leftVal, rightVal, result, startTime) {
-        const leftVisual = this.objects.variables.get(leftVar);
-        const rightVisual = this.objects.variables.get(rightVar);
+    /**
+     * Play cinematic IF_ELSE_BRANCH animation
+     * Delegates to the standardized BehaviorLibrary
+     */
+    playCinematicComparison(params, onComplete) {
+        console.log('🎭 PixiRenderer.playCinematicComparison:', params);
+
+        // Calculate center position for the comparison animation
         const zone = this.zones.interaction;
+        const position = {
+            x: zone?.centerX || this.width / 2,
+            y: zone?.centerY || this.height / 2
+        };
 
-        // Calculate positions in interaction zone (centered, with spacing)
-        const centerX = zone.centerX;
-        const centerY = zone.centerY;
-        const spacing = 60; // Space between values and operator
+        // Map params to behavior params
+        const behaviorParams = {
+            leftValue: params.left,
+            rightValue: params.right,
+            leftVarName: params.leftVar,
+            rightVarName: params.rightVar,
+            operator: params.operator,
+            result: params.result,
+            position: position
+        };
 
-        // Create temporary value bubbles
-        let leftBubble = null;
-        let rightBubble = null;
-        let operatorText = null;
-        let resultText = null;
-
-        // Step 1: Highlight source variables
-        if (leftVisual) {
-            timeline.to(leftVisual.container, {
-                pixi: { tint: 0x6366f1 },
-                duration: 0.2
-            }, startTime);
-        }
-        if (rightVisual) {
-            timeline.to(rightVisual.container, {
-                pixi: { tint: 0x6366f1 },
-                duration: 0.2
-            }, startTime);
-        }
-
-        // Step 2: Create value bubbles at source positions and animate to center
-        timeline.call(() => {
-            // Left value bubble
-            leftBubble = this.createValueBubble(leftVal);
-            if (leftVisual) {
-                const pos = leftVisual.getPosition();
-                leftBubble.setPosition(pos.x + 80, pos.y + 15);
-            } else {
-                leftBubble.setPosition(zone.x, centerY);
-            }
-            leftBubble.show();
-
-            // Right value bubble  
-            rightBubble = this.createValueBubble(rightVal);
-            if (rightVisual) {
-                const pos = rightVisual.getPosition();
-                rightBubble.setPosition(pos.x + 80, pos.y + 15);
-            } else {
-                rightBubble.setPosition(zone.x + zone.width, centerY);
-            }
-            rightBubble.show();
-
-            // Animate bubbles to center positions
-            gsap.to(leftBubble.container, {
-                x: centerX - spacing,
-                y: centerY,
-                duration: 0.4,
-                ease: 'power2.out'
-            });
-
-            gsap.to(rightBubble.container, {
-                x: centerX + spacing,
-                y: centerY,
-                duration: 0.4,
-                ease: 'power2.out'
-            });
-        }, null, startTime + 0.25);
-
-        // Step 3: Show operator between values
-        timeline.call(() => {
-            operatorText = new PIXI.Text({
-                text: operator,
-                style: new PIXI.TextStyle({
-                    fontFamily: 'JetBrains Mono, monospace',
-                    fontSize: 24,
-                    fill: 0xf59e0b,
-                    fontWeight: 'bold'
-                })
-            });
-            operatorText.anchor.set(0.5);
-            operatorText.x = centerX;
-            operatorText.y = centerY;
-            operatorText.alpha = 0;
-            this.layers.effects.addChild(operatorText);
-
-            gsap.to(operatorText, {
-                alpha: 1,
-                duration: 0.2,
-                ease: 'power2.out'
-            });
-        }, null, startTime + 0.7);
-
-        // Step 4: Show result
-        timeline.call(() => {
-            const resultColor = result ? 0x22c55e : 0xef4444;
-            const resultSymbol = result ? '→ True ✓' : '→ False ✗';
-
-            resultText = new PIXI.Text({
-                text: resultSymbol,
-                style: new PIXI.TextStyle({
-                    fontFamily: 'JetBrains Mono, monospace',
-                    fontSize: 16,
-                    fill: resultColor,
-                    fontWeight: 'bold'
-                })
-            });
-            resultText.anchor.set(0.5);
-            resultText.x = centerX;
-            resultText.y = centerY + 40;
-            resultText.alpha = 0;
-            resultText.scale.set(0.5);
-            this.layers.effects.addChild(resultText);
-
-            gsap.to(resultText, {
-                alpha: 1,
-                duration: 0.2
-            });
-            gsap.to(resultText.scale, {
-                x: 1, y: 1,
-                duration: 0.3,
-                ease: 'back.out(2)'
-            });
-        }, null, startTime + 1.0);
-
-        // Step 5: Remove highlights from variables
-        if (leftVisual) {
-            timeline.to(leftVisual.container, {
-                pixi: { tint: 0xffffff },
-                duration: 0.3
-            }, startTime + 1.3);
-        }
-        if (rightVisual) {
-            timeline.to(rightVisual.container, {
-                pixi: { tint: 0xffffff },
-                duration: 0.3
-            }, startTime + 1.3);
-        }
-
-        // Step 6: Clean up - fade out everything
-        timeline.call(() => {
-            const fadeOut = [leftBubble?.container, rightBubble?.container, operatorText, resultText].filter(Boolean);
-
-            gsap.to(fadeOut, {
-                alpha: 0,
-                duration: 0.3,
-                ease: 'power2.in',
-                onComplete: () => {
-                    leftBubble?.destroy();
-                    rightBubble?.destroy();
-                    operatorText?.destroy();
-                    resultText?.destroy();
-                }
-            });
-        }, null, startTime + 1.5);
+        // Use the BehaviorLibrary to execute the animation
+        return playBehavior('IF_ELSE_BRANCH', this.layers.effects, behaviorParams, (result) => {
+            onComplete?.(result);
+        });
     }
 
     /**
@@ -785,6 +660,7 @@ export class PixiRenderer {
      * Create animation from command - returns a GSAP tween/timeline
      */
     createAnimation(command) {
+        console.log('🎨 PixiRenderer.createAnimation:', command.type, command);
         const timeline = gsap.timeline();
 
         switch (command.type) {
@@ -816,14 +692,7 @@ export class PixiRenderer {
             case 'SHOW_VALUE_BUBBLE':
                 return this._animateShowValueBubble(command);
 
-            case 'SHOW_COMPARISON':
-                return this._animateShowComparison(command);
-
-            case 'EVALUATE_CONDITION':
-                return this._animateEvaluateCondition(command);
-
-            case 'SHOW_BRANCH':
-                return this._animateShowBranch(command);
+            // Legacy cases removed: SHOW_COMPARISON, EVALUATE_CONDITION, SHOW_BRANCH
 
             case 'SHOW_LOOP_INDICATOR':
                 return this._animateShowLoopIndicator(command);
