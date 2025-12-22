@@ -50,6 +50,7 @@ class PythonTracer:
         self.target_class_name: Optional[str] = None
         self.function_start_line: int = 0
         self.function_end_line: int = 0
+        self.on_frame = None
         
     def _safe_copy(self, value: Any) -> Any:
         if value is None:
@@ -282,6 +283,12 @@ class PythonTracer:
             )
             trace_frame.explanation = self._generate_explanation(trace_frame)
             self.frames.append(trace_frame)
+            if self.on_frame:
+                try:
+                    self.on_frame(trace_frame.to_dict())
+                except Exception:
+                    # Never break tracing due to callback errors
+                    pass
             
         elif event == 'exception':
             self.step_count += 1
@@ -297,10 +304,15 @@ class PythonTracer:
             )
             trace_frame.explanation = f"Exception: {exc_type.__name__}: {exc_value}"
             self.frames.append(trace_frame)
+            if self.on_frame:
+                try:
+                    self.on_frame(trace_frame.to_dict())
+                except Exception:
+                    pass
         
         return self._trace_callback
     
-    def trace(self, code: str, input_values: Optional[List[str]] = None) -> Dict[str, Any]:
+    def trace(self, code: str, input_values: Optional[List[str]] = None, on_frame=None) -> Dict[str, Any]:
         self.frames = []
         self.step_count = 0
         self.previous_locals = {}
@@ -311,6 +323,7 @@ class PythonTracer:
         self.target_class_name = None
         self.function_start_line = 0
         self.function_end_line = 0
+        self.on_frame = on_frame
         
         self.source_lines = code.split('\n')
         self._analyze_code_structure(code)

@@ -9,6 +9,8 @@ import json
 import ast
 import re
 import time
+import threading
+import queue
 from typing import List, Optional
 
 from django.http import JsonResponse, StreamingHttpResponse
@@ -388,35 +390,87 @@ def trace_stream(request):
         input_types = data.get('inputTypes', [])
         
         def generate_frames():
-            try:
-                executable_code = prepare_execution_code(code, code_type, function_name, class_name, inputs, input_types)
-                result = trace_code(executable_code, inputs if code_type == "script" else [])
-                
-                if result.get('success'):
-                    frames = result.get('frames', [])
-                    source_lines = result.get('source_lines', [])
-                    
-                    for i, frame in enumerate(frames):
-                        if narrator and narrator.is_available:
-                            frame['explanation'] = narrator.generate_narration(
-                                step=frame.get('step', 0),
-                                line=frame.get('line', 0),
-                                code=frame.get('code', ''),
-                                event=frame.get('event', 'line'),
-                                variables=frame.get('locals', {}),
-                                changed_vars=frame.get('changed_vars', []),
-                                function_name=frame.get('function_name'),
-                                return_value=frame.get('return_value'),
-                                full_source=source_lines
-                            )
-                        yield f"data: {json.dumps({'type': 'frame', 'index': i, 'frame': frame})}\n\n"
-                        time.sleep(0.05)
-                    
-                    yield f"data: {json.dumps({'type': 'complete', 'totalFrames': len(frames)})}\n\n"
-                else:
-                    yield f"data: {json.dumps({'type': 'error', 'error': result.get('error', 'Unknown error')})}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+            """Generator that yields SSE messages as frames are produced."""
+            executable_code = prepare_execution_code(code, code_type, function_name, class_name, inputs, input_types)
+            source_lines = executable_code.splitlines()
+            frame_queue: "queue.Queue" = queue.Queue()
+            done_event = threading.Event()
+
+            # Send metadata immediately so the frontend can show "starting" state
+            yield f"data: {json.dumps({'type': 'metadata', 'codeType': code_type, 'functionName': function_name, 'className': class_name, 'aiNarrator': (narrator.is_available if narrator else False)})}\n\n"
+
+            def maybe_add_ai_narration(frame_dict):
+                if not (narrator and narrator.is_available):
+                    return
+                try:
+                    ai_narration = narrator.generate_narration(
+                        step=frame_dict.get('step', 0),
+                        line=frame_dict.get('line', 0),
+                        code=frame_dict.get('code', ''),
+                        event=frame_dict.get('event', 'line'),
+                        variables=frame_dict.get('locals', {}),
+                        changed_vars=frame_dict.get('changed_vars', []),
+                        function_name=frame_dict.get('function_name'),
+                        return_value=frame_dict.get('return_value'),
+                        full_source=source_lines
+                    )
+                    if ai_narration:
+                        frame_dict['explanation'] = ai_narration
+                except Exception:
+                    # If narration fails, keep the tracer's existing explanation.
+                    return
+
+            def on_frame(frame_dict):
+                # frame_dict is already JSON-serializable
+                maybe_add_ai_narration(frame_dict)
+                frame_queue.put({'type': 'frame', 'frame': frame_dict})
+
+            result_holder = {'result': None, 'error': None}
+
+            def worker():
+                try:
+                    from .tracer import PythonTracer
+                    tracer = PythonTracer()
+
+                    result = tracer.trace(
+                        executable_code,
+                        inputs if code_type == "script" else [],
+                        on_frame=on_frame
+                    )
+                    result_holder['result'] = result
+                except Exception as e:
+                    result_holder['error'] = str(e)
+                finally:
+                    done_event.set()
+
+            t = threading.Thread(target=worker, daemon=True)
+            t.start()
+
+            frame_index = 0
+            while True:
+                try:
+                    item = frame_queue.get(timeout=0.25)
+                except queue.Empty:
+                    if done_event.is_set():
+                        break
+                    continue
+
+                if item.get('type') == 'frame':
+                    frame = item['frame']
+                    yield f"data: {json.dumps({'type': 'frame', 'index': frame_index, 'frame': frame})}\n\n"
+                    frame_index += 1
+
+            if result_holder['error']:
+                yield f"data: {json.dumps({'type': 'error', 'error': result_holder['error']})}\n\n"
+                return
+
+            result = result_holder['result'] or {}
+            if not result.get('success'):
+                yield f"data: {json.dumps({'type': 'error', 'error': result.get('error', 'Unknown error')})}\n\n"
+                return
+
+            # Send completion message with output (if any)
+            yield f"data: {json.dumps({'type': 'complete', 'totalFrames': frame_index, 'output': result.get('output', '')})}\n\n"
         
         response = StreamingHttpResponse(
             generate_frames(),

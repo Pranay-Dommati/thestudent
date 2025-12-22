@@ -84,10 +84,10 @@ function CodeVisualizerPage() {
         setLoadingPhase(3); // Preparing
 
         try {
-            // Use the trace endpoint (non-streaming for Django compatibility)
-            const response = await fetch(`${API_BASE_URL}/trace/`, {
+            // Prefer SSE streaming to reduce perceived latency
+            const response = await fetch(`${API_BASE_URL}/trace-stream/`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
                 body: JSON.stringify({
                     code: code,
                     inputs: inputValues,
@@ -173,7 +173,20 @@ function CodeVisualizerPage() {
                 }
             } else {
                 // Fall back to regular JSON response
-                const data = await response.json();
+                const fallback = await fetch(`${API_BASE_URL}/trace/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code: code,
+                        inputs: inputValues,
+                        codeType: meta?.codeType || 'script',
+                        functionName: meta?.functionName || null,
+                        className: meta?.className || null,
+                        inputTypes: meta?.inputs?.map(i => i.type) || []
+                    })
+                });
+
+                const data = await fallback.json();
 
                 setLoadingPhase(4); // Starting
                 await new Promise(resolve => setTimeout(resolve, 300));

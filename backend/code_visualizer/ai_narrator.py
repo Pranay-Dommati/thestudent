@@ -144,7 +144,7 @@ class AINarrator:
             prompt += f"\n\nExplain what the line `{code_line}` does with these values. Include DRY-RUN:"
             
             response = self.client.models.generate_content(
-                model='gemini-2.0-flash-exp',
+                model='gemini-2.0-flash',
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=NARRATOR_SYSTEM_PROMPT,
@@ -157,6 +157,15 @@ class AINarrator:
             narration = narration.strip('"\'')
             if narration.startswith('Narration:'):
                 narration = narration[10:].strip()
+
+            # Guarantee consistent UI formatting: if Gemini output doesn't include
+            # a DRY-RUN block, fall back to our formatted basic narration.
+            import re
+            if not re.search(r"\bDRY\s*-?\s*RUN\s*:", narration, re.IGNORECASE):
+                return self._generate_basic_narration(
+                    step, line, code, event, variables,
+                    changed_vars, function_name, return_value
+                )
             
             return narration
             
@@ -180,6 +189,12 @@ class AINarrator:
     ) -> str:
         import re
         code = code.strip()
+
+        def fmt(explanation: str, dry_run_lines: List[str]) -> str:
+            dry_run = "\n".join(dry_run_lines).strip()
+            if dry_run:
+                return f"{explanation}\n\nDRY-RUN:\n{dry_run}"
+            return f"{explanation}\n\nDRY-RUN:\n"
         
         def get_var_value(var_name):
             if var_name in variables:
@@ -188,13 +203,28 @@ class AINarrator:
             return None
         
         if event == 'call':
-            return f"Calling function '{function_name}'"
+            name = function_name or "<function>"
+            return fmt(
+                f"Calling function `{name}`.",
+                [f"{name}(...)"],
+            )
         if event == 'return':
             if return_value is not None:
-                return f"Returning {return_value} from '{function_name}'"
-            return f"Returning from '{function_name}'"
+                name = function_name or "<function>"
+                return fmt(
+                    f"Returning from `{name}`.",
+                    [f"return {repr(return_value)} ✓"],
+                )
+            name = function_name or "<function>"
+            return fmt(
+                f"Returning from `{name}`.",
+                ["return ..."],
+            )
         if event == 'exception':
-            return f"An error occurred at this line"
+            return fmt(
+                "An error occurred while executing this line.",
+                [code],
+            )
         
         for_match = re.match(r'for\s+(\w+)\s+in\s+(.+):', code)
         if for_match:
@@ -202,24 +232,42 @@ class AINarrator:
             iterable = for_match.group(2).strip()
             val = get_var_value(loop_var)
             if val is not None:
-                return f"Loop iteration: {loop_var} is now {val}"
-            return f"Starting loop: iterating {loop_var} through {iterable}"
+                return fmt(
+                    f"Loop iteration: updating `{loop_var}` for this pass.",
+                    [f"{loop_var} = {repr(val)}"],
+                )
+            return fmt(
+                f"Starting loop over `{iterable}`.",
+                [f"for {loop_var} in {iterable}:"],
+            )
         
         return_match = re.match(r'return\s+(.+)', code)
         if return_match:
             return_expr = return_match.group(1).strip()
             val = get_var_value(return_expr)
             if val is not None:
-                return f"Returning {return_expr} which equals {val}"
-            return f"Returning {return_expr}"
+                return fmt(
+                    "Returning a value from this function.",
+                    [f"return {return_expr}", f"return {repr(val)} ✓"],
+                )
+            return fmt(
+                "Returning a value from this function.",
+                [f"return {return_expr}"],
+            )
         
         if_match = re.match(r'(if|elif)\s+(.+):', code)
         if if_match:
             condition = if_match.group(2).strip()
-            return f"Checking condition: {condition}"
+            return fmt(
+                "Checking whether the condition is true.",
+                [condition, "(evaluated by Python)"],
+            )
             
         if code.strip() == 'else:':
-            return "Entering else branch"
+            return fmt(
+                "Entering the else branch.",
+                ["else:"],
+            )
         
         assign_match = re.match(r'^(\w+)\s*=\s*(.+)$', code)
         if assign_match and '==' not in code and '!=' not in code and '<=' not in code and '>=' not in code:
@@ -227,8 +275,14 @@ class AINarrator:
             expression = assign_match.group(2).strip()
             val = get_var_value(var_name)
             if val is not None:
-                return f"Setting {var_name} = {expression} → {val}"
-            return f"Assigning {expression} to {var_name}"
+                return fmt(
+                    f"Assigning the result of `{expression}` to `{var_name}`.",
+                    [f"{var_name} = {expression}", f"{var_name} = {repr(val)}"],
+                )
+            return fmt(
+                f"Assigning a value to `{var_name}`.",
+                [f"{var_name} = {expression}"],
+            )
         
         aug_match = re.match(r'^(\w+)\s*([+\-*/])=\s*(.+)$', code)
         if aug_match:
@@ -237,19 +291,40 @@ class AINarrator:
             expression = aug_match.group(3).strip()
             val = get_var_value(var_name)
             if val is not None:
-                return f"Updating {var_name} {op}= {expression} → {var_name} is now {val}"
-            return f"Updating {var_name} {op}= {expression}"
+                return fmt(
+                    f"Updating `{var_name}` using `{op}=`.",
+                    [f"{var_name} {op}= {expression}", f"{var_name} = {repr(val)}"],
+                )
+            return fmt(
+                f"Updating `{var_name}` using `{op}=`.",
+                [f"{var_name} {op}= {expression}"],
+            )
         
         if code.startswith('while '):
-            return "Checking the while loop condition"
+            return fmt(
+                "Checking the while-loop condition.",
+                [code],
+            )
         if code.startswith('print('):
-            return "Printing output to console"
+            return fmt(
+                "Printing output to the console.",
+                [code],
+            )
         if code.startswith('def '):
-            return "Defining a function"
+            return fmt(
+                "Defining a function.",
+                [code],
+            )
         if code.startswith('class '):
-            return "Defining a class"
+            return fmt(
+                "Defining a class.",
+                [code],
+            )
         
-        return "Executing this line"
+        return fmt(
+            "Executing this line.",
+            [code] if code else [],
+        )
 
 
 # Singleton instance

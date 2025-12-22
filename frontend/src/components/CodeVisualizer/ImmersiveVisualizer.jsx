@@ -51,16 +51,17 @@ const ImmersiveVisualizer = ({
         if (newStepsCount > 0) {
             // New steps have arrived
             const newSteps = steps.slice(prevStepsLengthRef.current);
-            
-            // If we received many steps at once (non-streaming), show them all immediately
-            if (newStepsCount > 3) {
-                // Bulk arrival - show all at once without animation queue
+
+            // If we received a very large batch in one go (likely non-streaming),
+            // avoid enqueueing thousands of state updates.
+            const isInitialLoad = prevStepsLengthRef.current === 0;
+            if (isInitialLoad && steps.length > 80) {
                 setVisibleSteps(steps);
                 setCurrentStepIndex(steps.length - 1);
                 setIsStreaming(false);
                 setPendingSteps([]);
             } else {
-                // Streaming - queue them for animated reveal
+                // Treat as streaming: queue for progressive reveal.
                 setIsStreaming(true);
                 setPendingSteps(prev => [...prev, ...newSteps]);
             }
