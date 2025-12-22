@@ -18,8 +18,9 @@ urlpatterns = [
     path('trace/', views.trace_endpoint, name='trace'),
     path('trace-stream/', views.trace_stream, name='trace_stream'),
     
-    # Input detection
+    # Input detection and generation
     path('detect-inputs/', views.detect_inputs, name='detect_inputs'),
+    path('generate-inputs/', views.generate_smart_inputs, name='generate_inputs'),
     
     # Code validation
     path('validate/', views.validate_code_endpoint, name='validate'),

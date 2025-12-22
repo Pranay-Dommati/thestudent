@@ -218,10 +218,58 @@ def detect_input_type(line):
 
 
 def parse_input_values(input_values, input_types):
-    """Parse input values based on their types."""
+    """Parse input values based on their types.
+    
+    Handles both:
+    - String values (from manual input modal)
+    - Native Python types (from auto-generation)
+    """
     parsed = []
     for i, value in enumerate(input_values):
         input_type = input_types[i] if i < len(input_types) else "any"
+        
+        # If value is already a native Python type (from auto-generator), format it directly
+        if isinstance(value, list):
+            # Already a list - format for Python
+            if all(isinstance(x, (int, float)) for x in value):
+                parsed.append(f"[{', '.join(map(str, value))}]")
+            else:
+                # List of strings or mixed
+                formatted_items = []
+                for item in value:
+                    if isinstance(item, str):
+                        formatted_items.append(f'"{item}"')
+                    else:
+                        formatted_items.append(str(item))
+                parsed.append(f"[{', '.join(formatted_items)}]")
+            continue
+        elif isinstance(value, bool):
+            parsed.append("True" if value else "False")
+            continue
+        elif isinstance(value, int):
+            parsed.append(str(value))
+            continue
+        elif isinstance(value, float):
+            parsed.append(str(value))
+            continue
+        elif isinstance(value, dict):
+            # Format dict for Python
+            items = []
+            for k, v in value.items():
+                k_str = f'"{k}"' if isinstance(k, str) else str(k)
+                v_str = f'"{v}"' if isinstance(v, str) else str(v)
+                items.append(f"{k_str}: {v_str}")
+            parsed.append("{" + ", ".join(items) + "}")
+            continue
+        elif value is None:
+            parsed.append("None")
+            continue
+        
+        # String value (from manual input) - parse based on type
+        if not isinstance(value, str):
+            # Fallback: convert to string
+            value = str(value)
+            
         if input_type in ["list_int", "list"]:
             value = value.strip()
             items = value.split(',') if ',' in value else value.split()
@@ -393,3 +441,120 @@ def validate_code_endpoint(request):
         return JsonResponse({"valid": is_valid, "error": error})
     except Exception as e:
         return JsonResponse({"valid": False, "error": str(e)})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def generate_smart_inputs(request):
+    """
+    Generate minimal, educational inputs for code visualization using AI.
+    
+    This endpoint uses Gemini AI to analyze the code and generate the smallest
+    meaningful inputs that will demonstrate the algorithm effectively.
+    """
+    try:
+        data = json.loads(request.body)
+        code = data.get('code', '')
+        inputs_metadata = data.get('inputs', [])
+        
+        if not code.strip():
+            return JsonResponse({"success": False, "error": "No code provided"})
+        
+        if not inputs_metadata:
+            return JsonResponse({"success": True, "inputs": []})
+        
+        # Build the prompt for Gemini
+        input_descriptions = []
+        for inp in inputs_metadata:
+            var_name = inp.get('variable') or inp.get('name', f'param{inp.get("id", 0)}')
+            var_type = inp.get('type', 'any')
+            input_descriptions.append(f"- {var_name}: {var_type}")
+        
+        prompt = f"""You are an expert at creating minimal test inputs for code visualization and education.
+
+Analyze this Python code and generate the SMALLEST, SIMPLEST inputs that will effectively demonstrate how the algorithm works.
+
+CODE:
+```python
+{code}
+```
+
+REQUIRED INPUTS:
+{chr(10).join(input_descriptions)}
+
+RULES:
+1. Keep arrays/lists to 3-6 elements maximum - enough to show the pattern, not more
+2. Use simple, small numbers (single or double digits preferred)
+3. Choose values that will exercise the main logic paths
+4. For string inputs, use 3-6 characters
+5. Ensure the inputs are valid and won't cause errors
+6. Make inputs that create an interesting execution (not trivial cases)
+
+Respond with ONLY a valid JSON object in this exact format:
+{{"inputs": {{{", ".join([f'"{inp.get("variable") or inp.get("name", f"param{inp.get("id", 0)}")}": <value>' for inp in inputs_metadata])}}}}}
+
+Examples of good minimal inputs:
+- For findMax([List[int]]): {{"inputs": {{"nums": [3, 7, 2, 9, 1]}}}}
+- For isIsomorphic(s, t): {{"inputs": {{"s": "egg", "t": "add"}}}}
+- For twoSum(nums, target): {{"inputs": {{"nums": [2, 7, 11, 15], "target": 9}}}}
+- For reverseString(s): {{"inputs": {{"s": "hello"}}}}
+
+Your response (JSON only):"""
+
+        try:
+            # Import and call Gemini API
+            from backend.ai.ai_service import call_gemini_api
+            
+            response = call_gemini_api(prompt, max_retries=2)
+            
+            if response and 'candidates' in response:
+                text = response['candidates'][0]['content']['parts'][0]['text']
+                
+                # Clean up the response - extract JSON
+                text = text.strip()
+                if text.startswith('```json'):
+                    text = text[7:]
+                if text.startswith('```'):
+                    text = text[3:]
+                if text.endswith('```'):
+                    text = text[:-3]
+                text = text.strip()
+                
+                # Parse the JSON
+                result = json.loads(text)
+                
+                if 'inputs' in result:
+                    # Convert to list format matching input order
+                    input_values = []
+                    for inp in inputs_metadata:
+                        var_name = inp.get('variable') or inp.get('name', f'param{inp.get("id", 0)}')
+                        value = result['inputs'].get(var_name)
+                        if value is not None:
+                            input_values.append(value)
+                        else:
+                            # Fallback for missing values
+                            input_values.append(None)
+                    
+                    return JsonResponse({
+                        "success": True,
+                        "inputs": input_values,
+                        "raw": result['inputs'],
+                        "source": "ai"
+                    })
+            
+            return JsonResponse({
+                "success": False,
+                "error": "AI response parsing failed",
+                "source": "ai"
+            })
+            
+        except Exception as ai_error:
+            print(f"❌ AI input generation failed: {ai_error}")
+            return JsonResponse({
+                "success": False,
+                "error": str(ai_error),
+                "source": "ai"
+            })
+            
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)})

@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import TopBar from './TopBar';
 import CodeEditor from './CodeEditor';
 import InputModal from './InputModal';
 import ImmersiveVisualizer from './ImmersiveVisualizer';
+import { ConstraintAwareGenerator } from './engine/InputGenerator';
 import './CodeVisualizer.css';
 
 // API Base URL - uses Django backend visualizer API
@@ -24,7 +25,7 @@ print(arr)`;
 
 function CodeVisualizerPage() {
     const [code, setCode] = useState('');
-    const [autoGenerateInput, setAutoGenerateInput] = useState(false);
+    const [autoGenerateInput, setAutoGenerateInput] = useState(true);
     const [isRunning, setIsRunning] = useState(false);
     const [steps, setSteps] = useState([]);
     const [error, setError] = useState(null);
@@ -38,6 +39,9 @@ function CodeVisualizerPage() {
     const [showVisualizer, setShowVisualizer] = useState(false);
     const [isLoadingTrace, setIsLoadingTrace] = useState(false);
     const [loadingPhase, setLoadingPhase] = useState(0);
+
+    // Input generator instance (memoized)
+    const inputGenerator = useMemo(() => new ConstraintAwareGenerator(), []);
 
     // Detect inputs in the code
     const detectInputs = useCallback(async (codeToCheck) => {
@@ -205,10 +209,52 @@ function CodeVisualizerPage() {
         }
     }, [code, codeMetadata]);
 
+    // Generate inputs using AI (primary) or local generator (fallback)
+    const generateInputsWithAI = useCallback(async (codeToAnalyze, inputDetection) => {
+        console.log('🤖 Attempting AI-powered input generation...');
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/generate-inputs/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: codeToAnalyze,
+                    inputs: inputDetection.inputs
+                })
+            });
+            
+            const data = await response.json();
+            console.log('AI generation response:', data);
+            
+            if (data.success && data.inputs) {
+                console.log('✅ AI generated inputs:', data.inputs);
+                return { success: true, inputs: data.inputs, source: 'ai' };
+            }
+            
+            throw new Error(data.error || 'AI generation failed');
+        } catch (err) {
+            console.log('⚠️ AI generation failed, using local fallback:', err.message);
+            
+            // Fallback to local constraint-aware generator
+            try {
+                const generated = inputGenerator.generate(codeToAnalyze, inputDetection);
+                const inputValues = inputDetection.inputs.map(input => {
+                    const varName = input.variable || input.name;
+                    return generated.inputs[varName];
+                });
+                return { success: true, inputs: inputValues, source: 'local' };
+            } catch (localErr) {
+                console.error('❌ Local generation also failed:', localErr);
+                return { success: false, error: localErr.message };
+            }
+        }
+    }, [inputGenerator]);
+
     // Handle start visualization button click
     const handleStartVisualization = useCallback(async () => {
         console.log('=== START VISUALIZATION CLICKED ===');
         console.log('Code length:', code.length);
+        console.log('Auto-generate input:', autoGenerateInput);
 
         if (!code.trim()) {
             console.log('No code, returning');
@@ -227,16 +273,32 @@ function CodeVisualizerPage() {
         setCodeMetadata(inputDetection);
 
         if (inputDetection.hasInputs && inputDetection.count > 0) {
-            console.log('Showing input modal');
-            // Show modal to collect inputs
-            setDetectedInputs(inputDetection.inputs);
-            setShowInputModal(true);
+            if (autoGenerateInput) {
+                // Auto-generate inputs using AI (with local fallback)
+                console.log('Auto-generating inputs with AI...');
+                const result = await generateInputsWithAI(code, inputDetection);
+                
+                if (result.success) {
+                    console.log(`Running trace with ${result.source} generated values:`, result.inputs);
+                    runTrace(result.inputs, inputDetection);
+                } else {
+                    console.error('All input generation methods failed:', result.error);
+                    // Fall back to showing modal
+                    setDetectedInputs(inputDetection.inputs);
+                    setShowInputModal(true);
+                }
+            } else {
+                console.log('Showing input modal');
+                // Show modal to collect inputs
+                setDetectedInputs(inputDetection.inputs);
+                setShowInputModal(true);
+            }
         } else {
             console.log('No inputs needed, running trace directly');
             // No inputs needed, run directly
             runTrace([], inputDetection);
         }
-    }, [code, detectInputs, runTrace]);
+    }, [code, detectInputs, runTrace, autoGenerateInput, generateInputsWithAI]);
 
     // Handle input submission from modal
     const handleInputSubmit = useCallback((inputValues) => {
