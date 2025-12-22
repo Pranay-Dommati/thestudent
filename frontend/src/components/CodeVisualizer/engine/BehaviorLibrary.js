@@ -55,7 +55,7 @@ function createText(content, options = {}) {
         fill = COLORS.text,
         fontWeight = 'bold'
     } = options;
-    
+
     return new PIXI.Text({
         text: String(content),
         style: new PIXI.TextStyle({
@@ -78,26 +78,26 @@ function createValueBox(value, options = {}) {
         textColor = COLORS.text,
         borderColor = COLORS.primary
     } = options;
-    
+
     const container = new PIXI.Container();
-    
+
     // Background
     const bg = new PIXI.Graphics();
     bg.roundRect(0, 0, width, height, 6);
     bg.fill(bgColor);
     bg.stroke({ width: 2, color: borderColor });
     container.addChild(bg);
-    
+
     // Value text
     const text = createText(value, { fontSize: 16, fill: textColor });
     text.anchor.set(0.5);
     text.x = width / 2;
     text.y = height / 2;
     container.addChild(text);
-    
+
     container.bg = bg;
     container.text = text;
-    
+
     return container;
 }
 
@@ -111,93 +111,93 @@ function createValueBox(value, options = {}) {
 export function VALUE_UPDATE(layer, params, onComplete) {
     const { varName = 'x', oldValue, newValue, position } = params;
     const { x, y } = position;
-    
+
     const tl = gsap.timeline({ onComplete });
-    
+
     // Container for the variable box
     const container = new PIXI.Container();
     container.x = x;
     container.y = y;
     layer.addChild(container);
-    
+
     // Variable name label
     const nameLabel = createText(`${varName}`, { fontSize: 16, fill: COLORS.value });
     nameLabel.anchor.set(1, 0.5);
     nameLabel.x = -30;
     nameLabel.y = 18;
     container.addChild(nameLabel);
-    
+
     // Equals sign
     const equalsLabel = createText('=', { fontSize: 16, fill: COLORS.text });
     equalsLabel.anchor.set(0.5, 0.5);
     equalsLabel.x = -15;
     equalsLabel.y = 18;
     container.addChild(equalsLabel);
-    
+
     // Value box background
     const BOX_WIDTH = 56;
     const BOX_HEIGHT = 36;
-    
+
     const boxBg = new PIXI.Graphics();
     boxBg.roundRect(0, 0, BOX_WIDTH, BOX_HEIGHT, 6);
     boxBg.fill(COLORS.bg);
     boxBg.stroke({ width: 2, color: COLORS.primary });
     container.addChild(boxBg);
-    
+
     // Mask for value text (clips during animation)
     const mask = new PIXI.Graphics();
     mask.rect(0, 0, BOX_WIDTH, BOX_HEIGHT);
     mask.fill(0xffffff);
     container.addChild(mask);
-    
+
     // Value container (masked)
     const valueContainer = new PIXI.Container();
     valueContainer.mask = mask;
     container.addChild(valueContainer);
-    
+
     // Old value text
     const oldText = createText(oldValue, { fontSize: 18, fill: COLORS.text });
     oldText.anchor.set(0.5);
     oldText.x = BOX_WIDTH / 2;
     oldText.y = BOX_HEIGHT / 2;
     valueContainer.addChild(oldText);
-    
+
     // New value text (starts below, hidden)
     const newText = createText(newValue, { fontSize: 18, fill: COLORS.success });
     newText.anchor.set(0.5);
     newText.x = BOX_WIDTH / 2;
     newText.y = BOX_HEIGHT / 2 + BOX_HEIGHT; // Below the box
     valueContainer.addChild(newText);
-    
+
     // Animation sequence
     // 1. Fade in container
     container.alpha = 0;
     tl.to(container, { alpha: 1, duration: TIMING.normal, ease: EASING.out }, 0);
-    
+
     // 2. Brief pause to show old value
     tl.to({}, { duration: 0.3 }, 0.25);
-    
+
     // 3. Flash border to indicate change coming
-    tl.to(boxBg, { 
-        pixi: { tint: COLORS.warning }, 
-        duration: TIMING.fast 
+    tl.to(boxBg, {
+        pixi: { tint: COLORS.warning },
+        duration: TIMING.fast
     }, 0.5);
-    
+
     // 4. Old value slides up and fades
-    tl.to(oldText, { 
-        y: BOX_HEIGHT / 2 - BOX_HEIGHT, 
+    tl.to(oldText, {
+        y: BOX_HEIGHT / 2 - BOX_HEIGHT,
         alpha: 0,
-        duration: TIMING.normal, 
-        ease: EASING.in 
+        duration: TIMING.normal,
+        ease: EASING.in
     }, 0.6);
-    
+
     // 5. New value slides up into place
-    tl.to(newText, { 
-        y: BOX_HEIGHT / 2, 
-        duration: TIMING.normal, 
-        ease: EASING.out 
+    tl.to(newText, {
+        y: BOX_HEIGHT / 2,
+        duration: TIMING.normal,
+        ease: EASING.out
     }, 0.7);
-    
+
     // 6. Border turns green for success
     tl.call(() => {
         boxBg.clear();
@@ -205,31 +205,31 @@ export function VALUE_UPDATE(layer, params, onComplete) {
         boxBg.fill(COLORS.bg);
         boxBg.stroke({ width: 2, color: COLORS.success });
     }, null, 0.9);
-    
+
     // 7. Pulse effect
-    tl.to(container.scale, { 
-        x: 1.08, y: 1.08, 
-        duration: TIMING.fast, 
-        ease: EASING.out 
+    tl.to(container.scale, {
+        x: 1.08, y: 1.08,
+        duration: TIMING.fast,
+        ease: EASING.out
     }, 0.9);
-    tl.to(container.scale, { 
-        x: 1, y: 1, 
-        duration: TIMING.normal, 
-        ease: EASING.bounce 
+    tl.to(container.scale, {
+        x: 1, y: 1,
+        duration: TIMING.normal,
+        ease: EASING.bounce
     }, 1.05);
-    
+
     // 8. Hold for readability
     tl.to({}, { duration: 0.5 }, 1.2);
-    
+
     // 9. Fade out
     tl.to(container, { alpha: 0, duration: TIMING.normal, ease: EASING.in }, 1.7);
-    
+
     // Cleanup
     tl.call(() => {
         layer.removeChild(container);
         container.destroy({ children: true });
     }, null, 2.0);
-    
+
     return tl;
 }
 
@@ -242,15 +242,15 @@ export function VALUE_UPDATE(layer, params, onComplete) {
 export function COMPARE(layer, params, onComplete) {
     const { left, right, operator, result, position } = params;
     const { x, y } = position;
-    
+
     const tl = gsap.timeline({ onComplete });
-    
+
     // Container for entire comparison
     const container = new PIXI.Container();
     container.x = x;
     container.y = y;
     layer.addChild(container);
-    
+
     // Left value box
     const leftBox = createValueBox(left, { borderColor: COLORS.value });
     leftBox.x = -80;
@@ -258,7 +258,7 @@ export function COMPARE(layer, params, onComplete) {
     leftBox.alpha = 0;
     leftBox.scale.set(0.5);
     container.addChild(leftBox);
-    
+
     // Operator text
     const opText = createText(operator, { fontSize: 22, fill: COLORS.warning });
     opText.anchor.set(0.5);
@@ -266,7 +266,7 @@ export function COMPARE(layer, params, onComplete) {
     opText.y = 18;
     opText.alpha = 0;
     container.addChild(opText);
-    
+
     // Right value box
     const rightBox = createValueBox(right, { borderColor: COLORS.value });
     rightBox.x = 30;
@@ -274,7 +274,7 @@ export function COMPARE(layer, params, onComplete) {
     rightBox.alpha = 0;
     rightBox.scale.set(0.5);
     container.addChild(rightBox);
-    
+
     // Result text
     const resultColor = result ? COLORS.success : COLORS.error;
     const resultSymbol = result ? 'True ✓' : 'False ✗';
@@ -284,38 +284,38 @@ export function COMPARE(layer, params, onComplete) {
     resultText.y = 55;
     resultText.alpha = 0;
     container.addChild(resultText);
-    
+
     // Animation sequence
     // 1. Left value slides in
     tl.to(leftBox, { alpha: 1, duration: TIMING.normal, ease: EASING.out }, 0);
     tl.to(leftBox.scale, { x: 1, y: 1, duration: TIMING.normal, ease: EASING.bounce }, 0);
-    
+
     // 2. Right value slides in
     tl.to(rightBox, { alpha: 1, duration: TIMING.normal, ease: EASING.out }, 0.1);
     tl.to(rightBox.scale, { x: 1, y: 1, duration: TIMING.normal, ease: EASING.bounce }, 0.1);
-    
+
     // 3. Operator appears
     tl.to(opText, { alpha: 1, duration: TIMING.fast, ease: EASING.out }, 0.25);
-    
+
     // 4. Brief pause (processing)
     tl.to({}, { duration: TIMING.pause }, 0.4);
-    
+
     // 5. Result appears
     tl.to(resultText, { alpha: 1, duration: TIMING.fast }, 0.7);
     tl.from(resultText.scale, { x: 0.5, y: 0.5, duration: TIMING.normal, ease: EASING.bounce }, 0.7);
-    
+
     // 6. Hold for readability
     tl.to({}, { duration: 0.5 }, 0.9);
-    
+
     // 7. Fade out
     tl.to(container, { alpha: 0, duration: TIMING.normal, ease: EASING.in }, 1.4);
-    
+
     // Cleanup
     tl.call(() => {
         layer.removeChild(container);
         container.destroy({ children: true });
     }, null, 1.7);
-    
+
     return tl;
 }
 
@@ -327,12 +327,12 @@ export function COMPARE(layer, params, onComplete) {
 // ============================================
 export function ASSIGN_FROM(layer, params, onComplete) {
     const { sourceValue, targetPosition, sourcePosition } = params;
-    
+
     const tl = gsap.timeline({ onComplete });
-    
+
     // Create flying value bubble
-    const bubble = createValueBox(sourceValue, { 
-        width: 44, 
+    const bubble = createValueBox(sourceValue, {
+        width: 44,
         height: 32,
         bgColor: COLORS.primary,
         borderColor: COLORS.primary
@@ -342,11 +342,11 @@ export function ASSIGN_FROM(layer, params, onComplete) {
     bubble.alpha = 0;
     bubble.scale.set(0.5);
     layer.addChild(bubble);
-    
+
     // 1. Appear at source
     tl.to(bubble, { alpha: 1, duration: TIMING.fast, ease: EASING.out }, 0);
     tl.to(bubble.scale, { x: 1, y: 1, duration: TIMING.fast, ease: EASING.out }, 0);
-    
+
     // 2. Fly to target
     tl.to(bubble, {
         x: targetPosition.x,
@@ -354,20 +354,20 @@ export function ASSIGN_FROM(layer, params, onComplete) {
         duration: TIMING.slow,
         ease: EASING.inOut
     }, 0.15);
-    
+
     // 3. Land effect (pulse)
     tl.to(bubble.scale, { x: 1.2, y: 1.2, duration: TIMING.fast, ease: EASING.out }, 0.55);
     tl.to(bubble.scale, { x: 1, y: 1, duration: TIMING.fast, ease: EASING.bounce }, 0.7);
-    
+
     // 4. Fade out
     tl.to(bubble, { alpha: 0, duration: TIMING.fast, ease: EASING.in }, 0.9);
-    
+
     // Cleanup
     tl.call(() => {
         layer.removeChild(bubble);
         bubble.destroy({ children: true });
     }, null, 1.1);
-    
+
     return tl;
 }
 
@@ -400,7 +400,8 @@ export function ASSIGN_FROM_ARRAY_INDEX(layer, params, onComplete) {
     const safeIndex = Math.max(0, Math.min(index, (arrayValues?.length ?? 1) - 1));
     const newValue = Array.isArray(arrayValues) ? arrayValues[safeIndex] : undefined;
 
-    const tl = gsap.timeline({ onComplete });
+    // Don't use onComplete in constructor - we call it manually with position info
+    const tl = gsap.timeline();
 
     // Layout constants
     const CELL_W = 40;
@@ -553,16 +554,16 @@ export function ASSIGN_FROM_ARRAY_INDEX(layer, params, onComplete) {
     // --- STEP 3: Slide index text to the right, fade out array name, show array ---
     // Index slides to end of array (center anchor, so position at center)
     const indexAfterArrayX = arrayStartX + totalArrayWidth + 8 + indexText.width / 2;
-    
+
     // Slide index to the right smoothly
     tl.to(indexText, { x: indexAfterArrayX, duration: 0.45, ease: 'power2.inOut' }, t);
-    
+
     // Fade out array name
     tl.to(arrayNameText, { alpha: 0, duration: 0.2, ease: 'power2.in' }, t);
-    
+
     // Show array container
     tl.to(arrayContainer, { alpha: 1, duration: 0.15 }, t + 0.1);
-    
+
     // Cells pop in with stagger from left to right
     cells.forEach((cell, i) => {
         const delay = t + 0.1 + i * 0.05;
@@ -581,19 +582,19 @@ export function ASSIGN_FROM_ARRAY_INDEX(layer, params, onComplete) {
     // Target position: centered above the selected cell
     const indexTargetX = pointerTargetX;
     const indexTargetY = -CELL_H / 2 - 24;
-    
+
     // Smooth arc-like movement to above the cell
-    tl.to(indexText, { 
-        x: indexTargetX, 
+    tl.to(indexText, {
+        x: indexTargetX,
         y: indexTargetY,
-        duration: 0.5, 
+        duration: 0.5,
         ease: 'power3.inOut'
     }, t);
-    
+
     // Scale down as it moves into pointer position
     tl.to(indexText.scale, { x: 0.75, y: 0.75, duration: 0.5, ease: 'power2.inOut' }, t);
     t += 0.55;
-    
+
     // Show the pointer arrow below the index text
     tl.to(pointerArrow, { alpha: 1, duration: 0.15, ease: 'power2.out' }, t);
     tl.from(pointerArrow.scale, { x: 0.5, y: 0.5, duration: 0.2, ease: 'back.out(2)' }, t);
@@ -602,11 +603,11 @@ export function ASSIGN_FROM_ARRAY_INDEX(layer, params, onComplete) {
     // --- STEP 6: Highlight selected cell with glow ---
     tl.to(glowOuter, { alpha: 1, duration: 0.2, ease: 'power2.out' }, t);
     tl.to(glowInner, { alpha: 1, duration: 0.2, ease: 'power2.out' }, t + 0.05);
-    
+
     // Pulse the selected cell
     tl.to(selectedCell.container.scale, { x: 1.12, y: 1.12, duration: 0.15, ease: 'power2.out' }, t);
     tl.to(selectedCell.container.scale, { x: 1.05, y: 1.05, duration: 0.15, ease: 'power2.inOut' }, t + 0.15);
-    
+
     // Change cell to highlighted state
     tl.call(() => {
         selectedCell.bg.clear();
@@ -622,24 +623,24 @@ export function ASSIGN_FROM_ARRAY_INDEX(layer, params, onComplete) {
     cells.forEach((cell, i) => {
         if (i !== safeIndex) {
             const dir = i < safeIndex ? -1 : 1;
-            tl.to(cell.container, { 
-                alpha: 0, 
-                x: cell.container.x + dir * 20, 
-                duration: 0.3, 
-                ease: 'power2.in' 
+            tl.to(cell.container, {
+                alpha: 0,
+                x: cell.container.x + dir * 20,
+                duration: 0.3,
+                ease: 'power2.in'
             }, t);
         }
     });
-    
+
     // Fade out index text and pointer arrow
     tl.to(indexText, { alpha: 0, y: indexText.y - 10, duration: 0.25, ease: 'power2.in' }, t);
     tl.to(pointerArrow, { alpha: 0, duration: 0.2, ease: 'power2.in' }, t);
-    
+
     // Fade out index labels
     indexLabels.forEach(label => {
         tl.to(label, { alpha: 0, duration: 0.2, ease: 'power2.in' }, t);
     });
-    
+
     // Fade out varName and equals temporarily
     tl.to([varNameText, equalsText], { alpha: 0.3, duration: 0.2, ease: 'power2.in' }, t);
     t += 0.35;
@@ -650,12 +651,12 @@ export function ASSIGN_FROM_ARRAY_INDEX(layer, params, onComplete) {
     const cellCurrentGlobalX = arrayStartX + safeIndex * (CELL_W + GAP);
     const moveX = resultX - cellCurrentGlobalX;
 
-    tl.to(selectedCell.container, { 
-        x: selectedCell.container.x + moveX, 
-        duration: 0.4, 
-        ease: 'power2.inOut' 
+    tl.to(selectedCell.container, {
+        x: selectedCell.container.x + moveX,
+        duration: 0.4,
+        ease: 'power2.inOut'
     }, t);
-    
+
     // Bring back varName and equals
     tl.to([varNameText, equalsText], { alpha: 1, duration: 0.25, ease: 'power2.out' }, t + 0.15);
     t += 0.45;
@@ -668,28 +669,42 @@ export function ASSIGN_FROM_ARRAY_INDEX(layer, params, onComplete) {
         selectedCell.bg.fill(COLORS.bg);
         selectedCell.bg.stroke({ width: 2, color: COLORS.success });
         selectedCell.text.style.fill = COLORS.success;
-        
+
         // Hide glows
         glowOuter.alpha = 0;
         glowInner.alpha = 0;
     }, null, t);
-    
+
     // Success pulse
     tl.to(selectedCell.container.scale, { x: 1.15, y: 1.15, duration: 0.12, ease: 'power2.out' }, t);
     tl.to(selectedCell.container.scale, { x: 1, y: 1, duration: 0.2, ease: 'back.out(2)' }, t + 0.12);
     t += 0.5;
 
-    // --- STEP 10: Hold and fade out ---
-    tl.to({}, { duration: 0.5 }, t);
-    t += 0.5;
-    
-    tl.to(container, { alpha: 0, duration: 0.3, ease: 'power2.in' }, t);
-    t += 0.35;
+    // --- STEP 10: Hold briefly at final state (NO FADE OUT) ---
+    // The VariableVisual will be created at this exact position to take over
+    tl.to({}, { duration: 0.2 }, t);
+    t += 0.2;
 
-    // --- Cleanup ---
+    // Calculate the EXACT final global position of the result for handoff
+    // This is relative to the container's position at (x, y)
+    // varNameText.x is -20 (anchored right at 1, 0.5)
+    // The overall container x is 'x' from params
+    // So final position of expression is approximately at container x + small offset
+    const finalResultInfo = {
+        x: x - 20,  // Approximate center of "varName = [value]"
+        y: y,
+        value: newValue,
+        varName: varName
+    };
+
+    // --- Cleanup: Destroy instantly (VariableVisual has taken over) ---
     tl.call(() => {
         layer.removeChild(container);
         container.destroy({ children: true });
+        // Call onComplete with final position info for seamless handoff
+        if (typeof onComplete === 'function') {
+            onComplete(finalResultInfo);
+        }
     }, null, t);
 
     return tl;
@@ -705,38 +720,38 @@ export function ASSIGN_FROM_ARRAY_INDEX(layer, params, onComplete) {
 export function HIGHLIGHT_ARRAY_INDEX(layer, params, onComplete) {
     const { arrayName = 'a', arrayValues = [5, 6, 10, 13, 56, 76, 1, 2, 4, 8], index, position } = params;
     const { x, y } = position;
-    
+
     const tl = gsap.timeline({ onComplete });
-    
+
     // Layout constants
     const CELL_WIDTH = 44;
     const CELL_HEIGHT = 40;
     const CELL_GAP = 2;
     const BORDER_WIDTH = 2;
-    
+
     // Container for entire array
     const container = new PIXI.Container();
     container.x = x;
     container.y = y;
     container.alpha = 0;
     layer.addChild(container);
-    
+
     // Array name label (left side)
     const nameLabel = createText(arrayName, { fontSize: 18, fill: COLORS.text });
     nameLabel.anchor.set(1, 0.5);
     nameLabel.x = -15;
     nameLabel.y = CELL_HEIGHT / 2;
     container.addChild(nameLabel);
-    
+
     // Calculate total width to center
     const totalWidth = arrayValues.length * (CELL_WIDTH + CELL_GAP) - CELL_GAP;
     const startX = -totalWidth / 2 + CELL_WIDTH / 2;
-    
+
     // Create cells
     const cells = [];
     arrayValues.forEach((value, i) => {
         const cellX = startX + i * (CELL_WIDTH + CELL_GAP);
-        
+
         // Cell background
         const cellBg = new PIXI.Graphics();
         cellBg.roundRect(0, 0, CELL_WIDTH, CELL_HEIGHT, 2);
@@ -745,14 +760,14 @@ export function HIGHLIGHT_ARRAY_INDEX(layer, params, onComplete) {
         cellBg.x = cellX - CELL_WIDTH / 2;
         cellBg.y = 0;
         container.addChild(cellBg);
-        
+
         // Value text
         const valueText = createText(value, { fontSize: 16, fill: COLORS.text });
         valueText.anchor.set(0.5);
         valueText.x = cellX;
         valueText.y = CELL_HEIGHT / 2;
         container.addChild(valueText);
-        
+
         // Index label below
         const indexLabel = createText(i, { fontSize: 11, fill: COLORS.muted });
         indexLabel.anchor.set(0.5);
@@ -760,10 +775,10 @@ export function HIGHLIGHT_ARRAY_INDEX(layer, params, onComplete) {
         indexLabel.y = CELL_HEIGHT + 12;
         indexLabel.alpha = 0;
         container.addChild(indexLabel);
-        
+
         cells.push({ bg: cellBg, value: valueText, indexLabel, x: cellX });
     });
-    
+
     // Highlight border (will animate onto selected cell)
     const highlight = new PIXI.Graphics();
     highlight.roundRect(0, 0, CELL_WIDTH + 4, CELL_HEIGHT + 4, 3);
@@ -772,7 +787,7 @@ export function HIGHLIGHT_ARRAY_INDEX(layer, params, onComplete) {
     highlight.y = -2;
     highlight.alpha = 0;
     container.addChild(highlight);
-    
+
     // Pointer arrow above highlighted cell
     const pointer = new PIXI.Graphics();
     pointer.moveTo(0, 0);
@@ -784,38 +799,38 @@ export function HIGHLIGHT_ARRAY_INDEX(layer, params, onComplete) {
     pointer.y = -8;
     pointer.alpha = 0;
     container.addChild(pointer);
-    
+
     // Animation sequence
     // 1. Fade in array
     tl.to(container, { alpha: 1, duration: TIMING.normal, ease: EASING.out }, 0);
-    
+
     // 2. Show all index labels
     const indexLabels = cells.map(c => c.indexLabel);
     tl.to(indexLabels, { alpha: 1, duration: TIMING.fast, stagger: 0.02 }, 0.2);
-    
+
     // 3. Highlight border appears
     tl.to(highlight, { alpha: 1, duration: TIMING.fast, ease: EASING.out }, 0.4);
     tl.from(highlight.scale, { x: 1.2, y: 1.2, duration: TIMING.normal, ease: EASING.bounce }, 0.4);
-    
+
     // 4. Pointer appears
     tl.to(pointer, { alpha: 1, duration: TIMING.fast }, 0.5);
     tl.from(pointer, { y: -20, duration: TIMING.normal, ease: EASING.bounce }, 0.5);
-    
+
     // 5. Pulse highlight
     tl.to(highlight, { alpha: 0.6, duration: 0.15, yoyo: true, repeat: 1 }, 0.8);
-    
+
     // 6. Hold for readability
     tl.to({}, { duration: 0.6 }, 1.0);
-    
+
     // 7. Fade out
     tl.to(container, { alpha: 0, duration: TIMING.normal, ease: EASING.in }, 1.6);
-    
+
     // Cleanup
     tl.call(() => {
         layer.removeChild(container);
         container.destroy({ children: true });
     }, null, 1.9);
-    
+
     return tl;
 }
 
@@ -828,9 +843,9 @@ export function HIGHLIGHT_ARRAY_INDEX(layer, params, onComplete) {
 export function LOOP_ADVANCE(layer, params, onComplete) {
     const { iteration, position } = params;
     const { x, y } = position;
-    
+
     const tl = gsap.timeline({ onComplete });
-    
+
     // Circle indicator
     const circle = new PIXI.Graphics();
     circle.circle(0, 0, 22);
@@ -839,14 +854,14 @@ export function LOOP_ADVANCE(layer, params, onComplete) {
     circle.y = y;
     circle.scale.set(0.8);
     layer.addChild(circle);
-    
+
     // Iteration number
     const numText = createText(iteration, { fontSize: 16 });
     numText.anchor.set(0.5);
     numText.x = x;
     numText.y = y;
     layer.addChild(numText);
-    
+
     // Label
     const label = createText('iteration', { fontSize: 10, fill: COLORS.muted });
     label.anchor.set(0.5);
@@ -854,14 +869,14 @@ export function LOOP_ADVANCE(layer, params, onComplete) {
     label.y = y + 30;
     label.alpha = 0;
     layer.addChild(label);
-    
+
     // 1. Pop in
     tl.to(circle.scale, { x: 1.2, y: 1.2, duration: TIMING.fast, ease: EASING.out }, 0);
     tl.to(circle.scale, { x: 1, y: 1, duration: TIMING.normal, ease: EASING.bounce }, TIMING.fast);
-    
+
     // 2. Label appears
     tl.to(label, { alpha: 1, duration: TIMING.fast }, 0.2);
-    
+
     // Keep visible (don't auto-cleanup for loop indicator)
     return tl;
 }
@@ -875,9 +890,9 @@ export function LOOP_ADVANCE(layer, params, onComplete) {
 export function RETURN_VALUE(layer, params, onComplete) {
     const { value, position } = params;
     const { x, y } = position;
-    
+
     const tl = gsap.timeline({ onComplete });
-    
+
     // Container
     const container = new PIXI.Container();
     container.x = x;
@@ -885,11 +900,11 @@ export function RETURN_VALUE(layer, params, onComplete) {
     container.alpha = 0;
     container.scale.set(0.5);
     layer.addChild(container);
-    
+
     // "return" label
     const returnLabel = createText('return', { fontSize: 14, fill: COLORS.muted });
     container.addChild(returnLabel);
-    
+
     // Value box (green for success)
     const valueBox = createValueBox(value, {
         width: 56,
@@ -900,21 +915,21 @@ export function RETURN_VALUE(layer, params, onComplete) {
     valueBox.x = returnLabel.width + 10;
     valueBox.y = -4;
     container.addChild(valueBox);
-    
+
     // Checkmark
     const check = createText('✓', { fontSize: 18, fill: COLORS.success });
     check.x = valueBox.x + 65;
     check.y = 2;
     check.alpha = 0;
     container.addChild(check);
-    
+
     // 1. Container appears
     tl.to(container, { alpha: 1, duration: TIMING.normal, ease: EASING.out }, 0);
     tl.to(container.scale, { x: 1, y: 1, duration: TIMING.slow, ease: EASING.bounce }, 0);
-    
+
     // 2. Checkmark appears
     tl.to(check, { alpha: 1, duration: TIMING.fast }, 0.4);
-    
+
     // Keep visible (final result)
     return tl;
 }
@@ -946,7 +961,7 @@ export function playBehavior(behaviorId, layer, params, onComplete) {
         onComplete?.();
         return null;
     }
-    
+
     console.log(`🎬 Playing behavior: ${behaviorId}`, params);
     return behavior(layer, params, onComplete);
 }

@@ -1415,6 +1415,9 @@ export class PixiRenderer {
      * Play the cinematic ASSIGN_FROM_ARRAY_INDEX animation
      * Uses the tested behavior from BehaviorLibrary for professional animation
      * 
+     * After animation completes, the variable smoothly slides from center to STATE zone
+     * The behavior passes finalResultInfo with exact position for seamless handoff
+     * 
      * @param {Object} options - Animation options
      * @param {string} options.arrayName - Name of the source array
      * @param {Array} options.arrayValues - Array values
@@ -1433,7 +1436,11 @@ export class PixiRenderer {
 
         console.log('🎬 playAssignFromArrayIndex:', { arrayName, arrayValues, index, varName, oldValue, position });
 
+        // Get the value early
+        const value = arrayValues?.[index];
+
         // Use the effects layer for the animation
+        // The behavior calls our callback with finalResultInfo containing exact position
         const timeline = ASSIGN_FROM_ARRAY_INDEX(this.layers.effects, {
             arrayName,
             arrayValues: arrayValues || [],
@@ -1441,16 +1448,81 @@ export class PixiRenderer {
             varName,
             oldValue,
             position
-        }, () => {
-            // Ensure variable is updated after animation
-            const value = arrayValues?.[index];
+        }, (finalResultInfo) => {
+            // finalResultInfo contains: { x, y, value, varName } - exact position of the final result
+            console.log('🎬 Behavior complete, finalResultInfo:', finalResultInfo);
+
+            // After cinematic animation: Create variable at EXACT POSITION, then slide to HOME
             if (value !== undefined) {
-                const variable = this.getOrCreateVariable(varName, value);
-                if (variable) {
-                    variable.setValue(value, true);
+                // Check if variable already exists
+                const existingVar = this.objects.variables.get(varName);
+
+                if (existingVar) {
+                    // Variable exists - just update value with pulse
+                    existingVar.setValue(value, true);
+                    onComplete?.();
+                } else {
+                    // NEW VARIABLE: Create at EXACT position where behavior ended
+                    const varVisual = new VariableVisual(this.layers.variables, varName, value);
+
+                    // Calculate HOME position in STATE zone
+                    const zone = this.zones.state;
+                    const homeX = zone.x + 5;
+                    const homeY = zone.y + 10 + this.variableCount * 45;
+
+                    // Set home position for future reference
+                    varVisual.setHomePosition(homeX, homeY);
+
+                    // START at the EXACT position from the behavior's final result
+                    // Use finalResultInfo if available, fallback to center position
+                    const startX = finalResultInfo?.x ?? (position.x - 25);
+                    const startY = finalResultInfo?.y ?? position.y;
+
+                    varVisual.container.x = startX;
+                    varVisual.container.y = startY;
+                    varVisual.show();
+                    varVisual.container.alpha = 1;
+                    varVisual.container.scale.set(1);
+
+                    // Register the variable
+                    this.variableCount++;
+                    this.objects.variables.set(varName, varVisual);
+
+                    console.log(`🎯 Created VariableVisual at (${startX}, ${startY}), sliding to (${homeX}, ${homeY})`);
+
+                    // ANIMATE: Slide from exact position to home (STATE zone on left)
+                    const slideTl = gsap.timeline({
+                        onComplete: () => {
+                            console.log(`✅ Variable ${varName} slid to home position`);
+                            onComplete?.();
+                        }
+                    });
+
+                    // Immediate slide to left (no delay since we're taking over seamlessly)
+                    slideTl.to(varVisual.container, {
+                        x: homeX,
+                        y: homeY,
+                        duration: 0.5,
+                        ease: 'power2.inOut'
+                    });
+
+                    // Subtle scale pulse when landing
+                    slideTl.to(varVisual.container.scale, {
+                        x: 1.08,
+                        y: 1.08,
+                        duration: 0.1,
+                        ease: 'power2.out'
+                    }, '-=0.1');
+                    slideTl.to(varVisual.container.scale, {
+                        x: 1,
+                        y: 1,
+                        duration: 0.15,
+                        ease: 'back.out(2)'
+                    });
                 }
+            } else {
+                onComplete?.();
             }
-            onComplete?.();
         });
 
         return timeline;
