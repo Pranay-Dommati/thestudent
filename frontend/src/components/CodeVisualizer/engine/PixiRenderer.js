@@ -32,6 +32,7 @@ import {
     CodeHighlight,
     PointerArrow
 } from './VisualObjects';
+import { ASSIGN_FROM_ARRAY_INDEX } from './BehaviorLibrary';
 
 // Register GSAP PixiJS plugin
 gsap.registerPlugin(PixiPlugin);
@@ -45,7 +46,7 @@ export class PixiRenderer {
         this.height = 500;
         this.isInitialized = false;
         this.isDestroyed = false;
-        
+
         // Persistent visual objects registry
         // These are the ACTORS that participate in choreography
         this.objects = {
@@ -58,7 +59,7 @@ export class PixiRenderer {
             codeHighlight: null,    // CodeHighlight
             pointerArrow: null      // PointerArrow (for connections)
         };
-        
+
         // ============================================
         // ZONE-BASED LAYOUT SYSTEM
         // ============================================
@@ -75,14 +76,14 @@ export class PixiRenderer {
         // ├────────────┴────────────────────────────────┤
         // │ OUTPUT ZONE         (return / result)       │
         // └─────────────────────────────────────────────┘
-        
+
         this.zones = {
             input: { x: 0, y: 0, width: 0, height: 0 },
             state: { x: 0, y: 0, width: 0, height: 0 },
             interaction: { x: 0, y: 0, width: 0, height: 0 },
             output: { x: 0, y: 0, width: 0, height: 0 }
         };
-        
+
         this.variableCount = 0;
         this.layers = null;
     }
@@ -92,14 +93,14 @@ export class PixiRenderer {
         const padY = 56;
         const canvasWidth = this.width;
         const canvasHeight = this.height;
-        
+
         // ============================================
         // ZONE CALCULATIONS
         // ============================================
         const stateZoneWidth = 140;  // Left column for state
         const outputZoneHeight = 60; // Bottom row for output
         const inputZoneHeight = 80;  // Top row for input
-        
+
         // INPUT ZONE: Top strip (arrays, parameters)
         this.zones.input = {
             x: padX,
@@ -107,7 +108,7 @@ export class PixiRenderer {
             width: canvasWidth - padX * 2,
             height: inputZoneHeight
         };
-        
+
         // STATE ZONE: Left column below input (variables)
         this.zones.state = {
             x: padX,
@@ -115,7 +116,7 @@ export class PixiRenderer {
             width: stateZoneWidth,
             height: canvasHeight - padY - inputZoneHeight - outputZoneHeight - 30
         };
-        
+
         // INTERACTION ZONE: Center-right area (choreography happens here)
         this.zones.interaction = {
             x: padX + stateZoneWidth + 20,
@@ -123,7 +124,7 @@ export class PixiRenderer {
             width: canvasWidth - padX * 2 - stateZoneWidth - 20,
             height: canvasHeight - padY - inputZoneHeight - outputZoneHeight - 30
         };
-        
+
         // OUTPUT ZONE: Bottom strip (return values)
         this.zones.output = {
             x: padX,
@@ -131,7 +132,7 @@ export class PixiRenderer {
             width: canvasWidth - padX * 2,
             height: outputZoneHeight
         };
-        
+
         // Store centers for choreography targets
         this.zones.interaction.centerX = this.zones.interaction.x + this.zones.interaction.width / 2;
         this.zones.interaction.centerY = this.zones.interaction.y + this.zones.interaction.height / 2;
@@ -146,7 +147,7 @@ export class PixiRenderer {
         this._layoutOutputZone();
         this._layoutInteractionZone();
     }
-    
+
     /**
      * Layout INPUT ZONE: Arrays and parameters
      */
@@ -174,7 +175,7 @@ export class PixiRenderer {
 
             currentX += baseWidth * scale + 30;
         });
-        
+
         // Loop indicator in top-right of input zone
         if (this.objects.loopIndicator) {
             this.objects.loopIndicator.setPosition(
@@ -183,7 +184,7 @@ export class PixiRenderer {
             );
         }
     }
-    
+
     /**
      * Layout STATE ZONE: Variables (persistent actors, vertically stacked)
      * These are the ONLY state display - no separate panel
@@ -191,7 +192,7 @@ export class PixiRenderer {
     _layoutStateZone() {
         const vars = Array.from(this.objects.variables.values());
         const zone = this.zones.state;
-        
+
         // Variables stacked vertically in STATE zone
         const startY = zone.y + 10;
         vars.forEach((v, idx) => {
@@ -200,25 +201,25 @@ export class PixiRenderer {
             v.moveToHome();
         });
     }
-    
+
     /**
      * Layout INTERACTION ZONE: Comparison visual (center)
      */
     _layoutInteractionZone() {
         const zone = this.zones.interaction;
-        
+
         // Comparison visual lives in center of interaction zone
         if (this.objects.comparison) {
             this.objects.comparison.setPosition(zone.centerX - 60, zone.centerY - 20);
         }
     }
-    
+
     /**
      * Layout OUTPUT ZONE: Return visual
      */
     _layoutOutputZone() {
         const zone = this.zones.output;
-        
+
         if (this.objects.returnVisual) {
             this.objects.returnVisual.setPosition(
                 zone.x + zone.width / 2 - 50,
@@ -226,13 +227,13 @@ export class PixiRenderer {
             );
         }
     }
-    
+
     // ============================================
     // CHOREOGRAPHY METHODS
     // ============================================
     // These methods animate visuals INTO the interaction zone,
     // perform the interaction, then return them HOME.
-    
+
     /**
      * Get the interaction zone center point
      */
@@ -242,21 +243,21 @@ export class PixiRenderer {
             y: this.zones.interaction.centerY
         };
     }
-    
+
     /**
      * Get a variable visual by name
      */
     getVariable(name) {
         return this.objects.variables.get(name);
     }
-    
+
     /**
      * Get an array visual by name
      */
     getArray(name) {
         return this.objects.arrays.get(name);
     }
-    
+
     /**
      * Choreograph a comparison: gather value representations, compare, show result
      * 
@@ -273,18 +274,18 @@ export class PixiRenderer {
         const leftVisual = this.objects.variables.get(leftVar);
         const rightVisual = this.objects.variables.get(rightVar);
         const zone = this.zones.interaction;
-        
+
         // Calculate positions in interaction zone (centered, with spacing)
         const centerX = zone.centerX;
         const centerY = zone.centerY;
         const spacing = 60; // Space between values and operator
-        
+
         // Create temporary value bubbles
         let leftBubble = null;
         let rightBubble = null;
         let operatorText = null;
         let resultText = null;
-        
+
         // Step 1: Highlight source variables
         if (leftVisual) {
             timeline.to(leftVisual.container, {
@@ -298,7 +299,7 @@ export class PixiRenderer {
                 duration: 0.2
             }, startTime);
         }
-        
+
         // Step 2: Create value bubbles at source positions and animate to center
         timeline.call(() => {
             // Left value bubble
@@ -310,7 +311,7 @@ export class PixiRenderer {
                 leftBubble.setPosition(zone.x, centerY);
             }
             leftBubble.show();
-            
+
             // Right value bubble  
             rightBubble = this.createValueBubble(rightVal);
             if (rightVisual) {
@@ -320,7 +321,7 @@ export class PixiRenderer {
                 rightBubble.setPosition(zone.x + zone.width, centerY);
             }
             rightBubble.show();
-            
+
             // Animate bubbles to center positions
             gsap.to(leftBubble.container, {
                 x: centerX - spacing,
@@ -328,7 +329,7 @@ export class PixiRenderer {
                 duration: 0.4,
                 ease: 'power2.out'
             });
-            
+
             gsap.to(rightBubble.container, {
                 x: centerX + spacing,
                 y: centerY,
@@ -336,7 +337,7 @@ export class PixiRenderer {
                 ease: 'power2.out'
             });
         }, null, startTime + 0.25);
-        
+
         // Step 3: Show operator between values
         timeline.call(() => {
             operatorText = new PIXI.Text({
@@ -353,19 +354,19 @@ export class PixiRenderer {
             operatorText.y = centerY;
             operatorText.alpha = 0;
             this.layers.effects.addChild(operatorText);
-            
+
             gsap.to(operatorText, {
                 alpha: 1,
                 duration: 0.2,
                 ease: 'power2.out'
             });
         }, null, startTime + 0.7);
-        
+
         // Step 4: Show result
         timeline.call(() => {
             const resultColor = result ? 0x22c55e : 0xef4444;
             const resultSymbol = result ? '→ True ✓' : '→ False ✗';
-            
+
             resultText = new PIXI.Text({
                 text: resultSymbol,
                 style: new PIXI.TextStyle({
@@ -381,7 +382,7 @@ export class PixiRenderer {
             resultText.alpha = 0;
             resultText.scale.set(0.5);
             this.layers.effects.addChild(resultText);
-            
+
             gsap.to(resultText, {
                 alpha: 1,
                 duration: 0.2
@@ -392,7 +393,7 @@ export class PixiRenderer {
                 ease: 'back.out(2)'
             });
         }, null, startTime + 1.0);
-        
+
         // Step 5: Remove highlights from variables
         if (leftVisual) {
             timeline.to(leftVisual.container, {
@@ -406,11 +407,11 @@ export class PixiRenderer {
                 duration: 0.3
             }, startTime + 1.3);
         }
-        
+
         // Step 6: Clean up - fade out everything
         timeline.call(() => {
             const fadeOut = [leftBubble?.container, rightBubble?.container, operatorText, resultText].filter(Boolean);
-            
+
             gsap.to(fadeOut, {
                 alpha: 0,
                 duration: 0.3,
@@ -424,7 +425,7 @@ export class PixiRenderer {
             });
         }, null, startTime + 1.5);
     }
-    
+
     /**
      * Choreograph an assignment: highlight source, transfer value to target
      * Variables STAY in place - we animate a value bubble transfer
@@ -438,21 +439,21 @@ export class PixiRenderer {
     choreographAssignment(timeline, targetVar, sourceVar, value, startTime) {
         const targetVisual = this.objects.variables.get(targetVar);
         const sourceVisual = sourceVar ? this.objects.variables.get(sourceVar) : null;
-        
+
         if (sourceVisual && targetVisual) {
             // Highlight source variable
             timeline.to(sourceVisual.container, {
                 pixi: { tint: 0x6366f1 },
                 duration: 0.15
             }, startTime);
-            
+
             // Create value bubble at source position
             timeline.call(() => {
                 const bubble = this.createValueBubble(value);
                 const sourcePos = sourceVisual.getPosition();
                 bubble.setPosition(sourcePos.x + 80, sourcePos.y + 15);
                 bubble.show();
-                
+
                 // Animate bubble to target
                 const targetPos = targetVisual.getPosition();
                 gsap.to(bubble.container, {
@@ -469,7 +470,7 @@ export class PixiRenderer {
                     }
                 });
             }, null, startTime + 0.2);
-            
+
             // Remove highlight from source
             timeline.to(sourceVisual.container, {
                 pixi: { tint: 0xffffff },
@@ -528,7 +529,7 @@ export class PixiRenderer {
         this.objects.comparison?.hide();
         this.objects.loopIndicator?.hide();
         this.objects.returnVisual?.hide();
-        
+
         // Hide ALL existing scalar variables (they should only appear during animation)
         this.objects.variables.forEach(v => {
             v.hide();
@@ -558,7 +559,7 @@ export class PixiRenderer {
      */
     async initialize(container, width = 800, height = 500) {
         if (this.isDestroyed) return this;
-        
+
         this.width = width || 800;
         this.height = height || 500;
 
@@ -583,13 +584,13 @@ export class PixiRenderer {
             if (container && this.app.canvas) {
                 container.appendChild(this.app.canvas);
             }
-            
+
             this.stage = this.app.stage;
-            
+
             if (!this.stage) {
                 throw new Error('Stage not available after init');
             }
-            
+
             // Create layer containers for z-ordering
             this.layers = {
                 background: new PIXI.Container(),
@@ -599,7 +600,7 @@ export class PixiRenderer {
                 effects: new PIXI.Container(),
                 ui: new PIXI.Container()
             };
-            
+
             Object.values(this.layers).forEach(layer => {
                 if (this.stage && layer) {
                     this.stage.addChild(layer);
@@ -610,7 +611,7 @@ export class PixiRenderer {
 
             // Create persistent objects
             this._createPersistentObjects();
-            
+
             this.isInitialized = true;
             this._layoutAll();
             return this;
@@ -637,21 +638,21 @@ export class PixiRenderer {
     _createPersistentObjects() {
         // NOTE: No StatePanel - VariableVisuals ARE the state display
         // They are persistent actors that live in STATE zone and move for choreography
-        
+
         // Pointer arrow for showing connections
         this.objects.pointerArrow = new PointerArrow(this.layers.effects);
-        
+
         // Code highlight
         this.objects.codeHighlight = new CodeHighlight(this.layers.code);
-        
+
         // Comparison visual lives in INTERACTION ZONE (center)
         this.objects.comparison = new ComparisonVisual(this.layers.effects);
         this.objects.comparison.setPosition(
-            this.zones.interaction.centerX - 60, 
+            this.zones.interaction.centerX - 60,
             this.zones.interaction.centerY - 20
         );
         this.objects.comparison.hide();
-        
+
         // Loop indicator lives in INPUT ZONE (top-right)
         this.objects.loopIndicator = new LoopIndicator(this.layers.ui);
         this.objects.loopIndicator.setPosition(
@@ -659,7 +660,7 @@ export class PixiRenderer {
             this.zones.input.y + 20
         );
         this.objects.loopIndicator.hide();
-        
+
         // Return visual lives in OUTPUT ZONE (bottom-center)
         this.objects.returnVisual = new ReturnVisual(this.layers.effects);
         this.objects.returnVisual.setPosition(
@@ -667,11 +668,10 @@ export class PixiRenderer {
             this.zones.output.y + 10
         );
         this.objects.returnVisual.hide();
-        
-        // Draw zone label for STATE area (inside the zone, subtle)
-        this._drawZoneLabel('STATE', this.zones.state.x + 6, this.zones.state.y + 4);
+
+        // Zone labels removed for cleaner visualization
     }
-    
+
     /**
      * Draw a zone label
      */
@@ -696,23 +696,23 @@ export class PixiRenderer {
      */
     getOrCreateArray(name, values = []) {
         console.log(`🎨 getOrCreateArray: ${name} =`, values, 'exists:', this.objects.arrays.has(name));
-        
+
         if (!this.objects.arrays.has(name)) {
             const arrayVisual = new ArrayVisual(this.layers.arrays, name, values);
-            
+
             // Calculate HOME position in INPUT zone
             const zone = this.zones.input;
             const arrayCount = this.objects.arrays.size;
             const homeX = zone.x;
             const homeY = zone.y + 10 + arrayCount * 70;  // Stack vertically if multiple arrays
-            
+
             arrayVisual.setHomePosition(homeX, homeY);
             arrayVisual.moveToHome();
-            
+
             // Hidden until seeded/animated
             arrayVisual.container.alpha = 0;
             arrayVisual.show();
-            
+
             this.objects.arrays.set(name, arrayVisual);
             console.log(`✅ Created array visual: ${name} with ${values.length} elements at home (${homeX}, ${homeY})`);
         } else if (Array.isArray(values) && values.length) {
@@ -732,34 +732,34 @@ export class PixiRenderer {
         if (name === 'self' || name.startsWith('_')) {
             return null;
         }
-        
+
         console.log(`🎨 getOrCreateVariable: ${name} =`, value, 'exists:', this.objects.variables.has(name));
-        
+
         // Display value - show actual value or '?' if undefined
         const displayValue = (value !== null && value !== undefined) ? value : '?';
-        
+
         if (!this.objects.variables.has(name)) {
             const varVisual = new VariableVisual(this.layers.variables, name, displayValue);
-            
+
             // Calculate HOME position in STATE zone
             const zone = this.zones.state;
             const homeX = zone.x + 5;
             const homeY = zone.y + 10 + this.variableCount * 45;
-            
+
             varVisual.setHomePosition(homeX, homeY);
             varVisual.moveToHome();
-            
+
             // Start visible but faded, will animate in
             varVisual.show();
             varVisual.container.alpha = 0;
-            
+
             // Fade in animation
             gsap.to(varVisual.container, {
                 alpha: 1,
                 duration: 0.3,
                 ease: 'power2.out'
             });
-            
+
             this.variableCount++;
             this.objects.variables.set(name, varVisual);
             console.log(`✅ Created variable: ${name} at home (${homeX}, ${homeY})`);
@@ -785,60 +785,60 @@ export class PixiRenderer {
      */
     createAnimation(command) {
         const timeline = gsap.timeline();
-        
+
         switch (command.type) {
             case 'HIGHLIGHT_CODE':
                 // For now, just a placeholder - would integrate with code editor
                 return null;
-                
+
             case 'SHOW_ARRAY':
                 return this._animateShowArray(command);
-                
+
             case 'SHOW_INDICES':
                 return this._animateShowIndices(command);
-                
+
             case 'HIGHLIGHT_INDEX':
                 return this._animateHighlightIndex(command);
-                
+
             case 'EXTRACT_VALUE':
                 return this._animateExtractValue(command);
-                
+
             case 'CREATE_VARIABLE':
                 return this._animateCreateVariable(command);
-                
+
             case 'ASSIGN_VALUE':
                 return this._animateAssignValue(command);
-                
+
             case 'UPDATE_VARIABLE':
                 return this._animateUpdateVariable(command);
-                
+
             case 'SHOW_VALUE_BUBBLE':
                 return this._animateShowValueBubble(command);
-                
+
             case 'SHOW_COMPARISON':
                 return this._animateShowComparison(command);
-                
+
             case 'EVALUATE_CONDITION':
                 return this._animateEvaluateCondition(command);
-                
+
             case 'SHOW_BRANCH':
                 return this._animateShowBranch(command);
-                
+
             case 'SHOW_LOOP_INDICATOR':
                 return this._animateShowLoopIndicator(command);
-                
+
             case 'PULSE_LOOP':
                 return this._animatePulseLoop(command);
-                
+
             case 'SHOW_RETURN_VALUE':
                 return this._animateShowReturnValue(command);
-                
+
             case 'ANIMATE_RETURN':
                 return this._animateReturn(command);
-                
+
             case 'COMPLETE_STEP':
                 return this._animateCompleteStep(command);
-                
+
             default:
                 return null;
         }
@@ -849,11 +849,11 @@ export class PixiRenderer {
         const { name, values, duration } = command;
         const array = this.getOrCreateArray(name, values);
         array.show();
-        
+
         const tl = gsap.timeline();
         array.container.alpha = 0;
         array.container.scale.set(0.8);
-        
+
         tl.to(array.container, {
             alpha: 1,
             duration: duration * 0.5
@@ -864,7 +864,7 @@ export class PixiRenderer {
             duration: duration * 0.5,
             ease: 'back.out(1.5)'
         }, '<');
-        
+
         return tl;
     }
 
@@ -872,7 +872,7 @@ export class PixiRenderer {
         const { name, duration } = command;
         const array = this.objects.arrays.get(name);
         if (!array) return null;
-        
+
         const tl = gsap.timeline();
         array.animateShowIndices(tl, 0);
         return tl;
@@ -882,7 +882,7 @@ export class PixiRenderer {
         const { name, index, duration } = command;
         const array = this.objects.arrays.get(name);
         if (!array) return null;
-        
+
         const tl = gsap.timeline();
         array.animateHighlightIndex(tl, index, 0);
         return tl;
@@ -892,12 +892,12 @@ export class PixiRenderer {
         const { from, index, value, duration } = command;
         const array = this.objects.arrays.get(from);
         if (!array) return null;
-        
+
         const bubble = this.createValueBubble(value);
         const fromPos = array.getElementPosition(index);
         // Target will be set later when we know the variable position
         const toPos = { x: 200, y: 280 }; // Default position
-        
+
         const tl = gsap.timeline();
         bubble.animateTransfer(tl, fromPos, toPos, 0, duration);
         return tl;
@@ -908,14 +908,14 @@ export class PixiRenderer {
         const isNew = !this.objects.variables.has(name);
         const variable = this.getOrCreateVariable(name, value);
         variable.show();
-        
+
         const tl = gsap.timeline();
-        
+
         // Only animate "pop in" if this is a new variable
         if (isNew) {
             variable.container.alpha = 0;
             variable.container.scale.set(0);
-            
+
             tl.to(variable.container, {
                 alpha: 1,
                 duration: duration * 0.3
@@ -938,7 +938,7 @@ export class PixiRenderer {
             tl.to(variable.container.scale, { x: 1.05, y: 1.05, duration: 0.1 });
             tl.to(variable.container.scale, { x: 1, y: 1, duration: 0.1, ease: 'back.out(2)' });
         }
-        
+
         return tl;
     }
 
@@ -947,7 +947,7 @@ export class PixiRenderer {
         const variable = this.objects.variables.get(target);
         if (!variable) return null;
         variable.show();
-        
+
         const tl = gsap.timeline();
         variable.animateAssignment(tl, value, 0);
         return tl;
@@ -957,7 +957,7 @@ export class PixiRenderer {
         const { name, value, duration } = command;
         console.log('📝 Updating variable:', name, '=', value);
         let variable = this.objects.variables.get(name);
-        
+
         // Create if doesn't exist (for loop variables)
         if (!variable) {
             variable = this.getOrCreateVariable(name, value);
@@ -966,7 +966,7 @@ export class PixiRenderer {
         // Ensure visible for existing variables
         variable.container.alpha = 1;
         variable.container.scale.set(1);
-        
+
         const tl = gsap.timeline();
         variable.animateUpdate(tl, value, 0);
         return tl;
@@ -976,11 +976,11 @@ export class PixiRenderer {
         const { value, duration } = command;
         const bubble = this.createValueBubble(value);
         bubble.setPosition(400, 100);
-        
+
         const tl = gsap.timeline();
         bubble.container.alpha = 0;
         bubble.container.scale.set(0);
-        
+
         tl.to(bubble.container, {
             alpha: 1,
             duration: duration * 0.3
@@ -991,7 +991,7 @@ export class PixiRenderer {
             duration: duration * 0.5,
             ease: 'back.out(2)'
         }, '<');
-        
+
         return tl;
     }
 
@@ -1002,7 +1002,7 @@ export class PixiRenderer {
         comparison.show();
         // Reset result text for new comparison
         comparison.resultText.alpha = 0;
-        
+
         const tl = gsap.timeline();
         comparison.animateComparison(tl, left, operator, right, 0);
         return tl;
@@ -1011,7 +1011,7 @@ export class PixiRenderer {
     _animateEvaluateCondition(command) {
         const { result, duration } = command;
         const comparison = this.objects.comparison;
-        
+
         const tl = gsap.timeline();
         comparison.animateResult(tl, result, 0);
         return tl;
@@ -1033,7 +1033,7 @@ export class PixiRenderer {
         // Ensure visible and reset for animation
         indicator.container.alpha = 1;
         indicator.container.scale.set(1);
-        
+
         const tl = gsap.timeline();
         indicator.animateIteration(tl, iteration, 0);
         return tl;
@@ -1041,7 +1041,7 @@ export class PixiRenderer {
 
     _animatePulseLoop(command) {
         const indicator = this.objects.loopIndicator;
-        
+
         const tl = gsap.timeline();
         tl.to(indicator.container.scale, {
             x: 1.15,
@@ -1061,7 +1061,7 @@ export class PixiRenderer {
         const { value, duration } = command;
         const returnVisual = this.objects.returnVisual;
         returnVisual.show();
-        
+
         const tl = gsap.timeline();
         returnVisual.animateReturn(tl, value, 0);
         return tl;
@@ -1071,13 +1071,13 @@ export class PixiRenderer {
         const { value, duration } = command;
         // Additional return animation effects
         const tl = gsap.timeline();
-        
+
         // Flash screen effect
         const flash = new PIXI.Graphics();
         flash.rect(0, 0, this.width, this.height);
         flash.fill({ color: 0x22c55e, alpha: 0 });
         this.layers.effects.addChild(flash);
-        
+
         tl.to(flash, {
             alpha: 0.1,
             duration: 0.2
@@ -1087,7 +1087,7 @@ export class PixiRenderer {
             duration: 0.3,
             onComplete: () => flash.destroy()
         });
-        
+
         return tl;
     }
 
@@ -1103,28 +1103,28 @@ export class PixiRenderer {
      */
     reset() {
         if (!this.isInitialized || this.isDestroyed) return;
-        
+
         // Clear arrays
         this.objects.arrays.forEach(arr => arr?.destroy());
         this.objects.arrays.clear();
-        
+
         // Clear variables
         this.objects.variables.forEach(v => v?.destroy());
         this.objects.variables.clear();
         this.variableCount = 0;
-        
+
         // Clear bubbles
         this.objects.bubbles.forEach(b => b?.destroy());
         this.objects.bubbles = [];
-        
+
         // Hide persistent objects
         this.objects.comparison?.hide();
         this.objects.loopIndicator?.hide();
         this.objects.returnVisual?.hide();
-        
+
         // Reset pointer arrow
         this.objects.pointerArrow?.reset();
-        
+
         // Clear state panel
         this.objects.statePanel?.clear();
     }
@@ -1148,16 +1148,16 @@ export class PixiRenderer {
     showValueBubble(value, targetVarName) {
         const bubble = this.createValueBubble(value);
         const targetVar = this.objects.variables.get(targetVarName);
-        
+
         // Position bubble above the variable
-        const targetPos = targetVar 
+        const targetPos = targetVar
             ? { x: targetVar.container.x + 60, y: targetVar.container.y - 40 }
             : { x: this.width / 2, y: this.height / 2 - 50 };
-        
+
         bubble.setPosition(targetPos.x, targetPos.y);
         bubble.container.alpha = 0;
         bubble.container.scale.set(0);
-        
+
         gsap.to(bubble.container, {
             alpha: 1,
             duration: 0.2
@@ -1168,7 +1168,7 @@ export class PixiRenderer {
             duration: 0.3,
             ease: 'back.out(2)'
         });
-        
+
         // Store reference for clearing
         this._currentBubble = bubble;
     }
@@ -1194,10 +1194,10 @@ export class PixiRenderer {
     animateAssignment(varName, value) {
         const variable = this.objects.variables.get(varName);
         if (!variable) return;
-        
+
         variable.show();
         variable.container.alpha = 1;
-        
+
         const tl = gsap.timeline();
         variable.animateAssignment(tl, value, 0);
     }
@@ -1208,7 +1208,7 @@ export class PixiRenderer {
     highlightArrayIndex(arrayName, index) {
         const array = this.objects.arrays.get(arrayName);
         if (!array) return;
-        
+
         array.show();
         const tl = gsap.timeline();
         array.animateHighlightIndex(tl, index, 0);
@@ -1231,15 +1231,15 @@ export class PixiRenderer {
         const array = this.objects.arrays.get(arrayName);
         const targetVar = this.objects.variables.get(targetVarName);
         if (!array) return;
-        
+
         const fromPos = array.getElementPosition(index);
-        const toPos = targetVar 
+        const toPos = targetVar
             ? { x: targetVar.container.x + 60, y: targetVar.container.y }
             : { x: 200, y: 280 };
-        
+
         const value = array.values[index];
         const bubble = this.createValueBubble(value);
-        
+
         const tl = gsap.timeline();
         bubble.animateTransfer(tl, fromPos, toPos, 0, 0.5);
     }
@@ -1267,15 +1267,15 @@ export class PixiRenderer {
      * Show comparison visual
      */
     showComparison(left, operator, right) {
-        console.log('🔍 showComparison called:', { 
-            left, operator, right, 
+        console.log('🔍 showComparison called:', {
+            left, operator, right,
             hasComparison: !!this.objects.comparison,
             comparisonPosition: this.objects.comparison ? {
                 x: this.objects.comparison.container?.x,
                 y: this.objects.comparison.container?.y
             } : null
         });
-        
+
         if (this.objects.comparison) {
             this.objects.comparison.show();
             // Use the animateComparison method with a timeline
@@ -1346,9 +1346,9 @@ export class PixiRenderer {
     animatePointerToArrayElement(arrayName, index, varName) {
         const array = this.objects.arrays.get(arrayName);
         if (!array || !this.objects.pointerArrow) return;
-        
+
         const elementPos = array.getElementPosition(index);
-        
+
         // Variable position (or use a starting point near the variable name)
         const variable = this.objects.variables.get(varName);
         let fromPos;
@@ -1364,7 +1364,7 @@ export class PixiRenderer {
                 y: elementPos.y - 80
             };
         }
-        
+
         const tl = gsap.timeline();
         this.objects.pointerArrow.animatePointer(tl, fromPos, elementPos, varName, 0);
     }
@@ -1385,9 +1385,9 @@ export class PixiRenderer {
     animateValueFromArray(arrayName, index, varName, value) {
         const array = this.objects.arrays.get(arrayName);
         const variable = this.objects.variables.get(varName);
-        
+
         if (!array) return;
-        
+
         const fromPos = array.getElementPosition(index);
         const toPos = variable ? {
             x: variable.container.x + variable.valueBox.x + variable.boxWidth / 2,
@@ -1396,12 +1396,12 @@ export class PixiRenderer {
             x: fromPos.x,
             y: fromPos.y + 100
         };
-        
+
         // Create value bubble for transfer animation
         const bubble = this.createValueBubble(value);
         const tl = gsap.timeline();
         bubble.animateTransfer(tl, fromPos, toPos, 0, 0.5);
-        
+
         // Update variable after bubble arrives
         tl.call(() => {
             if (variable) {
@@ -1409,6 +1409,51 @@ export class PixiRenderer {
                 variable.valueText.text = String(value);
             }
         }, null, 0.5);
+    }
+
+    /**
+     * Play the cinematic ASSIGN_FROM_ARRAY_INDEX animation
+     * Uses the tested behavior from BehaviorLibrary for professional animation
+     * 
+     * @param {Object} options - Animation options
+     * @param {string} options.arrayName - Name of the source array
+     * @param {Array} options.arrayValues - Array values
+     * @param {number} options.index - Index being accessed
+     * @param {string} options.varName - Target variable name
+     * @param {*} options.oldValue - Previous value (optional)
+     * @param {Function} onComplete - Callback when animation completes
+     * @returns {Object} GSAP timeline
+     */
+    playAssignFromArrayIndex({ arrayName, arrayValues, index, varName, oldValue = null }, onComplete) {
+        // Use the interaction zone center for positioning
+        const position = {
+            x: this.zones.interaction.centerX,
+            y: this.zones.interaction.centerY
+        };
+
+        console.log('🎬 playAssignFromArrayIndex:', { arrayName, arrayValues, index, varName, oldValue, position });
+
+        // Use the effects layer for the animation
+        const timeline = ASSIGN_FROM_ARRAY_INDEX(this.layers.effects, {
+            arrayName,
+            arrayValues: arrayValues || [],
+            index: index ?? 0,
+            varName,
+            oldValue,
+            position
+        }, () => {
+            // Ensure variable is updated after animation
+            const value = arrayValues?.[index];
+            if (value !== undefined) {
+                const variable = this.getOrCreateVariable(varName, value);
+                if (variable) {
+                    variable.setValue(value, true);
+                }
+            }
+            onComplete?.();
+        });
+
+        return timeline;
     }
 
     /**
@@ -1437,7 +1482,7 @@ export class PixiRenderer {
      */
     resize(width, height) {
         if (!this.isInitialized || this.isDestroyed || !this.app) return;
-        
+
         this.width = width;
         this.height = height;
         this.app.renderer?.resize(width, height);
@@ -1452,13 +1497,13 @@ export class PixiRenderer {
         if (this.isDestroyed) return;
         this.isDestroyed = true;
         this.isInitialized = false;
-        
+
         try {
             this.reset();
         } catch (e) {
             console.warn('Error during reset:', e);
         }
-        
+
         try {
             if (this.app) {
                 this.app.destroy(true, { children: true, texture: true });
@@ -1466,7 +1511,7 @@ export class PixiRenderer {
         } catch (e) {
             console.warn('Error destroying PixiJS app:', e);
         }
-        
+
         this.app = null;
         this.stage = null;
         this.layers = null;

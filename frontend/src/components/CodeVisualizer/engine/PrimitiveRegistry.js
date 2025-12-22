@@ -57,7 +57,7 @@ export class AssignmentPrimitive extends BasePrimitive {
     static animate(step, renderer, timeline, onComplete) {
         const { targetVar, value, expression, sourceVar } = step.meta;
         const lineNumber = step.line;
-        
+
         console.log('📝 AssignmentPrimitive [CHOREOGRAPHY]:', { targetVar, value, expression, sourceVar, lineNumber });
 
         const tl = gsap.timeline({
@@ -106,7 +106,15 @@ export class AssignmentPrimitive extends BasePrimitive {
  * Array Access Primitive
  * Handles: x = arr[i]
  * 
- * ARCHITECTURE: PURE FUNCTION
+ * Uses the cinematic ASSIGN_FROM_ARRAY_INDEX animation from BehaviorLibrary
+ * This provides a professional, unified animation:
+ * 1. Show expression: "max_val = nums[0]"
+ * 2. Array name expands INTO array cells in-place
+ * 3. Index bracket animates down to point at the correct cell
+ * 4. Highlight the target cell with glow effect
+ * 5. Other cells fade out smoothly
+ * 6. Final result: "max_val = 4"
+ * 
  * step.meta contains:
  * - targetVar: string (e.g., "max_val")
  * - arrayName: string (e.g., "nums")
@@ -116,14 +124,14 @@ export class AssignmentPrimitive extends BasePrimitive {
  */
 export class ArrayAccessPrimitive extends BasePrimitive {
     static getDuration() {
-        return 2.0;
+        return 4.5; // Longer duration for the cinematic animation
     }
 
     static animate(step, renderer, timeline, onComplete) {
         const { targetVar, arrayName, arrayValue, index, value } = step.meta;
         const lineNumber = step.line;
-        
-        console.log('📥 ArrayAccessPrimitive [PURE]:', { targetVar, arrayName, index, value });
+
+        console.log('📥 ArrayAccessPrimitive [CINEMATIC]:', { targetVar, arrayName, arrayValue, index, value });
 
         const tl = gsap.timeline({
             onComplete: () => onComplete?.()
@@ -134,47 +142,29 @@ export class ArrayAccessPrimitive extends BasePrimitive {
             renderer.highlightLine(lineNumber);
         }, null, 0);
 
-        // 2. Ensure array exists with correct values
+        // 2. Play the cinematic ASSIGN_FROM_ARRAY_INDEX animation
         tl.call(() => {
-            const arr = renderer.getOrCreateArray(arrayName, arrayValue);
-            arr?.showIndices();
-        }, null, 0.2);
+            // Use the cinematic animation from BehaviorLibrary
+            renderer.playAssignFromArrayIndex({
+                arrayName,
+                arrayValues: arrayValue,
+                index,
+                varName: targetVar,
+                oldValue: null
+            }, () => {
+                // Animation cleanup happens inside the behavior
+                console.log('✅ Cinematic array access animation complete');
+            });
+        }, null, 0.15);
 
-        // 3. Highlight the accessed index
-        tl.call(() => {
-            renderer.highlightArrayIndex(arrayName, index);
-        }, null, 0.5);
+        // 3. Wait for the cinematic animation to complete
+        // The animation takes about 4 seconds in total
+        tl.to({}, { duration: 4.0 }, 0.2);
 
-        // 4. Create target variable
-        tl.call(() => {
-            renderer.getOrCreateVariable(targetVar, '?');
-        }, null, 0.7);
-
-        // 5. Animate pointer from variable to array element
-        tl.call(() => {
-            renderer.animatePointerToArrayElement(arrayName, index, targetVar);
-        }, null, 0.8);
-
-        // 6. Animate value transfer from array to variable
-        tl.call(() => {
-            renderer.animateValueFromArray(arrayName, index, targetVar, value);
-        }, null, 1.0);
-
-        // 7. Update variable with value
-        tl.call(() => {
-            renderer.animateAssignment(targetVar, value);
-        }, null, 1.3);
-
-        // 8. Update state panel
+        // 4. Update state panel (variable is already updated by the animation)
         tl.call(() => {
             renderer.updateStatePanel(targetVar, value);
-        }, null, 1.5);
-
-        // 9. Hide pointer and clear highlight
-        tl.call(() => {
-            renderer.hidePointer();
-            renderer.clearArrayHighlight(arrayName);
-        }, null, 1.7);
+        }, null, 4.2);
 
         timeline.add(tl);
     }
@@ -211,9 +201,9 @@ export class ForLoopPrimitive extends BasePrimitive {
             iteration,
             arrayIndex
         } = step.meta;
-        
+
         const lineNumber = step.line;
-        
+
         console.log('🔄 ForLoopPrimitive [PURE]:', {
             loopVar,
             currentValue,
@@ -320,7 +310,7 @@ export class ConditionPrimitive extends BasePrimitive {
     static animate(step, renderer, timeline, onComplete) {
         const { left, operator, right, result, leftVar, rightVar, expression } = step.meta;
         const lineNumber = step.line;
-        
+
         console.log('🔀 ConditionPrimitive [CHOREOGRAPHY]:', {
             leftVar, rightVar, left, operator, right, result, lineNumber
         });
@@ -418,7 +408,7 @@ export class GenericPrimitive extends BasePrimitive {
         tl.call(() => {
             const changedVars = step.changedVars || [];
             const variables = step.variables || {};
-            
+
             changedVars.forEach(varName => {
                 const value = variables[varName];
                 if (value !== undefined) {
