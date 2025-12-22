@@ -14,6 +14,7 @@ const ImmersiveVisualizer = ({
     const [visibleSteps, setVisibleSteps] = useState([]);
     const [currentStepIndex, setCurrentStepIndex] = useState(-1);
     const [isStreaming, setIsStreaming] = useState(false); // Track if we're receiving streamed data
+    const [selectedStepIndex, setSelectedStepIndex] = useState(null); // Track which step user clicked
 
     // Visualization mode: 'timeline' (legacy) or 'enterprise' (PixiJS + GSAP)
     const [visualizationMode, setVisualizationMode] = useState('timeline');
@@ -35,6 +36,7 @@ const ImmersiveVisualizer = ({
         if (isOpen && !isLoading) {
             setVisibleSteps([]);
             setCurrentStepIndex(-1);
+            setSelectedStepIndex(null);
             prevStepsLengthRef.current = 0;
             setPendingSteps([]);
             setIsStepAnimating(false);
@@ -397,10 +399,10 @@ const ImmersiveVisualizer = ({
                         {codeLines.map((line, idx) => {
                             const lineNum = idx + 1;
                             
-                            // In Enterprise mode, use currentStepIndex; in Timeline mode, use visibleSteps
+                            // In Enterprise mode, use currentStepIndex; in Timeline mode, use selectedStep or latest visible step
                             const activeStep = visualizationMode === 'enterprise' 
                                 ? (currentStepIndex >= 0 ? steps[currentStepIndex] : null)
-                                : visibleSteps[visibleSteps.length - 1];
+                                : (selectedStepIndex !== null ? visibleSteps[selectedStepIndex] : visibleSteps[visibleSteps.length - 1]);
                             
                             const isCurrentLine = activeStep?.lineNumber === lineNum || 
                                 activeStep?.line_no === lineNum || 
@@ -501,6 +503,7 @@ const ImmersiveVisualizer = ({
                                 {/* Steps */}
                                 {visibleSteps.map((step, idx) => {
                                     const isLatest = idx === visibleSteps.length - 1;
+                                    const isSelected = selectedStepIndex === idx;
 
                                     return (
                                         <div
@@ -508,21 +511,26 @@ const ImmersiveVisualizer = ({
                                             ref={isLatest ? latestStepRef : null}
                                             className={`relative pl-16 pb-8 transition-all duration-500 ${isLatest ? 'animate-fade-in-up' : ''
                                                 }`}
+                                            onClick={() => setSelectedStepIndex(idx)}
                                         >
                                             {/* Timeline Node */}
-                                            <div className={`absolute left-4 w-5 h-5 rounded-full border-2 transition-all ${isLatest
-                                                ? 'bg-teal-500 border-teal-400 shadow-lg shadow-teal-500/50 scale-125'
-                                                : 'bg-slate-800 border-slate-600'
+                                            <div className={`absolute left-4 w-5 h-5 rounded-full border-2 transition-all ${isSelected
+                                                ? 'bg-cyan-500 border-cyan-400 shadow-lg shadow-cyan-500/50 scale-125'
+                                                : isLatest
+                                                    ? 'bg-teal-500 border-teal-400 shadow-lg shadow-teal-500/50 scale-125'
+                                                    : 'bg-slate-800 border-slate-600'
                                                 }`}>
-                                                {isLatest && (
-                                                    <div className="absolute inset-0 rounded-full bg-teal-400 animate-ping opacity-50" />
+                                                {(isSelected || isLatest) && (
+                                                    <div className={`absolute inset-0 rounded-full animate-ping opacity-50 ${isSelected ? 'bg-cyan-400' : 'bg-teal-400'}`} />
                                                 )}
                                             </div>
 
                                             {/* Step Card */}
-                                            <div className={`bg-slate-800/50 rounded-2xl border transition-all ${isLatest
-                                                ? 'border-teal-500/50 shadow-xl shadow-teal-500/10'
-                                                : 'border-slate-700/50'
+                                            <div className={`bg-slate-800/50 rounded-2xl border transition-all cursor-pointer hover:border-slate-500/50 ${isSelected
+                                                ? 'border-cyan-500/70 shadow-xl shadow-cyan-500/20 ring-1 ring-cyan-500/30'
+                                                : isLatest
+                                                    ? 'border-teal-500/50 shadow-xl shadow-teal-500/10'
+                                                    : 'border-slate-700/50'
                                                 }`}>
                                                 {/* Card Header */}
                                                 <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700/50">
