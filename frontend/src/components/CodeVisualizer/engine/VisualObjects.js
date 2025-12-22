@@ -17,20 +17,20 @@ const COLORS = {
     primary: 0x6366f1,      // Indigo
     secondary: 0x8b5cf6,    // Purple
     accent: 0x14b8a6,       // Teal
-    
+
     // State colors
     active: 0x22d3ee,       // Cyan
     success: 0x22c55e,      // Green
     warning: 0xf59e0b,      // Amber
     error: 0xef4444,        // Red
-    
+
     // Neutrals
     bg: 0x0f172a,           // Slate 900
     bgLight: 0x1e293b,      // Slate 800
     border: 0x334155,       // Slate 700
     text: 0xf1f5f9,         // Slate 100
     textMuted: 0x94a3b8,    // Slate 400
-    
+
     // Syntax
     keyword: 0xc084fc,      // Purple 400
     variable: 0x60a5fa,     // Blue 400
@@ -40,20 +40,20 @@ const COLORS = {
 
 // Helper to create text with PixiJS v8 API
 const createText = (text, options = {}) => {
-    const { 
-        fontSize = 14, 
-        fill = COLORS.text, 
-        fontWeight = 'normal', 
-        fontFamily = 'JetBrains Mono, Consolas, monospace' 
+    const {
+        fontSize = 14,
+        fill = COLORS.text,
+        fontWeight = 'normal',
+        fontFamily = 'JetBrains Mono, Consolas, monospace'
     } = options;
-    
+
     const style = new PIXI.TextStyle({
         fontFamily,
         fontSize,
         fill,
         fontWeight
     });
-    
+
     return new PIXI.Text({ text: String(text), style });
 };
 
@@ -73,7 +73,7 @@ export class VisualObject {
             this.stage.addChild(this.container);
         }
         this.isVisible = true;
-        
+
         // HOME position - where this visual "lives"
         this.homeX = 0;
         this.homeY = 0;
@@ -85,7 +85,7 @@ export class VisualObject {
         this.container.y = y;
         return this;
     }
-    
+
     /**
      * Set the HOME position for this visual
      * This is where the visual "lives" in its zone
@@ -95,7 +95,7 @@ export class VisualObject {
         this.homeY = y;
         return this;
     }
-    
+
     /**
      * Instantly move to home position
      */
@@ -105,7 +105,7 @@ export class VisualObject {
         this.isAtHome = true;
         return this;
     }
-    
+
     /**
      * Animate movement to a target position (for choreography)
      * @returns {Object} GSAP tween config
@@ -118,7 +118,7 @@ export class VisualObject {
             ease: 'power2.out'
         });
     }
-    
+
     /**
      * Animate return to home position
      * @returns {Object} GSAP tween config
@@ -132,7 +132,7 @@ export class VisualObject {
             ease: 'power2.inOut'
         });
     }
-    
+
     /**
      * Get current position
      */
@@ -177,11 +177,11 @@ export class ArrayVisual extends VisualObject {
         this.indexLabels = [];
         this.valueTexts = [];
         this.highlightedIndex = -1;
-        
+
         this.elementSize = 44;  // Compact cell size
         this.elementHeight = 40;
         this.gap = 2;  // Minimal gap between cells
-        
+
         this._createGraphics();
     }
 
@@ -217,7 +217,7 @@ export class ArrayVisual extends VisualObject {
     _createElements() {
         this.values.forEach((value, index) => {
             const x = this.elementsStartX + index * (this.elementSize + this.gap);
-            
+
             // Element box - clean rectangular cells
             const box = new PIXI.Graphics();
             box.roundRect(0, 0, this.elementSize, this.elementHeight, 2);
@@ -266,10 +266,10 @@ export class ArrayVisual extends VisualObject {
 
     animateHighlightIndex(timeline, index, startTime) {
         if (index < 0 || index >= this.elementBoxes.length) return;
-        
+
         const box = this.elementBoxes[index];
         const indexLabel = this.indexLabels[index];
-        
+
         // Create highlight border around the element
         const highlight = new PIXI.Graphics();
         highlight.roundRect(-3, -3, this.elementSize + 6, this.elementHeight + 6, 3);
@@ -278,14 +278,14 @@ export class ArrayVisual extends VisualObject {
         highlight.y = box.y;
         highlight.alpha = 0;
         this.container.addChild(highlight);
-        
+
         // Animate highlight appearing
         timeline.to(highlight, {
             alpha: 1,
             duration: 0.2,
             ease: 'power2.out'
         }, startTime);
-        
+
         // Scale the highlight slightly
         timeline.from(highlight.scale, {
             x: 1.15,
@@ -306,12 +306,86 @@ export class ArrayVisual extends VisualObject {
 
     getElementPosition(index) {
         if (index < 0 || index >= this.elementBoxes.length) return { x: 0, y: 0 };
-        
+
         const box = this.elementBoxes[index];
         return {
             x: this.container.x + box.x + this.elementSize / 2,
             y: this.container.y + this.elementHeight / 2
         };
+    }
+
+    /**
+     * Get the position and size of a cell (relative to the array container)
+     * Used for choreography to position pointers and extract values
+     */
+    getCellPosition(index) {
+        if (index < 0 || index >= this.elementBoxes.length) {
+            return { x: 0, y: 0, width: this.elementSize, height: this.elementHeight };
+        }
+
+        const box = this.elementBoxes[index];
+        return {
+            x: box.x,
+            y: box.y,
+            width: this.elementSize,
+            height: this.elementHeight
+        };
+    }
+
+    /**
+     * Highlight a specific cell with a color (for choreography)
+     */
+    highlightCell(index, color = 0x6366f1) {
+        if (index < 0 || index >= this.elementBoxes.length) return;
+
+        // Clear any existing highlight first
+        this.clearHighlight();
+
+        const box = this.elementBoxes[index];
+
+        // Create glow effect behind the cell
+        this._highlightGlow = new PIXI.Graphics();
+        this._highlightGlow.roundRect(-4, -4, this.elementSize + 8, this.elementHeight + 8, 6);
+        this._highlightGlow.fill({ color, alpha: 0.3 });
+        this._highlightGlow.x = box.x;
+        this._highlightGlow.y = box.y;
+        this.container.addChildAt(this._highlightGlow, 0);
+
+        // Redraw the cell border with highlight color
+        box.clear();
+        box.roundRect(0, 0, this.elementSize, this.elementHeight, 2);
+        box.fill(0x1e293b);
+        box.stroke({ width: 2, color });
+
+        this.highlightedIndex = index;
+
+        // Animate glow
+        gsap.fromTo(this._highlightGlow,
+            { alpha: 0 },
+            { alpha: 1, duration: 0.2, ease: 'power2.out' }
+        );
+    }
+
+    /**
+     * Clear any cell highlight
+     */
+    clearHighlight() {
+        if (this._highlightGlow) {
+            this.container.removeChild(this._highlightGlow);
+            this._highlightGlow.destroy();
+            this._highlightGlow = null;
+        }
+
+        // Reset highlighted cell border to default
+        if (this.highlightedIndex >= 0 && this.highlightedIndex < this.elementBoxes.length) {
+            const box = this.elementBoxes[this.highlightedIndex];
+            box.clear();
+            box.roundRect(0, 0, this.elementSize, this.elementHeight, 2);
+            box.fill(0x1e293b);
+            box.stroke({ width: 2, color: 0x475569 });
+        }
+
+        this.highlightedIndex = -1;
     }
 
     getVisualWidth() {
@@ -346,16 +420,16 @@ export class ArrayVisual extends VisualObject {
 
         // Remove old element graphics/text/labels
         for (const box of this.elementBoxes) {
-            try { this.container.removeChild(box); } catch {}
-            try { box.destroy(); } catch {}
+            try { this.container.removeChild(box); } catch { }
+            try { box.destroy(); } catch { }
         }
         for (const text of this.valueTexts) {
-            try { this.container.removeChild(text); } catch {}
-            try { text.destroy(); } catch {}
+            try { this.container.removeChild(text); } catch { }
+            try { text.destroy(); } catch { }
         }
         for (const label of this.indexLabels) {
-            try { this.container.removeChild(label); } catch {}
-            try { label.destroy(); } catch {}
+            try { this.container.removeChild(label); } catch { }
+            try { label.destroy(); } catch { }
         }
         this.elementBoxes = [];
         this.valueTexts = [];
@@ -382,7 +456,7 @@ export class VariableVisual extends VisualObject {
         this.value = value;
         this.boxWidth = 70;
         this.boxHeight = 36;
-        
+
         this._createGraphics();
     }
 
@@ -489,7 +563,7 @@ export class VariableVisual extends VisualObject {
             ease: 'back.out(3)'
         }, startTime + 0.1);
     }
-    
+
     /**
      * Set value instantly (with optional flash effect)
      */
@@ -497,10 +571,10 @@ export class VariableVisual extends VisualObject {
         this.value = newValue;
         this.valueText.text = String(newValue);
         this.valueText.style.fill = COLORS.number;
-        
+
         if (animate) {
             // Quick flash effect
-            gsap.fromTo(this.valueBox, 
+            gsap.fromTo(this.valueBox,
                 { pixi: { tint: COLORS.accent } },
                 { pixi: { tint: 0xffffff }, duration: 0.3 }
             );
@@ -529,7 +603,7 @@ export class ValueBubble extends VisualObject {
         super(stage);
         this.value = value;
         this.size = 48;
-        
+
         this._createGraphics();
     }
 
@@ -607,7 +681,7 @@ export class ComparisonVisual extends VisualObject {
     constructor(stage) {
         super(stage);
         this.boxPadding = 10;
-        
+
         this._createGraphics();
     }
 
@@ -708,7 +782,7 @@ export class ComparisonVisual extends VisualObject {
             ease: 'back.out(2)'
         }, startTime + 0.15);
     }
-    
+
     /**
      * Set comparison values instantly (for choreography)
      */
@@ -716,25 +790,25 @@ export class ComparisonVisual extends VisualObject {
         this.leftText.text = String(left);
         this.operatorText.text = ` ${operator} `;
         this.rightText.text = String(right);
-        
+
         this.operatorText.x = this.leftText.x + this.leftText.width;
         this.operatorText.y = this.boxPadding;
         this.rightText.x = this.operatorText.x + this.operatorText.width;
         this.rightText.y = this.boxPadding;
-        
+
         const totalWidth = this.rightText.x + this.rightText.width + this.boxPadding;
         const totalHeight = this.boxPadding * 2 + 20;
-        
+
         this.bg.clear();
         this.bg.roundRect(0, 0, totalWidth, totalHeight, 6);
         this.bg.fill(COLORS.bgLight);
         this.bg.stroke({ width: 2, color: COLORS.border });
-        
+
         this.resultText.alpha = 0;
         this.container.alpha = 1;
         this.container.scale.set(1);
     }
-    
+
     /**
      * Show result instantly (for choreography)
      */
@@ -743,7 +817,7 @@ export class ComparisonVisual extends VisualObject {
         this.resultText.style.fill = result ? COLORS.success : COLORS.error;
         this.resultText.x = this.rightText.x + this.rightText.width + 10;
         this.resultText.y = this.boxPadding;
-        
+
         gsap.to(this.resultText, { alpha: 1, duration: 0.2 });
     }
 }
@@ -756,7 +830,7 @@ export class LoopIndicator extends VisualObject {
         super(stage);
         this.iteration = 0;
         this.size = 40;  // Smaller, more compact
-        
+
         this._createGraphics();
     }
 
@@ -898,7 +972,7 @@ export class ReturnVisual extends VisualObject {
      */
     animate() {
         // Pulse animation on the value box
-        gsap.fromTo(this.valueBox.scale, 
+        gsap.fromTo(this.valueBox.scale,
             { x: 1, y: 1 },
             { x: 1.1, y: 1.1, duration: 0.2, yoyo: true, repeat: 1 }
         );
@@ -914,7 +988,7 @@ export class CodeHighlight extends VisualObject {
         super(stage);
         this.lineHeight = lineHeight;
         this.currentLine = -1;
-        
+
         this._createGraphics();
     }
 
@@ -926,7 +1000,7 @@ export class CodeHighlight extends VisualObject {
 
     animateHighlight(timeline, lineNumber, codeWidth, startTime) {
         const y = (lineNumber - 1) * this.lineHeight;
-        
+
         this.highlight.clear();
         this.highlight.roundRect(0, y, codeWidth, this.lineHeight, 4);
         this.highlight.fill({ color: COLORS.accent, alpha: 0.2 });
@@ -949,7 +1023,7 @@ export class PointerArrow extends VisualObject {
         this.line = null;
         this.arrowHead = null;
         this.label = null;
-        
+
         this._createGraphics();
     }
 
@@ -957,11 +1031,11 @@ export class PointerArrow extends VisualObject {
         // Line/path
         this.line = new PIXI.Graphics();
         this.container.addChild(this.line);
-        
+
         // Arrow head
         this.arrowHead = new PIXI.Graphics();
         this.container.addChild(this.arrowHead);
-        
+
         // Label showing the variable name
         this.label = createText('', {
             fontSize: 14,
@@ -970,7 +1044,7 @@ export class PointerArrow extends VisualObject {
         });
         this.label.anchor.set(0.5);
         this.container.addChild(this.label);
-        
+
         this.container.alpha = 0;
     }
 
@@ -979,46 +1053,46 @@ export class PointerArrow extends VisualObject {
      */
     animatePointer(timeline, fromPos, toPos, varName, startTime) {
         this.label.text = varName;
-        
+
         // Draw the curved line
         const midX = (fromPos.x + toPos.x) / 2;
         const midY = toPos.y - 50; // Arc above
-        
+
         timeline.call(() => {
             this.line.clear();
             this.arrowHead.clear();
-            
+
             // Draw line with animation effect
             this.line.moveTo(fromPos.x, fromPos.y);
             this.line.quadraticCurveTo(midX, midY, toPos.x, toPos.y - 10);
             this.line.stroke({ width: 3, color: COLORS.accent, alpha: 0.8 });
-            
+
             // Arrow head pointing down
             this.arrowHead.moveTo(toPos.x, toPos.y);
             this.arrowHead.lineTo(toPos.x - 8, toPos.y - 12);
             this.arrowHead.lineTo(toPos.x + 8, toPos.y - 12);
             this.arrowHead.closePath();
             this.arrowHead.fill({ color: COLORS.accent });
-            
+
             // Position label at start
             this.label.x = fromPos.x;
             this.label.y = fromPos.y - 20;
         }, null, startTime);
-        
+
         // Fade in
         timeline.to(this.container, {
             alpha: 1,
             duration: 0.3,
             ease: 'power2.out'
         }, startTime);
-        
+
         // Pulse effect
         timeline.to(this.arrowHead, {
             pixi: { scale: 1.3 },
             duration: 0.15,
             ease: 'power2.out'
         }, startTime + 0.3);
-        
+
         timeline.to(this.arrowHead, {
             pixi: { scale: 1 },
             duration: 0.15,
@@ -1055,7 +1129,7 @@ export class StatePanel extends VisualObject {
         this.variables = new Map(); // name -> {text, value, y}
         this.nextY = 40;
         this.rowHeight = 32;
-        
+
         this._createGraphics();
     }
 
@@ -1066,7 +1140,7 @@ export class StatePanel extends VisualObject {
         this.bg.fill({ color: COLORS.bg, alpha: 0.7 });
         this.bg.stroke({ width: 1, color: COLORS.border, alpha: 0.5 });
         this.container.addChild(this.bg);
-        
+
         // Header
         this.header = createText('State', {
             fontSize: 14,
@@ -1076,7 +1150,7 @@ export class StatePanel extends VisualObject {
         this.header.x = 12;
         this.header.y = 12;
         this.container.addChild(this.header);
-        
+
         // Divider line
         this.divider = new PIXI.Graphics();
         this.divider.moveTo(10, 32);
@@ -1090,16 +1164,16 @@ export class StatePanel extends VisualObject {
      */
     setVariable(name, value, animate = true) {
         console.log('📊 StatePanel.setVariable:', { name, value, hasExisting: this.variables.has(name) });
-        
+
         if (this.variables.has(name)) {
             // Update existing
             const entry = this.variables.get(name);
             const oldValue = entry.valueText.text;
             entry.valueText.text = String(value);
-            
+
             if (animate && oldValue !== String(value)) {
                 // Flash effect on change
-                gsap.fromTo(entry.valueText, 
+                gsap.fromTo(entry.valueText,
                     { pixi: { tint: COLORS.accent } },
                     { pixi: { tint: 0xffffff }, duration: 0.5 }
                 );
@@ -1107,7 +1181,7 @@ export class StatePanel extends VisualObject {
         } else {
             // Create new entry
             const y = this.nextY;
-            
+
             // Variable name
             const nameText = createText(name + ':', {
                 fontSize: 13,
@@ -1116,7 +1190,7 @@ export class StatePanel extends VisualObject {
             nameText.x = 12;
             nameText.y = y;
             this.container.addChild(nameText);
-            
+
             // Value
             const valueText = createText(String(value), {
                 fontSize: 13,
@@ -1127,15 +1201,15 @@ export class StatePanel extends VisualObject {
             valueText.anchor.set(1, 0);
             valueText.y = y;
             this.container.addChild(valueText);
-            
+
             this.variables.set(name, {
                 nameText,
                 valueText,
                 y
             });
-            
+
             this.nextY += this.rowHeight;
-            
+
             if (animate) {
                 // Slide in animation
                 nameText.alpha = 0;

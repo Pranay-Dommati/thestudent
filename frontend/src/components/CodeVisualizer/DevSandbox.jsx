@@ -36,6 +36,26 @@ const TEST_CASES = {
         { label: 'max_val = nums[1]', params: { arrayName: 'nums', arrayValues: [4, 5], index: 1, varName: 'max_val', oldValue: '—' } },
         { label: 'n = arr[3] (longer)', params: { arrayName: 'arr', arrayValues: [5, 6, 10, 13, 56, 76, 1, 2, 4, 8], index: 3, varName: 'n', oldValue: '—' } },
     ],
+    ASSIGN_FROM_VARIABLE: [
+        { label: 'y = x (copy 5)', params: { sourceVarName: 'x', sourceValue: 5, targetVarName: 'y' } },
+        { label: 'max_val = num (42)', params: { sourceVarName: 'num', sourceValue: 42, targetVarName: 'max_val' } },
+        { label: 'temp = current (0)', params: { sourceVarName: 'current', sourceValue: 0, targetVarName: 'temp' } },
+        { label: 'result = count (-7)', params: { sourceVarName: 'count', sourceValue: -7, targetVarName: 'result' } },
+    ],
+    ASSIGN_BINARY_OPERATION: [
+        { label: 'sum = a + b (3+5=8)', params: { targetVarName: 'sum', leftVarName: 'a', leftValue: 3, rightVarName: 'b', rightValue: 5, operator: '+', resultValue: 8 } },
+        { label: 'diff = x - y (10-4=6)', params: { targetVarName: 'diff', leftVarName: 'x', leftValue: 10, rightVarName: 'y', rightValue: 4, operator: '-', resultValue: 6 } },
+        { label: 'prod = m * n (7*8=56)', params: { targetVarName: 'prod', leftVarName: 'm', leftValue: 7, rightVarName: 'n', rightValue: 8, operator: '*', resultValue: 56 } },
+        { label: 'quot = p / q (20/4=5)', params: { targetVarName: 'quot', leftVarName: 'p', leftValue: 20, rightVarName: 'q', rightValue: 4, operator: '/', resultValue: 5 } },
+        { label: 'rem = a % b (17%5=2)', params: { targetVarName: 'rem', leftVarName: 'a', leftValue: 17, rightVarName: 'b', rightValue: 5, operator: '%', resultValue: 2 } },
+    ],
+    IF_ELSE_BRANCH: [
+        { label: '10 > 5 (True)', params: { leftValue: 10, rightValue: 5, operator: '>', result: true } },
+        { label: '3 > 8 (False)', params: { leftValue: 3, rightValue: 8, operator: '>', result: false } },
+        { label: '5 == 5 (True)', params: { leftValue: 5, rightValue: 5, operator: '==', result: true } },
+        { label: '7 < 3 (False)', params: { leftValue: 7, rightValue: 3, operator: '<', result: false } },
+        { label: '1 <= 1 (True)', params: { leftValue: 1, rightValue: 1, operator: '<=', result: true } },
+    ],
     COMPARE: [
         { label: '3 > 5 (False)', params: { left: 3, right: 5, operator: '>', result: false } },
         { label: '10 > 3 (True)', params: { left: 10, right: 3, operator: '>', result: true } },
@@ -62,6 +82,14 @@ const TEST_CASES = {
         { label: 'Iteration 5', params: { iteration: 5 } },
         { label: 'Iteration 10', params: { iteration: 10 } },
     ],
+    FOR_LOOP_ITERATION: [
+        { label: 'for n in nums: (first, idx 0)', params: { loopVar: 'n', arrayName: 'nums', arrayValues: [5, 3, 8, 2], currentIndex: 0, previousIndex: null, iteration: 1, currentValue: 5 } },
+        { label: 'for n in nums: (second, 0→1)', params: { loopVar: 'n', arrayName: 'nums', arrayValues: [5, 3, 8, 2], currentIndex: 1, previousIndex: 0, iteration: 2, currentValue: 3 } },
+        { label: 'for n in nums: (third, 1→2)', params: { loopVar: 'n', arrayName: 'nums', arrayValues: [5, 3, 8, 2], currentIndex: 2, previousIndex: 1, iteration: 3, currentValue: 8 } },
+        { label: 'for n in nums: (last, 2→3)', params: { loopVar: 'n', arrayName: 'nums', arrayValues: [5, 3, 8, 2], currentIndex: 3, previousIndex: 2, iteration: 4, currentValue: 2 } },
+        { label: 'for x in arr: (short array)', params: { loopVar: 'x', arrayName: 'arr', arrayValues: [10, 20], currentIndex: 0, previousIndex: null, iteration: 1, currentValue: 10 } },
+        { label: 'for i in data: (long array)', params: { loopVar: 'i', arrayName: 'data', arrayValues: [1, 2, 3, 4, 5, 6], currentIndex: 3, previousIndex: 2, iteration: 4, currentValue: 4 } },
+    ],
     RETURN_VALUE: [
         { label: 'Return 42', params: { value: 42 } },
         { label: 'Return 0', params: { value: 0 } },
@@ -78,23 +106,23 @@ export default function DevSandbox() {
     const appRef = useRef(null);
     const layerRef = useRef(null);
     const mountedRef = useRef(true);
-    
+
     const [selectedBehavior, setSelectedBehavior] = useState('COMPARE');
     const [isPlaying, setIsPlaying] = useState(false);
     const [lastPlayed, setLastPlayed] = useState(null);
     const [isReady, setIsReady] = useState(false);
-    
+
     // Initialize PixiJS
     useEffect(() => {
         mountedRef.current = true;
         let app = null;
-        
+
         const initPixi = async () => {
             // Wait a tick to ensure canvas is mounted
             await new Promise(resolve => setTimeout(resolve, 0));
-            
+
             if (!mountedRef.current || !canvasRef.current) return;
-            
+
             // Destroy any existing app first
             if (appRef.current) {
                 try {
@@ -105,7 +133,7 @@ export default function DevSandbox() {
                 appRef.current = null;
                 layerRef.current = null;
             }
-            
+
             try {
                 app = new PIXI.Application();
                 await app.init({
@@ -117,35 +145,35 @@ export default function DevSandbox() {
                     resolution: window.devicePixelRatio || 1,
                     autoDensity: true
                 });
-                
+
                 // Check if still mounted after async init
                 if (!mountedRef.current) {
                     app.destroy(true, { children: true });
                     return;
                 }
-                
+
                 appRef.current = app;
-                
+
                 // Create animation layer
                 const layer = new PIXI.Container();
                 app.stage.addChild(layer);
                 layerRef.current = layer;
-                
+
                 // Add grid for reference
                 drawGrid(app.stage);
-                
+
                 setIsReady(true);
             } catch (error) {
                 console.error('Failed to initialize PixiJS:', error);
             }
         };
-        
+
         initPixi();
-        
+
         return () => {
             mountedRef.current = false;
             setIsReady(false);
-            
+
             if (appRef.current) {
                 try {
                     appRef.current.destroy(true, { children: true });
@@ -157,59 +185,59 @@ export default function DevSandbox() {
             }
         };
     }, []);
-    
+
     // Draw reference grid
     const drawGrid = (stage) => {
         const grid = new PIXI.Graphics();
         grid.alpha = 0.1;
-        
+
         // Vertical lines
         for (let x = 0; x <= 700; x += 50) {
             grid.moveTo(x, 0);
             grid.lineTo(x, 300);
         }
-        
+
         // Horizontal lines
         for (let y = 0; y <= 300; y += 50) {
             grid.moveTo(0, y);
             grid.lineTo(700, y);
         }
-        
+
         grid.stroke({ width: 1, color: 0x475569 });
         stage.addChildAt(grid, 0);
     };
-    
 
-    
+
+
     // Clear animation layer
     const clearLayer = useCallback(() => {
         if (layerRef.current) {
             layerRef.current.removeChildren();
         }
     }, []);
-    
+
     // Play a behavior with test params
     const handlePlayBehavior = useCallback((testCase) => {
         if (!layerRef.current || !isReady || isPlaying) return;
-        
+
         clearLayer();
         setIsPlaying(true);
         setLastPlayed({ behavior: selectedBehavior, testCase });
-        
+
         // Build full params with position
         const fullParams = {
             ...testCase.params,
             position: { x: 350, y: 150 }, // Center of canvas
         };
-        
+
         // For ASSIGN_FROM, add source/target positions
         if (selectedBehavior === 'ASSIGN_FROM') {
             fullParams.sourcePosition = { x: 200, y: 150 };
             fullParams.targetPosition = { x: 500, y: 150 };
         }
-        
+
         // For HIGHLIGHT_ARRAY_INDEX, position is already handled (uses position for center)
-        
+
         playBehavior(
             selectedBehavior,
             layerRef.current,
@@ -221,7 +249,7 @@ export default function DevSandbox() {
             }
         );
     }, [selectedBehavior, isPlaying, isReady, clearLayer]);
-    
+
     // Play random test case
     const playRandom = useCallback(() => {
         if (!isReady) return;
@@ -229,7 +257,7 @@ export default function DevSandbox() {
         const randomCase = testCases[Math.floor(Math.random() * testCases.length)];
         handlePlayBehavior(randomCase);
     }, [selectedBehavior, handlePlayBehavior, isReady]);
-    
+
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -241,18 +269,18 @@ export default function DevSandbox() {
                 clearLayer();
             }
         };
-        
+
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [playRandom, clearLayer]);
-    
+
     return (
         <div className="dev-sandbox">
             <header className="dev-sandbox__header">
                 <h1>🧪 Behavior Sandbox</h1>
                 <p>Test visual behaviors with dummy values. Space/Enter = play random, C = clear</p>
             </header>
-            
+
             <div className="dev-sandbox__main">
                 {/* Sidebar - Behavior Selection */}
                 <aside className="dev-sandbox__sidebar">
@@ -268,7 +296,7 @@ export default function DevSandbox() {
                             </button>
                         ))}
                     </div>
-                    
+
                     <h2>Test Cases</h2>
                     <div className="test-cases">
                         {TEST_CASES[selectedBehavior]?.map((testCase, i) => (
@@ -282,34 +310,34 @@ export default function DevSandbox() {
                             </button>
                         ))}
                     </div>
-                    
-                    <button 
+
+                    <button
                         className="random-btn"
                         onClick={playRandom}
                         disabled={isPlaying}
                     >
                         🎲 Play Random
                     </button>
-                    
-                    <button 
+
+                    <button
                         className="clear-btn"
                         onClick={clearLayer}
                     >
                         🗑️ Clear
                     </button>
                 </aside>
-                
+
                 {/* Canvas */}
                 <div className="dev-sandbox__canvas-container">
                     <canvas ref={canvasRef} />
-                    
+
                     {isPlaying && (
                         <div className="playing-indicator">
                             ▶ Playing...
                         </div>
                     )}
                 </div>
-                
+
                 {/* Info Panel */}
                 <aside className="dev-sandbox__info">
                     <h2>Quality Check</h2>
@@ -330,7 +358,7 @@ export default function DevSandbox() {
                             <input type="checkbox" /> Clear result
                         </label>
                     </div>
-                    
+
                     {lastPlayed && (
                         <div className="last-played">
                             <h3>Last Played</h3>
@@ -341,7 +369,7 @@ export default function DevSandbox() {
                             </code>
                         </div>
                     )}
-                    
+
                     <div className="instructions">
                         <h3>How to Use</h3>
                         <ol>

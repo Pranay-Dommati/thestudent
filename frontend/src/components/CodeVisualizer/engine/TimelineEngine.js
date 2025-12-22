@@ -13,12 +13,12 @@ import gsap from 'gsap';
 export class TimelineEngine {
     constructor() {
         // Master timeline - single source of truth
-        this.masterTimeline = gsap.timeline({ 
+        this.masterTimeline = gsap.timeline({
             paused: true,
             onUpdate: () => this._onUpdate(),
             onComplete: () => this._onComplete()
         });
-        
+
         // State
         this.currentTime = 0;
         this.duration = 0;
@@ -27,13 +27,13 @@ export class TimelineEngine {
         this.steps = [];
         this.stepByStepMode = true; // Default to step-by-step mode
         this.stepAnimation = null; // Track current step animation
-        
+
         // Callbacks
         this.onStepChange = null;
         this.onProgress = null;
         this.onComplete = null;
         this.onStateChange = null;
-        
+
         // Step markers for seeking
         this.stepMarkers = [];
     }
@@ -47,15 +47,15 @@ export class TimelineEngine {
         this.clear();
         this.steps = steps;
         this.renderer = renderer;
-        
+
         console.log('🎬 TimelineEngine initializing with', steps.length, 'steps');
         console.log('📊 First step data:', steps[0]);
-        
+
         // Pre-scan all steps to find all arrays and variables we'll need
         this._prescanSteps(steps);
-        
+
         let timeOffset = 0;
-        
+
         steps.forEach((step, index) => {
             // Mark step start time
             this.stepMarkers.push({
@@ -63,21 +63,21 @@ export class TimelineEngine {
                 startTime: timeOffset,
                 step
             });
-            
+
             // Generate animation commands for this step
             const commands = this._generateCommands(step, index);
             console.log(`Step ${index} commands:`, commands);
-            
+
             // Add commands to master timeline
             commands.forEach(cmd => {
                 this._addCommand(cmd, timeOffset);
                 timeOffset += cmd.duration || 0;
             });
-            
+
             // Add pause point between steps (optional)
             timeOffset += 0.1; // Small gap between steps
         });
-        
+
         this.duration = this.masterTimeline.duration();
         this._notifyStateChange();
     }
@@ -104,22 +104,22 @@ export class TimelineEngine {
     _getStepLine(step) {
         return step?.line_no ?? step?.line ?? step?.lineNumber ?? null;
     }
-    
+
     /**
      * Pre-scan steps to identify all arrays and variables
      */
     _prescanSteps(steps) {
         if (!this.renderer) return;
-        
+
         const seenArrays = new Set();
         const seenVars = new Set();
-        
+
         steps.forEach((step, index) => {
             // Try different data structures that steps might have
             const locals = this._normalizeLocals(step);
             const variables = step?.variables ? this._normalizeLocals({ variables: step.variables }) : {};
             const allVars = { ...variables, ...locals };
-            
+
             // Log all data for debugging
             if (index === 0) {
                 console.log('📋 Step 0 full data:', step);
@@ -127,7 +127,7 @@ export class TimelineEngine {
                 console.log('📋 Step 0 variables:', variables);
                 console.log('📋 Step 0 combined:', allVars);
             }
-            
+
             // Find and create arrays
             Object.entries(allVars).forEach(([name, value]) => {
                 if (Array.isArray(value) && !seenArrays.has(name)) {
@@ -141,7 +141,7 @@ export class TimelineEngine {
                 }
             });
         });
-        
+
         console.log('📊 Pre-scanned arrays:', [...seenArrays]);
         console.log('📊 Pre-scanned vars:', [...seenVars]);
     }
@@ -153,7 +153,7 @@ export class TimelineEngine {
         const commands = [];
         const code = step?.code;
         const stepLine = this._getStepLine(step);
-        
+
         // Parse the step type
         const stepType = this._parseStepType(step);
         console.log(`🔎 Step ${stepIndex}:`, {
@@ -163,31 +163,57 @@ export class TimelineEngine {
             locals: this._normalizeLocals(step),
             parsed: stepType
         });
-        
+
         switch (stepType.type) {
             case 'array_access':
+                // Use cinematic ASSIGN_FROM_ARRAY_INDEX behavior
                 commands.push(
                     { type: 'HIGHLIGHT_CODE', line: stepLine, duration: 0.3 },
-                    { type: 'SHOW_ARRAY', name: stepType.sourceArray, values: stepType.arrayValue, duration: 0.5 },
-                    { type: 'SHOW_INDICES', name: stepType.sourceArray, duration: 0.4 },
-                    { type: 'HIGHLIGHT_INDEX', name: stepType.sourceArray, index: stepType.index, duration: 0.4 },
-                    { type: 'EXTRACT_VALUE', from: stepType.sourceArray, index: stepType.index, value: stepType.resultValue, duration: 0.6 },
-                    { type: 'CREATE_VARIABLE', name: stepType.targetVar, value: stepType.resultValue, duration: 0.2 },
-                    { type: 'ASSIGN_VALUE', target: stepType.targetVar, value: stepType.resultValue, duration: 0.4 },
+                    {
+                        type: 'PLAY_BEHAVIOR',
+                        behaviorId: 'ASSIGN_FROM_ARRAY_INDEX',
+                        params: {
+                            arrayName: stepType.sourceArray,
+                            arrayValues: stepType.arrayValue,
+                            index: stepType.index,
+                            varName: stepType.targetVar
+                        },
+                        duration: 3.5 // Cinematic behavior duration
+                    },
                     { type: 'COMPLETE_STEP', stepIndex, duration: 0.2 }
                 );
                 break;
-                
+
             case 'assignment':
-                commands.push(
-                    { type: 'HIGHLIGHT_CODE', line: stepLine, duration: 0.3 },
-                    { type: 'CREATE_VARIABLE', name: stepType.targetVar, value: stepType.value, duration: 0.2 },
-                    { type: 'SHOW_VALUE_BUBBLE', value: stepType.value, duration: 0.4 },
-                    { type: 'ASSIGN_VALUE', target: stepType.targetVar, value: stepType.value, duration: 0.5 },
-                    { type: 'COMPLETE_STEP', stepIndex, duration: 0.2 }
-                );
+                // Check if this is a variable-to-variable assignment
+                if (stepType.sourceVar && stepType.sourceVar !== stepType.targetVar) {
+                    // Use cinematic ASSIGN_FROM_VARIABLE behavior
+                    commands.push(
+                        { type: 'HIGHLIGHT_CODE', line: stepLine, duration: 0.3 },
+                        {
+                            type: 'PLAY_BEHAVIOR',
+                            behaviorId: 'ASSIGN_FROM_VARIABLE',
+                            params: {
+                                sourceVarName: stepType.sourceVar,
+                                sourceValue: stepType.value,
+                                targetVarName: stepType.targetVar
+                            },
+                            duration: 2.5
+                        },
+                        { type: 'COMPLETE_STEP', stepIndex, duration: 0.2 }
+                    );
+                } else {
+                    // Simple literal assignment - use basic animation
+                    commands.push(
+                        { type: 'HIGHLIGHT_CODE', line: stepLine, duration: 0.3 },
+                        { type: 'CREATE_VARIABLE', name: stepType.targetVar, value: stepType.value, duration: 0.2 },
+                        { type: 'SHOW_VALUE_BUBBLE', value: stepType.value, duration: 0.4 },
+                        { type: 'ASSIGN_VALUE', target: stepType.targetVar, value: stepType.value, duration: 0.5 },
+                        { type: 'COMPLETE_STEP', stepIndex, duration: 0.2 }
+                    );
+                }
                 break;
-                
+
             case 'for_loop':
                 commands.push(
                     { type: 'HIGHLIGHT_CODE', line: stepLine, duration: 0.3 },
@@ -201,17 +227,26 @@ export class TimelineEngine {
                     { type: 'COMPLETE_STEP', stepIndex, duration: 0.2 }
                 );
                 break;
-                
+
             case 'condition':
+                // Use cinematic IF_ELSE_BRANCH behavior
                 commands.push(
                     { type: 'HIGHLIGHT_CODE', line: stepLine, duration: 0.3 },
-                    { type: 'SHOW_COMPARISON', left: stepType.left, operator: stepType.operator, right: stepType.right, duration: 0.5 },
-                    { type: 'EVALUATE_CONDITION', result: stepType.result, duration: 0.4 },
-                    { type: 'SHOW_BRANCH', taken: stepType.result, duration: 0.3 },
+                    {
+                        type: 'PLAY_BEHAVIOR',
+                        behaviorId: 'IF_ELSE_BRANCH',
+                        params: {
+                            leftValue: stepType.left,
+                            rightValue: stepType.right,
+                            operator: stepType.operator,
+                            result: stepType.result
+                        },
+                        duration: 3.0
+                    },
                     { type: 'COMPLETE_STEP', stepIndex, duration: 0.2 }
                 );
                 break;
-                
+
             case 'return':
                 commands.push(
                     { type: 'HIGHLIGHT_CODE', line: stepLine, duration: 0.3 },
@@ -220,7 +255,7 @@ export class TimelineEngine {
                     { type: 'COMPLETE_STEP', stepIndex, duration: 0.2 }
                 );
                 break;
-                
+
             default:
                 commands.push(
                     { type: 'HIGHLIGHT_CODE', line: stepLine, duration: 0.3 },
@@ -228,7 +263,7 @@ export class TimelineEngine {
                     { type: 'COMPLETE_STEP', stepIndex, duration: 0.2 }
                 );
         }
-        
+
         return commands;
     }
 
@@ -239,10 +274,10 @@ export class TimelineEngine {
         const code = step.code?.trim() || '';
         const locals = this._normalizeLocals(step);
         // Handle both camelCase (from frontend transform) and snake_case (from raw tracer)
-        const changedVarNames = Array.isArray(step?.changedVars) 
-            ? step.changedVars 
+        const changedVarNames = Array.isArray(step?.changedVars)
+            ? step.changedVars
             : (Array.isArray(step?.changed_vars) ? step.changed_vars : []);
-        
+
         // Array access: target = array[index]
         const arrayAccessMatch = code.match(/(\w+)\s*=\s*(\w+)\[(\d+|\w+)\]/);
         if (arrayAccessMatch) {
@@ -250,7 +285,7 @@ export class TimelineEngine {
             const index = isNaN(indexStr) ? locals[indexStr] : parseInt(indexStr);
             const arrayValue = locals[sourceArray] || [];
             const resultValue = Array.isArray(arrayValue) ? arrayValue[index] : undefined;
-            
+
             return {
                 type: 'array_access',
                 targetVar,
@@ -260,7 +295,7 @@ export class TimelineEngine {
                 resultValue
             };
         }
-        
+
         // For loop: for var in iterable
         const forLoopMatch = code.match(/for\s+(\w+)\s+in\s+(\w+)/);
         if (forLoopMatch) {
@@ -268,7 +303,7 @@ export class TimelineEngine {
             const iterable = locals[iterableName] || [];
             const currentValue = locals[loopVar];
             const iteration = Array.isArray(iterable) ? iterable.indexOf(currentValue) + 1 : 1;
-            
+
             return {
                 type: 'for_loop',
                 loopVar,
@@ -278,18 +313,18 @@ export class TimelineEngine {
                 iteration
             };
         }
-        
+
         // Condition: if/elif with comparison
         const conditionMatch = code.match(/(?:if|elif)\s+(.+?):/);
         if (conditionMatch) {
             const condition = conditionMatch[1];
             const compMatch = condition.match(/(\w+)\s*(>|<|>=|<=|==|!=)\s*(\w+)/);
-            
+
             if (compMatch) {
                 const [, leftVar, operator, rightVar] = compMatch;
                 const left = locals[leftVar] !== undefined ? locals[leftVar] : leftVar;
                 const right = locals[rightVar] !== undefined ? locals[rightVar] : rightVar;
-                
+
                 let result = false;
                 switch (operator) {
                     case '>': result = left > right; break;
@@ -299,7 +334,7 @@ export class TimelineEngine {
                     case '==': result = left == right; break;
                     case '!=': result = left != right; break;
                 }
-                
+
                 return {
                     type: 'condition',
                     condition,
@@ -312,20 +347,20 @@ export class TimelineEngine {
                 };
             }
         }
-        
+
         // Return statement
         const returnMatch = code.match(/return\s+(.+)/);
         if (returnMatch) {
             const returnExpr = returnMatch[1];
             const value = locals[returnExpr] !== undefined ? locals[returnExpr] : returnExpr;
-            
+
             return {
                 type: 'return',
                 expression: returnExpr,
                 value
             };
         }
-        
+
         // Simple assignment: var = value
         const assignMatch = code.match(/(\w+)\s*=\s*(.+)/);
         if (assignMatch) {
@@ -333,15 +368,21 @@ export class TimelineEngine {
             // Tracer provides locals as the current state; changed_vars is just a list of names.
             // Prefer current locals value (new value), else fall back to expression.
             const value = locals[targetVar] !== undefined ? locals[targetVar] : expression;
-            
+
+            // Detect variable-to-variable assignment: check if expression is a known local variable
+            const sourceVar = (expression.trim().match(/^\w+$/) && locals[expression.trim()] !== undefined)
+                ? expression.trim()
+                : null;
+
             return {
                 type: 'assignment',
                 targetVar,
                 expression,
-                value
+                value,
+                sourceVar  // Will be null for literal assignments, or the source var name
             };
         }
-        
+
         return { type: 'generic', code };
     }
 
@@ -350,7 +391,7 @@ export class TimelineEngine {
      */
     _addCommand(command, startTime) {
         if (!this.renderer) return;
-        
+
         const tween = this.renderer.createAnimation(command);
         if (tween) {
             this.masterTimeline.add(tween, startTime);
@@ -369,7 +410,7 @@ export class TimelineEngine {
      */
     playNextStep() {
         console.log('▶️ playNextStep called, currentStep:', this.currentStepIndex, 'totalSteps:', this.stepMarkers.length);
-        
+
         // Cancel any existing step animation
         if (this.stepAnimation) {
             this.stepAnimation.kill();
@@ -396,7 +437,7 @@ export class TimelineEngine {
         this.masterTimeline.seek(startMarker.startTime);
         this.currentStepIndex = nextIndex;
         this.isPlaying = true;
-        
+
         // Notify step change for code highlighting
         if (this.onStepChange) {
             this.onStepChange(nextIndex, startMarker.step);
@@ -406,7 +447,7 @@ export class TimelineEngine {
         // Animate to step end, then pause
         const stepDuration = endTime - startMarker.startTime;
         const animDuration = stepDuration / this.masterTimeline.timeScale();
-        
+
         // Safety: ensure duration is positive and reasonable
         if (animDuration <= 0 || !isFinite(animDuration)) {
             console.warn('⚠️ Invalid animation duration, completing step immediately');
@@ -416,7 +457,7 @@ export class TimelineEngine {
             this._notifyStateChange();
             return;
         }
-        
+
         this.stepAnimation = gsap.to(this.masterTimeline, {
             time: endTime,
             duration: animDuration,
@@ -499,46 +540,46 @@ export class TimelineEngine {
 
     restart() {
         console.log('🔄 TimelineEngine restart called');
-        
+
         // Kill any pending step animation
         if (this.stepAnimation) {
             this.stepAnimation.kill();
             this.stepAnimation = null;
         }
-        
+
         // Pause and reset timeline position
         this.masterTimeline.pause();
         this.masterTimeline.seek(0);
         this.currentStepIndex = -1;
         this.currentTime = 0;
         this.isPlaying = false;
-        
+
         // Notify step change to reset code highlighting
         if (this.onStepChange) {
             this.onStepChange(-1, null);
         }
-        
+
         // Reset renderer visuals
         if (this.renderer) {
             this.renderer.reset();
         }
-        
+
         // Clear and rebuild the master timeline with the same steps
         // This is necessary because the old animations reference destroyed objects
         const savedSteps = this.steps;
         const savedRenderer = this.renderer;
-        
+
         this.clear();
-        
+
         if (savedSteps.length > 0 && savedRenderer) {
             this.initialize(savedSteps, savedRenderer);
         }
-        
+
         // Re-seed initial snapshot so inputs are visible before Start
         if (this.renderer && savedSteps.length > 0) {
             this.renderer.seedInitialStateFromSteps?.(savedSteps);
         }
-        
+
         this._notifyStateChange();
         console.log('✅ TimelineEngine restart complete, ready for playback');
     }
@@ -557,7 +598,7 @@ export class TimelineEngine {
      */
     goToStep(stepIndex) {
         if (stepIndex < 0 || stepIndex >= this.stepMarkers.length) return;
-        
+
         const marker = this.stepMarkers[stepIndex];
         this.masterTimeline.seek(marker.startTime);
         this.currentStepIndex = stepIndex;
@@ -569,16 +610,16 @@ export class TimelineEngine {
      */
     playStep(stepIndex) {
         if (stepIndex < 0 || stepIndex >= this.stepMarkers.length) return;
-        
+
         const startMarker = this.stepMarkers[stepIndex];
         const endMarker = this.stepMarkers[stepIndex + 1];
-        
+
         this.masterTimeline.seek(startMarker.startTime);
         this.currentStepIndex = stepIndex;
-        
+
         // Play until next step or end
         const endTime = endMarker ? endMarker.startTime : this.duration;
-        
+
         // Create a temporary timeline segment
         gsap.to(this.masterTimeline, {
             time: endTime,
@@ -588,7 +629,7 @@ export class TimelineEngine {
                 this.pause();
             }
         });
-        
+
         this.isPlaying = true;
         this._notifyStateChange();
     }
@@ -625,7 +666,7 @@ export class TimelineEngine {
     _onUpdate() {
         this.currentTime = this.masterTimeline.time();
         this._updateCurrentStep();
-        
+
         if (this.onProgress) {
             this.onProgress(this.currentTime / this.duration);
         }

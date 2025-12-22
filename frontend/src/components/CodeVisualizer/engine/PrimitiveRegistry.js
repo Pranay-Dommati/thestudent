@@ -189,7 +189,7 @@ export class ArrayAccessPrimitive extends BasePrimitive {
  */
 export class ForLoopPrimitive extends BasePrimitive {
     static getDuration() {
-        return 2.0;
+        return 4.0; // Longer for cinematic animation
     }
 
     static animate(step, renderer, timeline, onComplete) {
@@ -199,12 +199,13 @@ export class ForLoopPrimitive extends BasePrimitive {
             iterableName,
             currentValue,
             iteration,
-            arrayIndex
+            arrayIndex,
+            iterableValue
         } = step.meta;
 
         const lineNumber = step.line;
 
-        console.log('🔄 ForLoopPrimitive [PURE]:', {
+        console.log('🔄 ForLoopPrimitive [CINEMATIC]:', {
             loopVar,
             currentValue,
             iteration,
@@ -221,65 +222,35 @@ export class ForLoopPrimitive extends BasePrimitive {
             renderer.highlightLine(lineNumber);
         }, null, 0);
 
-        // 2. Show loop indicator with iteration count
+        // 2. Play the cinematic FOR loop iteration animation
         tl.call(() => {
-            renderer.showLoopIndicator(iteration);
-        }, null, 0.1);
+            // Get previous index for this loopVar if available
+            // We store it on the renderer instance for easy access across steps
+            const prevIndexKey = `perf_last_idx_${loopVar}`;
+            const previousIndex = renderer[prevIndexKey] !== undefined ? renderer[prevIndexKey] : null;
 
-        // 3. Highlight current element in array
-        if (iterableName) {
-            tl.call(() => {
-                renderer.highlightArrayIndex(iterableName, arrayIndex);
-            }, null, 0.2);
-        }
+            renderer.playForLoopIteration({
+                loopVar,
+                arrayName: iterableName,
+                arrayValues: iterableValue,
+                currentIndex: arrayIndex,
+                previousIndex: previousIndex,
+                iteration,
+                currentValue
+            }, () => {
+                // Store the current index as previous for next iteration
+                renderer[prevIndexKey] = arrayIndex;
+                console.log('✅ Cinematic loop step complete');
+            });
+        }, null, 0.15);
 
-        // 4. Create/show the loop variable (with ? initially)
-        tl.call(() => {
-            renderer.getOrCreateVariable(loopVar, '?');
-        }, null, 0.3);
+        // 3. Wait for cinematic animation
+        tl.to({}, { duration: 3.8 }, 0.2);
 
-        // 5. Animate pointer arrow from variable to array element
-        if (iterableName) {
-            tl.call(() => {
-                renderer.animatePointerToArrayElement(iterableName, arrayIndex, loopVar);
-            }, null, 0.4);
-        }
-
-        // 6. Animate value transfer from array to variable
-        if (iterableName && currentValue !== undefined) {
-            tl.call(() => {
-                renderer.animateValueFromArray(iterableName, arrayIndex, loopVar, currentValue);
-            }, null, 0.7);
-        }
-
-        // 7. Update the variable display with actual value
-        tl.call(() => {
-            renderer.animateAssignment(loopVar, currentValue);
-        }, null, 1.0);
-
-        // 8. Update state panel
+        // 4. Update state panel
         tl.call(() => {
             renderer.updateStatePanel(loopVar, currentValue);
-        }, null, 1.2);
-
-        // 9. Hide pointer arrow
-        if (iterableName) {
-            tl.call(() => {
-                renderer.hidePointer();
-            }, null, 1.4);
-        }
-
-        // 10. Clear array highlight
-        if (iterableName) {
-            tl.call(() => {
-                renderer.clearArrayHighlight(iterableName);
-            }, null, 1.6);
-        }
-
-        // 11. Pulse loop indicator
-        tl.call(() => {
-            renderer.pulseLoopIndicator();
-        }, null, 1.7);
+        }, null, 4.0);
 
         timeline.add(tl);
     }

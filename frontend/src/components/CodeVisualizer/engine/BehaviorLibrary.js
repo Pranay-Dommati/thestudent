@@ -882,6 +882,322 @@ export function LOOP_ADVANCE(layer, params, onComplete) {
 }
 
 // ============================================
+// BEHAVIOR: FOR_LOOP_ITERATION
+// ============================================
+// Purpose: Visualize `for n in nums:` loop iteration
+// Input: { 
+//     loopVar: 'n',
+//     arrayName: 'nums', 
+//     arrayValues: [5, 3, 8, 2],
+//     currentIndex: 0,
+//     previousIndex: null (or number for smooth transition),
+//     iteration: 1,
+//     position 
+// }
+// Visual:
+//   1. Show array with name: "nums = [5] [3] [8] [2]"
+//                              0   1   2   3
+//   2. Show loop variable "n" above the current element with arrow pointer
+//   3. Highlight the current element
+//   4. If previousIndex exists, animate smooth transition from previous to current
+// ============================================
+export function FOR_LOOP_ITERATION(layer, params, onComplete) {
+    const {
+        loopVar = 'n',
+        arrayName = 'nums',
+        arrayValues = [5, 3, 8, 2],
+        currentIndex = 0,
+        previousIndex = null,
+        iteration = 1,
+        position
+    } = params;
+
+    const { x, y } = position;
+    const safeCurrentIndex = Math.max(0, Math.min(currentIndex, (arrayValues?.length ?? 1) - 1));
+    const hasPreviousIndex = previousIndex !== null && previousIndex !== undefined;
+    const safePreviousIndex = hasPreviousIndex ? Math.max(0, Math.min(previousIndex, (arrayValues?.length ?? 1) - 1)) : null;
+    const currentValue = Array.isArray(arrayValues) ? arrayValues[safeCurrentIndex] : undefined;
+
+    const tl = gsap.timeline({ onComplete });
+
+    // Layout constants
+    const CELL_W = 44;
+    const CELL_H = 40;
+    const GAP = 3;
+    const TOTAL_ARRAY_WIDTH = arrayValues.length * (CELL_W + GAP) - GAP;
+
+    // Container for everything
+    const container = new PIXI.Container();
+    container.x = x;
+    container.y = y;
+    container.alpha = 0;
+    layer.addChild(container);
+
+    // ========================================
+    // ARRAY SECTION: "arrayName = [values]"
+    // ========================================
+    const arraySection = new PIXI.Container();
+    arraySection.y = 20; // Offset down so pointer has room above
+    container.addChild(arraySection);
+
+    // Array name label
+    const arrayLabel = createText(`${arrayName}`, { fontSize: 16, fill: COLORS.value });
+    arrayLabel.anchor.set(1, 0.5);
+    arrayLabel.x = -15;
+    arrayLabel.y = CELL_H / 2;
+    arraySection.addChild(arrayLabel);
+
+    // Equals sign
+    const equalsSign = createText('=', { fontSize: 16, fill: COLORS.text });
+    equalsSign.anchor.set(0.5);
+    equalsSign.x = 0;
+    equalsSign.y = CELL_H / 2;
+    arraySection.addChild(equalsSign);
+
+    // Array cells starting position
+    const cellsStartX = 15;
+
+    // Create array cells
+    const cells = [];
+    for (let i = 0; i < arrayValues.length; i++) {
+        const cellX = cellsStartX + i * (CELL_W + GAP);
+
+        // Cell background
+        const cellBg = new PIXI.Graphics();
+        cellBg.roundRect(0, 0, CELL_W, CELL_H, 4);
+        cellBg.fill(COLORS.bg);
+        cellBg.stroke({ width: 2, color: i === safeCurrentIndex ? COLORS.primary : 0x475569 });
+        cellBg.x = cellX;
+        cellBg.y = 0;
+        arraySection.addChild(cellBg);
+
+        // Cell value
+        const cellText = createText(arrayValues[i], { fontSize: 16, fill: COLORS.text });
+        cellText.anchor.set(0.5);
+        cellText.x = cellX + CELL_W / 2;
+        cellText.y = CELL_H / 2;
+        arraySection.addChild(cellText);
+
+        // Index label below
+        const indexLabel = createText(i, { fontSize: 11, fill: COLORS.muted });
+        indexLabel.anchor.set(0.5);
+        indexLabel.x = cellX + CELL_W / 2;
+        indexLabel.y = CELL_H + 14;
+        indexLabel.alpha = 0;
+        arraySection.addChild(indexLabel);
+
+        cells.push({ bg: cellBg, text: cellText, indexLabel, x: cellX, index: i });
+    }
+
+    // ========================================
+    // LOOP VARIABLE WITH POINTER: "n ▼"
+    // ========================================
+    const pointerSection = new PIXI.Container();
+    container.addChild(pointerSection);
+
+    // Get the X position of current cell
+    const getCurrentCellX = (index) => cellsStartX + index * (CELL_W + GAP) + CELL_W / 2;
+
+    // Starting position (either previous or current)
+    const startPosX = hasPreviousIndex ? getCurrentCellX(safePreviousIndex) : getCurrentCellX(safeCurrentIndex);
+    const targetPosX = getCurrentCellX(safeCurrentIndex);
+
+    pointerSection.x = startPosX;
+    pointerSection.y = 15; // Positioned right above the array cells
+
+    // Loop variable name acts as the indicator
+    const varText = createText(loopVar, {
+        fontSize: 24,
+        fill: COLORS.warning,
+        fontWeight: '900'
+    });
+    varText.anchor.set(0.5, 1); // Anchor bottom-center
+    varText.y = 0;
+    pointerSection.addChild(varText);
+
+    // NOTE: Iteration badge is now managed by PixiRenderer as a persistent element
+    // It stays visible during the entire loop execution
+
+    // ========================================
+    // HIGHLIGHT GLOW for current cell
+    // ========================================
+    const highlightGlow = new PIXI.Graphics();
+    highlightGlow.roundRect(-4, -4, CELL_W + 8, CELL_H + 8, 6);
+    highlightGlow.fill({ color: COLORS.primary, alpha: 0.2 });
+    highlightGlow.x = cellsStartX + safeCurrentIndex * (CELL_W + GAP);
+    highlightGlow.y = 0;
+    highlightGlow.alpha = 0;
+    arraySection.addChildAt(highlightGlow, 0);
+
+    // ========================================
+    // ANIMATION TIMELINE
+    // ========================================
+    let t = 0;
+
+    if (hasPreviousIndex) {
+        // --- CONTINUATION: Smooth transition from previous to current ---
+
+        // Show container immediately (already visible from previous)
+        tl.to(container, { alpha: 1, duration: 0.1 }, t);
+        t += 0.1;
+
+        // Update the previous cell border to normal
+        const prevCell = cells[safePreviousIndex];
+        tl.call(() => {
+            prevCell.bg.clear();
+            prevCell.bg.roundRect(0, 0, CELL_W, CELL_H, 4);
+            prevCell.bg.fill(COLORS.bg);
+            prevCell.bg.stroke({ width: 2, color: 0x475569 });
+        }, null, t);
+
+        // Move glow to new position
+        tl.to(highlightGlow, {
+            x: cellsStartX + safeCurrentIndex * (CELL_W + GAP),
+            duration: 0.35,
+            ease: 'power2.inOut'
+        }, t);
+
+        // Smoothly slide pointer to new position
+        tl.to(pointerSection, {
+            x: targetPosX,
+            duration: 0.4,
+            ease: 'power2.inOut'
+        }, t);
+
+        // Variable name stays the same (just the loopVar)
+        // No need to update text since it's just the variable name
+
+        t += 0.4;
+
+        // Highlight new cell
+        const currCell = cells[safeCurrentIndex];
+        tl.call(() => {
+            currCell.bg.clear();
+            currCell.bg.roundRect(0, 0, CELL_W, CELL_H, 4);
+            currCell.bg.fill(COLORS.bg);
+            currCell.bg.stroke({ width: 2, color: COLORS.primary });
+        }, null, t);
+
+        // Pulse glow
+        tl.to(highlightGlow, { alpha: 1, duration: 0.15 }, t);
+        tl.to(highlightGlow, { alpha: 0.5, duration: 0.15 }, t + 0.15);
+        t += 0.3;
+
+
+
+    } else {
+        // --- FIRST ITERATION: Full intro animation ---
+
+        // Fade in container
+        tl.to(container, { alpha: 1, duration: 0.25, ease: 'power2.out' }, t);
+
+        t += 0.3;
+
+        // Show index labels with stagger
+        cells.forEach((cell, i) => {
+            tl.to(cell.indexLabel, { alpha: 1, duration: 0.15, ease: 'power2.out' }, t + i * 0.03);
+        });
+        t += 0.15 + cells.length * 0.03;
+
+        // Pointer drops in from above
+        tl.from(pointerSection, { y: -60, duration: 0.3, ease: 'back.out(1.5)' }, t);
+        t += 0.3;
+
+        // Glow appears on current cell
+        tl.to(highlightGlow, { alpha: 0.7, duration: 0.2, ease: 'power2.out' }, t);
+
+        // Pulse the current cell
+        const currCell = cells[safeCurrentIndex];
+        tl.to(currCell.bg.scale || currCell.bg, {
+            pixi: { scaleX: 1.05, scaleY: 1.05 },
+            duration: 0.1,
+            ease: 'power2.out'
+        }, t);
+        tl.to(currCell.bg.scale || currCell.bg, {
+            pixi: { scaleX: 1, scaleY: 1 },
+            duration: 0.15,
+            ease: 'back.out(2)'
+        }, t + 0.1);
+        t += 0.25;
+
+        // Glow settles
+        tl.to(highlightGlow, { alpha: 0.4, duration: 0.2 }, t);
+        t += 0.2;
+    }
+
+    // --- NEW: Cinematic Value Extraction ---
+    // A value box pops out of the current cell and merges with the pointerSection (the variable 'n')
+    const extractionContainer = new PIXI.Container();
+    extractionContainer.x = cellsStartX + safeCurrentIndex * (CELL_W + GAP) + CELL_W / 2;
+    extractionContainer.y = CELL_H / 2;
+    extractionContainer.alpha = 0;
+    extractionContainer.scale.set(0.5);
+    arraySection.addChild(extractionContainer);
+
+    const valBox = createValueBox(currentValue, {
+        width: CELL_W - 4,
+        height: CELL_H - 4,
+        bgColor: COLORS.primary,
+        borderColor: COLORS.primary
+    });
+    valBox.x = - (CELL_W - 4) / 2;
+    valBox.y = - (CELL_H - 4) / 2;
+    extractionContainer.addChild(valBox);
+
+    // Extraction animation
+    tl.to(extractionContainer, { alpha: 1, duration: 0.2, ease: 'power2.out' }, t);
+    tl.to(extractionContainer.scale, { x: 1.2, y: 1.2, duration: 0.25, ease: 'back.out(2)' }, t);
+    t += 0.3;
+
+    // Move extracted value to meet the variable name
+    // The pointerSection is at y=15 relative to container. ArraySection is at y=20.
+    // So target Y is approximately -5 or so relative to arraySection
+    tl.to(extractionContainer, {
+        x: targetPosX,
+        y: -15, // Move up to meeting point
+        alpha: 0.8,
+        duration: 0.4,
+        ease: 'power3.inOut'
+    }, t);
+    tl.to(extractionContainer.scale, { x: 0.6, y: 0.6, duration: 0.4 }, t);
+
+    // Pointer pulses as it receives the value
+    tl.to(pointerSection.scale, { x: 1.2, y: 1.2, duration: 0.2, ease: 'power2.out' }, t + 0.2);
+    t += 0.4;
+
+    // Show combined "n = value" state
+    tl.call(() => {
+        varText.text = `${loopVar} = ${currentValue}`;
+        extractionContainer.visible = false;
+    }, null, t);
+    tl.to(pointerSection.scale, { x: 1, y: 1, duration: 0.2, ease: 'back.out(2)' }, t);
+    t += 0.3;
+
+    // --- Hold for readability ---
+    tl.to({}, { duration: 0.5 }, t);
+    t += 0.5;
+
+    // Position for handoff
+    const finalResultInfo = {
+        x: x + targetPosX - (varText.width / 2),
+        y: y + 15 - varText.height, // Position of n=value
+        value: currentValue,
+        varName: loopVar
+    };
+
+    // --- Cleanup: Destroy instantly (VariableVisual will take over) ---
+    tl.call(() => {
+        layer.removeChild(container);
+        container.destroy({ children: true });
+        if (typeof onComplete === 'function') {
+            onComplete(finalResultInfo);
+        }
+    }, null, t);
+
+    return tl;
+}
+
+// ============================================
 // BEHAVIOR: RETURN_VALUE
 // ============================================
 // Purpose: Show final return value
@@ -935,6 +1251,602 @@ export function RETURN_VALUE(layer, params, onComplete) {
 }
 
 // ============================================
+// BEHAVIOR: ASSIGN_FROM_VARIABLE (GOLD STANDARD)
+// ============================================
+// Purpose: Visualize `y = x` (variable to variable copy)
+// CINEMATIC ANIMATION SEQUENCE:
+//  1. Show expression: "y = x"
+//  2. Highlight source variable
+//  3. Value bubble rises from source
+//  4. Value bubble travels in arc to target position
+//  5. Value lands with glow effect
+//  6. Result: "y = [value]"
+// ============================================
+export function ASSIGN_FROM_VARIABLE(layer, params, onComplete) {
+    const {
+        sourceVarName = 'x',
+        sourceValue = 5,
+        targetVarName = 'y',
+        oldValue = null,
+        position
+    } = params;
+
+    const { x, y } = position;
+    const tl = gsap.timeline();
+
+    // Layout constants
+    const BOX_W = 50;
+    const BOX_H = 36;
+
+    const container = new PIXI.Container();
+    container.x = x;
+    container.y = y;
+    container.alpha = 0;
+    layer.addChild(container);
+
+    // ========================================
+    // PHASE 1: Show expression "targetVar = sourceVar"
+    // ========================================
+    const expressionContainer = new PIXI.Container();
+    container.addChild(expressionContainer);
+
+    // Target variable name (left side)
+    const targetText = createText(targetVarName, { fontSize: 20, fill: COLORS.value });
+    targetText.anchor.set(1, 0.5);
+    targetText.x = -20;
+    targetText.y = 0;
+    expressionContainer.addChild(targetText);
+
+    // Equals sign
+    const equalsText = createText('=', { fontSize: 20, fill: COLORS.text });
+    equalsText.anchor.set(0.5, 0.5);
+    equalsText.x = -5;
+    equalsText.y = 0;
+    expressionContainer.addChild(equalsText);
+
+    // Source variable name (will be replaced by value)
+    const sourceText = createText(sourceVarName, { fontSize: 20, fill: COLORS.primary });
+    sourceText.anchor.set(0, 0.5);
+    sourceText.x = 10;
+    sourceText.y = 0;
+    expressionContainer.addChild(sourceText);
+
+    // ========================================
+    // PHASE 2: Value box (hidden initially, appears after source highlight)
+    // ========================================
+    const valueBox = createValueBox(sourceValue, {
+        width: BOX_W,
+        height: BOX_H,
+        borderColor: COLORS.primary
+    });
+    valueBox.x = 10;
+    valueBox.y = -BOX_H / 2;
+    valueBox.alpha = 0;
+    valueBox.scale.set(0.5);
+    expressionContainer.addChild(valueBox);
+
+    // ========================================
+    // PHASE 3: Glow effect for landing
+    // ========================================
+    const glowOuter = new PIXI.Graphics();
+    glowOuter.roundRect(-6, -BOX_H / 2 - 6, BOX_W + 12, BOX_H + 12, 10);
+    glowOuter.fill({ color: COLORS.primary, alpha: 0.2 });
+    glowOuter.x = 10;
+    glowOuter.y = 0;
+    glowOuter.alpha = 0;
+    expressionContainer.addChildAt(glowOuter, 0);
+
+    // ========================================
+    // ANIMATION TIMELINE
+    // ========================================
+    let t = 0;
+
+    // --- STEP 1: Fade in expression ---
+    tl.to(container, { alpha: 1, duration: 0.3, ease: 'power2.out' }, t);
+    t += 0.5;
+
+    // --- STEP 2: Pulse source variable name ---
+    tl.to(sourceText.scale, { x: 1.15, y: 1.15, duration: 0.12, ease: 'power2.out' }, t);
+    tl.to(sourceText.scale, { x: 1, y: 1, duration: 0.12, ease: 'power2.in' }, t + 0.12);
+    t += 0.35;
+
+    // --- STEP 3: Source name fades, value box rises up ---
+    tl.to(sourceText, { alpha: 0, y: -15, duration: 0.25, ease: 'power2.in' }, t);
+    tl.to(valueBox, { alpha: 1, duration: 0.2, ease: 'power2.out' }, t + 0.15);
+    tl.to(valueBox.scale, { x: 1, y: 1, duration: 0.3, ease: 'back.out(1.5)' }, t + 0.15);
+    t += 0.5;
+
+    // --- STEP 4: Value box rises up in arc (showing extraction) ---
+    tl.to(valueBox, { y: -BOX_H / 2 - 30, duration: 0.3, ease: 'power2.out' }, t);
+    t += 0.35;
+
+    // --- STEP 5: Value travels back down to position ---
+    tl.to(valueBox, { y: -BOX_H / 2, duration: 0.25, ease: 'power2.in' }, t);
+    t += 0.3;
+
+    // --- STEP 6: Glow effect on landing ---
+    tl.to(glowOuter, { alpha: 1, duration: 0.15, ease: 'power2.out' }, t);
+    tl.to(valueBox.scale, { x: 1.1, y: 1.1, duration: 0.1, ease: 'power2.out' }, t);
+    tl.to(valueBox.scale, { x: 1, y: 1, duration: 0.15, ease: 'back.out(2)' }, t + 0.1);
+    t += 0.3;
+
+    // --- STEP 7: Transform to success state ---
+    tl.call(() => {
+        valueBox.bg.clear();
+        valueBox.bg.roundRect(0, 0, BOX_W, BOX_H, 6);
+        valueBox.bg.fill(COLORS.bg);
+        valueBox.bg.stroke({ width: 2, color: COLORS.success });
+        valueBox.text.style.fill = COLORS.success;
+        glowOuter.alpha = 0;
+    }, null, t);
+    t += 0.2;
+
+    // --- STEP 8: Success pulse ---
+    tl.to(valueBox.scale, { x: 1.12, y: 1.12, duration: 0.1, ease: 'power2.out' }, t);
+    tl.to(valueBox.scale, { x: 1, y: 1, duration: 0.15, ease: 'back.out(2)' }, t + 0.1);
+    t += 0.4;
+
+    // --- STEP 9: Hold briefly ---
+    tl.to({}, { duration: 0.2 }, t);
+    t += 0.2;
+
+    // --- Cleanup ---
+    const finalResultInfo = {
+        x: x - 20,
+        y: y,
+        value: sourceValue,
+        varName: targetVarName
+    };
+
+    tl.call(() => {
+        layer.removeChild(container);
+        container.destroy({ children: true });
+        if (typeof onComplete === 'function') {
+            onComplete(finalResultInfo);
+        }
+    }, null, t);
+
+    return tl;
+}
+
+// ============================================
+// BEHAVIOR: ASSIGN_BINARY_OPERATION (GOLD STANDARD)
+// ============================================
+// Purpose: Visualize `result = a + b` (or -, *, /, %)
+// CINEMATIC ANIMATION SEQUENCE:
+//  1. Show expression: "result = a + b"
+//  2. Variable names transform into their values
+//  3. Values fly toward operator in center
+//  4. Operator glows, computation "spark" effect
+//  5. Result value emerges from computation
+//  6. Final result: "result = [computed value]"
+// ============================================
+export function ASSIGN_BINARY_OPERATION(layer, params, onComplete) {
+    const {
+        targetVarName = 'result',
+        leftVarName = 'a',
+        leftValue = 3,
+        rightVarName = 'b',
+        rightValue = 5,
+        operator = '+',
+        resultValue = 8,
+        position
+    } = params;
+
+    const { x, y } = position;
+    const tl = gsap.timeline();
+
+    // Layout constants
+    const BOX_W = 44;
+    const BOX_H = 34;
+
+    const container = new PIXI.Container();
+    container.x = x;
+    container.y = y;
+    container.alpha = 0;
+    layer.addChild(container);
+
+    // ========================================
+    // PHASE 1: Expression "target = left op right"
+    // ========================================
+    const expressionContainer = new PIXI.Container();
+    container.addChild(expressionContainer);
+
+    // Target variable name
+    const targetText = createText(targetVarName, { fontSize: 18, fill: COLORS.value });
+    targetText.anchor.set(1, 0.5);
+    targetText.x = -30;
+    targetText.y = 0;
+    expressionContainer.addChild(targetText);
+
+    // Equals sign (assignment)
+    const assignEquals = createText('=', { fontSize: 18, fill: COLORS.text });
+    assignEquals.anchor.set(0.5, 0.5);
+    assignEquals.x = -15;
+    assignEquals.y = 0;
+    expressionContainer.addChild(assignEquals);
+
+    // Left operand name → will become value
+    const leftText = createText(leftVarName, { fontSize: 18, fill: COLORS.primary });
+    leftText.anchor.set(0.5, 0.5);
+    leftText.x = 15;
+    leftText.y = 0;
+    expressionContainer.addChild(leftText);
+
+    // Operator
+    const opText = createText(operator, { fontSize: 20, fill: COLORS.warning });
+    opText.anchor.set(0.5, 0.5);
+    opText.x = 45;
+    opText.y = 0;
+    expressionContainer.addChild(opText);
+
+    // Right operand name → will become value
+    const rightText = createText(rightVarName, { fontSize: 18, fill: COLORS.primary });
+    rightText.anchor.set(0.5, 0.5);
+    rightText.x = 75;
+    rightText.y = 0;
+    expressionContainer.addChild(rightText);
+
+    // ========================================
+    // PHASE 2: Value boxes (hidden initially)
+    // ========================================
+    const leftBox = createValueBox(leftValue, {
+        width: BOX_W,
+        height: BOX_H,
+        borderColor: COLORS.primary
+    });
+    leftBox.x = 15 - BOX_W / 2;
+    leftBox.y = -BOX_H / 2;
+    leftBox.alpha = 0;
+    leftBox.scale.set(0.3);
+    expressionContainer.addChild(leftBox);
+
+    const rightBox = createValueBox(rightValue, {
+        width: BOX_W,
+        height: BOX_H,
+        borderColor: COLORS.primary
+    });
+    rightBox.x = 75 - BOX_W / 2;
+    rightBox.y = -BOX_H / 2;
+    rightBox.alpha = 0;
+    rightBox.scale.set(0.3);
+    expressionContainer.addChild(rightBox);
+
+    // Result box (appears after computation)
+    const resultBox = createValueBox(resultValue, {
+        width: BOX_W + 6,
+        height: BOX_H,
+        borderColor: COLORS.success,
+        bgColor: COLORS.bg
+    });
+    resultBox.x = 45 - (BOX_W + 6) / 2;
+    resultBox.y = -BOX_H / 2;
+    resultBox.alpha = 0;
+    resultBox.scale.set(0);
+    expressionContainer.addChild(resultBox);
+
+    // Computation spark (center glow)
+    const spark = new PIXI.Graphics();
+    spark.circle(0, 0, 25);
+    spark.fill({ color: COLORS.warning, alpha: 0.5 });
+    spark.x = 45;
+    spark.y = 0;
+    spark.alpha = 0;
+    spark.scale.set(0.3);
+    expressionContainer.addChild(spark);
+
+    // ========================================
+    // ANIMATION TIMELINE
+    // ========================================
+    let t = 0;
+
+    // --- STEP 1: Fade in expression ---
+    tl.to(container, { alpha: 1, duration: 0.3, ease: 'power2.out' }, t);
+    t += 0.5;
+
+    // --- STEP 2: Pulse operand names ---
+    tl.to([leftText.scale, rightText.scale], {
+        x: 1.1, y: 1.1,
+        duration: 0.15,
+        ease: 'power2.out',
+        stagger: 0.05
+    }, t);
+    tl.to([leftText.scale, rightText.scale], {
+        x: 1, y: 1,
+        duration: 0.15,
+        ease: 'power2.in',
+        stagger: 0.05
+    }, t + 0.15);
+    t += 0.4;
+
+    // --- STEP 3: Names fade, value boxes appear ---
+    tl.to([leftText, rightText], { alpha: 0, duration: 0.2, ease: 'power2.in' }, t);
+    tl.to([leftBox, rightBox], { alpha: 1, duration: 0.2, ease: 'power2.out' }, t + 0.1);
+    tl.to([leftBox.scale, rightBox.scale], {
+        x: 1, y: 1,
+        duration: 0.25,
+        ease: 'back.out(1.5)',
+        stagger: 0.05
+    }, t + 0.1);
+    t += 0.45;
+
+    // --- STEP 4: Values fly toward operator ---
+    tl.to(leftBox, { x: 30 - BOX_W / 2, duration: 0.35, ease: 'power2.inOut' }, t);
+    tl.to(rightBox, { x: 60 - BOX_W / 2, duration: 0.35, ease: 'power2.inOut' }, t);
+    t += 0.4;
+
+    // --- STEP 5: Operator glows, spark appears ---
+    tl.to(opText.scale, { x: 1.3, y: 1.3, duration: 0.15, ease: 'power2.out' }, t);
+    tl.to(spark, { alpha: 1, duration: 0.1 }, t);
+    tl.to(spark.scale, { x: 1.5, y: 1.5, duration: 0.25, ease: 'power2.out' }, t);
+    t += 0.3;
+
+    // --- STEP 6: Values and operator fade, spark contracts ---
+    tl.to([leftBox, rightBox, opText], { alpha: 0, duration: 0.2, ease: 'power2.in' }, t);
+    tl.to(spark.scale, { x: 0, y: 0, duration: 0.25, ease: 'power2.in' }, t);
+    tl.to(spark, { alpha: 0, duration: 0.25 }, t);
+    t += 0.3;
+
+    // --- STEP 7: Result emerges ---
+    tl.to(resultBox, { alpha: 1, duration: 0.15 }, t);
+    tl.to(resultBox.scale, { x: 1.15, y: 1.15, duration: 0.2, ease: 'back.out(2)' }, t);
+    tl.to(resultBox.scale, { x: 1, y: 1, duration: 0.15, ease: 'power2.inOut' }, t + 0.2);
+    t += 0.45;
+
+    // --- STEP 8: Success flash on result ---
+    tl.call(() => {
+        resultBox.bg.clear();
+        resultBox.bg.roundRect(0, 0, BOX_W + 6, BOX_H, 6);
+        resultBox.bg.fill(COLORS.bg);
+        resultBox.bg.stroke({ width: 2, color: COLORS.success });
+        resultBox.text.style.fill = COLORS.success;
+    }, null, t);
+    tl.to(resultBox.scale, { x: 1.1, y: 1.1, duration: 0.1, ease: 'power2.out' }, t);
+    tl.to(resultBox.scale, { x: 1, y: 1, duration: 0.12, ease: 'back.out(2)' }, t + 0.1);
+    t += 0.4;
+
+    // --- Hold briefly ---
+    tl.to({}, { duration: 0.2 }, t);
+    t += 0.2;
+
+    // --- Cleanup ---
+    const finalResultInfo = {
+        x: x - 30,
+        y: y,
+        value: resultValue,
+        varName: targetVarName
+    };
+
+    tl.call(() => {
+        layer.removeChild(container);
+        container.destroy({ children: true });
+        if (typeof onComplete === 'function') {
+            onComplete(finalResultInfo);
+        }
+    }, null, t);
+
+    return tl;
+}
+
+// ============================================
+// BEHAVIOR: IF_ELSE_BRANCH (GOLD STANDARD)
+// ============================================
+// Purpose: Visualize if/else branching with path indication
+// CINEMATIC ANIMATION SEQUENCE:
+//  1. Show condition expression: "if a > b:"
+//  2. Values appear for comparison
+//  3. Comparison evaluates with visual indicator
+//  4. Branch paths illuminate (True path / False path)
+//  5. Chosen path glows, other fades
+//  6. "Gate" opens to chosen branch
+// ============================================
+export function IF_ELSE_BRANCH(layer, params, onComplete) {
+    const {
+        leftValue = 10,
+        rightValue = 5,
+        operator = '>',
+        result = true,
+        position
+    } = params;
+
+    const { x, y } = position;
+    const tl = gsap.timeline({ onComplete });
+
+    // Layout constants
+    const BOX_W = 44;
+    const BOX_H = 34;
+    const PATH_WIDTH = 80;
+    const PATH_HEIGHT = 50;
+
+    const container = new PIXI.Container();
+    container.x = x;
+    container.y = y;
+    container.alpha = 0;
+    layer.addChild(container);
+
+    // ========================================
+    // PHASE 1: Condition expression "if left op right:"
+    // ========================================
+    const conditionContainer = new PIXI.Container();
+    conditionContainer.y = -30;
+    container.addChild(conditionContainer);
+
+    // "if" keyword
+    const ifText = createText('if', { fontSize: 18, fill: COLORS.muted });
+    ifText.anchor.set(0.5, 0.5);
+    ifText.x = -60;
+    ifText.y = 0;
+    conditionContainer.addChild(ifText);
+
+    // Left value box
+    const leftBox = createValueBox(leftValue, {
+        width: BOX_W,
+        height: BOX_H,
+        borderColor: COLORS.value
+    });
+    leftBox.x = -30 - BOX_W / 2;
+    leftBox.y = -BOX_H / 2;
+    leftBox.alpha = 0;
+    leftBox.scale.set(0.5);
+    conditionContainer.addChild(leftBox);
+
+    // Operator
+    const opText = createText(operator, { fontSize: 22, fill: COLORS.warning });
+    opText.anchor.set(0.5, 0.5);
+    opText.x = 0;
+    opText.y = 0;
+    opText.alpha = 0;
+    conditionContainer.addChild(opText);
+
+    // Right value box
+    const rightBox = createValueBox(rightValue, {
+        width: BOX_W,
+        height: BOX_H,
+        borderColor: COLORS.value
+    });
+    rightBox.x = 30 - BOX_W / 2;
+    rightBox.y = -BOX_H / 2;
+    rightBox.alpha = 0;
+    rightBox.scale.set(0.5);
+    conditionContainer.addChild(rightBox);
+
+    // Colon
+    const colonText = createText(':', { fontSize: 18, fill: COLORS.muted });
+    colonText.anchor.set(0.5, 0.5);
+    colonText.x = 65;
+    colonText.y = 0;
+    conditionContainer.addChild(colonText);
+
+    // ========================================
+    // PHASE 2: Branch paths
+    // ========================================
+    const pathsContainer = new PIXI.Container();
+    pathsContainer.y = 20;
+    container.addChild(pathsContainer);
+
+    // True path (left)
+    const truePath = new PIXI.Graphics();
+    truePath.roundRect(-PATH_WIDTH - 10, 0, PATH_WIDTH, PATH_HEIGHT, 8);
+    truePath.fill({ color: COLORS.success, alpha: 0.15 });
+    truePath.stroke({ width: 2, color: COLORS.success, alpha: 0.5 });
+    truePath.alpha = 0;
+    pathsContainer.addChild(truePath);
+
+    const trueLabel = createText('True ✓', { fontSize: 14, fill: COLORS.success });
+    trueLabel.anchor.set(0.5, 0.5);
+    trueLabel.x = -PATH_WIDTH / 2 - 10;
+    trueLabel.y = PATH_HEIGHT / 2;
+    trueLabel.alpha = 0;
+    pathsContainer.addChild(trueLabel);
+
+    // False path (right)
+    const falsePath = new PIXI.Graphics();
+    falsePath.roundRect(10, 0, PATH_WIDTH, PATH_HEIGHT, 8);
+    falsePath.fill({ color: COLORS.error, alpha: 0.15 });
+    falsePath.stroke({ width: 2, color: COLORS.error, alpha: 0.5 });
+    falsePath.alpha = 0;
+    pathsContainer.addChild(falsePath);
+
+    const falseLabel = createText('False ✗', { fontSize: 14, fill: COLORS.error });
+    falseLabel.anchor.set(0.5, 0.5);
+    falseLabel.x = PATH_WIDTH / 2 + 10;
+    falseLabel.y = PATH_HEIGHT / 2;
+    falseLabel.alpha = 0;
+    pathsContainer.addChild(falseLabel);
+
+    // Decision arrow (points to chosen path)
+    const arrow = new PIXI.Graphics();
+    arrow.moveTo(0, -5);
+    arrow.lineTo(-8, -15);
+    arrow.lineTo(8, -15);
+    arrow.closePath();
+    arrow.fill(result ? COLORS.success : COLORS.error);
+    arrow.x = result ? (-PATH_WIDTH / 2 - 10) : (PATH_WIDTH / 2 + 10);
+    arrow.y = 5;
+    arrow.alpha = 0;
+    arrow.scale.set(0.5);
+    pathsContainer.addChild(arrow);
+
+    // Glow ring around result
+    const resultGlow = new PIXI.Graphics();
+    resultGlow.circle(0, 0, 35);
+    resultGlow.fill({ color: result ? COLORS.success : COLORS.error, alpha: 0.2 });
+    resultGlow.x = 0;
+    resultGlow.y = -30;
+    resultGlow.alpha = 0;
+    resultGlow.scale.set(0.5);
+    container.addChild(resultGlow);
+
+    // ========================================
+    // ANIMATION TIMELINE
+    // ========================================
+    let t = 0;
+
+    // --- STEP 1: Fade in container with "if" ---
+    tl.to(container, { alpha: 1, duration: 0.3, ease: 'power2.out' }, t);
+    t += 0.4;
+
+    // --- STEP 2: Value boxes appear ---
+    tl.to([leftBox, rightBox], { alpha: 1, duration: 0.2, stagger: 0.1 }, t);
+    tl.to([leftBox.scale, rightBox.scale], { x: 1, y: 1, duration: 0.25, ease: 'back.out(1.5)', stagger: 0.1 }, t);
+    t += 0.4;
+
+    // --- STEP 3: Operator appears ---
+    tl.to(opText, { alpha: 1, duration: 0.2, ease: 'power2.out' }, t);
+    t += 0.3;
+
+    // --- STEP 4: Comparison "processing" - operator pulses ---
+    tl.to(opText.scale, { x: 1.3, y: 1.3, duration: 0.15, ease: 'power2.out' }, t);
+    tl.to(opText.scale, { x: 1, y: 1, duration: 0.2, ease: 'power2.inOut' }, t + 0.15);
+    t += 0.45;
+
+    // --- STEP 5: Both paths appear ---
+    tl.to([truePath, falsePath], { alpha: 1, duration: 0.25, stagger: 0.1 }, t);
+    tl.to([trueLabel, falseLabel], { alpha: 0.5, duration: 0.25, stagger: 0.1 }, t + 0.1);
+    t += 0.45;
+
+    // --- STEP 6: Result glow expands from center ---
+    tl.to(resultGlow, { alpha: 1, duration: 0.2 }, t);
+    tl.to(resultGlow.scale, { x: 1.2, y: 1.2, duration: 0.3, ease: 'power2.out' }, t);
+    t += 0.35;
+
+    // --- STEP 7: Chosen path brightens, other fades ---
+    const chosenPath = result ? truePath : falsePath;
+    const chosenLabel = result ? trueLabel : falseLabel;
+    const fadedPath = result ? falsePath : truePath;
+    const fadedLabel = result ? falseLabel : trueLabel;
+
+    tl.to(chosenPath, { alpha: 1, duration: 0.25 }, t);
+    tl.to(chosenLabel, { alpha: 1, duration: 0.25 }, t);
+    tl.to(fadedPath, { alpha: 0.2, duration: 0.25 }, t);
+    tl.to(fadedLabel, { alpha: 0.2, duration: 0.25 }, t);
+    t += 0.35;
+
+    // --- STEP 8: Arrow appears, points to chosen path ---
+    tl.to(arrow, { alpha: 1, duration: 0.2 }, t);
+    tl.to(arrow.scale, { x: 1, y: 1, duration: 0.25, ease: 'back.out(2)' }, t);
+    t += 0.4;
+
+    // --- STEP 9: Chosen path "opens" (scale effect) ---
+    tl.to(chosenPath.scale, { x: 1.05, y: 1.05, duration: 0.15, ease: 'power2.out' }, t);
+    tl.to(chosenPath.scale, { x: 1, y: 1, duration: 0.2, ease: 'power2.inOut' }, t + 0.15);
+    t += 0.5;
+
+    // --- Hold ---
+    tl.to({}, { duration: 0.3 }, t);
+    t += 0.3;
+
+    // --- Cleanup ---
+    tl.to(container, { alpha: 0, duration: 0.3, ease: 'power2.in' }, t);
+    tl.call(() => {
+        layer.removeChild(container);
+        container.destroy({ children: true });
+    }, null, t + 0.35);
+
+    return tl;
+}
+
+// ============================================
 // BEHAVIOR REGISTRY
 // ============================================
 export const BehaviorRegistry = {
@@ -942,8 +1854,12 @@ export const BehaviorRegistry = {
     COMPARE,
     ASSIGN_FROM,
     ASSIGN_FROM_ARRAY_INDEX,
+    ASSIGN_FROM_VARIABLE,
+    ASSIGN_BINARY_OPERATION,
+    IF_ELSE_BRANCH,
     HIGHLIGHT_ARRAY_INDEX,
     LOOP_ADVANCE,
+    FOR_LOOP_ITERATION,
     RETURN_VALUE
 };
 

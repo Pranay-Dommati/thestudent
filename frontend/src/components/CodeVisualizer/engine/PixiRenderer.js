@@ -32,7 +32,7 @@ import {
     CodeHighlight,
     PointerArrow
 } from './VisualObjects';
-import { ASSIGN_FROM_ARRAY_INDEX } from './BehaviorLibrary';
+import { ASSIGN_FROM_ARRAY_INDEX, FOR_LOOP_ITERATION, playBehavior } from './BehaviorLibrary';
 
 // Register GSAP PixiJS plugin
 gsap.registerPlugin(PixiPlugin);
@@ -839,6 +839,10 @@ export class PixiRenderer {
             case 'COMPLETE_STEP':
                 return this._animateCompleteStep(command);
 
+            // CINEMATIC BEHAVIORS - Renderer just executes, doesn't decide
+            case 'PLAY_BEHAVIOR':
+                return this._playBehavior(command);
+
             default:
                 return null;
         }
@@ -1096,6 +1100,70 @@ export class PixiRenderer {
         // Could add step completion indicator
         tl.to({}, { duration: command.duration });
         return tl;
+    }
+
+    /**
+     * Execute a cinematic behavior from BehaviorLibrary
+     * PixiRenderer is just the executor - it doesn't decide which behavior to play
+     * 
+     * @param {Object} command - { behaviorId, params, onComplete }
+     */
+    _playBehavior(command) {
+        const { behaviorId, params } = command;
+
+        // Add position from interaction zone center
+        const fullParams = {
+            ...params,
+            position: {
+                x: this.zones.interaction.centerX,
+                y: this.zones.interaction.centerY
+            }
+        };
+
+        console.log(`🎬 PixiRenderer._playBehavior: ${behaviorId}`, fullParams);
+
+        // Let BehaviorLibrary handle the animation
+        // Returns GSAP timeline that TimelineEngine will sequence
+        return playBehavior(behaviorId, this.layers.effects, fullParams, (finalResultInfo) => {
+            // Handle handoff to persistent visuals if needed
+            if (finalResultInfo?.varName && finalResultInfo?.value !== undefined) {
+                this._handleBehaviorComplete(finalResultInfo);
+            }
+        });
+    }
+
+    /**
+     * Handle behavior completion - create/update persistent variable
+     * Called after cinematic behavior finishes
+     */
+    _handleBehaviorComplete(resultInfo) {
+        const { varName, value, x, y } = resultInfo;
+
+        // Check if variable already exists
+        const existingVar = this.objects.variables.get(varName);
+
+        if (existingVar) {
+            // Variable exists - just update value with pulse
+            existingVar.setValue(value, true);
+        } else {
+            // Create new variable at behavior's final position, then slide to home
+            const varVisual = this.getOrCreateVariable(varName, value);
+            if (varVisual && x !== undefined && y !== undefined) {
+                // Start at behavior's final position
+                varVisual.container.x = x;
+                varVisual.container.y = y;
+                varVisual.container.alpha = 1;
+                varVisual.container.scale.set(1);
+
+                // Slide to home position
+                gsap.to(varVisual.container, {
+                    x: varVisual.homeX,
+                    y: varVisual.homeY,
+                    duration: 0.5,
+                    ease: 'power2.inOut'
+                });
+            }
+        }
     }
 
     /**
@@ -1526,6 +1594,245 @@ export class PixiRenderer {
         });
 
         return timeline;
+    }
+
+    /**
+     * Show/update the persistent loop iteration indicator
+     */
+    showIterationIndicator(iteration) {
+        // Create or update the persistent iteration indicator
+        if (!this.objects.iterationIndicator) {
+            const container = new PIXI.Container();
+
+            // Position in top-right of interaction zone
+            container.x = this.width - 160;
+            container.y = 100;
+
+            // Badge background: Sleek dark panel with primary glow
+            const badgeBg = new PIXI.Graphics();
+            badgeBg.roundRect(0, 0, 130, 40, 8);
+            badgeBg.fill({ color: 0x0f172a, alpha: 0.95 });
+            badgeBg.stroke({ width: 2, color: 0x6366f1, alpha: 0.8 });
+            container.addChild(badgeBg);
+
+            // "Iteration:" label
+            const labelText = new PIXI.Text({
+                text: 'Iteration:',
+                style: { fontFamily: 'Inter, sans-serif', fontSize: 14, fill: 0xf8fafc }
+            });
+            labelText.x = 12;
+            labelText.y = 10;
+            container.addChild(labelText);
+
+            // Iteration number
+            const numText = new PIXI.Text({
+                text: String(iteration),
+                style: { fontFamily: 'Inter, sans-serif', fontSize: 20, fill: 0xfbbf24, fontWeight: '900' }
+            });
+            numText.anchor.set(0.5);
+            numText.x = 105;
+            numText.y = 20;
+            container.addChild(numText);
+
+            container.alpha = 0;
+            this.layers.effects.addChild(container);
+
+            this.objects.iterationIndicator = { container, numText };
+
+            // Fade in with scale pop
+            gsap.to(container, { alpha: 1, duration: 0.3, ease: 'power2.out' });
+            gsap.from(container.scale, { x: 0.7, y: 0.7, duration: 0.4, ease: 'back.out(2)' });
+        } else {
+            // Update existing indicator
+            const { numText, container } = this.objects.iterationIndicator;
+            numText.text = String(iteration);
+
+            // Pulse animation on update
+            gsap.to(numText.scale, { x: 1.4, y: 1.4, duration: 0.12, ease: 'power2.out' });
+            gsap.to(numText.scale, { x: 1, y: 1, duration: 0.2, ease: 'back.out(2)', delay: 0.12 });
+        }
+    }
+
+    /**
+     * Hide the iteration indicator (when loop ends)
+     */
+    hideIterationIndicator() {
+        if (this.objects.iterationIndicator) {
+            const { container } = this.objects.iterationIndicator;
+            gsap.to(container, {
+                alpha: 0,
+                duration: 0.25,
+                ease: 'power2.in',
+                onComplete: () => {
+                    this.layers.effects.removeChild(container);
+                    container.destroy({ children: true });
+                    this.objects.iterationIndicator = null;
+                }
+            });
+        }
+    }
+
+    /**
+     * Play a cinematic FOR loop iteration
+     */
+    playForLoopIteration({ loopVar, arrayName, arrayValues, currentIndex, previousIndex, iteration, currentValue }, onComplete) {
+        // Show/update the persistent iteration indicator
+        this.showIterationIndicator(iteration);
+
+        // ============================================
+        // CHOREOGRAPHY: Use the EXISTING array visual
+        // ============================================
+        const arrayVisual = this.objects.arrays.get(arrayName);
+        if (!arrayVisual) {
+            console.warn(`Array ${arrayName} not found for loop animation`);
+            onComplete?.();
+            return null;
+        }
+
+        // Get the position of the target cell in the existing array
+        const cellPos = arrayVisual.getCellPosition(currentIndex);
+        const arrayPos = arrayVisual.getPosition();
+        const targetX = arrayPos.x + cellPos.x + cellPos.width / 2;
+        const targetY = arrayPos.y + cellPos.y;
+
+        // Find if the variable already exists
+        const existingVar = this.objects.variables.get(loopVar);
+
+        // Determine home position in STATE zone
+        const varIndex = existingVar ? Array.from(this.objects.variables.keys()).indexOf(loopVar) : this.variableCount;
+        const homeX = this.zones.state.x + 10;
+        const homeY = this.zones.state.y + 10 + (varIndex * 50);
+
+        const tl = gsap.timeline({
+            onComplete: () => onComplete?.()
+        });
+
+        // ========================================
+        // STEP 1: Create pointer label 'n' above the target cell
+        // ========================================
+        const pointerContainer = new PIXI.Container();
+        pointerContainer.x = targetX;
+        pointerContainer.y = targetY - 30;
+        pointerContainer.alpha = 0;
+        this.layers.effects.addChild(pointerContainer);
+
+        const pointerText = new PIXI.Text({
+            text: loopVar,
+            style: { fontFamily: 'Inter, sans-serif', fontSize: 22, fill: 0xfbbf24, fontWeight: '700' }
+        });
+        pointerText.anchor.set(0.5, 1);
+        pointerContainer.addChild(pointerText);
+
+        // Pointer drops in from above
+        tl.to(pointerContainer, { alpha: 1, duration: 0.2, ease: 'power2.out' }, 0);
+        tl.from(pointerContainer, { y: targetY - 60, duration: 0.35, ease: 'back.out(1.5)' }, 0);
+
+        // ========================================
+        // STEP 2: Highlight the target cell in the EXISTING array
+        // ========================================
+        tl.call(() => {
+            arrayVisual.highlightCell(currentIndex, 0x6366f1);
+        }, null, 0.2);
+
+        // ========================================
+        // STEP 3: Extract value from the cell (create a copy that moves)
+        // ========================================
+        const extractedValue = new PIXI.Container();
+        const extractBg = new PIXI.Graphics();
+        extractBg.roundRect(0, 0, 36, 32, 4);
+        extractBg.fill({ color: 0x6366f1, alpha: 0.9 });
+        extractedValue.addChild(extractBg);
+
+        const extractText = new PIXI.Text({
+            text: String(currentValue),
+            style: { fontFamily: 'Inter, sans-serif', fontSize: 16, fill: 0xffffff }
+        });
+        extractText.anchor.set(0.5);
+        extractText.x = 18;
+        extractText.y = 16;
+        extractedValue.addChild(extractText);
+
+        extractedValue.x = targetX - 18;
+        extractedValue.y = targetY + cellPos.height / 2 - 16;
+        extractedValue.alpha = 0;
+        extractedValue.scale.set(0.5);
+        this.layers.effects.addChild(extractedValue);
+
+        // Value pops out
+        tl.to(extractedValue, { alpha: 1, duration: 0.2, ease: 'power2.out' }, 0.4);
+        tl.to(extractedValue.scale, { x: 1.15, y: 1.15, duration: 0.25, ease: 'back.out(2)' }, 0.4);
+
+        // ========================================
+        // STEP 4: Value moves up to meet the pointer
+        // ========================================
+        tl.to(extractedValue, {
+            x: targetX - 18,
+            y: targetY - 55,
+            duration: 0.4,
+            ease: 'power3.inOut'
+        }, 0.7);
+        tl.to(extractedValue.scale, { x: 0.8, y: 0.8, duration: 0.3 }, 0.8);
+
+        // Pointer pulses
+        tl.to(pointerContainer.scale, { x: 1.15, y: 1.15, duration: 0.15, ease: 'power2.out' }, 0.9);
+        tl.to(pointerContainer.scale, { x: 1, y: 1, duration: 0.2, ease: 'back.out(2)' }, 1.05);
+
+        // ========================================
+        // STEP 5: Combine into "n = value" and prepare for slide
+        // ========================================
+        tl.call(() => {
+            pointerText.text = `${loopVar} = ${currentValue}`;
+            extractedValue.visible = false;
+        }, null, 1.1);
+
+        // Hold briefly
+        tl.to({}, { duration: 0.4 }, 1.2);
+
+        // ========================================
+        // STEP 6: Clear array highlight
+        // ========================================
+        tl.call(() => {
+            arrayVisual.clearHighlight();
+        }, null, 1.5);
+
+        // ========================================
+        // STEP 7: Slide combined result to STATE zone
+        // ========================================
+        tl.to(pointerContainer, {
+            x: homeX + 50,
+            y: homeY + 15,
+            duration: 0.5,
+            ease: 'power2.inOut'
+        }, 1.6);
+
+        // ========================================
+        // STEP 8: Handoff to VariableVisual and cleanup
+        // ========================================
+        tl.call(() => {
+            // Remove temporary graphics
+            this.layers.effects.removeChild(pointerContainer);
+            this.layers.effects.removeChild(extractedValue);
+            pointerContainer.destroy({ children: true });
+            extractedValue.destroy({ children: true });
+
+            // Create or update the real VariableVisual
+            if (existingVar) {
+                existingVar.setValue(currentValue, true);
+                existingVar.container.x = homeX;
+                existingVar.container.y = homeY;
+                existingVar.show();
+            } else {
+                const varVisual = new VariableVisual(this.layers.variables, loopVar, currentValue);
+                varVisual.setHomePosition(homeX, homeY);
+                varVisual.container.x = homeX;
+                varVisual.container.y = homeY;
+                varVisual.show();
+                this.variableCount++;
+                this.objects.variables.set(loopVar, varVisual);
+            }
+        }, null, 2.1);
+
+        return tl;
     }
 
     /**
