@@ -154,6 +154,8 @@ export class VisualEngine {
      * Restart from beginning
      */
     restart() {
+        console.log('🔄 VisualEngine restart called, steps:', this.normalizedSteps.length);
+        
         // CRITICAL: Kill any running animation
         if (this.timeline) {
             this.timeline.kill();
@@ -163,8 +165,15 @@ export class VisualEngine {
         this.isPlaying = false;
         this.isAnimating = false;
         
-        // Reset cursor
+        // Reset cursor (keeps steps, just resets position to -1)
         this.cursor.reset();
+        
+        console.log('🔄 After cursor reset:', {
+            currentIndex: this.cursor.getCurrentIndex(),
+            totalSteps: this.cursor.getTotalSteps(),
+            hasNext: this.cursor.hasNext(),
+            isAtEnd: this.cursor.isAtEnd()
+        });
         
         // Reset renderer visuals
         this.renderer?.reset();
@@ -181,7 +190,7 @@ export class VisualEngine {
         }
         
         this._emitStateChange();
-        console.log('🔄 VisualEngine restarted');
+        console.log('🔄 VisualEngine restarted successfully');
     }
 
     /**

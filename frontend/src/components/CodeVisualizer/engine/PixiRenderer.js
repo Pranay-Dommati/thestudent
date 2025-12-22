@@ -32,8 +32,6 @@ import {
     CodeHighlight,
     PointerArrow
 } from './VisualObjects';
-import { ASSIGN_FROM_ARRAY_INDEX, FOR_LOOP_ITERATION, playBehavior } from './BehaviorLibrary';
-import { choreographForLoopIteration, choreographForLoopEnd } from './Choreography';
 
 // Register GSAP PixiJS plugin
 gsap.registerPlugin(PixiPlugin);
@@ -301,231 +299,6 @@ export class PixiRenderer {
         return { x: localToEffects.x, y: localToEffects.y };
     }
 
-    /**
-     * Choreograph a comparison: gather value representations, compare, show result
-     * 
-     * PROPER CHOREOGRAPHY:
-     * 1. Create value bubbles representing the two values
-     * 2. Animate them to interaction zone with proper spacing
-     * 3. Show operator between them
-     * 4. Show result (True ✓ / False ✗)
-     * 5. Clean up
-     * 
-     * Original variables STAY in place - we animate VALUE representations
-     */
-    /**
-     * Play cinematic IF_ELSE_BRANCH animation
-     * Delegates to the standardized BehaviorLibrary
-     */
-    playCinematicComparison(params, onComplete) {
-        console.log('🎭 PixiRenderer.playCinematicComparison:', params);
-
-        // Calculate center position for the comparison animation
-        const zone = this.zones.interaction;
-        const position = {
-            x: zone?.centerX || this.width / 2,
-            y: zone?.centerY || this.height / 2
-        };
-
-        // Map params to behavior params
-        const behaviorParams = {
-            leftValue: params.left,
-            rightValue: params.right,
-            leftVarName: params.leftVar,
-            rightVarName: params.rightVar,
-            operator: params.operator,
-            result: params.result,
-            position: position
-        };
-
-        // Use the BehaviorLibrary to execute the animation
-        return playBehavior('IF_ELSE_BRANCH', this.layers.effects, behaviorParams, (result) => {
-            onComplete?.(result);
-        });
-    }
-
-    /**
-     * Choreograph an assignment: highlight source, transfer value to target
-     * Variables STAY in place - we animate a value bubble transfer
-     * 
-     * @param {Object} timeline - GSAP timeline
-     * @param {string} targetVar - Target variable name
-     * @param {string} sourceVar - Source variable name (or null if literal)
-     * @param {*} value - Value being assigned
-     * @param {number} startTime - Start time in timeline
-     */
-    choreographAssignment(timeline, targetVar, sourceVar, value, startTime) {
-        const targetVisual = this.objects.variables.get(targetVar);
-        const sourceVisual = sourceVar ? this.objects.variables.get(sourceVar) : null;
-
-        if (sourceVisual && targetVisual) {
-            // Highlight source variable
-            timeline.to(sourceVisual.container, {
-                pixi: { tint: 0x6366f1 },
-                duration: 0.15
-            }, startTime);
-
-            // Create value bubble at source position
-            timeline.call(() => {
-                const bubble = this.createValueBubble(value);
-                const sourcePos = sourceVisual.getPosition();
-                bubble.setPosition(sourcePos.x + 80, sourcePos.y + 15);
-                bubble.show();
-
-                // Animate bubble to target
-                const targetPos = targetVisual.getPosition();
-                gsap.to(bubble.container, {
-                    x: targetPos.x + 80,
-                    y: targetPos.y + 15,
-                    duration: 0.4,
-                    ease: 'power2.inOut',
-                    onComplete: () => {
-                        // Update target value
-                        targetVisual.setValue(value, true);
-                        // Remove bubble
-                        bubble.hide();
-                        setTimeout(() => bubble.destroy(), 100);
-                    }
-                });
-            }, null, startTime + 0.2);
-
-            // Remove highlight from source
-            timeline.to(sourceVisual.container, {
-                pixi: { tint: 0xffffff },
-                duration: 0.2
-            }, startTime + 0.7);
-        } else if (targetVisual) {
-            // Direct value assignment (no source visual)
-            timeline.call(() => {
-                targetVisual.setValue(value, true);
-            }, null, startTime + 0.2);
-        }
-    }
-
-    /**
-     * Cinematic var-to-var assignment overlay.
-     * Shows `target = <old>` sliding in from left, then transfers value from `source`.
-     */
-    choreographAssignFromVariableOverlay({ targetVar, sourceVar, value, oldValue }, startTime = 0) {
-        const targetVisual = this.getVariable(targetVar);
-        const sourceVisual = this.getVariable(sourceVar);
-
-        if (!targetVisual || !sourceVisual) return null;
-
-        const tl = gsap.timeline();
-
-        const zone = this.zones.interaction;
-        const endX = (zone?.centerX ?? this.width / 2) - 60;
-        const endY = (zone?.centerY ?? this.height / 2) + 10;
-        const startX = (this.zones.state?.x ?? 0) - 140;
-
-        // Overlay container lives in EFFECTS layer
-        const overlay = new PIXI.Container();
-        overlay.x = startX;
-        overlay.y = endY;
-        overlay.alpha = 0;
-        this.layers.effects.addChild(overlay);
-
-        // Layout
-        const BOX_W = 70;
-        const BOX_H = 34;
-
-        const targetText = new PIXI.Text({
-            text: String(targetVar),
-            style: new PIXI.TextStyle({
-                fontFamily: 'Inter, sans-serif',
-                fontSize: 18,
-                fill: 0x60a5fa,
-                fontWeight: '700'
-            })
-        });
-        targetText.anchor.set(1, 0.5);
-        targetText.x = 0;
-        targetText.y = 0;
-        overlay.addChild(targetText);
-
-        const equalsText = new PIXI.Text({
-            text: '=',
-            style: new PIXI.TextStyle({
-                fontFamily: 'Inter, sans-serif',
-                fontSize: 18,
-                fill: 0xf1f5f9,
-                fontWeight: '700'
-            })
-        });
-        equalsText.anchor.set(0.5, 0.5);
-        equalsText.x = 18;
-        equalsText.y = 0;
-        overlay.addChild(equalsText);
-
-        const valueBox = new PIXI.Graphics();
-        valueBox.roundRect(0, 0, BOX_W, BOX_H, 8);
-        valueBox.fill(0x1e293b);
-        valueBox.stroke({ width: 2, color: 0x334155 });
-        valueBox.x = 32;
-        valueBox.y = -BOX_H / 2;
-        overlay.addChild(valueBox);
-
-        const valueText = new PIXI.Text({
-            text: String(oldValue ?? ''),
-            style: new PIXI.TextStyle({
-                fontFamily: 'Inter, sans-serif',
-                fontSize: 18,
-                fill: 0xfbbf24,
-                fontWeight: '800'
-            })
-        });
-        valueText.anchor.set(0.5);
-        valueText.x = valueBox.x + BOX_W / 2;
-        valueText.y = 0;
-        overlay.addChild(valueText);
-
-        const getOverlayValueBoxCenter = () => ({
-            x: overlay.x + valueBox.x + BOX_W / 2,
-            y: overlay.y + 0
-        });
-
-        // 1) Slide in from left
-        tl.to(overlay, { alpha: 1, duration: 0.35, ease: 'power2.out' }, startTime);
-        tl.to(overlay, { x: endX, duration: 0.6, ease: 'power3.out' }, startTime);
-
-        // 2) Pulse source variable on the left
-        const pulseAt = startTime + 0.55;
-        tl.call(() => {
-            sourceVisual.animateAssignment?.(tl, value, pulseAt);
-        }, null, pulseAt);
-
-        // 3) Value bubble travels from source var to overlay box
-        const bubbleAt = startTime + 0.65;
-        tl.call(() => {
-            const fromPos = this.getVariableValueBoxCenter(sourceVar);
-            const toPos = getOverlayValueBoxCenter();
-            if (!fromPos || !toPos) return;
-
-            const bubble = this.createValueBubble(value);
-            bubble.animateTransfer(tl, fromPos, toPos, bubbleAt, 1.2);
-        }, null, bubbleAt);
-
-        // 4) Replace old value with new value (overlay + actual target variable)
-        const swapAt = startTime + 2.0;
-        tl.call(() => {
-            valueText.text = String(value);
-            targetVisual.setValue(value, true);
-        }, null, swapAt);
-        tl.to(valueText.scale, { x: 1.12, y: 1.12, duration: 0.16, ease: 'power2.out' }, swapAt);
-        tl.to(valueText.scale, { x: 1, y: 1, duration: 0.22, ease: 'back.out(2)' }, swapAt + 0.16);
-
-        // 5) Hold briefly then fade out and cleanup
-        const outAt = swapAt + 0.5;
-        tl.to(overlay, { alpha: 0, duration: 0.25, ease: 'power2.in' }, outAt);
-        tl.call(() => {
-            this.layers.effects.removeChild(overlay);
-            overlay.destroy({ children: true });
-        }, null, outAt + 0.3);
-
-        return tl;
-    }
-
     _unwrapTracerValue(payload) {
         // Backend tracer format: { value, type }
         if (payload && typeof payload === 'object' && !Array.isArray(payload) && 'value' in payload) {
@@ -751,8 +524,8 @@ export class PixiRenderer {
             arrayVisual.setHomePosition(homeX, homeY);
             arrayVisual.moveToHome();
 
-            // Hidden until seeded/animated
-            arrayVisual.container.alpha = 0;
+            // Make visible immediately (alpha 1)
+            arrayVisual.container.alpha = 1;
             arrayVisual.show();
 
             this.objects.arrays.set(name, arrayVisual);
@@ -874,10 +647,6 @@ export class PixiRenderer {
 
             case 'COMPLETE_STEP':
                 return this._animateCompleteStep(command);
-
-            // CINEMATIC BEHAVIORS - Renderer just executes, doesn't decide
-            case 'PLAY_BEHAVIOR':
-                return this._playBehavior(command);
 
             default:
                 return null;
@@ -1210,70 +979,6 @@ export class PixiRenderer {
     }
 
     /**
-     * Execute a cinematic behavior from BehaviorLibrary
-     * PixiRenderer is just the executor - it doesn't decide which behavior to play
-     * 
-     * @param {Object} command - { behaviorId, params, onComplete }
-     */
-    _playBehavior(command) {
-        const { behaviorId, params } = command;
-
-        // Add position from interaction zone center
-        const fullParams = {
-            ...params,
-            position: {
-                x: this.zones.interaction.centerX,
-                y: this.zones.interaction.centerY
-            }
-        };
-
-        console.log(`🎬 PixiRenderer._playBehavior: ${behaviorId}`, fullParams);
-
-        // Let BehaviorLibrary handle the animation
-        // Returns GSAP timeline that TimelineEngine will sequence
-        return playBehavior(behaviorId, this.layers.effects, fullParams, (finalResultInfo) => {
-            // Handle handoff to persistent visuals if needed
-            if (finalResultInfo?.varName && finalResultInfo?.value !== undefined) {
-                this._handleBehaviorComplete(finalResultInfo);
-            }
-        });
-    }
-
-    /**
-     * Handle behavior completion - create/update persistent variable
-     * Called after cinematic behavior finishes
-     */
-    _handleBehaviorComplete(resultInfo) {
-        const { varName, value, x, y } = resultInfo;
-
-        // Check if variable already exists
-        const existingVar = this.objects.variables.get(varName);
-
-        if (existingVar) {
-            // Variable exists - just update value with pulse
-            existingVar.setValue(value, true);
-        } else {
-            // Create new variable at behavior's final position, then slide to home
-            const varVisual = this.getOrCreateVariable(varName, value);
-            if (varVisual && x !== undefined && y !== undefined) {
-                // Start at behavior's final position
-                varVisual.container.x = x;
-                varVisual.container.y = y;
-                varVisual.container.alpha = 1;
-                varVisual.container.scale.set(1);
-
-                // Slide to home position
-                gsap.to(varVisual.container, {
-                    x: varVisual.homeX,
-                    y: varVisual.homeY,
-                    duration: 0.5,
-                    ease: 'power2.inOut'
-                });
-            }
-        }
-    }
-
-    /**
      * Reset all visual objects
      */
     reset() {
@@ -1587,123 +1292,6 @@ export class PixiRenderer {
     }
 
     /**
-     * Play the cinematic ASSIGN_FROM_ARRAY_INDEX animation
-     * Uses the tested behavior from BehaviorLibrary for professional animation
-     * 
-     * After animation completes, the variable smoothly slides from center to STATE zone
-     * The behavior passes finalResultInfo with exact position for seamless handoff
-     * 
-     * @param {Object} options - Animation options
-     * @param {string} options.arrayName - Name of the source array
-     * @param {Array} options.arrayValues - Array values
-     * @param {number} options.index - Index being accessed
-     * @param {string} options.varName - Target variable name
-     * @param {*} options.oldValue - Previous value (optional)
-     * @param {Function} onComplete - Callback when animation completes
-     * @returns {Object} GSAP timeline
-     */
-    playAssignFromArrayIndex({ arrayName, arrayValues, index, varName, oldValue = null }, onComplete) {
-        // Use the interaction zone center for positioning
-        const position = {
-            x: this.zones.interaction.centerX,
-            y: this.zones.interaction.centerY
-        };
-
-        console.log('🎬 playAssignFromArrayIndex:', { arrayName, arrayValues, index, varName, oldValue, position });
-
-        // Get the value early
-        const value = arrayValues?.[index];
-
-        // Use the effects layer for the animation
-        // The behavior calls our callback with finalResultInfo containing exact position
-        const timeline = ASSIGN_FROM_ARRAY_INDEX(this.layers.effects, {
-            arrayName,
-            arrayValues: arrayValues || [],
-            index: index ?? 0,
-            varName,
-            oldValue,
-            position
-        }, (finalResultInfo) => {
-            // finalResultInfo contains: { x, y, value, varName } - exact position of the final result
-            console.log('🎬 Behavior complete, finalResultInfo:', finalResultInfo);
-
-            // After cinematic animation: Create variable at EXACT POSITION, then slide to HOME
-            if (value !== undefined) {
-                // Check if variable already exists
-                const existingVar = this.objects.variables.get(varName);
-
-                if (existingVar) {
-                    // Variable exists - just update value with pulse
-                    existingVar.setValue(value, true);
-                    onComplete?.();
-                } else {
-                    // NEW VARIABLE: Create at EXACT position where behavior ended
-                    const varVisual = new VariableVisual(this.layers.variables, varName, value);
-
-                    // Calculate HOME position in STATE zone
-                    const zone = this.zones.state;
-                    const homeX = zone.x + 5;
-                    const homeY = zone.y + 10 + this.variableCount * 45;
-
-                    // Set home position for future reference
-                    varVisual.setHomePosition(homeX, homeY);
-
-                    // START at the EXACT position from the behavior's final result
-                    // Use finalResultInfo if available, fallback to center position
-                    const startX = finalResultInfo?.x ?? (position.x - 25);
-                    const startY = finalResultInfo?.y ?? position.y;
-
-                    varVisual.container.x = startX;
-                    varVisual.container.y = startY;
-                    varVisual.show();
-                    varVisual.container.alpha = 1;
-                    varVisual.container.scale.set(1);
-
-                    // Register the variable
-                    this.variableCount++;
-                    this.objects.variables.set(varName, varVisual);
-
-                    console.log(`🎯 Created VariableVisual at (${startX}, ${startY}), sliding to (${homeX}, ${homeY})`);
-
-                    // ANIMATE: Slide from exact position to home (STATE zone on left)
-                    const slideTl = gsap.timeline({
-                        onComplete: () => {
-                            console.log(`✅ Variable ${varName} slid to home position`);
-                            onComplete?.();
-                        }
-                    });
-
-                    // Immediate slide to left (no delay since we're taking over seamlessly)
-                    slideTl.to(varVisual.container, {
-                        x: homeX,
-                        y: homeY,
-                        duration: 0.5,
-                        ease: 'power2.inOut'
-                    });
-
-                    // Subtle scale pulse when landing
-                    slideTl.to(varVisual.container.scale, {
-                        x: 1.08,
-                        y: 1.08,
-                        duration: 0.1,
-                        ease: 'power2.out'
-                    }, '-=0.1');
-                    slideTl.to(varVisual.container.scale, {
-                        x: 1,
-                        y: 1,
-                        duration: 0.15,
-                        ease: 'back.out(2)'
-                    });
-                }
-            } else {
-                onComplete?.();
-            }
-        });
-
-        return timeline;
-    }
-
-    /**
      * Show/update the persistent loop iteration indicator
      */
     showIterationIndicator(iteration) {
@@ -1796,44 +1384,6 @@ export class PixiRenderer {
                 variable.destroy?.();
                 this.objects.variables.delete(varName);
             }
-        });
-    }
-
-    /**
-     * Play a cinematic FOR loop iteration
-     * Uses modular choreography from Choreography.js
-     */
-    playForLoopIteration({ loopVar, arrayName, arrayValues, currentIndex, previousIndex, iteration, currentValue }, onComplete) {
-        // Show/update the persistent iteration indicator
-        this.showIterationIndicator(iteration);
-
-        // Delegate to modular choreography function
-        return choreographForLoopIteration({
-            loopVar,
-            arrayName,
-            currentIndex,
-            currentValue,
-            iteration
-        }, this, onComplete);
-    }
-
-    /**
-     * Play a cinematic FOR loop end (StopIteration check)
-     * Slides loop variable pointer out of the array and cleans up.
-     */
-    playForLoopEnd({ loopVar, arrayName, arrayValues, previousIndex }, onComplete) {
-        // Hide the persistent iteration indicator as the loop is terminating
-        this.hideIterationIndicator();
-
-        return choreographForLoopEnd({
-            loopVar,
-            arrayName,
-            arrayValues,
-            previousIndex
-        }, this, () => {
-            // Remove loop variable from state after the exit animation
-            this.removeStateVariable(loopVar);
-            onComplete?.();
         });
     }
 

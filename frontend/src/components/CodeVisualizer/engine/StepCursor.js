@@ -93,9 +93,12 @@ export class StepCursor {
     }
 
     /**
-     * Check if at the end
+     * Check if at the end (completed all steps)
      */
     isAtEnd() {
+        // Not at end if no steps loaded or haven't started
+        if (this.steps.length === 0) return false;
+        if (this.current < 0) return false;
         return this.current >= this.steps.length - 1;
     }
 
@@ -103,6 +106,7 @@ export class StepCursor {
      * Check if has more steps
      */
     hasNext() {
+        if (this.steps.length === 0) return false;
         return this.current < this.steps.length - 1;
     }
 
