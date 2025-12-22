@@ -252,7 +252,13 @@ export class TimelineEngine {
             case 'return':
                 commands.push(
                     { type: 'HIGHLIGHT_CODE', line: stepLine, duration: 0.3 },
-                    { type: 'SHOW_RETURN_VALUE', value: stepType.value, duration: 0.5 },
+                    {
+                        type: 'SHOW_RETURN_VALUE',
+                        expression: stepType.expression,
+                        value: stepType.value,
+                        sourceVar: stepType.sourceVar,
+                        duration: 1.8
+                    },
                     { type: 'ANIMATE_RETURN', value: stepType.value, duration: 0.6 },
                     { type: 'COMPLETE_STEP', stepIndex, duration: 0.2 }
                 );
@@ -353,13 +359,16 @@ export class TimelineEngine {
         // Return statement
         const returnMatch = code.match(/return\s+(.+)/);
         if (returnMatch) {
-            const returnExpr = returnMatch[1];
-            const value = locals[returnExpr] !== undefined ? locals[returnExpr] : returnExpr;
+            const returnExpr = returnMatch[1].trim();
+            const isIdentifier = /^[_a-zA-Z]\w*$/.test(returnExpr);
+            const sourceVar = (isIdentifier && locals[returnExpr] !== undefined) ? returnExpr : null;
+            const value = sourceVar ? locals[sourceVar] : (locals[returnExpr] !== undefined ? locals[returnExpr] : returnExpr);
 
             return {
                 type: 'return',
                 expression: returnExpr,
-                value
+                value,
+                sourceVar
             };
         }
 

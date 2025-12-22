@@ -633,44 +633,50 @@ export class ValueBubble extends VisualObject {
 
         timeline.to(this.container, {
             alpha: 1,
-            duration: 0.15,
+            duration: 0.22,
             ease: 'power2.out'
         }, startTime);
 
         timeline.to(this.container.scale, {
             x: 1,
             y: 1,
-            duration: 0.2,
+            duration: 0.24,
             ease: 'back.out(2)'
         }, startTime);
 
         const midX = (fromPos.x + toPos.x) / 2;
-        const midY = Math.min(fromPos.y, toPos.y) - 40;
+        const midY = Math.min(fromPos.y, toPos.y) - 55;
+
+        const flyStart = startTime + 0.26;
+        const firstLeg = duration * 0.55;
+        const secondLeg = duration * 0.45;
 
         timeline.to(this.container, {
             x: midX,
             y: midY,
-            duration: duration * 0.5,
-            ease: 'power2.out'
-        }, startTime + 0.2);
+            duration: firstLeg,
+            ease: 'power3.inOut'
+        }, flyStart);
 
         timeline.to(this.container, {
             x: toPos.x,
             y: toPos.y,
-            duration: duration * 0.5,
-            ease: 'power2.in'
-        }, startTime + 0.2 + duration * 0.5);
+            duration: secondLeg,
+            ease: 'power3.inOut'
+        }, flyStart + firstLeg);
 
         timeline.to(this.container, {
             alpha: 0,
-            duration: 0.15
-        }, startTime + 0.2 + duration - 0.1);
+            duration: 0.2,
+            ease: 'power2.in'
+        }, flyStart + duration - 0.05);
 
         timeline.to(this.container.scale, {
             x: 0,
             y: 0,
-            duration: 0.1
-        }, startTime + 0.2 + duration - 0.1);
+            duration: 0.14,
+            ease: 'power2.in'
+        }, flyStart + duration - 0.05);
     }
 }
 
@@ -889,22 +895,26 @@ export class ReturnVisual extends VisualObject {
 
     _createGraphics() {
         this.returnLabel = createText('return', {
-            fontSize: 13,
+            fontSize: 14,
             fill: COLORS.keyword,
             fontWeight: 'bold'
         });
+        // Nudge baseline to visually align with the value box
+        this.returnLabel.y = 2;
         this.container.addChild(this.returnLabel);
 
         this.valueBox = new PIXI.Graphics();
         this.valueBox.roundRect(0, 0, 60, 32, 6);
-        this.valueBox.fill({ color: COLORS.success });
+        // Neutral box styling (match other value boxes; no green background)
+        this.valueBox.fill(COLORS.bgLight);
+        this.valueBox.stroke({ width: 2, color: COLORS.border });
         this.valueBox.x = this.returnLabel.width + 10;
         this.valueBox.y = -8;
         this.container.addChild(this.valueBox);
 
         this.valueText = createText('', {
             fontSize: 16,
-            fill: 0xffffff,
+            fill: COLORS.number,
             fontWeight: 'bold'
         });
         this.valueText.anchor.set(0.5);

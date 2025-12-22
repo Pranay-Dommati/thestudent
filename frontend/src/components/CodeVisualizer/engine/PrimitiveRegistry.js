@@ -51,7 +51,8 @@ class BasePrimitive {
  */
 export class AssignmentPrimitive extends BasePrimitive {
     static getDuration() {
-        return 1.4;
+        // Longer for cinematic var-to-var overlay
+        return 3.2;
     }
 
     static animate(step, renderer, timeline, onComplete) {
@@ -76,7 +77,29 @@ export class AssignmentPrimitive extends BasePrimitive {
 
         // 3. Use CHOREOGRAPHY for variable-to-variable assignment
         if (sourceVar && renderer.getVariable(sourceVar)) {
-            renderer.choreographAssignment(tl, targetVar, sourceVar, value, 0.3);
+            const oldValue = renderer.getVariable(targetVar)?.value;
+            const choreoTl = renderer.choreographAssignFromVariableOverlay?.({
+                targetVar,
+                sourceVar,
+                value,
+                oldValue
+            }, 0.3);
+
+            if (choreoTl) {
+                tl.add(choreoTl, 0.0);
+
+                const dur = choreoTl?.duration?.() ?? 2.6;
+                const updateAt = 0.3 + dur + 0.05;
+                tl.call(() => {
+                    renderer.updateStatePanel(targetVar, value);
+                }, null, updateAt);
+            } else {
+                renderer.choreographAssignment(tl, targetVar, sourceVar, value, 0.3);
+
+                tl.call(() => {
+                    renderer.updateStatePanel(targetVar, value);
+                }, null, 1.1);
+            }
         } else {
             // Simple literal assignment
             tl.call(() => {
@@ -93,10 +116,12 @@ export class AssignmentPrimitive extends BasePrimitive {
             }, null, 0.9);
         }
 
-        // 4. Update state panel
-        tl.call(() => {
-            renderer.updateStatePanel(targetVar, value);
-        }, null, 1.1);
+        // 4. Update state panel (for non var-to-var path)
+        if (!(sourceVar && renderer.getVariable(sourceVar))) {
+            tl.call(() => {
+                renderer.updateStatePanel(targetVar, value);
+            }, null, 1.1);
+        }
 
         timeline.add(tl);
     }
@@ -343,11 +368,12 @@ export class ConditionPrimitive extends BasePrimitive {
  */
 export class ReturnPrimitive extends BasePrimitive {
     static getDuration() {
-        return 1.2;
+        // Longer, readable cinematic return
+        return 3.2;
     }
 
     static animate(step, renderer, timeline, onComplete) {
-        const { value, expression } = step.meta;
+        const { value, expression, sourceVar } = step.meta;
         const lineNumber = step.line;
 
         console.log('🔙 ReturnPrimitive [PURE]:', { value, expression, lineNumber, meta: step.meta });
@@ -361,15 +387,63 @@ export class ReturnPrimitive extends BasePrimitive {
             renderer.highlightLine(lineNumber);
         }, null, 0);
 
-        // 2. Show return value
-        tl.call(() => {
-            renderer.showReturnValue(value);
-        }, null, 0.3);
+        const canReturnFromVar = !!(sourceVar && renderer.getVariable?.(sourceVar) && renderer.getReturnVisual?.());
 
-        // 3. Animate return
-        tl.call(() => {
-            renderer.animateReturn(value);
-        }, null, 0.7);
+        if (canReturnFromVar) {
+            const rv = renderer.getReturnVisual();
+            const source = renderer.getVariable(sourceVar);
+
+            // 2. Show "return <var>" on the CANVAS
+            rv.show();
+            rv.setValue(expression);
+            rv.checkmark.alpha = 0;
+            rv.container.alpha = 0;
+            rv.container.scale.set(0.5);
+
+            tl.to(rv.container, {
+                alpha: 1,
+                duration: 0.35,
+                ease: 'power2.out'
+            }, 0.25);
+            tl.to(rv.container.scale, {
+                x: 1,
+                y: 1,
+                duration: 0.5,
+                ease: 'back.out(2)'
+            }, 0.25);
+
+            // 3. Highlight the left variable's value box
+            const highlightStart = 0.9;
+            if (source?.animateAssignment) {
+                source.animateAssignment(tl, value, highlightStart);
+            }
+
+            // 4. Transfer the value into the return box
+            const fromPos = renderer.getVariableValueBoxCenter?.(sourceVar);
+            const toPos = renderer.getReturnValueBoxCenter?.();
+
+            if (fromPos && toPos) {
+                const bubble = renderer.createValueBubble(value);
+                bubble.animateTransfer(tl, fromPos, toPos, highlightStart + 0.15, 1.2);
+            }
+
+            // 5. Swap the return box from "max_val" to its actual value
+            tl.call(() => {
+                rv.setValue(value);
+                rv.animate?.();
+            }, null, highlightStart + 1.55);
+
+            tl.to(rv.checkmark, { alpha: 1, duration: 0.2 }, highlightStart + 1.55);
+        } else {
+            // Fallback: show the computed return value
+            tl.call(() => {
+                renderer.showReturnValue(value);
+            }, null, 0.3);
+
+            tl.call(() => {
+                renderer.animateReturn(value);
+            }, null, 0.7);
+        }
 
         timeline.add(tl);
     }

@@ -260,6 +260,48 @@ export class PixiRenderer {
     }
 
     /**
+     * Get the return visual (output zone)
+     */
+    getReturnVisual() {
+        return this.objects.returnVisual;
+    }
+
+    /**
+     * Get the center point of a variable's value box (EFFECTS-layer coordinates)
+     * This matters because bubbles live in the effects layer.
+     */
+    getVariableValueBoxCenter(name) {
+        const variable = this.getVariable(name);
+        if (!variable) return null;
+
+        const global = variable.container.toGlobal(
+            new PIXI.Point(
+                variable.valueBox.x + variable.boxWidth / 2,
+                variable.valueBox.y + variable.boxHeight / 2
+            )
+        );
+        const localToEffects = this.layers.effects.toLocal(global);
+        return { x: localToEffects.x, y: localToEffects.y };
+    }
+
+    /**
+     * Get the center point of the return visual's value box (EFFECTS-layer coordinates)
+     */
+    getReturnValueBoxCenter() {
+        const rv = this.getReturnVisual();
+        if (!rv) return null;
+
+        const global = rv.container.toGlobal(
+            new PIXI.Point(
+                rv.valueBox.x + 30,
+                rv.valueBox.y + 16
+            )
+        );
+        const localToEffects = this.layers.effects.toLocal(global);
+        return { x: localToEffects.x, y: localToEffects.y };
+    }
+
+    /**
      * Choreograph a comparison: gather value representations, compare, show result
      * 
      * PROPER CHOREOGRAPHY:
@@ -358,6 +400,130 @@ export class PixiRenderer {
                 targetVisual.setValue(value, true);
             }, null, startTime + 0.2);
         }
+    }
+
+    /**
+     * Cinematic var-to-var assignment overlay.
+     * Shows `target = <old>` sliding in from left, then transfers value from `source`.
+     */
+    choreographAssignFromVariableOverlay({ targetVar, sourceVar, value, oldValue }, startTime = 0) {
+        const targetVisual = this.getVariable(targetVar);
+        const sourceVisual = this.getVariable(sourceVar);
+
+        if (!targetVisual || !sourceVisual) return null;
+
+        const tl = gsap.timeline();
+
+        const zone = this.zones.interaction;
+        const endX = (zone?.centerX ?? this.width / 2) - 60;
+        const endY = (zone?.centerY ?? this.height / 2) + 10;
+        const startX = (this.zones.state?.x ?? 0) - 140;
+
+        // Overlay container lives in EFFECTS layer
+        const overlay = new PIXI.Container();
+        overlay.x = startX;
+        overlay.y = endY;
+        overlay.alpha = 0;
+        this.layers.effects.addChild(overlay);
+
+        // Layout
+        const BOX_W = 70;
+        const BOX_H = 34;
+
+        const targetText = new PIXI.Text({
+            text: String(targetVar),
+            style: new PIXI.TextStyle({
+                fontFamily: 'Inter, sans-serif',
+                fontSize: 18,
+                fill: 0x60a5fa,
+                fontWeight: '700'
+            })
+        });
+        targetText.anchor.set(1, 0.5);
+        targetText.x = 0;
+        targetText.y = 0;
+        overlay.addChild(targetText);
+
+        const equalsText = new PIXI.Text({
+            text: '=',
+            style: new PIXI.TextStyle({
+                fontFamily: 'Inter, sans-serif',
+                fontSize: 18,
+                fill: 0xf1f5f9,
+                fontWeight: '700'
+            })
+        });
+        equalsText.anchor.set(0.5, 0.5);
+        equalsText.x = 18;
+        equalsText.y = 0;
+        overlay.addChild(equalsText);
+
+        const valueBox = new PIXI.Graphics();
+        valueBox.roundRect(0, 0, BOX_W, BOX_H, 8);
+        valueBox.fill(0x1e293b);
+        valueBox.stroke({ width: 2, color: 0x334155 });
+        valueBox.x = 32;
+        valueBox.y = -BOX_H / 2;
+        overlay.addChild(valueBox);
+
+        const valueText = new PIXI.Text({
+            text: String(oldValue ?? ''),
+            style: new PIXI.TextStyle({
+                fontFamily: 'Inter, sans-serif',
+                fontSize: 18,
+                fill: 0xfbbf24,
+                fontWeight: '800'
+            })
+        });
+        valueText.anchor.set(0.5);
+        valueText.x = valueBox.x + BOX_W / 2;
+        valueText.y = 0;
+        overlay.addChild(valueText);
+
+        const getOverlayValueBoxCenter = () => ({
+            x: overlay.x + valueBox.x + BOX_W / 2,
+            y: overlay.y + 0
+        });
+
+        // 1) Slide in from left
+        tl.to(overlay, { alpha: 1, duration: 0.35, ease: 'power2.out' }, startTime);
+        tl.to(overlay, { x: endX, duration: 0.6, ease: 'power3.out' }, startTime);
+
+        // 2) Pulse source variable on the left
+        const pulseAt = startTime + 0.55;
+        tl.call(() => {
+            sourceVisual.animateAssignment?.(tl, value, pulseAt);
+        }, null, pulseAt);
+
+        // 3) Value bubble travels from source var to overlay box
+        const bubbleAt = startTime + 0.65;
+        tl.call(() => {
+            const fromPos = this.getVariableValueBoxCenter(sourceVar);
+            const toPos = getOverlayValueBoxCenter();
+            if (!fromPos || !toPos) return;
+
+            const bubble = this.createValueBubble(value);
+            bubble.animateTransfer(tl, fromPos, toPos, bubbleAt, 1.2);
+        }, null, bubbleAt);
+
+        // 4) Replace old value with new value (overlay + actual target variable)
+        const swapAt = startTime + 2.0;
+        tl.call(() => {
+            valueText.text = String(value);
+            targetVisual.setValue(value, true);
+        }, null, swapAt);
+        tl.to(valueText.scale, { x: 1.12, y: 1.12, duration: 0.16, ease: 'power2.out' }, swapAt);
+        tl.to(valueText.scale, { x: 1, y: 1, duration: 0.22, ease: 'back.out(2)' }, swapAt + 0.16);
+
+        // 5) Hold briefly then fade out and cleanup
+        const outAt = swapAt + 0.5;
+        tl.to(overlay, { alpha: 0, duration: 0.25, ease: 'power2.in' }, outAt);
+        tl.call(() => {
+            this.layers.effects.removeChild(overlay);
+            overlay.destroy({ children: true });
+        }, null, outAt + 0.3);
+
+        return tl;
     }
 
     _unwrapTracerValue(payload) {
@@ -932,12 +1098,83 @@ export class PixiRenderer {
     }
 
     _animateShowReturnValue(command) {
-        const { value, duration } = command;
+        const { value, expression, sourceVar, duration } = command;
         const returnVisual = this.objects.returnVisual;
-        returnVisual.show();
+        if (!returnVisual) return null;
 
         const tl = gsap.timeline();
-        returnVisual.animateReturn(tl, value, 0);
+
+        const canReturnFromVar = !!(sourceVar && this.getVariable(sourceVar));
+
+        if (canReturnFromVar) {
+            const source = this.getVariable(sourceVar);
+            const fromPos = this.getVariableValueBoxCenter(sourceVar);
+            const toPos = this.getReturnValueBoxCenter();
+
+            // Show "return <var>" first (canvas)
+            returnVisual.show();
+            returnVisual.setValue(expression ?? sourceVar);
+            returnVisual.checkmark.alpha = 0;
+            returnVisual.container.alpha = 0;
+            returnVisual.container.scale.set(0.5);
+
+            tl.to(returnVisual.container, {
+                alpha: 1,
+                duration: 0.35,
+                ease: 'power2.out'
+            }, 0);
+            tl.to(returnVisual.container.scale, {
+                x: 1,
+                y: 1,
+                duration: 0.5,
+                ease: 'back.out(2)'
+            }, 0);
+
+            // Highlight left variable and transfer its value into the return box
+            const highlightStart = 0.55;
+            if (source?.animateAssignment) {
+                source.animateAssignment(tl, value, highlightStart);
+            }
+
+            if (fromPos && toPos) {
+                const bubble = this.createValueBubble(value);
+                bubble.animateTransfer(tl, fromPos, toPos, highlightStart + 0.15, 1.2);
+            }
+
+            // Swap to actual value + checkmark
+            tl.call(() => {
+                returnVisual.setValue(value);
+            }, [], highlightStart + 1.55);
+            tl.to(returnVisual.checkmark, { alpha: 1, duration: 0.2 }, highlightStart + 1.55);
+
+            // Small pulse for emphasis
+            tl.to(returnVisual.valueBox.scale, { x: 1.08, y: 1.08, duration: 0.18 }, highlightStart + 1.55);
+            tl.to(returnVisual.valueBox.scale, { x: 1, y: 1, duration: 0.22, ease: 'back.out(2)' }, highlightStart + 1.73);
+
+            return tl;
+        }
+
+        // Fallback: show computed value directly
+        returnVisual.show();
+        const shown = (value !== undefined) ? value : '';
+        returnVisual.setValue(shown);
+        returnVisual.checkmark.alpha = 0;
+        returnVisual.container.alpha = 0;
+        returnVisual.container.scale.set(0.5);
+
+        tl.to(returnVisual.container, {
+            alpha: 1,
+            duration: 0.35,
+            ease: 'power2.out'
+        }, 0);
+        tl.to(returnVisual.container.scale, {
+            x: 1,
+            y: 1,
+            duration: 0.5,
+            ease: 'back.out(2)'
+        }, 0);
+        tl.to(returnVisual.checkmark, { alpha: 1, duration: 0.2 }, 0.55);
+
         return tl;
     }
 

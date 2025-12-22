@@ -243,13 +243,16 @@ function detectStepType(step, loopCounters, variableHistory, knownArrays) {
     const returnMatch = code.match(/return\s+(.+)/);
     if (returnMatch) {
         const expr = returnMatch[1].trim();
-        const value = variables[expr] !== undefined ? variables[expr] : expr;
+        const isIdentifier = /^[_a-zA-Z]\w*$/.test(expr);
+        const sourceVar = (isIdentifier && variables[expr] !== undefined) ? expr : null;
+        const value = sourceVar ? variables[sourceVar] : (variables[expr] !== undefined ? variables[expr] : expr);
         
         return {
             type: 'return',
             meta: {
                 expression: expr,
-                value
+                value,
+                sourceVar
             }
         };
     }
