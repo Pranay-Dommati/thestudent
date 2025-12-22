@@ -153,12 +153,26 @@ export class PixiRenderer {
     _layoutInputZone() {
         const arrays = Array.from(this.objects.arrays.values());
         const zone = this.zones.input;
-        
-        let currentX = zone.x;
-        arrays.forEach((arr, idx) => {
-            arr.setHomePosition(currentX, zone.y + 10);
+
+        const leftPad = 10;
+        const rightPad = 10;
+        let currentX = zone.x + leftPad;
+
+        arrays.forEach((arr) => {
+            // Ensure arrays never overflow the canvas/zone.
+            // Scale down if needed, but never scale up.
+            const maxWidth = Math.max(50, zone.width - leftPad - rightPad);
+            const baseWidth = Math.max(1, arr.getVisualWidth());
+            const scale = Math.min(1, maxWidth / baseWidth);
+            arr.container.scale.set(scale);
+
+            const visualHeight = arr.getVisualHeight() * scale;
+            const y = zone.y + Math.max(6, (zone.height - visualHeight) / 2);
+
+            arr.setHomePosition(currentX, y);
             arr.moveToHome();
-            currentX += arr.getVisualWidth() + 30;
+
+            currentX += baseWidth * scale + 30;
         });
         
         // Loop indicator in top-right of input zone
@@ -654,8 +668,8 @@ export class PixiRenderer {
         );
         this.objects.returnVisual.hide();
         
-        // Draw zone label for STATE area
-        this._drawZoneLabel('State', this.zones.state.x, this.zones.state.y - 20);
+        // Draw zone label for STATE area (inside the zone, subtle)
+        this._drawZoneLabel('STATE', this.zones.state.x + 6, this.zones.state.y + 4);
     }
     
     /**
@@ -666,8 +680,8 @@ export class PixiRenderer {
             text,
             style: new PIXI.TextStyle({
                 fontFamily: 'JetBrains Mono, monospace',
-                fontSize: 12,
-                fill: 0x6b7280,
+                fontSize: 11,
+                fill: 0x475569,
                 fontWeight: 'bold'
             })
         });

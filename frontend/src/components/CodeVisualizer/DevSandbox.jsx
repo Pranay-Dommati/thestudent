@@ -31,6 +31,11 @@ const TEST_CASES = {
         { label: 'Negative', params: { varName: 'temp', oldValue: -5, newValue: 10 } },
         { label: 'Float', params: { varName: 'pi', oldValue: 3.14, newValue: 3.141 } },
     ],
+    ASSIGN_FROM_ARRAY_INDEX: [
+        { label: 'max_val = nums[0]', params: { arrayName: 'nums', arrayValues: [4, 5], index: 0, varName: 'max_val', oldValue: '—' } },
+        { label: 'max_val = nums[1]', params: { arrayName: 'nums', arrayValues: [4, 5], index: 1, varName: 'max_val', oldValue: '—' } },
+        { label: 'n = arr[3] (longer)', params: { arrayName: 'arr', arrayValues: [5, 6, 10, 13, 56, 76, 1, 2, 4, 8], index: 3, varName: 'n', oldValue: '—' } },
+    ],
     COMPARE: [
         { label: '3 > 5 (False)', params: { left: 3, right: 5, operator: '>', result: false } },
         { label: '10 > 3 (True)', params: { left: 10, right: 3, operator: '>', result: true } },
@@ -46,9 +51,11 @@ const TEST_CASES = {
         { label: 'Negative', params: { sourceValue: -42 } },
     ],
     HIGHLIGHT_ARRAY_INDEX: [
-        { label: 'Index 0', params: { index: 0, value: 10 } },
-        { label: 'Index 3', params: { index: 3, value: 55 } },
-        { label: 'Index 5', params: { index: 5, value: 88 } },
+        { label: 'Index 0 (first)', params: { arrayName: 'a', arrayValues: [5, 6, 10, 13, 56, 76, 1, 2, 4, 8], index: 0 } },
+        { label: 'Index 3 (middle)', params: { arrayName: 'nums', arrayValues: [5, 6, 10, 13, 56, 76, 1, 2, 4, 8], index: 3 } },
+        { label: 'Index 9 (last)', params: { arrayName: 'arr', arrayValues: [5, 6, 10, 13, 56, 76, 1, 2, 4, 8], index: 9 } },
+        { label: 'Small array [0]', params: { arrayName: 'x', arrayValues: [4, 5], index: 0 } },
+        { label: 'Small array [1]', params: { arrayName: 'x', arrayValues: [4, 5], index: 1 } },
     ],
     LOOP_ADVANCE: [
         { label: 'Iteration 1', params: { iteration: 1 } },
@@ -70,47 +77,83 @@ export default function DevSandbox() {
     const canvasRef = useRef(null);
     const appRef = useRef(null);
     const layerRef = useRef(null);
+    const mountedRef = useRef(true);
     
     const [selectedBehavior, setSelectedBehavior] = useState('COMPARE');
     const [isPlaying, setIsPlaying] = useState(false);
     const [lastPlayed, setLastPlayed] = useState(null);
+    const [isReady, setIsReady] = useState(false);
     
     // Initialize PixiJS
     useEffect(() => {
+        mountedRef.current = true;
+        let app = null;
+        
         const initPixi = async () => {
-            if (!canvasRef.current || appRef.current) return;
+            // Wait a tick to ensure canvas is mounted
+            await new Promise(resolve => setTimeout(resolve, 0));
             
-            const app = new PIXI.Application();
-            await app.init({
-                canvas: canvasRef.current,
-                width: 600,
-                height: 400,
-                backgroundColor: 0x0f172a, // Dark slate
-                antialias: true,
-                resolution: window.devicePixelRatio || 1,
-                autoDensity: true
-            });
+            if (!mountedRef.current || !canvasRef.current) return;
             
-            appRef.current = app;
+            // Destroy any existing app first
+            if (appRef.current) {
+                try {
+                    appRef.current.destroy(true, { children: true });
+                } catch (e) {
+                    console.warn('Error destroying previous Pixi app:', e);
+                }
+                appRef.current = null;
+                layerRef.current = null;
+            }
             
-            // Create animation layer
-            const layer = new PIXI.Container();
-            app.stage.addChild(layer);
-            layerRef.current = layer;
-            
-            // Add grid for reference
-            drawGrid(app.stage);
-            
-            // Add zone labels
-            addZoneLabels(app.stage);
+            try {
+                app = new PIXI.Application();
+                await app.init({
+                    canvas: canvasRef.current,
+                    width: 700,
+                    height: 300,
+                    backgroundColor: 0x0f172a, // Dark slate
+                    antialias: true,
+                    resolution: window.devicePixelRatio || 1,
+                    autoDensity: true
+                });
+                
+                // Check if still mounted after async init
+                if (!mountedRef.current) {
+                    app.destroy(true, { children: true });
+                    return;
+                }
+                
+                appRef.current = app;
+                
+                // Create animation layer
+                const layer = new PIXI.Container();
+                app.stage.addChild(layer);
+                layerRef.current = layer;
+                
+                // Add grid for reference
+                drawGrid(app.stage);
+                
+                setIsReady(true);
+            } catch (error) {
+                console.error('Failed to initialize PixiJS:', error);
+            }
         };
         
         initPixi();
         
         return () => {
+            mountedRef.current = false;
+            setIsReady(false);
+            
             if (appRef.current) {
-                appRef.current.destroy(true, { children: true });
+                try {
+                    appRef.current.destroy(true, { children: true });
+                } catch (e) {
+                    console.warn('Error during Pixi cleanup:', e);
+                }
                 appRef.current = null;
+                layerRef.current = null;
             }
         };
     }, []);
@@ -121,51 +164,22 @@ export default function DevSandbox() {
         grid.alpha = 0.1;
         
         // Vertical lines
-        for (let x = 0; x <= 600; x += 50) {
+        for (let x = 0; x <= 700; x += 50) {
             grid.moveTo(x, 0);
-            grid.lineTo(x, 400);
+            grid.lineTo(x, 300);
         }
         
         // Horizontal lines
-        for (let y = 0; y <= 400; y += 50) {
+        for (let y = 0; y <= 300; y += 50) {
             grid.moveTo(0, y);
-            grid.lineTo(600, y);
+            grid.lineTo(700, y);
         }
         
         grid.stroke({ width: 1, color: 0x475569 });
         stage.addChildAt(grid, 0);
     };
     
-    // Add zone reference labels
-    const addZoneLabels = (stage) => {
-        const labels = [
-            { text: 'CENTER', x: 300, y: 200 },
-        ];
-        
-        labels.forEach(({ text, x, y }) => {
-            const label = new PIXI.Text({
-                text,
-                style: new PIXI.TextStyle({
-                    fontFamily: 'sans-serif',
-                    fontSize: 10,
-                    fill: 0x475569,
-                })
-            });
-            label.anchor.set(0.5);
-            label.x = x;
-            label.y = y;
-            stage.addChildAt(label, 1);
-        });
-        
-        // Crosshair at center
-        const crosshair = new PIXI.Graphics();
-        crosshair.moveTo(290, 200);
-        crosshair.lineTo(310, 200);
-        crosshair.moveTo(300, 190);
-        crosshair.lineTo(300, 210);
-        crosshair.stroke({ width: 1, color: 0x6366f1 });
-        stage.addChildAt(crosshair, 1);
-    };
+
     
     // Clear animation layer
     const clearLayer = useCallback(() => {
@@ -176,7 +190,7 @@ export default function DevSandbox() {
     
     // Play a behavior with test params
     const handlePlayBehavior = useCallback((testCase) => {
-        if (!layerRef.current || isPlaying) return;
+        if (!layerRef.current || !isReady || isPlaying) return;
         
         clearLayer();
         setIsPlaying(true);
@@ -185,34 +199,36 @@ export default function DevSandbox() {
         // Build full params with position
         const fullParams = {
             ...testCase.params,
-            position: { x: 300, y: 200 }, // Center of canvas
+            position: { x: 350, y: 150 }, // Center of canvas
         };
         
         // For ASSIGN_FROM, add source/target positions
         if (selectedBehavior === 'ASSIGN_FROM') {
-            fullParams.sourcePosition = { x: 150, y: 200 };
-            fullParams.targetPosition = { x: 450, y: 200 };
+            fullParams.sourcePosition = { x: 200, y: 150 };
+            fullParams.targetPosition = { x: 500, y: 150 };
         }
         
-        // For HIGHLIGHT_ARRAY_INDEX, add array position
-        if (selectedBehavior === 'HIGHLIGHT_ARRAY_INDEX') {
-            fullParams.arrayPosition = { x: 100, y: 180 };
-        }
+        // For HIGHLIGHT_ARRAY_INDEX, position is already handled (uses position for center)
         
         playBehavior(
             selectedBehavior,
             layerRef.current,
             fullParams,
-            () => setIsPlaying(false)
+            () => {
+                if (mountedRef.current) {
+                    setIsPlaying(false);
+                }
+            }
         );
-    }, [selectedBehavior, isPlaying, clearLayer]);
+    }, [selectedBehavior, isPlaying, isReady, clearLayer]);
     
     // Play random test case
     const playRandom = useCallback(() => {
+        if (!isReady) return;
         const testCases = TEST_CASES[selectedBehavior];
         const randomCase = testCases[Math.floor(Math.random() * testCases.length)];
         handlePlayBehavior(randomCase);
-    }, [selectedBehavior, handlePlayBehavior]);
+    }, [selectedBehavior, handlePlayBehavior, isReady]);
     
     // Keyboard shortcuts
     useEffect(() => {

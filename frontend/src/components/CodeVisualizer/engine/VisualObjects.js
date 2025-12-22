@@ -178,20 +178,25 @@ export class ArrayVisual extends VisualObject {
         this.valueTexts = [];
         this.highlightedIndex = -1;
         
-        this.elementSize = 50;  // Smaller, more compact
-        this.gap = 6;
+        this.elementSize = 44;  // Compact cell size
+        this.elementHeight = 40;
+        this.gap = 2;  // Minimal gap between cells
         
         this._createGraphics();
     }
 
     _createGraphics() {
-        // Array name label (inline with array)
+        // IMPORTANT: keep all child x >= 0 so we never clip off the left edge
+
+        // Array name label
         this.nameLabel = createText(this.name, {
-            fontSize: 15,
+            fontSize: 16,
             fill: COLORS.variable,
             fontWeight: 'bold'
         });
-        this.nameLabel.y = (this.elementSize - 15) / 2;
+        this.nameLabel.anchor.set(0, 0.5);
+        this.nameLabel.x = 0;
+        this.nameLabel.y = this.elementHeight / 2;
         this.container.addChild(this.nameLabel);
 
         // Equals sign
@@ -199,76 +204,57 @@ export class ArrayVisual extends VisualObject {
             fontSize: 14,
             fill: COLORS.textMuted
         });
-        this.equalsSign.x = this.nameLabel.width + 6;
-        this.equalsSign.y = (this.elementSize - 14) / 2;
+        this.equalsSign.anchor.set(0, 0.5);
+        this.equalsSign.x = this.nameLabel.width + 8;
+        this.equalsSign.y = this.elementHeight / 2;
         this.container.addChild(this.equalsSign);
 
-        // Opening bracket - position after "name ="
-        const bracketStartX = this.equalsSign.x + 18;
-        
-        this.openBracket = createText('[', {
-            fontSize: 20,
-            fill: COLORS.textMuted
-        });
-        this.openBracket.x = bracketStartX;
-        this.openBracket.y = (this.elementSize - 20) / 2;
-        this.container.addChild(this.openBracket);
-
-        // Create element boxes (starting after bracket)
-        this.elementsStartX = bracketStartX + 14;
+        // Create element boxes after "name ="
+        this.elementsStartX = this.equalsSign.x + this.equalsSign.width + 10;
         this._createElements();
-
-        // Closing bracket
-        this.closeBracket = createText(']', {
-            fontSize: 20,
-            fill: COLORS.textMuted
-        });
-        this.closeBracket.x = this.elementsStartX + this.values.length * (this.elementSize + this.gap);
-        this.closeBracket.y = (this.elementSize - 20) / 2;
-        this.container.addChild(this.closeBracket);
     }
 
     _createElements() {
         this.values.forEach((value, index) => {
             const x = this.elementsStartX + index * (this.elementSize + this.gap);
             
-            // Element box
+            // Element box - clean rectangular cells
             const box = new PIXI.Graphics();
-            box.roundRect(0, 0, this.elementSize, this.elementSize, 6);
-            box.fill(COLORS.bgLight);
-            box.stroke({ width: 2, color: COLORS.border });
+            box.roundRect(0, 0, this.elementSize, this.elementHeight, 2);
+            box.fill(0x1e293b);  // Dark slate background
+            box.stroke({ width: 2, color: 0x475569 });  // Gray border
             box.x = x;
             box.y = 0;
             this.container.addChild(box);
             this.elementBoxes.push(box);
 
-            // Value text
+            // Value text (centered in cell)
             const valueText = createText(value, {
-                fontSize: 18,
+                fontSize: 16,
                 fill: COLORS.text,
                 fontWeight: 'bold'
             });
             valueText.anchor.set(0.5);
             valueText.x = x + this.elementSize / 2;
-            valueText.y = this.elementSize / 2;
+            valueText.y = this.elementHeight / 2;
             this.container.addChild(valueText);
             this.valueTexts.push(valueText);
 
-            // Index label (hidden initially)
-            const indexLabel = createText(`[${index}]`, {
-                fontSize: 10,
+            // Index label below (always visible)
+            const indexLabel = createText(index, {
+                fontSize: 11,
                 fill: COLORS.textMuted
             });
             indexLabel.anchor.set(0.5, 0);
             indexLabel.x = x + this.elementSize / 2;
-            indexLabel.y = this.elementSize + 2;
-            indexLabel.alpha = 0;
+            indexLabel.y = this.elementHeight + 4;
             this.container.addChild(indexLabel);
             this.indexLabels.push(indexLabel);
         });
     }
 
     animateShowIndices(timeline, startTime) {
+        // Indices are always visible now, but can still animate them
         this.indexLabels.forEach((label, i) => {
             timeline.to(label, {
                 alpha: 1,
@@ -284,31 +270,38 @@ export class ArrayVisual extends VisualObject {
         const box = this.elementBoxes[index];
         const indexLabel = this.indexLabels[index];
         
-        timeline.to(box, {
-            pixi: { tint: COLORS.accent, scale: 1.1 },
-            duration: 0.3,
+        // Create highlight border around the element
+        const highlight = new PIXI.Graphics();
+        highlight.roundRect(-3, -3, this.elementSize + 6, this.elementHeight + 6, 3);
+        highlight.stroke({ width: 3, color: COLORS.accent });
+        highlight.x = box.x;
+        highlight.y = box.y;
+        highlight.alpha = 0;
+        this.container.addChild(highlight);
+        
+        // Animate highlight appearing
+        timeline.to(highlight, {
+            alpha: 1,
+            duration: 0.2,
             ease: 'power2.out'
         }, startTime);
+        
+        // Scale the highlight slightly
+        timeline.from(highlight.scale, {
+            x: 1.15,
+            y: 1.15,
+            duration: 0.25,
+            ease: 'back.out(1.7)'
+        }, startTime);
 
+        // Highlight the index label
         timeline.to(indexLabel, {
             pixi: { tint: COLORS.accent },
             duration: 0.2
         }, startTime);
 
-        const glow = new PIXI.Graphics();
-        glow.roundRect(-4, -4, this.elementSize + 8, this.elementSize + 8, 10);
-        glow.fill({ color: COLORS.accent, alpha: 0 });
-        glow.x = box.x;
-        glow.y = box.y;
-        this.container.addChildAt(glow, 0);
-
-        timeline.to(glow, {
-            alpha: 0.3,
-            duration: 0.3,
-            ease: 'power2.out'
-        }, startTime);
-
         this.highlightedIndex = index;
+        this._currentHighlight = highlight;
     }
 
     getElementPosition(index) {
@@ -317,19 +310,22 @@ export class ArrayVisual extends VisualObject {
         const box = this.elementBoxes[index];
         return {
             x: this.container.x + box.x + this.elementSize / 2,
-            y: this.container.y + this.elementSize / 2
+            y: this.container.y + this.elementHeight / 2
         };
     }
 
     getVisualWidth() {
-        // Total width from name to closing bracket
-        const elementsEnd = this.elementsStartX + this.values.length * (this.elementSize + this.gap);
-        return elementsEnd + 14; // closing bracket width
+        // Total width from start (0) to the right edge of the last cell
+        if (!this.values?.length) {
+            return this.elementsStartX;
+        }
+        const elementsEnd = this.elementsStartX + this.values.length * (this.elementSize + this.gap) - this.gap;
+        return elementsEnd;
     }
 
     getVisualHeight() {
         // Element row height + index labels spacing
-        return this.elementSize + 20;
+        return this.elementHeight + 20;
     }
 
     updateValues(newValues) {
