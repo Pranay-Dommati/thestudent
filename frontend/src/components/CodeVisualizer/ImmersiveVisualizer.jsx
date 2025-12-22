@@ -16,7 +16,7 @@ const ImmersiveVisualizer = ({
     const [isStreaming, setIsStreaming] = useState(false); // Track if we're receiving streamed data
 
     // Visualization mode: 'timeline' (legacy) or 'enterprise' (PixiJS + GSAP)
-    const [visualizationMode, setVisualizationMode] = useState('enterprise');
+    const [visualizationMode, setVisualizationMode] = useState('timeline');
 
     // Cinematic step reveal: queue incoming steps and animate one-by-one
     const [pendingSteps, setPendingSteps] = useState([]);
@@ -338,10 +338,10 @@ const ImmersiveVisualizer = ({
                     <div className="relative flex items-center bg-slate-800/80 rounded-full p-1 border border-slate-700/50">
                         {/* Sliding Background Indicator */}
                         <div 
-                            className={`absolute h-[calc(100%-8px)] w-[calc(50%-4px)] bg-gradient-to-r rounded-full transition-all duration-300 ease-out shadow-lg ${
+                            className={`absolute h-[calc(100%-8px)] w-[calc(50%-4px)] bg-gradient-to-r from-teal-500 to-cyan-500 rounded-full transition-all duration-300 ease-out shadow-lg ${
                                 visualizationMode === 'timeline'
-                                    ? 'left-1 from-slate-600 to-slate-500'
-                                    : 'left-[calc(50%+2px)] from-teal-500 to-cyan-500'
+                                    ? 'left-1'
+                                    : 'left-[calc(50%+2px)]'
                             }`}
                         />
                         
