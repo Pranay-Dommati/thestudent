@@ -96,6 +96,7 @@ class PythonTracer:
         return result
     
     def _detect_changed_vars(self, current_locals: Dict[str, Any]) -> List[str]:
+        """Detect which variables changed since the last step (used internally)."""
         changed = []
         serialized_current = self._serialize_locals(current_locals)
         for name, data in serialized_current.items():
@@ -105,6 +106,54 @@ class PythonTracer:
                 changed.append(name)
         self.previous_locals = copy.deepcopy(serialized_current)
         return changed
+    
+    def _predict_changed_vars(self, code_line: str, current_locals: Dict[str, Any]) -> List[str]:
+        """Predict which variables THIS line will modify based on code analysis."""
+        code = code_line.strip()
+        predicted = []
+        
+        # For loop: `for x in iterable:` - x is the loop variable being set
+        for_match = re.match(r'for\s+(\w+)\s+in\s+', code)
+        if for_match:
+            loop_var = for_match.group(1)
+            predicted.append(loop_var)
+            return predicted
+        
+        # Augmented assignment: `x += y`, `x -= y`, etc.
+        aug_match = re.match(r'^(\w+)\s*[+\-*/|&^%@]+=', code)
+        if aug_match:
+            predicted.append(aug_match.group(1))
+            return predicted
+        
+        # Simple assignment: `x = ...` (not ==, !=, <=, >=)
+        # Handle multiple targets: `a = b = c = value`
+        if '=' in code and '==' not in code and '!=' not in code and '<=' not in code and '>=' not in code:
+            # Split on '=' but be careful with walrus operator ':='
+            parts = code.split('=')
+            if len(parts) >= 2:
+                # All parts except the last one are targets
+                for i in range(len(parts) - 1):
+                    target = parts[i].strip()
+                    # Handle tuple unpacking: `a, b = ...`
+                    if ',' in target:
+                        for var in target.split(','):
+                            var = var.strip().lstrip('(').rstrip(')')
+                            if var.isidentifier():
+                                predicted.append(var)
+                    # Handle subscript assignment: `arr[i] = ...` - the array is modified
+                    elif '[' in target:
+                        base_var = target.split('[')[0].strip()
+                        if base_var.isidentifier():
+                            predicted.append(base_var)
+                    # Simple variable
+                    elif target.isidentifier():
+                        predicted.append(target)
+        
+        # Return statement doesn't change variables (but we could mark the return value)
+        # If/elif/while conditions don't change variables
+        # Function definitions don't change variables at this line
+        
+        return predicted
     
     def _get_code_line(self, line_no: int) -> str:
         if 0 < line_no <= len(self.source_lines):
@@ -270,15 +319,21 @@ class PythonTracer:
             self.step_count += 1
             current_locals = dict(frame.f_locals)
             serialized_locals = self._serialize_locals(current_locals)
-            changed_vars = self._detect_changed_vars(current_locals)
+            code_line = self._get_code_line(line_no)
+            
+            # Predict what THIS line will change (based on code analysis)
+            predicted_changes = self._predict_changed_vars(code_line, current_locals)
+            
+            # Also track actual changes for internal state (needed for next comparison)
+            self._detect_changed_vars(current_locals)
             
             trace_frame = TraceFrame(
                 step=self.step_count,
                 line=line_no,
-                code=self._get_code_line(line_no),
+                code=code_line,
                 event=event,
                 locals=serialized_locals,
-                changed_vars=changed_vars,
+                changed_vars=predicted_changes,
                 function_name=func_name if func_name != '<module>' else None
             )
             trace_frame.explanation = self._generate_explanation(trace_frame)

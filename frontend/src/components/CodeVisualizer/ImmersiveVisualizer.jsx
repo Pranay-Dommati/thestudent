@@ -581,7 +581,7 @@ const ImmersiveVisualizer = ({
                                                     </div>
                                                 )}
 
-                                                {/* Variables State */}
+                                                {/* Variables State - only show if there are actual variables */}
                                                 {step.variables && Object.keys(step.variables).length > 0 && (
                                                     <div className="px-5 py-4">
                                                         <div className="flex items-center gap-2 mb-3">
@@ -591,13 +591,15 @@ const ImmersiveVisualizer = ({
                                                                 <line x1="9" y1="21" x2="9" y2="9" />
                                                             </svg>
                                                             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Variables</span>
-                                                            {step.changedVars?.length > 0 && (
+                                                            {/* Only count changed vars that actually exist */}
+                                                            {step.changedVars?.filter(name => step.variables?.[name]).length > 0 && (
                                                                 <span className="text-xs bg-teal-500/20 text-teal-400 px-2 py-0.5 rounded-full">
-                                                                    {step.changedVars.length} changed
+                                                                    {step.changedVars.filter(name => step.variables?.[name]).length} changed
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <div className="flex flex-wrap gap-2">
+                                                            {/* Show existing variables only */}
                                                             {Object.entries(step.variables).map(([name, data]) => {
                                                                 const isChanged = step.changedVars?.includes(name);
                                                                 const valueStr = typeof data.value === 'object'
