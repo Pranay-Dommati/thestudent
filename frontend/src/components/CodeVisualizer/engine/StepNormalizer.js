@@ -139,6 +139,11 @@ function detectStepType(step, loopCounters, variableHistory, knownArrays) {
         const loopKey = `${step.line}:${loopVar}`;
         const iteration = (loopCounters.get(loopKey) || 0) + 1;
         loopCounters.set(loopKey, iteration);
+
+        const iterableLength = Array.isArray(iterableValue) ? iterableValue.length : 0;
+        // Python traces execute the `for ... in ...:` line one extra time to detect StopIteration.
+        // We mark that final check as a loop-end step so visuals can cleanly exit.
+        const isLoopEnd = Array.isArray(iterableValue) && iteration > iterableLength;
         
         // ALWAYS derive currentValue from iteration count and iterable
         // Don't trust variables[loopVar] because it might have stale value from previous iteration
@@ -153,6 +158,11 @@ function detectStepType(step, loopCounters, variableHistory, knownArrays) {
         // Fallback to variables only if we couldn't derive from iterable
         if (currentValue === undefined) {
             currentValue = variables[loopVar];
+        }
+
+        // On loop-end steps we intentionally do not provide a "new" value.
+        if (isLoopEnd) {
+            currentValue = undefined;
         }
         
         console.log('🔄 For loop detected:', { 
@@ -171,7 +181,8 @@ function detectStepType(step, loopCounters, variableHistory, knownArrays) {
                 iteration,
                 arrayIndex: iteration - 1,
                 isFirstIteration: iteration === 1,
-                isLastIteration: Array.isArray(iterableValue) && iteration >= iterableValue.length
+                isLastIteration: Array.isArray(iterableValue) && iteration >= iterableValue.length,
+                isLoopEnd
             }
         };
     }

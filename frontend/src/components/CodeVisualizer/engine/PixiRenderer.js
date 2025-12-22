@@ -33,7 +33,7 @@ import {
     PointerArrow
 } from './VisualObjects';
 import { ASSIGN_FROM_ARRAY_INDEX, FOR_LOOP_ITERATION, playBehavior } from './BehaviorLibrary';
-import { choreographForLoopIteration } from './Choreography';
+import { choreographForLoopIteration, choreographForLoopEnd } from './Choreography';
 
 // Register GSAP PixiJS plugin
 gsap.registerPlugin(PixiPlugin);
@@ -1543,6 +1543,26 @@ export class PixiRenderer {
     }
 
     /**
+     * Remove a variable visual from the STATE zone.
+     * Used for ephemeral loop variables (e.g., `n` in `for n in nums`).
+     */
+    removeStateVariable(varName) {
+        const variable = this.objects.variables.get(varName);
+        if (!variable) return;
+
+        // Fade out then destroy
+        gsap.to(variable.container, {
+            alpha: 0,
+            duration: 0.25,
+            ease: 'power2.in',
+            onComplete: () => {
+                variable.destroy?.();
+                this.objects.variables.delete(varName);
+            }
+        });
+    }
+
+    /**
      * Play a cinematic FOR loop iteration
      * Uses modular choreography from Choreography.js
      */
@@ -1558,6 +1578,26 @@ export class PixiRenderer {
             currentValue,
             iteration
         }, this, onComplete);
+    }
+
+    /**
+     * Play a cinematic FOR loop end (StopIteration check)
+     * Slides loop variable pointer out of the array and cleans up.
+     */
+    playForLoopEnd({ loopVar, arrayName, arrayValues, previousIndex }, onComplete) {
+        // Hide the persistent iteration indicator as the loop is terminating
+        this.hideIterationIndicator();
+
+        return choreographForLoopEnd({
+            loopVar,
+            arrayName,
+            arrayValues,
+            previousIndex
+        }, this, () => {
+            // Remove loop variable from state after the exit animation
+            this.removeStateVariable(loopVar);
+            onComplete?.();
+        });
     }
 
     /**

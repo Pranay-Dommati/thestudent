@@ -71,6 +71,19 @@ export function choreographForLoopIteration({
     const varHomeX = zones.state.x + 10;
     const varHomeY = zones.state.y + 10 + (varIndex * 50);
 
+    // Ensure the loop variable exists as a persistent actor
+    // (so each iteration animates the SAME `n` coming from the STATE zone)
+    const loopVarVisual = existingVar ?? (() => {
+        const v = new VariableVisual(layers.variables, loopVar, '?');
+        v.setHomePosition(varHomeX, varHomeY);
+        v.container.x = varHomeX;
+        v.container.y = varHomeY;
+        v.show();
+        renderer.variableCount++;
+        objects.variables.set(loopVar, v);
+        return v;
+    })();
+
     // Cell position (relative to array)
     const cellPos = arrayVisual.getCellPosition(currentIndex);
 
@@ -78,61 +91,70 @@ export function choreographForLoopIteration({
         onComplete: () => onComplete?.()
     });
 
+    // Cinematic timing tuned to match ASSIGN_FROM_ARRAY_INDEX feel
+    const T = {
+        arrayToCenter: 0.6,
+        varToCell: 0.75,
+        bubblePop: 0.25,
+        bubbleFly: 0.75,
+        settleHold: 0.35,
+        returnHome: 0.7,
+        fadeBubble: 0.15
+    };
+
     // ========================================
     // PHASE 1: GATHER - Move array to center
     // ========================================
     tl.to(arrayVisual.container, {
         x: centerX - arrayVisual.getVisualWidth() / 2,
         y: centerY - 20,
-        duration: 0.4,
+        duration: T.arrayToCenter,
         ease: 'power2.inOut'
     }, 0);
 
     // ========================================
-    // PHASE 2: INTERACT - Show pointer and extract value
+    // PHASE 2: INTERACT - Bring the SAME loop variable to the array and update it
     // ========================================
-
-    // Create temporary pointer label
-    const pointerContainer = new PIXI.Container();
-    pointerContainer.alpha = 0;
-    layers.effects.addChild(pointerContainer);
-
-    const pointerText = new PIXI.Text({
-        text: loopVar,
-        style: { fontFamily: 'Inter, sans-serif', fontSize: 24, fill: COLORS.warning, fontWeight: '700' }
-    });
-    pointerText.anchor.set(0.5, 1);
-    pointerContainer.addChild(pointerText);
 
     // Calculate the CENTER position where the array will be after moving
     const arrayCenterX = centerX - arrayVisual.getVisualWidth() / 2;
     const arrayCenterY = centerY - 20;
 
-    // Calculate pointer position relative to where array WILL BE (at center)
-    const pointerTargetX = arrayCenterX + cellPos.x + cellPos.width / 2;
-    const pointerTargetY = arrayCenterY + cellPos.y - 10;
+    // Target position: center the variable box above the current cell
+    const cellCenterX = arrayCenterX + cellPos.x + cellPos.width / 2;
+    const cellTopY = arrayCenterY + cellPos.y;
+    const loopVarTargetX = cellCenterX - loopVarVisual.getVisualWidth() / 2;
+    const loopVarTargetY = cellTopY - 52;
 
-    // Position pointer ABOVE (starts off-screen, will drop in)
-    pointerContainer.x = pointerTargetX;
-    pointerContainer.y = pointerTargetY - 50;
-
-    // Pointer drops in AFTER array has moved to center
-    tl.to(pointerContainer, {
-        alpha: 1,
-        y: pointerTargetY,
-        duration: 0.35,
-        ease: 'back.out(1.5)'
-    }, 0.45);
+    // Bring the loop variable from the STATE zone to above the cell
+    // Move `n` after the array is mostly centered (more readable, less rushed)
+    const varMoveStart = 0.35;
+    tl.to(loopVarVisual.container, {
+        x: loopVarTargetX,
+        y: loopVarTargetY,
+        duration: T.varToCell,
+        ease: 'power2.inOut'
+    }, varMoveStart);
+    tl.to(loopVarVisual.container.scale, {
+        x: 0.95,
+        y: 0.95,
+        duration: T.varToCell,
+        ease: 'power2.out'
+    }, varMoveStart);
 
     // Highlight the cell
     tl.call(() => {
         arrayVisual.highlightCell(currentIndex, COLORS.primary);
     }, null, 0.5);
 
-    // Create extracted value box
+    // Create extracted value bubble in EFFECTS layer
     const extractedValue = new PIXI.Container();
+    extractedValue.alpha = 0;
+    extractedValue.scale.set(0.6);
+    layers.effects.addChild(extractedValue);
+
     const extractBg = new PIXI.Graphics();
-    extractBg.roundRect(0, 0, 40, 36, 4);
+    extractBg.roundRect(0, 0, 40, 36, 6);
     extractBg.fill({ color: COLORS.primary, alpha: 0.95 });
     extractedValue.addChild(extractBg);
 
@@ -145,88 +167,275 @@ export function choreographForLoopIteration({
     extractText.y = 18;
     extractedValue.addChild(extractText);
 
-    // Position extracted value at the CENTERED array position
+    // Place bubble at the selected cell
     extractedValue.x = arrayCenterX + cellPos.x + cellPos.width / 2 - 20;
     extractedValue.y = arrayCenterY + cellPos.y + cellPos.height / 2 - 18;
-    extractedValue.alpha = 0;
-    extractedValue.scale.set(0.5);
-    layers.effects.addChild(extractedValue);
 
-    // Value pops out
-    tl.to(extractedValue, { alpha: 1, duration: 0.2, ease: 'power2.out' }, 0.75);
-    tl.to(extractedValue.scale, { x: 1.1, y: 1.1, duration: 0.25, ease: 'back.out(2)' }, 0.75);
+    // Compute target at the variable's value box center
+    const getValueBoxCenter = () => ({
+        x: loopVarVisual.container.x + loopVarVisual.valueBox.x + loopVarVisual.boxWidth / 2,
+        y: loopVarVisual.container.y + loopVarVisual.valueBox.y + loopVarVisual.boxHeight / 2
+    });
 
-    // Value moves up to meet pointer
+    // Bubble pops out
+    const bubblePopStart = 1.25;
+    tl.to(extractedValue, { alpha: 1, duration: T.bubblePop, ease: 'power2.out' }, bubblePopStart);
+    tl.to(extractedValue.scale, { x: 1.05, y: 1.05, duration: T.bubblePop, ease: 'back.out(2)' }, bubblePopStart);
+
+    // Fly into the variable's value box
     tl.to(extractedValue, {
-        y: pointerTargetY - 25,
-        duration: 0.35,
+        x: () => getValueBoxCenter().x - 20,
+        y: () => getValueBoxCenter().y - 18,
+        duration: T.bubbleFly,
         ease: 'power3.inOut'
-    }, 1.0);
-    tl.to(extractedValue.scale, { x: 0.85, y: 0.85, duration: 0.3 }, 1.1);
+    }, bubblePopStart + 0.35);
 
-    // Pointer pulses
-    tl.to(pointerContainer.scale, { x: 1.15, y: 1.15, duration: 0.12 }, 1.2);
-    tl.to(pointerContainer.scale, { x: 1, y: 1, duration: 0.15, ease: 'back.out(2)' }, 1.32);
-
-
-    // Combine into "n = value"
+    // Update the variable value when the bubble arrives
     tl.call(() => {
-        pointerText.text = `${loopVar} = ${currentValue}`;
-        extractedValue.visible = false;
-    }, null, 1.4);
+        loopVarVisual.setValue(currentValue, true);
+        // fade bubble out smoothly once it lands
+        extractedValue.alpha = 0;
+    }, null, bubblePopStart + 0.35 + T.bubbleFly);
 
     // Brief hold
-    tl.to({}, { duration: 0.3 }, 1.5);
+    tl.to({}, { duration: T.settleHold }, bubblePopStart + 0.35 + T.bubbleFly + 0.05);
 
     // ========================================
-    // PHASE 3: RETURN - Move array back home
+    // PHASE 3: RETURN - Move array and variable back home
     // ========================================
     tl.call(() => {
         arrayVisual.clearHighlight();
-    }, null, 1.8);
+    }, null, 2.95);
 
     tl.to(arrayVisual.container, {
         x: arrayHome.x,
         y: arrayHome.y,
-        duration: 0.4,
+        duration: T.returnHome,
         ease: 'power2.inOut'
-    }, 1.9);
+    }, 3.05);
 
-    // Slide pointer/result to STATE zone
-    tl.to(pointerContainer, {
-        x: varHomeX + 50,
-        y: varHomeY + 15,
-        duration: 0.5,
+    // Variable returns home after the interaction
+    tl.to(loopVarVisual.container, {
+        x: varHomeX,
+        y: varHomeY,
+        duration: T.returnHome,
         ease: 'power2.inOut'
-    }, 1.9);
+    }, 3.05);
+    tl.to(loopVarVisual.container.scale, {
+        x: 1,
+        y: 1,
+        duration: T.returnHome,
+        ease: 'power2.out'
+    }, 3.05);
 
-    // ========================================
-    // PHASE 4: HANDOFF - Create/update VariableVisual
-    // ========================================
+    // Cleanup bubble
     tl.call(() => {
-        // Cleanup temporary graphics
-        layers.effects.removeChild(pointerContainer);
         layers.effects.removeChild(extractedValue);
-        pointerContainer.destroy({ children: true });
         extractedValue.destroy({ children: true });
+    }, null, 3.9);
 
-        // Create or update the real VariableVisual
-        if (existingVar) {
-            existingVar.setValue(currentValue, true);
-            existingVar.container.x = varHomeX;
-            existingVar.container.y = varHomeY;
-            existingVar.show();
-        } else {
-            // Use imported VariableVisual
-            const varVisual = new VariableVisual(layers.variables, loopVar, currentValue);
-            varVisual.setHomePosition(varHomeX, varHomeY);
-            varVisual.container.x = varHomeX;
-            varVisual.container.y = varHomeY;
-            varVisual.show();
-            renderer.variableCount++;
-            objects.variables.set(loopVar, varVisual);
-        }
-    }, null, 2.4);
+    return tl;
+}
+
+/**
+ * FOR Loop End Choreography
+ * 
+ * Animates the final (StopIteration) execution of: for n in nums
+ * - Shows the loop variable pointer at the last element
+ * - Slides it out past the array and fades
+ * - Returns array home
+ */
+export function choreographForLoopEnd({
+    loopVar,
+    arrayName,
+    arrayValues,
+    previousIndex
+}, renderer, onComplete) {
+    const { layers, zones, objects } = renderer;
+
+    const arrayVisual = objects.arrays.get(arrayName);
+    if (!arrayVisual) {
+        console.warn(`Choreography: Array ${arrayName} not found`);
+        onComplete?.();
+        return null;
+    }
+
+    const arrayHome = { x: arrayVisual.homeX, y: arrayVisual.homeY };
+    const centerX = zones.interaction.centerX;
+    const centerY = zones.interaction.centerY;
+
+    const arrayLen = Array.isArray(arrayValues) ? arrayValues.length : 0;
+    const lastIndex = Math.max(0, arrayLen - 1);
+    const safeIndex = previousIndex !== null && previousIndex !== undefined
+        ? Math.max(0, Math.min(previousIndex, lastIndex))
+        : lastIndex;
+
+    const cellPos = arrayVisual.getCellPosition(safeIndex);
+
+    const tl = gsap.timeline({
+        onComplete: () => onComplete?.()
+    });
+
+    // Cinematic timing tuned to match ASSIGN_FROM_ARRAY_INDEX feel
+    const T = {
+        arrayToCenter: 0.6,
+        varToCell: 0.75,
+        holdAtCell: 0.35,
+        varExit: 0.9,
+        blastExpand: 0.7,
+        blastFade: 0.45,
+        returnHome: 0.7
+    };
+
+    // Move array to center (smooth)
+    tl.to(arrayVisual.container, {
+        x: centerX - arrayVisual.getVisualWidth() / 2,
+        y: centerY - 20,
+        duration: T.arrayToCenter,
+        ease: 'power2.inOut'
+    }, 0);
+
+    // Ensure no stale highlight
+    tl.call(() => {
+        arrayVisual.clearHighlight?.();
+    }, null, 0.05);
+
+    // Use the SAME loop variable visual from the STATE zone
+    const existingVar = objects.variables.get(loopVar);
+    const loopVarVisual = existingVar ?? (() => {
+        const v = new VariableVisual(layers.variables, loopVar, '?');
+        // If we don't know home, keep wherever it currently is (will be removed after end)
+        v.show();
+        objects.variables.set(loopVar, v);
+        return v;
+    })();
+
+    const arrayCenterX = centerX - arrayVisual.getVisualWidth() / 2;
+    const arrayCenterY = centerY - 20;
+
+    const cellCenterX = arrayCenterX + cellPos.x + cellPos.width / 2;
+    const cellTopY = arrayCenterY + cellPos.y;
+    const loopVarTargetX = cellCenterX - loopVarVisual.getVisualWidth() / 2;
+    const loopVarTargetY = cellTopY - 52;
+
+    // Pre-create blast graphics NOW so GSAP can tween real objects
+    const exitX = (cellCenterX + cellPos.width / 2) + 90;
+    const BLAST_Y = loopVarTargetY + 12;
+
+    const blast = new PIXI.Container();
+    blast.x = exitX;
+    blast.y = BLAST_Y;
+    blast.alpha = 0;
+    layers.effects.addChild(blast);
+
+    const ring = new PIXI.Graphics();
+    ring.circle(0, 0, 10);
+    ring.stroke({ width: 3, color: COLORS.primary, alpha: 0.9 });
+    blast.addChild(ring);
+
+    const particles = [];
+    const offsets = [
+        { x: -6, y: -2 },
+        { x: 3, y: -6 },
+        { x: 7, y: 4 },
+        { x: -2, y: 7 }
+    ];
+    offsets.forEach((o) => {
+        const p = new PIXI.Graphics();
+        p.circle(0, 0, 2.2);
+        p.fill({ color: COLORS.warning, alpha: 0.9 });
+        p.x = o.x;
+        p.y = o.y;
+        p.alpha = 0; // will fade in with blast
+        blast.addChild(p);
+        particles.push(p);
+    });
+
+    // Bring the loop variable to the last cell (readable)
+    tl.to(loopVarVisual.container, {
+        x: loopVarTargetX,
+        y: loopVarTargetY,
+        duration: T.varToCell,
+        ease: 'power2.inOut'
+    }, 0.45);
+    tl.to(loopVarVisual.container.scale, {
+        x: 0.95,
+        y: 0.95,
+        duration: T.varToCell,
+        ease: 'power2.out'
+    }, 0.45);
+
+    // Brief hold so it's clear we're at the last element
+    tl.to({}, { duration: T.holdAtCell }, 1.25);
+
+    // Bring blast above other effects right before it plays
+    tl.call(() => {
+        // re-add moves it to top of z-order
+        layers.effects.addChild(blast);
+    }, null, 1.03);
+
+    // Variable exits smoothly (out-of-bounds) then vanishes
+    const exitStart = 1.75;
+    tl.to(loopVarVisual.container, {
+        x: exitX,
+        duration: T.varExit,
+        ease: 'power3.inOut'
+    }, exitStart);
+    tl.to(loopVarVisual.container.scale, {
+        x: 0.9,
+        y: 0.9,
+        duration: T.varExit,
+        ease: 'power2.in'
+    }, exitStart);
+    tl.to(loopVarVisual.container, {
+        alpha: 0,
+        duration: 0.45,
+        ease: 'power2.in'
+    }, exitStart + 0.35);
+
+    // Blast: quick pop + fade
+    // Blast: pop + expand + fade (slower cinematic)
+    const blastStart = exitStart + 0.55;
+    tl.to(blast, { alpha: 1, duration: 0.12, ease: 'power2.out' }, blastStart);
+    tl.to(blast.scale, { x: 1.9, y: 1.9, duration: T.blastExpand, ease: 'power2.out' }, blastStart);
+    tl.to(blast, { alpha: 0, duration: T.blastFade, ease: 'power2.in' }, blastStart + 0.25);
+
+    // Particles appear then drift outward
+    tl.to(particles, { alpha: 1, duration: 0.12, ease: 'power2.out' }, blastStart);
+
+    // Particles drift slightly outward
+    particles.forEach((p, i) => {
+        const dir = i % 2 === 0 ? 1 : -1;
+        tl.to(p, {
+            x: p.x + dir * (8 + i * 2),
+            y: p.y + (i - 1.5) * 3,
+            alpha: 0,
+            duration: 0.55,
+            ease: 'power2.out'
+        }, blastStart + 0.1);
+    });
+
+    // Return array home AFTER the blast finishes (no overlap)
+    const returnStart = blastStart + 0.75;
+    tl.to(arrayVisual.container, {
+        x: arrayHome.x,
+        y: arrayHome.y,
+        duration: T.returnHome,
+        ease: 'power2.inOut'
+    }, returnStart);
+
+    // Hard guarantee: snap to home at the end (prevents any stuck-in-center edge cases)
+    tl.call(() => {
+        arrayVisual.container.x = arrayHome.x;
+        arrayVisual.container.y = arrayHome.y;
+        arrayVisual.clearHighlight?.();
+    }, null, returnStart + T.returnHome + 0.1);
+
+    // Cleanup
+    tl.call(() => {
+        layers.effects.removeChild(blast);
+        blast.destroy({ children: true });
+    }, null, returnStart + T.returnHome + 0.2);
 
     return tl;
 }

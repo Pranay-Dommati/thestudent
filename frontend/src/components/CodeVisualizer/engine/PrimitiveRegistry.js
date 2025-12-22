@@ -189,7 +189,7 @@ export class ArrayAccessPrimitive extends BasePrimitive {
  */
 export class ForLoopPrimitive extends BasePrimitive {
     static getDuration() {
-        return 4.0; // Longer for cinematic animation
+        return 4.8; // Longer for cinematic animation (actual duration comes from choreography)
     }
 
     static animate(step, renderer, timeline, onComplete) {
@@ -200,7 +200,8 @@ export class ForLoopPrimitive extends BasePrimitive {
             currentValue,
             iteration,
             arrayIndex,
-            iterableValue
+            iterableValue,
+            isLoopEnd
         } = step.meta;
 
         const lineNumber = step.line;
@@ -222,35 +223,48 @@ export class ForLoopPrimitive extends BasePrimitive {
             renderer.highlightLine(lineNumber);
         }, null, 0);
 
-        // 2. Play the cinematic FOR loop iteration animation
-        tl.call(() => {
-            // Get previous index for this loopVar if available
-            // We store it on the renderer instance for easy access across steps
-            const prevIndexKey = `perf_last_idx_${loopVar}`;
-            const previousIndex = renderer[prevIndexKey] !== undefined ? renderer[prevIndexKey] : null;
+        // 2. Play the cinematic FOR loop animation and SEQUENCE based on its real duration
+        // This avoids hard-coded waits and lets us tune speed to match ASSIGN_FROM_ARRAY_INDEX.
+        const prevIndexKey = `perf_last_idx_${loopVar}`;
+        const previousIndex = renderer[prevIndexKey] !== undefined ? renderer[prevIndexKey] : null;
 
-            renderer.playForLoopIteration({
+        const choreoTl = isLoopEnd
+            ? renderer.playForLoopEnd({
+                loopVar,
+                arrayName: iterableName,
+                arrayValues: iterableValue,
+                previousIndex
+            }, () => {
+                delete renderer[prevIndexKey];
+                console.log('✅ Cinematic loop end complete');
+            })
+            : renderer.playForLoopIteration({
                 loopVar,
                 arrayName: iterableName,
                 arrayValues: iterableValue,
                 currentIndex: arrayIndex,
-                previousIndex: previousIndex,
+                previousIndex,
                 iteration,
                 currentValue
             }, () => {
-                // Store the current index as previous for next iteration
                 renderer[prevIndexKey] = arrayIndex;
                 console.log('✅ Cinematic loop step complete');
             });
-        }, null, 0.15);
 
-        // 3. Wait for cinematic animation
-        tl.to({}, { duration: 3.8 }, 0.2);
+        const startAt = 0.15;
+        if (choreoTl) {
+            tl.add(choreoTl, startAt);
+        }
 
-        // 4. Update state panel
-        tl.call(() => {
-            renderer.updateStatePanel(loopVar, currentValue);
-        }, null, 4.0);
+        const choreoDuration = choreoTl?.duration?.() ?? 4.0;
+        const afterChoreo = startAt + choreoDuration + 0.05;
+
+        // 3. Update state panel right after choreography (skip on loop-end cleanup step)
+        if (!isLoopEnd) {
+            tl.call(() => {
+                renderer.updateStatePanel(loopVar, currentValue);
+            }, null, afterChoreo);
+        }
 
         timeline.add(tl);
     }
