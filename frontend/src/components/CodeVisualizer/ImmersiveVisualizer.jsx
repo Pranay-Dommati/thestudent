@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Sparkles } from 'lucide-react';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
 
+const BATCH_SIZE = 6; // Number of steps to show/generate at a time
+
 const ImmersiveVisualizer = ({
     isOpen,
     onClose,
@@ -10,7 +12,10 @@ const ImmersiveVisualizer = ({
     codeLines,
     isLoading,
     loadingPhase,
-    isGenerating = false
+    isGenerating = false,
+    sourceLines = [],  // For generating more explanations
+    totalSteps = null,
+    generatedUpTo = null,
 }) => {
     const [visibleSteps, setVisibleSteps] = useState([]);
     const [currentStepIndex, setCurrentStepIndex] = useState(-1);
@@ -28,6 +33,11 @@ const ImmersiveVisualizer = ({
     const [sidebarWidth, setSidebarWidth] = useState(400);
     const [isResizing, setIsResizing] = useState(false);
 
+    // Progressive loading state
+    const [displayedStepsCount, setDisplayedStepsCount] = useState(BATCH_SIZE);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [allSteps, setAllSteps] = useState([]);  // Store all steps with explanations
+
     const scrollContainerRef = useRef(null);
     const latestStepRef = useRef(null);
     const prevStepsLengthRef = useRef(0);
@@ -41,11 +51,13 @@ const ImmersiveVisualizer = ({
             prevStepsLengthRef.current = 0;
             setPendingSteps([]);
             setIsStepAnimating(false);
+            setDisplayedStepsCount(BATCH_SIZE);
+            setAllSteps([]);
             // Wait for steps to stream in
         }
     }, [isOpen, isLoading]);
 
-    // Handle streaming steps - show them as they arrive
+    // Handle streaming steps - show them as they arrive (limited by displayedStepsCount)
     useEffect(() => {
         if (!isOpen || isLoading) return;
 
@@ -56,22 +68,36 @@ const ImmersiveVisualizer = ({
             const newSteps = steps.slice(prevStepsLengthRef.current);
 
             // If we received a very large batch in one go (likely non-streaming),
-            // avoid enqueueing thousands of state updates.
+            // only show first BATCH_SIZE and allow user to load more
             const isInitialLoad = prevStepsLengthRef.current === 0;
-            if (isInitialLoad && steps.length > 80) {
+            if (isInitialLoad && steps.length > BATCH_SIZE) {
+                // Only show first BATCH_SIZE steps
+                setVisibleSteps(steps.slice(0, displayedStepsCount));
+                setCurrentStepIndex(Math.min(displayedStepsCount - 1, steps.length - 1));
+                setIsStreaming(false);
+                setPendingSteps([]);
+                setAllSteps(steps);
+            } else if (isInitialLoad && steps.length > 80) {
                 setVisibleSteps(steps);
                 setCurrentStepIndex(steps.length - 1);
                 setIsStreaming(false);
                 setPendingSteps([]);
             } else {
-                // Treat as streaming: queue for progressive reveal.
+                // Treat as streaming: queue for progressive reveal (only within limit)
                 setIsStreaming(true);
-                setPendingSteps(prev => [...prev, ...newSteps]);
+                // Only queue steps that are within our display limit
+                const stepsToQueue = newSteps.filter((_, i) =>
+                    prevStepsLengthRef.current + i < displayedStepsCount
+                );
+                if (stepsToQueue.length > 0) {
+                    setPendingSteps(prev => [...prev, ...stepsToQueue]);
+                }
             }
 
             prevStepsLengthRef.current = steps.length;
+            setAllSteps(steps);
         }
-    }, [steps, isOpen, isLoading]);
+    }, [steps, isOpen, isLoading, displayedStepsCount]);
 
     // Reveal next pending step (streamed) without relying on card animations
     useEffect(() => {
@@ -93,25 +119,28 @@ const ImmersiveVisualizer = ({
         setTimeout(() => setIsStepAnimating(false), 0);
     }, [pendingSteps, isStepAnimating, isOpen, isLoading]);
 
-    // Stop streaming mode when all steps are received AND revealed
+    // Stop streaming mode when we've shown all available steps (up to limit)
     useEffect(() => {
-        // console.log(`[Immersive] State: streaming=${isStreaming}, gen=${isGenerating}, steps=${steps.length}, visible=${visibleSteps.length}, pending=${pendingSteps.length}`);
+        // console.log(`[Immersive] State: streaming=${isStreaming}, gen=${isGenerating}, steps=${steps.length}, visible=${visibleSteps.length}, pending=${pendingSteps.length}, limit=${displayedStepsCount}`);
 
-        // Only stop streaming if parent says generation is done AND we have shown all steps
-        if (isStreaming && steps.length > 0 && visibleSteps.length === steps.length && !isGenerating) {
-            console.log('[Immersive] Normal finish: all steps visible and generation done');
-            // All steps have been received and shown
+        // Stop streaming when:
+        // 1. We've shown all steps up to our display limit, OR
+        // 2. We've shown all steps if total is less than limit
+        const targetCount = Math.min(displayedStepsCount, steps.length);
+        const hasShownEnough = visibleSteps.length >= targetCount;
+
+        if (isStreaming && steps.length > 0 && hasShownEnough && !isGenerating && pendingSteps.length === 0) {
+            console.log('[Immersive] Batch complete: shown', visibleSteps.length, 'of', steps.length, '(limit:', displayedStepsCount, ')');
             setIsStreaming(false);
         }
 
-        // Safety: If parent says generation halted and we have no pending steps AND we've shown everything
-        // We add steps.length === visibleSteps.length to ensure we don't kill it while steps are waiting to be queued
-        if (isStreaming && !isGenerating && pendingSteps.length === 0 && visibleSteps.length === steps.length) {
-            console.log('[Immersive] Safety finish: parent stopped and all steps shown');
+        // Safety: If parent says generation halted and we have no pending steps
+        if (isStreaming && !isGenerating && pendingSteps.length === 0 && hasShownEnough) {
+            console.log('[Immersive] Safety finish: parent stopped and batch shown');
             const t = setTimeout(() => setIsStreaming(false), 200);
             return () => clearTimeout(t);
         }
-    }, [isStreaming, steps.length, visibleSteps.length, isGenerating, pendingSteps.length]);
+    }, [isStreaming, steps.length, visibleSteps.length, isGenerating, pendingSteps.length, displayedStepsCount]);
 
 
     // Auto-scroll to latest step only if user is near the bottom
@@ -180,6 +209,55 @@ const ImmersiveVisualizer = ({
             window.removeEventListener('mouseup', stopResizing);
         };
     }, [resize, stopResizing]);
+
+    // Load more explanations on-demand
+    const loadMoreExplanations = useCallback(async () => {
+        if (isLoadingMore) return;
+
+        const currentCount = displayedStepsCount;
+        const remainingSteps = steps.slice(currentCount, currentCount + BATCH_SIZE);
+
+        if (remainingSteps.length === 0) return;
+
+        setIsLoadingMore(true);
+
+        try {
+            const response = await fetch('/api/visualizer/generate-explanations/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    frames: remainingSteps,
+                    sourceLines: sourceLines || codeLines,
+                    startIndex: currentCount
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.explanations) {
+                // Update steps with new explanations
+                const updatedSteps = [...steps];
+                data.explanations.forEach(({ index, explanation }) => {
+                    if (updatedSteps[index]) {
+                        updatedSteps[index] = { ...updatedSteps[index], explanation };
+                    }
+                });
+
+                // Update allSteps to include new explanations
+                setAllSteps(updatedSteps);
+
+                // Show more steps - add newly explained steps to visible
+                const newVisibleCount = Math.min(currentCount + BATCH_SIZE, steps.length);
+                setVisibleSteps(updatedSteps.slice(0, newVisibleCount));
+                setDisplayedStepsCount(newVisibleCount);
+                setCurrentStepIndex(newVisibleCount - 1);
+            }
+        } catch (error) {
+            console.error('[ImmersiveVisualizer] Error loading more explanations:', error);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    }, [displayedStepsCount, steps, sourceLines, codeLines, isLoadingMore]);
 
     // Get syntax highlighted code line - returns React elements (Light Theme Optimized)
     const highlightSyntax = (codeLine) => {
@@ -545,7 +623,7 @@ const ImmersiveVisualizer = ({
                                                                 >
                                                                     <span className="font-semibold">{name}</span>
                                                                     <span className="text-slate-400">=</span>
-                                                                    <span>{valueStr.length > 20 ? valueStr.slice(0, 20) + '...' : valueStr}</span>
+                                                                    <span>{valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr}</span>
                                                                 </span>
                                                             );
                                                         })}
@@ -565,8 +643,39 @@ const ImmersiveVisualizer = ({
                                     );
                                 })}
 
-                                {/* End Marker */}
-                                {!isStreaming && !isGenerating && currentStepIndex >= steps.length - 1 && visibleSteps.length > 0 && steps.length > 0 && (
+                                {/* Load More Steps Button */}
+                                {!isStreaming && !isGenerating && visibleSteps.length < steps.length && (
+                                    <div className="relative pl-10 py-6">
+                                        {/* Timeline continuation dot */}
+                                        <div className="absolute left-0 w-6 h-6 rounded-full border-2 border-slate-300 bg-white flex items-center justify-center">
+                                            <span className="text-slate-400 text-sm">⋯</span>
+                                        </div>
+
+                                        <button
+                                            onClick={loadMoreExplanations}
+                                            disabled={isLoadingMore}
+                                            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-medium text-sm transition-all ${isLoadingMore
+                                                    ? 'bg-slate-100 text-slate-400'
+                                                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg'
+                                                }`}
+                                        >
+                                            {isLoadingMore ? (
+                                                <>
+                                                    <div className="w-4 h-4 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin" />
+                                                    Generating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Sparkles className="w-4 h-4" />
+                                                    Continue • {steps.length - visibleSteps.length} more steps
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* End Marker - Only show when ALL steps are displayed */}
+                                {!isStreaming && !isGenerating && visibleSteps.length >= steps.length && visibleSteps.length > 0 && steps.length > 0 && (
                                     <div className="relative pl-10 pt-2 animate-fade-in">
                                         {/* Green completion dot - aligned with timeline */}
                                         <div className="absolute left-0 w-6 h-6 rounded-full bg-emerald-500 border-2 border-emerald-400 shadow-lg shadow-emerald-500/30 flex items-center justify-center">

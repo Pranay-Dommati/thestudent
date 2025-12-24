@@ -223,11 +223,81 @@ def create_sandbox(input_values: Optional[List[str]] = None) -> Tuple[Dict[str, 
     from typing import Tuple as TypingTuple, Optional as TypingOptional
     from typing import Any as TypingAny, Union as TypingUnion
     
+    # Common LeetCode data structures
+    class ListNode:
+        """Singly linked list node for LeetCode problems."""
+        def __init__(self, val=0, next=None):
+            self.val = val
+            self.next = next
+        
+        def __repr__(self):
+            values = []
+            node = self
+            seen = set()
+            while node and id(node) not in seen:
+                seen.add(id(node))
+                values.append(str(node.val))
+                node = node.next
+            return f"ListNode([{' -> '.join(values)}])"
+    
+    class TreeNode:
+        """Binary tree node for LeetCode problems."""
+        def __init__(self, val=0, left=None, right=None):
+            self.val = val
+            self.left = left
+            self.right = right
+        
+        def __repr__(self):
+            return f"TreeNode({self.val})"
+    
+    class Node:
+        """Generic graph/N-ary tree node for LeetCode problems."""
+        def __init__(self, val=None, children=None, neighbors=None, next=None):
+            self.val = val
+            self.children = children or []
+            self.neighbors = neighbors or []
+            self.next = next
+        
+        def __repr__(self):
+            return f"Node({self.val})"
+    
+    # Helper functions to convert arrays to data structures
+    def _list_to_listnode(values):
+        """Convert a list of values to a ListNode chain."""
+        if not values:
+            return None
+        dummy = ListNode(0)
+        current = dummy
+        for val in values:
+            current.next = ListNode(val)
+            current = current.next
+        return dummy.next
+    
+    def _list_to_treenode(values):
+        """Convert a list of values to a TreeNode (level-order)."""
+        if not values or values[0] is None:
+            return None
+        root = TreeNode(values[0])
+        queue = [root]
+        i = 1
+        while queue and i < len(values):
+            node = queue.pop(0)
+            if i < len(values) and values[i] is not None:
+                node.left = TreeNode(values[i])
+                queue.append(node.left)
+            i += 1
+            if i < len(values) and values[i] is not None:
+                node.right = TreeNode(values[i])
+                queue.append(node.right)
+            i += 1
+        return root
+    
     sandbox_globals = {
         '__builtins__': safe_builtins,
         '__name__': '__main__',
         '__doc__': None,
         '_output_buffer_': output_buffer,
+        # Typing imports
         'List': TypingList,
         'Dict': TypingDict,
         'Set': TypingSet,
@@ -235,6 +305,13 @@ def create_sandbox(input_values: Optional[List[str]] = None) -> Tuple[Dict[str, 
         'Optional': TypingOptional,
         'Any': TypingAny,
         'Union': TypingUnion,
+        # LeetCode data structures
+        'ListNode': ListNode,
+        'TreeNode': TreeNode,
+        'Node': Node,
+        # Helper functions for input conversion
+        '_list_to_listnode': _list_to_listnode,
+        '_list_to_treenode': _list_to_treenode,
     }
     
     sandbox_locals = {}

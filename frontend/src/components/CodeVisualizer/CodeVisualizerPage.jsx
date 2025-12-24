@@ -440,6 +440,7 @@ function CodeVisualizerPage() {
                 steps={steps}
                 code={code}
                 codeLines={codeLines}
+                sourceLines={codeLines}
                 isLoading={isLoadingTrace}
                 loadingPhase={loadingPhase}
                 isGenerating={isRunning}

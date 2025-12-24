@@ -35,7 +35,7 @@ class PythonTracer:
     
     SAFE_TYPES = (int, float, str, bool, list, tuple, dict, set, type(None))
     MAX_STEPS = 1000
-    MAX_STR_LENGTH = 100
+    MAX_STR_LENGTH = 500
     
     def __init__(self):
         self.frames: List[TraceFrame] = []

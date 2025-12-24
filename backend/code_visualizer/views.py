@@ -185,7 +185,15 @@ def detect_param_type(arg):
     
     if arg.annotation:
         annotation = ast.unparse(arg.annotation) if hasattr(ast, 'unparse') else str(arg.annotation)
-        if 'List[int]' in annotation or 'list' in annotation.lower():
+        
+        # LeetCode data structure types
+        if 'ListNode' in annotation:
+            param_type = "listnode"
+            param_label = f"{arg.arg} (Linked List, e.g., 1,2,3)"
+        elif 'TreeNode' in annotation:
+            param_type = "treenode"
+            param_label = f"{arg.arg} (Binary Tree, e.g., 1,2,3,null,4)"
+        elif 'List[int]' in annotation or 'list' in annotation.lower():
             param_type = "list_int"
             param_label = f"{arg.arg} (List of integers, e.g., 1,2,3,4,5)"
         elif 'List[str]' in annotation:
@@ -229,6 +237,34 @@ def parse_input_values(input_values, input_types):
     parsed = []
     for i, value in enumerate(input_values):
         input_type = input_types[i] if i < len(input_types) else "any"
+        
+        # Handle ListNode type - convert list to linked list creation code
+        if input_type == "listnode":
+            # Parse the value to a list of integers
+            if isinstance(value, list):
+                items = value
+            elif isinstance(value, str):
+                value = value.strip()
+                items_str = value.split(',') if ',' in value else value.split()
+                try:
+                    items = [int(x.strip()) for x in items_str if x.strip()]
+                except ValueError:
+                    items = []
+            else:
+                items = []
+            
+            if not items:
+                parsed.append("None")
+            else:
+                # Use the helper function from sandbox
+                parsed.append(f"_list_to_listnode({items})")
+            continue
+        
+        # Handle TreeNode type
+        if input_type == "treenode":
+            # For now, just pass None - tree construction is more complex
+            parsed.append("None")
+            continue
         
         # If value is already a native Python type (from auto-generator), format it directly
         if isinstance(value, list):
@@ -342,7 +378,13 @@ def prepare_execution_code(code, code_type, function_name, class_name, inputs, i
 @csrf_exempt
 @require_http_methods(["POST"])
 def trace_endpoint(request):
-    """Trace code execution (non-streaming)."""
+    """Trace code execution (non-streaming).
+    
+    Only generates AI explanations for the first BATCH_SIZE steps to save resources.
+    Use /generate-explanations endpoint to get more explanations on-demand.
+    """
+    BATCH_SIZE = 6  # Only generate AI explanations for first 6 steps
+    
     try:
         data = json.loads(request.body)
         code = data.get('code', '')
@@ -355,9 +397,12 @@ def trace_endpoint(request):
         executable_code = prepare_execution_code(code, code_type, function_name, class_name, inputs, input_types)
         result = trace_code(executable_code, inputs if code_type == "script" else [])
         
+        # Only generate AI explanations for first BATCH_SIZE steps
         if narrator and narrator.is_available and result.get('success') and result.get('frames'):
             source_lines = result.get('source_lines', [])
-            for frame in result['frames']:
+            frames = result['frames']
+            
+            for i, frame in enumerate(frames[:BATCH_SIZE]):
                 ai_narration = narrator.generate_narration(
                     step=frame.get('step', 0),
                     line=frame.get('line', 0),
@@ -370,8 +415,67 @@ def trace_endpoint(request):
                     full_source=source_lines
                 )
                 frame['explanation'] = ai_narration
+            
+            # Mark remaining frames as not yet generated
+            for frame in frames[BATCH_SIZE:]:
+                frame['explanation'] = None  # Will be generated on-demand
+        
+        # Add metadata for progressive loading
+        result['totalSteps'] = len(result.get('frames', []))
+        result['generatedUpTo'] = min(BATCH_SIZE, len(result.get('frames', [])))
+        result['batchSize'] = BATCH_SIZE
         
         return JsonResponse(result)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def generate_explanations(request):
+    """Generate AI explanations for a batch of frames on-demand.
+    
+    This endpoint is used for progressive/lazy loading of explanations.
+    Frontend sends frames that need explanations, and we generate them.
+    """
+    BATCH_SIZE = 6
+    
+    try:
+        data = json.loads(request.body)
+        frames = data.get('frames', [])  # Frames without explanations
+        source_lines = data.get('sourceLines', [])
+        start_index = data.get('startIndex', 0)
+        
+        if not narrator or not narrator.is_available:
+            return JsonResponse({
+                "error": "AI narrator not available",
+                "explanations": []
+            })
+        
+        explanations = []
+        
+        for i, frame in enumerate(frames[:BATCH_SIZE]):
+            ai_narration = narrator.generate_narration(
+                step=frame.get('step', start_index + i),
+                line=frame.get('line', 0),
+                code=frame.get('code', ''),
+                event=frame.get('event', 'line'),
+                variables=frame.get('locals', {}),
+                changed_vars=frame.get('changed_vars', []),
+                function_name=frame.get('function_name'),
+                return_value=frame.get('return_value'),
+                full_source=source_lines
+            )
+            explanations.append({
+                'index': start_index + i,
+                'explanation': ai_narration
+            })
+        
+        return JsonResponse({
+            "success": True,
+            "explanations": explanations,
+            "generatedCount": len(explanations)
+        })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
