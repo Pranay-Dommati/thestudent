@@ -322,7 +322,7 @@ function CodeVisualizerPage() {
     return (
         <div className="min-h-screen bg-gray-50 code-visualizer-container relative overflow-x-hidden">
             {/* Top gradient section with Wave at bottom */}
-            <div className="absolute top-0 left-0 right-0 h-[60vh] bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-700">
+            <div className="absolute top-0 left-0 right-0 h-[75vh] bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-700">
                 {/* Decorative background elements inside gradient */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     {/* Large gradient orbs */}
