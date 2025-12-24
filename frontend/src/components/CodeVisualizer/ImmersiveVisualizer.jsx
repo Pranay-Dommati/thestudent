@@ -270,23 +270,25 @@ const ImmersiveVisualizer = ({
                             const data = JSON.parse(line.slice(6));
 
                             if (data.type === 'explanation') {
-                                console.log(`[Progressive] Step ${data.index + 1}: Received explanation`);
+                                console.log(`[Progressive] Step ${data.index + 1}: Received explanation`, data.explanation ? '✅' : '❌ NULL');
 
-                                // Update the step with explanation
-                                if (updatedSteps[data.index]) {
-                                    updatedSteps[data.index] = {
-                                        ...updatedSteps[data.index],
-                                        explanation: data.explanation
-                                    };
-                                }
+                                // Create the step with the explanation
+                                const stepWithExplanation = {
+                                    ...updatedSteps[data.index],
+                                    explanation: data.explanation
+                                };
+                                
+                                // Update the local tracking array
+                                updatedSteps[data.index] = stepWithExplanation;
+                                console.log(`[Progressive] Step ${data.index + 1}: Prepared step with explanation:`, !!stepWithExplanation.explanation);
 
                                 // Scroll to first step of the new batch
                                 if (data.index === currentCount) {
                                     setScrollToStepIndex(data.index);
                                 }
 
-                                // Immediately add to pending for progressive reveal
-                                setPendingSteps(prev => [...prev, updatedSteps[data.index]]);
+                                // Immediately add to pending for progressive reveal (use the explicit object)
+                                setPendingSteps(prev => [...prev, stepWithExplanation]);
                             } else if (data.type === 'complete') {
                                 console.log(`[Progressive] ✅ Completed ${data.count} explanations`);
                                 setAllSteps(updatedSteps);
@@ -693,13 +695,20 @@ const ImmersiveVisualizer = ({
                                                 </div>
 
                                                 {/* AI Explanation - Soft, inline */}
-                                                {step.explanation && (
+                                                {step.explanation ? (
                                                     <div className="mb-4 p-4 bg-indigo-50 rounded-xl">
                                                         <div className="flex items-start gap-2">
                                                             <Sparkles className="w-5 h-5 text-indigo-500 flex-shrink-0 mt-1" />
                                                             <div className="flex-1">
                                                                 {renderExplanationWithDryRun(step.explanation)}
                                                             </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                        <div className="flex items-center gap-2 text-slate-500 text-sm">
+                                                            <div className="w-4 h-4 border-2 border-slate-300 border-t-indigo-400 rounded-full animate-spin" />
+                                                            <span>Generating explanation...</span>
                                                         </div>
                                                     </div>
                                                 )}
