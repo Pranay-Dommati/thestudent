@@ -51,6 +51,8 @@ class PythonTracer:
         self.function_start_line: int = 0
         self.function_end_line: int = 0
         self.on_frame = None
+        # Track for-loop iterations: {line_no: iteration_count}
+        self.loop_iterations: Dict[int, int] = {}
         
     def _safe_copy(self, value: Any) -> Any:
         if value is None:
@@ -318,8 +320,50 @@ class PythonTracer:
         if event == 'line':
             self.step_count += 1
             current_locals = dict(frame.f_locals)
-            serialized_locals = self._serialize_locals(current_locals)
             code_line = self._get_code_line(line_no)
+            
+            # For for-loops, compute the NEXT value of the loop variable
+            loop_info = None
+            for_match = re.match(r'for\s+(\w+)\s+in\s+(\w+)', code_line.strip())
+            if for_match:
+                loop_var = for_match.group(1)
+                iterable_name = for_match.group(2)
+                
+                # Get the iterable from locals
+                iterable = current_locals.get(iterable_name)
+                if iterable and hasattr(iterable, '__iter__'):
+                    try:
+                        iterable_list = list(iterable) if not isinstance(iterable, (list, tuple)) else iterable
+                        # Track iteration count for this line
+                        if line_no not in self.loop_iterations:
+                            self.loop_iterations[line_no] = 0
+                        iter_idx = self.loop_iterations[line_no]
+                        
+                        if iter_idx < len(iterable_list):
+                            next_value = iterable_list[iter_idx]
+                            # Update the loop variable in our serialized locals to show the NEXT value
+                            current_locals[loop_var] = next_value
+                            loop_info = {
+                                'variable': loop_var,
+                                'iteration': iter_idx + 1,
+                                'value': next_value,
+                                'total': len(iterable_list),
+                                'finished': False
+                            }
+                        else:
+                            # Loop is exiting - mark as finished
+                            loop_info = {
+                                'variable': loop_var,
+                                'iteration': iter_idx + 1,
+                                'value': None,
+                                'total': len(iterable_list),
+                                'finished': True
+                            }
+                        self.loop_iterations[line_no] += 1
+                    except (TypeError, ValueError):
+                        pass
+            
+            serialized_locals = self._serialize_locals(current_locals)
             
             # Predict what THIS line will change (based on code analysis)
             predicted_changes = self._predict_changed_vars(code_line, current_locals)
@@ -336,11 +380,19 @@ class PythonTracer:
                 changed_vars=predicted_changes,
                 function_name=func_name if func_name != '<module>' else None
             )
+            
+            # Add loop info if this is a for-loop line
+            frame_dict = trace_frame.to_dict()
+            if loop_info:
+                frame_dict['loop_info'] = loop_info
+            
             trace_frame.explanation = self._generate_explanation(trace_frame)
+            frame_dict['explanation'] = trace_frame.explanation
+            
             self.frames.append(trace_frame)
             if self.on_frame:
                 try:
-                    self.on_frame(trace_frame.to_dict())
+                    self.on_frame(frame_dict)
                 except Exception:
                     # Never break tracing due to callback errors
                     pass
@@ -376,6 +428,7 @@ class PythonTracer:
         self.inside_target_function = False
         self.target_function_name = None
         self.target_class_name = None
+        self.loop_iterations = {}  # Reset loop tracking
         self.function_start_line = 0
         self.function_end_line = 0
         self.on_frame = on_frame

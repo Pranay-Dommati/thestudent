@@ -20,53 +20,47 @@ except ImportError:
 # Get API key from Django settings or environment
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
-NARRATOR_SYSTEM_PROMPT = """You are a coding tutor explaining Python code execution step by step.
+NARRATOR_SYSTEM_PROMPT = """You are a coding tutor giving MINIMAL, value-specific explanations.
 
-CRITICAL: Read the CODE LINE being executed carefully. Explain what THAT specific line does.
+FORMAT (follow EXACTLY):
 
-For each step, provide:
-1. A brief, accurate explanation of what the line does (1-2 sentences)
-2. A DRY-RUN showing actual values being used
+[One short sentence with actual values]
 
-IMPORTANT RULES:
-- Look at the actual code line and explain what IT does
-- Use the variable values provided in the context
-- For assignments like `x = expression`, explain we're assigning the RESULT to x
-- For conditions, show the comparison with actual values and the result (True/False)
-- For loops, show the current loop variable value
-- Keep explanations SHORT and focused
+🔍 DRY-RUN:
+[original code]
+[code with values substituted]
 
-FORMAT:
+RULES:
+1. Explanation is ONE sentence only - short and clear
+2. Use ACTUAL VALUES from the variables provided (e.g., "8 > 5" not "n > max_val")
+3. NO markdown formatting (no ```, no **, no code blocks)
+4. The DRY-RUN section has ONLY the code lines, nothing else after
+5. Keep it minimal - students should understand in 2 seconds
 
-For assignments (e.g., max_val = nums[0]):
-"[What this line does - assigning to the LEFT side variable]
+EXAMPLES:
 
-DRY-RUN:
+For `max_val = nums[0]` with nums=[5,2,8,1]:
+"Setting max_val to nums[0], which is 5.
+
+🔍 DRY-RUN:
 max_val = nums[0]
-max_val = [actual value of nums[0]]"
+max_val = 5"
 
-For conditions (if/elif):
-"[What we're checking]
+For `if n > max_val:` with n=8, max_val=5:
+"Checking if 8 > 5. True, so we enter the if-block.
 
-DRY-RUN:
-[condition with variable names]
-[condition with actual values]
-[True/False] → [what happens]"
+🔍 DRY-RUN:
+if n > max_val:
+if 8 > 5: True"
 
-For loops (for n in items):
-"[Loop iteration description]
+For `for n in nums:` with n=2, nums=[5,2,8,1]:
+"Loop iteration: n takes value 2.
 
-DRY-RUN:
-n = [current value]"
+🔍 DRY-RUN:
+for n in nums:
+n = 2"
 
-For return:
-"[What we're returning]
-
-DRY-RUN:
-return [expression]
-return [actual value] ✓"
-
-NEVER describe the wrong variable. The LEFT side of = is what's being assigned TO."""
+NEVER add text after the DRY-RUN code lines. Keep everything minimal."""
 
 
 class AINarrator:
@@ -110,12 +104,13 @@ class AINarrator:
         changed_vars: List[str],
         function_name: Optional[str] = None,
         return_value: Any = None,
-        full_source: Optional[List[str]] = None
+        full_source: Optional[List[str]] = None,
+        loop_info: Optional[Dict[str, Any]] = None
     ) -> str:
         if not self.is_available or not self.client:
             return self._generate_basic_narration(
                 step, line, code, event, variables, 
-                changed_vars, function_name, return_value
+                changed_vars, function_name, return_value, loop_info
             )
         
         try:
@@ -127,6 +122,20 @@ class AINarrator:
             
             if function_name and function_name != '<module>':
                 context_parts.append(f"Inside function: {function_name}")
+            
+            # For loop-exit, skip AI entirely - just return clean formatted response
+            if loop_info and loop_info.get('finished'):
+                total = loop_info.get('total', '?')
+                var_name = loop_info.get('variable', 'n')
+                return f"Loop complete - all {total} elements processed.\n\n🔍 DRY-RUN:\nfor {var_name} in ...: ✓ done"
+            
+            # For for-loops, provide explicit loop info to prevent hallucination
+            if loop_info:
+                var_name = loop_info.get('variable', 'x')
+                iteration = loop_info.get('iteration', 1)
+                value = loop_info.get('value')
+                total = loop_info.get('total', '?')
+                context_parts.append(f"LOOP INFO: This is iteration {iteration} of {total}. {var_name} = {value}")
             
             if variables:
                 var_list = []
@@ -141,7 +150,10 @@ class AINarrator:
                 context_parts.append(f"Return value: {return_value}")
             
             prompt = "\n".join(context_parts)
-            prompt += f"\n\nExplain what the line `{code_line}` does with these values. Include DRY-RUN:"
+            prompt += f"\n\nExplain `{code_line}` in ONE sentence using the values above. No markdown. Include 🔍 DRY-RUN with code substitution:"
+            
+            # Debug logging - shows exactly what we send and receive
+            print(f"[AI Narrator] PROMPT:\n{prompt[:200]}...")
             
             response = self.client.models.generate_content(
                 model='gemini-2.0-flash',
@@ -154,17 +166,19 @@ class AINarrator:
             )
             
             narration = response.text.strip()
+            print(f"[AI Narrator] RESPONSE:\n{narration[:200]}...")
+            
             narration = narration.strip('"\'')
             if narration.startswith('Narration:'):
                 narration = narration[10:].strip()
 
-            # Guarantee consistent UI formatting: if Gemini output doesn't include
-            # a DRY-RUN block, fall back to our formatted basic narration.
+            # Check if response has proper DRY-RUN format
             import re
-            if not re.search(r"\bDRY\s*-?\s*RUN\s*:", narration, re.IGNORECASE):
+            if not re.search(r"(🔍\s*)?DRY\s*-?\s*RUN\s*:", narration, re.IGNORECASE):
+                print(f"[AI Narrator] WARNING: Response missing DRY-RUN, using template")
                 return self._generate_basic_narration(
                     step, line, code, event, variables,
-                    changed_vars, function_name, return_value
+                    changed_vars, function_name, return_value, loop_info
                 )
             
             return narration
@@ -173,7 +187,7 @@ class AINarrator:
             print(f"[AI Narrator] ERROR: {type(e).__name__}: {e}")
             return self._generate_basic_narration(
                 step, line, code, event, variables,
-                changed_vars, function_name, return_value
+                changed_vars, function_name, return_value, loop_info
             )
     
     def _generate_basic_narration(
@@ -185,7 +199,8 @@ class AINarrator:
         variables: Dict[str, Any],
         changed_vars: List[str],
         function_name: Optional[str] = None,
-        return_value: Any = None
+        return_value: Any = None,
+        loop_info: Optional[Dict[str, Any]] = None
     ) -> str:
         import re
         code = code.strip()
@@ -193,8 +208,8 @@ class AINarrator:
         def fmt(explanation: str, dry_run_lines: List[str]) -> str:
             dry_run = "\n".join(dry_run_lines).strip()
             if dry_run:
-                return f"{explanation}\n\nDRY-RUN:\n{dry_run}"
-            return f"{explanation}\n\nDRY-RUN:\n"
+                return f"{explanation}\n\n🔍 DRY-RUN:\n{dry_run}"
+            return f"{explanation}\n\n🔍 DRY-RUN:\n"
         
         def get_var_value(var_name):
             if var_name in variables:
@@ -226,15 +241,34 @@ class AINarrator:
                 [code],
             )
         
+        # For loops - use loop_info if available for accurate values
         for_match = re.match(r'for\s+(\w+)\s+in\s+(.+):', code)
         if for_match:
             loop_var = for_match.group(1)
             iterable = for_match.group(2).strip()
+            
+            if loop_info:
+                finished = loop_info.get('finished', False)
+                if finished:
+                    total = loop_info.get('total', '?')
+                    return fmt(
+                        f"Loop complete - processed all {total} elements.",
+                        [f"for {loop_var} in {iterable}: (done)"],
+                    )
+                
+                iteration = loop_info.get('iteration', 1)
+                total = loop_info.get('total', '?')
+                val = loop_info.get('value')
+                return fmt(
+                    f"Iteration {iteration}/{total}: {loop_var} = {val}.",
+                    [f"for {loop_var} in {iterable}:", f"{loop_var} = {val}"],
+                )
+            
             val = get_var_value(loop_var)
             if val is not None:
                 return fmt(
-                    f"Loop iteration: updating `{loop_var}` for this pass.",
-                    [f"{loop_var} = {repr(val)}"],
+                    f"Loop iteration: {loop_var} = {val}.",
+                    [f"for {loop_var} in {iterable}:", f"{loop_var} = {val}"],
                 )
             return fmt(
                 f"Starting loop over `{iterable}`.",

@@ -412,7 +412,8 @@ def trace_stream(request):
                         changed_vars=frame_dict.get('changed_vars', []),
                         function_name=frame_dict.get('function_name'),
                         return_value=frame_dict.get('return_value'),
-                        full_source=source_lines
+                        full_source=source_lines,
+                        loop_info=frame_dict.get('loop_info')
                     )
                     if ai_narration:
                         frame_dict['explanation'] = ai_narration
