@@ -37,10 +37,12 @@ const ImmersiveVisualizer = ({
     const [displayedStepsCount, setDisplayedStepsCount] = useState(BATCH_SIZE);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [allSteps, setAllSteps] = useState([]);  // Store all steps with explanations
+    const [scrollToStepIndex, setScrollToStepIndex] = useState(null);  // Index to scroll to after loading
 
     const scrollContainerRef = useRef(null);
     const latestStepRef = useRef(null);
     const prevStepsLengthRef = useRef(0);
+    const stepRefs = useRef({});  // Store refs for each step
 
     // Reset when opened
     useEffect(() => {
@@ -159,6 +161,19 @@ const ImmersiveVisualizer = ({
         }
     }, [visibleSteps]);
 
+    // Scroll to specific step when scrollToStepIndex changes
+    useEffect(() => {
+        if (scrollToStepIndex !== null && stepRefs.current[scrollToStepIndex]) {
+            setTimeout(() => {
+                stepRefs.current[scrollToStepIndex]?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+                setScrollToStepIndex(null);  // Clear after scrolling
+            }, 100);  // Small delay to ensure element is rendered
+        }
+    }, [scrollToStepIndex, visibleSteps]);
+
     // Handle keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -221,7 +236,7 @@ const ImmersiveVisualizer = ({
 
         setIsLoadingMore(true);
         setIsStreaming(true);
-        
+
         const newVisibleCount = Math.min(currentCount + BATCH_SIZE, steps.length);
         setDisplayedStepsCount(newVisibleCount);
 
@@ -253,18 +268,23 @@ const ImmersiveVisualizer = ({
                     if (line.startsWith('data: ')) {
                         try {
                             const data = JSON.parse(line.slice(6));
-                            
+
                             if (data.type === 'explanation') {
                                 console.log(`[Progressive] Step ${data.index + 1}: Received explanation`);
-                                
+
                                 // Update the step with explanation
                                 if (updatedSteps[data.index]) {
-                                    updatedSteps[data.index] = { 
-                                        ...updatedSteps[data.index], 
-                                        explanation: data.explanation 
+                                    updatedSteps[data.index] = {
+                                        ...updatedSteps[data.index],
+                                        explanation: data.explanation
                                     };
                                 }
-                                
+
+                                // Scroll to first step of the new batch
+                                if (data.index === currentCount) {
+                                    setScrollToStepIndex(data.index);
+                                }
+
                                 // Immediately add to pending for progressive reveal
                                 setPendingSteps(prev => [...prev, updatedSteps[data.index]]);
                             } else if (data.type === 'complete') {
@@ -375,44 +395,92 @@ const ImmersiveVisualizer = ({
                         {explanationPart}
                     </p>
 
-                    {/* Dry-run box - Terminal inspired but ONLY dark section */}
-                    <div className="mt-3 bg-slate-900 rounded-lg p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400">
-                                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                            </svg>
-                            <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Dry Run</span>
+                    {/* Dry-run box - Clean light design with subtle border */}
+                    <div className="mt-3 bg-gradient-to-br from-slate-50 to-indigo-50/30 border border-indigo-100 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="w-5 h-5 rounded-md bg-indigo-100 flex items-center justify-center">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-indigo-500">
+                                    <polyline points="4,17 10,11 4,5" />
+                                    <line x1="12" y1="19" x2="20" y2="19" />
+                                </svg>
+                            </div>
+                            <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Dry Run</span>
                         </div>
-                        <div className="font-mono text-sm space-y-1 whitespace-pre">
+                        <div className="font-mono text-sm space-y-1.5 whitespace-pre">
                             {dryRunLines.map((line, idx) => {
-                                // Style based on content
-                                let lineClass = 'text-slate-300';
-                                let content = line;
-
-                                // True result - green
-                                if (line.includes('True') || line.includes('✓') || line.includes('executes')) {
-                                    lineClass = 'text-emerald-400 font-medium';
-                                }
-                                // False result - red/orange
-                                else if (line.includes('False') || line.includes('skipped')) {
-                                    lineClass = 'text-orange-400';
-                                }
-                                // Arrow or assignment result
-                                else if (line.includes('→') || (line.includes('=') && !line.includes('=='))) {
-                                    lineClass = 'text-cyan-400';
-                                }
-                                // Comparison/condition
-                                else if (line.includes('>') || line.includes('<') || line.includes('==')) {
-                                    lineClass = 'text-blue-400';
-                                }
-                                // "so" explanations
-                                else if (line.toLowerCase().startsWith('so ')) {
-                                    lineClass = 'text-slate-500 italic';
-                                }
+                                // Enhanced styling with inline element coloring
+                                const renderLine = () => {
+                                    // Check for checkmark or truthy indicator
+                                    if (line.includes('✔') || line.includes('✓')) {
+                                        const parts = line.split(/(✔|✓)/);
+                                        return (
+                                            <span className="text-slate-600">
+                                                {parts.map((part, i) =>
+                                                    part === '✔' || part === '✓'
+                                                        ? <span key={i} className="text-emerald-500 font-bold"> ✓</span>
+                                                        : part
+                                                )}
+                                            </span>
+                                        );
+                                    }
+                                    // Check for X or falsy indicator
+                                    if (line.includes('✗') || line.includes('✕')) {
+                                        const parts = line.split(/(✗|✕)/);
+                                        return (
+                                            <span className="text-slate-600">
+                                                {parts.map((part, i) =>
+                                                    part === '✗' || part === '✕'
+                                                        ? <span key={i} className="text-rose-500 font-bold"> ✗</span>
+                                                        : part
+                                                )}
+                                            </span>
+                                        );
+                                    }
+                                    // Arrow indicators (→) for flow
+                                    if (line.includes('→')) {
+                                        return <span className="text-indigo-600">{line}</span>;
+                                    }
+                                    // Arrows at start (result lines)
+                                    if (line.startsWith('→') || line.startsWith('↑')) {
+                                        return <span className="text-violet-600 font-medium">{line}</span>;
+                                    }
+                                    // True/truthy results
+                                    if (line.includes('True') || line.includes('truthy')) {
+                                        return <span className="text-emerald-600 font-medium">{line}</span>;
+                                    }
+                                    // False/falsy results
+                                    if (line.includes('False') || line.includes('falsy') || line.includes('skipped')) {
+                                        return <span className="text-amber-600">{line}</span>;
+                                    }
+                                    // Assignment lines (var = value)
+                                    if (line.includes(' = ') && !line.includes('==')) {
+                                        const [varPart, ...rest] = line.split(' = ');
+                                        return (
+                                            <>
+                                                <span className="text-indigo-700 font-medium">{varPart}</span>
+                                                <span className="text-slate-400"> = </span>
+                                                <span className="text-emerald-600">{rest.join(' = ')}</span>
+                                            </>
+                                        );
+                                    }
+                                    // Loop continues/exits
+                                    if (line.includes('Loop continues') || line.includes('continues')) {
+                                        return <span className="text-blue-600 font-medium">{line}</span>;
+                                    }
+                                    if (line.includes('Loop exits') || line.includes('exits')) {
+                                        return <span className="text-amber-600 font-medium">{line}</span>;
+                                    }
+                                    // Taking branch
+                                    if (line.includes("Taking the '")) {
+                                        return <span className="text-violet-600">{line}</span>;
+                                    }
+                                    // Default - subtle dark text
+                                    return <span className="text-slate-700">{line}</span>;
+                                };
 
                                 return (
-                                    <div key={idx} className={lineClass}>
-                                        {content}
+                                    <div key={idx} className="leading-relaxed">
+                                        {renderLine()}
                                     </div>
                                 );
                             })}
@@ -585,10 +653,16 @@ const ImmersiveVisualizer = ({
                                     const isLatest = idx === visibleSteps.length - 1;
                                     const isSelected = selectedStepIndex === idx;
 
+                                    // Get the actual step index from the step object
+                                    const stepIndex = step.step !== undefined ? step.step - 1 : idx;
+
                                     return (
                                         <div
                                             key={idx}
-                                            ref={isLatest ? latestStepRef : null}
+                                            ref={(el) => {
+                                                if (isLatest) latestStepRef.current = el;
+                                                stepRefs.current[stepIndex] = el;
+                                            }}
                                             className={`relative pl-10 pb-6 transition-all duration-300 ${isLatest ? 'animate-fade-in-up' : ''}`}
                                             onClick={() => setSelectedStepIndex(idx)}
                                         >
