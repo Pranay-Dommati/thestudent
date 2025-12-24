@@ -452,9 +452,15 @@ def generate_explanations(request):
                 "explanations": []
             })
         
+        print(f"[On-Demand] 🔄 Generating AI explanations for steps {start_index + 1} to {start_index + min(BATCH_SIZE, len(frames))}")
+        
         explanations = []
         
         for i, frame in enumerate(frames[:BATCH_SIZE]):
+            step_num = start_index + i + 1
+            code_line = frame.get('code', '')[:50]
+            print(f"[On-Demand] Step {step_num}: 🤖 Generating AI for: {code_line}")
+            
             ai_narration = narrator.generate_narration(
                 step=frame.get('step', start_index + i),
                 line=frame.get('line', 0),
@@ -471,6 +477,8 @@ def generate_explanations(request):
                 'explanation': ai_narration
             })
         
+        print(f"[On-Demand] ✅ Completed {len(explanations)} explanations")
+        
         return JsonResponse({
             "success": True,
             "explanations": explanations,
@@ -479,6 +487,59 @@ def generate_explanations(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def generate_explanations_stream(request):
+    """Stream AI explanations one-by-one via Server-Sent Events.
+    
+    This provides progressive rendering like the initial trace.
+    """
+    BATCH_SIZE = 6
+    
+    try:
+        data = json.loads(request.body)
+        frames = data.get('frames', [])
+        source_lines = data.get('sourceLines', [])
+        start_index = data.get('startIndex', 0)
+        
+        def generate():
+            if not narrator or not narrator.is_available:
+                yield "data: " + json.dumps({'type': 'error', 'error': 'AI narrator not available'}) + "\n\n"
+                return
+            
+            print(f"[On-Demand Stream] 🔄 Streaming AI explanations for steps {start_index + 1} to {start_index + min(BATCH_SIZE, len(frames))}")
+            
+            for i, frame in enumerate(frames[:BATCH_SIZE]):
+                step_num = start_index + i + 1
+                code_line = frame.get('code', '')[:50]
+                print(f"[On-Demand Stream] Step {step_num}: 🤖 Generating AI for: {code_line}")
+                
+                ai_narration = narrator.generate_narration(
+                    step=frame.get('step', start_index + i),
+                    line=frame.get('line', 0),
+                    code=frame.get('code', ''),
+                    event=frame.get('event', 'line'),
+                    variables=frame.get('locals', {}),
+                    changed_vars=frame.get('changed_vars', []),
+                    function_name=frame.get('function_name'),
+                    return_value=frame.get('return_value'),
+                    full_source=source_lines
+                )
+                
+                # Stream each explanation immediately
+                yield "data: " + json.dumps({'type': 'explanation', 'index': start_index + i, 'explanation': ai_narration, 'frame': frame}) + "\n\n"
+            
+            print(f"[On-Demand Stream] ✅ Completed streaming {min(BATCH_SIZE, len(frames))} explanations")
+            yield "data: " + json.dumps({'type': 'complete', 'count': min(BATCH_SIZE, len(frames))}) + "\n\n"
+        
+        response = StreamingHttpResponse(generate(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response
+        
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -525,9 +586,24 @@ def trace_stream(request):
                     # If narration fails, keep the tracer's existing explanation.
                     return
 
+            frame_counter = [0]  # Use list to allow mutation in nested function
+            BATCH_SIZE = 6  # Only generate AI for first 6 frames
+            
             def on_frame(frame_dict):
                 # frame_dict is already JSON-serializable
-                maybe_add_ai_narration(frame_dict)
+                step_num = frame_counter[0] + 1
+                code_line = frame_dict.get('code', '')[:50]
+                
+                # Only generate AI explanations for first BATCH_SIZE frames
+                if frame_counter[0] < BATCH_SIZE:
+                    print(f"[Stream] Step {step_num}: 🤖 Generating AI explanation for: {code_line}")
+                    maybe_add_ai_narration(frame_dict)
+                else:
+                    if frame_counter[0] == BATCH_SIZE:
+                        print(f"[Stream] Step {step_num}+: ⏭️ Skipping AI (on-demand) for remaining frames")
+                    frame_dict['explanation'] = None  # Will be generated on-demand
+                
+                frame_counter[0] += 1
                 frame_queue.put({'type': 'frame', 'frame': frame_dict})
 
             result_holder = {'result': None, 'error': None}

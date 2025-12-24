@@ -18,6 +18,7 @@ urlpatterns = [
     path('trace/', views.trace_endpoint, name='trace'),
     path('trace-stream/', views.trace_stream, name='trace_stream'),
     path('generate-explanations/', views.generate_explanations, name='generate_explanations'),
+    path('generate-explanations-stream/', views.generate_explanations_stream, name='generate_explanations_stream'),
     
     # Input detection and generation
     path('detect-inputs/', views.detect_inputs, name='detect_inputs'),
