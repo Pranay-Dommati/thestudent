@@ -335,22 +335,22 @@ const ImmersiveVisualizer = ({
                     </h1>
                 </div>
 
-                {/* Minimal Toggle */}
-                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                {/* Mode Toggle - More Prominent */}
+                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1 border border-slate-200">
                     <button
                         onClick={() => setVisualizationMode('timeline')}
-                        className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${visualizationMode === 'timeline'
-                            ? 'bg-white text-slate-900 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700'
+                        className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${visualizationMode === 'timeline'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                             }`}
                     >
                         Timeline
                     </button>
                     <button
                         onClick={() => setVisualizationMode('enterprise')}
-                        className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${visualizationMode === 'enterprise'
-                            ? 'bg-white text-slate-900 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700'
+                        className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${visualizationMode === 'enterprise'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                             }`}
                     >
                         Visualize
@@ -397,9 +397,7 @@ const ImmersiveVisualizer = ({
                                     key={idx}
                                     className={`flex transition-all duration-300 rounded-lg ${isCurrentLine
                                         ? 'bg-indigo-50 border-l-4 border-indigo-600'
-                                        : wasExecuted
-                                            ? 'bg-slate-50'
-                                            : ''
+                                        : ''
                                         }`}
                                 >
                                     <span className={`w-12 min-w-[3rem] text-right pr-4 select-none flex-shrink-0 ${isCurrentLine ? 'text-indigo-600 font-bold' : 'text-slate-400'
@@ -409,9 +407,7 @@ const ImmersiveVisualizer = ({
                                     <span
                                         className={`flex-1 whitespace-pre ${isCurrentLine
                                             ? 'text-slate-900'
-                                            : wasExecuted
-                                                ? 'text-slate-500'
-                                                : 'text-slate-400'
+                                            : 'text-slate-600'
                                             }`}
                                     >
                                         {highlightSyntax(line)}
@@ -462,8 +458,8 @@ const ImmersiveVisualizer = ({
                         <div className="max-w-3xl mx-auto py-8 px-6">
                             {/* Timeline Items */}
                             <div className="relative">
-                                {/* Timeline Line - Thin, elegant */}
-                                <div className="absolute left-[11px] top-0 bottom-0 w-[2px] bg-gradient-to-b from-indigo-400 to-purple-400" />
+                                {/* Timeline Line - Stops at last step */}
+                                <div className="absolute left-[11px] top-3 bottom-12 w-[2px] bg-gradient-to-b from-indigo-400 to-emerald-400" />
 
                                 {/* Steps */}
                                 {visibleSteps.map((step, idx) => {
@@ -560,17 +556,17 @@ const ImmersiveVisualizer = ({
 
                                 {/* End Marker */}
                                 {!isStreaming && !isGenerating && currentStepIndex >= steps.length - 1 && visibleSteps.length > 0 && steps.length > 0 && (
-                                    <div className="relative pl-16 pt-4 animate-fade-in">
-                                        <div className="absolute left-4 w-5 h-5 rounded-full bg-green-500 border-2 border-green-400 shadow-lg shadow-green-500/50" />
-                                        <div className="flex items-center gap-4 bg-emerald-50 border border-emerald-100 rounded-2xl p-5 shadow-sm">
-                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-200">
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                                                    <polyline points="20,6 9,17 4,12" />
-                                                </svg>
-                                            </div>
+                                    <div className="relative pl-10 pt-2 animate-fade-in">
+                                        {/* Green completion dot - aligned with timeline */}
+                                        <div className="absolute left-0 w-6 h-6 rounded-full bg-emerald-500 border-2 border-emerald-400 shadow-lg shadow-emerald-500/30 flex items-center justify-center">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                                                <polyline points="20,6 9,17 4,12" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
                                             <div>
-                                                <h3 className="text-lg font-bold text-emerald-800">Execution Complete! 🎉</h3>
-                                                <p className="text-sm text-emerald-600">
+                                                <h3 className="text-sm font-bold text-emerald-800">Execution Complete! 🎉</h3>
+                                                <p className="text-xs text-emerald-600">
                                                     Successfully executed {steps.length} steps
                                                 </p>
                                             </div>
@@ -578,11 +574,11 @@ const ImmersiveVisualizer = ({
                                     </div>
                                 )}
 
-                                {/* Waiting for more steps indicator - show during streaming */}
+                                {/* Waiting for more steps indicator */}
                                 {(isStreaming || isGenerating) && (
-                                    <div className="relative pl-16 pt-4">
-                                        <div className={`absolute left-4 w-5 h-5 rounded-full border-2 animate-pulse ${isStreaming ? 'bg-blue-600 border-blue-500' : 'bg-slate-700 border-slate-600'}`} />
-                                        <div className="text-slate-500 text-sm flex items-center gap-2 font-medium">
+                                    <div className="relative pl-10 pt-2">
+                                        <div className={`absolute left-0 w-6 h-6 rounded-full border-2 animate-pulse ${isStreaming ? 'bg-blue-500 border-blue-400' : 'bg-slate-600 border-slate-500'}`} />
+                                        <div className="text-slate-500 text-sm flex items-center gap-2 font-medium py-2">
                                             <span className="inline-flex gap-1">
                                                 <span className={`w-1.5 h-1.5 rounded-full animate-bounce ${isStreaming ? 'bg-blue-500' : 'bg-indigo-500'}`} style={{ animationDelay: '0ms' }}></span>
                                                 <span className={`w-1.5 h-1.5 rounded-full animate-bounce ${isStreaming ? 'bg-blue-500' : 'bg-indigo-500'}`} style={{ animationDelay: '150ms' }}></span>
