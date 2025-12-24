@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import TopBar from './TopBar';
+import { Link, useNavigate } from 'react-router-dom';
+import Navbar from '../Navbar/Navbar';
 import CodeEditor from './CodeEditor';
 import InputModal from './InputModal';
 import ImmersiveVisualizer from './ImmersiveVisualizer';
@@ -9,21 +10,12 @@ import './CodeVisualizer.css';
 // API Base URL - uses Django backend visualizer API
 // In development: http://localhost:8000/api/visualizer
 // In production: uses relative URL through VITE_API_BASE_URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
     ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/visualizer`
     : 'http://localhost:8000/api/visualizer';
 
-const exampleCode = `arr = [64, 34, 25, 12, 22, 11, 90]
-n = len(arr)
-
-for i in range(n):
-    for j in range(0, n-i-1):
-        if arr[j] > arr[j+1]:
-            arr[j], arr[j+1] = arr[j+1], arr[j]
-
-print(arr)`;
-
 function CodeVisualizerPage() {
+    const navigate = useNavigate();
     const [code, setCode] = useState('');
     const [autoGenerateInput, setAutoGenerateInput] = useState(true);
     const [isRunning, setIsRunning] = useState(false);
@@ -225,7 +217,7 @@ function CodeVisualizerPage() {
     // Generate inputs using AI (primary) or local generator (fallback)
     const generateInputsWithAI = useCallback(async (codeToAnalyze, inputDetection) => {
         console.log('🤖 Attempting AI-powered input generation...');
-        
+
         try {
             const response = await fetch(`${API_BASE_URL}/generate-inputs/`, {
                 method: 'POST',
@@ -235,19 +227,19 @@ function CodeVisualizerPage() {
                     inputs: inputDetection.inputs
                 })
             });
-            
+
             const data = await response.json();
             console.log('AI generation response:', data);
-            
+
             if (data.success && data.inputs) {
                 console.log('✅ AI generated inputs:', data.inputs);
                 return { success: true, inputs: data.inputs, source: 'ai' };
             }
-            
+
             throw new Error(data.error || 'AI generation failed');
         } catch (err) {
             console.log('⚠️ AI generation failed, using local fallback:', err.message);
-            
+
             // Fallback to local constraint-aware generator
             try {
                 const generated = inputGenerator.generate(codeToAnalyze, inputDetection);
@@ -290,7 +282,7 @@ function CodeVisualizerPage() {
                 // Auto-generate inputs using AI (with local fallback)
                 console.log('Auto-generating inputs with AI...');
                 const result = await generateInputsWithAI(code, inputDetection);
-                
+
                 if (result.success) {
                     console.log(`Running trace with ${result.source} generated values:`, result.inputs);
                     runTrace(result.inputs, inputDetection);
@@ -324,24 +316,32 @@ function CodeVisualizerPage() {
         setIsLoadingTrace(false);
     }, []);
 
-    const handleUploadExample = useCallback(() => {
-        setCode(exampleCode);
-        setSteps([]);
-        setError(null);
-        setCodeMetadata(null);
-        setShowVisualizer(false);
-    }, []);
-
     // Get code lines for the visualizer
     const codeLines = code.split('\n');
 
     return (
-        <div className="code-visualizer-container h-screen flex flex-col overflow-hidden bg-gradient-to-br from-slate-950 to-slate-900">
-            <TopBar onUploadExample={handleUploadExample} />
+        <div className="min-h-screen bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-700 code-visualizer-container">
+            <Navbar initialStyle="transparent" />
 
-            <main className="flex-1 flex items-center justify-center p-4 overflow-hidden min-h-0">
-                {/* Centered Code Editor */}
-                <div className="w-full max-w-3xl h-full">
+            {/* Decorative background elements */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none">
+                {/* Large gradient orbs */}
+                <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-72 h-72 lg:w-96 lg:h-96 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 opacity-20 blur-3xl" />
+                <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-72 h-72 lg:w-96 lg:h-96 rounded-full bg-gradient-to-br from-blue-400 to-cyan-300 opacity-20 blur-3xl" />
+
+                {/* Subtle floating shapes */}
+                <div className="absolute top-32 left-8 w-3 h-3 bg-white/20 rounded rotate-45" />
+                <div className="absolute top-1/4 right-16 w-2 h-6 bg-white/10 rounded-full" />
+                <div className="absolute bottom-1/3 left-12 w-4 h-4 border border-white/20 rounded-full" />
+                <div className="absolute top-1/2 right-8 w-4 h-4 bg-yellow-300/20 rounded-full" />
+
+                {/* Grid background */}
+                <div className="absolute inset-0 bg-grid-white/[0.02] bg-[length:24px_24px]" />
+            </div>
+
+            {/* Main Content - Editor centered and prominent */}
+            <main className="relative z-10 min-h-screen flex items-center justify-center px-4 py-6 pt-20 md:pt-24">
+                <div className="w-full max-w-4xl">
                     <CodeEditor
                         code={code}
                         setCode={setCode}
