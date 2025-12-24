@@ -100,10 +100,30 @@ function CodeVisualizerPage() {
                 let buffer = '';
                 let receivedFirstFrame = false;
 
+                let silenceTimeout = null;
+                const resetSilenceTimeout = () => {
+                    if (silenceTimeout) clearTimeout(silenceTimeout);
+                    silenceTimeout = setTimeout(() => {
+                        console.log('[SSE] Silence timeout - no data for 5s. Closing stream.');
+                        reader.cancel();
+                        setIsLoadingTrace(false);
+                        setIsRunning(false);
+                        setSteps(prev => {
+                            // If we have steps, assume success
+                            if (prev.length > 0) return prev;
+                            return prev;
+                        });
+                    }, 5000);
+                };
+
                 while (true) {
+                    resetSilenceTimeout();
                     const { done, value } = await reader.read();
 
-                    if (done) break;
+                    if (done) {
+                        if (silenceTimeout) clearTimeout(silenceTimeout);
+                        break;
+                    }
 
                     buffer += decoder.decode(value, { stream: true });
 
@@ -117,6 +137,7 @@ function CodeVisualizerPage() {
                                 const data = JSON.parse(line.slice(6));
 
                                 if (data.type === 'error') {
+                                    if (silenceTimeout) clearTimeout(silenceTimeout);
                                     setError(data.error);
                                     setSteps([]);
                                     setShowVisualizer(false);
@@ -137,6 +158,7 @@ function CodeVisualizerPage() {
                                     }
 
                                     const frame = data.frame;
+                                    console.log(`[SSE] Frame received: Line ${frame.line} | Code: ${frame.code.trim()}`);
                                     const transformedStep = {
                                         lineNumber: frame.line,
                                         code: frame.code,
@@ -153,7 +175,9 @@ function CodeVisualizerPage() {
                                 }
 
                                 if (data.type === 'complete') {
+                                    console.log('[SSE] Complete message received. Total frames:', data.totalFrames);
                                     // All frames received
+                                    if (silenceTimeout) clearTimeout(silenceTimeout);
                                     setIsLoadingTrace(false);
                                     setIsRunning(false);
                                 }
@@ -163,6 +187,42 @@ function CodeVisualizerPage() {
                         }
                     }
                 }
+                if (silenceTimeout) clearTimeout(silenceTimeout);
+
+                console.log('[SSE] Stream loop exited. Buffer size:', buffer.length);
+
+                // Process any remaining data in buffer after stream ends
+                if (buffer.trim() && buffer.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(buffer.slice(6));
+
+                        if (data.type === 'complete') {
+                            setIsLoadingTrace(false);
+                            setIsRunning(false);
+                        } else if (data.type === 'frame') {
+                            const frame = data.frame;
+                            setSteps(prev => [...prev, {
+                                lineNumber: frame.line,
+                                code: frame.code,
+                                explanation: frame.explanation,
+                                variables: frame.locals,
+                                changedVars: frame.changed_vars || [],
+                                event: frame.event,
+                                functionName: frame.function_name,
+                                output: frame.output
+                            }]);
+                            // Implicitly done if this was the last frame
+                            setIsLoadingTrace(false);
+                            setIsRunning(false);
+                        }
+                    } catch (e) {
+                        // Ignore parse errors for incomplete buffer
+                    }
+                }
+
+                // Safety: Ensure loading states are cleared after stream ends
+                setIsLoadingTrace(false);
+                setIsRunning(false);
             } else {
                 // Fall back to regular JSON response
                 const fallback = await fetch(`${API_BASE_URL}/trace/`, {

@@ -86,18 +86,31 @@ const ImmersiveVisualizer = ({
             return nextVisible;
         });
         setPendingSteps(prev => prev.slice(1));
-        // No AnimatedStepCard in Timeline anymore, so release immediately
-        const t = setTimeout(() => setIsStepAnimating(false), 0);
-        return () => clearTimeout(t);
+
+        // Release immediately to process next step
+        // DO NOT cleanup this timeout - canceling it causes a deadlock where isStepAnimating stays true forever
+        setTimeout(() => setIsStepAnimating(false), 0);
     }, [pendingSteps, isStepAnimating, isOpen, isLoading]);
 
     // Stop streaming mode when all steps are received AND revealed
     useEffect(() => {
-        if (isStreaming && steps.length > 0 && visibleSteps.length === steps.length) {
+        // console.log(`[Immersive] State: streaming=${isStreaming}, gen=${isGenerating}, steps=${steps.length}, visible=${visibleSteps.length}, pending=${pendingSteps.length}`);
+
+        // Only stop streaming if parent says generation is done AND we have shown all steps
+        if (isStreaming && steps.length > 0 && visibleSteps.length === steps.length && !isGenerating) {
+            console.log('[Immersive] Normal finish: all steps visible and generation done');
             // All steps have been received and shown
             setIsStreaming(false);
         }
-    }, [isStreaming, steps.length, visibleSteps.length]);
+
+        // Safety: If parent says generation halted and we have no pending steps AND we've shown everything
+        // We add steps.length === visibleSteps.length to ensure we don't kill it while steps are waiting to be queued
+        if (isStreaming && !isGenerating && pendingSteps.length === 0 && visibleSteps.length === steps.length) {
+            console.log('[Immersive] Safety finish: parent stopped and all steps shown');
+            const t = setTimeout(() => setIsStreaming(false), 200);
+            return () => clearTimeout(t);
+        }
+    }, [isStreaming, steps.length, visibleSteps.length, isGenerating, pendingSteps.length]);
 
 
     // Auto-scroll to latest step only if user is near the bottom
