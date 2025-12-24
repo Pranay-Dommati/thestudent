@@ -32,12 +32,7 @@ const CodeEditor = ({
             {/* Editor Header - Glassmorphism style */}
             <div className="flex items-center justify-between px-5 py-4 bg-white/5 border-b border-white/10">
                 <div className="flex items-center gap-4">
-                    {/* Window Controls */}
-                    <div className="flex gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-400/80 hover:bg-red-400 transition cursor-pointer shadow-sm" />
-                        <div className="w-3 h-3 rounded-full bg-yellow-400/80 hover:bg-yellow-400 transition cursor-pointer shadow-sm" />
-                        <div className="w-3 h-3 rounded-full bg-green-400/80 hover:bg-green-400 transition cursor-pointer shadow-sm" />
-                    </div>
+
 
                     {/* Title */}
                     <div className="flex items-center gap-3">
@@ -114,7 +109,7 @@ print(arr)`}
             </div>
 
             {/* Bottom Action Bar - Premium glassmorphism */}
-            <div className="px-5 py-5 bg-white/5 border-t border-white/10">
+            <div className="px-5 py-5 bg-slate-900/50 border-t border-white/10">
                 {/* Error Display */}
                 {error && (
                     <div className="mb-4 p-4 bg-red-500/10 border border-red-400/30 rounded-xl flex items-start gap-3 backdrop-blur-sm">
@@ -133,7 +128,7 @@ print(arr)`}
                 )}
 
                 {/* Action Row - Auto-generate toggle + Start button */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
                     {/* Auto-generate Toggle */}
                     <label className="flex items-center gap-3 cursor-pointer group">
                         <div className="relative">
@@ -161,7 +156,7 @@ print(arr)`}
                         onClick={onStartVisualization}
                         disabled={!code.trim() || isRunning}
                         className={`flex-1 sm:flex-initial py-3.5 px-8 rounded-xl font-bold text-sm flex items-center justify-center gap-3 transition-all duration-300 ${!code.trim() || isRunning
-                            ? 'bg-white/5 text-white/30 cursor-not-allowed border border-white/5'
+                            ? 'bg-slate-700/50 text-white/40 cursor-not-allowed border border-white/10'
                             : 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 hover:from-cyan-400 hover:via-blue-400 hover:to-indigo-400 text-white shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] active:scale-[0.98] border border-white/20'
                             }`}
                     >
