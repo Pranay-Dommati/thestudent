@@ -133,43 +133,37 @@ else:
     SECURE_CROSS_ORIGIN_OPENER_POLICY = (None if DEBUG else 'same-origin-allow-popups')
 
 # Cache Configuration - Required for Rate Limiting
-# Use database cache for persistent caching across server restarts
-# This is better than LocMemCache for development
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-        'LOCATION': 'django_cache_table',
-        'TIMEOUT': 2592000,  # 30 days (for monthly tracking)
-        'OPTIONS': {
-            'MAX_ENTRIES': 10000,
+# Use Redis in production (when REDIS_URL is set) to avoid MySQL connection exhaustion
+# Falls back to DatabaseCache for local development
+REDIS_URL = os.environ.get('REDIS_URL')
+
+if REDIS_URL:
+    # Production: Use Redis for caching (prevents MySQL connection exhaustion from DRF throttling)
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
+            "KEY_PREFIX": "easylearnova",
         }
     }
-}
+else:
+    # Local development: Use database cache for persistence across server restarts
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'django_cache_table',
+            'TIMEOUT': 2592000,  # 30 days (for monthly tracking)
+            'OPTIONS': {
+                'MAX_ENTRIES': 10000,
+            }
+        }
+    }
 
-# OLD: LocMemCache (loses data on server restart/reload)
-# CACHES = {
-#     'default': {
-#         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-#         'LOCATION': 'unique-snowflake',
-#         'TIMEOUT': 86400,  # 24 hours
-#         'OPTIONS': {
-#             'MAX_ENTRIES': 10000,
-#             'CULL_FREQUENCY': 3,
-#         }
-#     }
-# }
-
-# For production, use Redis:
-# CACHES = {
-#     'default': {
-#         'BACKEND': 'django_redis.cache.RedisCache',
-#         'LOCATION': os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/1'),
-#         'OPTIONS': {
-#             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-#         },
-#         'TIMEOUT': 86400,  # 24 hours
-#     }
-# }
+# Close idle database connections (prevents MySQL connection pool exhaustion)
+CONN_MAX_AGE = 60
 
 
 # Application definition
