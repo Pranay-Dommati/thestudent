@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Sparkles } from 'lucide-react';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
 
 const ImmersiveVisualizer = ({
@@ -255,8 +256,8 @@ const ImmersiveVisualizer = ({
         const dryRunMatch = explanation.match(/DRY-RUN:\s*([\s\S]*?)(?:$)/i);
 
         if (dryRunMatch) {
-            // Split into explanation and dry-run parts
-            const explanationPart = explanation.substring(0, explanation.indexOf('DRY-RUN:')).trim();
+            // Split into explanation and dry-run parts, removing any stray search emojis
+            const explanationPart = explanation.substring(0, explanation.indexOf('DRY-RUN:')).replace(/🔍/g, '').trim();
             const dryRunPart = dryRunMatch[1].trim();
 
             // Parse dry-run lines and style them
@@ -265,7 +266,7 @@ const ImmersiveVisualizer = ({
             return (
                 <>
                     {/* Text explanation - Soft style */}
-                    <p className="mt-1 text-slate-700 leading-relaxed">
+                    <p className="text-slate-700 leading-relaxed pt-0.5">
                         {explanationPart}
                     </p>
 
@@ -277,7 +278,7 @@ const ImmersiveVisualizer = ({
                             </svg>
                             <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Dry Run</span>
                         </div>
-                        <div className="font-mono text-sm space-y-1">
+                        <div className="font-mono text-sm space-y-1 whitespace-pre">
                             {dryRunLines.map((line, idx) => {
                                 // Style based on content
                                 let lineClass = 'text-slate-300';
@@ -516,10 +517,7 @@ const ImmersiveVisualizer = ({
                                                 {step.explanation && (
                                                     <div className="mb-4 p-4 bg-indigo-50 rounded-xl">
                                                         <div className="flex items-start gap-2">
-                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-indigo-500 mt-0.5 flex-shrink-0">
-                                                                <path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" fill="currentColor" />
-                                                                <path d="M19 10a7 7 0 0 1-14 0" stroke="currentColor" strokeWidth="2" />
-                                                            </svg>
+                                                            <Sparkles className="w-5 h-5 text-indigo-500 flex-shrink-0 mt-1" />
                                                             <div className="flex-1">
                                                                 {renderExplanationWithDryRun(step.explanation)}
                                                             </div>

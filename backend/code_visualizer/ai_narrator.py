@@ -123,19 +123,13 @@ class AINarrator:
             if function_name and function_name != '<module>':
                 context_parts.append(f"Inside function: {function_name}")
             
-            # For loop-exit, skip AI entirely - just return clean formatted response
-            if loop_info and loop_info.get('finished'):
-                total = loop_info.get('total', '?')
-                var_name = loop_info.get('variable', 'n')
-                return f"Loop complete - all {total} elements processed.\n\n🔍 DRY-RUN:\nfor {var_name} in ...: ✓ done"
-            
-            # For for-loops, provide explicit loop info to prevent hallucination
+            # For for-loops, skip AI entirely - use our visual pointer format
             if loop_info:
-                var_name = loop_info.get('variable', 'x')
-                iteration = loop_info.get('iteration', 1)
-                value = loop_info.get('value')
-                total = loop_info.get('total', '?')
-                context_parts.append(f"LOOP INFO: This is iteration {iteration} of {total}. {var_name} = {value}")
+                # Use the basic narration which now has the visual pointer
+                return self._generate_basic_narration(
+                    step, line, code, event, variables,
+                    changed_vars, function_name, return_value, loop_info
+                )
             
             if variables:
                 var_list = []
@@ -150,7 +144,7 @@ class AINarrator:
                 context_parts.append(f"Return value: {return_value}")
             
             prompt = "\n".join(context_parts)
-            prompt += f"\n\nExplain `{code_line}` in ONE sentence using the values above. No markdown. Include 🔍 DRY-RUN with code substitution:"
+            prompt += f"\n\nExplain `{code_line}` in ONE sentence using the values above. No markdown. Include DRY-RUN with code substitution:"
             
             # Debug logging - shows exactly what we send and receive
             print(f"[AI Narrator] PROMPT:\n{prompt[:200]}...")
@@ -174,7 +168,7 @@ class AINarrator:
 
             # Check if response has proper DRY-RUN format
             import re
-            if not re.search(r"(🔍\s*)?DRY\s*-?\s*RUN\s*:", narration, re.IGNORECASE):
+            if not re.search(r"DRY\s*-?\s*RUN\s*:", narration, re.IGNORECASE):
                 print(f"[AI Narrator] WARNING: Response missing DRY-RUN, using template")
                 return self._generate_basic_narration(
                     step, line, code, event, variables,
@@ -208,8 +202,8 @@ class AINarrator:
         def fmt(explanation: str, dry_run_lines: List[str]) -> str:
             dry_run = "\n".join(dry_run_lines).strip()
             if dry_run:
-                return f"{explanation}\n\n🔍 DRY-RUN:\n{dry_run}"
-            return f"{explanation}\n\n🔍 DRY-RUN:\n"
+                return f"{explanation}\n\nDRY-RUN:\n{dry_run}"
+            return f"{explanation}\n\nDRY-RUN:\n"
         
         def get_var_value(var_name):
             if var_name in variables:
@@ -245,7 +239,7 @@ class AINarrator:
         for_match = re.match(r'for\s+(\w+)\s+in\s+(.+):', code)
         if for_match:
             loop_var = for_match.group(1)
-            iterable = for_match.group(2).strip()
+            iterable_name = for_match.group(2).strip()
             
             if loop_info:
                 finished = loop_info.get('finished', False)
@@ -253,26 +247,55 @@ class AINarrator:
                     total = loop_info.get('total', '?')
                     return fmt(
                         f"Loop complete - processed all {total} elements.",
-                        [f"for {loop_var} in {iterable}: (done)"],
+                        [f"for {loop_var} in {iterable_name}: ✓ done"],
                     )
                 
                 iteration = loop_info.get('iteration', 1)
                 total = loop_info.get('total', '?')
                 val = loop_info.get('value')
+                
+                # Try to get the iterable to create a visual pointer
+                iterable_val = get_var_value(iterable_name)
+                if iterable_val and isinstance(iterable_val, (list, tuple)):
+                    # Create visual representation with pointer
+                    # Format: [5, 2, 8, 1]
+                    #             ^
+                    #             n = 2
+                    elements = [str(x) for x in iterable_val]
+                    arr_str = "[" + ", ".join(elements) + "]"
+                    
+                    # Calculate pointer position (iteration is 1-indexed)
+                    idx = iteration - 1
+                    if 0 <= idx < len(elements):
+                        # Calculate position: "[" + elements before + ", " separators
+                        pos = 1  # Start after "["
+                        for i in range(idx):
+                            pos += len(elements[i]) + 2  # element + ", "
+                        # Pointer should be at start of element
+                        
+                        pointer_line = " " * pos + "↑"
+                        var_line = " " * pos + f"{loop_var}={val}"
+                        
+                        return fmt(
+                            f"Iteration {iteration}/{total}: {loop_var} takes value {val}.",
+                            [arr_str, pointer_line, var_line],
+                        )
+                
+                # Fallback if we can't get the iterable
                 return fmt(
                     f"Iteration {iteration}/{total}: {loop_var} = {val}.",
-                    [f"for {loop_var} in {iterable}:", f"{loop_var} = {val}"],
+                    [f"for {loop_var} in {iterable_name}:", f"{loop_var} = {val}"],
                 )
             
             val = get_var_value(loop_var)
             if val is not None:
                 return fmt(
                     f"Loop iteration: {loop_var} = {val}.",
-                    [f"for {loop_var} in {iterable}:", f"{loop_var} = {val}"],
+                    [f"for {loop_var} in {iterable_name}:", f"{loop_var} = {val}"],
                 )
             return fmt(
-                f"Starting loop over `{iterable}`.",
-                [f"for {loop_var} in {iterable}:"],
+                f"Starting loop over `{iterable_name}`.",
+                [f"for {loop_var} in {iterable_name}:"],
             )
         
         return_match = re.match(r'return\s+(.+)', code)
