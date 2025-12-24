@@ -157,7 +157,7 @@ print(arr)`}
                         disabled={!code.trim() || isRunning}
                         className={`flex-1 sm:flex-initial py-3.5 px-8 rounded-xl font-bold text-sm flex items-center justify-center gap-3 transition-all duration-300 ${!code.trim() || isRunning
                             ? 'bg-slate-700/50 text-white/40 cursor-not-allowed border border-white/10'
-                            : 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 hover:from-cyan-400 hover:via-blue-400 hover:to-indigo-400 text-white shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] active:scale-[0.98] border border-white/20'
+                            : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:scale-[1.02] active:scale-[0.98] border border-white/20'
                             }`}
                     >
                         {isRunning ? (
