@@ -461,14 +461,18 @@ def generate_explanations(request):
             code_line = frame.get('code', '')[:50]
             print(f"[On-Demand] Step {step_num}: 🤖 Generating AI for: {code_line}")
             
+            # Frontend sends 'variables' but original frame uses 'locals'
+            variables = frame.get('locals') or frame.get('variables', {})
+            changed_vars = frame.get('changed_vars') or frame.get('changedVars', [])
+            
             ai_narration = narrator.generate_narration(
                 step=frame.get('step', start_index + i),
-                line=frame.get('line', 0),
+                line=frame.get('line') or frame.get('lineNumber', 0),
                 code=frame.get('code', ''),
                 event=frame.get('event', 'line'),
-                variables=frame.get('locals', {}),
-                changed_vars=frame.get('changed_vars', []),
-                function_name=frame.get('function_name'),
+                variables=variables,
+                changed_vars=changed_vars,
+                function_name=frame.get('function_name') or frame.get('functionName'),
                 return_value=frame.get('return_value'),
                 full_source=source_lines
             )
@@ -515,14 +519,23 @@ def generate_explanations_stream(request):
                 code_line = frame.get('code', '')[:50]
                 print(f"[On-Demand Stream] Step {step_num}: 🤖 Generating AI for: {code_line}")
                 
+                # Frontend sends 'variables' but original frame uses 'locals'
+                variables = frame.get('locals') or frame.get('variables', {})
+                changed_vars = frame.get('changed_vars') or frame.get('changedVars', [])
+                
+                # Debug: show what we're working with
+                print(f"[On-Demand Stream] Frame keys: {list(frame.keys())}")
+                print(f"[On-Demand Stream] Variables keys: {list(variables.keys()) if variables else 'EMPTY'}")
+                changed_vars = frame.get('changed_vars') or frame.get('changedVars', [])
+                
                 ai_narration = narrator.generate_narration(
                     step=frame.get('step', start_index + i),
-                    line=frame.get('line', 0),
+                    line=frame.get('line') or frame.get('lineNumber', 0),
                     code=frame.get('code', ''),
                     event=frame.get('event', 'line'),
-                    variables=frame.get('locals', {}),
-                    changed_vars=frame.get('changed_vars', []),
-                    function_name=frame.get('function_name'),
+                    variables=variables,
+                    changed_vars=changed_vars,
+                    function_name=frame.get('function_name') or frame.get('functionName'),
                     return_value=frame.get('return_value'),
                     full_source=source_lines
                 )

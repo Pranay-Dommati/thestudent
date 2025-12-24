@@ -20,47 +20,125 @@ except ImportError:
 # Get API key from Django settings or environment
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
-NARRATOR_SYSTEM_PROMPT = """You are a coding tutor giving MINIMAL, value-specific explanations.
+NARRATOR_SYSTEM_PROMPT = """You are a coding tutor explaining code execution step-by-step.
 
-FORMAT (follow EXACTLY):
+FORMAT (follow EXACTLY - no deviations):
 
-[One short sentence with actual values]
-
-🔍 DRY-RUN:
-[original code]
-[code with values substituted]
-
-RULES:
-1. Explanation is ONE sentence only - short and clear
-2. Use ACTUAL VALUES from the variables provided (e.g., "8 > 5" not "n > max_val")
-3. NO markdown formatting (no ```, no **, no code blocks)
-4. The DRY-RUN section has ONLY the code lines, nothing else after
-5. Keep it minimal - students should understand in 2 seconds
-
-EXAMPLES:
-
-For `max_val = nums[0]` with nums=[5,2,8,1]:
-"Setting max_val to nums[0], which is 5.
+[One clear sentence explaining what happens with ACTUAL VALUES]
 
 🔍 DRY-RUN:
-max_val = nums[0]
-max_val = 5"
+[original code line]
+[substitute ALL variables with their actual values]
+→ [final result with computed value]
 
-For `if n > max_val:` with n=8, max_val=5:
-"Checking if 8 > 5. True, so we enter the if-block.
+CRITICAL RULES:
+1. ALWAYS substitute variable names with their ACTUAL values
+2. ALWAYS compute and show the final result with → arrow
+3. For truthy/falsy checks, show the actual value and whether it's truthy/falsy
+4. NO markdown (no ```, no **, no code blocks)
+5. Be concise but complete
+
+═══════════════════════════════════════════════════════════
+EXAMPLE 1: Simple Assignment
+═══════════════════════════════════════════════════════════
+Code: `total = val1 + val2 + carry`
+Variables: val1=2, val2=5, carry=0
+
+OUTPUT:
+Computing total by adding val1 (2), val2 (5), and carry (0).
+
+🔍 DRY-RUN:
+total = val1 + val2 + carry
+total = 2 + 5 + 0
+→ total = 7
+
+═══════════════════════════════════════════════════════════
+EXAMPLE 2: Integer Division
+═══════════════════════════════════════════════════════════
+Code: `carry = total // 10`
+Variables: total=7
+
+OUTPUT:
+Computing carry as 7 integer-divided by 10.
+
+🔍 DRY-RUN:
+carry = total // 10
+carry = 7 // 10
+→ carry = 0
+
+═══════════════════════════════════════════════════════════
+EXAMPLE 3: While Loop with OR Conditions
+═══════════════════════════════════════════════════════════
+Code: `while l1 or l2 or carry:`
+Variables: l1=[2→4→3], l2=[5→6→4], carry=0
+
+OUTPUT:
+Checking loop condition: at least one of l1, l2, or carry must be truthy.
+
+🔍 DRY-RUN:
+while l1 or l2 or carry:
+  l1 = [2→4→3] (truthy) ✓
+  l2 = [5→6→4] (truthy) ✓  
+  carry = 0 (falsy) ✗
+→ Condition is True (l1 and l2 are truthy), loop continues
+
+═══════════════════════════════════════════════════════════
+EXAMPLE 4: Ternary/Conditional Expression
+═══════════════════════════════════════════════════════════
+Code: `val1 = l1.val if l1 else 0`
+Variables: l1=[2→4→3] (with l1.val=2)
+
+OUTPUT:
+Since l1 is truthy, val1 gets l1.val which is 2.
+
+🔍 DRY-RUN:
+val1 = l1.val if l1 else 0
+l1 = [2→4→3] (truthy) ✓
+→ Taking 'if' branch: val1 = 2
+
+═══════════════════════════════════════════════════════════
+EXAMPLE 5: If Condition
+═══════════════════════════════════════════════════════════
+Code: `if n > max_val:`
+Variables: n=8, max_val=5
+
+OUTPUT:
+Checking if 8 > 5, which is True, so we enter the if-block.
 
 🔍 DRY-RUN:
 if n > max_val:
-if 8 > 5: True"
+if 8 > 5:
+→ True ✓ (entering if-block)
 
-For `for n in nums:` with n=2, nums=[5,2,8,1]:
-"Loop iteration: n takes value 2.
+═══════════════════════════════════════════════════════════
+EXAMPLE 6: For Loop
+═══════════════════════════════════════════════════════════
+Code: `for n in nums:`
+Variables: n=2, nums=[5,2,8,1]
+
+OUTPUT:
+Loop iteration: n takes the value 2.
 
 🔍 DRY-RUN:
 for n in nums:
-n = 2"
+→ n = 2
 
-NEVER add text after the DRY-RUN code lines. Keep everything minimal."""
+═══════════════════════════════════════════════════════════
+
+CRITICAL - DO NOT:
+- Say "I cannot execute" or "I don't have" - you ALWAYS have the variables!
+- Skip the DRY-RUN section
+- Skip the → result line
+- Use markdown code blocks
+- Refuse or explain limitations
+
+YOU MUST ALWAYS:
+1. Write one explanation sentence
+2. Include 🔍 DRY-RUN: header
+3. Show the code with values substituted
+4. End with → and the computed result
+
+The variables are provided to you - USE THEM to compute the result."""
 
 
 class AINarrator:
@@ -74,7 +152,7 @@ class AINarrator:
             try:
                 self.client = genai.Client(api_key=GEMINI_API_KEY)
                 self.is_available = True
-                print("✓ AI Narrator initialized with Gemini 2.0 Flash")
+                print("✓ AI Narrator initialized with Gemini 2.5 Flash")
             except Exception as e:
                 print(f"⚠ AI Narrator initialization failed: {e}")
                 self.is_available = False
@@ -107,479 +185,108 @@ class AINarrator:
         full_source: Optional[List[str]] = None,
         loop_info: Optional[Dict[str, Any]] = None
     ) -> str:
-        if not self.is_available or not self.client:
-            return self._generate_basic_narration(
-                step, line, code, event, variables, 
-                changed_vars, function_name, return_value, loop_info
-            )
+        """Generate AI narration. NO FALLBACKS - errors are shown clearly."""
         
-        try:
-            code_line = code.strip()
-            context_parts = [
-                f"CURRENT LINE TO EXPLAIN: {code_line}",
-                f"Step {step}, Line {line}",
-            ]
-            
-            if function_name and function_name != '<module>':
-                context_parts.append(f"Inside function: {function_name}")
-            
-            # For for-loops, skip AI entirely - use our visual pointer format
-            if loop_info:
-                # Use the basic narration which now has the visual pointer
-                return self._generate_basic_narration(
-                    step, line, code, event, variables,
-                    changed_vars, function_name, return_value, loop_info
-                )
-            
-            # For while loops with compound conditions, skip AI for clean formatting
-            if code.strip().startswith('while ') and (' or ' in code or ' and ' in code):
-                return self._generate_basic_narration(
-                    step, line, code, event, variables,
-                    changed_vars, function_name, return_value, loop_info
-                )
-            
-            # For ternary expressions, skip AI for clean formatting
-            if ' if ' in code and ' else ' in code:
-                return self._generate_basic_narration(
-                    step, line, code, event, variables,
-                    changed_vars, function_name, return_value, loop_info
-                )
-            
-            if variables:
-                var_list = []
-                for name, data in variables.items():
-                    if isinstance(data, dict) and 'value' in data:
-                        var_list.append(f"  {name} = {data['value']} ({data.get('type', 'unknown')})")
-                    else:
-                        var_list.append(f"  {name} = {data}")
-                context_parts.append("Current variable values:\n" + "\n".join(var_list))
-            
-            if event == 'return' and return_value is not None:
-                context_parts.append(f"Return value: {return_value}")
-            
-            prompt = "\n".join(context_parts)
-            prompt += f"\n\nExplain `{code_line}` in ONE sentence using the values above. No markdown. Include DRY-RUN with code substitution:"
-            
-            # Debug logging - shows exactly what we send and receive
-            print(f"[AI Narrator] PROMPT:\n{prompt[:200]}...")
-            
-            response = self.client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=NARRATOR_SYSTEM_PROMPT,
-                    temperature=0.5,
-                    max_output_tokens=200,
-                )
-            )
-            
-            narration = response.text.strip()
-            print(f"[AI Narrator] RESPONSE:\n{narration[:200]}...")
-            
-            narration = narration.strip('"\'')
-            if narration.startswith('Narration:'):
-                narration = narration[10:].strip()
-
-            # Check if response has proper DRY-RUN format
-            import re
-            if not re.search(r"DRY\s*-?\s*RUN\s*:", narration, re.IGNORECASE):
-                print(f"[AI Narrator] WARNING: Response missing DRY-RUN, using template")
-                return self._generate_basic_narration(
-                    step, line, code, event, variables,
-                    changed_vars, function_name, return_value, loop_info
-                )
-            
-            return narration
-            
-        except Exception as e:
-            print(f"[AI Narrator] ERROR: {type(e).__name__}: {e}")
-            return self._generate_basic_narration(
-                step, line, code, event, variables,
-                changed_vars, function_name, return_value, loop_info
-            )
-    
-    def _generate_basic_narration(
-        self,
-        step: int,
-        line: int,
-        code: str,
-        event: str,
-        variables: Dict[str, Any],
-        changed_vars: List[str],
-        function_name: Optional[str] = None,
-        return_value: Any = None,
-        loop_info: Optional[Dict[str, Any]] = None
-    ) -> str:
-        import re
-        code = code.strip()
-
-        def fmt(explanation: str, dry_run_lines: List[str]) -> str:
-            dry_run = "\n".join(dry_run_lines).strip()
-            if dry_run:
-                return f"{explanation}\n\nDRY-RUN:\n{dry_run}"
-            return f"{explanation}\n\nDRY-RUN:\n"
+        code_line = code.strip()
         
-        def get_var_value(var_name):
-            if var_name in variables:
-                data = variables[var_name]
-                return data['value'] if isinstance(data, dict) else data
-            return None
+        # ===== CHECK 1: Is AI available? =====
+        if not self.is_available:
+            error_msg = f"❌ AI UNAVAILABLE: Gemini client not initialized. Check GEMINI_API_KEY."
+            print(f"[AI Narrator] {error_msg}")
+            return f"{error_msg}\n\n🔍 DRY-RUN:\n{code_line}\n→ [AI unavailable]"
         
-        if event == 'call':
-            name = function_name or "<function>"
-            return fmt(
-                f"Calling function `{name}`.",
-                [f"{name}(...)"],
-            )
-        if event == 'return':
-            if return_value is not None:
-                name = function_name or "<function>"
-                return fmt(
-                    f"Returning from `{name}`.",
-                    [f"return {repr(return_value)} ✓"],
-                )
-            name = function_name or "<function>"
-            return fmt(
-                f"Returning from `{name}`.",
-                ["return ..."],
-            )
-        if event == 'exception':
-            return fmt(
-                "An error occurred while executing this line.",
-                [code],
-            )
+        if not self.client:
+            error_msg = f"❌ AI CLIENT NULL: Gemini client is None."
+            print(f"[AI Narrator] {error_msg}")
+            return f"{error_msg}\n\n🔍 DRY-RUN:\n{code_line}\n→ [AI client null]"
         
-        # For loops - use loop_info if available for accurate values
-        for_match = re.match(r'for\s+(\w+)\s+in\s+(.+):', code)
-        if for_match:
-            loop_var = for_match.group(1)
-            iterable_name = for_match.group(2).strip()
-            
-            if loop_info:
-                finished = loop_info.get('finished', False)
-                if finished:
-                    total = loop_info.get('total', '?')
-                    return fmt(
-                        f"Loop complete - processed all {total} elements.",
-                        [f"for {loop_var} in {iterable_name}: ✓ done"],
-                    )
-                
-                iteration = loop_info.get('iteration', 1)
-                total = loop_info.get('total', '?')
-                val = loop_info.get('value')
-                
-                # Try to get the iterable to create a visual pointer
-                iterable_val = get_var_value(iterable_name)
-                if iterable_val and isinstance(iterable_val, (list, tuple)):
-                    # Create visual representation with pointer
-                    # Format: [5, 2, 8, 1]
-                    #             ^
-                    #             n = 2
-                    elements = [str(x) for x in iterable_val]
-                    arr_str = "[" + ", ".join(elements) + "]"
-                    
-                    # Calculate pointer position (iteration is 1-indexed)
-                    idx = iteration - 1
-                    if 0 <= idx < len(elements):
-                        # Calculate position: "[" + elements before + ", " separators
-                        pos = 1  # Start after "["
-                        for i in range(idx):
-                            pos += len(elements[i]) + 2  # element + ", "
-                        # Pointer should be at start of element
-                        
-                        pointer_line = " " * pos + "↑"
-                        var_line = " " * pos + f"{loop_var}={val}"
-                        
-                        return fmt(
-                            f"Iteration {iteration}/{total}: {loop_var} takes value {val}.",
-                            [arr_str, pointer_line, var_line],
-                        )
-                
-                # Fallback if we can't get the iterable
-                return fmt(
-                    f"Iteration {iteration}/{total}: {loop_var} = {val}.",
-                    [f"for {loop_var} in {iterable_name}:", f"{loop_var} = {val}"],
-                )
-            
-            val = get_var_value(loop_var)
-            if val is not None:
-                return fmt(
-                    f"Loop iteration: {loop_var} = {val}.",
-                    [f"for {loop_var} in {iterable_name}:", f"{loop_var} = {val}"],
-                )
-            return fmt(
-                f"Starting loop over `{iterable_name}`.",
-                [f"for {loop_var} in {iterable_name}:"],
-            )
+        # ===== BUILD CONTEXT =====
+        context_parts = [
+            f"CODE TO EXPLAIN: `{code_line}`",
+            f"Step {step}, Line {line}",
+        ]
         
-        # While loops - special handling for compound conditions
-        while_match = re.match(r'while\s+(.+):', code)
-        if while_match:
-            condition = while_match.group(1).strip()
-            
-            # Check if it's a compound condition (contains 'or' or 'and')
-            if ' or ' in condition or ' and ' in condition:
-                # Parse individual conditions
-                if ' or ' in condition:
-                    parts = [p.strip() for p in condition.split(' or ')]
-                    connector = 'or'
+        if function_name and function_name != '<module>':
+            context_parts.append(f"Inside function: {function_name}")
+        
+        # Add loop info if present
+        if loop_info:
+            context_parts.append(f"Loop info: {loop_info}")
+        
+        # Build detailed variable context
+        if variables:
+            var_list = []
+            for name, data in variables.items():
+                if isinstance(data, dict) and 'value' in data:
+                    val = data['value']
+                    var_type = data.get('type', 'unknown')
+                    # Determine truthy/falsy
+                    try:
+                        is_truthy = bool(val) if val is not None else False
+                    except:
+                        is_truthy = val is not None
+                    truthy_str = "truthy" if is_truthy else "falsy"
+                    var_list.append(f"  {name} = {val} (type: {var_type}, {truthy_str})")
                 else:
-                    parts = [p.strip() for p in condition.split(' and ')]
-                    connector = 'and'
-                
-                dry_run_lines = ["Loop condition:"]
-                any_true = False
-                all_true = True
-                
-                for part in parts:
-                    # Evaluate the part
-                    val = get_var_value(part)
-                    if val is not None:
-                        # Direct variable reference
-                        if val is None or val == 0 or val == False or val == '' or val == []:
-                            dry_run_lines.append(f"  {part} is falsy ✗")
-                            all_true = False
-                        else:
-                            # For ListNode-like objects, show meaningful info
-                            if 'ListNode' in str(type(val).__name__) or hasattr(val, 'val'):
-                                dry_run_lines.append(f"  {part} is not None ✔")
-                            else:
-                                dry_run_lines.append(f"  {part} = {val} ✔")
-                            any_true = True
-                    else:
-                        # Check for common patterns like "var != 0" or just variable name
-                        if '!=' in part:
-                            var, check_val = part.split('!=')
-                            var = var.strip()
-                            check_val = check_val.strip()
-                            actual = get_var_value(var)
-                            if actual is not None:
-                                is_true = str(actual) != check_val
-                                if is_true:
-                                    dry_run_lines.append(f"  {var} ≠ {check_val} ✔ ({var}={actual})")
-                                    any_true = True
-                                else:
-                                    dry_run_lines.append(f"  {var} ≠ {check_val} ✗ ({var}={actual})")
-                                    all_true = False
-                            else:
-                                dry_run_lines.append(f"  {part} (unknown)")
-                        else:
-                            # Assume it's a variable that should be truthy
-                            actual = get_var_value(part)
-                            if actual is not None:
-                                if actual:
-                                    if hasattr(actual, 'val'):
-                                        dry_run_lines.append(f"  {part} is not None ✔")
-                                    else:
-                                        dry_run_lines.append(f"  {part} = {actual} ✔")
-                                    any_true = True
-                                else:
-                                    dry_run_lines.append(f"  {part} = {actual} ✗")
-                                    all_true = False
-                            else:
-                                dry_run_lines.append(f"  {part} (checking...)")
-                
-                # Determine loop outcome
-                if connector == 'or':
-                    continues = any_true
-                else:  # 'and'
-                    continues = all_true
-                
-                if continues:
-                    dry_run_lines.append("→ Loop continues")
-                    explanation = "At least one condition is true, so the loop continues."
-                else:
-                    dry_run_lines.append("→ Loop exits")
-                    explanation = "All conditions are false, so the loop exits."
-                
-                return fmt(explanation, dry_run_lines)
-            else:
-                # Simple while condition
-                val = get_var_value(condition)
-                if val is not None:
-                    if val:
-                        return fmt(
-                            f"Condition `{condition}` is true, loop continues.",
-                            [f"while {condition}:", f"{condition} = {val} → continues"],
-                        )
-                    else:
-                        return fmt(
-                            f"Condition `{condition}` is false, loop exits.",
-                            [f"while {condition}:", f"{condition} = {val} → exits"],
-                        )
-                return fmt(
-                    f"Checking while loop condition.",
-                    [f"while {condition}:"],
-                )
+                    var_list.append(f"  {name} = {data}")
+            context_parts.append("CURRENT VARIABLES:\n" + "\n".join(var_list))
+        else:
+            context_parts.append("CURRENT VARIABLES: (none)")
         
-        return_match = re.match(r'return\s+(.+)', code)
-        if return_match:
-            return_expr = return_match.group(1).strip()
-            val = get_var_value(return_expr)
-            if val is not None:
-                return fmt(
-                    "Returning a value from this function.",
-                    [f"return {return_expr}", f"return {repr(val)} ✓"],
-                )
-            return fmt(
-                "Returning a value from this function.",
-                [f"return {return_expr}"],
-            )
+        if event == 'return' and return_value is not None:
+            context_parts.append(f"RETURN VALUE: {return_value}")
         
-        if_match = re.match(r'(if|elif)\s+(.+):', code)
-        if if_match:
-            condition = if_match.group(2).strip()
-            return fmt(
-                "Checking whether the condition is true.",
-                [condition, "(evaluated by Python)"],
-            )
-            
-        if code.strip() == 'else:':
-            return fmt(
-                "Entering the else branch.",
-                ["else:"],
-            )
+        prompt = "\n".join(context_parts)
+        prompt += f"\n\n=== TASK: Explain this code line ===\nCode: `{code_line}`"
+        prompt += "\n\n=== INSTRUCTIONS ==="
+        prompt += "\n1. Write ONE sentence explaining what this line does, using the actual values"
+        prompt += "\n2. Include a DRY-RUN section that:"
+        prompt += "\n   - Shows the original code"
+        prompt += "\n   - Substitutes variable names with values (e.g., val1=2, val2=5, carry=0)"
+        prompt += "\n   - Computes the result (e.g., 2 + 5 + 0 = 7)"
+        prompt += "\n   - Shows → with the final result"
+        prompt += "\n\nIMPORTANT: You have ALL variables needed. DO NOT say you cannot execute. COMPUTE the result."
         
-        # Ternary/conditional expression: var = true_val if condition else false_val
-        ternary_match = re.match(r'^(\w+)\s*=\s*(.+)\s+if\s+(\w+)\s+else\s+(.+)$', code)
-        if ternary_match:
-            var_name = ternary_match.group(1)
-            true_expr = ternary_match.group(2).strip()
-            condition_var = ternary_match.group(3).strip()
-            false_expr = ternary_match.group(4).strip()
-            
-            condition_val = get_var_value(condition_var)
-            result_val = get_var_value(var_name)
-            
-            dry_run_lines = [f"{var_name} = {true_expr} if {condition_var} else {false_expr}"]
-            
-            if condition_val is not None:
-                # Check if it's a ListNode or similar
-                if hasattr(condition_val, 'val'):
-                    dry_run_lines.append(f"{condition_var} = ListNode (not None)")
-                    is_truthy = True
-                else:
-                    dry_run_lines.append(f"{condition_var} = {repr(condition_val)}")
-                    is_truthy = bool(condition_val)
-                
-                if is_truthy:
-                    dry_run_lines.append(f"→ {condition_var} is truthy ✔")
-                    dry_run_lines.append(f"→ Taking the 'if' branch: {true_expr}")
-                    # Try to get the value of the true expression
-                    if '.' in true_expr:
-                        # e.g., l1.val
-                        parts = true_expr.split('.')
-                        obj = get_var_value(parts[0])
-                        if obj and hasattr(obj, parts[1]):
-                            true_val = getattr(obj, parts[1])
-                            dry_run_lines.append(f"→ {true_expr} = {true_val}")
-                else:
-                    dry_run_lines.append(f"→ {condition_var} is falsy ✗")
-                    dry_run_lines.append(f"→ Taking the 'else' branch: {false_expr}")
-                
-                if result_val is not None:
-                    dry_run_lines.append(f"∴ {var_name} = {repr(result_val)}")
-                
-                explanation = f"`{condition_var}` is {'truthy' if is_truthy else 'falsy'}, so {var_name} gets {'the ' + true_expr if is_truthy else false_expr}."
-                return fmt(explanation, dry_run_lines)
-            
-            if result_val is not None:
-                return fmt(
-                    f"Conditional assignment to `{var_name}`.",
-                    [f"{var_name} = {true_expr} if {condition_var} else {false_expr}", f"{var_name} = {repr(result_val)}"],
-                )
-            return fmt(
-                f"Conditional assignment to `{var_name}`.",
-                [f"{var_name} = {true_expr} if {condition_var} else {false_expr}"],
-            )
+        # ===== DETAILED LOGGING =====
+        print("=" * 60)
+        print(f"[AI Narrator] STEP {step} | LINE {line}")
+        print(f"[AI Narrator] CODE: {code_line}")
+        print(f"[AI Narrator] VARIABLES: {list(variables.keys()) if variables else 'none'}")
+        print(f"[AI Narrator] FULL PROMPT:\n{prompt}")
+        print("=" * 60)
         
-        assign_match = re.match(r'^(\w+)\s*=\s*(.+)$', code)
-        if assign_match and '==' not in code and '!=' not in code and '<=' not in code and '>=' not in code:
-            var_name = assign_match.group(1)
-            expression = assign_match.group(2).strip()
-            
-            # Try to substitute variable values into the expression
-            substituted = expression
-            for v_name in re.findall(r'\b([a-zA-Z_]\w*)\b', expression):
-                v_val = get_var_value(v_name)
-                if v_val is not None and isinstance(v_val, (int, float)):
-                    substituted = re.sub(rf'\b{v_name}\b', str(v_val), substituted)
-            
-            # Try to evaluate the substituted expression
-            evaluated = None
-            if substituted != expression:
-                try:
-                    # Only evaluate if it's a safe arithmetic expression
-                    if re.match(r'^[\d\s\+\-\*\/\%\(\)\.]+$', substituted):
-                        evaluated = eval(substituted)
-                except:
-                    pass
-            
-            dry_run_lines = [f"{var_name} = {expression}"]
-            
-            if substituted != expression:
-                dry_run_lines.append(f"{var_name} = {substituted}")
-            
-            if evaluated is not None:
-                dry_run_lines.append(f"{var_name} = {evaluated}")
-                return fmt(
-                    f"Computing `{expression}` and assigning result to `{var_name}`.",
-                    dry_run_lines,
-                )
-            
-            val = get_var_value(var_name)
-            if val is not None:
-                dry_run_lines.append(f"{var_name} = {repr(val)}")
-                return fmt(
-                    f"Assigning the result of `{expression}` to `{var_name}`.",
-                    dry_run_lines,
-                )
-            return fmt(
-                f"Assigning a value to `{var_name}`.",
-                dry_run_lines,
+        # ===== CALL AI - NO TRY/EXCEPT =====
+        # If this fails, we WANT to see the error
+        response = self.client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=NARRATOR_SYSTEM_PROMPT,
+                temperature=0.1,  # Very low for consistent format
+                max_output_tokens=500,
             )
-        
-        aug_match = re.match(r'^(\w+)\s*([+\-*/])=\s*(.+)$', code)
-        if aug_match:
-            var_name = aug_match.group(1)
-            op = aug_match.group(2)
-            expression = aug_match.group(3).strip()
-            val = get_var_value(var_name)
-            if val is not None:
-                return fmt(
-                    f"Updating `{var_name}` using `{op}=`.",
-                    [f"{var_name} {op}= {expression}", f"{var_name} = {repr(val)}"],
-                )
-            return fmt(
-                f"Updating `{var_name}` using `{op}=`.",
-                [f"{var_name} {op}= {expression}"],
-            )
-        
-        if code.startswith('while '):
-            return fmt(
-                "Checking the while-loop condition.",
-                [code],
-            )
-        if code.startswith('print('):
-            return fmt(
-                "Printing output to the console.",
-                [code],
-            )
-        if code.startswith('def '):
-            return fmt(
-                "Defining a function.",
-                [code],
-            )
-        if code.startswith('class '):
-            return fmt(
-                "Defining a class.",
-                [code],
-            )
-        
-        return fmt(
-            "Executing this line.",
-            [code] if code else [],
         )
+        
+        narration = response.text.strip()
+        
+        # ===== LOG RESPONSE =====
+        print(f"[AI Narrator] RESPONSE:\n{narration}")
+        print("=" * 60)
+        
+        # Clean up response
+        narration = narration.strip('"\'')
+        if narration.startswith('Narration:'):
+            narration = narration[10:].strip()
+        
+        # ===== VALIDATE RESPONSE =====
+        import re
+        if not re.search(r"DRY\s*-?\s*RUN\s*:", narration, re.IGNORECASE):
+            error_msg = f"⚠️ AI RESPONSE MISSING DRY-RUN FORMAT"
+            print(f"[AI Narrator] {error_msg}")
+            # Return what we got with an error note, but DO NOT FALLBACK
+            return f"{narration}\n\n⚠️ [AI did not include DRY-RUN section]"
+        
+        return narration
 
 
 # Singleton instance

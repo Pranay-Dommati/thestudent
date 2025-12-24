@@ -277,7 +277,7 @@ const ImmersiveVisualizer = ({
                                     ...updatedSteps[data.index],
                                     explanation: data.explanation
                                 };
-                                
+
                                 // Update the local tracking array
                                 updatedSteps[data.index] = stepWithExplanation;
                                 console.log(`[Progressive] Step ${data.index + 1}: Prepared step with explanation:`, !!stepWithExplanation.explanation);
@@ -376,19 +376,30 @@ const ImmersiveVisualizer = ({
     };
 
     // Render explanation with styled dry-run section
-    const renderExplanationWithDryRun = (explanation) => {
+    // If deterministicDryRun is provided (from tracer), use it instead of parsing from AI text
+    const renderExplanationWithDryRun = (explanation, deterministicDryRun = null) => {
         if (!explanation) return null;
 
-        // Check if the explanation contains a DRY-RUN section
-        const dryRunMatch = explanation.match(/DRY-RUN:\s*([\s\S]*?)(?:$)/i);
+        // Extract just the text explanation (remove any DRY-RUN section from AI text)
+        let explanationPart = explanation;
+        if (explanation.includes('DRY-RUN:')) {
+            explanationPart = explanation.substring(0, explanation.indexOf('DRY-RUN:')).replace(/🔍/g, '').trim();
+        }
 
-        if (dryRunMatch) {
-            // Split into explanation and dry-run parts, removing any stray search emojis
-            const explanationPart = explanation.substring(0, explanation.indexOf('DRY-RUN:')).replace(/🔍/g, '').trim();
-            const dryRunPart = dryRunMatch[1].trim();
+        // Use deterministic dry_run from tracer if available, otherwise parse from AI
+        let dryRunLines = [];
+        if (deterministicDryRun && Array.isArray(deterministicDryRun) && deterministicDryRun.length > 0) {
+            // Use the pre-computed deterministic dry run from the tracer
+            dryRunLines = deterministicDryRun;
+        } else if (explanation.includes('DRY-RUN:')) {
+            // Fallback: parse from AI-generated text
+            const dryRunMatch = explanation.match(/DRY-RUN:\s*([\s\S]*?)(?:$)/i);
+            if (dryRunMatch) {
+                dryRunLines = dryRunMatch[1].trim().split('\n').filter(line => line.trim());
+            }
+        }
 
-            // Parse dry-run lines and style them
-            const dryRunLines = dryRunPart.split('\n').filter(line => line.trim());
+        if (dryRunLines.length > 0) {
 
             return (
                 <>
@@ -700,7 +711,7 @@ const ImmersiveVisualizer = ({
                                                         <div className="flex items-start gap-2">
                                                             <Sparkles className="w-5 h-5 text-indigo-500 flex-shrink-0 mt-1" />
                                                             <div className="flex-1">
-                                                                {renderExplanationWithDryRun(step.explanation)}
+                                                                {renderExplanationWithDryRun(step.explanation, step.dry_run)}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -718,22 +729,37 @@ const ImmersiveVisualizer = ({
                                                     <div className="flex flex-wrap items-center gap-2">
                                                         <span className="text-xs text-slate-500 font-medium">Variables:</span>
                                                         {Object.entries(step.variables).map(([name, data]) => {
-                                                            const valueStr = typeof data.value === 'object'
-                                                                ? JSON.stringify(data.value)
-                                                                : String(data.value);
                                                             const isChanged = step.changedVars?.includes(name);
+
+                                                            // Use computed_values for NEW value if this variable is being changed
+                                                            let displayValue = data.value;
+                                                            let showNewBadge = false;
+
+                                                            if (isChanged && step.computed_values && step.computed_values[name] !== undefined) {
+                                                                displayValue = step.computed_values[name];
+                                                                showNewBadge = true;
+                                                            }
+
+                                                            const valueStr = typeof displayValue === 'object'
+                                                                ? JSON.stringify(displayValue)
+                                                                : String(displayValue);
 
                                                             return (
                                                                 <span
                                                                     key={name}
                                                                     className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono ${isChanged
-                                                                        ? 'bg-indigo-100 text-indigo-700'
+                                                                        ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-200'
                                                                         : 'bg-slate-100 text-slate-700'
                                                                         }`}
                                                                 >
                                                                     <span className="font-semibold">{name}</span>
                                                                     <span className="text-slate-400">=</span>
                                                                     <span>{valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr}</span>
+                                                                    {showNewBadge && (
+                                                                        <span className="ml-1 text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold">
+                                                                            NEW!
+                                                                        </span>
+                                                                    )}
                                                                 </span>
                                                             );
                                                         })}

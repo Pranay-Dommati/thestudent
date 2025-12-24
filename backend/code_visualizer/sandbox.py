@@ -238,7 +238,7 @@ def create_sandbox(input_values: Optional[List[str]] = None) -> Tuple[Dict[str, 
                 seen.add(id(node))
                 values.append(str(node.val))
                 node = node.next
-            return f"ListNode([{' -> '.join(values)}])"
+            return f"[{' -> '.join(values)}]"
     
     class TreeNode:
         """Binary tree node for LeetCode problems."""

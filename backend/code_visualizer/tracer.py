@@ -157,6 +157,204 @@ class PythonTracer:
         
         return predicted
     
+    def _compute_expected_values(self, code_line: str, current_locals: Dict[str, Any]) -> Dict[str, Any]:
+        """Compute the expected NEW values for variables that will be assigned.
+        
+        This is crucial for showing the RESULT of an operation, not just the inputs.
+        We safely evaluate simple arithmetic/comparison expressions.
+        """
+        computed = {}
+        code = code_line.strip()
+        
+        # Simple assignment: `var = expression`
+        assign_match = re.match(r'^(\w+)\s*=\s*(.+)$', code)
+        if assign_match and '==' not in code:
+            var_name = assign_match.group(1)
+            expression = assign_match.group(2).strip()
+            
+            try:
+                # Create a safe evaluation context with current locals
+                eval_context = {}
+                for name, data in current_locals.items():
+                    if name.startswith('_'):
+                        continue
+                    val = data.get('value') if isinstance(data, dict) else data
+                    eval_context[name] = val
+                
+                # Try to safely evaluate simple arithmetic expressions
+                # Only allow safe operations: +, -, *, /, //, %, **
+                if self._is_safe_expression(expression):
+                    result = eval(expression, {"__builtins__": {}}, eval_context)
+                    computed[var_name] = self._safe_copy(result)
+            except:
+                # If evaluation fails, that's okay - we just won't have the computed value
+                pass
+        
+        # Augmented assignment: `var += expr`, `var -= expr`, etc.
+        aug_match = re.match(r'^(\w+)\s*([+\-*/|&^%@])=\s*(.+)$', code)
+        if aug_match:
+            var_name = aug_match.group(1)
+            operator = aug_match.group(2)
+            expression = aug_match.group(3).strip()
+            
+            try:
+                eval_context = {}
+                for name, data in current_locals.items():
+                    if name.startswith('_'):
+                        continue
+                    val = data.get('value') if isinstance(data, dict) else data
+                    eval_context[name] = val
+                
+                if var_name in eval_context and self._is_safe_expression(expression):
+                    current_val = eval_context[var_name]
+                    expr_val = eval(expression, {"__builtins__": {}}, eval_context)
+                    
+                    op_map = {
+                        '+': lambda a, b: a + b,
+                        '-': lambda a, b: a - b,
+                        '*': lambda a, b: a * b,
+                        '/': lambda a, b: a / b,
+                        '%': lambda a, b: a % b,
+                    }
+                    if operator in op_map:
+                        result = op_map[operator](current_val, expr_val)
+                        computed[var_name] = self._safe_copy(result)
+            except:
+                pass
+        
+        return computed
+    
+    def _is_safe_expression(self, expr: str) -> bool:
+        """Check if an expression is safe to evaluate (no function calls, imports, etc.)"""
+        # Disallow dangerous patterns
+        dangerous = ['import', 'exec', 'eval', 'open', 'file', 'input', '__', 
+                     'lambda', 'class', 'def', 'global', 'nonlocal']
+        expr_lower = expr.lower()
+        for d in dangerous:
+            if d in expr_lower:
+                return False
+        
+        # Allow simple expressions with arithmetic and comparisons
+        # Check for function call patterns like `func(` but allow things like `(a + b)`
+        # This is a simple heuristic: if there's a word immediately followed by '(' it's likely a function call
+        if re.search(r'\b[a-zA-Z_]\w*\s*\(', expr):
+            # Exception: allow things like `(x + y)` but not `foo(x)`
+            # Check if it's just a parenthesized expression
+            if not re.match(r'^\s*\(', expr):
+                return False
+        
+        return True
+    
+    def _generate_dry_run(self, code_line: str, locals_data: Dict[str, Any], computed_values: Dict[str, Any]) -> List[str]:
+        """Generate a deterministic DRY-RUN breakdown.
+        
+        This is the enterprise fix - we compute the DRY-RUN ourselves,
+        don't rely on AI for computation.
+        
+        Returns a list of lines for the DRY-RUN section.
+        """
+        code = code_line.strip()
+        lines = [code]  # Always start with original code
+        
+        def get_val(name):
+            """Get the actual value from locals, properly formatted."""
+            if name in locals_data:
+                data = locals_data[name]
+                val = data.get('value') if isinstance(data, dict) else data
+                return val
+            return None
+        
+        def format_val(val):
+            """Format a value for display."""
+            if val is None:
+                return "None"
+            if isinstance(val, bool):
+                return str(val)
+            if isinstance(val, str):
+                return repr(val)
+            return str(val)
+        
+        def is_truthy(val):
+            """Check if a value is truthy."""
+            try:
+                return bool(val)
+            except:
+                return val is not None
+        
+        # Handle while/if conditions with or/and
+        condition_match = re.match(r'^(while|if|elif)\s+(.+):', code)
+        if condition_match:
+            keyword = condition_match.group(1)
+            condition = condition_match.group(2).strip()
+            
+            # Split by 'or' or 'and'
+            if ' or ' in condition or ' and ' in condition:
+                # Parse the condition parts
+                parts = re.split(r'\s+(or|and)\s+', condition)
+                condition_lines = []
+                
+                for part in parts:
+                    if part in ('or', 'and'):
+                        continue
+                    part = part.strip()
+                    val = get_val(part)
+                    if val is not None:
+                        truthy = is_truthy(val)
+                        mark = "✓" if truthy else "✗"
+                        condition_lines.append(f"  {part} = {format_val(val)} {'(truthy)' if truthy else '(falsy)'} {mark}")
+                
+                if condition_lines:
+                    lines = [f"{keyword.capitalize()} condition:"] + condition_lines
+                    # Add result
+                    if keyword == 'while':
+                        lines.append("→ Loop continues" if any('✓' in l for l in condition_lines) else "→ Loop exits")
+                    else:
+                        lines.append("→ True ✓" if any('✓' in l for l in condition_lines) else "→ False ✗")
+            else:
+                # Simple condition
+                val = get_val(condition)
+                if val is not None:
+                    truthy = is_truthy(val)
+                    mark = "✓" if truthy else "✗"
+                    lines.append(f"{condition} = {format_val(val)} {'(truthy)' if truthy else '(falsy)'} {mark}")
+            
+            return lines
+        
+        # Handle simple assignments: var = expr
+        assign_match = re.match(r'^(\w+)\s*=\s*(.+)$', code)
+        if assign_match and '==' not in code:
+            var_name = assign_match.group(1)
+            expression = assign_match.group(2).strip()
+            
+            # Substitute variable values in the expression
+            substituted = expression
+            for name, data in locals_data.items():
+                if name in substituted:
+                    val = data.get('value') if isinstance(data, dict) else data
+                    # Replace whole word only
+                    substituted = re.sub(r'\b' + re.escape(name) + r'\b', format_val(val), substituted)
+            
+            if substituted != expression:
+                lines.append(f"{var_name} = {substituted}")
+            
+            # Add computed result
+            if var_name in computed_values:
+                result = computed_values[var_name]
+                lines.append(f"→ {var_name} = {format_val(result)}")
+            
+            return lines
+        
+        # Handle for loops
+        for_match = re.match(r'for\s+(\w+)\s+in\s+(.+):', code)
+        if for_match:
+            loop_var = for_match.group(1)
+            val = get_val(loop_var)
+            if val is not None:
+                lines.append(f"→ {loop_var} = {format_val(val)}")
+            return lines
+        
+        return lines
+    
     def _get_code_line(self, line_no: int) -> str:
         if 0 < line_no <= len(self.source_lines):
             return self.source_lines[line_no - 1].rstrip()
@@ -385,6 +583,16 @@ class PythonTracer:
             frame_dict = trace_frame.to_dict()
             if loop_info:
                 frame_dict['loop_info'] = loop_info
+            
+            # Compute expected new values for assignments (architectural fix for showing results)
+            computed_values = self._compute_expected_values(code_line, serialized_locals)
+            if computed_values:
+                frame_dict['computed_values'] = computed_values
+            
+            # Generate deterministic DRY-RUN (enterprise fix - don't rely on AI for computation)
+            dry_run_lines = self._generate_dry_run(code_line, serialized_locals, computed_values)
+            if dry_run_lines:
+                frame_dict['dry_run'] = dry_run_lines
             
             trace_frame.explanation = self._generate_explanation(trace_frame)
             frame_dict['explanation'] = trace_frame.explanation
