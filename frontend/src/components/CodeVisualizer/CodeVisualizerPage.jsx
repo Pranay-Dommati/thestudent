@@ -320,23 +320,14 @@ function CodeVisualizerPage() {
     const codeLines = code.split('\n');
 
     return (
-        <div className="min-h-screen bg-gray-50 code-visualizer-container relative overflow-x-hidden">
-            {/* Top gradient section with Wave at bottom */}
-            <div className="absolute top-0 left-0 right-0 h-[75vh] bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-700">
-                {/* Decorative background elements inside gradient */}
+        <div className="min-h-screen bg-slate-50 code-visualizer-container relative overflow-x-hidden">
+            {/* Top gradient section - Subtle, not dominant */}
+            <div className="absolute top-0 left-0 right-0 h-[65vh] bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 opacity-90">
+                {/* Decorative background elements */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    {/* Large gradient orbs */}
-                    <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-72 h-72 lg:w-96 lg:h-96 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 opacity-20 blur-3xl" />
-                    <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-72 h-72 lg:w-96 lg:h-96 rounded-full bg-gradient-to-br from-blue-400 to-cyan-300 opacity-20 blur-3xl" />
-
-                    {/* Subtle floating shapes */}
-                    <div className="absolute top-32 left-8 w-3 h-3 bg-white/20 rounded rotate-45" />
-                    <div className="absolute top-1/4 right-16 w-2 h-6 bg-white/10 rounded-full" />
-                    <div className="absolute bottom-1/3 left-12 w-4 h-4 border border-white/20 rounded-full" />
-                    <div className="absolute top-1/2 right-8 w-4 h-4 bg-yellow-300/20 rounded-full" />
-
-                    {/* Grid background */}
-                    <div className="absolute inset-0 bg-grid-white/[0.02] bg-[length:24px_24px]" />
+                    {/* Subtle gradient orbs */}
+                    <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-72 h-72 lg:w-96 lg:h-96 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 opacity-10 blur-3xl" />
+                    <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-72 h-72 lg:w-96 lg:h-96 rounded-full bg-gradient-to-br from-blue-400 to-cyan-300 opacity-10 blur-3xl" />
                 </div>
 
                 {/* Wave separator - Positioned at the bottom of the gradient section */}
