@@ -332,7 +332,7 @@ class PythonTracer:
         
         return True
     
-    def _generate_dry_run(self, code_line: str, locals_data: Dict[str, Any], computed_values: Dict[str, Any]) -> List[str]:
+    def _generate_dry_run(self, code_line: str, locals_data: Dict[str, Any], computed_values: Dict[str, Any], loop_info: Optional[Dict[str, Any]] = None) -> List[str]:
         """Generate a deterministic DRY-RUN breakdown.
         
         This is the enterprise fix - we compute the DRY-RUN ourselves,
@@ -431,13 +431,25 @@ class PythonTracer:
             
             return lines
         
-        # Handle for loops
+        # Handle for loops - USE loop_info AS SSOT (Enterprise Architecture)
         for_match = re.match(r'for\s+(\w+)\s+in\s+(.+):', code)
         if for_match:
             loop_var = for_match.group(1)
-            val = get_val(loop_var)
-            if val is not None:
-                lines.append(f"→ {loop_var} = {format_val(val)}")
+            iterable_expr = for_match.group(2).strip()
+            
+            # SSOT: Use loop_info if available (computed deterministically earlier)
+            if loop_info and loop_info.get('variable') == loop_var:
+                val = loop_info.get('value')
+                iteration = loop_info.get('iteration')
+                total = loop_info.get('total')
+                # Deterministic dry-run from SSOT
+                lines.append(f"for {loop_var} in {iterable_expr}:")
+                lines.append(f"→ Iteration {iteration}/{total}: {loop_var} = {format_val(val)}")
+            else:
+                # Fallback to locals (legacy behavior)
+                val = get_val(loop_var)
+                if val is not None:
+                    lines.append(f"→ {loop_var} = {format_val(val)}")
             return lines
         
         return lines
@@ -623,8 +635,12 @@ class PythonTracer:
                         loop_var = for_node.target.id
                         
                         # 2. Evaluate Iterable Expression safely
+                        # Merge all contexts: builtins + globals + locals into ONE dict
+                        eval_globals = {"__builtins__": __builtins__}
+                        eval_globals.update(frame.f_globals)
+                        eval_globals.update(current_locals)
                         expr_code = compile(ast.Expression(body=for_node.iter), filename="<string>", mode="eval")
-                        iterable = eval(expr_code, {"__builtins__": __builtins__}, current_locals)
+                        iterable = eval(expr_code, eval_globals)
 
                         if iterable is not None and hasattr(iterable, '__iter__'):
                             try:
@@ -689,7 +705,14 @@ class PythonTracer:
                 frame_dict['computed_values'] = computed_values
             
             # Generate deterministic DRY-RUN (enterprise fix - don't rely on AI for computation)
-            dry_run_lines = self._generate_dry_run(code_line, serialized_locals, computed_values)
+            dry_run_lines = self._generate_dry_run(code_line, serialized_locals, computed_values, loop_info)
+            
+            # DEBUG: Log loop processing
+            if 'for ' in code_line:
+                print(f"[TRACER DEBUG] Step {self.step_count} | Code: {code_line.strip()}")
+                print(f"[TRACER DEBUG]   loop_info: {loop_info}")
+                print(f"[TRACER DEBUG]   dry_run_lines: {dry_run_lines}")
+            
             if dry_run_lines:
                 frame_dict['dry_run'] = dry_run_lines
             
@@ -729,10 +752,12 @@ class PythonTracer:
                             pending['computed_values'] = computed_vals
                             
                         # Send the pending frame now that it's fully enriched
+                        if 'for ' in pending.get('code', '') and 'dry_run' not in pending:
+                            print(f"[TRACER ERROR] Step {pending.get('step')} sent WITHOUT dry_run! Loop info: {pending.get('loop_info')}")
                         self.on_frame(pending)
                     
-                    # Store current frame as pending
-                    self.pending_frame_dict = frame_dict
+                    # Store current frame as pending (use copy to be safe against mutations)
+                    self.pending_frame_dict = frame_dict.copy()
                     
                 except Exception:
                     # Never break tracing due to callback errors

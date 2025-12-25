@@ -378,6 +378,13 @@ const ImmersiveVisualizer = ({
     // Render explanation with styled dry-run section
     // If deterministicDryRun is provided (from tracer), use it instead of parsing from AI text
     const renderExplanationWithDryRun = (explanation, deterministicDryRun = null) => {
+        // DEBUG: Check if frontend receives dry_run
+        if (deterministicDryRun) {
+            console.log("Renderer received dry_run:", deterministicDryRun);
+        } else {
+            console.log("Renderer missing dry_run for explanation:", explanation?.substring(0, 20));
+        }
+
         if (!explanation) return null;
 
         // Extract just the text explanation (remove any DRY-RUN section from AI text)
@@ -711,6 +718,10 @@ const ImmersiveVisualizer = ({
                                                         <div className="flex items-start gap-2">
                                                             <Sparkles className="w-5 h-5 text-indigo-500 flex-shrink-0 mt-1" />
                                                             <div className="flex-1 min-w-0">
+                                                                {/* DEBUG BADGE */}
+                                                                <div className="text-[10px] text-slate-300 font-mono mb-1">
+                                                                    Data: {step.dry_run ? `✅ len=${step.dry_run.length}` : '❌ missing'}
+                                                                </div>
                                                                 {renderExplanationWithDryRun(step.explanation, step.dry_run)}
                                                             </div>
                                                         </div>

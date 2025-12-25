@@ -168,7 +168,10 @@ function CodeVisualizerPage() {
                                         computed_values: frame.computed_values,
                                         event: frame.event,
                                         functionName: frame.function_name,
-                                        output: frame.output
+                                        output: frame.output,
+                                        // SSOT: Deterministic dry-run from tracer
+                                        dry_run: frame.dry_run,
+                                        loop_info: frame.loop_info
                                     };
 
                                     // Add step progressively
@@ -253,7 +256,10 @@ function CodeVisualizerPage() {
                         changedVars: frame.changed_vars || [],
                         event: frame.event,
                         functionName: frame.function_name,
-                        output: data.output
+                        output: data.output,
+                        // SSOT: Deterministic dry-run from tracer
+                        dry_run: frame.dry_run,
+                        loop_info: frame.loop_info
                     }));
 
                     setSteps(transformedSteps);
