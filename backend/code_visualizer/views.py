@@ -593,7 +593,9 @@ def trace_stream(request):
                         return_value=frame_dict.get('return_value'),
                         full_source=source_lines,
                         loop_info=frame_dict.get('loop_info'),
-                        std_inputs=inputs
+                        std_inputs=inputs,
+                        state_before=frame_dict.get('state_before'),
+                        state_after=frame_dict.get('state_after')
                     )
                     if ai_narration:
                         frame_dict['explanation'] = ai_narration

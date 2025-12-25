@@ -789,38 +789,37 @@ class PythonTracer:
                         pending_code = pending.get('code', '').strip()
                         pending_loop_info = pending.get('loop_info')
                         
-                        # Detect if this is an assignment line
-                        is_assignment = '=' in pending_code and '==' not in pending_code and 'for ' not in pending_code
+                        # Detect line types
+                        is_assignment = '=' in pending_code and '==' not in pending_code and 'for ' not in pending_code and 'if ' not in pending_code and 'while ' not in pending_code
+                        is_conditional = pending_code.startswith('if ') or pending_code.startswith('elif ') or pending_code.startswith('while ')
                         
+                        # For conditionals: don't use state-diff, let AI handle
+                        # For assignments: extract LHS variables and show their changes
                         state_changes = []
-                        for var_name, after_data in serialized_locals.items():
-                            after_val = after_data.get('value') if isinstance(after_data, dict) else after_data
-                            
-                            # FILTER: Only include variables that appear in the code line
-                            if var_name not in pending_code:
-                                continue
-                            
-                            before_val = None
-                            if var_name in pending_locals:
-                                before_data = pending_locals[var_name]
-                                before_val = before_data.get('value') if isinstance(before_data, dict) else before_data
-                            
-                            # For assignment lines: show ALL LHS variables (even if unchanged)
-                            # For other lines: only show changed/new variables
-                            if is_assignment:
-                                # Always include for assignments
-                                state_changes.append({
-                                    'var': var_name,
-                                    'before': before_val,
-                                    'after': after_val
-                                })
-                            elif before_val != after_val:
-                                # Value changed or new variable
-                                state_changes.append({
-                                    'var': var_name,
-                                    'before': before_val,
-                                    'after': after_val
-                                })
+                        
+                        if is_assignment:
+                            # Extract LHS variables (left of =)
+                            lhs_match = re.match(r'^([^=]+)=', pending_code)
+                            if lhs_match:
+                                lhs = lhs_match.group(1).strip()
+                                # Handle tuple unpacking: a, b = ...
+                                lhs_vars = [v.strip() for v in lhs.split(',')]
+                                
+                                for var_name in lhs_vars:
+                                    if var_name in serialized_locals:
+                                        after_data = serialized_locals[var_name]
+                                        after_val = after_data.get('value') if isinstance(after_data, dict) else after_data
+                                        
+                                        before_val = None
+                                        if var_name in pending_locals:
+                                            before_data = pending_locals[var_name]
+                                            before_val = before_data.get('value') if isinstance(before_data, dict) else before_data
+                                        
+                                        state_changes.append({
+                                            'var': var_name,
+                                            'before': before_val,
+                                            'after': after_val
+                                        })
                         
                         # Build dry-run from state diff
                         dry_run_lines = [pending_code]
@@ -832,8 +831,12 @@ class PythonTracer:
                             total = pending_loop_info.get('total', '?')
                             value = pending_loop_info.get('value')
                             dry_run_lines.append(f"→ Iteration {iteration}/{total}: {loop_var} = {self._format_value(value)}")
+                        elif is_conditional:
+                            # For conditionals: let AI generate the dry-run
+                            # Just add a placeholder that will be replaced by AI
+                            pass  # AI will generate substitution like "if 5 > 3: → True"
                         elif state_changes:
-                            # Regular state-diff for non-loop lines
+                            # Regular assignment state-diff
                             for change in state_changes:
                                 var = change['var']
                                 before = change['before']
@@ -842,9 +845,12 @@ class PythonTracer:
                                 if before is None:
                                     # New variable
                                     dry_run_lines.append(f"→ {var} = {self._format_value(after)}")
-                                else:
-                                    # Changed variable
+                                elif before != after:
+                                    # Changed variable (only show if actually changed!)
                                     dry_run_lines.append(f"→ {var}: {self._format_value(before)} → {self._format_value(after)}")
+                                else:
+                                    # Value unchanged but was assigned
+                                    dry_run_lines.append(f"→ {var} = {self._format_value(after)}")
                         
                         # Only add dry_run if we have more than just the code line
                         if len(dry_run_lines) > 1:
@@ -856,6 +862,21 @@ class PythonTracer:
                             for change in state_changes:
                                 computed_vals[change['var']] = change['after']
                             pending['computed_values'] = computed_vals
+                        
+                        # Add state_before and state_after for AI hybrid dry-run
+                        # Simplify to just var -> value mappings
+                        state_before_simple = {}
+                        for var_name, data in pending_locals.items():
+                            val = data.get('value') if isinstance(data, dict) else data
+                            state_before_simple[var_name] = val
+                        
+                        state_after_simple = {}
+                        for var_name, data in serialized_locals.items():
+                            val = data.get('value') if isinstance(data, dict) else data
+                            state_after_simple[var_name] = val
+                        
+                        pending['state_before'] = state_before_simple
+                        pending['state_after'] = state_after_simple
                         
                         # Send the pending frame with state-diff dry-run
                         self.on_frame(pending)

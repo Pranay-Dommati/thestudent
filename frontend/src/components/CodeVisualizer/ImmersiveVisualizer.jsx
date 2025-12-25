@@ -379,14 +379,24 @@ const ImmersiveVisualizer = ({
     const renderExplanationWithDryRun = (explanation, deterministicDryRun = null) => {
         if (!explanation) return null;
 
-        // Extract just the text explanation (remove any DRY-RUN section from AI text if present)
+        // Extract just the text explanation (remove any DRY-RUN section from AI text)
         let explanationPart = explanation;
         if (explanation.includes('DRY-RUN:')) {
             explanationPart = explanation.substring(0, explanation.indexOf('DRY-RUN:')).replace(/🔍/g, '').trim();
         }
 
-        // SSOT: Use ONLY deterministic dry_run from tracer (no fallback to AI parsing)
-        const dryRunLines = (deterministicDryRun && Array.isArray(deterministicDryRun)) ? deterministicDryRun : [];
+        // Hybrid approach: Use tracer dry_run if available, otherwise parse from AI
+        let dryRunLines = [];
+        if (deterministicDryRun && Array.isArray(deterministicDryRun) && deterministicDryRun.length > 0) {
+            // Use tracer-generated dry-run
+            dryRunLines = deterministicDryRun;
+        } else if (explanation.includes('DRY-RUN:')) {
+            // Parse from AI-generated text (AI has state context for accurate dry-run)
+            const dryRunMatch = explanation.match(/DRY-RUN:\s*([\s\S]*?)(?:$)/i);
+            if (dryRunMatch) {
+                dryRunLines = dryRunMatch[1].trim().split('\n').filter(line => line.trim());
+            }
+        }
 
         if (dryRunLines.length > 0) {
 

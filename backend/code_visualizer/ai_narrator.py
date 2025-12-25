@@ -184,7 +184,9 @@ class AINarrator:
         return_value: Any = None,
         full_source: Optional[List[str]] = None,
         loop_info: Optional[Dict[str, Any]] = None,
-        std_inputs: Optional[List[str]] = None
+        std_inputs: Optional[List[str]] = None,
+        state_before: Optional[Dict[str, Any]] = None,
+        state_after: Optional[Dict[str, Any]] = None
     ) -> str:
         """Generate AI narration. NO FALLBACKS - errors are shown clearly."""
         import re
@@ -258,14 +260,49 @@ class AINarrator:
         if event == 'return' and return_value is not None:
             context_parts.append(f"RETURN VALUE: {return_value}")
         
+        # Add STATE TRANSITION context (deterministic data from tracer)
+        if state_before or state_after:
+            context_parts.append("\n=== STATE TRANSITION (VERIFIED BY RUNTIME) ===")
+            if state_before:
+                before_str = ", ".join([f"{k}={v}" for k, v in state_before.items()])
+                context_parts.append(f"BEFORE: {before_str}")
+            if state_after:
+                after_str = ", ".join([f"{k}={v}" for k, v in state_after.items()])
+                context_parts.append(f"AFTER: {after_str}")
+            # Show what changed
+            if state_before and state_after:
+                changes = []
+                for var, after_val in state_after.items():
+                    before_val = state_before.get(var)
+                    if before_val != after_val:
+                        if before_val is None:
+                            changes.append(f"{var}: (new) → {after_val}")
+                        else:
+                            changes.append(f"{var}: {before_val} → {after_val}")
+                if changes:
+                    context_parts.append(f"CHANGES: {'; '.join(changes)}")
+        
         prompt = "\n".join(context_parts)
         prompt += f"\n\n=== TASK: Explain this code line ===\nCode: `{code_line}`"
         prompt += "\n\n=== INSTRUCTIONS ==="
-        prompt += "\nWrite ONE clear sentence explaining what this line does."
-        prompt += "\n- Use the actual variable values provided above."
-        prompt += "\n- For LOOPS: State 'Iteration X/Y' and the loop variable value from LOOP STATUS."
-        prompt += "\n- Do NOT generate a dry-run section (it's handled separately)."
-        prompt += "\n- Keep it simple and educational."
+        prompt += "\n1. Write ONE clear sentence explaining what this line does."
+        prompt += "\n2. Then write a DRY-RUN section that shows:"
+        prompt += "\n   - Original code"
+        prompt += "\n   - Substitution of variables with actual values"
+        prompt += "\n   - Final result with → arrow"
+        prompt += "\n"
+        prompt += "\nFORMAT:"
+        prompt += "\n[Explanation sentence]"
+        prompt += "\n"
+        prompt += "\n🔍 DRY-RUN:"
+        prompt += "\n[code with variables substituted]"
+        prompt += "\n→ [result]"
+        prompt += "\n"
+        prompt += "\nRULES:"
+        prompt += "\n- Use ONLY the values from STATE TRANSITION above - no guessing!"
+        prompt += "\n- Show clear step-by-step substitution"
+        prompt += "\n- For loops: show 'Iteration X/Y: var = value'"
+        prompt += "\n- For conditionals: show 'condition → True/False'"
         
         # ===== DETAILED LOGGING =====
         print("=" * 60)
