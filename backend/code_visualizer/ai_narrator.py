@@ -329,7 +329,7 @@ class AINarrator:
             config=types.GenerateContentConfig(
                 system_instruction=NARRATOR_SYSTEM_PROMPT,
                 temperature=0.1,  # Very low for consistent format
-                max_output_tokens=500,
+                max_output_tokens=1000,  # Increased for complex dry-runs
             )
         )
         
