@@ -815,10 +815,6 @@ class PythonTracer:
                         if i + 1 < len(self.frame_dicts):
                             next_locals = self.frame_dicts[i + 1].get('locals', {})
                             
-                            # DEBUG LOGGING
-                            print(f"[DEBUG] Step {frame_dict.get('step')} ({frame_dict.get('code', '').strip()}): Look-ahead for '{var_name}'")
-                            # print(f"   Next locals keys: {list(next_locals.keys())}")
-                            
                             if var_name in next_locals:
                                 next_val = next_locals[var_name]
                                 val_to_store = None
@@ -826,11 +822,8 @@ class PythonTracer:
                                     val_to_store = next_val['value']
                                 else:
                                     val_to_store = next_val
-                                    
-                                print(f"   FOUND! Value: {val_to_store}")
+                                
                                 computed_values[var_name] = val_to_store
-                            else:
-                                print(f"   NOT FOUND in next frame locals")
                 
                 frame_dict['computed_values'] = computed_values
             

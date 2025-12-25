@@ -727,83 +727,88 @@ const ImmersiveVisualizer = ({
                                                 {(step.variables && Object.keys(step.variables).length > 0) || (step.computed_values && Object.keys(step.computed_values).length > 0) || (step.changedVars && step.changedVars.length > 0) ? (
                                                     <div className="flex flex-wrap items-center gap-2">
                                                         <span className="text-xs text-slate-500 font-medium">Variables:</span>
-                                                        {/* Existing variables */}
-                                                        {step.variables && Object.entries(step.variables).map(([name, data]) => {
-                                                            const isChanged = step.changedVars?.includes(name);
+                                                        {(() => {
+                                                            const allVars = new Map();
 
-                                                            // Use computed_values for NEW value if this variable is being changed
-                                                            let displayValue = data.value;
-                                                            let showNewBadge = false;
-
-                                                            if (isChanged && step.computed_values && step.computed_values[name] !== undefined) {
-                                                                displayValue = step.computed_values[name];
-                                                                showNewBadge = true;
+                                                            // 1. Existing variables
+                                                            if (step.variables) {
+                                                                Object.entries(step.variables).forEach(([name, data]) => {
+                                                                    allVars.set(name, {
+                                                                        value: data.value,
+                                                                        isChanged: false
+                                                                    });
+                                                                });
                                                             }
 
-                                                            const valueStr = typeof displayValue === 'object'
-                                                                ? JSON.stringify(displayValue)
-                                                                : String(displayValue);
+                                                            // 2. Process changed variables
+                                                            if (step.changedVars) {
+                                                                step.changedVars.forEach(name => {
+                                                                    const existing = allVars.get(name);
+                                                                    const hasComputed = step.computed_values && step.computed_values[name] !== undefined;
 
-                                                            return (
-                                                                <span
-                                                                    key={name}
-                                                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono ${isChanged
-                                                                        ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-200'
-                                                                        : 'bg-slate-100 text-slate-700'
-                                                                        }`}
-                                                                >
-                                                                    <span className="font-semibold">{name}</span>
-                                                                    <span className="text-slate-400">=</span>
-                                                                    <span>{valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr}</span>
-                                                                    {showNewBadge && (
-                                                                        <span className="ml-1 text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold">
-                                                                            NEW!
-                                                                        </span>
-                                                                    )}
-                                                                </span>
-                                                            );
-                                                        })}
-                                                        {/* NEW variables from computed_values that don't exist yet */}
-                                                        {step.computed_values && Object.entries(step.computed_values)
-                                                            .filter(([name]) => !step.variables || !step.variables[name])
-                                                            .map(([name, value]) => {
-                                                                const valueStr = typeof value === 'object'
-                                                                    ? JSON.stringify(value)
-                                                                    : String(value);
+                                                                    if (existing) {
+                                                                        existing.isChanged = true;
+                                                                        if (hasComputed) existing.value = step.computed_values[name];
+                                                                    } else {
+                                                                        allVars.set(name, {
+                                                                            value: hasComputed ? step.computed_values[name] : undefined,
+                                                                            isChanged: true
+                                                                        });
+                                                                    }
+                                                                });
+                                                            }
+
+                                                            // 3. Catch strictly new computed values not in changedVars
+                                                            if (step.computed_values) {
+                                                                Object.entries(step.computed_values).forEach(([name, val]) => {
+                                                                    if (!allVars.has(name)) {
+                                                                        allVars.set(name, {
+                                                                            value: val,
+                                                                            isChanged: true
+                                                                        });
+                                                                    }
+                                                                });
+                                                            }
+
+                                                            // 4. Sort: Changed first, then alphabetical
+                                                            const sortedVars = Array.from(allVars.entries()).sort((a, b) => {
+                                                                if (a[1].isChanged && !b[1].isChanged) return -1;
+                                                                if (!a[1].isChanged && b[1].isChanged) return 1;
+                                                                return a[0].localeCompare(b[0]);
+                                                            });
+
+                                                            // 5. Render
+                                                            return sortedVars.map(([name, data]) => {
+                                                                let valueStr;
+                                                                if (data.value === undefined) {
+                                                                    valueStr = "assigning...";
+                                                                } else {
+                                                                    valueStr = typeof data.value === 'object'
+                                                                        ? JSON.stringify(data.value)
+                                                                        : String(data.value);
+                                                                }
+
+                                                                const isAssigning = data.value === undefined;
 
                                                                 return (
                                                                     <span
-                                                                        key={`new-${name}`}
-                                                                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300"
+                                                                        key={name}
+                                                                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono ${data.isChanged
+                                                                                ? isAssigning
+                                                                                    ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-300'
+                                                                                    : 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300'
+                                                                                : 'bg-slate-100 text-slate-700'
+                                                                            }`}
                                                                     >
                                                                         <span className="font-semibold">{name}</span>
-                                                                        <span className="text-indigo-400">=</span>
-                                                                        <span>{valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr}</span>
-                                                                        <span className="ml-1 text-[10px] bg-indigo-500 text-white px-1.5 py-0.5 rounded-full font-bold">
-                                                                            NEW!
+                                                                        <span className={data.isChanged ? "text-indigo-400" : "text-slate-400"}>=</span>
+                                                                        <span className={isAssigning ? "italic opacity-80" : ""}>
+                                                                            {valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr}
                                                                         </span>
                                                                     </span>
                                                                 );
-                                                            })}
-                                                        {/* Variables being assigned but not in computed_values or variables */}
-                                                        {step.changedVars && step.changedVars
-                                                            .filter(name =>
-                                                                (!step.variables || !step.variables[name]) &&
-                                                                (!step.computed_values || step.computed_values[name] === undefined)
-                                                            )
-                                                            .map(name => (
-                                                                <span
-                                                                    key={`assigning-${name}`}
-                                                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono bg-blue-100 text-blue-700 ring-2 ring-blue-300"
-                                                                >
-                                                                    <span className="font-semibold">{name}</span>
-                                                                    <span className="text-blue-400">=</span>
-                                                                    <span className="text-blue-500 italic">assigning...</span>
-                                                                    <span className="ml-1 text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold">
-                                                                        NEW!
-                                                                    </span>
-                                                                </span>
-                                                            ))}
+                                                            });
+                                                        })()}
                                                     </div>
                                                 ) : null}
 
