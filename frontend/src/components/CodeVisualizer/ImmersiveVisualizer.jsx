@@ -376,35 +376,17 @@ const ImmersiveVisualizer = ({
     };
 
     // Render explanation with styled dry-run section
-    // If deterministicDryRun is provided (from tracer), use it instead of parsing from AI text
     const renderExplanationWithDryRun = (explanation, deterministicDryRun = null) => {
-        // DEBUG: Check if frontend receives dry_run
-        if (deterministicDryRun) {
-            console.log("Renderer received dry_run:", deterministicDryRun);
-        } else {
-            console.log("Renderer missing dry_run for explanation:", explanation?.substring(0, 20));
-        }
-
         if (!explanation) return null;
 
-        // Extract just the text explanation (remove any DRY-RUN section from AI text)
+        // Extract just the text explanation (remove any DRY-RUN section from AI text if present)
         let explanationPart = explanation;
         if (explanation.includes('DRY-RUN:')) {
             explanationPart = explanation.substring(0, explanation.indexOf('DRY-RUN:')).replace(/🔍/g, '').trim();
         }
 
-        // Use deterministic dry_run from tracer if available, otherwise parse from AI
-        let dryRunLines = [];
-        if (deterministicDryRun && Array.isArray(deterministicDryRun) && deterministicDryRun.length > 0) {
-            // Use the pre-computed deterministic dry run from the tracer
-            dryRunLines = deterministicDryRun;
-        } else if (explanation.includes('DRY-RUN:')) {
-            // Fallback: parse from AI-generated text
-            const dryRunMatch = explanation.match(/DRY-RUN:\s*([\s\S]*?)(?:$)/i);
-            if (dryRunMatch) {
-                dryRunLines = dryRunMatch[1].trim().split('\n').filter(line => line.trim());
-            }
-        }
+        // SSOT: Use ONLY deterministic dry_run from tracer (no fallback to AI parsing)
+        const dryRunLines = (deterministicDryRun && Array.isArray(deterministicDryRun)) ? deterministicDryRun : [];
 
         if (dryRunLines.length > 0) {
 
@@ -718,10 +700,6 @@ const ImmersiveVisualizer = ({
                                                         <div className="flex items-start gap-2">
                                                             <Sparkles className="w-5 h-5 text-indigo-500 flex-shrink-0 mt-1" />
                                                             <div className="flex-1 min-w-0">
-                                                                {/* DEBUG BADGE */}
-                                                                <div className="text-[10px] text-slate-300 font-mono mb-1">
-                                                                    Data: {step.dry_run ? `✅ len=${step.dry_run.length}` : '❌ missing'}
-                                                                </div>
                                                                 {renderExplanationWithDryRun(step.explanation, step.dry_run)}
                                                             </div>
                                                         </div>

@@ -609,13 +609,6 @@ def trace_stream(request):
                 step_num = frame_counter[0] + 1
                 code_line = frame_dict.get('code', '')[:50]
                 
-                # DEBUG: Check dry_run presence
-                if 'for ' in code_line:
-                    has_dry_run = 'dry_run' in frame_dict and frame_dict['dry_run']
-                    print(f"[VIEWS DEBUG] Step {step_num} | dry_run present: {has_dry_run}")
-                    if has_dry_run:
-                        print(f"[VIEWS DEBUG]   dry_run: {frame_dict['dry_run']}")
-                
                 # Only generate AI explanations for first BATCH_SIZE frames
                 if frame_counter[0] < BATCH_SIZE:
                     print(f"[Stream] Step {step_num}: 🤖 Generating AI explanation for: {code_line}")

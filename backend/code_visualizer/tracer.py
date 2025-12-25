@@ -86,6 +86,22 @@ class PythonTracer:
             return "NoneType"
         return type(value).__name__
     
+    def _format_value(self, value: Any) -> str:
+        """Format a value for dry-run display."""
+        if value is None:
+            return "None"
+        if isinstance(value, str):
+            if len(value) > 50:
+                return f'"{value[:50]}..."'
+            return f'"{value}"'
+        if isinstance(value, (list, tuple)):
+            if len(value) > 5:
+                items = [self._format_value(v) for v in value[:5]]
+                return f"[{', '.join(items)}, ...]"
+            items = [self._format_value(v) for v in value]
+            return f"[{', '.join(items)}]"
+        return str(value)
+    
     def _serialize_locals(self, local_vars: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
         result = {}
         for name, value in local_vars.items():
@@ -169,6 +185,32 @@ class PythonTracer:
         """
         computed = {}
         code = code_line.strip()
+        
+        # Build eval context
+        eval_context = {}
+        for name, data in current_locals.items():
+            if name.startswith('_') and name != '_':
+                continue
+            val = data.get('value') if isinstance(data, dict) else data
+            eval_context[name] = val
+        
+        # Tuple/multiple assignment: `a, b = expr1, expr2` OR `a, b = b, a + b`
+        tuple_assign_match = re.match(r'^([a-zA-Z_]\w*(?:\s*,\s*[a-zA-Z_]\w*)+)\s*=\s*(.+)$', code)
+        if tuple_assign_match and '==' not in code:
+            var_names_str = tuple_assign_match.group(1)
+            expression = tuple_assign_match.group(2).strip()
+            var_names = [v.strip() for v in var_names_str.split(',')]
+            
+            try:
+                # Evaluate the right-hand side as a tuple
+                result = eval(expression, {"__builtins__": {}}, eval_context)
+                if isinstance(result, (tuple, list)) and len(result) == len(var_names):
+                    for i, var_name in enumerate(var_names):
+                        computed[var_name] = self._safe_copy(result[i])
+            except:
+                pass
+            
+            return computed
         
         # Simple assignment: `var = expression`
         assign_match = re.match(r'^(\w+)\s*=\s*(.+)$', code)
@@ -407,6 +449,34 @@ class PythonTracer:
             
             return lines
         
+        # Handle tuple/multiple assignments: a, b = expr1, expr2 OR a, b = b, a + b
+        tuple_assign_match = re.match(r'^([a-zA-Z_]\w*(?:\s*,\s*[a-zA-Z_]\w*)+)\s*=\s*(.+)$', code)
+        if tuple_assign_match and '==' not in code:
+            var_names_str = tuple_assign_match.group(1)
+            expression = tuple_assign_match.group(2).strip()
+            var_names = [v.strip() for v in var_names_str.split(',')]
+            
+            # Substitute variable values in the expression
+            substituted = expression
+            for name, data in locals_data.items():
+                if name in substituted:
+                    val = data.get('value') if isinstance(data, dict) else data
+                    # Replace whole word only
+                    substituted = re.sub(r'\b' + re.escape(name) + r'\b', format_val(val), substituted)
+            
+            if substituted != expression:
+                lines.append(f"{var_names_str} = {substituted}")
+            
+            # Add computed results for each variable
+            results = []
+            for var_name in var_names:
+                if computed_values and var_name in computed_values:
+                    results.append(f"{var_name} = {format_val(computed_values[var_name])}")
+            if results:
+                lines.append(f"→ {', '.join(results)}")
+            
+            return lines
+        
         # Handle simple assignments: var = expr
         assign_match = re.match(r'^(\w+)\s*=\s*(.+)$', code)
         if assign_match and '==' not in code:
@@ -425,7 +495,7 @@ class PythonTracer:
                 lines.append(f"{var_name} = {substituted}")
             
             # Add computed result
-            if var_name in computed_values:
+            if computed_values and var_name in computed_values:
                 result = computed_values[var_name]
                 lines.append(f"→ {var_name} = {format_val(result)}")
             
@@ -437,7 +507,7 @@ class PythonTracer:
             loop_var = for_match.group(1)
             iterable_expr = for_match.group(2).strip()
             
-            # SSOT: Use loop_info if available (computed deterministically earlier)
+            # SSOT: Use loop_info ONLY (no fallback)
             if loop_info and loop_info.get('variable') == loop_var:
                 val = loop_info.get('value')
                 iteration = loop_info.get('iteration')
@@ -445,11 +515,6 @@ class PythonTracer:
                 # Deterministic dry-run from SSOT
                 lines.append(f"for {loop_var} in {iterable_expr}:")
                 lines.append(f"→ Iteration {iteration}/{total}: {loop_var} = {format_val(val)}")
-            else:
-                # Fallback to locals (legacy behavior)
-                val = get_val(loop_var)
-                if val is not None:
-                    lines.append(f"→ {loop_var} = {format_val(val)}")
             return lines
         
         return lines
@@ -699,22 +764,8 @@ class PythonTracer:
             if loop_info:
                 frame_dict['loop_info'] = loop_info
             
-            # Compute expected new values for assignments (architectural fix for showing results)
-            computed_values = self._compute_expected_values(code_line, serialized_locals)
-            if computed_values:
-                frame_dict['computed_values'] = computed_values
-            
-            # Generate deterministic DRY-RUN (enterprise fix - don't rely on AI for computation)
-            dry_run_lines = self._generate_dry_run(code_line, serialized_locals, computed_values, loop_info)
-            
-            # DEBUG: Log loop processing
-            if 'for ' in code_line:
-                print(f"[TRACER DEBUG] Step {self.step_count} | Code: {code_line.strip()}")
-                print(f"[TRACER DEBUG]   loop_info: {loop_info}")
-                print(f"[TRACER DEBUG]   dry_run_lines: {dry_run_lines}")
-            
-            if dry_run_lines:
-                frame_dict['dry_run'] = dry_run_lines
+            # NOTE: dry_run is now computed via state-diff in the streaming buffer
+            # This eliminates all regex-based parsing and works for ANY Python syntax
             
             trace_frame.explanation = self._generate_explanation(trace_frame)
             frame_dict['explanation'] = trace_frame.explanation
@@ -725,35 +776,88 @@ class PythonTracer:
             
             if self.on_frame:
                 try:
-                    # STREAMING BUFFER LOGIC:
-                    # If we have a pending frame, we can now look ahead at the CURRENT frame's locals
-                    # (which represent the state AFTER the pending frame executed).
+                    # ENTERPRISE-GRADE STATE-DIFF DRY-RUN:
+                    # Instead of parsing code, we observe runtime state changes.
+                    # pending_frame = state BEFORE execution
+                    # current_locals = state AFTER execution
+                    # diff = dry-run
+                    
                     if self.pending_frame_dict:
                         pending = self.pending_frame_dict
-                        changed_vars = pending.get('changed_vars', [])
-                        computed_vals = pending.get('computed_values', {})
-                        if computed_vals is None: computed_vals = {}
+                        pending_locals = pending.get('locals', {})
+                        # Compute state diff: what changed between before and after
+                        pending_code = pending.get('code', '').strip()
+                        pending_loop_info = pending.get('loop_info')
                         
-                        modified_pending = False
+                        # Detect if this is an assignment line
+                        is_assignment = '=' in pending_code and '==' not in pending_code and 'for ' not in pending_code
                         
-                        for var_name in changed_vars:
-                            if var_name not in computed_vals and var_name in serialized_locals:
-                                next_val = serialized_locals[var_name]
-                                val_to_store = None
-                                if isinstance(next_val, dict) and 'value' in next_val:
-                                    val_to_store = next_val['value']
-                                else:
-                                    val_to_store = next_val
-                                
-                                computed_vals[var_name] = val_to_store
-                                modified_pending = True
-                        
-                        if modified_pending:
-                            pending['computed_values'] = computed_vals
+                        state_changes = []
+                        for var_name, after_data in serialized_locals.items():
+                            after_val = after_data.get('value') if isinstance(after_data, dict) else after_data
                             
-                        # Send the pending frame now that it's fully enriched
-                        if 'for ' in pending.get('code', '') and 'dry_run' not in pending:
-                            print(f"[TRACER ERROR] Step {pending.get('step')} sent WITHOUT dry_run! Loop info: {pending.get('loop_info')}")
+                            # FILTER: Only include variables that appear in the code line
+                            if var_name not in pending_code:
+                                continue
+                            
+                            before_val = None
+                            if var_name in pending_locals:
+                                before_data = pending_locals[var_name]
+                                before_val = before_data.get('value') if isinstance(before_data, dict) else before_data
+                            
+                            # For assignment lines: show ALL LHS variables (even if unchanged)
+                            # For other lines: only show changed/new variables
+                            if is_assignment:
+                                # Always include for assignments
+                                state_changes.append({
+                                    'var': var_name,
+                                    'before': before_val,
+                                    'after': after_val
+                                })
+                            elif before_val != after_val:
+                                # Value changed or new variable
+                                state_changes.append({
+                                    'var': var_name,
+                                    'before': before_val,
+                                    'after': after_val
+                                })
+                        
+                        # Build dry-run from state diff
+                        dry_run_lines = [pending_code]
+                        
+                        # Special handling for for-loops: use loop_info for iteration display
+                        if pending_loop_info and 'for ' in pending_code:
+                            loop_var = pending_loop_info.get('variable', '')
+                            iteration = pending_loop_info.get('iteration', 1)
+                            total = pending_loop_info.get('total', '?')
+                            value = pending_loop_info.get('value')
+                            dry_run_lines.append(f"→ Iteration {iteration}/{total}: {loop_var} = {self._format_value(value)}")
+                        elif state_changes:
+                            # Regular state-diff for non-loop lines
+                            for change in state_changes:
+                                var = change['var']
+                                before = change['before']
+                                after = change['after']
+                                
+                                if before is None:
+                                    # New variable
+                                    dry_run_lines.append(f"→ {var} = {self._format_value(after)}")
+                                else:
+                                    # Changed variable
+                                    dry_run_lines.append(f"→ {var}: {self._format_value(before)} → {self._format_value(after)}")
+                        
+                        # Only add dry_run if we have more than just the code line
+                        if len(dry_run_lines) > 1:
+                            pending['dry_run'] = dry_run_lines
+                        
+                        # Populate computed_values for frontend variable display
+                        if state_changes:
+                            computed_vals = {}
+                            for change in state_changes:
+                                computed_vals[change['var']] = change['after']
+                            pending['computed_values'] = computed_vals
+                        
+                        # Send the pending frame with state-diff dry-run
                         self.on_frame(pending)
                     
                     # Store current frame as pending (use copy to be safe against mutations)
