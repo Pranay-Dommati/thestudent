@@ -419,7 +419,7 @@ const ImmersiveVisualizer = ({
                             </div>
                             <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Dry Run</span>
                         </div>
-                        <div className="font-mono text-sm space-y-1.5 whitespace-pre">
+                        <div className="font-mono text-sm space-y-1.5 whitespace-pre overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-indigo-200 scrollbar-track-transparent">
                             {dryRunLines.map((line, idx) => {
                                 // Enhanced styling with inline element coloring
                                 const renderLine = () => {
@@ -710,7 +710,7 @@ const ImmersiveVisualizer = ({
                                                     <div className="mb-4 p-4 bg-indigo-50 rounded-xl">
                                                         <div className="flex items-start gap-2">
                                                             <Sparkles className="w-5 h-5 text-indigo-500 flex-shrink-0 mt-1" />
-                                                            <div className="flex-1">
+                                                            <div className="flex-1 min-w-0">
                                                                 {renderExplanationWithDryRun(step.explanation, step.dry_run)}
                                                             </div>
                                                         </div>
