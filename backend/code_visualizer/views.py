@@ -412,7 +412,8 @@ def trace_endpoint(request):
                     changed_vars=frame.get('changed_vars', []),
                     function_name=frame.get('function_name'),
                     return_value=frame.get('return_value'),
-                    full_source=source_lines
+                    full_source=source_lines,
+                    std_inputs=inputs
                 )
                 frame['explanation'] = ai_narration
             
@@ -591,7 +592,8 @@ def trace_stream(request):
                         function_name=frame_dict.get('function_name'),
                         return_value=frame_dict.get('return_value'),
                         full_source=source_lines,
-                        loop_info=frame_dict.get('loop_info')
+                        loop_info=frame_dict.get('loop_info'),
+                        std_inputs=inputs
                     )
                     if ai_narration:
                         frame_dict['explanation'] = ai_narration

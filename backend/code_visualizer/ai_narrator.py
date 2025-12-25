@@ -183,10 +183,11 @@ class AINarrator:
         function_name: Optional[str] = None,
         return_value: Any = None,
         full_source: Optional[List[str]] = None,
-        loop_info: Optional[Dict[str, Any]] = None
+        loop_info: Optional[Dict[str, Any]] = None,
+        std_inputs: Optional[List[str]] = None
     ) -> str:
         """Generate AI narration. NO FALLBACKS - errors are shown clearly."""
-        
+        import re
         code_line = code.strip()
         
         # ===== CHECK 1: Is AI available? =====
@@ -206,12 +207,29 @@ class AINarrator:
             f"Step {step}, Line {line}",
         ]
         
+        # Add Full Source context
+        if full_source and len(full_source) > 0:
+            # Show a few lines around the current line for better context
+            start = max(0, line - 3)
+            end = min(len(full_source), line + 2)
+            context_code = []
+            for i in range(start, end):
+                prefix = "->" if i + 1 == line else "  "
+                context_code.append(f"{prefix} {i+1}: {full_source[i]}")
+            context_parts.append("CONTEXT:\n" + "\n".join(context_code))
+            
         if function_name and function_name != '<module>':
             context_parts.append(f"Inside function: {function_name}")
         
         # Add loop info if present
         if loop_info:
             context_parts.append(f"Loop info: {loop_info}")
+
+        # Add User Inputs info
+        if std_inputs and len(std_inputs) > 0:
+            context_parts.append(f"Available User Inputs (stdin): {std_inputs}")
+            if "input(" in code_line:
+                 context_parts.append("NOTE: This line calls input(). Use the provided User Inputs for the value.")
         
         # Build detailed variable context
         if variables:
