@@ -223,7 +223,11 @@ class AINarrator:
         
         # Add loop info if present
         if loop_info:
-            context_parts.append(f"Loop info: {loop_info}")
+            iter_num = loop_info.get('iteration')
+            total = loop_info.get('total')
+            val = loop_info.get('value')
+            var = loop_info.get('variable')
+            context_parts.append(f"LOOP STATUS: Iteration {iter_num}/{total}. Loop variable '{var}' = {val}.")
 
         # Add User Inputs info
         if std_inputs and len(std_inputs) > 0:
@@ -257,12 +261,15 @@ class AINarrator:
         prompt = "\n".join(context_parts)
         prompt += f"\n\n=== TASK: Explain this code line ===\nCode: `{code_line}`"
         prompt += "\n\n=== INSTRUCTIONS ==="
-        prompt += "\n1. Write ONE sentence explaining what this line does, using the actual values"
-        prompt += "\n2. Include a DRY-RUN section that:"
-        prompt += "\n   - Shows the original code"
-        prompt += "\n   - Substitutes variable names with values (e.g., val1=2, val2=5, carry=0)"
-        prompt += "\n   - Computes the result (e.g., 2 + 5 + 0 = 7)"
-        prompt += "\n   - Shows → with the final result"
+        prompt += "\n1. Write ONE sentence explaining what this line does, using the actual values."
+        prompt += "\n2. Include a DRY-RUN section that shows substitution and result."
+        prompt += "\n   - For LOOPS: The result MUST MATCH the variable value from 'LOOP STATUS' exactly."
+        prompt += "\n   - Do NOT re-calculate based on iteration number."
+        prompt += "\n\n3. For LOOPS check 'LOOP STATUS' above:"
+        prompt += "\n   - You MUST state: 'Iteration X of Y.'"
+        prompt += "\n   - You MUST state the CURRENT variable value as provided in LOOP STATUS."
+        prompt += "\n   - Example: 'Iteration 2/5. Loop variable i is 1.'"
+        prompt += "\n   - DO NOT confuse Iteration Number with Variable Value. They are different."
         prompt += "\n\nIMPORTANT: You have ALL variables needed. DO NOT say you cannot execute. COMPUTE the result."
         
         # ===== DETAILED LOGGING =====

@@ -89,7 +89,7 @@ class PythonTracer:
     def _serialize_locals(self, local_vars: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
         result = {}
         for name, value in local_vars.items():
-            if name.startswith('_') or name.startswith('@'):
+            if (name.startswith('_') and name != '_') or name.startswith('@'):
                 continue
             if name == 'self':
                 continue
@@ -607,46 +607,58 @@ class PythonTracer:
             current_locals = dict(frame.f_locals)
             code_line = self._get_code_line(line_no)
             
-            # For for-loops, compute the NEXT value of the loop variable
+            # ROBUST AST-BASED LOOP ANALYSIS
+            # Instead of guessing with dictionary regex, we parse the code structure exactly like Python does.
             loop_info = None
-            for_match = re.match(r'for\s+(\w+)\s+in\s+(\w+)', code_line.strip())
-            if for_match:
-                loop_var = for_match.group(1)
-                iterable_name = for_match.group(2)
+            try:
+                # We add ' pass' because 'for x in y:' is incomplete syntax on its own.
+                # 'pass' completes the block so AST can parse it.
+                tree = ast.parse(code_line.strip() + " pass")
                 
-                # Get the iterable from locals
-                iterable = current_locals.get(iterable_name)
-                if iterable and hasattr(iterable, '__iter__'):
-                    try:
-                        iterable_list = list(iterable) if not isinstance(iterable, (list, tuple)) else iterable
-                        # Track iteration count for this line
-                        if line_no not in self.loop_iterations:
-                            self.loop_iterations[line_no] = 0
-                        iter_idx = self.loop_iterations[line_no]
+                if len(tree.body) > 0 and isinstance(tree.body[0], ast.For):
+                    for_node = tree.body[0]
+                    
+                    # 1. Identify Loop Variable(s)
+                    if isinstance(for_node.target, ast.Name):
+                        loop_var = for_node.target.id
                         
-                        if iter_idx < len(iterable_list):
-                            next_value = iterable_list[iter_idx]
-                            # Update the loop variable in our serialized locals to show the NEXT value
-                            current_locals[loop_var] = next_value
-                            loop_info = {
-                                'variable': loop_var,
-                                'iteration': iter_idx + 1,
-                                'value': next_value,
-                                'total': len(iterable_list),
-                                'finished': False
-                            }
-                        else:
-                            # Loop is exiting - mark as finished
-                            loop_info = {
-                                'variable': loop_var,
-                                'iteration': iter_idx + 1,
-                                'value': None,
-                                'total': len(iterable_list),
-                                'finished': True
-                            }
-                        self.loop_iterations[line_no] += 1
-                    except (TypeError, ValueError):
-                        pass
+                        # 2. Evaluate Iterable Expression safely
+                        expr_code = compile(ast.Expression(body=for_node.iter), filename="<string>", mode="eval")
+                        iterable = eval(expr_code, {"__builtins__": __builtins__}, current_locals)
+
+                        if iterable is not None and hasattr(iterable, '__iter__'):
+                            try:
+                                iterable_list = list(iterable) if not isinstance(iterable, (list, tuple)) else iterable
+                                # Track iteration count for this line
+                                if line_no not in self.loop_iterations:
+                                    self.loop_iterations[line_no] = 0
+                                iter_idx = self.loop_iterations[line_no]
+                                
+                                if iter_idx < len(iterable_list):
+                                    next_value = iterable_list[iter_idx]
+                                    # Update the loop variable in our serialized locals to show the NEXT value
+                                    current_locals[loop_var] = next_value
+                                    loop_info = {
+                                        'variable': loop_var,
+                                        'iteration': iter_idx + 1,
+                                        'value': next_value,
+                                        'total': len(iterable_list),
+                                        'finished': False
+                                    }
+                                else:
+                                    # Loop is exiting - mark as finished
+                                    loop_info = {
+                                        'variable': loop_var,
+                                        'iteration': iter_idx + 1,
+                                        'value': None,
+                                        'total': len(iterable_list),
+                                        'finished': True
+                                    }
+                                self.loop_iterations[line_no] += 1
+                            except (TypeError, ValueError):
+                                pass
+            except Exception:
+                pass
             
             serialized_locals = self._serialize_locals(current_locals)
             
