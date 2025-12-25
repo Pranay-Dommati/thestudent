@@ -725,90 +725,92 @@ const ImmersiveVisualizer = ({
                                                 )}
                                                 {/* Variables - Inline chips */}
                                                 {(step.variables && Object.keys(step.variables).length > 0) || (step.computed_values && Object.keys(step.computed_values).length > 0) || (step.changedVars && step.changedVars.length > 0) ? (
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <span className="text-xs text-slate-500 font-medium">Variables:</span>
-                                                        {(() => {
-                                                            const allVars = new Map();
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-xs text-slate-500 font-medium shrink-0">Variables:</span>
+                                                        <div className="flex-1 flex items-center gap-2 overflow-x-auto pb-2 -mb-2 pt-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent px-1">
+                                                            {(() => {
+                                                                const allVars = new Map();
 
-                                                            // 1. Existing variables
-                                                            if (step.variables) {
-                                                                Object.entries(step.variables).forEach(([name, data]) => {
-                                                                    allVars.set(name, {
-                                                                        value: data.value,
-                                                                        isChanged: false
+                                                                // 1. Existing variables
+                                                                if (step.variables) {
+                                                                    Object.entries(step.variables).forEach(([name, data]) => {
+                                                                        allVars.set(name, {
+                                                                            value: data.value,
+                                                                            isChanged: false
+                                                                        });
                                                                     });
-                                                                });
-                                                            }
-
-                                                            // 2. Process changed variables
-                                                            if (step.changedVars) {
-                                                                step.changedVars.forEach(name => {
-                                                                    const existing = allVars.get(name);
-                                                                    const hasComputed = step.computed_values && step.computed_values[name] !== undefined;
-
-                                                                    if (existing) {
-                                                                        existing.isChanged = true;
-                                                                        if (hasComputed) existing.value = step.computed_values[name];
-                                                                    } else {
-                                                                        allVars.set(name, {
-                                                                            value: hasComputed ? step.computed_values[name] : undefined,
-                                                                            isChanged: true
-                                                                        });
-                                                                    }
-                                                                });
-                                                            }
-
-                                                            // 3. Catch strictly new computed values not in changedVars
-                                                            if (step.computed_values) {
-                                                                Object.entries(step.computed_values).forEach(([name, val]) => {
-                                                                    if (!allVars.has(name)) {
-                                                                        allVars.set(name, {
-                                                                            value: val,
-                                                                            isChanged: true
-                                                                        });
-                                                                    }
-                                                                });
-                                                            }
-
-                                                            // 4. Sort: Changed first, then alphabetical
-                                                            const sortedVars = Array.from(allVars.entries()).sort((a, b) => {
-                                                                if (a[1].isChanged && !b[1].isChanged) return -1;
-                                                                if (!a[1].isChanged && b[1].isChanged) return 1;
-                                                                return a[0].localeCompare(b[0]);
-                                                            });
-
-                                                            // 5. Render
-                                                            return sortedVars.map(([name, data]) => {
-                                                                let valueStr;
-                                                                if (data.value === undefined) {
-                                                                    valueStr = "assigning...";
-                                                                } else {
-                                                                    valueStr = typeof data.value === 'object'
-                                                                        ? JSON.stringify(data.value)
-                                                                        : String(data.value);
                                                                 }
 
-                                                                const isAssigning = data.value === undefined;
+                                                                // 2. Process changed variables
+                                                                if (step.changedVars) {
+                                                                    step.changedVars.forEach(name => {
+                                                                        const existing = allVars.get(name);
+                                                                        const hasComputed = step.computed_values && step.computed_values[name] !== undefined;
 
-                                                                return (
-                                                                    <span
-                                                                        key={name}
-                                                                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono ${data.isChanged
+                                                                        if (existing) {
+                                                                            existing.isChanged = true;
+                                                                            if (hasComputed) existing.value = step.computed_values[name];
+                                                                        } else {
+                                                                            allVars.set(name, {
+                                                                                value: hasComputed ? step.computed_values[name] : undefined,
+                                                                                isChanged: true
+                                                                            });
+                                                                        }
+                                                                    });
+                                                                }
+
+                                                                // 3. Catch strictly new computed values not in changedVars
+                                                                if (step.computed_values) {
+                                                                    Object.entries(step.computed_values).forEach(([name, val]) => {
+                                                                        if (!allVars.has(name)) {
+                                                                            allVars.set(name, {
+                                                                                value: val,
+                                                                                isChanged: true
+                                                                            });
+                                                                        }
+                                                                    });
+                                                                }
+
+                                                                // 4. Sort: Changed first, then alphabetical
+                                                                const sortedVars = Array.from(allVars.entries()).sort((a, b) => {
+                                                                    if (a[1].isChanged && !b[1].isChanged) return -1;
+                                                                    if (!a[1].isChanged && b[1].isChanged) return 1;
+                                                                    return a[0].localeCompare(b[0]);
+                                                                });
+
+                                                                // 5. Render
+                                                                return sortedVars.map(([name, data]) => {
+                                                                    let valueStr;
+                                                                    if (data.value === undefined) {
+                                                                        valueStr = "assigning...";
+                                                                    } else {
+                                                                        valueStr = typeof data.value === 'object'
+                                                                            ? JSON.stringify(data.value)
+                                                                            : String(data.value);
+                                                                    }
+
+                                                                    const isAssigning = data.value === undefined;
+
+                                                                    return (
+                                                                        <span
+                                                                            key={name}
+                                                                            className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono ${data.isChanged
                                                                                 ? isAssigning
                                                                                     ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-300'
                                                                                     : 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300'
                                                                                 : 'bg-slate-100 text-slate-700'
-                                                                            }`}
-                                                                    >
-                                                                        <span className="font-semibold">{name}</span>
-                                                                        <span className={data.isChanged ? "text-indigo-400" : "text-slate-400"}>=</span>
-                                                                        <span className={isAssigning ? "italic opacity-80" : ""}>
-                                                                            {valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr}
+                                                                                }`}
+                                                                        >
+                                                                            <span className="font-semibold">{name}</span>
+                                                                            <span className={data.isChanged ? "text-indigo-400" : "text-slate-400"}>=</span>
+                                                                            <span className={isAssigning ? "italic opacity-80" : ""}>
+                                                                                {valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr}
+                                                                            </span>
                                                                         </span>
-                                                                    </span>
-                                                                );
-                                                            });
-                                                        })()}
+                                                                    );
+                                                                });
+                                                            })()}
+                                                        </div>
                                                     </div>
                                                 ) : null}
 
@@ -893,18 +895,20 @@ const ImmersiveVisualizer = ({
                             </div>
 
                             {/* Empty state */}
-                            {visibleSteps.length === 0 && !isLoading && (
-                                <div className="flex flex-col items-center justify-center py-20 text-center">
-                                    <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-6">
-                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-slate-600">
-                                            <circle cx="12" cy="12" r="10" />
-                                            <path d="M12 6v12M6 12h12" />
-                                        </svg>
+                            {
+                                visibleSteps.length === 0 && !isLoading && (
+                                    <div className="flex flex-col items-center justify-center py-20 text-center">
+                                        <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-6">
+                                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-slate-600">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <path d="M12 6v12M6 12h12" />
+                                            </svg>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-slate-700 mb-2">Ready to Start</h3>
+                                        <p className="text-slate-500">Waiting for execution to start...</p>
                                     </div>
-                                    <h3 className="text-xl font-bold text-slate-700 mb-2">Ready to Start</h3>
-                                    <p className="text-slate-500">Waiting for execution to start...</p>
-                                </div>
-                            )}
+                                )
+                            }
                         </div>
                     )}
                 </div>
