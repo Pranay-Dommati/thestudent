@@ -695,10 +695,17 @@ class PythonTracer:
                 if len(tree.body) > 0 and isinstance(tree.body[0], ast.For):
                     for_node = tree.body[0]
                     
-                    # 1. Identify Loop Variable(s)
+                    # 1. Identify Loop Variable(s) - handle both single and tuple unpacking
+                    loop_vars = []
                     if isinstance(for_node.target, ast.Name):
-                        loop_var = for_node.target.id
-                        
+                        loop_vars = [for_node.target.id]
+                    elif isinstance(for_node.target, ast.Tuple):
+                        # Handle tuple unpacking: for c1, c2 in zip(s, t):
+                        for elt in for_node.target.elts:
+                            if isinstance(elt, ast.Name):
+                                loop_vars.append(elt.id)
+                    
+                    if loop_vars:
                         # 2. Evaluate Iterable Expression safely
                         # Merge all contexts: builtins + globals + locals into ONE dict
                         eval_globals = {"__builtins__": __builtins__}
@@ -715,26 +722,42 @@ class PythonTracer:
                                     self.loop_iterations[line_no] = 0
                                 iter_idx = self.loop_iterations[line_no]
                                 
+                                # Format loop_var string for display
+                                loop_var_str = ', '.join(loop_vars)
+                                
                                 if iter_idx < len(iterable_list):
                                     next_value = iterable_list[iter_idx]
-                                    # Update the loop variable in our serialized locals to show the NEXT value
-                                    current_locals[loop_var] = next_value
+                                    # Update the loop variable(s) in our serialized locals
+                                    if len(loop_vars) == 1:
+                                        current_locals[loop_vars[0]] = next_value
+                                        value_str = next_value
+                                    else:
+                                        # Tuple unpacking
+                                        if isinstance(next_value, (list, tuple)) and len(next_value) == len(loop_vars):
+                                            for i, var in enumerate(loop_vars):
+                                                current_locals[var] = next_value[i]
+                                            value_str = ', '.join([str(v) for v in next_value])
+                                        else:
+                                            value_str = str(next_value)
+                                    
                                     loop_info = {
-                                        'variable': loop_var,
+                                        'variable': loop_var_str,
                                         'iteration': iter_idx + 1,
-                                        'value': next_value,
+                                        'value': value_str,
                                         'total': len(iterable_list),
                                         'finished': False
                                     }
+                                    print(f"[LOOP DEBUG] Step {self.step_count} Line {line_no}: ITERATION {iter_idx + 1}/{len(iterable_list)}, finished=False")
                                 else:
                                     # Loop is exiting - mark as finished
                                     loop_info = {
-                                        'variable': loop_var,
+                                        'variable': loop_var_str,
                                         'iteration': iter_idx + 1,
                                         'value': None,
                                         'total': len(iterable_list),
                                         'finished': True
                                     }
+                                    print(f"[LOOP DEBUG] Step {self.step_count} Line {line_no}: FINISHED! iter_idx={iter_idx} >= len={len(iterable_list)}")
                                 self.loop_iterations[line_no] += 1
                             except (TypeError, ValueError):
                                 pass
@@ -789,6 +812,15 @@ class PythonTracer:
                         pending_code = pending.get('code', '').strip()
                         pending_loop_info = pending.get('loop_info')
                         
+                        # Check if the pending frame's loop_info already has finished=True
+                        # OR if the CURRENT frame shows the loop has finished (same line)
+                        current_loop_info = frame_dict.get('loop_info')
+                        if pending_loop_info and 'for ' in pending_code:
+                            if current_loop_info and current_loop_info.get('finished'):
+                                # Current frame says loop is finished, update pending
+                                pending_loop_info = current_loop_info.copy()
+                                pending['loop_info'] = pending_loop_info
+                        
                         # Detect line types
                         is_assignment = '=' in pending_code and '==' not in pending_code and 'for ' not in pending_code and 'if ' not in pending_code and 'while ' not in pending_code
                         is_conditional = pending_code.startswith('if ') or pending_code.startswith('elif ') or pending_code.startswith('while ')
@@ -821,40 +853,11 @@ class PythonTracer:
                                             'after': after_val
                                         })
                         
-                        # Build dry-run from state diff
-                        dry_run_lines = [pending_code]
-                        
-                        # Special handling for for-loops: use loop_info for iteration display
-                        if pending_loop_info and 'for ' in pending_code:
-                            loop_var = pending_loop_info.get('variable', '')
-                            iteration = pending_loop_info.get('iteration', 1)
-                            total = pending_loop_info.get('total', '?')
-                            value = pending_loop_info.get('value')
-                            dry_run_lines.append(f"→ Iteration {iteration}/{total}: {loop_var} = {self._format_value(value)}")
-                        elif is_conditional:
-                            # For conditionals: let AI generate the dry-run
-                            # Just add a placeholder that will be replaced by AI
-                            pass  # AI will generate substitution like "if 5 > 3: → True"
-                        elif state_changes:
-                            # Regular assignment state-diff
-                            for change in state_changes:
-                                var = change['var']
-                                before = change['before']
-                                after = change['after']
-                                
-                                if before is None:
-                                    # New variable
-                                    dry_run_lines.append(f"→ {var} = {self._format_value(after)}")
-                                elif before != after:
-                                    # Changed variable (only show if actually changed!)
-                                    dry_run_lines.append(f"→ {var}: {self._format_value(before)} → {self._format_value(after)}")
-                                else:
-                                    # Value unchanged but was assigned
-                                    dry_run_lines.append(f"→ {var} = {self._format_value(after)}")
-                        
-                        # Only add dry_run if we have more than just the code line
-                        if len(dry_run_lines) > 1:
-                            pending['dry_run'] = dry_run_lines
+                        # AI-ONLY DRY-RUN ARCHITECTURE:
+                        # The tracer provides CONTEXT (state_before, state_after, loop_info)
+                        # The AI generates ALL dry-run explanations using this context
+                        # This is cleaner - no manual edge-case handling needed
+                        # AI naturally explains simple things simply, complex things thoroughly
                         
                         # Populate computed_values for frontend variable display
                         if state_changes:

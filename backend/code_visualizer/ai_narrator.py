@@ -229,7 +229,15 @@ class AINarrator:
             total = loop_info.get('total')
             val = loop_info.get('value')
             var = loop_info.get('variable')
-            context_parts.append(f"LOOP STATUS: Iteration {iter_num}/{total}. Loop variable '{var}' = {val}.")
+            finished = loop_info.get('finished', False)
+            
+            print(f"[AI DEBUG] Step {step}: loop_info received = {loop_info}")
+            print(f"[AI DEBUG]   finished = {finished}")
+            
+            if finished:
+                context_parts.append(f"LOOP STATUS: Loop COMPLETE after {total} iterations. This is the exit check - loop is ending.")
+            else:
+                context_parts.append(f"LOOP STATUS: Iteration {iter_num}/{total}. Loop variable '{var}' = {val}.")
 
         # Add User Inputs info
         if std_inputs and len(std_inputs) > 0:
@@ -301,7 +309,8 @@ class AINarrator:
         prompt += "\nRULES:"
         prompt += "\n- Use ONLY the values from STATE TRANSITION above - no guessing!"
         prompt += "\n- Show clear step-by-step substitution"
-        prompt += "\n- For loops: show 'Iteration X/Y: var = value'"
+        prompt += "\n- For loops: If LOOP STATUS says 'COMPLETE', say 'Loop has completed - exiting' (NOT 'continuing to next iteration')"
+        prompt += "\n- For loops: If LOOP STATUS shows iteration X/Y, say 'Iteration X of Y'"
         prompt += "\n- For conditionals: show 'condition → True/False'"
         
         # ===== DETAILED LOGGING =====

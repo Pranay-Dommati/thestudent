@@ -529,6 +529,11 @@ def generate_explanations_stream(request):
                 print(f"[On-Demand Stream] Variables keys: {list(variables.keys()) if variables else 'EMPTY'}")
                 changed_vars = frame.get('changed_vars') or frame.get('changedVars', [])
                 
+                # Get loop_info from frame (frontend sends this as part of the frame)
+                loop_info = frame.get('loop_info')
+                state_before = frame.get('state_before')
+                state_after = frame.get('state_after')
+                
                 ai_narration = narrator.generate_narration(
                     step=frame.get('step', start_index + i),
                     line=frame.get('line') or frame.get('lineNumber', 0),
@@ -538,7 +543,10 @@ def generate_explanations_stream(request):
                     changed_vars=changed_vars,
                     function_name=frame.get('function_name') or frame.get('functionName'),
                     return_value=frame.get('return_value'),
-                    full_source=source_lines
+                    full_source=source_lines,
+                    loop_info=loop_info,
+                    state_before=state_before,
+                    state_after=state_after
                 )
                 
                 # Stream each explanation immediately
