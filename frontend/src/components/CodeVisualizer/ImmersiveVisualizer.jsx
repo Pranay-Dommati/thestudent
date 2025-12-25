@@ -723,12 +723,12 @@ const ImmersiveVisualizer = ({
                                                         </div>
                                                     </div>
                                                 )}
-
                                                 {/* Variables - Inline chips */}
-                                                {step.variables && Object.keys(step.variables).length > 0 && (
+                                                {(step.variables && Object.keys(step.variables).length > 0) || (step.computed_values && Object.keys(step.computed_values).length > 0) || (step.changedVars && step.changedVars.length > 0) ? (
                                                     <div className="flex flex-wrap items-center gap-2">
                                                         <span className="text-xs text-slate-500 font-medium">Variables:</span>
-                                                        {Object.entries(step.variables).map(([name, data]) => {
+                                                        {/* Existing variables */}
+                                                        {step.variables && Object.entries(step.variables).map(([name, data]) => {
                                                             const isChanged = step.changedVars?.includes(name);
 
                                                             // Use computed_values for NEW value if this variable is being changed
@@ -763,8 +763,49 @@ const ImmersiveVisualizer = ({
                                                                 </span>
                                                             );
                                                         })}
+                                                        {/* NEW variables from computed_values that don't exist yet */}
+                                                        {step.computed_values && Object.entries(step.computed_values)
+                                                            .filter(([name]) => !step.variables || !step.variables[name])
+                                                            .map(([name, value]) => {
+                                                                const valueStr = typeof value === 'object'
+                                                                    ? JSON.stringify(value)
+                                                                    : String(value);
+
+                                                                return (
+                                                                    <span
+                                                                        key={`new-${name}`}
+                                                                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300"
+                                                                    >
+                                                                        <span className="font-semibold">{name}</span>
+                                                                        <span className="text-indigo-400">=</span>
+                                                                        <span>{valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr}</span>
+                                                                        <span className="ml-1 text-[10px] bg-indigo-500 text-white px-1.5 py-0.5 rounded-full font-bold">
+                                                                            NEW!
+                                                                        </span>
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        {/* Variables being assigned but not in computed_values or variables */}
+                                                        {step.changedVars && step.changedVars
+                                                            .filter(name =>
+                                                                (!step.variables || !step.variables[name]) &&
+                                                                (!step.computed_values || step.computed_values[name] === undefined)
+                                                            )
+                                                            .map(name => (
+                                                                <span
+                                                                    key={`assigning-${name}`}
+                                                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono bg-blue-100 text-blue-700 ring-2 ring-blue-300"
+                                                                >
+                                                                    <span className="font-semibold">{name}</span>
+                                                                    <span className="text-blue-400">=</span>
+                                                                    <span className="text-blue-500 italic">assigning...</span>
+                                                                    <span className="ml-1 text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-bold">
+                                                                        NEW!
+                                                                    </span>
+                                                                </span>
+                                                            ))}
                                                     </div>
-                                                )}
+                                                ) : null}
 
                                                 {/* Output */}
                                                 {step.output && (

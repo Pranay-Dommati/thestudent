@@ -53,6 +53,10 @@ class PythonTracer:
         self.on_frame = None
         # Track for-loop iterations: {line_no: iteration_count}
         self.loop_iterations: Dict[int, int] = {}
+        # Store enriched frame dicts for post-processing
+        self.frame_dicts: List[Dict] = []
+        # Buffer for streaming look-ahead
+        self.pending_frame_dict: Optional[Dict] = None
         
     def _safe_copy(self, value: Any) -> Any:
         if value is None:
@@ -172,23 +176,63 @@ class PythonTracer:
             var_name = assign_match.group(1)
             expression = assign_match.group(2).strip()
             
-            try:
-                # Create a safe evaluation context with current locals
-                eval_context = {}
-                for name, data in current_locals.items():
-                    if name.startswith('_'):
-                        continue
-                    val = data.get('value') if isinstance(data, dict) else data
-                    eval_context[name] = val
-                
-                # Try to safely evaluate simple arithmetic expressions
-                # Only allow safe operations: +, -, *, /, //, %, **
-                if self._is_safe_expression(expression):
+            # Create a context with current locals
+            eval_context = {}
+            for name, data in current_locals.items():
+                if name.startswith('_'):
+                    continue
+                val = data.get('value') if isinstance(data, dict) else data
+                eval_context[name] = val
+            
+            # Case 1: Simple variable copy - `current = dummy`
+            if expression in eval_context:
+                computed[var_name] = self._safe_copy(eval_context[expression])
+            
+            # Case 2: Attribute access - `val = node.val`
+            elif '.' in expression and '(' not in expression and '[' not in expression:
+                parts = expression.split('.')
+                if len(parts) == 2:
+                    obj_name, attr_name = parts
+                    if obj_name in eval_context:
+                        obj = eval_context[obj_name]
+                        if hasattr(obj, attr_name):
+                            computed[var_name] = getattr(obj, attr_name)
+            
+            # Case 3: Array/list indexing - `max_val = nums[0]`
+            elif '[' in expression and ']' in expression and '(' not in expression:
+                # Match patterns like: arr[0], arr[i], arr[-1]
+                index_match = re.match(r'^(\w+)\[(.+)\]$', expression)
+                if index_match:
+                    arr_name = index_match.group(1)
+                    index_expr = index_match.group(2)
+                    if arr_name in eval_context:
+                        arr = eval_context[arr_name]
+                        try:
+                            # Try to evaluate the index
+                            if index_expr.lstrip('-').isdigit():
+                                idx = int(index_expr)
+                            elif index_expr in eval_context:
+                                idx = eval_context[index_expr]
+                            else:
+                                idx = eval(index_expr, {"__builtins__": {}}, eval_context)
+                            
+                            if isinstance(arr, (list, tuple, str)) and -len(arr) <= idx < len(arr):
+                                computed[var_name] = self._safe_copy(arr[idx])
+                        except:
+                            pass
+            
+            # Case 4: Safe arithmetic expressions
+            elif self._is_safe_expression(expression):
+                try:
                     result = eval(expression, {"__builtins__": {}}, eval_context)
                     computed[var_name] = self._safe_copy(result)
-            except:
-                # If evaluation fails, that's okay - we just won't have the computed value
-                pass
+                except:
+                    pass
+            
+            # Case 5: If the variable already exists (loop iteration), use current value
+            # This handles cases like `dummy = ListNode(0)` in a loop
+            elif var_name in eval_context:
+                computed[var_name] = self._safe_copy(eval_context[var_name])
         
         # Augmented assignment: `var += expr`, `var -= expr`, etc.
         aug_match = re.match(r'^(\w+)\s*([+\-*/|&^%@])=\s*(.+)$', code)
@@ -219,6 +263,49 @@ class PythonTracer:
                     if operator in op_map:
                         result = op_map[operator](current_val, expr_val)
                         computed[var_name] = self._safe_copy(result)
+            except:
+                pass
+        
+        # Handle ternary expressions: var = value if condition else other_value
+        ternary_match = re.match(r'^(\w+)\s*=\s*(.+)\s+if\s+(\w+)\s+else\s+(.+)$', code)
+        if ternary_match:
+            var_name = ternary_match.group(1)
+            true_expr = ternary_match.group(2).strip()
+            condition_var = ternary_match.group(3).strip()
+            false_expr = ternary_match.group(4).strip()
+            
+            try:
+                # Get the condition value
+                if condition_var in current_locals:
+                    cond_data = current_locals[condition_var]
+                    cond_val = cond_data.get('value') if isinstance(cond_data, dict) else cond_data
+                    
+                    # Determine if condition is truthy
+                    is_truthy = bool(cond_val) if cond_val is not None else False
+                    
+                    if is_truthy:
+                        # Evaluate the true branch
+                        # Handle attribute access like l2.val
+                        if '.' in true_expr:
+                            parts = true_expr.split('.')
+                            obj_name = parts[0]
+                            attr_name = parts[1]
+                            if obj_name in current_locals:
+                                obj_data = current_locals[obj_name]
+                                obj_val = obj_data.get('value') if isinstance(obj_data, dict) else obj_data
+                                if hasattr(obj_val, attr_name):
+                                    computed[var_name] = getattr(obj_val, attr_name)
+                        else:
+                            # Simple variable
+                            if true_expr in current_locals:
+                                data = current_locals[true_expr]
+                                computed[var_name] = data.get('value') if isinstance(data, dict) else data
+                    else:
+                        # Evaluate the false branch (usually 0 or similar)
+                        try:
+                            computed[var_name] = eval(false_expr, {"__builtins__": {}}, {})
+                        except:
+                            pass
             except:
                 pass
         
@@ -598,9 +685,43 @@ class PythonTracer:
             frame_dict['explanation'] = trace_frame.explanation
             
             self.frames.append(trace_frame)
+            self.frame_dicts.append(frame_dict)  # Store enriched dict for post-processing
+
+            
             if self.on_frame:
                 try:
-                    self.on_frame(frame_dict)
+                    # STREAMING BUFFER LOGIC:
+                    # If we have a pending frame, we can now look ahead at the CURRENT frame's locals
+                    # (which represent the state AFTER the pending frame executed).
+                    if self.pending_frame_dict:
+                        pending = self.pending_frame_dict
+                        changed_vars = pending.get('changed_vars', [])
+                        computed_vals = pending.get('computed_values', {})
+                        if computed_vals is None: computed_vals = {}
+                        
+                        modified_pending = False
+                        
+                        for var_name in changed_vars:
+                            if var_name not in computed_vals and var_name in serialized_locals:
+                                next_val = serialized_locals[var_name]
+                                val_to_store = None
+                                if isinstance(next_val, dict) and 'value' in next_val:
+                                    val_to_store = next_val['value']
+                                else:
+                                    val_to_store = next_val
+                                
+                                computed_vals[var_name] = val_to_store
+                                modified_pending = True
+                        
+                        if modified_pending:
+                            pending['computed_values'] = computed_vals
+                            
+                        # Send the pending frame now that it's fully enriched
+                        self.on_frame(pending)
+                    
+                    # Store current frame as pending
+                    self.pending_frame_dict = frame_dict
+                    
                 except Exception:
                     # Never break tracing due to callback errors
                     pass
@@ -629,6 +750,7 @@ class PythonTracer:
     
     def trace(self, code: str, input_values: Optional[List[str]] = None, on_frame=None) -> Dict[str, Any]:
         self.frames = []
+        self.frame_dicts = []  # Reset enriched dicts
         self.step_count = 0
         self.previous_locals = {}
         self.error = None
@@ -640,6 +762,7 @@ class PythonTracer:
         self.function_start_line = 0
         self.function_end_line = 0
         self.on_frame = on_frame
+        self.pending_frame_dict = None  # Reset buffer
         
         self.source_lines = code.split('\n')
         self._analyze_code_structure(code)
@@ -666,22 +789,64 @@ class PythonTracer:
                     exec(compiled_code, sandbox_globals, sandbox_globals)
                 finally:
                     sys.settrace(None)
+                    # Flush pending frame if any
+                    if self.pending_frame_dict and self.on_frame:
+                         try:
+                             self.on_frame(self.pending_frame_dict)
+                         except Exception:
+                             pass
+                         self.pending_frame_dict = None
             
             result["output"] = captured.getvalue()
             result["success"] = True
-            result["frames"] = [frame.to_dict() for frame in self.frames]
+            
+            # POST-PROCESSING: Look ahead to fill in computed_values for variables we couldn't compute
+            # This happens when a line creates a new object (e.g., dummy = ListNode(0))
+            for i, frame_dict in enumerate(self.frame_dicts):
+                # If there are changed_vars without computed values, look ahead
+                changed_vars = frame_dict.get('changed_vars', [])
+                computed_values = frame_dict.get('computed_values', {})
+                if computed_values is None:
+                    computed_values = {}
+                
+                for var_name in changed_vars:
+                    if var_name not in computed_values:
+                        # Look at the NEXT frame's locals to get the actual value after execution
+                        if i + 1 < len(self.frame_dicts):
+                            next_locals = self.frame_dicts[i + 1].get('locals', {})
+                            
+                            # DEBUG LOGGING
+                            print(f"[DEBUG] Step {frame_dict.get('step')} ({frame_dict.get('code', '').strip()}): Look-ahead for '{var_name}'")
+                            # print(f"   Next locals keys: {list(next_locals.keys())}")
+                            
+                            if var_name in next_locals:
+                                next_val = next_locals[var_name]
+                                val_to_store = None
+                                if isinstance(next_val, dict) and 'value' in next_val:
+                                    val_to_store = next_val['value']
+                                else:
+                                    val_to_store = next_val
+                                    
+                                print(f"   FOUND! Value: {val_to_store}")
+                                computed_values[var_name] = val_to_store
+                            else:
+                                print(f"   NOT FOUND in next frame locals")
+                
+                frame_dict['computed_values'] = computed_values
+            
+            result["frames"] = self.frame_dicts
             
             if self.error:
                 result["error"] = self.error
                 
         except SyntaxError as e:
             result["error"] = f"Syntax Error at line {e.lineno}: {e.msg}"
-            result["frames"] = [frame.to_dict() for frame in self.frames]
+            result["frames"] = self.frame_dicts if self.frame_dicts else [frame.to_dict() for frame in self.frames]
             
         except Exception as e:
             result["error"] = f"{type(e).__name__}: {str(e)}"
-            result["frames"] = [frame.to_dict() for frame in self.frames]
-            result["success"] = len(self.frames) > 0
+            result["frames"] = self.frame_dicts if self.frame_dicts else [frame.to_dict() for frame in self.frames]
+            result["success"] = len(self.frame_dicts) > 0 or len(self.frames) > 0
             
         return result
 

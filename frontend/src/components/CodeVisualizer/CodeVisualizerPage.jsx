@@ -165,6 +165,7 @@ function CodeVisualizerPage() {
                                         explanation: frame.explanation,
                                         variables: frame.locals,
                                         changedVars: frame.changed_vars || [],
+                                        computed_values: frame.computed_values,
                                         event: frame.event,
                                         functionName: frame.function_name,
                                         output: frame.output
