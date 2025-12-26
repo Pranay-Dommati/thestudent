@@ -441,10 +441,17 @@ function CodeVisualizerPage() {
                             d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,138.7C672,149,768,203,864,202.7C960,203,1056,149,1152,138.7C1248,128,1344,160,1392,176L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
                         />
 
-                        {/* Text flowing along the wave path */}
+                        {/* Text flowing along the wave path - Single strip with repeated content for seamless loop */}
                         <text className="wave-path-text" dy="-5">
-                            <textPath href="#wavePath" className="animate-wave-text-path">
-                                ✦ Visualize your code ✦ See code come alive ✦ Learn how code thinks ✦ No more blind coding ✦ Clarity over memorization ✦ Understand the "why" ✦ Concepts made visible ✦ Beyond the result ✦ Where code makes sense ✦ Visualize your code ✦ See code come alive ✦ Learn how code thinks ✦ No more blind coding ✦ Clarity over memorization ✦
+                            <textPath href="#wavePath" startOffset="100%">
+                                ✦ Visualize your code ✦ See code come alive ✦ Learn how code thinks ✦ No more blind coding ✦ Clarity over memorization ✦ Understand the "why" ✦ Concepts made visible ✦ Beyond the result ✦ Where code makes sense ✦ Visualize your code ✦ See code come alive ✦ Learn how code thinks ✦ No more blind coding ✦ Clarity over memorization ✦ Understand the "why" ✦ Concepts made visible ✦ Beyond the result ✦ Where code makes sense ✦ Visualize your code ✦ See code come alive ✦ Learn how code thinks ✦ No more blind coding ✦ Clarity over memorization ✦ Understand the "why" ✦ Concepts made visible ✦ Beyond the result ✦ Where code makes sense ✦
+                                <animate
+                                    attributeName="startOffset"
+                                    from="100%"
+                                    to="-200%"
+                                    dur="45s"
+                                    repeatCount="indefinite"
+                                />
                             </textPath>
                         </text>
                     </svg>
