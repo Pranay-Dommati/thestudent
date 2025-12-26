@@ -16,6 +16,7 @@ const ImmersiveVisualizer = ({
     sourceLines = [],  // For generating more explanations
     totalSteps = null,
     generatedUpTo = null,
+    executionId = null,  // ENTERPRISE: Backend session ID for on-demand requests
 }) => {
     const [visibleSteps, setVisibleSteps] = useState([]);
     const [currentStepIndex, setCurrentStepIndex] = useState(-1);
@@ -241,14 +242,27 @@ const ImmersiveVisualizer = ({
         setDisplayedStepsCount(newVisibleCount);
 
         try {
-            const response = await fetch('/api/visualizer/generate-explanations-stream/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            // ENTERPRISE MODE: Use executionId to retrieve frames from backend store
+            // This ensures state_before/state_after are always available (no round-trip data loss)
+            const requestBody = executionId
+                ? {
+                    executionId: executionId,
+                    frameIndices: remainingSteps.map((_, i) => currentCount + i),
+                    startIndex: currentCount
+                }
+                : {
+                    // LEGACY FALLBACK: Send frames directly (less reliable)
                     frames: remainingSteps,
                     sourceLines: sourceLines || codeLines,
                     startIndex: currentCount
-                })
+                };
+
+            console.log(`[On-Demand] Using ${executionId ? 'ENTERPRISE' : 'LEGACY'} mode for steps ${currentCount}-${currentCount + remainingSteps.length - 1}`);
+
+            const response = await fetch('/api/visualizer/generate-explanations-stream/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
             });
 
             const reader = response.body.getReader();
@@ -306,7 +320,7 @@ const ImmersiveVisualizer = ({
         } finally {
             setIsLoadingMore(false);
         }
-    }, [displayedStepsCount, steps, sourceLines, codeLines, isLoadingMore]);
+    }, [displayedStepsCount, steps, sourceLines, codeLines, isLoadingMore, executionId]);
 
     // Get syntax highlighted code line - returns React elements (Light Theme Optimized)
     const highlightSyntax = (codeLine) => {

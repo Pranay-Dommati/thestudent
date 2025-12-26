@@ -20,6 +20,7 @@ from django.views.decorators.http import require_http_methods
 from .tracer import trace_code
 from .sandbox import validate_code
 from .ai_narrator import get_narrator
+from . import execution_store
 
 
 # Initialize narrator
@@ -446,6 +447,7 @@ def generate_explanations(request):
         frames = data.get('frames', [])  # Frames without explanations
         source_lines = data.get('sourceLines', [])
         start_index = data.get('startIndex', 0)
+        previous_frame = data.get('previousFrame')  # Optional: for computing state_before of first frame
         
         if not narrator or not narrator.is_available:
             return JsonResponse({
@@ -466,6 +468,33 @@ def generate_explanations(request):
             variables = frame.get('locals') or frame.get('variables', {})
             changed_vars = frame.get('changed_vars') or frame.get('changedVars', [])
             
+            # Get loop_info and state info from frame
+            loop_info = frame.get('loop_info')
+            state_before = frame.get('state_before')
+            state_after = frame.get('state_after')
+            
+            # CRITICAL FIX: Compute state_before/state_after from frame sequence if not provided
+            if state_before is None:
+                prev_frame_to_use = None
+                if i > 0:
+                    prev_frame_to_use = frames[i - 1]
+                elif previous_frame:
+                    prev_frame_to_use = previous_frame
+                
+                if prev_frame_to_use:
+                    prev_locals = prev_frame_to_use.get('locals') or prev_frame_to_use.get('variables', {})
+                    if prev_locals:
+                        state_before = {}
+                        for var_name, data_val in prev_locals.items():
+                            val = data_val.get('value') if isinstance(data_val, dict) else data_val
+                            state_before[var_name] = val
+            
+            if state_after is None and variables:
+                state_after = {}
+                for var_name, data_val in variables.items():
+                    val = data_val.get('value') if isinstance(data_val, dict) else data_val
+                    state_after[var_name] = val
+            
             ai_narration = narrator.generate_narration(
                 step=frame.get('step', start_index + i),
                 line=frame.get('line') or frame.get('lineNumber', 0),
@@ -475,7 +504,10 @@ def generate_explanations(request):
                 changed_vars=changed_vars,
                 function_name=frame.get('function_name') or frame.get('functionName'),
                 return_value=frame.get('return_value'),
-                full_source=source_lines
+                full_source=source_lines,
+                loop_info=loop_info,
+                state_before=state_before,
+                state_after=state_after
             )
             explanations.append({
                 'index': start_index + i,
@@ -498,50 +530,122 @@ def generate_explanations(request):
 def generate_explanations_stream(request):
     """Stream AI explanations one-by-one via Server-Sent Events.
     
-    This provides progressive rendering like the initial trace.
+    ENTERPRISE-GRADE: Uses execution_store as Single Source of Truth.
+    Frontend sends execution_id + frame_indices, NOT frame data.
+    Backend retrieves canonical frames with complete state.
+    
+    Fallback: Still supports legacy mode where frontend sends frames directly.
     """
     BATCH_SIZE = 6
     
     try:
         data = json.loads(request.body)
-        frames = data.get('frames', [])
-        source_lines = data.get('sourceLines', [])
+        
+        # ENTERPRISE MODE: Use execution_id to retrieve canonical frames
+        execution_id = data.get('executionId')
+        frame_indices = data.get('frameIndices', [])
+        
+        # LEGACY MODE: Frontend sends frames directly (fallback)
+        legacy_frames = data.get('frames', [])
+        legacy_source_lines = data.get('sourceLines', [])
         start_index = data.get('startIndex', 0)
+        previous_frame = data.get('previousFrame')
         
         def generate():
+            nonlocal frame_indices, legacy_frames, start_index
+            
             if not narrator or not narrator.is_available:
                 yield "data: " + json.dumps({'type': 'error', 'error': 'AI narrator not available'}) + "\n\n"
                 return
             
-            # print(f"[On-Demand Stream] 🔄 Streaming AI explanations for steps {start_index + 1} to {start_index + min(BATCH_SIZE, len(frames))}")
+            # Determine which mode to use
+            frames_to_process = []
+            source_lines = []
             
-            for i, frame in enumerate(frames[:BATCH_SIZE]):
-                step_num = start_index + i + 1
+            print(f"[ON-DEMAND DEBUG] execution_id={execution_id}, frame_indices={frame_indices}, start_index={start_index}")
+            print(f"[ON-DEMAND DEBUG] legacy_frames count={len(legacy_frames)}")
+            
+            if execution_id:
+                # ENTERPRISE MODE: Retrieve frames from execution store (SSOT)
+                print(f"[ON-DEMAND DEBUG] Using ENTERPRISE MODE with execution_id={execution_id}")
+                execution = execution_store.get_execution(execution_id)
+                if not execution:
+                    print(f"[ON-DEMAND DEBUG] ERROR: Execution not found!")
+                    yield "data: " + json.dumps({'type': 'error', 'error': f'Execution {execution_id} not found or expired'}) + "\n\n"
+                    return
+                
+                all_frames = execution.get('frames', [])
+                source_lines = execution.get('source_lines', [])
+                print(f"[ON-DEMAND DEBUG] Retrieved {len(all_frames)} frames from store")
+                
+                # If frame_indices provided, use them; otherwise use start_index
+                if frame_indices:
+                    for idx in frame_indices[:BATCH_SIZE]:
+                        if 0 <= idx < len(all_frames):
+                            frames_to_process.append((idx, all_frames[idx]))
+                else:
+                    # Use start_index for backwards compatibility
+                    for i in range(BATCH_SIZE):
+                        idx = start_index + i
+                        if idx < len(all_frames):
+                            frames_to_process.append((idx, all_frames[idx]))
+                
+                # Log what we got
+                for idx, frame in frames_to_process[:2]:
+                    print(f"[ON-DEMAND DEBUG] Frame {idx}: state_before={frame.get('state_before') is not None}, state_after={frame.get('state_after') is not None}")
+            else:
+                # LEGACY MODE: Use frames sent by frontend (with state computation fallback)
+                print(f"[ON-DEMAND DEBUG] Using LEGACY MODE - frontend sent frames directly")
+                source_lines = legacy_source_lines
+                for i, frame in enumerate(legacy_frames[:BATCH_SIZE]):
+                    frames_to_process.append((start_index + i, frame))
+            
+            # Generate explanations for each frame
+            for frame_idx, frame in frames_to_process:
                 code_line = frame.get('code', '')[:50]
-                # print(f"[On-Demand Stream] Step {step_num}: 🤖 Generating AI for: {code_line}")
                 
-                # Frontend sends 'variables' but original frame uses 'locals'
-                variables = frame.get('locals') or frame.get('variables', {})
-                changed_vars = frame.get('changed_vars') or frame.get('changedVars', [])
-                
-                # Debug: show what we're working with
-                # print(f"[On-Demand Stream] Frame keys: {list(frame.keys())}")
-                # print(f"[On-Demand Stream] Variables keys: {list(variables.keys()) if variables else 'EMPTY'}")
-                changed_vars = frame.get('changed_vars') or frame.get('changedVars', [])
-                
-                # Get loop_info from frame (frontend sends this as part of the frame)
+                # Get data from the canonical frame
+                variables = frame.get('locals', {})
+                changed_vars = frame.get('changed_vars', [])
                 loop_info = frame.get('loop_info')
                 state_before = frame.get('state_before')
                 state_after = frame.get('state_after')
                 
+                # FALLBACK: If still no state_before (legacy mode), compute from sequence
+                if state_before is None and not execution_id:
+                    # Find previous frame
+                    current_idx_in_batch = next((i for i, (idx, _) in enumerate(frames_to_process) if idx == frame_idx), -1)
+                    if current_idx_in_batch > 0:
+                        _, prev_frame = frames_to_process[current_idx_in_batch - 1]
+                        prev_locals = prev_frame.get('locals', {})
+                        if prev_locals:
+                            state_before = {}
+                            for var_name, d in prev_locals.items():
+                                val = d.get('value') if isinstance(d, dict) else d
+                                state_before[var_name] = val
+                    elif previous_frame:
+                        prev_locals = previous_frame.get('locals', {})
+                        if prev_locals:
+                            state_before = {}
+                            for var_name, d in prev_locals.items():
+                                val = d.get('value') if isinstance(d, dict) else d
+                                state_before[var_name] = val
+                
+                if state_after is None and not execution_id:
+                    if variables:
+                        state_after = {}
+                        for var_name, d in variables.items():
+                            val = d.get('value') if isinstance(d, dict) else d
+                            state_after[var_name] = val
+                
                 ai_narration = narrator.generate_narration(
-                    step=frame.get('step', start_index + i),
-                    line=frame.get('line') or frame.get('lineNumber', 0),
+                    step=frame.get('step', frame_idx),
+                    line=frame.get('line', 0),
                     code=frame.get('code', ''),
                     event=frame.get('event', 'line'),
                     variables=variables,
                     changed_vars=changed_vars,
-                    function_name=frame.get('function_name') or frame.get('functionName'),
+                    function_name=frame.get('function_name'),
                     return_value=frame.get('return_value'),
                     full_source=source_lines,
                     loop_info=loop_info,
@@ -550,10 +654,9 @@ def generate_explanations_stream(request):
                 )
                 
                 # Stream each explanation immediately
-                yield "data: " + json.dumps({'type': 'explanation', 'index': start_index + i, 'explanation': ai_narration, 'frame': frame}) + "\n\n"
+                yield "data: " + json.dumps({'type': 'explanation', 'index': frame_idx, 'explanation': ai_narration}) + "\n\n"
             
-            # print(f"[On-Demand Stream] ✅ Completed streaming {min(BATCH_SIZE, len(frames))} explanations")
-            yield "data: " + json.dumps({'type': 'complete', 'count': min(BATCH_SIZE, len(frames))}) + "\n\n"
+            yield "data: " + json.dumps({'type': 'complete', 'count': len(frames_to_process)}) + "\n\n"
         
         response = StreamingHttpResponse(generate(), content_type='text/event-stream')
         response['Cache-Control'] = 'no-cache'
@@ -562,6 +665,7 @@ def generate_explanations_stream(request):
         
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -674,8 +778,30 @@ def trace_stream(request):
                 yield f"data: {json.dumps({'type': 'error', 'error': result.get('error', 'Unknown error')})}\n\n"
                 return
 
-            # Send completion message with output (if any)
-            yield f"data: {json.dumps({'type': 'complete', 'totalFrames': frame_index, 'output': result.get('output', '')})}\n\n"
+            # ENTERPRISE-GRADE: Store execution in backend session store
+            # Backend is the SINGLE SOURCE OF TRUTH for all execution state
+            all_frames = result.get('frames', [])
+            
+            # DEBUG: Log what we're storing
+            print(f"[EXEC STORE] Storing {len(all_frames)} frames")
+            for idx, frame in enumerate(all_frames[:3]):  # Log first 3 frames
+                print(f"[EXEC STORE] Frame {idx}: keys={list(frame.keys())}")
+                print(f"[EXEC STORE] Frame {idx}: state_before={frame.get('state_before') is not None}, state_after={frame.get('state_after') is not None}")
+            if len(all_frames) > 3:
+                print(f"[EXEC STORE] ... and {len(all_frames) - 3} more frames")
+            
+            exec_id = execution_store.store_execution(
+                frames=all_frames,
+                source_lines=source_lines,
+                metadata={
+                    'code_type': code_type,
+                    'function_name': function_name,
+                    'class_name': class_name,
+                }
+            )
+            print(f"[EXEC STORE] Stored execution with id={exec_id}")
+            # Send completion message with executionId for future reference
+            yield f"data: {json.dumps({'type': 'complete', 'totalFrames': frame_index, 'output': result.get('output', ''), 'executionId': exec_id})}\n\n"
         
         response = StreamingHttpResponse(
             generate_frames(),

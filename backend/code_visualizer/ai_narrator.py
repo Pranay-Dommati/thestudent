@@ -245,25 +245,41 @@ class AINarrator:
             if "input(" in code_line:
                  context_parts.append("NOTE: This line calls input(). Use the provided User Inputs for the value.")
         
-        # Build detailed variable context
-        if variables:
-            var_list = []
+        # Build detailed variable context for DRY-RUN substitution
+        # CRITICAL: Use state_before if available - these are the values BEFORE this line executes
+        # This ensures dry-run shows correct substitution (e.g., k=2 for "k += 1" → "k = 2 + 1 → 3")
+        
+        # DEBUG: Log what we received
+        print(f"[AI NARRATOR] Step {step}, Code: {code_line[:40]}")
+        print(f"[AI NARRATOR]   state_before: {state_before is not None} ({len(state_before) if state_before else 0} vars)")
+        print(f"[AI NARRATOR]   state_after: {state_after is not None} ({len(state_after) if state_after else 0} vars)")
+        
+        substitution_vars = state_before if state_before else {}
+        
+        # Fall back to variables if state_before is empty (first frame or non-streaming)
+        if not substitution_vars and variables:
+            print(f"[AI NARRATOR]   FALLBACK to variables!")
+            # Extract values from variables dict
             for name, data in variables.items():
                 if isinstance(data, dict) and 'value' in data:
-                    val = data['value']
-                    var_type = data.get('type', 'unknown')
-                    # Determine truthy/falsy
-                    try:
-                        is_truthy = bool(val) if val is not None else False
-                    except:
-                        is_truthy = val is not None
-                    truthy_str = "truthy" if is_truthy else "falsy"
-                    var_list.append(f"  {name} = {val} (type: {var_type}, {truthy_str})")
+                    substitution_vars[name] = data['value']
                 else:
-                    var_list.append(f"  {name} = {data}")
-            context_parts.append("CURRENT VARIABLES:\n" + "\n".join(var_list))
+                    substitution_vars[name] = data
+        
+        if substitution_vars:
+            var_list = []
+            for name, val in substitution_vars.items():
+                # Determine truthy/falsy
+                try:
+                    is_truthy = bool(val) if val is not None else False
+                except:
+                    is_truthy = val is not None
+                truthy_str = "truthy" if is_truthy else "falsy"
+                var_type = type(val).__name__ if val is not None else "NoneType"
+                var_list.append(f"  {name} = {val} (type: {var_type}, {truthy_str})")
+            context_parts.append("VARIABLES FOR SUBSTITUTION (before this line executes):\n" + "\n".join(var_list))
         else:
-            context_parts.append("CURRENT VARIABLES: (none)")
+            context_parts.append("VARIABLES FOR SUBSTITUTION: (none)")
         
         if event == 'return' and return_value is not None:
             context_parts.append(f"RETURN VALUE: {return_value}")
@@ -307,7 +323,8 @@ class AINarrator:
         prompt += "\n→ [result]"
         prompt += "\n"
         prompt += "\nRULES:"
-        prompt += "\n- Use ONLY the values from STATE TRANSITION above - no guessing!"
+        prompt += "\n- Use ONLY the values from 'VARIABLES FOR SUBSTITUTION' for substitution - these are the BEFORE values!"
+        prompt += "\n- The STATE TRANSITION shows BEFORE → AFTER, use BEFORE values in your substitution"
         prompt += "\n- Show clear step-by-step substitution"
         prompt += "\n- For loops: If LOOP STATUS says 'COMPLETE', say 'Loop has completed - exiting' (NOT 'continuing to next iteration')"
         prompt += "\n- For loops: If LOOP STATUS shows iteration X/Y, say 'Iteration X of Y'"

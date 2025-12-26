@@ -20,6 +20,7 @@ function CodeVisualizerPage() {
     const [autoGenerateInput, setAutoGenerateInput] = useState(true);
     const [isRunning, setIsRunning] = useState(false);
     const [steps, setSteps] = useState([]);
+    const [executionId, setExecutionId] = useState(null);  // ENTERPRISE: Backend session ID
     const [error, setError] = useState(null);
 
     // Input modal state
@@ -65,6 +66,7 @@ function CodeVisualizerPage() {
         setShowVisualizer(true);
         setIsLoadingTrace(true);
         setSteps([]);
+        setExecutionId(null);  // ENTERPRISE: Reset for new trace
 
         const meta = metadata || codeMetadata;
 
@@ -179,7 +181,11 @@ function CodeVisualizerPage() {
                                 }
 
                                 if (data.type === 'complete') {
-                                    console.log('[SSE] Complete message received. Total frames:', data.totalFrames);
+                                    console.log('[SSE] Complete message received. Total frames:', data.totalFrames, 'ExecutionId:', data.executionId);
+                                    // ENTERPRISE: Store execution ID for on-demand requests
+                                    if (data.executionId) {
+                                        setExecutionId(data.executionId);
+                                    }
                                     // All frames received
                                     if (silenceTimeout) clearTimeout(silenceTimeout);
                                     setIsLoadingTrace(false);
@@ -451,6 +457,7 @@ function CodeVisualizerPage() {
                 isLoading={isLoadingTrace}
                 loadingPhase={loadingPhase}
                 isGenerating={isRunning}
+                executionId={executionId}
             />
         </div>
     );

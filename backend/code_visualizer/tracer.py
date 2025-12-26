@@ -787,8 +787,22 @@ class PythonTracer:
             if loop_info:
                 frame_dict['loop_info'] = loop_info
             
-            # NOTE: dry_run is now computed via state-diff in the streaming buffer
-            # This eliminates all regex-based parsing and works for ANY Python syntax
+            # STATE TRACKING FOR DRY-RUN:
+            # - state_before = state at START of this line (serialized_locals, before line executes)
+            # - state_after = state at START of next line (filled in when next frame fires)
+            
+            # Set THIS frame's state_before (current state before line executes)
+            state_before_simple = {}
+            for var_name, data in serialized_locals.items():
+                val = data.get('value') if isinstance(data, dict) else data
+                state_before_simple[var_name] = val
+            frame_dict['state_before'] = state_before_simple
+            
+            # Update PREVIOUS frame's state_after (current state = result of previous line)
+            # This gives the previous frame its "after" state
+            if len(self.frame_dicts) > 0:
+                prev_frame = self.frame_dicts[-1]
+                prev_frame['state_after'] = state_before_simple.copy()
             
             trace_frame.explanation = self._generate_explanation(trace_frame)
             frame_dict['explanation'] = trace_frame.explanation
