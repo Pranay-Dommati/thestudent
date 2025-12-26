@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FaUserCircle, FaSignOutAlt, FaUserPlus, FaSignInAlt, FaChevronRight, FaHome } from 'react-icons/fa';
+import { FaUserCircle, FaSignOutAlt, FaUserPlus, FaSignInAlt, FaChevronRight, FaBookOpen } from 'react-icons/fa';
 import { IoClose } from 'react-icons/io5';
 import { useAuth } from '../../context/AuthContext';
 import LogoutConfirmModal from '../common/LogoutConfirmModal';
@@ -20,7 +20,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
     const generateBreadcrumbs = () => {
         const pathSegments = location.pathname.split('/').filter(Boolean);
         const breadcrumbs = [
-            { name: 'Home', path: '/', icon: <FaHome className="w-3 h-3" /> }
+            { name: 'Courses', path: '/', icon: <FaBookOpen className="w-3 h-3" /> }
         ];
 
         let currentPath = '';
@@ -245,7 +245,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                             // Full navigation for desktop
                             <div className="flex items-center justify-center flex-1 max-w-[700px]">
                                 <div className="flex items-center space-x-8">
-                                    <Link to="/" className={`font-medium transition-colors ${textColor}`}>Home</Link>
+                                    <Link to="/" className={`font-medium transition-colors ${textColor}`}>Courses</Link>
 
                                     {isLoggedIn && (
                                         <Link

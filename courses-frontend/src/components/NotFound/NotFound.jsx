@@ -52,8 +52,7 @@ const NotFound = () => {
                         </div>
                         <div className="hidden md:flex items-center justify-center flex-1 max-w-[600px]">
                             <div className="flex items-center space-x-8">
-                                <Link to="/" className="font-medium transition-colors text-white hover:text-blue-200">Home</Link>
-                                <Link to="/courses" className="font-medium transition-colors text-white hover:text-blue-200">Courses</Link>
+                                <Link to="/" className="font-medium transition-colors text-white hover:text-blue-200">Courses</Link>
                                 <Link to="/learning-path" className="font-medium transition-colors text-white hover:text-blue-200">Learn Smarter</Link>
                                 {isLoggedIn && (
                                     <Link to="/learning-hub" className="font-medium transition-colors text-white hover:text-blue-200">Learning Hub</Link>
@@ -125,7 +124,7 @@ const NotFound = () => {
                                 onClick={() => navigate("/")}
                                 className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-medium py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg transition-colors shadow-sm text-sm sm:text-base"
                             >
-                                Home Page
+                                Browse Courses
                             </button>
                         </div>
                     </div>

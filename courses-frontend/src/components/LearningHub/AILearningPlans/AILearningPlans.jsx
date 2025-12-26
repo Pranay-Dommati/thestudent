@@ -55,6 +55,28 @@ const AILearningPlans = () => {
     const [deleteConfirm, setDeleteConfirm] = useState({ show: false, course: null });
 
     const COURSES_TO_SHOW = 6;
+    const [openMenuId, setOpenMenuId] = useState(null); // Track open menu
+    const menuRef = useRef(null); // Ref for closing menu on click outside
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setOpenMenuId(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    const toggleMenu = (e, courseId) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpenMenuId(openMenuId === courseId ? null : courseId);
+    };
 
     const isFetchingRef = useRef(null); // holds in-flight promise
     const lastFetchTimeRef = useRef(0);
@@ -380,8 +402,8 @@ const AILearningPlans = () => {
                 {coursesToDisplay.map((course) => (
                     <div
                         key={course.id}
-                        className="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                        style={{ pointerEvents: 'auto' }}
+                        className="bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors relative"
+                        style={{ pointerEvents: 'auto', zIndex: openMenuId === course.id ? 100 : 1 }}
                     >
                         <div className="flex items-center justify-between">
                             {/* Left: Course Info */}
@@ -402,58 +424,73 @@ const AILearningPlans = () => {
                                 </div>
                             </div>
 
-                            {/* Right: Progress & Actions */}
-                            <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 flex-shrink-0 relative z-10" style={{ pointerEvents: 'auto' }}>
-                                {/* Progress */}
-                                <div className="text-xs text-gray-500 font-medium" style={{ userSelect: 'text', cursor: 'text' }}>
-                                    {Math.round(course.completion_percentage || 0)}%
-                                </div>
-
-                                {/* Start Button */}
+                            {/* Right: Actions */}
+                            <div className="flex items-center gap-2 flex-shrink-0" style={{ pointerEvents: 'auto' }}>
+                                {/* Start Button - Primary Action */}
                                 <button
                                     onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
                                         handleStartCourse(course.id, formatCourseName(course));
                                     }}
-                                    className="px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-600 text-white rounded text-[11px] sm:text-xs font-medium hover:bg-blue-700 transition-colors flex items-center relative z-10"
-                                    style={{ cursor: 'pointer', pointerEvents: 'auto', position: 'relative' }}
+                                    className="h-8 px-3 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center shadow-sm"
+                                    style={{ cursor: 'pointer', pointerEvents: 'auto', minWidth: '70px' }}
                                     type="button"
                                 >
-                                    <FaPlay className="mr-1 text-[9px] sm:text-[10px]" />
-                                    Start
+                                    <FaPlay className="mr-1.5 text-[9px]" />
+                                    {course.is_completed ? 'Review' : (course.completion_percentage > 0 ? 'Continue' : 'Start')}
                                 </button>
 
-                                {/* Share Button */}
-                                <div style={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
-                                    <ShareCourseButton
-                                        courseId={course.id}
-                                        courseTitle={formatCourseName(course)}
-                                        className="p-1.5 sm:p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors relative z-10"
-                                        title="Share course"
-                                        preventDefault
-                                    />
-                                </div>
+                                {/* Menu Action */}
+                                <div className="relative">
+                                    <button
+                                        onClick={(e) => toggleMenu(e, course.id)}
+                                        className="h-8 w-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <FaEllipsisV className="text-sm" />
+                                    </button>
 
-                                {/* Delete Button */}
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleDeleteClick(course);
-                                    }}
-                                    disabled={deleteLoading === course.id}
-                                    className="p-1.5 sm:p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded transition-colors relative z-10"
-                                    title="Delete"
-                                    style={{ cursor: 'pointer', pointerEvents: 'auto', position: 'relative' }}
-                                    type="button"
-                                >
-                                    {deleteLoading === course.id ? (
-                                        <FaSpinner className="text-xs sm:text-sm animate-spin" />
-                                    ) : (
-                                        <FaTrash className="text-xs sm:text-sm" />
+                                    {/* Dropdown Menu */}
+                                    {openMenuId === course.id && (
+                                        <div
+                                            ref={menuRef}
+                                            className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-[999] overflow-hidden"
+                                            onClick={(e) => e.stopPropagation()}
+                                            style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.15)' }}
+                                        >
+                                            {/* Share Option */}
+                                            <div className="border-b border-gray-50 last:border-0">
+                                                <ShareCourseButton
+                                                    courseId={course.id}
+                                                    courseTitle={formatCourseName(course)}
+                                                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
+                                                    title="Share course"
+                                                    showIcon={true}
+                                                    customLabel="Share Course"
+                                                    preventDefault
+                                                />
+                                            </div>
+
+                                            {/* Delete Option */}
+                                            <div className="border-b border-gray-50 last:border-0">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setOpenMenuId(null);
+                                                        handleDeleteClick(course);
+                                                    }}
+                                                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center transition-colors"
+                                                    disabled={deleteLoading === course.id}
+                                                >
+                                                    <FaTrash className="mr-3 text-xs opacity-70" />
+                                                    Delete Course
+                                                </button>
+                                            </div>
+                                        </div>
                                     )}
-                                </button>
+                                </div>
                             </div>
                         </div>
                     </div>
