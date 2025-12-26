@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { 
-    FaGraduationCap, 
-    FaBook, 
-    FaUniversity, 
-    FaLaptopCode, 
+import {
+    FaGraduationCap,
+    FaBook,
+    FaUniversity,
+    FaLaptopCode,
     FaChevronRight,
     FaSearch,
     FaFilter,
@@ -28,63 +28,63 @@ const MobileFirstCourses = () => {
     const [loading, setLoading] = useState(true);
 
     const allEducationLevels = [
-        { 
-            id: '6th', 
-            name: '6th Standard', 
+        {
+            id: '6th',
+            name: '6th Standard',
             icon: FaBook,
             description: 'Board-wise Preparation',
             subjects: ['CBSE', 'State Boards'],
             difficulty: 'Beginner',
             apiClass: '6th'
         },
-        { 
-            id: '7th', 
-            name: '7th Standard', 
+        {
+            id: '7th',
+            name: '7th Standard',
             icon: FaBook,
             description: 'Board-wise Preparation',
             subjects: ['CBSE', 'State Boards'],
             difficulty: 'Beginner',
             apiClass: '7th'
         },
-        { 
-            id: '8th', 
-            name: '8th Standard', 
+        {
+            id: '8th',
+            name: '8th Standard',
             icon: FaBook,
             description: 'Board-wise Preparation',
             subjects: ['CBSE', 'State Boards'],
             difficulty: 'Beginner',
             apiClass: '8th'
         },
-        { 
-            id: '9th', 
-            name: '9th Standard', 
+        {
+            id: '9th',
+            name: '9th Standard',
             icon: FaGraduationCap,
             description: 'Board-wise Preparation',
             subjects: ['CBSE', 'State Boards'],
             difficulty: 'Intermediate',
             apiClass: '9th'
         },
-        { 
-            id: '10th', 
-            name: '10th Standard', 
+        {
+            id: '10th',
+            name: '10th Standard',
             icon: FaBook,
             description: 'Board-wise Preparation',
             subjects: ['CBSE', 'State Boards'],
             difficulty: 'Intermediate',
             apiClass: '10th'
         },
-        { 
-            id: '11th', 
-            name: '11th Standard', 
+        {
+            id: '11th',
+            name: '11th Standard',
             icon: FaGraduationCap,
             description: 'Board-wise Preparation',
             subjects: ['CBSE', 'State Boards'],
             difficulty: 'Advanced',
             apiClass: '11th'
         },
-        { 
-            id: '12th', 
-            name: '12th Standard', 
+        {
+            id: '12th',
+            name: '12th Standard',
             icon: FaUniversity,
             description: 'Board-wise Preparation',
             subjects: ['CBSE', 'State Boards'],
@@ -107,49 +107,33 @@ const MobileFirstCourses = () => {
     const checkCoursesAvailability = async () => {
         // STRICT REQUIREMENT: Only show 10th and 11th standard cards.
         // No API checks, no conditions, just these two.
-        const forcedLevels = allEducationLevels.filter(level => 
+        const forcedLevels = allEducationLevels.filter(level =>
             level.id === '10th' || level.id === '11th'
         );
-        
+
         setAvailableLevels(forcedLevels);
         setLoading(false);
     };
 
     const handleLevelSelect = (level) => {
         setSelectedLevel(level);
-        navigate(`/courses/${level}`);
+        navigate(`/${level}`);
     };
-
-    useEffect(() => {
-        // Defer the availability check slightly to avoid blocking paint, but keep it fast
-        const t = setTimeout(checkCoursesAvailability, 0);
-        // Prefetch board/state availability on mobile entry as well
-        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-        const run = () => prefetchBoardsAndStates(undefined, controller?.signal);
-        const handle = typeof requestIdleCallback !== 'undefined'
-            ? requestIdleCallback(run, { timeout: 1500 })
-            : setTimeout(run, 200);
-        return () => {
-            clearTimeout(t);
-            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {}
-            else clearTimeout(handle);
-            try { controller?.abort(); } catch {}
-        };
-    }, []);
 
     useEffect(() => {
         // Derive selected level from URL so back/forward navigation renders correct child
         const segments = location.pathname.split('/').filter(Boolean);
-        if (segments[0] === 'courses' && segments[1]) {
-            const levelId = segments[1];
-            if (allEducationLevels.some(l => l.id === levelId)) {
-                setSelectedLevel(levelId);
-                return;
-            }
+
+        // If we are at root /, show chooser
+        if (segments.length === 0) {
+            setSelectedLevel(null);
+            return;
         }
 
-        if (location.pathname === '/courses') {
-            setSelectedLevel(null);
+        // If first segment is a valid level ID
+        const levelId = segments[0];
+        if (allEducationLevels.some(l => l.id === levelId)) {
+            setSelectedLevel(levelId);
         }
     }, [location.pathname]);
 
@@ -158,7 +142,7 @@ const MobileFirstCourses = () => {
             const filtered = availableLevels.filter(level =>
                 level.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 level.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                level.subjects.some(subject => 
+                level.subjects.some(subject =>
                     subject.toLowerCase().includes(searchQuery.toLowerCase())
                 )
             );
@@ -176,7 +160,7 @@ const MobileFirstCourses = () => {
                 <div className="absolute top-32 right-8 w-16 h-16 border border-white rounded-full animate-bounce"></div>
                 <div className="absolute bottom-10 left-1/3 w-12 h-12 border border-white rounded-full"></div>
             </div>
-            
+
             <div className="container mx-auto px-4 relative z-10">
                 <div className="text-center">
                     <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 leading-tight">
@@ -185,7 +169,7 @@ const MobileFirstCourses = () => {
                     <p className="text-sm sm:text-base opacity-90 mb-6 px-4">
                         Choose your education level and start learning today
                     </p>
-                    
+
                     {/* Feature highlights */}
                     <div className="flex justify-center space-x-6 text-center">
                         <div className="flex flex-col items-center">
@@ -229,21 +213,21 @@ const MobileFirstCourses = () => {
                     >
                         <FaSearch className="w-4 h-4 text-gray-600" />
                     </button>
-                    
+
                     {showSearch && (
-                            <div className="flex-1">
-                                <input
-                                    type="text"
-                                    placeholder="Search courses, subjects..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg 
+                        <div className="flex-1">
+                            <input
+                                type="text"
+                                placeholder="Search courses, subjects..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-200 rounded-lg 
                                              focus:outline-none focus:ring-2 focus:ring-indigo-500 
                                              focus:border-transparent text-sm"
-                                />
-                            </div>
-                        )}
-                    
+                            />
+                        </div>
+                    )}
+
                     <div className="text-sm text-gray-500">
                         {filteredLevels.length} course{filteredLevels.length !== 1 ? 's' : ''}
                     </div>
@@ -255,7 +239,7 @@ const MobileFirstCourses = () => {
     const MobileCourseCard = ({ level, index }) => {
         // Safely get the icon component or use a default
         const IconComponent = level.icon || FaBook;
-        
+
         return (
             <button
                 onClick={() => handleLevelSelect(level.id)}
@@ -270,54 +254,54 @@ const MobileFirstCourses = () => {
                             <IconComponent className="w-5 h-5 text-indigo-600" />
                         </div>
                     </div>
-                <div className="absolute bottom-3 left-4">
-                    <div className="flex items-center space-x-1 text-gray-600">
-                        <FaStar className="w-3 h-3" />
-                        <span className="text-xs font-medium">{level.difficulty}</span>
+                    <div className="absolute bottom-3 left-4">
+                        <div className="flex items-center space-x-1 text-gray-600">
+                            <FaStar className="w-3 h-3" />
+                            <span className="text-xs font-medium">{level.difficulty}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Card Content */}
-            <div className="p-4 text-left">
-                <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-bold text-gray-900">{level.name}</h3>
-                    <FaChevronRight className="w-4 h-4 text-gray-400" />
-                </div>
-                
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                    {level.description}
-                </p>
-                
-                {/* Subject Tags */}
-                <div className="flex flex-wrap gap-1 mb-3">
-                    {(level.subjects || []).slice(0, 3).map((subject, idx) => (
-                        <span
-                            key={idx}
-                            className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-medium"
-                        >
-                            {subject}
-                        </span>
-                    ))}
-                    {level.id !== 'engineering' && (
-                        <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-medium">
-                            + More
-                        </span>
-                    )}
-                    {(level.subjects && level.subjects.length > 3) && (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-md text-xs">
-                            +{level.subjects.length - 3}
-                        </span>
-                    )}
-                </div>
+                {/* Card Content */}
+                <div className="p-4 text-left">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-lg font-bold text-gray-900">{level.name}</h3>
+                        <FaChevronRight className="w-4 h-4 text-gray-400" />
+                    </div>
 
-                {/* Progress indicator or call to action */}
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Tap to explore</span>
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                        {level.description}
+                    </p>
+
+                    {/* Subject Tags */}
+                    <div className="flex flex-wrap gap-1 mb-3">
+                        {(level.subjects || []).slice(0, 3).map((subject, idx) => (
+                            <span
+                                key={idx}
+                                className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-medium"
+                            >
+                                {subject}
+                            </span>
+                        ))}
+                        {level.id !== 'engineering' && (
+                            <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-medium">
+                                + More
+                            </span>
+                        )}
+                        {(level.subjects && level.subjects.length > 3) && (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-md text-xs">
+                                +{level.subjects.length - 3}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Progress indicator or call to action */}
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>Tap to explore</span>
+                        <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                    </div>
                 </div>
-            </div>
-        </button>
+            </button>
         );
     };
 
@@ -333,7 +317,7 @@ const MobileFirstCourses = () => {
     return (
         <>
             <MobileHero />
-            
+
             <div className="bg-gray-50 min-h-screen pb-6">
                 <div className="container mx-auto px-4 py-6">
                     {loading ? (
@@ -352,10 +336,10 @@ const MobileFirstCourses = () => {
                             {/* Course Grid */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {filteredLevels.map((level, index) => (
-                                    <MobileCourseCard 
-                                        key={level.id} 
-                                        level={level} 
-                                        index={index} 
+                                    <MobileCourseCard
+                                        key={level.id}
+                                        level={level}
+                                        index={index}
                                     />
                                 ))}
                             </div>

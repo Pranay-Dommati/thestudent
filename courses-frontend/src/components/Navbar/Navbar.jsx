@@ -30,7 +30,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             // Create readable names for common segments
             let name = segment.charAt(0).toUpperCase() + segment.slice(1);
             if (segment === 'learning-hub') name = 'Learning Hub';
-            if (segment === 'chat') name = 'Course Creator';
+            if (segment === 'learning-path') name = 'Learn Smarter';
             if (segment === 'courses') name = 'Courses';
             if (segment === 'pro-learning') name = 'Pro Learning';
             if (segment === 'auth') name = 'Authentication';
@@ -140,10 +140,10 @@ const Navbar = ({ initialStyle = "transparent" }) => {
     // where the navbar should be solid (white) even at the top of the page.
     // Includes optional trailing slashes and excludes subject/detail pages.
     const selectionMatchers = [
-        /^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/?$/,                 // /courses/10th[/]
-        /^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/cbse\/?$/,          // /courses/10th/cbse[/]
-        /^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/state\/?$/,         // /courses/10th/state[/]
-        /^\/courses\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/state\/[^/]+\/?$/   // /courses/7th/state/ap[/]
+        /^\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/?$/,                 // /10th[/]
+        /^\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/cbse\/?$/,          // /10th/cbse[/]
+        /^\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/state\/?$/,         // /10th/state[/]
+        /^\/(6th|7th|8th|9th|10th|11th|12th|engineering)\/state\/[^/]+\/?$/   // /7th/state/ap[/]
     ];
     const isCourseSelectionPage = selectionMatchers.some((rx) => rx.test(location.pathname));
 
@@ -246,12 +246,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                             <div className="flex items-center justify-center flex-1 max-w-[700px]">
                                 <div className="flex items-center space-x-8">
                                     <Link to="/" className={`font-medium transition-colors ${textColor}`}>Home</Link>
-                                    <Link
-                                        to="/courses"
-                                        className={`font-medium transition-colors ${textColor}`}
-                                    >
-                                        Courses
-                                    </Link>
+
                                     {isLoggedIn && (
                                         <Link
                                             to="/learning-hub"
@@ -261,10 +256,10 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                                         </Link>
                                     )}
                                     <Link
-                                        to="/chat"
+                                        to="/learning-path"
                                         className={`font-medium transition-colors ${textColor}`}
                                     >
-                                        Course Creator
+                                        Learn Smarter
                                     </Link>
                                 </div>
                             </div>

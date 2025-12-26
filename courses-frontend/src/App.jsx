@@ -1,7 +1,7 @@
 import './App.css';
 import React, { Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useParams, useLocation, Navigate } from 'react-router-dom';
-import HomePage from './components/HomePage/HomePage';
+
 import Courses from './components/Courses/Courses';
 import CoursesWrapper from './components/Courses/CoursesWrapper';
 import ChatbotWrapper from './components/Chatbot/ChatbotWrapper';
@@ -81,7 +81,7 @@ const Layout = ({ children, excludePaths = [] }) => {
         isLearningPage; // Exclude profile, certificate and learning pages for focused layout
 
     // Paths where we don't want mobile navigation (like auth, chat, etc.)
-    const noMobileNavPaths = ['/auth', '/not-found', '/chat', '/pro-learning'];
+    const noMobileNavPaths = ['/auth', '/not-found', '/learning-path', '/pro-learning'];
     const shouldShowMobileNav = !noMobileNavPaths.some(path => location.pathname.startsWith(path)) && !isCertificatePage && !isLearningPage;
 
     // Determine the navbar style based on the current route
@@ -96,7 +96,6 @@ const Layout = ({ children, excludePaths = [] }) => {
 
         // Transparent navbar for pages with hero sections (Home, Courses, Learning Hub)
         if (location.pathname === '/' ||
-            location.pathname.startsWith('/courses') ||
             location.pathname.startsWith('/learning-hub') ||
             location.pathname.startsWith('/pro-learning')) {
             return 'transparent';
@@ -268,15 +267,13 @@ const App = () => {
                     {/* Global Background Generation Card - shows on non-ProLearning pages when generating */}
                     <GlobalBackgroundGenerationCard />
 
-                    <Layout excludePaths={['/chat', '/offline', '/pro-learning']}>
+                    <Layout excludePaths={['/learning-path', '/offline', '/pro-learning']}>
                         <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
                             <Routes>
-                                <Route path="/" element={<HomePage />} />
+                                {/* Course Routes - Now at Root */}
                                 {/* Offline fallback page */}
                                 <Route path="/offline" element={<OfflinePage />} />
-
-                                {/* Course Routes */}
-                                <Route path="/courses" element={<CoursesWrapper />}>
+                                <Route path="/" element={<CoursesWrapper />}>
                                     <Route path="6th" element={<SixthStandard />} />
                                     <Route path="6th/cbse" element={<SixthStandard />} />
                                     <Route path="6th/state/:stateId" element={<SixthStandard />} />
@@ -311,9 +308,9 @@ const App = () => {
                                 <Route path="/terms" element={<Navigate to="/terms-and-conditions" />} />
                                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                                 <Route path="/privacy" element={<Navigate to="/privacy-policy" />} />
-                                <Route path="/chat" element={<ChatbotWrapper />} />
-                                {/* 301 Redirect: Old /pro-learning URL (without courseId) redirects to /chat for SEO */}
-                                <Route path="/pro-learning" element={<Navigate to="/chat" replace />} />
+                                <Route path="/learning-path" element={<ChatbotWrapper />} />
+                                {/* 301 Redirect: Old /pro-learning URL (without courseId) redirects to /learning-path for SEO */}
+                                <Route path="/pro-learning" element={<Navigate to="/learning-path" replace />} />
                                 <Route path="/pro-learning/:courseId" element={<ProLearningPage />} />
                                 <Route path="/pro-learning/share/:shareId" element={<SharedProLearningPage />} />
                                 <Route path="/courses/:courseId" element={<CourseDetailsWrapper />} />

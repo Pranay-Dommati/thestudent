@@ -16,51 +16,51 @@ const Courses = () => {
     const [loading, setLoading] = useState(true);
 
     const allEducationLevels = [
-        { 
-            id: '6th', 
-            name: '6th Standard', 
+        {
+            id: '6th',
+            name: '6th Standard',
             icon: FaBook,
             description: 'Foundation courses for 6th grade students',
             apiClass: '6th'
         },
-        { 
-            id: '7th', 
-            name: '7th Standard', 
+        {
+            id: '7th',
+            name: '7th Standard',
             icon: FaBook,
             description: 'Foundation courses for 7th grade students',
             apiClass: '7th'
         },
-        { 
-            id: '8th', 
-            name: '8th Standard', 
+        {
+            id: '8th',
+            name: '8th Standard',
             icon: FaBook,
             description: 'Foundation courses for 8th grade students',
             apiClass: '8th'
         },
-        { 
-            id: '9th', 
-            name: '9th Standard', 
+        {
+            id: '9th',
+            name: '9th Standard',
             icon: FaGraduationCap,
             description: 'Foundation courses for 9th grade students',
             apiClass: '9th'
         },
-        { 
-            id: '10th', 
-            name: '10th Standard', 
+        {
+            id: '10th',
+            name: '10th Standard',
             icon: FaBook,
             description: 'Foundation courses for 10th grade students',
             apiClass: '10th'
         },
-        { 
-            id: '11th', 
-            name: '11th Standard', 
+        {
+            id: '11th',
+            name: '11th Standard',
             icon: FaGraduationCap,
             description: 'Advanced courses for 11th grade students',
             apiClass: '11th'
         },
-        { 
-            id: '12th', 
-            name: '12th Standard', 
+        {
+            id: '12th',
+            name: '12th Standard',
             icon: FaUniversity,
             description: 'Preparation for higher education',
             apiClass: '12th'
@@ -79,10 +79,10 @@ const Courses = () => {
     const checkCoursesAvailability = async () => {
         // STRICT REQUIREMENT: Only show 10th and 11th standard cards.
         // No API checks, no conditions, just these two.
-        const forcedLevels = allEducationLevels.filter(level => 
+        const forcedLevels = allEducationLevels.filter(level =>
             level.id === '10th' || level.id === '11th'
         );
-        
+
         setAvailableLevels(forcedLevels);
         setLoading(false);
     };
@@ -101,32 +101,32 @@ const Courses = () => {
             ? requestIdleCallback(run, { timeout: 1500 })
             : setTimeout(run, 200);
         return () => {
-            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {}
+            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch { }
             else clearTimeout(handle);
-            try { controller?.abort(); } catch {}
+            try { controller?.abort(); } catch { }
         };
     }, []);
 
     const handleLevelSelect = (level) => {
         setSelectedLevel(level);
-        navigate(`/courses/${level}`);
+        navigate(`/${level}`);
     };
 
     useEffect(() => {
         // Derive selected level from URL so back/forward navigation renders correct child
         const segments = location.pathname.split('/').filter(Boolean);
-        // segments example: ['courses', '6th', 'cbse']
-        if (segments[0] === 'courses' && segments[1]) {
-            const levelId = segments[1];
-            if (allEducationLevels.some(l => l.id === levelId)) {
-                setSelectedLevel(levelId);
-                return;
-            }
+        // segments example: ['6th', 'cbse'] (was ['courses', '6th', 'cbse'])
+
+        // If we are at root /, show chooser
+        if (segments.length === 0) {
+            setSelectedLevel(null);
+            return;
         }
 
-        // If exactly /courses, show top-level chooser
-        if (location.pathname === '/courses') {
-            setSelectedLevel(null);
+        // If first segment is a valid level ID
+        const levelId = segments[0];
+        if (allEducationLevels.some(l => l.id === levelId)) {
+            setSelectedLevel(levelId);
         }
     }, [location.pathname]);
 
@@ -146,7 +146,7 @@ const Courses = () => {
                                     Select your education level to discover personalized learning resources
                                 </p>
                             </div>
-                            
+
                             {loading ? (
                                 <div className="text-center py-12">
                                     {/* Loading skeleton cards */}
