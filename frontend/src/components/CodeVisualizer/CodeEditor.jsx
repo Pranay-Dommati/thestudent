@@ -7,7 +7,8 @@ const CodeEditor = ({
     autoGenerateInput,
     setAutoGenerateInput,
     isRunning,
-    error
+    error,
+    hasInputsRequired = null  // null = unknown (show toggle), true = needs inputs (show toggle), false = no inputs (hide toggle)
 }) => {
     const lines = code.split('\n');
     const textareaRef = useRef(null);
@@ -118,22 +119,26 @@ print(arr)`}
 
                 {/* Action Row */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-                    {/* Auto-generate Toggle - Human-friendly */}
-                    <label className="flex items-center gap-3 cursor-pointer group">
-                        <div className="relative">
-                            <input
-                                type="checkbox"
-                                checked={autoGenerateInput}
-                                onChange={(e) => setAutoGenerateInput(e.target.checked)}
-                                className="sr-only peer"
-                            />
-                            <div className="w-10 h-6 bg-slate-200 rounded-full peer peer-checked:bg-indigo-500 transition-all duration-300" />
-                            <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 peer-checked:translate-x-4" />
-                        </div>
-                        <span className="text-sm text-slate-600 font-medium">
-                            ⚡ Auto-generate inputs <span className="text-slate-400">(recommended)</span>
-                        </span>
-                    </label>
+                    {/* Auto-generate Toggle - Only shown when code requires inputs */}
+                    {hasInputsRequired !== false ? (
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                            <div className="relative">
+                                <input
+                                    type="checkbox"
+                                    checked={autoGenerateInput}
+                                    onChange={(e) => setAutoGenerateInput(e.target.checked)}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-10 h-6 bg-slate-200 rounded-full peer peer-checked:bg-indigo-500 transition-all duration-300" />
+                                <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 peer-checked:translate-x-4" />
+                            </div>
+                            <span className="text-sm text-slate-600 font-medium">
+                                ⚡ Auto-generate inputs <span className="text-slate-400">(recommended)</span>
+                            </span>
+                        </label>
+                    ) : (
+                        <div />
+                    )}
 
                     {/* Start Button - THE ONLY STRONG ELEMENT */}
                     <button

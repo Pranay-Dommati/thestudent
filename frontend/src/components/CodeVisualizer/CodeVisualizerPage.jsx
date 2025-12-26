@@ -27,6 +27,7 @@ function CodeVisualizerPage() {
     const [showInputModal, setShowInputModal] = useState(false);
     const [detectedInputs, setDetectedInputs] = useState([]);
     const [codeMetadata, setCodeMetadata] = useState(null);
+    const [hasInputsRequired, setHasInputsRequired] = useState(null);  // null = unknown, true/false = detected
 
     // Immersive visualizer state
     const [showVisualizer, setShowVisualizer] = useState(false);
@@ -55,6 +56,21 @@ function CodeVisualizerPage() {
             return { hasInputs: false, inputs: [], count: 0, codeType: 'script' };
         }
     }, []);
+
+    // Detect inputs when code changes (debounced) to update toggle visibility
+    useEffect(() => {
+        if (!code.trim()) {
+            setHasInputsRequired(null);  // Unknown when no code
+            return;
+        }
+
+        const timeoutId = setTimeout(async () => {
+            const result = await detectInputs(code);
+            setHasInputsRequired(result.hasInputs && result.count > 0);
+        }, 500);  // 500ms debounce
+
+        return () => clearTimeout(timeoutId);
+    }, [code, detectInputs]);
 
     // Run the actual trace with streaming
     const runTrace = useCallback(async (inputValues = [], metadata = null) => {
@@ -431,6 +447,7 @@ function CodeVisualizerPage() {
                         currentLine={null}
                         error={error}
                         isVisualizationActive={false}
+                        hasInputsRequired={hasInputsRequired}
                     />
                 </div>
             </main>
