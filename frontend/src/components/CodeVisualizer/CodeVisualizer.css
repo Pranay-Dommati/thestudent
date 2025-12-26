@@ -410,3 +410,61 @@
 .code-visualizer-container kbd {
     font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
 }
+
+/* Flowing text animation for wave area */
+@keyframes cv-flowText {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+.code-visualizer-container .animate-flow-text {
+    animation: cv-flowText 30s linear infinite;
+}
+
+/* SVG Text on wave path animation */
+@keyframes cv-waveTextPath {
+    0% {
+        startOffset: 0%;
+    }
+
+    100% {
+        startOffset: 100%;
+    }
+}
+
+.code-visualizer-container .wave-path-text {
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: 0.05em;
+    fill: rgba(255, 255, 255, 0.5);
+}
+
+.code-visualizer-container .animate-wave-text-path {
+    animation: cv-waveTextSlide 25s linear infinite;
+}
+
+@keyframes cv-waveTextSlide {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-2880px);
+    }
+}
+
+/* Wave text with split color effect - visible on both backgrounds */
+.code-visualizer-container .wave-text-blend {
+    mix-blend-mode: difference;
+}
+
+.code-visualizer-container .wave-text-gradient {
+    color: rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+}
