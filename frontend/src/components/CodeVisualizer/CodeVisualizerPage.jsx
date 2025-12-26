@@ -67,7 +67,7 @@ function CodeVisualizerPage() {
         const timeoutId = setTimeout(async () => {
             const result = await detectInputs(code);
             setHasInputsRequired(result.hasInputs && result.count > 0);
-        }, 500);  // 500ms debounce
+        }, 150);  // 150ms debounce - fast detection
 
         return () => clearTimeout(timeoutId);
     }, [code, detectInputs]);
