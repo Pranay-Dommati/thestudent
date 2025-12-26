@@ -453,14 +453,14 @@ def generate_explanations(request):
                 "explanations": []
             })
         
-        print(f"[On-Demand] 🔄 Generating AI explanations for steps {start_index + 1} to {start_index + min(BATCH_SIZE, len(frames))}")
+        # print(f"[On-Demand] 🔄 Generating AI explanations for steps {start_index + 1} to {start_index + min(BATCH_SIZE, len(frames))}")
         
         explanations = []
         
         for i, frame in enumerate(frames[:BATCH_SIZE]):
             step_num = start_index + i + 1
             code_line = frame.get('code', '')[:50]
-            print(f"[On-Demand] Step {step_num}: 🤖 Generating AI for: {code_line}")
+            # print(f"[On-Demand] Step {step_num}: 🤖 Generating AI for: {code_line}")
             
             # Frontend sends 'variables' but original frame uses 'locals'
             variables = frame.get('locals') or frame.get('variables', {})
@@ -482,7 +482,7 @@ def generate_explanations(request):
                 'explanation': ai_narration
             })
         
-        print(f"[On-Demand] ✅ Completed {len(explanations)} explanations")
+        # print(f"[On-Demand] ✅ Completed {len(explanations)} explanations")
         
         return JsonResponse({
             "success": True,
@@ -513,20 +513,20 @@ def generate_explanations_stream(request):
                 yield "data: " + json.dumps({'type': 'error', 'error': 'AI narrator not available'}) + "\n\n"
                 return
             
-            print(f"[On-Demand Stream] 🔄 Streaming AI explanations for steps {start_index + 1} to {start_index + min(BATCH_SIZE, len(frames))}")
+            # print(f"[On-Demand Stream] 🔄 Streaming AI explanations for steps {start_index + 1} to {start_index + min(BATCH_SIZE, len(frames))}")
             
             for i, frame in enumerate(frames[:BATCH_SIZE]):
                 step_num = start_index + i + 1
                 code_line = frame.get('code', '')[:50]
-                print(f"[On-Demand Stream] Step {step_num}: 🤖 Generating AI for: {code_line}")
+                # print(f"[On-Demand Stream] Step {step_num}: 🤖 Generating AI for: {code_line}")
                 
                 # Frontend sends 'variables' but original frame uses 'locals'
                 variables = frame.get('locals') or frame.get('variables', {})
                 changed_vars = frame.get('changed_vars') or frame.get('changedVars', [])
                 
                 # Debug: show what we're working with
-                print(f"[On-Demand Stream] Frame keys: {list(frame.keys())}")
-                print(f"[On-Demand Stream] Variables keys: {list(variables.keys()) if variables else 'EMPTY'}")
+                # print(f"[On-Demand Stream] Frame keys: {list(frame.keys())}")
+                # print(f"[On-Demand Stream] Variables keys: {list(variables.keys()) if variables else 'EMPTY'}")
                 changed_vars = frame.get('changed_vars') or frame.get('changedVars', [])
                 
                 # Get loop_info from frame (frontend sends this as part of the frame)
@@ -552,7 +552,7 @@ def generate_explanations_stream(request):
                 # Stream each explanation immediately
                 yield "data: " + json.dumps({'type': 'explanation', 'index': start_index + i, 'explanation': ai_narration, 'frame': frame}) + "\n\n"
             
-            print(f"[On-Demand Stream] ✅ Completed streaming {min(BATCH_SIZE, len(frames))} explanations")
+            # print(f"[On-Demand Stream] ✅ Completed streaming {min(BATCH_SIZE, len(frames))} explanations")
             yield "data: " + json.dumps({'type': 'complete', 'count': min(BATCH_SIZE, len(frames))}) + "\n\n"
         
         response = StreamingHttpResponse(generate(), content_type='text/event-stream')
@@ -621,11 +621,10 @@ def trace_stream(request):
                 
                 # Only generate AI explanations for first BATCH_SIZE frames
                 if frame_counter[0] < BATCH_SIZE:
-                    print(f"[Stream] Step {step_num}: 🤖 Generating AI explanation for: {code_line}")
+                    # print(f"[Stream] Step {step_num}: 🤖 Generating AI explanation for: {code_line}")
                     maybe_add_ai_narration(frame_dict)
                 else:
-                    if frame_counter[0] == BATCH_SIZE:
-                        print(f"[Stream] Step {step_num}+: ⏭️ Skipping AI (on-demand) for remaining frames")
+
                     frame_dict['explanation'] = None  # Will be generated on-demand
                 
                 frame_counter[0] += 1

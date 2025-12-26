@@ -747,7 +747,7 @@ class PythonTracer:
                                         'total': len(iterable_list),
                                         'finished': False
                                     }
-                                    print(f"[LOOP DEBUG] Step {self.step_count} Line {line_no}: ITERATION {iter_idx + 1}/{len(iterable_list)}, finished=False")
+                                    # print(f"[LOOP DEBUG] Step {self.step_count} Line {line_no}: ITERATION {iter_idx + 1}/{len(iterable_list)}, finished=False")
                                 else:
                                     # Loop is exiting - mark as finished
                                     loop_info = {
@@ -757,7 +757,7 @@ class PythonTracer:
                                         'total': len(iterable_list),
                                         'finished': True
                                     }
-                                    print(f"[LOOP DEBUG] Step {self.step_count} Line {line_no}: FINISHED! iter_idx={iter_idx} >= len={len(iterable_list)}")
+                                    # print(f"[LOOP DEBUG] Step {self.step_count} Line {line_no}: FINISHED! iter_idx={iter_idx} >= len={len(iterable_list)}")
                                 self.loop_iterations[line_no] += 1
                             except (TypeError, ValueError):
                                 pass
@@ -825,33 +825,26 @@ class PythonTracer:
                         is_assignment = '=' in pending_code and '==' not in pending_code and 'for ' not in pending_code and 'if ' not in pending_code and 'while ' not in pending_code
                         is_conditional = pending_code.startswith('if ') or pending_code.startswith('elif ') or pending_code.startswith('while ')
                         
-                        # For conditionals: don't use state-diff, let AI handle
-                        # For assignments: extract LHS variables and show their changes
+                        # Detect ALL variable changes (assignments AND mutations like .append())
+                        # Compare pending_locals vs serialized_locals to catch in-place modifications
                         state_changes = []
                         
-                        if is_assignment:
-                            # Extract LHS variables (left of =)
-                            lhs_match = re.match(r'^([^=]+)=', pending_code)
-                            if lhs_match:
-                                lhs = lhs_match.group(1).strip()
-                                # Handle tuple unpacking: a, b = ...
-                                lhs_vars = [v.strip() for v in lhs.split(',')]
-                                
-                                for var_name in lhs_vars:
-                                    if var_name in serialized_locals:
-                                        after_data = serialized_locals[var_name]
-                                        after_val = after_data.get('value') if isinstance(after_data, dict) else after_data
-                                        
-                                        before_val = None
-                                        if var_name in pending_locals:
-                                            before_data = pending_locals[var_name]
-                                            before_val = before_data.get('value') if isinstance(before_data, dict) else before_data
-                                        
-                                        state_changes.append({
-                                            'var': var_name,
-                                            'before': before_val,
-                                            'after': after_val
-                                        })
+                        # Check all variables in serialized_locals (current state)
+                        for var_name, after_data in serialized_locals.items():
+                            after_val = after_data.get('value') if isinstance(after_data, dict) else after_data
+                            
+                            before_val = None
+                            if var_name in pending_locals:
+                                before_data = pending_locals[var_name]
+                                before_val = before_data.get('value') if isinstance(before_data, dict) else before_data
+                            
+                            # Check if value changed (new variable or modified value)
+                            if before_val != after_val:
+                                state_changes.append({
+                                    'var': var_name,
+                                    'before': before_val,
+                                    'after': after_val
+                                })
                         
                         # AI-ONLY DRY-RUN ARCHITECTURE:
                         # The tracer provides CONTEXT (state_before, state_after, loop_info)
@@ -881,15 +874,67 @@ class PythonTracer:
                         pending['state_before'] = state_before_simple
                         pending['state_after'] = state_after_simple
                         
-                        # Send the pending frame with state-diff dry-run
+                        # COMPUTE LOCALS_AFTER: Start with pending_locals, apply ONLY changes from THIS line
+                        # Manual deep copy to avoid tracing interference with copy module
+                        locals_after = {}
+                        for k, v in pending_locals.items():
+                            if isinstance(v, dict):
+                                locals_after[k] = dict(v)
+                                if 'value' in locals_after[k]:
+                                    val = locals_after[k]['value']
+                                    if isinstance(val, list):
+                                        locals_after[k]['value'] = list(val)
+                                    elif isinstance(val, dict):
+                                        locals_after[k]['value'] = dict(val)
+                            else:
+                                locals_after[k] = v
+                        
+                        for change in state_changes:
+                            var = change['var']
+                            after_val = change['after']
+                            # Update the variable with its new value
+                            if var in locals_after:
+                                if isinstance(locals_after[var], dict):
+                                    locals_after[var]['value'] = after_val
+                                else:
+                                    locals_after[var] = {'value': after_val, 'type': type(after_val).__name__}
+                            else:
+                                # New variable
+                                locals_after[var] = {'value': after_val, 'type': type(after_val).__name__}
+                        
+                        # Update pending's locals with the computed post-state
+                        pending['locals'] = locals_after
+                        
+                        # Send the pending frame with correct post-state
                         self.on_frame(pending)
                     
-                    # Store current frame as pending (use copy to be safe against mutations)
-                    self.pending_frame_dict = frame_dict.copy()
+                    # Store current frame as pending
+                    # Shallow copy the frame, but manually deep copy 'locals' to avoid mutable object corruption
+                    pending_copy = frame_dict.copy()
+                    if 'locals' in pending_copy:
+                        # Manual deep copy of locals dict (avoids copy module issues during tracing)
+                        old_locals = pending_copy['locals']
+                        new_locals = {}
+                        for k, v in old_locals.items():
+                            if isinstance(v, dict):
+                                new_locals[k] = dict(v)  # Shallow copy the inner dict
+                                # Deep copy the 'value' if it's a mutable type
+                                if 'value' in new_locals[k]:
+                                    val = new_locals[k]['value']
+                                    if isinstance(val, list):
+                                        new_locals[k]['value'] = list(val)
+                                    elif isinstance(val, dict):
+                                        new_locals[k]['value'] = dict(val)
+                            else:
+                                new_locals[k] = v
+                        pending_copy['locals'] = new_locals
+                    self.pending_frame_dict = pending_copy
                     
-                except Exception:
-                    # Never break tracing due to callback errors
-                    pass
+                except Exception as e:
+                    # Log the error for debugging
+                    import traceback
+                    print(f"[TRACER ERROR] Streaming buffer exception: {e}")
+                    traceback.print_exc()
             
         elif event == 'exception':
             self.step_count += 1

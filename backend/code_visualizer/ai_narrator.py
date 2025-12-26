@@ -231,8 +231,8 @@ class AINarrator:
             var = loop_info.get('variable')
             finished = loop_info.get('finished', False)
             
-            print(f"[AI DEBUG] Step {step}: loop_info received = {loop_info}")
-            print(f"[AI DEBUG]   finished = {finished}")
+            # print(f"[AI DEBUG] Step {step}: loop_info received = {loop_info}")
+            # print(f"[AI DEBUG]   finished = {finished}")
             
             if finished:
                 context_parts.append(f"LOOP STATUS: Loop COMPLETE after {total} iterations. This is the exit check - loop is ending.")
@@ -314,12 +314,12 @@ class AINarrator:
         prompt += "\n- For conditionals: show 'condition → True/False'"
         
         # ===== DETAILED LOGGING =====
-        print("=" * 60)
-        print(f"[AI Narrator] STEP {step} | LINE {line}")
-        print(f"[AI Narrator] CODE: {code_line}")
-        print(f"[AI Narrator] VARIABLES: {list(variables.keys()) if variables else 'none'}")
-        print(f"[AI Narrator] FULL PROMPT:\n{prompt}")
-        print("=" * 60)
+        # print("=" * 60)
+        # print(f"[AI Narrator] STEP {step} | LINE {line}")
+        # print(f"[AI Narrator] CODE: {code_line}")
+        # print(f"[AI Narrator] VARIABLES: {list(variables.keys()) if variables else 'none'}")
+        # print(f"[AI Narrator] FULL PROMPT:\n{prompt}")
+        # print("=" * 60)
         
         # ===== CALL AI - NO TRY/EXCEPT =====
         # If this fails, we WANT to see the error
@@ -336,8 +336,8 @@ class AINarrator:
         narration = response.text.strip()
         
         # ===== LOG RESPONSE =====
-        print(f"[AI Narrator] RESPONSE:\n{narration}")
-        print("=" * 60)
+        # print(f"[AI Narrator] RESPONSE:\n{narration}")
+        # print("=" * 60)
         
         # Clean up response
         narration = narration.strip('"\'')
