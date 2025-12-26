@@ -356,6 +356,7 @@ function CodeVisualizerPage() {
         }
 
         setError(null);
+        setIsRunning(true);  // Show loading immediately when button clicked
         setLoadingPhase(0);
 
         console.log('Detecting inputs...');
@@ -378,12 +379,14 @@ function CodeVisualizerPage() {
                 } else {
                     console.error('All input generation methods failed:', result.error);
                     // Fall back to showing modal
+                    setIsRunning(false);  // Reset button state
                     setDetectedInputs(inputDetection.inputs);
                     setShowInputModal(true);
                 }
             } else {
                 console.log('Showing input modal');
                 // Show modal to collect inputs
+                setIsRunning(false);  // Reset button state
                 setDetectedInputs(inputDetection.inputs);
                 setShowInputModal(true);
             }

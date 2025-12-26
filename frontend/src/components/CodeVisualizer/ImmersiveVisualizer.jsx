@@ -586,7 +586,7 @@ const ImmersiveVisualizer = ({
                     />
 
                     {/* Source Code Panel (Light Theme) */}
-                    <div className="flex-1 overflow-y-auto p-4 font-mono text-sm bg-white text-slate-800">
+                    <div className="flex-1 overflow-y-auto pl-2 pr-4 py-4 font-mono text-sm bg-white text-slate-800">
                         {codeLines.map((line, idx) => {
                             const lineNum = idx + 1;
 
@@ -613,7 +613,7 @@ const ImmersiveVisualizer = ({
                                         : ''
                                         }`}
                                 >
-                                    <span className={`w-12 min-w-[3rem] text-right pr-4 select-none flex-shrink-0 ${isCurrentLine ? 'text-indigo-600 font-bold' : 'text-slate-400'
+                                    <span className={`w-8 min-w-[2rem] text-right pr-3 select-none flex-shrink-0 ${isCurrentLine ? 'text-indigo-600 font-bold' : 'text-slate-400'
                                         }`}>
                                         {lineNum}
                                     </span>
