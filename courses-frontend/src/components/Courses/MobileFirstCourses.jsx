@@ -27,6 +27,11 @@ const MobileFirstCourses = () => {
     const [availableLevels, setAvailableLevels] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // New State for View Mode
+    const [viewMode, setViewMode] = useState('discovery');
+    const [allCourses, setAllCourses] = useState([]);
+    const [loadingCourses, setLoadingCourses] = useState(false);
+
     const allEducationLevels = [
         {
             id: '6th',
@@ -115,23 +120,56 @@ const MobileFirstCourses = () => {
         setLoading(false);
     };
 
+    const fetchAllCourses = async () => {
+        setLoadingCourses(true);
+        try {
+            const response = await api.get('/courses/all/');
+            if (response.data) {
+                // Filter out engineering courses (DSA, Python, etc.) as requested
+                // Using a blacklist approach since some valid school courses might have varying class_level values
+                const hiddenKeywords = ['python', 'dsa', 'data structures', 'engineering', 'web development', 'coding'];
+                const filteredCourses = response.data.filter(course => {
+                    const title = course.title?.toLowerCase() || '';
+                    const subject = course.subject?.toLowerCase() || '';
+
+                    // Check if title or subject contains any hidden keywords
+                    const isHidden = hiddenKeywords.some(keyword =>
+                        title.includes(keyword) || subject.includes(keyword)
+                    );
+
+                    return !isHidden;
+                });
+                setAllCourses(filteredCourses);
+            }
+        } catch (error) {
+            logger.error('Error fetching all courses (mobile):', error);
+        } finally {
+            setLoadingCourses(false);
+        }
+    };
+
+    useEffect(() => {
+        const t = setTimeout(checkCoursesAvailability, 0);
+        return () => clearTimeout(t);
+    }, []);
+
+    useEffect(() => {
+        if (viewMode === 'discovery' && allCourses.length === 0) {
+            fetchAllCourses();
+        }
+    }, [viewMode]);
+
     const handleLevelSelect = (level) => {
         setSelectedLevel(level);
         navigate(`/${level}`);
     };
 
     useEffect(() => {
-        // Derive selected level from URL so back/forward navigation renders correct child
         const segments = location.pathname.split('/').filter(Boolean);
-
-        // If we are at root /, show chooser
         if (segments.length === 0) {
             setSelectedLevel(null);
             return;
         }
-
-        // If first segment is a valid level ID
-        // Since we are at root, segments[0] is the level ID directly (e.g. '10th')
         const levelId = segments[0];
         if (allEducationLevels.some(l => l.id === levelId)) {
             setSelectedLevel(levelId);
@@ -140,18 +178,22 @@ const MobileFirstCourses = () => {
 
     useEffect(() => {
         if (searchQuery.trim()) {
-            const filtered = availableLevels.filter(level =>
-                level.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                level.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                level.subjects.some(subject =>
-                    subject.toLowerCase().includes(searchQuery.toLowerCase())
-                )
-            );
-            setFilteredLevels(filtered);
+            if (viewMode === 'by_class') {
+                const filtered = availableLevels.filter(level =>
+                    level.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    level.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    level.subjects.some(subject =>
+                        subject.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                );
+                setFilteredLevels(filtered);
+            } else {
+                // Discovery mode filtering handled in render or derived state
+            }
         } else {
             setFilteredLevels(availableLevels);
         }
-    }, [searchQuery, availableLevels]);
+    }, [searchQuery, availableLevels, viewMode]);
 
     const MobileHero = () => (
         <section className="bg-gradient-to-br from-indigo-600 via-purple-600 to-purple-700 text-white pt-16 pb-8 relative overflow-hidden">
@@ -165,37 +207,33 @@ const MobileFirstCourses = () => {
             <div className="container mx-auto px-4 relative z-10">
                 <div className="text-center">
                     <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 leading-tight">
-                        Find Your Perfect Course
+                        Explore All Courses
                     </h1>
                     <p className="text-sm sm:text-base opacity-90 mb-6 px-4">
-                        Choose your education level and start learning today
+                        Browse courses directly or discover them by class.
                     </p>
 
-                    {/* Feature highlights */}
-                    <div className="flex justify-center space-x-6 text-center">
-                        <div className="flex flex-col items-center">
-                            <div className="mb-1">
-                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                </svg>
-                            </div>
-                            <div className="text-xs opacity-80">Interactive Learning</div>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <div className="mb-1 flex justify-center">
-                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <div className="text-xs opacity-80">Personalized Path</div>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <div className="mb-1">
-                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                            </div>
-                            <div className="text-xs opacity-80">AI-Powered</div>
+                    {/* Mobile Toggle */}
+                    <div className="flex justify-center mb-6">
+                        <div className="bg-white/20 p-1 rounded-full backdrop-blur-sm inline-flex">
+                            <button
+                                onClick={() => setViewMode('discovery')}
+                                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${viewMode === 'discovery'
+                                    ? 'bg-white text-indigo-600 shadow-sm'
+                                    : 'text-white/80 hover:bg-white/10'
+                                    }`}
+                            >
+                                All Courses
+                            </button>
+                            <button
+                                onClick={() => setViewMode('by_class')}
+                                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${viewMode === 'by_class'
+                                    ? 'bg-white text-indigo-600 shadow-sm'
+                                    : 'text-white/80 hover:bg-white/10'
+                                    }`}
+                            >
+                                By Class
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -204,7 +242,7 @@ const MobileFirstCourses = () => {
     );
 
     const SearchSection = () => (
-        <div className="bg-white shadow-sm border-b">
+        <div className="bg-white shadow-sm border-b sticky top-14 z-10">
             <div className="container mx-auto px-4 py-3">
                 <div className="flex items-center space-x-3">
                     <button
@@ -219,7 +257,7 @@ const MobileFirstCourses = () => {
                         <div className="flex-1">
                             <input
                                 type="text"
-                                placeholder="Search courses, subjects..."
+                                placeholder={viewMode === 'discovery' ? "Search all courses..." : "Search classes..."}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full px-4 py-2 border border-gray-200 rounded-lg 
@@ -229,16 +267,13 @@ const MobileFirstCourses = () => {
                         </div>
                     )}
 
-                    <div className="text-sm text-gray-500">
-                        {filteredLevels.length} course{filteredLevels.length !== 1 ? 's' : ''}
-                    </div>
+                    {!showSearch && <div className="flex-1 text-sm text-gray-400 italic">Tap search to filter...</div>}
                 </div>
             </div>
         </div>
     );
 
     const MobileCourseCard = ({ level, index }) => {
-        // Safely get the icon component or use a default
         const IconComponent = level.icon || FaBook;
 
         return (
@@ -289,11 +324,6 @@ const MobileFirstCourses = () => {
                                 + More
                             </span>
                         )}
-                        {(level.subjects && level.subjects.length > 3) && (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-md text-xs">
-                                +{level.subjects.length - 3}
-                            </span>
-                        )}
                     </div>
 
                     {/* Progress indicator or call to action */}
@@ -306,11 +336,21 @@ const MobileFirstCourses = () => {
         );
     };
 
+    // Derived filtered courses for discovery mode
+    const getDiscoveryCourses = () => {
+        if (!searchQuery.trim()) return allCourses;
+        const lowerQ = searchQuery.toLowerCase();
+        return allCourses.filter(c =>
+            c.title?.toLowerCase().includes(lowerQ) ||
+            c.subject?.toLowerCase().includes(lowerQ)
+        );
+    };
+    const discoveryList = getDiscoveryCourses();
+
     if (selectedLevel) {
         return (
             <>
                 <Outlet />
-                {/* Footer hidden for class subpages on mobile */}
             </>
         );
     }
@@ -318,56 +358,113 @@ const MobileFirstCourses = () => {
     return (
         <>
             <MobileHero />
+            <SearchSection />
 
             <div className="bg-gray-50 min-h-screen pb-6">
                 <div className="container mx-auto px-4 py-6">
-                    {loading ? (
-                        <div className="text-center py-12">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                            <p className="text-gray-600">Loading available courses...</p>
-                        </div>
-                    ) : availableLevels.length === 0 ? (
-                        <div className="text-center py-12">
-                            <div className="text-gray-400 text-6xl mb-4">📚</div>
-                            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Courses Available Yet</h3>
-                            <p className="text-gray-500">New courses will appear here as they are added by administrators.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {/* Course Grid */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {filteredLevels.map((level, index) => (
-                                    <MobileCourseCard
-                                        key={level.id}
-                                        level={level}
-                                        index={index}
-                                    />
+                    {viewMode === 'discovery' ? (
+                        // Discovery View
+                        loadingCourses ? (
+                            <div className="text-center py-12">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                                <p className="text-gray-600">Loading courses...</p>
+                            </div>
+                        ) : discoveryList.length > 0 ? (
+                            <div className="space-y-4">
+                                {discoveryList.map((course) => (
+                                    <div
+                                        key={course.id}
+                                        onClick={() => {
+                                            if (course.class_level && course.board) {
+                                                const path = `/${course.class_level}/${course.board}/${course.subject?.toLowerCase()}?courseId=${course.id}`;
+                                                navigate(path);
+                                            } else {
+                                                navigate(`/engineering/${course.id}`);
+                                            }
+                                        }}
+                                        className="bg-white rounded-xl shadow-sm hover:shadow p-3 flex gap-3 border border-gray-100 active:scale-[0.99] transition-transform"
+                                    >
+                                        <div className="w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                                            <img
+                                                src={course.thumbnail || `https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80&text=${encodeURIComponent(course.subject || 'Course')}`}
+                                                alt={course.title}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                {course.class_level && course.class_level !== 'General' && (
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                                                        {course.class_level}
+                                                    </span>
+                                                )}
+                                                <span className="text-[10px] text-gray-400">
+                                                    {course.board}
+                                                </span>
+                                            </div>
+                                            <h3 className="text-sm font-bold text-gray-900 leading-tight mb-1 line-clamp-2">
+                                                {course.title}
+                                            </h3>
+                                            <p className="text-xs text-gray-500">{course.subject}</p>
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
-
-                            {/* Empty State for Search */}
-                            {filteredLevels.length === 0 && searchQuery && (
-                                <div className="text-center py-12">
-                                    <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full 
-                                                  flex items-center justify-center">
-                                        <FaSearch className="w-6 h-6 text-gray-400" />
-                                    </div>
-                                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                        No courses found
-                                    </h3>
-                                    <p className="text-gray-500 text-sm">
-                                        Try searching with different keywords
-                                    </p>
-                                    <button
-                                        onClick={() => setSearchQuery('')}
-                                        className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg 
-                                                 text-sm font-medium hover:bg-indigo-700 transition-colors"
-                                    >
-                                        Clear Search
-                                    </button>
+                        ) : (
+                            <div className="text-center py-12">
+                                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                    <FaSearch className="w-6 h-6 text-gray-400" />
                                 </div>
-                            )}
-                        </div>
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">No courses found</h3>
+                            </div>
+                        )
+                    ) : (
+                        // By Class View (Existing Mobile Logic)
+                        loading ? (
+                            <div className="text-center py-12">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                                <p className="text-gray-600">Loading available courses...</p>
+                            </div>
+                        ) : availableLevels.length === 0 ? (
+                            <div className="text-center py-12">
+                                <div className="text-gray-400 text-6xl mb-4">📚</div>
+                                <h3 className="text-xl font-semibold text-gray-700 mb-2">No Courses Available Yet</h3>
+                                <p className="text-gray-500">New courses will appear here as they are added by administrators.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {/* Course Grid */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {filteredLevels.map((level, index) => (
+                                        <MobileCourseCard
+                                            key={level.id}
+                                            level={level}
+                                            index={index}
+                                        />
+                                    ))}
+                                </div>
+
+                                {/* Empty State for Search */}
+                                {filteredLevels.length === 0 && searchQuery && (
+                                    <div className="text-center py-12">
+                                        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full 
+                                                      flex items-center justify-center">
+                                            <FaSearch className="w-6 h-6 text-gray-400" />
+                                        </div>
+                                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                            No courses found
+                                        </h3>
+                                        <button
+                                            onClick={() => setSearchQuery('')}
+                                            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg 
+                                                     text-sm font-medium hover:bg-indigo-700 transition-colors"
+                                        >
+                                            Clear Search
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )
                     )}
                 </div>
             </div>
