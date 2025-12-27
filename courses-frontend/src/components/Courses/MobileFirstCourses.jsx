@@ -205,34 +205,34 @@ const MobileFirstCourses = () => {
             </div>
 
             <div className="container mx-auto px-4 relative z-10">
-                <div className="text-center">
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 leading-tight">
-                        Explore All Courses
+                <div className="text-center mt-6">
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 leading-tight tracking-tight text-gray-900">
+                        Start Learning
                     </h1>
-                    <p className="text-sm sm:text-base opacity-90 mb-6 px-4">
-                        Browse courses directly or discover them by class.
+                    <p className="text-sm sm:text-base text-gray-500 mb-6 px-4">
+                        Browse courses directly, or discover what fits your class best.
                     </p>
 
                     {/* Mobile Toggle */}
-                    <div className="flex justify-center mb-6">
-                        <div className="bg-white/20 p-1 rounded-full backdrop-blur-sm inline-flex">
+                    <div className="flex justify-center mb-8">
+                        <div className="bg-gray-100/50 p-1 rounded-full inline-flex border border-gray-200/60 relative">
                             <button
                                 onClick={() => setViewMode('discovery')}
-                                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${viewMode === 'discovery'
-                                    ? 'bg-white text-indigo-600 shadow-sm'
-                                    : 'text-white/80 hover:bg-white/10'
+                                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all duration-300 ${viewMode === 'discovery'
+                                    ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-black/5 transform scale-105'
+                                    : 'text-gray-500 hover:text-gray-900'
                                     }`}
                             >
                                 All Courses
                             </button>
                             <button
                                 onClick={() => setViewMode('by_class')}
-                                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${viewMode === 'by_class'
-                                    ? 'bg-white text-indigo-600 shadow-sm'
-                                    : 'text-white/80 hover:bg-white/10'
+                                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all duration-300 ${viewMode === 'by_class'
+                                    ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-black/5 transform scale-105'
+                                    : 'text-gray-500 hover:text-gray-900'
                                     }`}
                             >
-                                By Class
+                                Discover by Class
                             </button>
                         </div>
                     </div>
@@ -384,11 +384,11 @@ const MobileFirstCourses = () => {
                                         }}
                                         className="bg-white rounded-xl shadow-sm hover:shadow p-3 flex gap-3 border border-gray-100 active:scale-[0.99] transition-transform"
                                     >
-                                        <div className="w-24 h-24 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                                        <div className="w-24 h-24 flex-shrink-0 relative">
                                             <img
-                                                src={course.thumbnail || `https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80&text=${encodeURIComponent(course.subject || 'Course')}`}
+                                                src={course.thumbnail || `https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80&text=${encodeURIComponent(course.subject || 'Course')}`}
                                                 alt={course.title}
-                                                className="w-full h-full object-cover"
+                                                className="w-full h-full object-cover rounded-xl"
                                             />
                                         </div>
                                         <div className="flex-1 min-w-0 flex flex-col justify-center">
@@ -409,6 +409,24 @@ const MobileFirstCourses = () => {
                                         </div>
                                     </div>
                                 ))}
+
+                                {/* Side-by-Side CTA Section (Mobile - Stacked) */}
+                                <div className="mt-12 mb-8 pt-8 border-t border-gray-100">
+                                    <div className="text-center">
+                                        <h3 className="text-lg font-bold text-gray-900 mb-1">
+                                            Not sure where to start?
+                                        </h3>
+                                        <p className="text-gray-500 text-sm mb-5">
+                                            We'll create a clear learning path for you — step by step.
+                                        </p>
+                                        <button
+                                            onClick={() => navigate('/learning-path')}
+                                            className="bg-slate-900 text-white px-6 py-3 rounded-lg font-semibold active:scale-[0.98] transition-all shadow-sm"
+                                        >
+                                            Get My Learning Path
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         ) : (
                             <div className="text-center py-12">

@@ -5,212 +5,162 @@ import { FaLinkedin, FaInstagram } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 
 const Footer = () => {
-  const [email, setEmail] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState(""); // "success" or "error"
-  const messageTimeoutRef = useRef(null);
+    const [email, setEmail] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [message, setMessage] = useState("");
+    const [messageType, setMessageType] = useState(""); // "success" or "error"
+    const messageTimeoutRef = useRef(null);
 
-  // Email validation function
-  const isValidEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const handleEmailChange = (e) => {
-    const value = e.target.value;
-    setEmail(value);
-    
-    // Clear messages when user starts typing
-    if (message) {
-      setMessage("");
-      setMessageType("");
-    }
-  };
-
-  const handleNewsletterSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validation - show messages when clicked
-    if (!email.trim()) {
-      setMessage("⚠️ Please enter your email address");
-      setMessageType("error");
-      return;
-    }
-
-    if (!isValidEmail(email.trim())) {
-      setMessage("⚠️ Please enter a valid email address");
-      setMessageType("error");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setMessage("");
-
-    try {
-      const response = await axios.post('/newsletter/', { email: email.trim() });
-      const data = response?.data || {};
-
-      // Treat 201 or explicit success flag as success
-      if (response.status === 201 || data.success) {
-        setMessage(data.message || "🎉 Successfully subscribed to newsletter!");
-        setMessageType("success");
-        setEmail("");
-      } else {
-        setMessage(data.message || "Failed to subscribe. Please try again.");
-        setMessageType("error");
-        // Clear input even on error if desired by UX
-        setEmail("");
-      }
-      // Start/refresh auto-hide timer for messages
-      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
-      messageTimeoutRef.current = setTimeout(() => {
-        setMessage("");
-        setMessageType("");
-      }, 5000);
-    } catch (error) {
-      console.error("Error subscribing to newsletter:", error);
-      // If the server returned a JSON error message (e.g., 400 duplicate), show it
-      const serverMessage = error?.response?.data?.message || error?.response?.data?.detail || error?.response?.data?.error;
-      if (serverMessage) {
-        setMessage(serverMessage);
-      } else if (error?.response) {
-        // Non-JSON response from server (status present)
-        setMessage(error.response.statusText || "Failed to subscribe. Please try again.");
-      } else {
-        // Network / CORS / client error
-        setMessage("Network error. Please check your connection and try again.");
-      }
-      setMessageType("error");
-      // Clear input on error as requested
-      setEmail("");
-      // Auto-hide the message after a short delay
-      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
-      messageTimeoutRef.current = setTimeout(() => {
-        setMessage("");
-        setMessageType("");
-      }, 5000);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+    // Email validation function
+    const isValidEmail = (email) => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
     };
-  }, []);
 
-  // Button is always enabled and looks good
-  const isButtonDisabled = isSubmitting;
+    const handleEmailChange = (e) => {
+        const value = e.target.value;
+        setEmail(value);
 
-  return (
-    <footer className="block bg-gray-900 text-white py-6 md:py-10 px-4 mt-0 border-t-0">
-      <div className="max-w-6xl mx-auto text-center space-y-6">
-        {/* Subscribe Section */}
-        <h3 className="text-2xl font-semibold">Start Learning Today!</h3>
-        <div className="max-w-md mx-auto">
-          <form onSubmit={handleNewsletterSubmit} className="flex flex-col items-center gap-3">
-            <div className="w-full">
-              <input
-                type="email"
-                placeholder="Enter your email for updates"
-                value={email}
-                onChange={handleEmailChange}
-                className={`p-3 border rounded-md w-full bg-gray-800 text-white focus:outline-none focus:ring-2 transition-all duration-200 text-left ${
-                  messageType === "error" && message
-                    ? "border-red-500 focus:ring-red-500"
-                    : "border-gray-500 focus:ring-blue-500"
-                }`}
-                disabled={isSubmitting}
-              />
+        // Clear messages when user starts typing
+        if (message) {
+            setMessage("");
+            setMessageType("");
+        }
+    };
+
+    const handleNewsletterSubmit = async (e) => {
+        e.preventDefault();
+
+        // Validation - show messages when clicked
+        if (!email.trim()) {
+            setMessage("⚠️ Please enter your email address");
+            setMessageType("error");
+            return;
+        }
+
+        if (!isValidEmail(email.trim())) {
+            setMessage("⚠️ Please enter a valid email address");
+            setMessageType("error");
+            return;
+        }
+
+        setIsSubmitting(true);
+        setMessage("");
+
+        try {
+            const response = await axios.post('/newsletter/', { email: email.trim() });
+            const data = response?.data || {};
+
+            // Treat 201 or explicit success flag as success
+            if (response.status === 201 || data.success) {
+                setMessage(data.message || "🎉 Successfully subscribed to newsletter!");
+                setMessageType("success");
+                setEmail("");
+            } else {
+                setMessage(data.message || "Failed to subscribe. Please try again.");
+                setMessageType("error");
+                // Clear input even on error if desired by UX
+                setEmail("");
+            }
+            // Start/refresh auto-hide timer for messages
+            if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+            messageTimeoutRef.current = setTimeout(() => {
+                setMessage("");
+                setMessageType("");
+            }, 5000);
+        } catch (error) {
+            console.error("Error subscribing to newsletter:", error);
+            // If the server returned a JSON error message (e.g., 400 duplicate), show it
+            const serverMessage = error?.response?.data?.message || error?.response?.data?.detail || error?.response?.data?.error;
+            if (serverMessage) {
+                setMessage(serverMessage);
+            } else if (error?.response) {
+                // Non-JSON response from server (status present)
+                setMessage(error.response.statusText || "Failed to subscribe. Please try again.");
+            } else {
+                // Network / CORS / client error
+                setMessage("Network error. Please check your connection and try again.");
+            }
+            setMessageType("error");
+            // Clear input on error as requested
+            setEmail("");
+            // Auto-hide the message after a short delay
+            if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+            messageTimeoutRef.current = setTimeout(() => {
+                setMessage("");
+                setMessageType("");
+            }, 5000);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+        };
+    }, []);
+
+    // Button is always enabled and looks good
+    const isButtonDisabled = isSubmitting;
+
+    return (
+        <footer className="bg-white border-t border-gray-100 pt-8 pb-6 mt-12">
+            <div className="max-w-6xl mx-auto px-4">
+
+                {/* Simplified Layout: Links & Social */}
+                <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
+
+                    {/* Navigation Links */}
+                    <div className="flex flex-wrap justify-center md:justify-start gap-x-8 gap-y-2 text-sm font-medium text-gray-500">
+                        <Link to="/feedback" className="hover:text-indigo-600 transition-colors">Feedback</Link>
+                        <Link to="/terms-and-conditions" className="hover:text-indigo-600 transition-colors">Terms of Service</Link>
+                        <Link to="/privacy-policy" className="hover:text-indigo-600 transition-colors">Privacy Policy</Link>
+                    </div>
+
+                    {/* Social Media Icons */}
+                    <div className="flex justify-center space-x-6 text-xl">
+                        <a
+                            href="https://x.com/easylearnova"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-400 hover:text-gray-900 transition-colors"
+                            title="X (Twitter)"
+                            aria-label="Visit us on X (Twitter)"
+                        >
+                            <FaXTwitter />
+                        </a>
+                        <a
+                            href="https://www.linkedin.com/company/easylearnova/?viewAsMember=true"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-400 hover:text-[#0077b5] transition-colors"
+                            title="LinkedIn"
+                            aria-label="Visit us on LinkedIn"
+                        >
+                            <FaLinkedin />
+                        </a>
+                        <a
+                            href="https://www.instagram.com/easylearnova"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-400 hover:text-[#E4405F] transition-colors"
+                            title="Instagram"
+                            aria-label="Visit us on Instagram"
+                        >
+                            <FaInstagram />
+                        </a>
+                    </div>
+                </div>
+
+                {/* Divider & Copyright */}
+                <div className="border-t border-gray-100 pt-6 text-center md:text-left flex flex-col md:flex-row justify-between items-center text-xs text-gray-400">
+                    <p>© {new Date().getFullYear()} EasyLearnova. All rights reserved.</p>
+                    <p className="mt-2 md:mt-0">Empowering learners worldwide.</p>
+                </div>
             </div>
-            
-            <button 
-              type="submit"
-              disabled={isButtonDisabled}
-              className={`px-6 py-3 rounded-md font-medium transition-all duration-200 w-full sm:w-auto min-w-[140px] flex items-center justify-center ${
-                isSubmitting
-                  ? "bg-blue-500 text-white cursor-wait"
-                  : "bg-blue-600 hover:bg-blue-500 text-white hover:shadow-lg transform hover:scale-105"
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Subscribing...
-                </>
-              ) : (
-                <>
-                  Subscribe
-                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-
-        {/* Message Display */}
-        {message && (
-          <div className={`max-w-md mx-auto p-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-            messageType === "success" 
-              ? "bg-green-100 text-green-800 border border-green-200" 
-              : "bg-red-100 text-red-800 border border-red-200"
-          }`}>
-            {message}
-          </div>
-        )}
-
-        {/* Navigation Links */}
-        <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-300">
-          <Link to="/feedback" className="hover:text-white transition-colors">Feedback</Link>
-          <Link to="/terms-and-conditions" className="hover:text-white transition-colors">Terms of Service</Link>
-          <Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
-        </div>
-
-        {/* Social Media Icons */}
-        <div className="flex justify-center space-x-8 text-xl mt-4">
-          <a
-            href="https://x.com/easylearnova"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-gray-300 transition-colors"
-            title="X (Twitter)"
-            aria-label="Visit us on X (Twitter)"
-          >
-            <FaXTwitter />
-          </a>
-          <a
-            href="https://www.linkedin.com/company/easylearnova/?viewAsMember=true"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-blue-600 transition-colors"
-            title="LinkedIn"
-            aria-label="Visit us on LinkedIn"
-          >
-            <FaLinkedin />
-          </a>
-          <a
-            href="https://www.instagram.com/easylearnova"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-pink-500 transition-colors"
-            title="Instagram"
-            aria-label="Visit us on Instagram"
-          >
-            <FaInstagram />
-          </a>
-        </div>
-
-        {/* Copyright */}
-        <p className="text-gray-400 text-sm mt-4">
-          © {new Date().getFullYear()} EasyLearnova. Empowering learners worldwide.
-        </p>
-      </div>
-    </footer>
-  );
+        </footer>
+    );
 };
 
 export default Footer;

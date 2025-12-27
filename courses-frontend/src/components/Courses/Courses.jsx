@@ -188,30 +188,30 @@ const Courses = () => {
                     {!selectedLevel ? (
                         <div className="max-w-7xl mx-auto">
                             {/* Header & Toggle */}
-                            <div className="flex flex-col items-center mb-12">
-                                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-                                    Explore All Courses
+                            <div className="flex flex-col items-center mb-12 mt-8">
+                                <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 tracking-tight">
+                                    Start Learning
                                 </h2>
-                                <p className="text-gray-600 text-lg max-w-2xl mx-auto text-center mb-8">
-                                    Browse courses directly or discover them by class.
+                                <p className="text-gray-500 text-base max-w-2xl mx-auto text-center mb-10">
+                                    Browse courses directly, or discover what fits your class best.
                                 </p>
 
                                 {/* Toggle Switch */}
-                                <div className="bg-white p-1.5 rounded-full border border-gray-200 shadow-sm inline-flex">
+                                <div className="bg-gray-100/50 p-1.5 rounded-full border border-gray-200/60 inline-flex relative">
                                     <button
                                         onClick={() => setViewMode('discovery')}
-                                        className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 ${viewMode === 'discovery'
-                                            ? 'bg-indigo-600 text-white shadow-sm'
-                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        className={`px-8 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ${viewMode === 'discovery'
+                                            ? 'bg-white text-indigo-700 shadow-md ring-1 ring-black/5 transform scale-105'
+                                            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50/50'
                                             }`}
                                     >
                                         All Courses
                                     </button>
                                     <button
                                         onClick={() => setViewMode('by_class')}
-                                        className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 ${viewMode === 'by_class'
-                                            ? 'bg-indigo-600 text-white shadow-sm'
-                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        className={`px-8 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ${viewMode === 'by_class'
+                                            ? 'bg-white text-indigo-700 shadow-md ring-1 ring-black/5 transform scale-105'
+                                            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50/50'
                                             }`}
                                     >
                                         Discover by Class
@@ -243,17 +243,25 @@ const Courses = () => {
                                                         navigate(`/engineering/${course.id}`);
                                                     }
                                                 }}
-                                                className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden cursor-pointer border border-gray-100 group"
+                                                className="bg-white rounded-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden cursor-pointer border border-gray-100/80 group transform"
                                             >
                                                 {/* Thumbnail */}
                                                 <div className="aspect-video relative overflow-hidden bg-gray-100">
                                                     <img
                                                         src={course.thumbnail || `https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80&text=${encodeURIComponent(course.subject || 'Course')}`}
                                                         alt={course.title}
-                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                                                     />
+
+                                                    {/* Hover CTA */}
+                                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                                                        <span className="bg-white text-gray-900 px-4 py-2 rounded-full font-bold text-sm transform scale-90 group-hover:scale-100 transition-transform duration-300 shadow-lg">
+                                                            Preview Course
+                                                        </span>
+                                                    </div>
+
                                                     {course.class_level && course.class_level !== 'General' && (
-                                                        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded-md text-xs font-semibold text-gray-700 shadow-sm">
+                                                        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded-md text-xs font-semibold text-gray-700 shadow-sm z-20">
                                                             {course.class_level}
                                                         </div>
                                                     )}
@@ -339,6 +347,28 @@ const Courses = () => {
                                     </div>
                                 )
                             )}
+                            {/* Side-by-Side CTA Section */}
+                            <div className="mt-20 mb-8 pt-12 border-t border-gray-100">
+                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 max-w-4xl mx-auto">
+                                    {/* Text - Left */}
+                                    <div className="text-center md:text-left">
+                                        <h3 className="text-xl font-bold text-gray-900 mb-1">
+                                            Not sure where to start?
+                                        </h3>
+                                        <p className="text-gray-500">
+                                            We'll create a clear learning path for you — step by step.
+                                        </p>
+                                    </div>
+
+                                    {/* Button - Right */}
+                                    <button
+                                        onClick={() => navigate('/learning-path')}
+                                        className="flex-shrink-0 bg-slate-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-slate-800 transition-all duration-200 shadow-sm hover:shadow-md"
+                                    >
+                                        Get My Learning Path
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         <Outlet />
