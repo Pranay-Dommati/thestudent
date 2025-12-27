@@ -14,7 +14,7 @@ const HeroSection = ({ user }) => {
                 <div className="max-w-4xl">
                     <h1 className="text-4xl md:text-5xl font-bold mb-4">Welcome Back, {user.name}! 👋</h1>
                     <p className="text-xl mb-8 text-white/80">
-                            Continue your learning with expert-crafted courses, or get a smart learning path when you’re not sure where to start.
+                        Continue your learning with expert-crafted courses, or get a smart learning path when you’re not sure where to start.
                     </p>
 
                     {/* Learning Stats */}
