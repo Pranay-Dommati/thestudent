@@ -144,7 +144,7 @@ const NinthStandard = () => {
             setSelectedBoard(null);
             navigate('/9th');
         } else {
-            navigate('/courses');
+            navigate('/');
         }
     };
 

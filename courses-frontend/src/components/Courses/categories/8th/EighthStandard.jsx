@@ -188,7 +188,7 @@ const EighthStandard = () => {
             setSelectedBoard(null);
             navigate('/8th');
         } else {
-            navigate('/courses');
+            navigate('/');
         }
     };
 

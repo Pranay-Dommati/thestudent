@@ -127,7 +127,7 @@ const TwelfthStandard = () => {
             setSelectedBoard(null);
             navigate('/12th');
         } else {
-            navigate('/courses');
+            navigate('/');
         }
     };
 

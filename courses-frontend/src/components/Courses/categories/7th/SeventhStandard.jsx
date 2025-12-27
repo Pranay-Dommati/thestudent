@@ -154,7 +154,7 @@ const SeventhStandard = () => {
             setSelectedBoard(null);
             navigate('/7th');
         } else {
-            navigate('/courses');
+            navigate('/');
         }
     };
 

@@ -163,7 +163,7 @@ const SixthStandard = () => {
             setSelectedBoard(null);
             navigate('/6th');
         } else {
-            navigate('/courses');
+            navigate('/');
         }
     };
 
