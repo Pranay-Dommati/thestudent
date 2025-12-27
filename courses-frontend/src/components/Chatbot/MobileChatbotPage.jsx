@@ -1374,17 +1374,17 @@ const MobileChatbotPage = () => {
             <div className="w-full mb-4">
                 <div className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
                     <div className={`${message.type === "user"
-                            ? "max-w-[80%]" // User messages - more constrained width
-                            : isLearningPlan || isProCard
-                                ? "w-full"
-                                : "max-w-[90%] min-w-0" // Bot messages - content-dependent width
+                        ? "max-w-[80%]" // User messages - more constrained width
+                        : isLearningPlan || isProCard
+                            ? "w-full"
+                            : "max-w-[90%] min-w-0" // Bot messages - content-dependent width
                         }`}>
                         <div
                             className={`px-4 py-3 ${message.type === "user"
-                                    ? "bg-indigo-600 text-white rounded-2xl rounded-br-md shadow-md"
-                                    : isLearningPlan || isProCard
-                                        ? "bg-gray-50 border border-gray-200 shadow-sm rounded-xl"
-                                        : "bg-white text-gray-800 border border-gray-200 rounded-2xl rounded-bl-md shadow-sm"
+                                ? "bg-indigo-600 text-white rounded-2xl rounded-br-md shadow-md"
+                                : isLearningPlan || isProCard
+                                    ? "bg-gray-50 border border-gray-200 shadow-sm rounded-xl"
+                                    : "bg-white text-gray-800 border border-gray-200 rounded-2xl rounded-bl-md shadow-sm"
                                 }`}
                         >
                             {message.type === "bot" && !isCourseContent && !isLearningPlan && !isProCard && (
@@ -1546,7 +1546,7 @@ const MobileChatbotPage = () => {
 
                             {message.type === "bot" && isProCard && (
                                 <Link
-                                    to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
+                                    to={`/learning-path/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
                                     className="inline-flex items-center justify-between w-full px-5 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 group"
                                     onClick={() => {
                                         // Set session flag for back button navigation
@@ -1598,10 +1598,10 @@ const MobileChatbotPage = () => {
                             {message.type === "user" && <div className="text-sm">{message.content}</div>}
 
                             <div className={`text-xs mt-2 ${message.type === "user"
-                                    ? "text-indigo-200"
-                                    : isLearningPlan || isProCard
-                                        ? "text-gray-400"
-                                        : "text-gray-500"
+                                ? "text-indigo-200"
+                                : isLearningPlan || isProCard
+                                    ? "text-gray-400"
+                                    : "text-gray-500"
                                 }`}>
                                 {message.timestamp}
                             </div>
@@ -1758,7 +1758,7 @@ const MobileChatbotPage = () => {
                                     .map((course) => {
                                         const firstTopic = Array.isArray(course.topics) && course.topics.length > 0 ? course.topics[0] : null;
                                         const topicParam = firstTopic ? `?topic=${encodeURIComponent(firstTopic.topic_name || firstTopic.name || '')}&tab=reading` : '';
-                                        const href = `/pro-learning/${course.id}${topicParam}`;
+                                        const href = `/learning-path/${course.id}${topicParam}`;
                                         const topics = Array.isArray(course.topics) ? course.topics : [];
                                         const topicNames = topics.map(t => (t.topic_name || t.name || '').trim()).filter(Boolean);
                                         const isIdLike = typeof course.course_name === 'string' && /^course_[a-z0-9_]+$/i.test(course.course_name);
@@ -1939,7 +1939,7 @@ const MobileChatbotPage = () => {
                                             .map((course) => {
                                                 const firstTopic = Array.isArray(course.topics) && course.topics.length > 0 ? course.topics[0] : null;
                                                 const topicParam = firstTopic ? `?topic=${encodeURIComponent(firstTopic.topic_name || firstTopic.name || '')}&tab=reading` : '';
-                                                const href = `/pro-learning/${course.id}${topicParam}`;
+                                                const href = `/learning-path/${course.id}${topicParam}`;
                                                 // Friendly display name logic (avoid ID-like course_name)
                                                 const topics = Array.isArray(course.topics) ? course.topics : [];
                                                 const topicNames = topics.map(t => (t.topic_name || t.name || '').trim()).filter(Boolean);
@@ -2101,10 +2101,10 @@ const MobileChatbotPage = () => {
                                                     (usageStats && ((usageStats.monthly_limit || 15) - (usageStats.monthly_used || 0)) <= 0)
                                                 }
                                                 className={`px-6 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${pendingTopics.length === 0 ||
-                                                        isCreatingCourse ||
-                                                        (usageStats && ((usageStats.monthly_limit || 15) - (usageStats.monthly_used || 0)) <= 0)
-                                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                                    isCreatingCourse ||
+                                                    (usageStats && ((usageStats.monthly_limit || 15) - (usageStats.monthly_used || 0)) <= 0)
+                                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
                                                     }`}
                                             >
                                                 {isCreatingCourse ? (
@@ -2171,8 +2171,8 @@ const MobileChatbotPage = () => {
                                     disabled={!message.trim() || isLoading || !online}
                                     aria-label="Send message"
                                     className={`h-10 w-10 flex items-center justify-center rounded-full transition-all ${message.trim() && !isLoading && online
-                                            ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
-                                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                        ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
+                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
                                         }`}
                                 >
                                     {isLoading ? (

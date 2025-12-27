@@ -400,7 +400,7 @@ const LearningPlanDisplay = ({ content, learningPlanId }) => {
                     {/* Learning path card */}
                     <div className="mt-4 lg:mt-6 pt-4 border-t border-gray-200">
                         <Link
-                            to="/pro-learning"
+                            to="/learning-path"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="block w-full p-3 lg:p-4 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-lg shadow-md transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1"
@@ -2248,7 +2248,7 @@ const ChatbotPage = () => {
                             {message.type === "bot" && isProCard && (
                                 <div className="w-full">
                                     <Link
-                                        to={`/pro-learning/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
+                                        to={`/learning-path/${message.courseId}?topic=${encodeURIComponent(message.topic)}&tab=reading`}
                                         className="block w-full p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
                                         onClick={() => {
                                             // Set session flag for back button navigation
@@ -2495,7 +2495,7 @@ const ChatbotPage = () => {
                                 .map((course) => {
                                     const firstTopic = Array.isArray(course.topics) && course.topics.length > 0 ? course.topics[0] : null;
                                     const topicParam = firstTopic ? `?topic=${encodeURIComponent(firstTopic.topic_name || firstTopic.name || '')}&tab=reading` : '';
-                                    const href = `/pro-learning/${course.id}${topicParam}`;
+                                    const href = `/learning-path/${course.id}${topicParam}`;
                                     // Compute friendly display name:
                                     // 1) If title is present and not generic/ID-like, use it
                                     // 2) Else build from topics: FirstTopic +1 +2 +3 (+...) style

@@ -115,7 +115,7 @@ const Courses = () => {
     useEffect(() => {
         // Derive selected level from URL so back/forward navigation renders correct child
         const segments = location.pathname.split('/').filter(Boolean);
-        // segments example: ['6th', 'cbse'] (was ['courses', '6th', 'cbse'])
+        // segments example: ['6th', 'cbse']
 
         // If we are at root /, show chooser
         if (segments.length === 0) {

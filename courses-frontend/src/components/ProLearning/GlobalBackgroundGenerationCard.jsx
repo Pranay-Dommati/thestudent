@@ -166,7 +166,7 @@ const GlobalBackgroundGenerationCard = () => {
     const pollIntervalRef = useRef(null);
 
     // Check if we're on a ProLearning page
-    const isOnProLearningPage = location.pathname.startsWith('/pro-learning');
+    const isOnProLearningPage = location.pathname.startsWith('/learning-path/') || location.pathname.startsWith('/pro-learning');
 
     // Poll for state updates and listen for events
     useEffect(() => {
@@ -265,7 +265,7 @@ const GlobalBackgroundGenerationCard = () => {
     // Handle view course
     const handleViewCourse = useCallback(() => {
         if (generationState?.courseId) {
-            navigate(`/pro-learning/${generationState.courseId}`);
+            navigate(`/learning-path/${generationState.courseId}`);
             // Clear the completion state after navigating
             setTimeout(() => clearGenerationState(), 500);
         }

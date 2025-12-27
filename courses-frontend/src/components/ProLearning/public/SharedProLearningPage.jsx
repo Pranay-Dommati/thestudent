@@ -150,7 +150,7 @@ const SharedProLearningPage = () => {
                     sp.set('courseTitle', data?.course_name || 'Shared Course');
                     sp.set('topic', firstName);
                     sp.set('tab', 'reading');
-                    const targetUrl = `/pro-learning/${shareId}?${sp.toString()}`;
+                    const targetUrl = `/learning-path/${shareId}?${sp.toString()}`;
                     navigate(targetUrl, { replace: true });
                     return;
                 }

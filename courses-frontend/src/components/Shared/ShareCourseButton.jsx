@@ -61,7 +61,7 @@ const ShareCourseButton = ({
                 // Create or fetch an active share link for this course
                 const { data } = await apiAxios.post(`/courses/pro-learning/${courseId}/share/`);
                 const shareId = data?.id || (typeof data?.web_url === 'string' ? data.web_url.split('/').pop() : null);
-                shareUrl = shareId ? `${window.location.origin}/pro-learning/share/${shareId}` : null;
+                shareUrl = shareId ? `${window.location.origin}/learning-path/share/${shareId}` : null;
                 if (shareUrl) cacheRef.current[courseId] = shareUrl;
             }
 

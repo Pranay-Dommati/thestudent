@@ -209,10 +209,10 @@ const AILearningPlans = () => {
                 universalToast.success('Course loaded successfully!', { id: `loading-${courseId}` });
                 // Open in a new tab for a friendlier experience
                 try {
-                    window.open(`/pro-learning/${courseId}`, '_blank', 'noopener');
+                    window.open(`/learning-path/${courseId}`, '_blank', 'noopener');
                 } catch (_) {
                     // Fallback to same-tab navigation if popup blocked
-                    navigate(`/pro-learning/${courseId}`);
+                    navigate(`/learning-path/${courseId}`);
                 }
             }
         } catch (error) {

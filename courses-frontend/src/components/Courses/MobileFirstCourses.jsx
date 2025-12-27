@@ -131,6 +131,7 @@ const MobileFirstCourses = () => {
         }
 
         // If first segment is a valid level ID
+        // Since we are at root, segments[0] is the level ID directly (e.g. '10th')
         const levelId = segments[0];
         if (allEducationLevels.some(l => l.id === levelId)) {
             setSelectedLevel(levelId);

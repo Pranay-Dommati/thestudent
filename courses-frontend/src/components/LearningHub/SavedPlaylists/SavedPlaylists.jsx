@@ -75,11 +75,11 @@ const SavedPlaylists = () => {
             const firstTopic = sortedTopics[0];
             const topicName = encodeURIComponent(firstTopic.topic_name);
 
-            return `/pro-learning/${course.id}?topic=${topicName}&tab=reading`;
+            return `/learning-path/${course.id}?topic=${topicName}&tab=reading`;
         }
 
         // Fallback if no topics found
-        return `/pro-learning/${course.id}`;
+        return `/learning-path/${course.id}`;
     };
 
     // Transform database courses to display format
@@ -170,8 +170,8 @@ const SavedPlaylists = () => {
                     <button
                         onClick={() => setActiveTab('courses')}
                         className={`flex-1 px-3 sm:px-6 py-3 font-medium text-sm focus:outline-none transition-all duration-200 ${activeTab === 'courses'
-                                ? 'border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50/50'
-                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50/50'
+                            ? 'border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50/50'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50/50'
                             }`}
                     >
                         <span className="relative">
@@ -184,8 +184,8 @@ const SavedPlaylists = () => {
                     <button
                         onClick={() => setActiveTab('favorites')}
                         className={`flex-1 px-3 sm:px-6 py-3 font-medium text-sm focus:outline-none transition-all duration-200 ${activeTab === 'favorites'
-                                ? 'border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50/50'
-                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50/50'
+                            ? 'border-b-2 border-indigo-600 text-indigo-600 bg-indigo-50/50'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50/50'
                             }`}
                     >
                         <span className="relative">
@@ -385,7 +385,7 @@ const SavedPlaylists = () => {
                             {courses.filter(course => course.progress === 100).map((course) => (
                                 <div key={course.id} className="border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                                     <div className="flex flex-col sm:flex-row h-full">
-                                        <Link to={`/learning-hub/pro-learning?courseId=${course.id}`} className="w-full sm:w-1/3 h-32 sm:h-auto">
+                                        <Link to={`/learning-path/${course.id}`} className="w-full sm:w-1/3 h-32 sm:h-auto">
                                             <img
                                                 src={course.thumbnail}
                                                 alt={course.title}
@@ -393,7 +393,7 @@ const SavedPlaylists = () => {
                                             />
                                         </Link>
                                         <div className="p-4 flex-1 flex flex-col">
-                                            <Link to={`/learning-hub/pro-learning?courseId=${course.id}`} className="hover:text-indigo-600">
+                                            <Link to={`/learning-path/${course.id}`} className="hover:text-indigo-600">
                                                 <h3 className="font-bold text-sm sm:text-base mb-1 line-clamp-2">{course.title}</h3>
                                             </Link>
                                             <div className="flex items-center flex-wrap gap-2 text-xs sm:text-sm text-gray-600 mb-2">
@@ -415,7 +415,7 @@ const SavedPlaylists = () => {
                                                     <span>{course.totalVideos} videos</span>
                                                 </div>
                                                 <Link
-                                                    to={`/learning-hub/pro-learning?courseId=${course.id}`}
+                                                    to={`/learning-path/${course.id}`}
                                                     className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                                                 >
                                                     Review

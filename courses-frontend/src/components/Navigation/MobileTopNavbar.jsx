@@ -45,20 +45,21 @@ const MobileTopNavbar = () => {
         const path = location.pathname;
         if (path === '/') return 'EasyLearnova';
         if (path === '/courses') return 'Courses';
-        if (path.startsWith('/courses/6th')) return '6th Standard';
-        if (path.startsWith('/courses/7th')) return '7th Standard';
-        if (path.startsWith('/courses/8th')) return '8th Standard';
-        if (path.startsWith('/courses/9th')) return '9th Standard';
-        if (path.startsWith('/courses/10th')) return '10th Standard';
-        if (path.startsWith('/courses/11th')) return '11th Standard';
-        if (path.startsWith('/courses/12th')) return '12th Standard';
-        if (path.startsWith('/courses/engineering')) return 'Engineering';
+        if (path.startsWith('/6th')) return '6th Standard';
+        if (path.startsWith('/7th')) return '7th Standard';
+        if (path.startsWith('/8th')) return '8th Standard';
+        if (path.startsWith('/9th')) return '9th Standard';
+        if (path.startsWith('/10th')) return '10th Standard';
+        if (path.startsWith('/11th')) return '11th Standard';
+        if (path.startsWith('/12th')) return '12th Standard';
+        if (path.startsWith('/engineering')) return 'Engineering';
         if (path.startsWith('/learning-path')) return 'Learn Smarter';
         if (path.startsWith('/learning-hub')) return 'Learning Hub';
         if (path.startsWith('/profile')) return 'Profile';
         if (path.startsWith('/auth')) return 'Sign In';
         // Only mark as "Learning" for course learning routes, not for "/learning-hub"
-        if (/^\/courses\/.+\/learning(\/|$)/.test(path)) return 'Learning';
+        // Updated regex to match /:courseId/learning pattern while avoiding exclusion of valid paths
+        if (/^\/[^\/]+\/learning(\/|$)/.test(path) && !path.startsWith('/learning-hub') && !path.startsWith('/learning-path')) return 'Learning';
         return 'EasyLearnova';
     };
 

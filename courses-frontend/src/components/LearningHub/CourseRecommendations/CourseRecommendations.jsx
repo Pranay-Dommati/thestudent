@@ -145,8 +145,8 @@ const CourseRecommendations = () => {
                         <button
                             key={tab.id}
                             className={`px-4 py-2 text-sm font-medium rounded-t-md transition-colors mr-2 -mb-px ${activeTab === tab.id
-                                    ? 'bg-indigo-50 text-indigo-700 border-l border-r border-t border-gray-200'
-                                    : 'text-gray-500 hover:text-gray-700 border-transparent'
+                                ? 'bg-indigo-50 text-indigo-700 border-l border-r border-t border-gray-200'
+                                : 'text-gray-500 hover:text-gray-700 border-transparent'
                                 }`}
                             onClick={() => setActiveTab(tab.id)}
                         >
@@ -218,7 +218,7 @@ const CourseRecommendations = () => {
 
                                     {/* View course button */}
                                     <Link
-                                        to={`/courses/${course.id}`}
+                                        to={`/${course.id}`}
                                         className="mt-auto text-center bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium py-2 px-4 rounded transition-colors"
                                     >
                                         View Course
