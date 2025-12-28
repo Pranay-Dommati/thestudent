@@ -1341,7 +1341,7 @@ const ChatbotPage = () => {
             const cancellationMessage = {
                 id: generateMessageId(),
                 type: "bot",
-                content: "❌ **Course creation cancelled** - Processing your new request instead.",
+                content: "**Previous request stopped** - Preparing your new learning path.",
                 timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                 isCancellation: true,
             };
@@ -2009,7 +2009,7 @@ const ChatbotPage = () => {
         const cancelResponse = {
             id: generateMessageId(),
             type: "bot",
-            content: "❌ Course creation cancelled. Feel free to ask me anything else or try again with a different query!",
+            content: "No problem — your learning path wasn’t created. Try entering another topic to continue.",
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         };
 
@@ -2739,7 +2739,7 @@ const ChatbotPage = () => {
                                         <div className="bg-gray-50 border border-gray-200 shadow-sm rounded-2xl px-5 py-4">
                                             <div className="flex items-center">
                                                 <BiLoaderAlt className="animate-spin text-indigo-500 w-4 h-4 mr-3" />
-                                                <span className="text-gray-700 text-sm">Creating your course...</span>
+                                                <span className="text-gray-700 text-sm">Preparing your learning path...</span>
                                                 <div className="ml-2 flex space-x-1">
                                                     <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
                                                     <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -2758,7 +2758,7 @@ const ChatbotPage = () => {
                                         {/* Header */}
                                         <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
                                             <h2 className="text-lg font-medium text-gray-900">
-                                                Configure Course Topics
+                                                Review Your Learning Path
                                             </h2>
                                             <span className="text-sm text-gray-500">
                                                 {pendingTopics.length}/4 topics
@@ -2847,7 +2847,7 @@ const ChatbotPage = () => {
                                                 ) : (
                                                     <>
                                                         <IoRocket size={20} />
-                                                        Create Course
+                                                        Build Learning Path
                                                     </>
                                                 )}
                                             </button>

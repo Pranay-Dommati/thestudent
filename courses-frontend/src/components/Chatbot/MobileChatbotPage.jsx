@@ -830,7 +830,7 @@ const MobileChatbotPage = () => {
             const cancellationMessage = {
                 id: generateUniqueId(),
                 type: "bot",
-                content: "❌ **Course creation cancelled** - Processing your new request instead.",
+                content: "**Previous request stopped.** - Preparing your new learning path.",
                 timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                 isCancellation: true,
             };
@@ -1302,7 +1302,7 @@ const MobileChatbotPage = () => {
         const cancelResponse = {
             id: generateUniqueId(),
             type: "bot",
-            content: "❌ Course creation cancelled. Feel free to ask me anything else or try again with a different query!",
+            content: "No problem — your learning path wasn’t created. Try entering another topic to continue.",
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         };
 
@@ -2077,7 +2077,7 @@ const MobileChatbotPage = () => {
                                     <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
                                         {/* Header */}
                                         <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-                                            <h2 className="text-base font-medium text-gray-900">Configure Course Topics</h2>
+                                            <h2 className="text-base font-medium text-gray-900">Review Your Learning Path</h2>
                                             <span className="text-sm text-gray-500">{pendingTopics.length}/4 topics</span>
                                         </div>
 
@@ -2170,7 +2170,7 @@ const MobileChatbotPage = () => {
                                                 ) : (
                                                     <>
                                                         <IoRocket size={18} />
-                                                        Create Course
+                                                        Build Learning Path
                                                     </>
                                                 )}
                                             </button>
