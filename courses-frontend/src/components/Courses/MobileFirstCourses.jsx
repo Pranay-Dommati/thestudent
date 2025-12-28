@@ -206,21 +206,21 @@ const MobileFirstCourses = () => {
 
             <div className="container mx-auto px-4 relative z-10">
                 <div className="text-center mt-6">
-                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 leading-tight tracking-tight text-gray-900">
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 leading-tight tracking-tight text-white">
                         Start Learning
                     </h1>
-                    <p className="text-sm sm:text-base text-gray-500 mb-6 px-4">
+                    <p className="text-sm sm:text-base text-white/80 mb-6 px-4">
                         Browse courses directly, or discover what fits your class best.
                     </p>
 
                     {/* Mobile Toggle */}
                     <div className="flex justify-center mb-8">
-                        <div className="bg-gray-100/50 p-1 rounded-full inline-flex border border-gray-200/60 relative">
+                        <div className="bg-white/20 backdrop-blur-md p-1 rounded-full inline-flex border border-white/30 relative shadow-lg">
                             <button
                                 onClick={() => setViewMode('discovery')}
                                 className={`px-5 py-2 rounded-full text-xs font-semibold transition-all duration-300 ${viewMode === 'discovery'
-                                    ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-black/5 transform scale-105'
-                                    : 'text-gray-500 hover:text-gray-900'
+                                    ? 'bg-white text-indigo-700 shadow-lg shadow-indigo-900/10 transform scale-105'
+                                    : 'text-white/80 hover:text-white hover:bg-white/10'
                                     }`}
                             >
                                 All Courses
@@ -228,8 +228,8 @@ const MobileFirstCourses = () => {
                             <button
                                 onClick={() => setViewMode('by_class')}
                                 className={`px-5 py-2 rounded-full text-xs font-semibold transition-all duration-300 ${viewMode === 'by_class'
-                                    ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-black/5 transform scale-105'
-                                    : 'text-gray-500 hover:text-gray-900'
+                                    ? 'bg-white text-indigo-700 shadow-lg shadow-indigo-900/10 transform scale-105'
+                                    : 'text-white/80 hover:text-white hover:bg-white/10'
                                     }`}
                             >
                                 Discover by Class
@@ -242,32 +242,19 @@ const MobileFirstCourses = () => {
     );
 
     const SearchSection = () => (
-        <div className="bg-white shadow-sm border-b sticky top-14 z-10">
+        <div className="bg-white border-b border-gray-100">
             <div className="container mx-auto px-4 py-3">
-                <div className="flex items-center space-x-3">
-                    <button
-                        onClick={() => setShowSearch(!showSearch)}
-                        className="flex-shrink-0 p-2 rounded-lg bg-gray-100 hover:bg-gray-200 
-                                 transition-colors duration-200"
-                    >
-                        <FaSearch className="w-4 h-4 text-gray-600" />
-                    </button>
-
-                    {showSearch && (
-                        <div className="flex-1">
-                            <input
-                                type="text"
-                                placeholder={viewMode === 'discovery' ? "Search all courses..." : "Search classes..."}
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-200 rounded-lg 
-                                             focus:outline-none focus:ring-2 focus:ring-indigo-500 
-                                             focus:border-transparent text-sm"
-                            />
-                        </div>
-                    )}
-
-                    {!showSearch && <div className="flex-1 text-sm text-gray-400 italic">Tap search to filter...</div>}
+                <div className="relative">
+                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder={viewMode === 'discovery' ? "Search courses..." : "Search classes..."}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl 
+                                     focus:outline-none focus:ring-2 focus:ring-indigo-500 
+                                     focus:border-transparent focus:bg-white text-sm transition-all"
+                    />
                 </div>
             </div>
         </div>
@@ -358,16 +345,42 @@ const MobileFirstCourses = () => {
     return (
         <>
             <MobileHero />
-            <SearchSection />
+
+            {/* Search Section - Inlined to prevent focus loss */}
+            <div className="bg-white border-b border-gray-100">
+                <div className="container mx-auto px-4 py-3">
+                    <div className="relative">
+                        <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder={viewMode === 'discovery' ? "Search courses..." : "Search classes..."}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl 
+                                         focus:outline-none focus:ring-2 focus:ring-indigo-500 
+                                         focus:border-transparent focus:bg-white text-sm transition-all"
+                        />
+                    </div>
+                </div>
+            </div>
 
             <div className="bg-gray-50 min-h-screen pb-6">
                 <div className="container mx-auto px-4 py-6">
                     {viewMode === 'discovery' ? (
                         // Discovery View
                         loadingCourses ? (
-                            <div className="text-center py-12">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                                <p className="text-gray-600">Loading courses...</p>
+                            // Skeleton Cards for loading
+                            <div className="space-y-4">
+                                {[...Array(4)].map((_, i) => (
+                                    <div key={i} className="bg-white rounded-xl shadow-sm p-3 flex gap-3 border border-gray-100 animate-pulse">
+                                        <div className="w-24 h-24 flex-shrink-0 bg-gray-200 rounded-xl" />
+                                        <div className="flex-1 flex flex-col justify-center space-y-2">
+                                            <div className="h-3 bg-gray-200 rounded w-1/4" />
+                                            <div className="h-4 bg-gray-200 rounded w-3/4" />
+                                            <div className="h-3 bg-gray-200 rounded w-1/2" />
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         ) : discoveryList.length > 0 ? (
                             <div className="space-y-4">
@@ -375,12 +388,27 @@ const MobileFirstCourses = () => {
                                     <div
                                         key={course.id}
                                         onClick={() => {
-                                            if (course.class_level && course.board) {
-                                                const path = `/${course.class_level}/${course.board}/${course.subject?.toLowerCase()}?courseId=${course.id}`;
-                                                navigate(path);
-                                            } else {
-                                                navigate(`/engineering/${course.id}`);
+                                            // Navigate based on course_type from API
+                                            // API returns: class: "10th - state", category: "Mathematics", course_type: "school"
+                                            if (course.course_type === 'school' && course.class && course.category) {
+                                                const classString = course.class || '';
+                                                const [classLevel, boardPart] = classString.split(' - ').map(s => s?.trim());
+                                                const subject = (course.category || '').toLowerCase();
+
+                                                if (classLevel && boardPart && subject) {
+                                                    const board = boardPart.toLowerCase();
+                                                    let path;
+                                                    if (board === 'state') {
+                                                        path = `/${classLevel}/state/ts/${subject}?courseId=${course.id}`;
+                                                    } else {
+                                                        path = `/${classLevel}/${board}/${subject}?courseId=${course.id}`;
+                                                    }
+                                                    navigate(path);
+                                                    return;
+                                                }
                                             }
+                                            // Fallback
+                                            navigate(`/${course.id}`);
                                         }}
                                         className="bg-white rounded-xl shadow-sm hover:shadow p-3 flex gap-3 border border-gray-100 active:scale-[0.99] transition-transform"
                                     >
@@ -392,20 +420,17 @@ const MobileFirstCourses = () => {
                                             />
                                         </div>
                                         <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                {course.class_level && course.class_level !== 'General' && (
+                                            {course.class && course.class !== 'Engineering' && (
+                                                <div className="flex items-center gap-2 mb-1">
                                                     <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                                                        {course.class_level}
+                                                        {course.class}
                                                     </span>
-                                                )}
-                                                <span className="text-[10px] text-gray-400">
-                                                    {course.board}
-                                                </span>
-                                            </div>
+                                                </div>
+                                            )}
                                             <h3 className="text-sm font-bold text-gray-900 leading-tight mb-1 line-clamp-2">
                                                 {course.title}
                                             </h3>
-                                            <p className="text-xs text-gray-500">{course.subject}</p>
+                                            <p className="text-xs text-gray-500">{course.category}</p>
                                         </div>
                                     </div>
                                 ))}

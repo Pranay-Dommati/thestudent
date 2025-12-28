@@ -223,8 +223,21 @@ const Courses = () => {
                             {viewMode === 'discovery' ? (
                                 // Discovery View
                                 loadingCourses ? (
-                                    <div className="flex justify-center py-12">
-                                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+                                    // Skeleton Cards
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                        {[...Array(4)].map((_, i) => (
+                                            <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-pulse">
+                                                <div className="aspect-video bg-gray-200" />
+                                                <div className="p-4 space-y-3">
+                                                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                                                    <div className="h-3 bg-gray-200 rounded w-1/2" />
+                                                    <div className="flex gap-2 pt-2">
+                                                        <div className="h-6 bg-gray-200 rounded-full w-16" />
+                                                        <div className="h-6 bg-gray-200 rounded-full w-20" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 ) : allCourses.length > 0 ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -232,16 +245,30 @@ const Courses = () => {
                                             <div
                                                 key={course.id}
                                                 onClick={() => {
-                                                    // Determine navigation path based on course metadata if available, or default
-                                                    // For now, simpler to navigate to generic course page or derive from course data
-                                                    // Check if it's a school course to build proper path
-                                                    if (course.class_level && course.board) {
-                                                        const path = `/${course.class_level}/${course.board}/${course.subject?.toLowerCase()}?courseId=${course.id}`;
-                                                        navigate(path);
-                                                    } else {
-                                                        // Fallback or engineering
-                                                        navigate(`/engineering/${course.id}`);
+                                                    // Navigate based on course_type from API
+                                                    // API returns: class: "10th - state", category: "Mathematics", course_type: "school"
+                                                    if (course.course_type === 'school' && course.class && course.category) {
+                                                        // Parse "10th - state" to get class_level and board
+                                                        const classString = course.class || '';
+                                                        const [classLevel, boardPart] = classString.split(' - ').map(s => s?.trim());
+                                                        const subject = (course.category || '').toLowerCase();
+
+                                                        if (classLevel && boardPart && subject) {
+                                                            const board = boardPart.toLowerCase();
+                                                            let path;
+                                                            if (board === 'state') {
+                                                                // Default to 'ts' for state board (Telangana State)
+                                                                path = `/${classLevel}/state/ts/${subject}?courseId=${course.id}`;
+                                                            } else {
+                                                                // CBSE or other boards
+                                                                path = `/${classLevel}/${board}/${subject}?courseId=${course.id}`;
+                                                            }
+                                                            navigate(path);
+                                                            return;
+                                                        }
                                                     }
+                                                    // Fallback: Navigate to course details page
+                                                    navigate(`/${course.id}`);
                                                 }}
                                                 className="bg-white rounded-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden cursor-pointer border border-gray-100/80 group transform"
                                             >
@@ -260,9 +287,9 @@ const Courses = () => {
                                                         </span>
                                                     </div>
 
-                                                    {course.class_level && course.class_level !== 'General' && (
+                                                    {course.class && course.class !== 'Engineering' && (
                                                         <div className="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded-md text-xs font-semibold text-gray-700 shadow-sm z-20">
-                                                            {course.class_level}
+                                                            {course.class}
                                                         </div>
                                                     )}
                                                 </div>
@@ -272,16 +299,8 @@ const Courses = () => {
                                                     <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
                                                         {course.title}
                                                     </h3>
-                                                    <div className="flex items-center text-sm text-gray-500 mb-3 space-x-4">
-                                                        <div className="flex items-center">
-                                                            <span>{course.subject}</span>
-                                                        </div>
-                                                        {course.board && (
-                                                            <div className="flex items-center">
-                                                                <FaUniversity className="w-3 h-3 mr-1.5 text-indigo-400" />
-                                                                <span className="uppercase">{course.board === 'state' ? 'State Board' : course.board}</span>
-                                                            </div>
-                                                        )}
+                                                    <div className="flex items-center text-sm text-gray-500 mb-3">
+                                                        <span>{course.category}</span>
                                                     </div>
                                                 </div>
                                             </div>

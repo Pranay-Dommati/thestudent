@@ -755,9 +755,21 @@ def get_school_course_by_id(request, course_id):
 @permission_classes([AllowAny])
 @authentication_classes([])
 def list_all_courses(request):
+    from django.core.cache import cache
+    
     try:
         category = request.query_params.get('category', 'all')
-        print(f"Requested category: {category}")
+        
+        # Check cache first (5 minute TTL)
+        cache_key = f'courses_all_{category}'
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            if settings.DEBUG:
+                print(f"[CACHE HIT] Returning cached courses for category: {category}")
+            return Response(cached_data)
+        
+        if settings.DEBUG:
+            print(f"[CACHE MISS] Fetching courses for category: {category}")
         
         # Process engineering courses (only published for public listing)
         eng_queryset = EngineeringCourse.objects.filter(is_published=True)
@@ -802,8 +814,11 @@ def list_all_courses(request):
             }
             courses_data.append(course_data)
 
+        # Cache the result for 5 minutes
+        cache.set(cache_key, courses_data, timeout=300)
+        
         if settings.DEBUG:
-            print(f"Successfully processed {len(courses_data)} courses")
+            print(f"[CACHE SET] Cached {len(courses_data)} courses for category: {category}")
         return Response(courses_data)
         
     except Exception as e:
