@@ -1656,7 +1656,6 @@ const MobileChatbotPage = () => {
                     {/* Center: EasyLearnova branding */}
                     <div className="flex-1 mx-3 md:mx-4 text-center">
                         <h1 className="text-base md:text-lg font-bold text-[#0A1A3F]">EasyLearnova</h1>
-                        <p className="text-xs md:text-sm text-gray-500">Smart Learning</p>
                     </div>
 
                     {/* Right: Back button */}
@@ -1907,12 +1906,53 @@ const MobileChatbotPage = () => {
                 <div className="min-h-full">
                     {/* Centered welcome screen layout when no messages */}
                     {chatHistory.length === 0 ? (
-                        <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 min-h-[60vh]">
-                            <div className="text-center w-full max-w-sm px-2">
+                        <div className="flex-1 flex flex-col items-center justify-center px-4 min-h-[calc(100vh-120px)]">
+                            <div className="text-center w-full max-w-md px-4">
                                 {/* Static Title */}
-                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 leading-tight mb-6">
+                                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 leading-tight mb-6">
                                     Learning Path Builder
                                 </h1>
+
+                                {/* Centered Input Area */}
+                                <div className="flex items-center gap-2 mb-5 bg-white border-2 border-indigo-300 hover:border-indigo-400 rounded-xl shadow-sm focus-within:ring-1 focus-within:ring-indigo-400/60 focus-within:border-indigo-400 transition-all pl-3 pr-1.5 py-1">
+                                    <textarea
+                                        rows={1}
+                                        placeholder="Describe what you want to learn..."
+                                        value={message}
+                                        onChange={(e) => setMessage(e.target.value)}
+                                        onInput={(e) => {
+                                            try {
+                                                const el = e.target;
+                                                el.style.height = 'auto';
+                                                el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+                                            } catch (_) { }
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && !e.shiftKey && !isLoading && online) {
+                                                e.preventDefault();
+                                                handleSendMessage();
+                                            }
+                                        }}
+                                        className="flex-1 bg-transparent border-none outline-none text-gray-900 placeholder-gray-400 resize-none overflow-hidden text-sm py-1.5"
+                                        style={{ minHeight: '20px', maxHeight: '120px' }}
+                                    />
+                                    <button
+                                        onClick={() => handleSendMessage()}
+                                        disabled={!message.trim() || isLoading || !online}
+                                        aria-label="Send message"
+                                        style={{ width: '28px', height: '28px', minWidth: '28px', minHeight: '28px' }}
+                                        className={`flex-shrink-0 flex items-center justify-center rounded-md transition-all ${message.trim() && !isLoading && online
+                                            ? "bg-indigo-600 text-white"
+                                            : "bg-gray-200 text-gray-400"
+                                            }`}
+                                    >
+                                        {isLoading ? (
+                                            <BiLoaderAlt className="animate-spin" size={14} />
+                                        ) : (
+                                            <IoSend size={14} />
+                                        )}
+                                    </button>
+                                </div>
 
                                 {/* Clickable Suggestion List */}
                                 <div className="w-full text-left">
@@ -2145,76 +2185,78 @@ const MobileChatbotPage = () => {
                 </div>
             </div>
 
-            {/* Message input - Fixed at bottom - Always visible */}
-            <div className="fixed bottom-0 left-0 right-0 z-20">
-                <div className="bg-white border-t border-gray-200 shadow-lg">
-                    <div className="px-4 sm:px-5 md:px-8 lg:px-12 xl:px-16 py-3">
-                        {/* Simple input field with send button */}
-                        <div className="relative">
-                            {!online && (
-                                <div className="mb-2 text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-center">
-                                    You’re offline. Messages can’t be sent. We’ll resume when you’re back online.
+            {/* Message input - Fixed at bottom - Only show when there are messages */}
+            {chatHistory.length > 0 && (
+                <div className="fixed bottom-0 left-0 right-0 z-20">
+                    <div className="bg-white border-t border-gray-200 shadow-lg">
+                        <div className="px-4 sm:px-5 md:px-8 lg:px-12 xl:px-16 py-3">
+                            {/* Simple input field with send button */}
+                            <div className="relative">
+                                {!online && (
+                                    <div className="mb-2 text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-center">
+                                        You’re offline. Messages can’t be sent. We’ll resume when you’re back online.
+                                    </div>
+                                )}
+                                <textarea
+                                    rows={1}
+                                    placeholder="Describe what you want to learn..."
+                                    value={message}
+                                    onChange={(e) => setMessage(e.target.value)}
+                                    onInput={(e) => {
+                                        try {
+                                            const el = e.target;
+                                            el.style.height = 'auto';
+                                            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+                                        } catch (_) { }
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" && !e.shiftKey && !isLoading && online) {
+                                            e.preventDefault();
+                                            handleSendMessage();
+                                        }
+                                    }}
+                                    onFocus={() => setIsInputFocused(true)}
+                                    onBlur={() => setIsInputFocused(false)}
+                                    aria-disabled={isLoading}
+                                    className="w-full px-4 pt-4 pb-5 pr-14 bg-white border-2 border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400/60 focus:border-indigo-400 text-gray-900 placeholder-gray-500 resize-none overflow-hidden text-base transition-all"
+                                    style={{ minHeight: '54px', maxHeight: '120px' }}
+                                />
+                                <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
+                                    <button
+                                        onClick={() => handleSendMessage()}
+                                        disabled={!message.trim() || isLoading || !online}
+                                        aria-label="Send message"
+                                        className={`h-10 w-10 flex items-center justify-center rounded-full transition-all ${message.trim() && !isLoading && online
+                                            ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
+                                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                            }`}
+                                    >
+                                        {isLoading ? (
+                                            <BiLoaderAlt className="animate-spin" size={18} />
+                                        ) : (
+                                            <IoSend size={18} className="ml-0.5" />
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Usage Stats - Show below input */}
+                            {usageStats && isLoggedIn && (
+                                <div className="mt-3 flex justify-center">
+                                    <div className="text-center">
+                                        <div className="[&>div]:text-center">
+                                            <CompactRateLimitStatus usageStats={usageStats} className="text-center" />
+                                        </div>
+                                        {usageStats.isFallback && (
+                                            <div className="text-xs text-gray-400 mt-1">Limits unavailable. Showing default.</div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
-                            <textarea
-                                rows={1}
-                                placeholder="Describe what you want to learn..."
-                                value={message}
-                                onChange={(e) => setMessage(e.target.value)}
-                                onInput={(e) => {
-                                    try {
-                                        const el = e.target;
-                                        el.style.height = 'auto';
-                                        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-                                    } catch (_) { }
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" && !e.shiftKey && !isLoading && online) {
-                                        e.preventDefault();
-                                        handleSendMessage();
-                                    }
-                                }}
-                                onFocus={() => setIsInputFocused(true)}
-                                onBlur={() => setIsInputFocused(false)}
-                                aria-disabled={isLoading}
-                                className="w-full px-4 pt-4 pb-5 pr-14 bg-white border-2 border-gray-200 hover:border-gray-300 rounded-2xl shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-400/60 focus:border-indigo-400 text-gray-900 placeholder-gray-500 resize-none overflow-hidden text-base transition-all"
-                                style={{ minHeight: '54px', maxHeight: '120px' }}
-                            />
-                            <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
-                                <button
-                                    onClick={() => handleSendMessage()}
-                                    disabled={!message.trim() || isLoading || !online}
-                                    aria-label="Send message"
-                                    className={`h-10 w-10 flex items-center justify-center rounded-full transition-all ${message.trim() && !isLoading && online
-                                        ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
-                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                        }`}
-                                >
-                                    {isLoading ? (
-                                        <BiLoaderAlt className="animate-spin" size={18} />
-                                    ) : (
-                                        <IoSend size={18} className="ml-0.5" />
-                                    )}
-                                </button>
-                            </div>
                         </div>
-
-                        {/* Usage Stats - Show below input */}
-                        {usageStats && isLoggedIn && (
-                            <div className="mt-3 flex justify-center">
-                                <div className="text-center">
-                                    <div className="[&>div]:text-center">
-                                        <CompactRateLimitStatus usageStats={usageStats} className="text-center" />
-                                    </div>
-                                    {usageStats.isFallback && (
-                                        <div className="text-xs text-gray-400 mt-1">Limits unavailable. Showing default.</div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Freemium: Save Course Modal (Mobile) */}
             {showSaveCourseModal && pendingCourseToSave && (
