@@ -1907,15 +1907,28 @@ const MobileChatbotPage = () => {
                 <div className="min-h-full">
                     {/* Centered welcome screen layout when no messages */}
                     {chatHistory.length === 0 ? (
-                        <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 min-h-[60vh]">
-                            <div className="text-center w-full max-w-sm px-4">
-                                <h1
-                                    key={suggestionKey}
-                                    className={`text-xl sm:text-2xl font-semibold tracking-tight text-gray-900 leading-tight mb-6 ${isAnimatingOut ? 'animate-slide-up-out' : 'animate-slide-up-in'
-                                        }`}
-                                >
-                                    {rotatingSuggestions[suggestionIndex]}
+                        <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 min-h-[60vh]">
+                            <div className="text-center w-full max-w-sm px-2">
+                                {/* Static Title */}
+                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 leading-tight mb-6">
+                                    Learning Path Builder
                                 </h1>
+
+                                {/* Clickable Suggestion List */}
+                                <div className="w-full text-left">
+                                    {rotatingSuggestions.slice(0, 5).map((suggestion, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => setMessage(suggestion)}
+                                            className={`w-full flex items-center gap-3 px-1 py-2.5 text-left text-xs text-gray-500 active:text-indigo-600 transition-all duration-200 ${idx !== 4 ? 'border-b border-gray-100' : ''}`}
+                                        >
+                                            <svg className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                            </svg>
+                                            <span className="flex-1">{suggestion}</span>
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     ) : (

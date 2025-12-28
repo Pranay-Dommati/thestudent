@@ -2647,16 +2647,13 @@ const ChatbotPage = () => {
                     /* Centered welcome screen layout */
                     <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
                         <div className="text-center w-full max-w-[900px] px-4">
-                            <h1
-                                key={suggestionKey}
-                                className={`text-2xl sm:text-3xl md:text-[1.75rem] font-semibold tracking-tight text-gray-900 leading-tight md:leading-snug mb-3 md:mb-4 ${isAnimatingOut ? 'animate-slide-up-out' : 'animate-slide-up-in'
-                                    }`}
-                            >
-                                {rotatingSuggestions[suggestionIndex]}
+                            {/* Static Title */}
+                            <h1 className="text-2xl sm:text-3xl md:text-[2rem] font-bold tracking-tight text-gray-900 leading-tight md:leading-snug mb-4 md:mb-6">
+                                Learning Path Builder
                             </h1>
 
                             {/* Centered Input Area */}
-                            <div className="max-w-[820px] mx-auto px-4 md:px-8 lg:px-12 pt-1 md:pt-2">
+                            <div className="max-w-[820px] mx-auto px-4 md:px-8 lg:px-12">
                                 <div className="relative group overflow-visible">
                                     <textarea
                                         rows={1}
@@ -2694,11 +2691,28 @@ const ChatbotPage = () => {
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Clickable Suggestion List */}
+                                <div className="mt-5">
+                                    {rotatingSuggestions.slice(0, 5).map((suggestion, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => setMessage(suggestion)}
+                                            className={`w-full flex items-center gap-3 px-1 py-2.5 text-left text-sm text-gray-500 hover:text-indigo-600 transition-all duration-200 ${idx !== 4 ? 'border-b border-gray-100' : ''}`}
+                                        >
+                                            <svg className="w-4 h-4 text-gray-300 flex-shrink-0 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                            </svg>
+                                            <span className="flex-1">{suggestion}</span>
+                                        </button>
+                                    ))}
+                                </div>
+
                                 {usageStats && isLoggedIn && (
-                                    <div className="mt-3">
+                                    <div className="mt-4">
                                         <CompactRateLimitStatus usageStats={usageStats} className="text-center" />
                                         {usageStats.isFallback && (
-                                            <div className="mt-1 text-[11px] text-gray-400 text-center">Limits unavailable right now. Showing defaults. We’ll update when connected.</div>
+                                            <div className="mt-1 text-[11px] text-gray-400 text-center">Limits unavailable right now. Showing defaults. We'll update when connected.</div>
                                         )}
                                     </div>
                                 )}
