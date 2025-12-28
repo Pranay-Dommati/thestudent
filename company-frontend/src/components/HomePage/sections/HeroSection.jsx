@@ -22,19 +22,31 @@ const HeroSection = () => {
             <div className="container mx-auto px-6 py-20 relative z-10">
                 <div className="max-w-4xl mx-auto text-center sm:text-center text-left">
 
-                    {/* Main heading: Mobile optimized split */}
-                    <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] mb-8 tracking-wide">
-                        <span className="block mb-2 sm:mb-0">Structured Learning <br className="sm:hidden" /> for School Students.</span>
-                        <span className="block sm:inline">Visual Code Understanding <br className="sm:hidden" /> for Engineers.</span>
+                    {/* Main heading: Distinct Mobile vs Desktop Layouts */}
+
+                    {/* MOBILE: Hierarchy (School = Primary, Eng = Secondary) */}
+                    <div className="sm:hidden text-left mb-8">
+                        <h1 className="text-4xl font-bold text-slate-900 leading-[1.1] mb-4">
+                            Structured Learning<br />for School Students.
+                        </h1>
+                        <p className="text-xl text-slate-500 font-medium leading-tight">
+                            Visual code understanding<br />for engineering students.
+                        </p>
+                    </div>
+
+                    {/* DESKTOP: Balanced (Equal Weight) - UNCHANGED */}
+                    <h1 className="hidden sm:block text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] mb-8 tracking-wide">
+                        <span className="block">Structured Learning for School Students.</span>
+                        <span className="block">Visual Code Understanding for Engineers.</span>
                     </h1>
 
                     {/* Subheading */}
-                    <p className="text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto mb-12 leading-relaxed font-normal">
-                        EasyLearnova builds focused learning systems — one for syllabus-aligned school learning, one for deep code understanding.
+                    <p className="text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
+                        We build focused learning systems — syllabus-aligned courses for schools, and visual code understanding for engineers.
                     </p>
 
                     {/* CTA Buttons - Mobile: Vertical Stack, Desktop: Horizontal */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-4 sm:gap-6">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-6">
                         <a
                             href="https://courses.easylearnova.com"
                             className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white font-medium rounded-2xl sm:rounded-lg hover:scale-[1.02] transition-transform duration-200 flex items-center justify-center gap-3 shadow-lg group"
