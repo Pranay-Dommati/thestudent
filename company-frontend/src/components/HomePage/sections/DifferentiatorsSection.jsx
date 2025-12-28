@@ -38,9 +38,12 @@ const DifferentiatorsSection = () => {
                 <StaggerContainer className="grid sm:grid-cols-2 gap-x-12 gap-y-12 max-w-4xl mx-auto">
                     {differentiators.map((item, index) => (
                         <StaggerItem key={index}>
-                            <div className="flex flex-col">
+                            <div className="flex flex-col relative pl-6 border-l-2 border-slate-100 sm:border-0 sm:pl-0">
+                                {/* Mobile Timeline Dot */}
+                                <div className="absolute -left-[5px] top-2 w-2 h-2 rounded-full bg-slate-900 sm:hidden"></div>
+
                                 <h3 className="text-xl font-bold text-slate-900 mb-3 relative">
-                                    <span className="absolute -left-6 top-0 text-slate-300 font-normal">0{index + 1}</span>
+                                    <span className="hidden sm:block absolute -left-6 top-0 text-slate-300 font-normal">0{index + 1}</span>
                                     {item.title}
                                 </h3>
                                 <p className="text-slate-600 leading-relaxed">

@@ -12,13 +12,26 @@ const FounderSection = () => {
                 <div className="max-w-3xl mx-auto">
 
                     {/* Main Headline */}
-                    <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-8 leading-tight">
-                        Learning isn’t hard. <br />
-                        <span className="text-slate-500">It just hasn’t been designed clearly enough.</span>
-                    </h2>
+                    <div className="mb-10 text-center sm:text-left">
+                        {/* Mobile: Quote Block Style */}
+                        <div className="sm:hidden border-l-4 border-slate-900 pl-6 py-2">
+                            <h2 className="text-2xl font-bold text-slate-900 italic leading-tight">
+                                “Learning isn’t hard. <br />
+                                It just hasn’t been designed clearly enough.”
+                            </h2>
+                        </div>
+
+                        {/* Desktop: Standard Style */}
+                        <div className="hidden sm:block">
+                            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-8 leading-tight">
+                                Learning isn’t hard. <br />
+                                <span className="text-slate-500">It just hasn’t been designed clearly enough.</span>
+                            </h2>
+                        </div>
+                    </div>
 
                     {/* Body Text */}
-                    <div className="space-y-6 text-lg text-slate-700 leading-relaxed mb-10">
+                    <div className="space-y-6 text-lg text-slate-700 leading-relaxed mb-10 text-left">
                         <p>
                             Most students don’t struggle because they lack ability.
                         </p>

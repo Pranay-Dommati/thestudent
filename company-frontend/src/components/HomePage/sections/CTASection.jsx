@@ -26,7 +26,7 @@ const CTASection = () => {
                         {/* School Card */}
                         <a
                             href="https://courses.easylearnova.com"
-                            className="group relative p-8 rounded-2xl bg-slate-50 border border-slate-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300"
+                            className="group relative p-6 sm:p-8 rounded-2xl bg-slate-50 border border-slate-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 active:scale-[0.98]"
                         >
                             <div className="flex items-center justify-between mb-4">
                                 <span className="w-12 h-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
@@ -45,7 +45,7 @@ const CTASection = () => {
                         {/* Engineer Card */}
                         <a
                             href="https://codevisualizer.easylearnova.com"
-                            className="group relative p-8 rounded-2xl bg-slate-50 border border-slate-200 hover:border-purple-300 hover:shadow-lg transition-all duration-300"
+                            className="group relative p-6 sm:p-8 rounded-2xl bg-slate-50 border border-slate-200 hover:border-purple-300 hover:shadow-lg transition-all duration-300 active:scale-[0.98]"
                         >
                             <div className="flex items-center justify-between mb-4">
                                 <span className="w-12 h-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center">
