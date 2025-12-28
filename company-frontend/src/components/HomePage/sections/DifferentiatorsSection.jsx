@@ -17,7 +17,7 @@ const DifferentiatorsSection = () => {
         },
         {
             title: "Separate systems",
-            desc: "A 6th grader and a CS major need different tools. We built both."
+            desc: "A 10th grader and a CS major need different tools. We built both."
         },
         {
             title: "Long-term clarity",
