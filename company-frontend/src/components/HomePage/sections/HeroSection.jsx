@@ -24,13 +24,28 @@ const HeroSection = () => {
 
                     {/* Main heading: Distinct Mobile vs Desktop Layouts */}
 
-                    {/* MOBILE: Hierarchy (School = Primary, Eng = Secondary) */}
-                    <div className="sm:hidden text-left mb-8">
-                        <h1 className="text-4xl font-bold text-slate-900 leading-[1.1] mb-4">
-                            Structured Learning<br />for School Students.
+                    {/* MOBILE: Industry Standard Structure (Left aligned, 3 layers) */}
+                    <div className="sm:hidden text-left">
+                        {/* 1. Headline */}
+                        <h1 className="text-4xl font-bold text-slate-900 leading-tight mb-6">
+                            Structured Learning,<br />Built for Students.
                         </h1>
-                        <p className="text-xl text-slate-500 font-medium leading-tight">
-                            Visual code understanding<br />for engineering students.
+
+                        {/* 2. Scope Block (Compact List) */}
+                        <ul className="text-base text-slate-600 space-y-2 mb-4">
+                            <li className="flex items-start gap-2">
+                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                                Syllabus-aligned courses for schools
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                                Visual code understanding for engineers
+                            </li>
+                        </ul>
+
+                        {/* 3. Tagline (Brand Statement) */}
+                        <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">
+                            EasyLearnova builds focused learning systems for real understanding.
                         </p>
                     </div>
 
@@ -40,9 +55,9 @@ const HeroSection = () => {
                         <span className="block">Visual Code Understanding for Engineers.</span>
                     </h1>
 
-                    {/* Subheading */}
-                    <p className="text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
-                        We build focused learning systems — syllabus-aligned courses for schools, and visual code understanding for engineers.
+                    {/* Subheading (Desktop Only now, since Mobile has its own Tagline) */}
+                    <p className="hidden sm:block text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
+                        EasyLearnova builds focused learning systems for real understanding.
                     </p>
 
                     {/* CTA Buttons - Mobile: Vertical Stack, Desktop: Horizontal */}
