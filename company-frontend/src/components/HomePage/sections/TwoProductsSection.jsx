@@ -33,26 +33,46 @@ const TwoProductsSection = () => {
                             <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">EasyLearnova Courses</h3>
                             <p className="text-xs sm:text-sm font-semibold text-blue-600 uppercase tracking-wider mb-4 sm:mb-6">For School Students (6th–12th)</p>
 
-                            <p className="text-slate-600 mb-6 sm:mb-8 leading-relaxed text-sm sm:text-base">
-                                Syllabus-aligned structured courses with clear chapters, progress tracking, and quizzes. Everything you need to master your board exams.
-                            </p>
+                            {/* MOBILE CONTENT */}
+                            <div className="sm:hidden w-full">
+                                <p className="text-slate-600 mb-6 leading-relaxed text-sm">
+                                    Structured, syllabus-aligned learning — without confusion.
+                                </p>
+                                <ul className="space-y-3 mb-8 w-full">
+                                    {['Board-aligned chapters', 'Clear learning paths'].map((feat, i) => (
+                                        <li key={i} className="flex items-center gap-3 text-slate-700 text-sm">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                            {feat}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
 
-                            <ul className="space-y-3 mb-8 sm:mb-10 w-full flex-grow">
-                                {['Syllabus-aligned courses', 'Structured chapters', 'Learning paths per subject', 'Quizzes & revision support'].map((feat, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-slate-700 text-sm">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                        {feat}
-                                    </li>
-                                ))}
-                            </ul>
+                            {/* DESKTOP CONTENT */}
+                            <div className="hidden sm:block w-full flex-grow">
+                                <p className="text-slate-600 mb-8 leading-relaxed text-base">
+                                    Syllabus-aligned structured courses with clear chapters, progress tracking, and quizzes. Everything you need to master your board exams.
+                                </p>
+                                <ul className="space-y-3 mb-10 w-full">
+                                    {['Syllabus-aligned courses', 'Structured chapters', 'Learning paths per subject', 'Quizzes & revision support'].map((feat, i) => (
+                                        <li key={i} className="flex items-center gap-3 text-slate-700 text-sm">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                            {feat}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
 
+                            {/* CTA Positioned Higher on Mobile */}
                             <a
                                 href="https://courses.easylearnova.com"
-                                className="w-full py-3 sm:py-4 px-6 rounded-xl bg-slate-50 text-slate-900 font-semibold border border-slate-200 hover:bg-slate-100 hover:border-slate-300 transition-all text-center flex items-center justify-center gap-2 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600"
+                                className="w-full py-3 sm:py-4 px-6 rounded-xl bg-slate-50 text-slate-900 font-semibold border border-slate-200 hover:bg-slate-100 hover:border-slate-300 transition-all text-center flex items-center justify-center gap-2 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 z-10 relative"
                             >
                                 Go to Courses
                                 <HiArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                             </a>
+
+
                         </div>
                     </StaggerItem>
 
@@ -64,30 +84,53 @@ const TwoProductsSection = () => {
                             </div>
 
                             <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">Code Visualizer</h3>
-                            <p className="text-xs sm:text-sm font-semibold text-purple-600 uppercase tracking-wider mb-4 sm:mb-6">For Engineering Students & DSA</p>
+                            <p className="text-xs sm:text-sm font-semibold text-purple-600 uppercase tracking-wider mb-4 sm:mb-6">For Engineering & DSA</p>
 
-                            <p className="text-slate-600 mb-6 sm:mb-8 leading-relaxed text-sm sm:text-base">
-                                Stop guessing how code works. See variables change, loops iterate, and recursion unfold step-by-step. Perfect for interviews.
-                            </p>
+                            {/* MOBILE CONTENT */}
+                            <div className="sm:hidden w-full">
+                                <p className="text-slate-600 mb-6 leading-relaxed text-sm">
+                                    See how code actually runs — step by step.
+                                </p>
+                                <ul className="space-y-3 mb-8 w-full">
+                                    {['Visual code execution', 'Loops & recursion explained'].map((feat, i) => (
+                                        <li key={i} className="flex items-center gap-3 text-slate-700 text-sm">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                            {feat}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
 
-                            <ul className="space-y-3 mb-8 sm:mb-10 w-full flex-grow">
-                                {['Visual Python execution', 'Step-by-step dry runs', 'Arrays, loops, recursion visualized', 'Logic building helper'].map((feat, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-slate-700 text-sm">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                                        {feat}
-                                    </li>
-                                ))}
-                            </ul>
+                            {/* DESKTOP CONTENT */}
+                            <div className="hidden sm:block w-full flex-grow">
+                                <p className="text-slate-600 mb-8 leading-relaxed text-base">
+                                    Stop guessing how code works. See variables change, loops iterate, and recursion unfold step-by-step. Perfect for interviews.
+                                </p>
+                                <ul className="space-y-3 mb-10 w-full">
+                                    {['Visual Python execution', 'Step-by-step dry runs', 'Arrays, loops, recursion visualized', 'Logic building helper'].map((feat, i) => (
+                                        <li key={i} className="flex items-center gap-3 text-slate-700 text-sm">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                            {feat}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
 
+                            {/* CTA Positioned Higher on Mobile */}
                             <a
                                 href="https://codevisualizer.easylearnova.com"
-                                className="w-full py-3 sm:py-4 px-6 rounded-xl bg-slate-50 text-slate-900 font-semibold border border-slate-200 hover:bg-slate-100 hover:border-slate-300 transition-all text-center flex items-center justify-center gap-2 group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-600"
+                                className="w-full py-3 sm:py-4 px-6 rounded-xl bg-slate-50 text-slate-900 font-semibold border border-slate-200 hover:bg-slate-100 hover:border-slate-300 transition-all text-center flex items-center justify-center gap-2 group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-600 z-10 relative"
                             >
                                 Go to Code Visualizer
                                 <HiArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                             </a>
+
+
                         </div>
                     </StaggerItem>
+
+                    {/* Add keyframes for fadeIn if not global */}
+
 
                 </StaggerContainer>
             </div>
