@@ -1,34 +1,60 @@
-import Hero from "./Hero/Hero";
-import FeaturedPlaylists from "./FeaturedPlaylists/FeaturedPlaylists";
-import AIGeneratedLearningPath from "./AIGeneratedLearningPath/AIGeneratedLearningPathComponent";
-import TrustSection from "./TrustSection/TrustSection";
-// import Testimonials from "./Testimonials/Testimonials";
-import Footer from "../Footer/Footer";
-import SEO from "../SEO/SEO";
-import { useEffect } from "react";
-// Prefetching utilities removed as they are no longer relevant
+import {
+    HeroSection,
+    ProblemsSection,
+    TwoProductsSection,
+    // DifferentiatorsSection, // Re-exported but checking if needed in import list if separate file used? 
+    // Wait, I need to make sure I import the new LearningPathsSection.
+    FounderSection,
+    CTASection
+} from './sections';
+// Need to add LearningPathsSection and DifferentiatorsSection to sections/index.js first
+import LearningPathsSection from './sections/LearningPathsSection';
+import DifferentiatorsSection from './sections/DifferentiatorsSection';
 
+import Footer from '../Footer/Footer';
+import SEO from '../SEO/SEO';
 
+/**
+ * HomePage - V3
+ * "Learning Systems Company"
+ * 
+ * Order:
+ * 1. Hero (No Animation)
+ * 2. Problem Split (Fade+Slide)
+ * 3. Two Core Products (Staggered)
+ * 4. Learning Paths Context (Fade)
+ * 5. Differentiators (Fade list)
+ * 6. Founder's Truth (Fade)
+ * 7. Final Navigation (Fade+Slide)
+ * 8. Footer (Static)
+ */
 const HomePage = () => {
-    useEffect(() => {
-        // Background prefetch logic removed
-    }, []);
     return (
         <>
             <SEO
-                title="EasyLearnova - AI-Powered Learning Platform | Custom Courses & Board Syllabus"
-                description="Transform your learning with EasyLearnova's AI-powered platform. Create custom courses with our Pro Learning feature or access structured CBSE & State Board content for grades 6-12. Master any subject with personalized learning paths, curated videos, interactive quizzes, and comprehensive resources—all in one place."
-                keywords="EasyLearnova, AI learning platform, Pro Learning, custom course creation, CBSE courses, state board syllabus, 6th to 12th standard, AI chatbot tutor, personalized learning, structured courses, board exam preparation"
+                title="EasyLearnova - Focused Learning Systems for School & Engineering"
+                description="EasyLearnova builds focused learning systems. Syllabus-aligned courses for school students and visual mental models for engineering students."
+                keywords="EasyLearnova, school courses, engineering learning, code visualization, syllabus aligned, visual learning"
                 canonical="https://easylearnova.com/"
             />
-            <Hero />
-            <FeaturedPlaylists />
-            <AIGeneratedLearningPath />
-            <TrustSection />
-            {/* <Testimonials /> */}
+
+            <HeroSection />
+
+            <ProblemsSection />
+
+            <TwoProductsSection />
+
+            <LearningPathsSection />
+
+            <DifferentiatorsSection />
+
+            <FounderSection />
+
+            <CTASection />
+
             <Footer />
         </>
     );
-}
+};
 
 export default HomePage;
