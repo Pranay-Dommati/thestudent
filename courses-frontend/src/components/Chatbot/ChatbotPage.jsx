@@ -554,21 +554,23 @@ const ChatbotPage = () => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     // Rotating suggestions for empty-state heading
     const rotatingSuggestions = [
-        "Help me get started with algebra basics",
-        "Explain how the human digestive system works",
-        "Break down Newton’s laws of motion for me",
-        "Build a mini course on electricity and magnetism",
-        "Guide me through the fundamentals of programming",
-        "Design a beginner-friendly Python course for me",
-        "Show me how the Internet actually works",
-        "Walk me through circuits and microcontrollers step by step",
-        "Simplify the basics of thermodynamics",
-        "Build me a hands-on course on machine learning",
-        "Teach me everything about the water cycle and environment",
-        "Explain how database management systems function",
-        "Give me a clear introduction to networking and cybersecurity",
-        "Help me understand how chemical reactions happen"
+        "Help me understand algebra basics",
+        "Explain linear equations step by step",
+        "Help me revise trigonometry for exams",
+        "Explain quadratic equations with simple examples",
+
+        "Explain Newton’s laws in a simple way",
+        "Help me understand motion and speed",
+        "Explain electricity and magnetism for exams",
+        "Explain current, voltage, and resistance clearly",
+        "Teach me thermodynamics with simple examples",
+
+        "Help me understand chemical reactions step by step",
+        "Explain acids, bases, and salts simply",
+        "Explain the periodic table in an easy way",
+        "Explain how atoms and molecules work"
     ];
+
     const [suggestionIndex, setSuggestionIndex] = useState(0);
     const [suggestionKey, setSuggestionKey] = useState(0); // for animation re-trigger
     const [isAnimatingOut, setIsAnimatingOut] = useState(false);
@@ -2431,7 +2433,7 @@ const ChatbotPage = () => {
                             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm">
                                 <IoSchoolOutline size={20} className="text-white" />
                             </div>
-                            <span className="font-semibold text-gray-900 text-base">Course Creator</span>
+                            <span className="font-semibold text-gray-900 text-base">Smart Learning</span>
                         </div>
                         <button
                             onClick={(e) => {
@@ -2461,14 +2463,14 @@ const ChatbotPage = () => {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
-                        New Course
+                        Start Learning Path
                     </button>
                 </div>
 
                 {/* ProLearning Courses Section */}
                 <div className="px-4 py-3">
                     <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                        Recent Courses
+                        Recent Learning Paths
                     </h3>
                 </div>
 
@@ -2557,8 +2559,8 @@ const ChatbotPage = () => {
                             <div className="text-gray-400 mb-2">
                                 <IoBook size={24} className="mx-auto opacity-50" />
                             </div>
-                            <div className="text-sm text-gray-500">No saved courses yet</div>
-                            <div className="text-xs text-gray-400 mt-1">Create your first course to get started</div>
+                            <div className="text-sm text-gray-500">No learning paths yet</div>
+                            <div className="text-xs text-gray-400 mt-1">Start a learning path to begin your journey</div>
                         </div>
                     )}
                 </div>
@@ -2577,7 +2579,7 @@ const ChatbotPage = () => {
                         className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
                     >
                         <IoHome size={16} />
-                        Home
+                        Courses
                     </Link>
                 </div>
             </div>
@@ -2625,7 +2627,7 @@ const ChatbotPage = () => {
                         </button>
                         <div className="flex flex-col items-center">
                             <span className="text-base font-semibold text-gray-900">EasyLearnova</span>
-                            <span className="text-xs text-gray-500">Course Creator</span>
+                            <span className="text-xs text-gray-500">Smart Learning</span>
                         </div>
                         <Link to="/" className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-600 hover:text-gray-800 transition-colors">
                             <IoChevronBack size={20} />
@@ -2658,7 +2660,7 @@ const ChatbotPage = () => {
                                 <div className="relative group overflow-visible">
                                     <textarea
                                         rows={1}
-                                        placeholder="Ask anything"
+                                        placeholder="Describe what you want to learn..."
                                         value={message}
                                         onChange={(e) => setMessage(e.target.value)}
                                         onInput={handleTextareaInput}

@@ -143,21 +143,23 @@ const MobileChatbotPage = () => {
 
     // Rotating suggestions for empty-state heading (same as desktop)
     const rotatingSuggestions = [
-        "Help me get started with algebra basics",
-        "Explain how the human digestive system works",
-        "Break down Newton's laws of motion for me",
-        "Build a mini course on electricity and magnetism",
-        "Guide me through the fundamentals of programming",
-        "Design a beginner-friendly Python course for me",
-        "Show me how the Internet actually works",
-        "Walk me through circuits and microcontrollers step by step",
-        "Simplify the basics of thermodynamics",
-        "Build me a hands-on course on machine learning",
-        "Teach me everything about the water cycle and environment",
-        "Explain how database management systems function",
-        "Give me a clear introduction to networking and cybersecurity",
-        "Help me understand how chemical reactions happen"
+        "Help me understand algebra basics",
+        "Explain linear equations step by step",
+        "Help me revise trigonometry for exams",
+        "Explain quadratic equations with simple examples",
+
+        "Explain Newton’s laws in a simple way",
+        "Help me understand motion and speed",
+        "Explain electricity and magnetism for exams",
+        "Explain current, voltage, and resistance clearly",
+        "Teach me thermodynamics with simple examples",
+
+        "Help me understand chemical reactions step by step",
+        "Explain acids, bases, and salts simply",
+        "Explain the periodic table in an easy way",
+        "Explain how atoms and molecules work"
     ];
+
     const [suggestionIndex, setSuggestionIndex] = useState(0);
     const [suggestionKey, setSuggestionKey] = useState(0); // for animation re-trigger
     const [isAnimatingOut, setIsAnimatingOut] = useState(false);
@@ -1654,7 +1656,7 @@ const MobileChatbotPage = () => {
                     {/* Center: EasyLearnova branding */}
                     <div className="flex-1 mx-3 md:mx-4 text-center">
                         <h1 className="text-base md:text-lg font-bold text-[#0A1A3F]">EasyLearnova</h1>
-                        <p className="text-xs md:text-sm text-gray-500">Course Creator</p>
+                        <p className="text-xs md:text-sm text-gray-500">Smart Learning</p>
                     </div>
 
                     {/* Right: Back button */}
@@ -1688,8 +1690,8 @@ const MobileChatbotPage = () => {
                                 <IoSchoolOutline className="w-4 h-4" />
                             </div>
                             <div>
-                                <div className="font-semibold text-gray-900">ProLearning Courses</div>
-                                <div className="text-xs text-gray-500">Your saved courses</div>
+                                <div className="font-semibold text-gray-900">Learning Paths</div>
+                                <div className="text-xs text-gray-500">Your saved learning paths</div>
                             </div>
                         </div>
                         <button
@@ -1714,7 +1716,7 @@ const MobileChatbotPage = () => {
                                     type="text"
                                     value={coursesSearch}
                                     onChange={(e) => { setCoursesSearch(e.target.value); setVisibleCoursesCount(10); }}
-                                    placeholder="Search courses..."
+                                    placeholder="Search learning paths..."
                                     className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                                 />
                                 <IoSearchOutline className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1808,7 +1810,7 @@ const MobileChatbotPage = () => {
                                 )}
                             </div>
                         ) : (
-                            <div className="text-sm text-gray-600">No saved courses found.</div>
+                            <div className="text-sm text-gray-600">No learning paths yet</div>
                         )}
                         <div style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}></div>
                     </div>
@@ -2143,7 +2145,7 @@ const MobileChatbotPage = () => {
                             )}
                             <textarea
                                 rows={1}
-                                placeholder="Ask anything"
+                                placeholder="Describe what you want to learn..."
                                 value={message}
                                 onChange={(e) => setMessage(e.target.value)}
                                 onInput={(e) => {
