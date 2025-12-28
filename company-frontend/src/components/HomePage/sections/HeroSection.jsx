@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { HiAcademicCap, HiCode } from 'react-icons/hi';
+import { AnimatedSection } from '../animations';
 
 /**
  * Hero Section - V3
@@ -9,7 +10,7 @@ import { HiAcademicCap, HiCode } from 'react-icons/hi';
  */
 const HeroSection = () => {
     return (
-        <section className="relative min-h-[90vh] flex items-center justify-center bg-white overflow-hidden">
+        <AnimatedSection className="relative min-h-[90vh] flex items-center justify-center bg-white overflow-hidden">
             {/* Subtle grid pattern background */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
                 <div className="absolute inset-0" style={{
@@ -54,7 +55,7 @@ const HeroSection = () => {
 
             {/* Fade to content */}
             <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white to-transparent pointer-events-none" />
-        </section>
+        </AnimatedSection>
     );
 };
 
