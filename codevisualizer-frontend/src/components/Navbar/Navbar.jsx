@@ -59,14 +59,14 @@ const Navbar = ({ initialStyle = "light" }) => {
 
     const mainTextColor = isTransparent ? 'text-white' : 'text-slate-800';
     const logoColor = isTransparent ? 'text-white' : 'text-slate-900';
-    const logoAccentColor = isTransparent ? 'text-cyan-300' : 'text-blue-600';
+    const logoAccentColor = isTransparent ? 'text-blue-200' : 'text-blue-600';
     
     const loginButtonClass = isTransparent 
         ? 'text-white hover:bg-white/10 border border-transparent hover:border-white/20' 
         : 'text-slate-600 hover:bg-slate-50';
         
     const signUpButtonClass = isTransparent
-        ? 'bg-white text-indigo-600 hover:bg-indigo-50 shadow-lg shadow-indigo-900/20 border border-transparent'
+        ? 'bg-white text-blue-600 hover:bg-blue-50 shadow-lg shadow-blue-900/20 border border-transparent'
         : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow-md';
 
     return (
@@ -133,7 +133,7 @@ const Navbar = ({ initialStyle = "light" }) => {
                             ) : (
                                 <Link
                                     to="/auth?mode=login"
-                                    className={`px-4 py-2 rounded-full text-sm font-medium ${isTransparent ? 'bg-white text-indigo-600 shadow-lg shadow-indigo-900/20' : 'bg-blue-600 text-white'}`}
+                                    className={`px-4 py-2 rounded-full text-sm font-medium ${isTransparent ? 'bg-white text-blue-600 shadow-lg shadow-blue-900/20' : 'bg-blue-600 text-white'}`}
                                 >
                                     Log In
                                 </Link>

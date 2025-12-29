@@ -38,15 +38,27 @@ const Layout = ({ children }) => {
     // Use transparent navbar on homepage and code-visualizer, light on others
     const isHomePage = location.pathname === '/' || location.pathname === '/code-visualizer';
     const navStyle = isHomePage ? 'transparent' : 'light';
+    
+    // Hide navbar on mobile for homepage (has its own mobile header)
+    const hideNavOnMobile = isHomePage;
 
     return (
         <>
-            {!hideNav && <Navbar initialStyle={navStyle} />}
+            {!hideNav && (
+                <div className={hideNavOnMobile ? 'hidden lg:block' : ''}>
+                    <Navbar initialStyle={navStyle} />
+                </div>
+            )}
             <div className="min-h-screen bg-slate-50 flex flex-col">
                 <main className="flex-grow">
                     {children}
                 </main>
-                {!hideNav && <Footer />}
+                {/* Hide footer on mobile for homepage */}
+                {!hideNav && (
+                    <div className={hideNavOnMobile ? 'hidden lg:block' : ''}>
+                        <Footer />
+                    </div>
+                )}
             </div>
         </>
     );

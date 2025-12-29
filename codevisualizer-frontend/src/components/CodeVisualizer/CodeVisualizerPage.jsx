@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { FaUserCircle } from 'react-icons/fa';
 
 import CodeEditor from './CodeEditor';
 import InputModal from './InputModal';
@@ -16,6 +18,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 function CodeVisualizerPage() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const { isLoggedIn, loading } = useAuth();
     const [code, setCode] = useState('');
     const [autoGenerateInput, setAutoGenerateInput] = useState(true);
     const [isRunning, setIsRunning] = useState(false);
@@ -413,70 +417,158 @@ function CodeVisualizerPage() {
 
     return (
         <div className="min-h-screen bg-slate-50 code-visualizer-container relative overflow-x-hidden">
-            {/* Top gradient section - Subtle, not dominant */}
-            <div className="absolute top-0 left-0 right-0 h-[65vh] bg-gradient-to-br from-indigo-500 via-purple-500 to-violet-600 opacity-90">
-                {/* Decorative background elements */}
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    {/* Subtle gradient orbs */}
-                    <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-72 h-72 lg:w-96 lg:h-96 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 opacity-10 blur-3xl" />
-                    <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-72 h-72 lg:w-96 lg:h-96 rounded-full bg-gradient-to-br from-blue-400 to-cyan-300 opacity-10 blur-3xl" />
+            {/* MOBILE: Professional app-like design */}
+            <div className="lg:hidden flex flex-col min-h-screen">
+                {/* Mobile Header - Gradient background extends behind status bar */}
+                <div className="bg-gradient-to-br from-indigo-500 via-blue-500 to-blue-600 relative">
+                    {/* Pattern overlay for depth */}
+                    <div className="absolute inset-0 opacity-20">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
+                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-300 rounded-full blur-2xl transform -translate-x-1/2 translate-y-1/2" />
+                    </div>
+                    
+                    {/* Top Nav Bar */}
+                    <div className="relative flex items-center justify-between px-4 py-4 pt-4">
+                        <Link to="/" className="text-white font-bold text-xl tracking-tight">
+                            Code<span className="text-blue-200">Visualizer</span>
+                        </Link>
+                        {loading ? (
+                            <div className="w-20 h-9 rounded-full bg-white/20 animate-pulse" />
+                        ) : isLoggedIn ? (
+                            <Link to="/profile" className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                                <FaUserCircle className="text-white text-xl" />
+                            </Link>
+                        ) : (
+                            <Link
+                                to={`/auth?mode=login&returnTo=${encodeURIComponent(location.pathname)}`}
+                                className="px-5 py-2 bg-white text-blue-600 rounded-full text-sm font-bold shadow-lg shadow-blue-900/20 hover:shadow-xl transition-all"
+                            >
+                                Log In
+                            </Link>
+                        )}
+                    </div>
+                    
+                    {/* Hero Section */}
+                    <div className="relative text-center px-6 pb-8 pt-2">
+                        <p className="text-white/90 text-base font-medium">See your Python code come alive</p>
+                        <p className="text-white/60 text-sm mt-1">Step-by-step execution visualization</p>
+                    </div>
                 </div>
-
-                {/* Wave separator with text flowing along the curve */}
-                <div className="absolute bottom-0 left-0 right-0 transform translate-y-[1px] z-10">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320" className="w-full h-auto block" preserveAspectRatio="none">
-                        {/* Define the wave path for text to follow */}
-                        <defs>
-                            <path
-                                id="wavePath"
-                                d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,138.7C672,149,768,203,864,202.7C960,203,1056,149,1152,138.7C1248,128,1344,160,1392,176L1440,192"
-                                fill="none"
-                            />
-                        </defs>
-
-                        {/* Wave fill */}
-                        <path
-                            fill="#F9FAFB"
-                            fillOpacity="1"
-                            d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,138.7C672,149,768,203,864,202.7C960,203,1056,149,1152,138.7C1248,128,1344,160,1392,176L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+                
+                {/* Mobile Editor Card - Floating above gradient */}
+                <div className="flex-1 flex flex-col px-4 -mt-4 relative z-10 pb-4">
+                    <div className="bg-white rounded-2xl flex-1 flex flex-col shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+                        {/* Editor Header */}
+                        <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                                    <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M14.25.18l.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05z" />
+                                    </svg>
+                                </div>
+                                <span className="text-slate-700 font-semibold text-sm">Python Editor</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-100">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span className="text-xs font-medium text-emerald-700">Ready</span>
+                            </div>
+                        </div>
+                        
+                        <CodeEditor
+                            code={code}
+                            setCode={setCode}
+                            onStartVisualization={handleStartVisualization}
+                            autoGenerateInput={autoGenerateInput}
+                            setAutoGenerateInput={setAutoGenerateInput}
+                            isRunning={isRunning}
+                            currentLine={null}
+                            error={error}
+                            isVisualizationActive={false}
+                            hasInputsRequired={hasInputsRequired}
+                            isMobile={true}
                         />
-
-                        {/* Text flowing along the wave path - Single strip with repeated content for seamless loop */}
-                        <text className="wave-path-text" dy="-5">
-                            <textPath href="#wavePath" startOffset="100%">
-                                ✦ Visualize your code ✦ See code come alive ✦ Learn how code thinks ✦ No more blind coding ✦ Clarity over memorization ✦ Understand the "why" ✦ Concepts made visible ✦ Beyond the result ✦ Where code makes sense ✦ Visualize your code ✦ See code come alive ✦ Learn how code thinks ✦ No more blind coding ✦ Clarity over memorization ✦ Understand the "why" ✦ Concepts made visible ✦ Beyond the result ✦ Where code makes sense ✦ Visualize your code ✦ See code come alive ✦ Learn how code thinks ✦ No more blind coding ✦ Clarity over memorization ✦ Understand the "why" ✦ Concepts made visible ✦ Beyond the result ✦ Where code makes sense ✦
-                                <animate
-                                    attributeName="startOffset"
-                                    from="100%"
-                                    to="-200%"
-                                    dur="45s"
-                                    repeatCount="indefinite"
-                                />
-                            </textPath>
-                        </text>
-                    </svg>
+                    </div>
+                </div>
+                
+                {/* Mobile Footer - Minimal */}
+                <div className="bg-white border-t border-slate-100 py-4 px-4">
+                    <div className="flex items-center justify-center gap-4 text-xs text-slate-500">
+                        <Link to="/feedback" className="hover:text-indigo-600 transition-colors">Feedback</Link>
+                        <span className="text-slate-300">•</span>
+                        <Link to="/terms-and-conditions" className="hover:text-indigo-600 transition-colors">Terms</Link>
+                        <span className="text-slate-300">•</span>
+                        <Link to="/privacy-policy" className="hover:text-indigo-600 transition-colors">Privacy</Link>
+                    </div>
+                    <p className="text-center text-xs text-slate-400 mt-2">© 2025 EasyLearnova</p>
                 </div>
             </div>
 
-            {/* Navbar removed - handled by Layout */}
+            {/* DESKTOP: Original gradient hero design */}
+            <div className="hidden lg:block">
+                {/* Top gradient section - Matching login/signup style */}
+                <div className="absolute top-0 left-0 right-0 h-[65vh] bg-gradient-to-br from-indigo-500 via-blue-500 to-blue-600">
+                    {/* Decorative background elements */}
+                    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                        {/* Subtle gradient orbs */}
+                        <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-96 h-96 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 opacity-15 blur-3xl" />
+                        <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-96 h-96 rounded-full bg-gradient-to-br from-indigo-400 to-blue-300 opacity-15 blur-3xl" />
+                    </div>
 
-            {/* Main Content - Editor centered and prominent */}
-            <main className="relative z-10 min-h-screen flex items-center justify-center px-4 py-6 pt-8">
-                <div className="w-full max-w-4xl">
-                    <CodeEditor
-                        code={code}
-                        setCode={setCode}
-                        onStartVisualization={handleStartVisualization}
-                        autoGenerateInput={autoGenerateInput}
-                        setAutoGenerateInput={setAutoGenerateInput}
-                        isRunning={isRunning}
-                        currentLine={null}
-                        error={error}
-                        isVisualizationActive={false}
-                        hasInputsRequired={hasInputsRequired}
-                    />
+                    {/* Wave separator with text flowing along the curve */}
+                    <div className="absolute bottom-0 left-0 right-0 transform translate-y-[1px] z-10">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320" className="w-full h-auto block" preserveAspectRatio="none">
+                            {/* Define the wave path for text to follow */}
+                            <defs>
+                                <path
+                                    id="wavePath"
+                                    d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,138.7C672,149,768,203,864,202.7C960,203,1056,149,1152,138.7C1248,128,1344,160,1392,176L1440,192"
+                                    fill="none"
+                                />
+                            </defs>
+
+                            {/* Wave fill */}
+                            <path
+                                fill="#F9FAFB"
+                                fillOpacity="1"
+                                d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,138.7C672,149,768,203,864,202.7C960,203,1056,149,1152,138.7C1248,128,1344,160,1392,176L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+                            />
+
+                            {/* Text flowing along the wave path - Single strip with repeated content for seamless loop */}
+                            <text className="wave-path-text" dy="-5">
+                                <textPath href="#wavePath" startOffset="100%">
+                                    ✦ Visualize your code ✦ See code come alive ✦ Learn how code thinks ✦ No more blind coding ✦ Clarity over memorization ✦ Understand the "why" ✦ Concepts made visible ✦ Beyond the result ✦ Where code makes sense ✦ Visualize your code ✦ See code come alive ✦ Learn how code thinks ✦ No more blind coding ✦ Clarity over memorization ✦ Understand the "why" ✦ Concepts made visible ✦ Beyond the result ✦ Where code makes sense ✦ Visualize your code ✦ See code come alive ✦ Learn how code thinks ✦ No more blind coding ✦ Clarity over memorization ✦ Understand the "why" ✦ Concepts made visible ✦ Beyond the result ✦ Where code makes sense ✦
+                                    <animate
+                                        attributeName="startOffset"
+                                        from="100%"
+                                        to="-200%"
+                                        dur="45s"
+                                        repeatCount="indefinite"
+                                    />
+                                </textPath>
+                            </text>
+                        </svg>
+                    </div>
                 </div>
-            </main>
+
+                {/* Main Content - Editor centered and prominent */}
+                <main className="relative z-10 min-h-screen flex items-center justify-center px-4">
+                    <div className="w-full max-w-4xl">
+                        <CodeEditor
+                            code={code}
+                            setCode={setCode}
+                            onStartVisualization={handleStartVisualization}
+                            autoGenerateInput={autoGenerateInput}
+                            setAutoGenerateInput={setAutoGenerateInput}
+                            isRunning={isRunning}
+                            currentLine={null}
+                            error={error}
+                            isVisualizationActive={false}
+                            hasInputsRequired={hasInputsRequired}
+                            isMobile={false}
+                        />
+                    </div>
+                </main>
+            </div>
 
             {/* Input Modal */}
             <InputModal
