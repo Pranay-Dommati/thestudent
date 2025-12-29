@@ -455,49 +455,48 @@ function CodeVisualizerPage() {
                     </div>
                 </div>
                 
-                {/* Mobile Editor Card - Floating above gradient */}
-                <div className="flex-1 flex flex-col px-4 -mt-4 relative z-10 pb-4">
-                    <div className="bg-white rounded-2xl flex-1 flex flex-col shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
-                        {/* Editor Header */}
-                        <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100">
-                            <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                                    <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M14.25.18l.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05z" />
-                                    </svg>
-                                </div>
-                                <span className="text-slate-700 font-semibold text-sm">Python Editor</span>
+                {/* Mobile Editor - Clean, no card look */}
+                <div className="flex-1 flex flex-col bg-white -mt-3 rounded-t-2xl relative z-10">
+                    {/* Simple Editor Header */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
+                                <svg className="w-4 h-4 text-white" viewBox="0 0 256 255" fill="currentColor">
+                                    <path d="M126.916.072c-64.832 0-60.784 28.115-60.784 28.115l.072 29.128h61.868v8.745H41.631S.145 61.355.145 126.77c0 65.417 36.21 63.097 36.21 63.097h21.61v-30.356s-1.165-36.21 35.632-36.21h61.362s34.475.557 34.475-33.319V33.97S194.67.072 126.916.072zM92.802 19.66a11.12 11.12 0 0 1 11.13 11.13 11.12 11.12 0 0 1-11.13 11.13 11.12 11.12 0 0 1-11.13-11.13 11.12 11.12 0 0 1 11.13-11.13z"/>
+                                    <path d="M128.757 254.126c64.832 0 60.784-28.115 60.784-28.115l-.072-29.127H127.6v-8.745h86.441s41.486 4.705 41.486-60.712c0-65.416-36.21-63.096-36.21-63.096h-21.61v30.355s1.165 36.21-35.632 36.21h-61.362s-34.475-.557-34.475 33.32v56.013s-5.235 33.897 62.518 33.897zm34.114-19.586a11.12 11.12 0 0 1-11.13-11.13 11.12 11.12 0 0 1 11.13-11.131 11.12 11.12 0 0 1 11.13 11.13 11.12 11.12 0 0 1-11.13 11.13z"/>
+                                </svg>
                             </div>
-                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-100">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                <span className="text-xs font-medium text-emerald-700">Ready</span>
-                            </div>
+                            <span className="text-slate-700 font-semibold text-sm">Python Editor</span>
                         </div>
-                        
-                        <CodeEditor
-                            code={code}
-                            setCode={setCode}
-                            onStartVisualization={handleStartVisualization}
-                            autoGenerateInput={autoGenerateInput}
-                            setAutoGenerateInput={setAutoGenerateInput}
-                            isRunning={isRunning}
-                            currentLine={null}
-                            error={error}
-                            isVisualizationActive={false}
-                            hasInputsRequired={hasInputsRequired}
-                            isMobile={true}
-                        />
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <span className="text-xs font-medium text-emerald-600">Ready</span>
+                        </div>
                     </div>
+                    
+                    <CodeEditor
+                        code={code}
+                        setCode={setCode}
+                        onStartVisualization={handleStartVisualization}
+                        autoGenerateInput={autoGenerateInput}
+                        setAutoGenerateInput={setAutoGenerateInput}
+                        isRunning={isRunning}
+                        currentLine={null}
+                        error={error}
+                        isVisualizationActive={false}
+                        hasInputsRequired={hasInputsRequired}
+                        isMobile={true}
+                    />
                 </div>
                 
-                {/* Mobile Footer - Minimal */}
-                <div className="bg-white border-t border-slate-100 py-4 px-4">
+                {/* Mobile Footer - Minimal with spacing */}
+                <div className="bg-slate-50 py-5 px-4 mt-auto">
                     <div className="flex items-center justify-center gap-4 text-xs text-slate-500">
-                        <Link to="/feedback" className="hover:text-indigo-600 transition-colors">Feedback</Link>
+                        <Link to="/feedback" className="hover:text-blue-600 transition-colors">Feedback</Link>
                         <span className="text-slate-300">•</span>
-                        <Link to="/terms-and-conditions" className="hover:text-indigo-600 transition-colors">Terms</Link>
+                        <Link to="/terms-and-conditions" className="hover:text-blue-600 transition-colors">Terms</Link>
                         <span className="text-slate-300">•</span>
-                        <Link to="/privacy-policy" className="hover:text-indigo-600 transition-colors">Privacy</Link>
+                        <Link to="/privacy-policy" className="hover:text-blue-600 transition-colors">Privacy</Link>
                     </div>
                     <p className="text-center text-xs text-slate-400 mt-2">© 2025 EasyLearnova</p>
                 </div>

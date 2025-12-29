@@ -34,7 +34,7 @@ const CodeEditor = ({
         return (
             <div className="flex flex-col flex-1">
                 {/* Mobile Code Area */}
-                <div className="flex flex-1 min-h-[240px] bg-slate-50">
+                <div className="flex flex-1 min-h-[200px] max-h-[340px] bg-white">
                     {/* Line Numbers */}
                     <div
                         ref={lineNumbersRef}
