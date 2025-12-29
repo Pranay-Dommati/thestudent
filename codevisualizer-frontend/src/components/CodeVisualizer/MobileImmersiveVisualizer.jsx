@@ -209,92 +209,99 @@ const MobileImmersiveVisualizer = ({
                             }
 
                             return (
-                                <div
-                                    key={idx}
-                                    className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-[fadeSlideIn_0.3s_ease-out]"
-                                    style={{ animationFillMode: 'both', animationDelay: `${(idx % 6) * 50}ms` }}
-                                >
-                                    {/* Header */}
-                                    <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
-                                                Line {step.lineNumber || step.line_no || step.line}
-                                            </span>
-                                            <span className="text-xs text-slate-400">
-                                                Step {idx + 1}
-                                            </span>
-                                        </div>
-                                    </div>
+                                <div key={idx}>
+                                    {/* Horizontal line separator between cards */}
+                                    {idx > 0 && (
+                                        <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent my-3" />
+                                    )}
 
-                                    {/* Code */}
-                                    <div className="px-3 py-2 bg-white border-b border-slate-100">
-                                        <div className="font-mono text-sm text-slate-800 whitespace-pre overflow-x-auto">
-                                            {highlightSyntax(step.code)}
+                                    {/* Step Card */}
+                                    <div
+                                        className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-[fadeSlideIn_0.3s_ease-out]"
+                                        style={{ animationFillMode: 'both', animationDelay: `${(idx % 6) * 50}ms` }}
+                                    >
+                                        {/* Header */}
+                                        <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                                            <div className="flex items-center gap-2">
+                                                <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
+                                                    Line {step.lineNumber || step.line_no || step.line}
+                                                </span>
+                                                <span className="text-xs text-slate-400">
+                                                    Step {idx + 1}
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* Explanation */}
-                                    {step.explanation && (
-                                        <div className="p-3 bg-gradient-to-br from-indigo-50/50 to-purple-50/30">
-                                            <div className="flex items-start gap-2">
-                                                <Sparkles className="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" />
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm text-slate-700 leading-relaxed">
-                                                        {explanationText}
-                                                    </p>
-                                                    {dryRunLines.length > 0 && renderDryRun(dryRunLines)}
+                                        {/* Code */}
+                                        <div className="px-3 py-2 bg-white border-b border-slate-100">
+                                            <div className="font-mono text-sm text-slate-800 whitespace-pre overflow-x-auto">
+                                                {highlightSyntax(step.code)}
+                                            </div>
+                                        </div>
+
+                                        {/* Explanation */}
+                                        {step.explanation && (
+                                            <div className="p-3 bg-gradient-to-br from-indigo-50/50 to-purple-50/30">
+                                                <div className="flex items-start gap-2">
+                                                    <Sparkles className="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm text-slate-700 leading-relaxed">
+                                                            {explanationText}
+                                                        </p>
+                                                        {dryRunLines.length > 0 && renderDryRun(dryRunLines)}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
 
-                                    {/* Generating Placeholder */}
-                                    {!step.explanation && (
-                                        <div className="p-3 bg-slate-50">
-                                            <div className="flex items-center gap-2 text-slate-500">
-                                                <div className="w-4 h-4 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin" />
-                                                <span className="text-xs">Generating...</span>
+                                        {/* Generating Placeholder */}
+                                        {!step.explanation && (
+                                            <div className="p-3 bg-slate-50">
+                                                <div className="flex items-center gap-2 text-slate-500">
+                                                    <div className="w-4 h-4 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin" />
+                                                    <span className="text-xs">Generating...</span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
 
-                                    {/* Variables */}
-                                    {step.variables && Object.keys(step.variables).length > 0 && (
-                                        <div className="px-3 py-2 border-t border-slate-100">
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {Object.entries(step.variables).map(([name, data]) => {
-                                                    const value = data.value !== undefined
-                                                        ? (typeof data.value === 'object' ? JSON.stringify(data.value) : String(data.value))
-                                                        : 'undefined';
-                                                    const isChanged = step.changedVars?.includes(name);
+                                        {/* Variables */}
+                                        {step.variables && Object.keys(step.variables).length > 0 && (
+                                            <div className="px-3 py-2 border-t border-slate-100">
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {Object.entries(step.variables).map(([name, data]) => {
+                                                        const value = data.value !== undefined
+                                                            ? (typeof data.value === 'object' ? JSON.stringify(data.value) : String(data.value))
+                                                            : 'undefined';
+                                                        const isChanged = step.changedVars?.includes(name);
 
-                                                    return (
-                                                        <span
-                                                            key={name}
-                                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono ${isChanged
-                                                                ? 'bg-indigo-100 text-indigo-700'
-                                                                : 'bg-slate-100 text-slate-600'
-                                                                }`}
-                                                        >
-                                                            <span className="font-semibold">{name}</span>
-                                                            <span className="text-slate-400">=</span>
-                                                            <span>{value.length > 15 ? value.slice(0, 15) + '...' : value}</span>
-                                                        </span>
-                                                    );
-                                                })}
+                                                        return (
+                                                            <span
+                                                                key={name}
+                                                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono ${isChanged
+                                                                    ? 'bg-indigo-100 text-indigo-700'
+                                                                    : 'bg-slate-100 text-slate-600'
+                                                                    }`}
+                                                            >
+                                                                <span className="font-semibold">{name}</span>
+                                                                <span className="text-slate-400">=</span>
+                                                                <span>{value.length > 15 ? value.slice(0, 15) + '...' : value}</span>
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
 
-                                    {/* Output */}
-                                    {step.output && (
-                                        <div className="px-3 py-2 border-t border-slate-100">
-                                            <div className="bg-slate-900 rounded-lg p-2 font-mono text-xs text-emerald-400">
-                                                <span className="text-slate-500 mr-2">$</span>
-                                                {step.output}
+                                        {/* Output */}
+                                        {step.output && (
+                                            <div className="px-3 py-2 border-t border-slate-100">
+                                                <div className="bg-slate-900 rounded-lg p-2 font-mono text-xs text-emerald-400">
+                                                    <span className="text-slate-500 mr-2">$</span>
+                                                    {step.output}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}
