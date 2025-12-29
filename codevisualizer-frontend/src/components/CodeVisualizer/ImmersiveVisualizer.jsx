@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Sparkles } from 'lucide-react';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
+import MobileImmersiveVisualizer from './MobileImmersiveVisualizer';
 
 const BATCH_SIZE = 6; // Number of steps to show/generate at a time
 
@@ -524,7 +525,37 @@ const ImmersiveVisualizer = ({
         );
     };
 
+    // Mobile detection
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     if (!isOpen) return null;
+
+    // Render mobile component on small screens
+    if (isMobile) {
+        return (
+            <MobileImmersiveVisualizer
+                isOpen={isOpen}
+                onClose={onClose}
+                visibleSteps={visibleSteps}
+                totalSteps={steps.length}
+                code={code}
+                codeLines={codeLines}
+                isLoading={isLoading}
+                loadingPhase={loadingPhase}
+                isGenerating={isGenerating}
+                isStreaming={isStreaming}
+                onLoadMore={loadMoreExplanations}
+                isLoadingMore={isLoadingMore}
+            />
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-50 bg-[#F8FAFC] flex flex-col overflow-hidden font-sans">
