@@ -119,8 +119,104 @@ const FeedbackPage = () => {
 
     return (
         <>
+            {/* MOBILE: App-like design with gradient header */}
+            <div className="lg:hidden min-h-screen flex flex-col bg-slate-50 overflow-x-hidden">
+                {/* Mobile Gradient Header */}
+                <div className="bg-gradient-to-br from-indigo-500 via-blue-500 to-blue-600 relative">
+                    {/* Pattern overlay */}
+                    <div className="absolute inset-0 opacity-20">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
+                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-300 rounded-full blur-2xl transform -translate-x-1/2 translate-y-1/2" />
+                    </div>
 
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden pt-20">
+                    {/* Header Content */}
+                    <div className="relative px-4 pb-8 pt-4">
+                        <Link
+                            to="/"
+                            className="inline-flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-medium mb-4 transition-colors"
+                        >
+                            <IoArrowBack size={18} />
+                            Back
+                        </Link>
+                        <h1 className="text-2xl font-bold text-white mb-2">
+                            We'd Love Your Feedback
+                        </h1>
+                        <p className="text-white/70 text-sm">
+                            Help us improve your experience
+                        </p>
+                    </div>
+                </div>
+
+                {/* Mobile Form Card */}
+                <div className="flex-1 flex flex-col bg-white -mt-3 rounded-t-2xl relative z-10">
+                    <div className="p-5 pb-6">
+                        {error && (
+                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+                                <p className="text-red-600 text-sm font-medium">{error}</p>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="space-y-5">
+                            <div>
+                                <label className="flex items-center text-slate-700 font-semibold text-sm mb-2">
+                                    <FaUser className="mr-2 text-blue-500" size={14} />
+                                    Your Name
+                                </label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter your full name"
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm bg-slate-50"
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="flex items-center text-slate-700 font-semibold text-sm mb-2">
+                                    <FaCommentDots className="mr-2 text-blue-500" size={14} />
+                                    Your Feedback
+                                </label>
+                                <textarea
+                                    name="message"
+                                    value={formData.message}
+                                    onChange={handleInputChange}
+                                    placeholder="Tell us about your experience, suggestions, or any issues..."
+                                    rows="5"
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm bg-slate-50 resize-none"
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isSubmitting || !formData.name.trim() || !formData.message.trim()}
+                                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3.5 px-6 rounded-xl font-semibold text-base hover:from-blue-600 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                        Submitting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <FaPaperPlane size={14} />
+                                        Submit Feedback
+                                    </>
+                                )}
+                            </button>
+                        </form>
+
+                        <p className="text-slate-400 text-xs text-center mt-5">
+                            Your feedback is reviewed by our team to improve the platform.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* DESKTOP: Original gradient design */}
+            <div className="hidden lg:block min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden pt-20">
                 {/* Background Elements */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-gradient-to-br from-blue-300/20 to-indigo-400/20 rounded-full blur-xl"></div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { FaArrowLeft, FaShieldAlt, FaUserShield, FaLock, FaServer, FaUsers, FaGavel, FaChevronUp } from 'react-icons/fa';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -7,25 +7,11 @@ const PrivacyPolicy = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const returnTo = location.state?.returnTo || '/';
-    const [showScrollTop, setShowScrollTop] = useState(false);
 
-    // Handle scroll to show/hide the scroll top button
-    React.useEffect(() => {
-        const handleScroll = () => {
-            setShowScrollTop(window.scrollY > 300);
-        };
-
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
     const handleBack = () => {
         // Ensure navigation works by checking if returnTo exists
         console.log("Navigating back to:", returnTo);
         navigate(returnTo);
-    };
-
-    const scrollToTop = () => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
     return (
         <div className="min-h-screen bg-slate-50">
@@ -178,27 +164,11 @@ const PrivacyPolicy = () => {
                             Contact us at <strong className="text-slate-900">easylearnova@gmail.com</strong>
                         </p>
                         <p className="text-xs md:text-sm text-slate-400">
-                            Student Hub Inc. Hyderabad, Telangana, India
+                            EasyLearnova, Hyderabad, Telangana, India
                         </p>
                     </section>
                 </motion.div>
             </div>
-
-            {/* Floating scroll to top button */}
-            <motion.button
-                className="fixed bottom-6 right-6 bg-slate-900 text-white p-3 rounded-full shadow-lg z-50 hover:bg-slate-800 transition-colors"
-                onClick={scrollToTop}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{
-                    opacity: showScrollTop ? 1 : 0,
-                    scale: showScrollTop ? 1 : 0.8,
-                    pointerEvents: showScrollTop ? 'auto' : 'none'
-                }}
-                transition={{ duration: 0.2 }}
-                aria-label="Scroll to top"
-            >
-                <FaChevronUp size={20} />
-            </motion.button>
         </div>
     );
 };

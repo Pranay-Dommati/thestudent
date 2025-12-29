@@ -572,11 +572,11 @@ const ImmersiveVisualizer = ({
             </header>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-row-reverse overflow-hidden">
-                {/* Left Side - Code Panel (Fixed) */}
+            <div className="flex-1 flex flex-col lg:flex-row-reverse overflow-hidden">
+                {/* Left Side - Code Panel (Fixed) - Hidden on Mobile */}
                 <div
                     style={{ width: `${sidebarWidth}px` }}
-                    className="flex-shrink-0 bg-white border-l border-slate-200 flex flex-col relative shadow-sm z-10"
+                    className="hidden lg:flex flex-shrink-0 bg-white border-l border-slate-200 flex-col relative shadow-sm z-10"
                 >
                     {/* Drag Handle */}
                     <div
