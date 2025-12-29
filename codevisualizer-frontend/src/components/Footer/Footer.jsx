@@ -60,7 +60,7 @@ const Footer = () => {
                 {/* Bottom Row: Copyright and Slogan */}
                 <div className="border-t border-slate-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-500">
                     <p>
-                        © {new Date().getFullYear()} CodeVisualizer. All rights reserved.
+                        © {new Date().getFullYear()} EasyLearnova. All rights reserved.
                     </p>
                     <p>
                         Empowering learners worldwide.

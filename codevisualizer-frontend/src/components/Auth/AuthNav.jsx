@@ -8,7 +8,7 @@ const AuthNav = () => {
                 <div className="flex items-center justify-between h-16">
                     {/* Logo Section */}
                     <Link to="/" className="flex items-center group">
-                        <span className="font-bold text-2xl text-slate-900 tracking-tight transition-opacity group-hover:opacity-80">
+                        <span className="font-bold text-xl md:text-2xl text-slate-900 tracking-tight transition-opacity group-hover:opacity-80">
                             Code<span className="text-blue-600">Visualizer</span>
                         </span>
                     </Link>
