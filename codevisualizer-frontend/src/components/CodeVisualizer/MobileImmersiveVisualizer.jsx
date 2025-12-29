@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Sparkles, ChevronLeft, Play } from 'lucide-react';
 
 // CSS animation for smooth card appearance
@@ -17,7 +17,7 @@ const cardAnimationStyles = `
 
 /**
  * MobileImmersiveVisualizer - Dedicated mobile component for code visualization
- * Uses vertical scrollable timeline with professional mobile UX
+ * Uses focus scroll effect - centered card is highlighted, others are blurred
  */
 const MobileImmersiveVisualizer = ({
     isOpen,
@@ -34,7 +34,48 @@ const MobileImmersiveVisualizer = ({
     isLoadingMore = false,
 }) => {
     const contentRef = useRef(null);
+    const cardRefs = useRef([]);
+    const [focusedIndex, setFocusedIndex] = useState(0);
+    const [focusModeEnabled, setFocusModeEnabled] = useState(false); // Default: normal scroll
     const hasMoreSteps = visibleSteps.length < totalSteps;
+
+    // Calculate which card is most centered in the viewport
+    const updateFocusedCard = useCallback(() => {
+        if (!contentRef.current || cardRefs.current.length === 0) return;
+
+        const container = contentRef.current;
+        const containerRect = container.getBoundingClientRect();
+        const containerCenter = containerRect.top + containerRect.height / 2;
+
+        let closestIndex = 0;
+        let closestDistance = Infinity;
+
+        cardRefs.current.forEach((card, index) => {
+            if (!card) return;
+            const cardRect = card.getBoundingClientRect();
+            const cardCenter = cardRect.top + cardRect.height / 2;
+            const distance = Math.abs(containerCenter - cardCenter);
+
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestIndex = index;
+            }
+        });
+
+        setFocusedIndex(closestIndex);
+    }, []);
+
+    // Add scroll listener
+    useEffect(() => {
+        const container = contentRef.current;
+        if (!container) return;
+
+        container.addEventListener('scroll', updateFocusedCard);
+        // Initial calculation
+        updateFocusedCard();
+
+        return () => container.removeEventListener('scroll', updateFocusedCard);
+    }, [updateFocusedCard, visibleSteps.length]);
 
     // Syntax highlighting for code
     const highlightSyntax = (codeLine) => {
@@ -179,15 +220,64 @@ const MobileImmersiveVisualizer = ({
                 </div>
             )}
 
-            {/* Main Content - Vertical Scrollable */}
+            {/* Fixed Focus Button (Only when ON) - Placed outside scroll container */}
+            {focusModeEnabled && (
+                <div className="fixed top-16 right-4 z-50 animate-[fadeSlideIn_0.3s_ease-out]">
+                    <button
+                        onClick={() => setFocusModeEnabled(false)}
+                        className="bg-indigo-50/95 backdrop-blur-sm text-indigo-700 border border-indigo-200/60 px-3 py-1.5 rounded-full text-xs font-semibold shadow-md flex items-center justify-center gap-1.5 transition-all active:scale-[0.95] hover:bg-indigo-100"
+                    >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-indigo-600">
+                            <circle cx="12" cy="12" r="10" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        Exit Focus Mode
+                    </button>
+                </div>
+            )}
+
+            {/* Main Content - Scroll Container */}
             {!isLoading && visibleSteps.length > 0 && (
                 <main
                     ref={contentRef}
-                    className={`flex-1 overflow-y-auto px-3 py-3 ${hasMoreSteps ? 'pb-24' : ''}`}
+                    className={`flex-1 overflow-y-auto px-4 ${focusModeEnabled ? 'scroll-smooth' : 'py-0'} ${hasMoreSteps ? 'pb-24' : ''}`}
+                    style={{
+                        ...(focusModeEnabled ? { scrollSnapType: 'y proximity' } : {}),
+                        overflowAnchor: 'none'
+                    }}
                 >
-                    {/* Step Cards */}
-                    <div className="space-y-3">
+                    {/* Controls & Spacing */}
+                    {/* Controls & Spacing */}
+                    {/* Inline Focus Button (Only when OFF) */}
+                    {!focusModeEnabled && (
+                        <div className="py-4 animate-[fadeSlideIn_0.3s_ease-out]">
+                            <button
+                                onClick={() => {
+                                    setFocusModeEnabled(true);
+                                    if (contentRef.current) {
+                                        contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }
+                                    setFocusedIndex(0);
+                                }}
+                                className="w-full bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 px-4 py-3 rounded-xl text-sm flex items-center justify-center gap-2 font-semibold shadow-sm transition-all active:scale-[0.98]"
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <circle cx="12" cy="12" r="3" />
+                                </svg>
+                                Enable Focus Mode
+                            </button>
+                        </div>
+                    )}
 
+                    {/* Top padding to allow first card to be centered (Focus Mode only) */}
+                    <div
+                        className={`transition-all ease-in-out ${focusModeEnabled ? 'duration-500' : 'duration-[1500ms]'}`}
+                        style={{ height: focusModeEnabled ? '30vh' : '0px' }}
+                    />
+
+                    {/* Step Cards Container */}
+                    <div className={focusModeEnabled ? 'space-y-2' : 'space-y-3'}>
                         {/* Step Cards */}
                         {visibleSteps.map((step, idx) => {
                             const isLatest = idx === visibleSteps.length - 1;
@@ -208,8 +298,25 @@ const MobileImmersiveVisualizer = ({
                                 dryRunLines = step.dry_run;
                             }
 
+                            // Calculate focus level for Focus Mode (0 = focused, 1+ = distance from focused)
+                            const distanceFromFocus = Math.abs(idx - focusedIndex);
+                            const isFocused = distanceFromFocus === 0;
+                            const isNearFocus = distanceFromFocus === 1;
+
+                            // Style based on Focus Mode
+                            const cardWrapperStyle = focusModeEnabled ? {
+                                transform: isFocused ? 'scale(1)' : isNearFocus ? 'scale(0.97)' : 'scale(0.94)',
+                                opacity: isFocused ? 1 : isNearFocus ? 0.7 : 0.4,
+                                filter: isFocused ? 'blur(0px)' : isNearFocus ? 'blur(1px)' : 'blur(2px)',
+                            } : {};
+
                             return (
-                                <div key={idx}>
+                                <div
+                                    key={idx}
+                                    ref={el => cardRefs.current[idx] = el}
+                                    className={`transition-all ease-in-out ${focusModeEnabled ? 'duration-500' : 'duration-[1500ms]'}`}
+                                    style={cardWrapperStyle}
+                                >
                                     {/* Horizontal line separator between cards */}
                                     {idx > 0 && (
                                         <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent my-3" />
@@ -217,7 +324,7 @@ const MobileImmersiveVisualizer = ({
 
                                     {/* Step Card */}
                                     <div
-                                        className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-[fadeSlideIn_0.3s_ease-out]"
+                                        className={`bg-white rounded-xl shadow-sm border overflow-hidden animate-[fadeSlideIn_0.3s_ease-out] ${focusModeEnabled && isFocused ? 'border-indigo-200 shadow-md ring-2 ring-indigo-100' : 'border-slate-100'}`}
                                         style={{ animationFillMode: 'both', animationDelay: `${(idx % 6) * 50}ms` }}
                                     >
                                         {/* Header */}
@@ -345,6 +452,12 @@ const MobileImmersiveVisualizer = ({
                             </div>
                         )}
                     </div>
+
+                    {/* Bottom padding to allow last card to be centered (Focus Mode only) */}
+                    <div
+                        className={`transition-all ease-in-out ${focusModeEnabled ? 'duration-500' : 'duration-[1500ms]'}`}
+                        style={{ height: focusModeEnabled ? '30vh' : '0px' }}
+                    />
                 </main>
             )}
 
