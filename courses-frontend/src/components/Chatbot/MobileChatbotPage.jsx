@@ -16,8 +16,8 @@ import ShareCourseButton from '../../components/Shared/ShareCourseButton.jsx';
 
 // Custom CSS - added for DeepSeek-like UI and welcome card fix
 import './mobileChatStyles.css';
-import './welcomeCardFix.css';
-import NewWelcomeCard from './NewWelcomeCard';
+
+
 
 // Use relative API paths; dev proxy routes to backend
 import apiAxios from '../../utils/axios';
@@ -1816,13 +1816,7 @@ const MobileChatbotPage = () => {
                 </div>
             </div>
 
-            {/* Welcome Message Modal for First-time Users - Using New Component */}
-            <NewWelcomeCard
-                showWelcomeMessage={showWelcomeMessage}
-                setShowWelcomeMessage={setShowWelcomeMessage}
-                setMessage={setMessage}
-                handleSendMessage={handleSendMessage}
-            />
+
             {/* Old welcome card code removed and replaced with component above */}
             {false && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 welcome-message-modal" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
