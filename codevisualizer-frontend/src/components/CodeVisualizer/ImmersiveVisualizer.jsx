@@ -28,13 +28,6 @@ const ImmersiveVisualizer = ({
     const [visualizationMode, setVisualizationMode] = useState('timeline');
     const [showEnterpriseModal, setShowEnterpriseModal] = useState(false);
 
-    // Show modal when switching to enterprise mode
-    useEffect(() => {
-        if (visualizationMode === 'enterprise') {
-            setShowEnterpriseModal(true);
-        }
-    }, [visualizationMode]);
-
     // Cinematic step reveal: queue incoming steps and animate one-by-one
     const [pendingSteps, setPendingSteps] = useState([]);
     const [isStepAnimating, setIsStepAnimating] = useState(false);
@@ -599,7 +592,13 @@ const ImmersiveVisualizer = ({
                         Timeline
                     </button>
                     <button
-                        onClick={() => setVisualizationMode('enterprise')}
+                        onClick={() => {
+                            if (window.location.hostname === 'codevisualizer.easylearnova.com') {
+                                setShowEnterpriseModal(true);
+                            } else {
+                                setVisualizationMode('enterprise');
+                            }
+                        }}
                         className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${visualizationMode === 'enterprise'
                             ? 'bg-indigo-600 text-white shadow-sm'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'

@@ -50,12 +50,7 @@ const MobileImmersiveVisualizer = ({
     const [showCodeSidebar, setShowCodeSidebar] = useState(false);
     const [showEnterpriseModal, setShowEnterpriseModal] = useState(false);
 
-    // Show modal when switching to visualize mode
-    useEffect(() => {
-        if (viewMode === 'visualize') {
-            setShowEnterpriseModal(true);
-        }
-    }, [viewMode]); // Default: normal scroll
+    // Default: normal scroll
     const hasMoreSteps = visibleSteps.length < totalSteps;
 
     // Calculate which card is most centered in the viewport
@@ -224,7 +219,13 @@ const MobileImmersiveVisualizer = ({
                         <button
                             className={`p-2 rounded-md transition-all duration-200 ${viewMode === 'visualize' ? 'bg-white shadow-sm text-indigo-600 scale-100' : 'text-slate-400 hover:text-slate-600 hover:bg-black/5 scale-95'}`}
                             title="Animation View"
-                            onClick={() => setViewMode('visualize')}
+                            onClick={() => {
+                                if (window.location.hostname === 'codevisualizer.easylearnova.com') {
+                                    setShowEnterpriseModal(true);
+                                } else {
+                                    setViewMode('visualize');
+                                }
+                            }}
                         >
                             <Play className="w-4 h-4 fill-current" />
                         </button>
