@@ -60,11 +60,11 @@ const Navbar = ({ initialStyle = "light" }) => {
     const mainTextColor = isTransparent ? 'text-white' : 'text-slate-800';
     const logoColor = isTransparent ? 'text-white' : 'text-slate-900';
     const logoAccentColor = isTransparent ? 'text-blue-200' : 'text-blue-600';
-    
-    const loginButtonClass = isTransparent 
-        ? 'text-white hover:bg-white/10 border border-transparent hover:border-white/20' 
+
+    const loginButtonClass = isTransparent
+        ? 'text-white hover:bg-white/10 border border-transparent hover:border-white/20'
         : 'text-slate-600 hover:bg-slate-50';
-        
+
     const signUpButtonClass = isTransparent
         ? 'bg-white text-blue-600 hover:bg-blue-50 shadow-lg shadow-blue-900/20 border border-transparent'
         : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow-md';
@@ -88,19 +88,22 @@ const Navbar = ({ initialStyle = "light" }) => {
                                 <div className="h-10 w-24 bg-slate-100 rounded-full animate-pulse"></div>
                             ) : isLoggedIn ? (
                                 <div className="flex items-center space-x-4">
-                                    <Link to="/profile">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isTransparent ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                            }`}>
-                                            <FaUserCircle size={24} />
-                                        </div>
-                                    </Link>
-                                    {location.pathname === '/profile' && (
+                                    {location.pathname === '/profile' ? (
                                         <button
                                             onClick={handleLogout}
-                                            className={`${isTransparent ? 'text-white/80 hover:text-white' : 'text-slate-500 hover:text-slate-800'} font-medium transition-colors`}
+                                            className={`px-5 py-2 rounded-full font-medium transition-all ${isTransparent ? 'bg-white/10 text-white hover:bg-white/20 border border-white/20' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                                         >
-                                            Logout
+                                            <span className="flex items-center gap-2">
+                                                <FaSignOutAlt size={16} />
+                                                Logout
+                                            </span>
                                         </button>
+                                    ) : (
+                                        <Link to="/profile">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isTransparent ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                                                <FaUserCircle size={24} />
+                                            </div>
+                                        </Link>
                                     )}
                                 </div>
                             ) : (
@@ -124,12 +127,22 @@ const Navbar = ({ initialStyle = "light" }) => {
                         {/* Mobile Toggle */}
                         <div className="lg:hidden flex items-center">
                             {isLoggedIn ? (
-                                <button
-                                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                                    className={`p-2 rounded-full ${isTransparent ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
-                                >
-                                    <FaUserCircle size={24} className={isTransparent ? 'text-white' : 'text-slate-700'} />
-                                </button>
+                                location.pathname === '/profile' ? (
+                                    <button
+                                        onClick={handleLogout}
+                                        className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-1.5 ${isTransparent ? 'bg-white/10 text-white border border-white/20' : 'bg-slate-100 text-slate-700'}`}
+                                    >
+                                        <FaSignOutAlt size={14} />
+                                        Sign Out
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                                        className={`p-2 rounded-full ${isTransparent ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}
+                                    >
+                                        <FaUserCircle size={24} className={isTransparent ? 'text-white' : 'text-slate-700'} />
+                                    </button>
+                                )
                             ) : (
                                 <Link
                                     to="/auth?mode=login"
